@@ -54,11 +54,13 @@ test("a new design stays editable after reload", async ({ page }) => {
   await page.goto("/o/northline/design/files");
   await page.locator("#main").getByRole("button", { name: "New file", exact: true }).click();
   await expect(page).toHaveURL(/\/design\/files\/.+/);
-  const before = await page.getByRole("button", { name: /^rect/ }).count();
-  await page.getByRole("button", { name: "Add rectangle" }).click();
-  await expect(page.getByRole("button", { name: /^rect/ })).toHaveCount(before + 1);
+  const layers = page.locator("#main .editor aside");
+  const before = await layers.getByRole("button", { name: /^rect/ }).count();
+  await page.locator("#main").getByRole("button", { name: "Add rectangle" }).click();
+  await expect(layers.getByRole("button", { name: /^rect/ })).toHaveCount(before + 1);
+  await page.getByRole("status").filter({ hasText: /Saved|layer/ }).first().waitFor({ state: "visible", timeout: 5000 }).catch(() => undefined);
   await page.reload();
-  await expect(page.getByRole("button", { name: /^rect/ })).toHaveCount(before + 1);
+  await expect(layers.getByRole("button", { name: /^rect/ })).toHaveCount(before + 1);
 });
 
 test("an AI employee appears in the directory and on the organization chart", async ({ page }) => {
