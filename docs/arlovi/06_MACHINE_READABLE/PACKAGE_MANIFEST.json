@@ -1,0 +1,32 @@
+{
+  "name": "Arlovi Complete Frontend Execution Package",
+  "version": "1.0",
+  "product_status": "unimplemented; frontend engineering handoff only",
+  "scope": "35 app domains, 316 screens, full interactive frontend; no backend",
+  "counts": {
+    "applications": 35,
+    "screens": 316,
+    "tabs": 1323,
+    "overlays": 956,
+    "primary_actions": 1328,
+    "workflows": 20,
+    "shared_components": 21
+  },
+  "workstream_screens": {
+    "WS1": 34,
+    "WS2": 59,
+    "WS3": 72,
+    "WS4": 49,
+    "WS5": 56,
+    "WS6": 46
+  },
+  "source_files": [
+    "07_ORIGINAL_SPECIFICATIONS/Arlovi_Complete_UX_Screen_Registry.json",
+    "07_ORIGINAL_SPECIFICATIONS/Arlovi_Complete_Platform_UX_Specification.md",
+    "07_ORIGINAL_SPECIFICATIONS/Arlovi_Full_Platform_Engineering_UX_Specification.docx"
+  ],
+  "additional_references": [
+    "02_PRODUCT_AND_UX/COMPETITOR_BENCHMARKS_AND_NATIVE_PARITY.md",
+    "03_ARCHITECTURE/FULL_SYSTEM_VISION_REFERENCE_NO_BACKEND_BUILD.md"
+  ]
+}

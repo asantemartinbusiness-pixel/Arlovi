@@ -1,0 +1,12 @@
+{
+  "screens": 316,
+  "tabs": 1323,
+  "overlays": 956,
+  "actions": 1328,
+  "workflows": 20,
+  "applications": 35,
+  "routeTest": "e2e/screens.spec.ts",
+  "workflowTest": "tests/unit/domain.test.ts",
+  "ledger": "balanced for Northline Atelier and Harbor Supply",
+  "providersVerifiedExternal": 0
+}

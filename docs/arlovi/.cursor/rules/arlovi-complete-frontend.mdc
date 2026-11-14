@@ -1,0 +1,13 @@
+---
+description: Governs all Arlovi frontend architecture, UI design, application implementation, tests and six-workstream execution
+alwaysApply: true
+---
+# Arlovi permanent Cursor rules
+- Read `docs/arlovi/01_CURSOR_PROMPTS/ARLOVI_MASTER_CURSOR_GROK_PROMPT.md`, `docs/arlovi/07_ORIGINAL_SPECIFICATIONS/Arlovi_Complete_UX_Screen_Registry.json`, and workstream briefs; follow their complete scope.
+- Never shrink scope to MVP or defer owned screens: all 35 application domains, 316 screen IDs, 1323 tabs, 956 overlays, 1328 named actions and 20 workflows are required.
+- Only frontend code in this project phase. Use browser-local IndexedDB for real CRUD/edit/undo/import/export/mission UX, type-safe ports for future backend. Never implement server APIs/auth/payment/email/AI orchestration, and never fabricate external verified success.
+- Make every displayed control meaningful; don't use generic cloned pages for specialist applications; no `demo`, `prototype`, `MVP`, `coming soon` as in-product labels.
+- Design system: Arlovi working name, Electric Cobalt + Papaya + Aqua, 60px header, 248px sidebar, 64px rail, 300–360px inspector, body 15–16px, 4px spacing, adaptive responsive shell, WCAG 2.2 AA and purposeful motion.
+- Respect strict route-to-screen registry matching, named tabs/actions/overlays, test evidence and cross-review. Do not claim completion without browser verification and independent QA.
+- Use typed canonical domain entities across native applications; preserve org identity, correct source context, undo and durable local state.
+- If ambiguity is routine, make an executive decision and record it; only escalate legally/financially irreversible authorization issues.
