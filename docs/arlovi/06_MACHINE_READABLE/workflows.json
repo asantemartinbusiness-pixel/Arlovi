@@ -1,0 +1,122 @@
+[
+  {
+    "id": "WF-01",
+    "name": "Company onboarding",
+    "steps": "Owner creates organization -> validates website or files -> optionally connects providers -> approves Company Brain profile -> assigns AI team -> configures authority -> creates first mission.",
+    "contracts": "Organization identity, source provenance, plan approvals, no unauthorized connector access."
+  },
+  {
+    "id": "WF-02",
+    "name": "Cross-department campaign",
+    "steps": "Chief of Staff researches commerce/finance -> Marketing and Creative produce plan/assets -> Finance checks margin -> owner approves -> tools publish -> receipts verify -> Insights reports.",
+    "contracts": "Spend reservation, publishing scopes, consent, asset rights, provider confirmation, rollback limitations."
+  },
+  {
+    "id": "WF-03",
+    "name": "Revenue decline investigation",
+    "steps": "Owner asks -> Finance reconciles actuals -> Commerce/Marketing/Sales compare drivers -> report separates fact/hypothesis -> plan with assumptions -> explicit change approvals.",
+    "contracts": "Source freshness, double-count prevention, attribution uncertainty."
+  },
+  {
+    "id": "WF-04",
+    "name": "Customer request to resolution",
+    "steps": "Request enters Service -> contact verified -> AI answers from approved KB or escalates -> order/booking/finance updates if authorized -> customer notified -> case closed with evidence.",
+    "contracts": "Identity, privacy, service SLA and no double-refund."
+  },
+  {
+    "id": "WF-05",
+    "name": "Sales-to-cash",
+    "steps": "Lead -> CRM qualify -> proposal -> quote approval -> customer acceptance -> project/order -> invoice -> bank reconciliation -> reporting.",
+    "contracts": "Canonical customer ID, accepted price version, financial posting and audit."
+  },
+  {
+    "id": "WF-06",
+    "name": "Hire-to-onboard",
+    "steps": "HR opens position -> candidate reviews -> approved offer -> employee record -> IT access request -> training/calendar -> payroll inputs -> manager signoff.",
+    "contracts": "Applicant retention, discrimination safeguards, identity and payroll approvals."
+  },
+  {
+    "id": "WF-07",
+    "name": "Design-to-publish",
+    "steps": "Creative brief -> Brand Intelligence -> editable Studio file -> human+AI reviews -> responsive/accessibility QA -> approved publish -> versioned live output.",
+    "contracts": "Editable structure, brand rules, asset licensing, provider confirmation."
+  },
+  {
+    "id": "WF-08",
+    "name": "Build-to-deploy",
+    "steps": "App brief -> data/roles architecture -> visual+code builder -> sandbox tests -> security/UX QA -> stage -> production approval -> monitor -> rollback if warranted.",
+    "contracts": "Environment isolation, no secret exposure, release gates."
+  },
+  {
+    "id": "WF-09",
+    "name": "Document-to-knowledge",
+    "steps": "Upload -> antivirus/validation -> extract -> classify -> canonical mapping -> discrepancy review -> approve fact -> scoped retrieval -> retention and correction.",
+    "contracts": "Prompt injection, GDPR/retention, source-to-fact traceability."
+  },
+  {
+    "id": "WF-10",
+    "name": "Booking-to-service",
+    "steps": "Customer selects service -> real inventory/staff available -> reserve slot -> payment/deposit -> confirm -> reminders -> check-in -> completion -> invoice/service history.",
+    "contracts": "Atomic slot holds, timezone, cancellation policy and receipts."
+  },
+  {
+    "id": "WF-11",
+    "name": "Replenishment-to-payment",
+    "steps": "Stock threshold -> forecast -> requisition -> policy approval -> PO -> supplier acknowledgment -> receipt/scan -> AP bill -> payment authorization -> reconciliation.",
+    "contracts": "Supplier identity, physical evidence, ledger consistency, spend cap."
+  },
+  {
+    "id": "WF-12",
+    "name": "Connector incident recovery",
+    "steps": "Health warning -> dedupe incident -> classify provider/internal -> safe retry or repair -> owner reconnect if required -> authoritative verification -> resume queued missions.",
+    "contracts": "Unknown side effects, no privilege escalation, auditable resolution."
+  },
+  {
+    "id": "WF-13",
+    "name": "AI workforce lifecycle",
+    "steps": "Create agent contract -> assign model/skill -> scoped data and actions -> evaluate scenarios -> owner activates -> mission assignments -> review metrics -> suspend/retire.",
+    "contracts": "Agent not self-authorizing, avoid unsafe model degradation."
+  },
+  {
+    "id": "WF-14",
+    "name": "Notification and approval",
+    "steps": "Event -> attention policy -> eligible recipients -> bundled notice -> inspect exact scope -> step-up where needed -> approve/deny -> mission update -> receipt.",
+    "contracts": "Read != resolved, organization isolation, delivery receipts."
+  },
+  {
+    "id": "WF-15",
+    "name": "Monthly executive reporting",
+    "steps": "Data freshness checks -> ledger/CRM/operations aggregation -> finance reconciliation -> AI insight drafting -> reviewer approval -> on-brand Docs/Present output -> authorized distribution.",
+    "contracts": "No fabricated statistics, recipients, version and audit controls."
+  },
+  {
+    "id": "WF-16",
+    "name": "External client collaboration",
+    "steps": "Project share grant -> portal invitation -> client authenticates -> accesses only scoped records -> comments/approves/pays -> native tasks and audit sync.",
+    "contracts": "No cross-client leakage or arbitrary sharing inheritance."
+  },
+  {
+    "id": "WF-17",
+    "name": "Multi-entity organization",
+    "steps": "Owner changes legal entity or brand -> UI scopes route, currency, locale and records -> AI context reset -> transactions remain within entity.",
+    "contracts": "Cross-tenant and cross-entity access cannot be assumed."
+  },
+  {
+    "id": "WF-18",
+    "name": "Personal-device continuation",
+    "steps": "Begin on desktop -> autosaved document/mission -> mobile authenticated session -> responsive state restores -> action approver confirms -> desktop reflects update.",
+    "contracts": "Concurrent change detection, private device notifications."
+  },
+  {
+    "id": "WF-19",
+    "name": "Sensitive data deletion/export",
+    "steps": "Authorized request -> retention/legal hold review -> scoped export or deletion jobs -> downstream connector requests -> verification -> evidence certificate.",
+    "contracts": "Deletion cannot break legally required immutable audits."
+  },
+  {
+    "id": "WF-20",
+    "name": "Company emergency pause",
+    "steps": "Authorized owner triggers pause -> execution dispatch prevented -> queued jobs checkpoint -> external side effects listed -> targeted revoke/escalation -> safe resume.",
+    "contracts": "Cannot falsely claim that accepted third-party actions were reversed."
+  }
+]
