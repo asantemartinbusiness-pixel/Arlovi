@@ -1,5 +1,7 @@
 import Dexie, { type Table } from "dexie";
 import { buildSeed } from "@/domain/seed";
+import { collectSeeds } from "@/domain/seedRegistry";
+import { SEED_NOW } from "@/domain/types";
 import type { Audit, Rec } from "@/domain/types";
 
 class ArloviDB extends Dexie {
@@ -17,6 +19,8 @@ class ArloviDB extends Dexie {
   }
 }
 
+export const SEED_VERSION = 2;
+
 export const db = new ArloviDB();
 
 let opening: Promise<void> | null = null;
@@ -24,14 +28,20 @@ let opening: Promise<void> | null = null;
 export function ensureSeed(): Promise<void> {
   opening ??= (async () => {
     const meta = await db.meta.get("seed");
-    if (meta?.value === 1) return;
-    const seed = buildSeed();
+    if (meta?.value === SEED_VERSION) return;
+    const base = buildSeed();
+    const extra = collectSeeds(SEED_NOW);
+    const seen = new Set(base.records.map((record) => record.id));
+    const seed = {
+      records: [...base.records, ...extra.records.filter((record) => !seen.has(record.id))],
+      events: [...base.events, ...extra.events],
+    };
     await db.transaction("rw", [db.records, db.events, db.meta], async () => {
       await db.records.clear();
       await db.events.clear();
       await db.records.bulkAdd(seed.records);
       await db.events.bulkAdd(seed.events);
-      await db.meta.put({ id: "seed", value: 1 });
+      await db.meta.put({ id: "seed", value: SEED_VERSION });
     });
   })();
   return opening;
