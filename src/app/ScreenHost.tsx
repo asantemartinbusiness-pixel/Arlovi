@@ -115,13 +115,19 @@ export function ScreenHost() {
   const title = def?.title?.(context) ?? screen.title;
   const AppIcon = APP_ENTRIES[screen.applicationCode]?.icon;
 
-  const body = def?.surface
+  const content = def?.surface
     ? def.surface(context)
     : activeDefTab
-      ? <TabPanel id={activeTab}>{activeDefTab.render(context)}</TabPanel>
+      ? activeDefTab.render(context)
       : app.fallback
         ? app.fallback(context)
         : <LegacyScreen />;
+
+  /* A tab strip always controls a panel: the tab's aria-controls must resolve,
+     including on screens still served by a fallback. */
+  const body = tabIds.length > 1 && def?.chrome !== "full"
+    ? <TabPanel id={activeTab}>{content}</TabPanel>
+    : content;
 
   if (def?.chrome === "full") {
     return (

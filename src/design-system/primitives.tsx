@@ -3,6 +3,13 @@ import { Link } from "react-router-dom";
 
 export type Tone = "neutral" | "accent" | "success" | "warning" | "danger" | "info";
 
+/**
+ * Where a fact came from. Rendered as the 2px material on the leading edge of
+ * anything that asserts one, so a page can be read for trust before it is read
+ * for content.
+ */
+export type Provenance = "posted" | "human" | "agent" | "unknown";
+
 /* ---------------- Button ---------------- */
 export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type"> {
   variant?: "primary" | "secondary" | "ghost" | "soft" | "danger" | "outline-danger";
@@ -42,17 +49,28 @@ export function ButtonGroup({ children, label }: { children: ReactNode; label: s
 
 /* ---------------- Surfaces ---------------- */
 export function Card({
-  title, subtitle, actions, children, footer, flush, pad, className, span, as: As = "section", ...rest
+  title, subtitle, actions, children, footer, flush, pad, className, span, prov, machine, eyebrow, as: As = "section", ...rest
 }: {
   title?: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children?: ReactNode; footer?: ReactNode;
   flush?: boolean; pad?: "none" | "tight" | "default"; className?: string; span?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 12;
+  /** Material on the leading edge: where this card's content came from. */
+  prov?: Provenance;
+  /** A surface an AI employee is working on; carries the machine gradient. */
+  machine?: boolean;
+  eyebrow?: string;
   as?: "section" | "article" | "div";
 } & Omit<HTMLAttributes<HTMLElement>, "title">) {
   return (
-    <As className={`ds-card${span ? ` ds-col-${span}` : ""}${className ? ` ${className}` : ""}`} {...rest}>
+    <As
+      className={`ds-card${span ? ` ds-col-${span}` : ""}${className ? ` ${className}` : ""}`}
+      data-prov={prov}
+      data-machine={machine ? "true" : undefined}
+      {...rest}
+    >
       {(title || actions) && (
         <header className="ds-card-head">
           <div className="ds-grow">
+            {eyebrow && <div className="ds-eyebrow" style={{ marginBottom: 3 }}>{eyebrow}</div>}
             {typeof title === "string" ? <h2>{title}</h2> : title}
             {subtitle && <div className="ds-card-sub">{subtitle}</div>}
           </div>
@@ -107,12 +125,15 @@ export function Notice({ tone = "neutral", title, children, actions }: { tone?: 
 
 /* ---------------- Stats ---------------- */
 export function Stat({
-  label, value, meta, delta, unavailable, onClick,
+  label, value, meta, delta, unavailable, onClick, prov,
 }: {
   label: string; value: ReactNode; meta?: ReactNode;
   delta?: { dir: "up" | "down" | "flat"; text: string };
   unavailable?: boolean; onClick?: () => void;
+  /** Where the figure came from. Defaults to unknown when it is unavailable. */
+  prov?: Provenance;
 }) {
+  const material = prov ?? (unavailable ? "unknown" : undefined);
   const body = (
     <>
       <span className="ds-stat-label">{label}</span>
@@ -124,9 +145,13 @@ export function Stat({
     </>
   );
   if (onClick) {
-    return <button type="button" className="ds-stat" onClick={onClick} style={{ textAlign: "start", cursor: "pointer" }}>{body}</button>;
+    return (
+      <button type="button" className="ds-stat" data-prov={material} onClick={onClick} style={{ textAlign: "start", cursor: "pointer" }}>
+        {body}
+      </button>
+    );
   }
-  return <div className="ds-stat">{body}</div>;
+  return <div className="ds-stat" data-prov={material}>{body}</div>;
 }
 
 export function StatRow({ children }: { children: ReactNode }) {
@@ -150,7 +175,8 @@ export function Skeleton({ height = 16, width = "100%", radius }: { height?: num
 }
 
 /* ---------------- Small parts ---------------- */
-const AVATAR_HUES = ["#234fe8", "#0f8780", "#b43e18", "#5b4dff", "#a33a63", "#1a369e", "#19a89f"];
+/** Every hue carries white text at 4.5:1 or better; checked with axe. */
+const AVATAR_HUES = ["#234fe8", "#0d7c76", "#a8441c", "#5b4dff", "#a33a63", "#1b359b", "#5a6478"];
 
 export function Avatar({ name, kind = "human", size = "md" }: { name: string; kind?: "human" | "ai"; size?: "sm" | "md" | "lg" }) {
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";

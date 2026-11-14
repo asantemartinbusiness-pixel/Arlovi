@@ -26,6 +26,67 @@ function useHqData() {
 
 /* ---------------------------- HQ-001 ---------------------------- */
 
+/**
+ * The state of the company, written as a sentence.
+ *
+ * The most characteristic thing in this product's world is not a greeting; it
+ * is whether the company is in a state that needs a person. Each figure is set
+ * in the data face and carries the material of its source, so the line can be
+ * read for trust before it is read for meaning.
+ */
+function StateOfPlay({
+  context, approvals, missions, overdue, ledgerDays, ledgerStale,
+}: {
+  context: ScreenContext;
+  approvals: number;
+  missions: number;
+  overdue: number;
+  ledgerDays: number | null;
+  ledgerStale: boolean;
+}) {
+  const { now, org } = useWorkspace();
+  const clauses: string[] = [];
+
+  clauses.push(approvals > 0
+    ? `${approvals} ${approvals === 1 ? "decision is" : "decisions are"} waiting on you`
+    : "Nothing is waiting on a decision");
+
+  clauses.push(missions > 0
+    ? `${missions} ${missions === 1 ? "mission is" : "missions are"} running`
+    : "no mission is running");
+
+  if (overdue > 0) {
+    clauses.push(`${overdue} ${overdue === 1 ? "invoice is" : "invoices are"} past due`);
+  }
+
+  clauses.push(ledgerDays === null
+    ? "the ledger has no recorded posting"
+    : ledgerDays === 0
+      ? "the ledger was posted today"
+      : `${ledgerDays} ${ledgerDays === 1 ? "day" : "days"} since the ledger was posted`);
+
+  return (
+    <header className="hq-state">
+      <p className="ds-eyebrow">
+        {context.date(now, { weekday: "long", day: "numeric", month: "long" })} · {org.timezone.replace("_", " ")}
+      </p>
+      <h2 className="hq-state-line">
+        {clauses.map((clause, index) => (
+          <span key={clause}>
+            {index === 0 ? clause : `${clause.charAt(0).toLowerCase()}${clause.slice(1)}`}
+            {index === clauses.length - 1 ? "." : ", "}
+          </span>
+        ))}
+      </h2>
+      {ledgerStale && (
+        <p className="ds-subtle" style={{ maxWidth: "52ch" }}>
+          Figures below come from posted journals in this browser. Nothing is read from a bank feed.
+        </p>
+      )}
+    </header>
+  );
+}
+
 function ExecutiveHome({ context, range }: { context: ScreenContext; range: "today" | "week" }) {
   const data = useHqData();
   const { now, org } = useWorkspace();
@@ -59,29 +120,35 @@ function ExecutiveHome({ context, range }: { context: ScreenContext; range: "tod
 
   return (
     <Stack gap={5}>
-      <Card className="hq-hero" flush>
-        <div style={{ background: "var(--grad-horizon)", padding: "var(--space-6)", borderRadius: "var(--radius-lg)", color: "#fff" }}>
-          <Row gap={3} wrap>
-            <div className="ds-grow">
-              <p style={{ opacity: 0.85, fontSize: "var(--text-sm)" }}>{context.date(now, { weekday: "long", day: "numeric", month: "long" })}</p>
-              <h2 style={{ fontSize: "var(--text-2xl)", color: "#fff", marginBlock: 4 }}>Good day, {context.actor.split(" ")[0]}.</h2>
-              <p style={{ opacity: 0.92, maxWidth: "60ch" }}>
-                {approvals.length > 0 ? `${approvals.length} ${approvals.length === 1 ? "decision is" : "decisions are"} waiting on you. ` : "Nothing is waiting on a decision. "}
-                {active.length > 0 ? `${active.length} mission${active.length === 1 ? " is" : "s are"} running.` : "No mission is running."}
-              </p>
-            </div>
-            <Button variant="secondary" onClick={() => context.openOverlay("Widget picker")}>Arrange cards</Button>
-          </Row>
-        </div>
-      </Card>
+      <StateOfPlay
+        context={context}
+        approvals={approvals.length}
+        missions={active.length}
+        overdue={overdue.length}
+        ledgerDays={ledgerAge.known ? ledgerAge.days : null}
+        ledgerStale={ledgerAge.stale}
+      />
 
       <StatRow>
-        <Stat label="Receivable" value={context.money(receivable)} meta={`${data.invoices.filter((i) => !["paid", "void", "draft"].includes(i.status)).length} open invoices`} onClick={() => context.openOverlay("metric inspector", { metric: "receivable" })} />
-        <Stat label="Overdue" value={context.money(overdue.reduce((sum, i) => sum + (i.amountMinor ?? 0), 0))} meta={`${overdue.length} past due`} onClick={() => context.openOverlay("metric inspector", { metric: "overdue" })} />
+        <Stat
+          label="Receivable"
+          value={context.money(receivable)}
+          prov="posted"
+          meta={`${data.invoices.filter((i) => !["paid", "void", "draft"].includes(i.status)).length} open invoices`}
+          onClick={() => context.openOverlay("metric inspector", { metric: "receivable" })}
+        />
+        <Stat
+          label="Overdue"
+          value={context.money(overdue.reduce((sum, i) => sum + (i.amountMinor ?? 0), 0))}
+          prov="posted"
+          meta={`${overdue.length} past due`}
+          onClick={() => context.openOverlay("metric inspector", { metric: "overdue" })}
+        />
         <Stat
           label="Ledger posted"
           value={ledgerAge.known ? context.date(latestPost) : "Unavailable"}
           unavailable={!ledgerAge.known}
+          prov={ledgerAge.known && !ledgerAge.stale ? "posted" : "unknown"}
           meta={ledgerAge.known ? `${ledgerAge.days} days ago${ledgerAge.stale ? " · stale" : ""}` : "No posting recorded"}
           onClick={() => context.openOverlay("metric inspector", { metric: "ledger" })}
         />
@@ -89,7 +156,7 @@ function ExecutiveHome({ context, range }: { context: ScreenContext; range: "tod
       </StatRow>
 
       <Grid>
-        <Card span={7} title={`Waiting on you`} subtitle={`${window.label} · ${approvals.length} items`}>
+        <Card span={7} title="Waiting on you" eyebrow="Decisions" prov="human" subtitle={`${window.label} · ${approvals.length} items`}>
           {approvals.length === 0 ? (
             <Empty title="Nothing to approve" icon={<Flag size={20} />}>Approvals appear here when a record is submitted for a decision.</Empty>
           ) : (
@@ -108,7 +175,7 @@ function ExecutiveHome({ context, range }: { context: ScreenContext; range: "tod
           )}
         </Card>
 
-        <Card span={5} title="Active missions" subtitle={`${active.length} running`}>
+        <Card span={5} title="Active missions" eyebrow="AI workforce" prov="agent" subtitle={`${active.length} running`}>
           {active.length === 0 ? (
             <Empty title="No mission is running" icon={<Compass size={20} />}>Start one from Missions to see progress here.</Empty>
           ) : (
@@ -155,7 +222,7 @@ function ExecutiveHome({ context, range }: { context: ScreenContext; range: "tod
             )}
         </Card>
 
-        <Card span={5} title="Recommended" subtitle="Derived from this workspace only">
+        <Card span={5} title="Recommended" eyebrow="Computed here" prov="agent" subtitle="Derived from records in this workspace, never inferred">
           {insights.length === 0 ? (
             <Empty title="No recommendations" icon={<Target size={20} />}>Recommendations are computed from records here, never invented.</Empty>
           ) : (
@@ -1042,7 +1109,6 @@ export const hqApp = registerApp({
     "ARL-HQ-001": {
       id: "ARL-HQ-001",
       title: () => "Executive Home",
-      subtitle: (context) => `What needs you in ${context.org.name}, from records in this browser.`,
       tabs: [
         { id: "Today", render: (context) => <ExecutiveHome context={context} range="today" /> },
         { id: "Week", render: (context) => <ExecutiveHome context={context} range="week" /> },
@@ -1055,7 +1121,7 @@ export const hqApp = registerApp({
         { id: "dismiss recommendation", label: "Save this view", placement: "overflow", run: (context) => context.openOverlay("save view dialog") },
       ],
       overlays: [
-        { id: "Widget picker", kind: "drawer", title: "Arrange cards", description: "Choose what Executive Home shows.", render: ({ }) => (
+        { id: "Widget picker", kind: "drawer", title: "Arrange cards", description: "Choose what Executive Home shows.", render: () => (
           <Stack gap={3}>
             {["Waiting on you", "Active missions", "Due work", "Recommended", "Receivable", "Ledger freshness"].map((card) => (
               <Checkbox key={card} label={card} defaultChecked />

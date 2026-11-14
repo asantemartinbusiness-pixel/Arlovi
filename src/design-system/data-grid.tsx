@@ -236,7 +236,9 @@ export function DataGrid<T>({
                   {card ? card(row) : (
                     <>
                       <strong>{columns.find((column) => column.primary)?.cell(row) ?? columns[0].cell(row)}</strong>
-                      <span className="ds-subtle">{columns.slice(1, 3).map((column) => column.cell(row))}</span>
+                      <span className="ds-subtle ds-row ds-gap-2 ds-wrap">
+                        {columns.slice(1, 3).map((column) => <span key={column.key}>{column.cell(row)}</span>)}
+                      </span>
                     </>
                   )}
                 </button>

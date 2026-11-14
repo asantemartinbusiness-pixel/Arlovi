@@ -44,8 +44,8 @@
 .hq-rail-btn:hover { background: var(--bg-hover); color: var(--fg-default); }
 .hq-rail-btn[data-active="true"] { background: var(--accent-soft); color: var(--accent-soft-fg); }
 .hq-rail-btn[data-active="true"]::before {
-  content: ""; position: absolute; inset-inline-start: -11px; inset-block: 10px;
-  width: 3px; border-radius: 0 3px 3px 0; background: var(--accent);
+  content: ""; position: absolute; inset-inline-start: -9px; inset-block: 11px;
+  width: 2px; border-radius: 0 2px 2px 0; background: var(--accent);
 }
 
 .hq-appnav {
@@ -157,3 +157,12 @@
   .pg-head { padding-block-start: var(--space-3); gap: var(--space-2); }
   .pg-lede { display: none; }
 }
+
+/* ===================== State of play ===================== */
+.hq-state { display: flex; flex-direction: column; gap: var(--space-3); padding-block-end: var(--space-2); }
+.hq-state-line {
+  font-family: var(--font-display); font-size: clamp(21px, 2.3vw, 31px); font-weight: 600;
+  line-height: 1.22; letter-spacing: -0.012em; color: var(--fg-strong);
+  max-width: 46ch; text-wrap: balance;
+}
+.hq-state-line > span { display: inline; }

@@ -127,3 +127,79 @@ shared primitive, build it inside your own folder and say so in your report.
    implemented and exercised at least once.
 5. Your report states, per screen, what is complete and what is not. Do not
    overstate. A screen that renders is not a screen that works.
+
+---
+
+# Visual identity
+
+The brand hues are fixed by the approved direction: Electric Cobalt `#234FE8`,
+Papaya `#FFAE7C`, Aqua `#36C5BA`. Everything below is how they are used.
+
+## Neutrals are warm
+
+The canvas is paper (`#F6F4F0`), not blue-grey, and the ink is graphite
+(`#1A1917`). On a warm ground cobalt reads as ink in a pen rather than as a
+default interface blue, and papaya and aqua become annotation colours — the
+role the brand direction gives them. Dark appearance is warm graphite, not navy.
+
+Never hardcode a colour. Every value is a token in `src/design-system/tokens.css`.
+
+## Three typefaces, three jobs
+
+| Role | Face | Used for |
+| --- | --- | --- |
+| Display | IBM Plex Sans Condensed | headings, tabs, stat labels that are words |
+| Data | IBM Plex Mono | money, quantities, dates, codes, identifiers, eyebrows, status pills |
+| Body | Inter | everything you read as a sentence |
+
+Headings pick the display face automatically. For figures use `.ds-num` or the
+`Stat` component; do not set a face by hand. Plex was drawn as an identity for
+the relationship between people and machines, which is what this product is
+about — that is why it is here rather than a fashionable serif.
+
+## The signature: provenance as a material
+
+Anything that asserts a fact says where the fact came from, as a 2px material
+on its leading edge.
+
+| Material | Meaning |
+| --- | --- |
+| solid ink | posted — already in the books, immutable |
+| solid cobalt | made by a person in this workspace |
+| aqua hatch | made by an AI employee |
+| dashed amber | no source, or a source too old to trust |
+
+```tsx
+<Stat label="Receivable" value={money(total)} prov="posted" meta="4 open invoices" />
+<Card eyebrow="AI workforce" prov="agent" title="Active missions">…</Card>
+<Card eyebrow="Decisions" prov="human" title="Waiting on you">…</Card>
+```
+
+Rules that keep it meaningful:
+
+- Provenance means **source**, never status. An overdue invoice is still
+  `posted`; its lateness is carried by its status pill and row tone.
+- Use it on cards, stats and records that state a fact. Never on navigation,
+  chrome, buttons or decoration.
+- Table rows use `rowTone` for status instead, so the two devices never stack.
+- `unavailable` on a `Stat` defaults the material to unknown, so a figure with
+  no source is visibly untrustworthy before it is read.
+
+## Gradients mean machine
+
+The signature gradients appear only where an AI employee is actually working —
+`<Card machine>` and agent surfaces. A gradient is never decoration, so when
+one appears it carries information.
+
+## Eyebrows name the kind of thing
+
+`.ds-eyebrow` or `<Card eyebrow="…">` sets a short mono label above a title.
+Use it to say what a panel *is* (`LEDGER`, `AI WORKFORCE`, `DECISIONS`). Do not
+use numbered markers (`01 / 02 / 03`) unless the content genuinely is a
+sequence; nothing in this product is.
+
+## Checking your work
+
+`/ds-check.html` renders the primitives in both appearances on the running dev
+server. Use it when you add or change anything shared. Both appearances must
+pass axe with no serious or critical violation, including colour contrast.
