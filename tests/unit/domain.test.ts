@@ -113,6 +113,72 @@ describe("actions", () => {
     expect(denied.records.find((item) => item.id === "nl-journals-008")?.status).toBe("draft");
   });
 
+  it("creates an invoice that issues into a balanced ledger", () => {
+    const effect = reduceAction(records, {
+      screen: screen({ id: "ARL-FIN-004", title: "Invoice List", route: "/o/:org/fin/invoices", collection: "invoices", actions: ["Create"] }),
+      action: "Create",
+      role: "finance",
+      orgId: ORG_NORTHLINE,
+      actor: "Jonah Adeyemi",
+      now: "2026-11-14T12:00:00.000Z",
+      ids,
+    });
+    const invoice = effect.records.find((item) => item.id === effect.selectId);
+    expect(effect.navigate).toBe("/o/:org/fin/invoices/:id");
+    expect(invoice?.status).toBe("draft");
+    expect(invoice?.fields.netMinor).toBe(48000);
+    expect(invoice?.fields.taxMinor).toBe(9600);
+    const issued = reduceAction(effect.records, {
+      screen: screen({ id: "ARL-FIN-005", title: "Invoice Detail", route: "/o/:org/fin/invoices/:id", collection: "invoices", actions: ["approve"] }),
+      action: "approve",
+      role: "finance",
+      orgId: ORG_NORTHLINE,
+      actor: "Jonah Adeyemi",
+      now: "2026-11-14T12:05:00.000Z",
+      selectedId: invoice?.id,
+      ids,
+    });
+    expect(issued.toastTitle).toBe("Invoice issued");
+    const report = statements(issued.records, ORG_NORTHLINE);
+    expect(report.booksBalance).toBe(true);
+    expect(report.equationHolds).toBe(true);
+    expect(issued.records.some((item) => item.collection === "journals" && item.title === `Issue ${invoice?.title}`)).toBe(true);
+  });
+
+  it("creates an AI employee in the directory and the organization chart", () => {
+    const effect = reduceAction(records, {
+      screen: screen({ id: "ARL-TEAM-004", title: "Agent Builder", route: "/o/:org/team/agents/new", collection: "agents", actions: ["Generate contract"] }),
+      action: "Generate contract",
+      role: "owner",
+      orgId: ORG_NORTHLINE,
+      actor: "Maya Chen",
+      now: "2026-11-14T12:00:00.000Z",
+      ids,
+    });
+    const agent = effect.records.find((item) => item.id === effect.selectId);
+    const member = effect.records.find((item) => item.collection === "members" && item.fields.agentId === agent?.id);
+    expect(agent?.title).toBe("New specialist");
+    expect(agent?.fields.model).toBe("not_connected");
+    expect(member?.fields.kind).toBe("ai");
+    expect(effect.navigate).toBe("/o/:org/team/agents/:id");
+  });
+
+  it("creates a design file with editable nodes", () => {
+    const effect = reduceAction(records, {
+      screen: screen({ id: "ARL-DESIGN-001", title: "Design Files", route: "/o/:org/design/files", collection: "designs", actions: ["New file"] }),
+      action: "New file",
+      role: "owner",
+      orgId: ORG_NORTHLINE,
+      actor: "Maya Chen",
+      now: "2026-11-14T12:00:00.000Z",
+      ids,
+    });
+    const design = effect.records.find((item) => item.id === effect.selectId);
+    const nodes = (design?.body as { nodes?: unknown[] } | undefined)?.nodes;
+    expect(nodes?.length).toBeGreaterThan(0);
+    expect(effect.navigate).toBe("/o/:org/design/files/:id");
+  });
+
   it("does not claim a connected send", () => {
     const effect = reduceAction(records, {
       screen: screen({ id: "ARL-FIN-005", collection: "invoices", title: "Invoice Detail", actions: ["send"] }),

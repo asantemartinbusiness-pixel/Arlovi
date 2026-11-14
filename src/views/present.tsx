@@ -11,32 +11,36 @@ export function money(record: Rec | undefined, minor: number): string {
   return formatMoney(minor, record?.currency ?? "GBP");
 }
 
-export function passesTab(record: Rec, tab: string, index: number, tabCount: number): boolean {
-  const name = tab.toLowerCase();
-  const hay = `${record.status} ${record.tags.join(" ")} ${record.title} ${record.summary} ${record.fields.kind ?? ""} ${record.fields.type ?? ""} ${record.fields.stage ?? ""} ${record.fields.channel ?? ""}`.toLowerCase();
-  if (/(^all$|overview|entries|business|everything)/.test(name)) return true;
-  if (name.includes("today")) return (record.at ?? record.updatedAt).slice(0, 10) === "2026-11-14" || record.status === "open" || record.status === "running";
-  if (name.includes("week") || name.includes("upcoming")) return true;
-  if (name.includes("human")) return record.fields.kind === "human" || record.tags.includes("human");
+export function passesTab(record: Rec, tab: string, _index = 0, _tabCount = 1): boolean {
+  const name = tab.toLowerCase().trim();
+  if (/^(all|overview|entries|everything|recent|directory|hierarchy|capacity|board|list|forecast|team|shared|brand|templates|template|agenda|month|week|upcoming|by owner|by sprint|assignees|by department|business)$/.test(name)) return true;
+  if (name.includes("week") || name.includes("upcoming") || name.includes("month") || name.includes("agenda")) return true;
+  if (name.includes("today")) return (record.at ?? record.updatedAt).slice(0, 10) === "2026-11-14";
+  if (name === "people" || name.includes("human")) return record.fields.kind === "human" || record.tags.includes("human");
   if (name === "ai" || name.includes("ai employee") || name.includes("agents")) return record.fields.kind === "ai" || record.tags.includes("ai") || record.collection === "agents";
   if (name.includes("archiv")) return record.status === "archived";
   if (name.includes("draft")) return record.status === "draft";
   if (name.includes("paid")) return record.status === "paid";
-  if (name.includes("overdue") || name.includes("await")) return record.status === "awaiting_payment" || record.status === "open";
-  if (name.includes("active") || name.includes("running")) return record.status === "active" || record.status === "running";
+  if (name.includes("overdue")) return record.status === "awaiting_payment" && (record.dueAt ?? "9999") < "2026-11-14";
+  if (name.includes("await")) return record.status === "awaiting_payment" || record.status === "awaiting_approval";
+  if (name.includes("void")) return record.status === "void";
   if (name.includes("paused") || name.includes("waiting")) return record.status === "paused" || record.status === "waiting" || record.status === "waiting_approval";
-  const tokens = name.split(/[^a-z0-9]+/).filter((token) => token.length > 3);
-  if (tokens.some((token) => hay.includes(token))) return true;
-  if (tokens.length === 0) return index === 0 || record.revision % tabCount === index;
-  return false;
+  if (name.includes("running")) return record.status === "running";
+  if (name.includes("active")) return record.status === "active" || record.status === "running";
+  if (name.includes("won") || name === "closed") return record.status === "won" || record.status === "completed";
+  if (name === "open" || name.startsWith("open ")) return record.status === "open";
+  const skip = new Set(["with", "from", "this", "that", "your", "into", "view", "only", "show"]);
+  const tokens = name.split(/[^a-z0-9]+/).filter((token) => token.length > 3 && !skip.has(token));
+  if (tokens.length === 0) return true;
+  const hay = `${record.status} ${record.tags.join(" ")} ${record.fields.kind ?? ""} ${record.fields.type ?? ""} ${record.fields.stage ?? ""} ${record.fields.channel ?? ""}`.toLowerCase();
+  return tokens.some((token) => hay.includes(token));
 }
 
 export function filterTab(rows: Rec[], tab: string, tabs: string[]): Rec[] {
-  const index = Math.max(0, tabs.indexOf(tab));
-  const filtered = rows.filter((row) => passesTab(row, tab, index, tabs.length));
-  if (filtered.length > 0) return filtered;
-  if (index === 0) return rows;
-  return rows.filter((_, rowIndex) => rowIndex % tabs.length === index);
+  const filtered = rows.filter((row) => passesTab(row, tab, 0, tabs.length));
+  const strict = /draft|paid|overdue|await|void|archiv|paused|human|people|agent|active|running|won|today/.test(tab.toLowerCase());
+  if (filtered.length === 0 && !strict && tabs[0] === tab) return rows;
+  return filtered;
 }
 
 export function Metrics({ records, orgId, screen }: { records: Rec[]; orgId: string; screen: ScreenInfo }) {
@@ -90,11 +94,13 @@ export function DataTable({
   currency,
   selectedId,
   onSelect,
+  onOpen,
 }: {
   rows: Rec[];
   currency: string;
   selectedId?: string;
   onSelect: (id: string) => void;
+  onOpen?: (id: string) => void;
 }) {
   if (rows.length === 0) return <p className="card">Nothing in this view yet. Create a record when you are ready.</p>;
   return (
@@ -111,7 +117,7 @@ export function DataTable({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id} aria-selected={row.id === selectedId} onClick={() => onSelect(row.id)} style={{ cursor: "pointer" }}>
+            <tr key={row.id} aria-selected={row.id === selectedId} onClick={() => (onOpen ?? onSelect)(row.id)} style={{ cursor: "pointer" }}>
               <td>
                 <strong>{row.title}</strong>
                 <div className="meta">{row.summary}</div>
@@ -149,20 +155,26 @@ function SortCard({ record, onSelect }: { record: Rec; onSelect: (id: string) =>
 
 export function Board({
   rows,
+  tab = "",
+  selectedId,
   onMove,
   onSelect,
 }: {
   rows: Rec[];
+  tab?: string;
+  selectedId?: string;
   onMove: (id: string, status: string) => void;
   onSelect: (id: string) => void;
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-  const columns = Array.from(new Set(rows.map((row) => String(row.fields.stage ?? row.status))));
+  const byAssignee = /owner|assignee/.test(tab.toLowerCase());
+  const columnOf = (row: Rec) => byAssignee ? String(row.fields.assignee ?? row.ownerName) : String(row.fields.stage ?? row.status);
+  const columns = Array.from(new Set(rows.map(columnOf)));
   const labels = columns.length ? columns : ["draft", "active", "done"];
   function onDragEnd(event: DragEndEvent) {
     const overId = event.over?.id ? String(event.over.id) : "";
     if (!overId || !event.active.id) return;
-    const column = labels.find((label) => overId === label || rows.find((row) => row.id === overId && String(row.fields.stage ?? row.status) === label));
+    const column = labels.find((label) => overId === label || rows.find((row) => row.id === overId && columnOf(row) === label));
     if (column) onMove(String(event.active.id), column);
   }
   return (
@@ -170,16 +182,14 @@ export function Board({
       <SortableContext items={rows.map((row) => row.id)}>
       <div className="board">
         {labels.map((label) => (
-          <section key={label} className="lane" id={label}>
+          <section key={label} className="lane" id={label} aria-label={label}>
             <h2>{label}</h2>
-            {rows.filter((row) => String(row.fields.stage ?? row.status) === label).map((row) => (
+            {rows.filter((row) => columnOf(row) === label).map((row) => (
               <SortCard key={row.id} record={row} onSelect={onSelect} />
             ))}
-            {rows.filter((row) => row.id).slice(0, 1).map((row) => (
-              <button key={`${label}-move`} className="btn-ghost" type="button" onClick={() => onMove(row.id, label)}>
-                Move selected toward {label}
-              </button>
-            ))}
+            {selectedId && rows.find((row) => row.id === selectedId && columnOf(row) !== label) && (
+              <button className="btn-ghost" type="button" onClick={() => onMove(selectedId, label)}>Move here</button>
+            )}
           </section>
         ))}
       </div>

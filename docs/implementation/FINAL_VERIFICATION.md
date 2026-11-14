@@ -1,23 +1,22 @@
-# Final verification
+# Verification notes
 
-Commands that passed in this workspace:
+This is not a completion certificate. Counts below are from the commands run on 14 November 2026.
 
-- `npm run verify:inventory` — 316 screens, 1323 tabs, 1328 actions, 956 overlays match the registry
+## Commands
+
+- `npm run verify:inventory` — 316 screens, 1,323 tabs, 1,328 actions, 956 overlays
 - `npx tsc --noEmit`
-- `npx eslint src tests`
-- `npx vitest run` — ledger balance, formula engine, booking conflicts, all 20 workflows, route matching, policy block on member post, unconnected send
+- `npx eslint src tests e2e`
+- `npx vitest run` — 13 tests, including invoice issue, agent directory member, and design-node creation
 - `npm run build`
-- `npx playwright test` — every registered screen shows its title, first tab, and first action; a draft wage journal posts and remains posted after reload; a storefront hold states that card capture is not connected; invoice actions stay on screen at 375, 768, and 1440px; axe reports no serious or critical issues on home, finance, the document editor, and the deal board (color-contrast rule included in that run after the label mismatch was removed)
+- Playwright journeys in `e2e/screens.spec.ts`: invoice issue, deal-to-invoice, design reload, AI employee, task move, wage journal post, storefront hold, and a render pass of all 316 screens with no page error
+- `e2e/a11y.spec.ts` — no serious or critical axe findings on `/hq/home`, `/fin/home`, the winter brief, and the deal board
+- `e2e/viewport.spec.ts` — invoice Create stays in view at 375, 768, and 1440
 
-## Limits that are still true
+## Ledger
 
-- No mail, card, bank feed, tax filing, hosted publish, or language model is connected. Those flows stop in the interface.
-- The formula engine supports arithmetic, ranges, SUM, AVERAGE, MIN, MAX, and COUNT. It is not a full spreadsheet application.
-- Video playback is a local timeline preview. Caption export is an SRT file, not a rendered film.
-- Photo editing composites layers on a canvas. It is not a full raster suite.
-- Role switching and the client portal are local views in one browser, not account isolation.
-- IndexedDB does not sync to another device. Reset is a fresh load of the seeded workspace only when the seed version changes; the in-app data otherwise stays until the browser clears it.
+`docs/implementation/ledger.json` marks 12 screens `verified` and 304 `implemented`. Implemented means the route renders and its buttons call the local reducer. It does not mean the specialist UX for that screen was exercised.
 
-## Not claimed
+## Still outside this frontend
 
-This pass did not execute a manual click of all 1,328 actions. The reducer covers every action verb, the browser test confirms each action button is present, and the finance, commerce, and booking paths above were clicked. A deeper click-through of every overlay remains useful follow-up work, not a reason to mark a route missing.
+Mail, card capture, bank feeds, tax filing, hosted publishing, and live model calls are not connected. The interface records the local state and says the service is not connected.

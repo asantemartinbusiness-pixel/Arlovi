@@ -1,5 +1,6 @@
+import { detailRoute, enrichCreated, nextStage } from "./create";
 import { issueInvoice, matchBankLine, postJournal, recordPayment, reverseJournal, voidInvoice } from "./finance";
-import { authorize, findBookingConflict, quantityOnHand } from "./ops";
+import { authorize, quantityOnHand } from "./ops";
 import type { Audit, CapabilityState, Rec, Role } from "./types";
 import { byId, currencyFor, inOrg, isPaused, replaceRec, touch } from "./types";
 
@@ -24,6 +25,8 @@ export interface ActionContext {
   now: string;
   selectedId?: string;
   ids: () => string;
+  title?: string;
+  summary?: string;
 }
 
 export interface ActionEffect {
@@ -258,13 +261,32 @@ export function reduceAction(records: Rec[], ctx: ActionContext): ActionEffect {
       { selectId: deal.id, navigate: ctx.screen.route.replace("/leads", "/deals") },
     );
   }
-  if (/^move|^drag/.test(verb) && current && current.fields.stage) {
-    const order = ["new", "discovery", "qualified", "proposal", "negotiation", "won"];
-    const stage = String(current.fields.stage);
-    const index = Math.max(0, order.indexOf(stage));
-    const next = order[Math.min(order.length - 1, index + 1)];
+  if (current && current.fields.stage && (/^move|^drag/.test(verb) || /stage/.test(lower))) {
+    const next = nextStage(String(current.fields.stage));
     const updated = touch(current, ctx.actor, ctx.now, { status: next, fields: { ...current.fields, stage: next } });
     return done(replaceRec(records, updated), [audit(ctx, "record.stage_changed", `${current.title} is now ${next}.`, current.id, "ready_local")], "Stage updated", `${current.title} moved to ${next}.`, { selectId: current.id });
+  }
+  if (verb === "close" && current?.collection === "deals") {
+    const updated = touch(current, ctx.actor, ctx.now, { status: "won", fields: { ...current.fields, stage: "won" } });
+    return done(replaceRec(records, updated), [audit(ctx, "crm.deal.won_local", `${current.title} is won in this workspace.`, current.id, "ready_local")], "Deal closed locally", `${current.title} is won. No external contract was filed.`, { selectId: current.id });
+  }
+  if (current?.collection === "deals" && groupOf(verb) === "create" && /quote|proposal/.test(lower)) {
+    const count = inOrg(records, ctx.orgId, "quotes").length + 1;
+    const net = Number(current.amountMinor ?? 0);
+    const tax = currencyFor(ctx.orgId) === "GBP" ? Math.round(net * 0.2) : 0;
+    const quote = blank(ctx, `Q-${200 + count}`, "draft");
+    quote.collection = "quotes";
+    quote.parentId = current.id;
+    quote.amountMinor = net + tax;
+    quote.summary = `Proposal for ${current.title}. Not sent.`;
+    quote.fields = { dealId: current.id, contactId: String(current.fields.contactId ?? ""), netMinor: net, taxMinor: tax };
+    return done(
+      [quote, ...records],
+      [audit(ctx, "crm.quote.created_local", `Created ${quote.title} from ${current.title}.`, quote.id, "ready_local")],
+      "Proposal drafted",
+      `${quote.title} is in this workspace. It has not been sent.`,
+      { selectId: quote.id },
+    );
   }
   if (ctx.screen.id === "ARL-ADMIN-004" && (verb === "suspend" || verb === "pause")) {
     const org = byId(records, ctx.orgId);
@@ -316,43 +338,28 @@ export function reduceAction(records: Rec[], ctx: ActionContext): ActionEffect {
     return external(records, ctx, current);
   }
 
-  if (groupOf(verb) === "create") {
-    const created = blank(ctx, `New ${ctx.screen.title.replace(/s$/, "")}`);
-    if (ctx.screen.collection === "journals") {
-      const bank = inOrg(records, ctx.orgId, "accounts").find((item) => item.fields.code === "1000");
-      const expense = inOrg(records, ctx.orgId, "accounts").find((item) => item.fields.code === "6200");
-      created.body = {
-        date: ctx.now.slice(0, 10),
-        memo: "Draft journal",
-        lines: bank && expense
-          ? [
-              { accountId: expense.id, debitMinor: 1000, creditMinor: 0 },
-              { accountId: bank.id, debitMinor: 0, creditMinor: 1000 },
-            ]
-          : [],
-      };
-      created.summary = "Balanced draft. Post it when Finance agrees.";
-    }
-    if (ctx.screen.collection === "accounts") {
-      created.fields = { code: String(8000 + records.filter((item) => item.collection === "accounts").length), type: "expense" };
-    }
-    if (ctx.screen.collection === "bookings") {
-      created.startAt = "2026-11-21T10:00:00.000Z";
-      created.endAt = "2026-11-21T10:45:00.000Z";
-      created.fields = { resourceId: "nl-resources-001", serviceId: "nl-services-001" };
-      const conflict = findBookingConflict(records, ctx.orgId, "nl-resources-001", created.startAt, created.endAt);
-      if (conflict) {
-        created.startAt = "2026-11-22T10:00:00.000Z";
-        created.endAt = "2026-11-22T10:45:00.000Z";
-      }
-      created.status = "held";
-    }
+  const buildingAgent = ctx.screen.id === "ARL-TEAM-004" && verb === "generate";
+  if (groupOf(verb) === "create" || buildingAgent) {
+    const created = blank(ctx, ctx.title?.trim() || `New ${ctx.screen.title.replace(/s$/, "")}`);
+    const enriched = enrichCreated(records, created, {
+      orgId: ctx.orgId,
+      actor: ctx.actor,
+      now: ctx.now,
+      ids: ctx.ids,
+      collection: created.collection,
+      title: ctx.title,
+      summary: ctx.summary,
+    });
     return done(
-      [created, ...records],
-      [audit(ctx, "record.created_local", `Created ${created.title}.`, created.id, "ready_local")],
+      [enriched.primary, ...enriched.extra, ...records],
+      [audit(ctx, "record.created_local", `Created ${enriched.primary.title}.`, enriched.primary.id, "ready_local")],
       "Draft created",
-      `${created.title} is saved in this workspace.`,
-      { selectId: created.id, overlay: overlayFor(ctx.screen, /create|edit|form|new|composer|editor/i) },
+      `${enriched.primary.title} is saved in this workspace.`,
+      {
+        selectId: enriched.primary.id,
+        navigate: enriched.navigate,
+        overlay: enriched.navigate ? undefined : overlayFor(ctx.screen, /create|edit|form|new|composer|editor/i),
+      },
     );
   }
 
@@ -378,6 +385,14 @@ export function reduceAction(records: Rec[], ctx: ActionContext): ActionEffect {
   }
 
   if (groupOf(verb) === "inspect") {
+    const path = detailRoute(current?.collection ?? ctx.screen.collection);
+    if (path && current && /^(open|drill|view)$/.test(verb)) {
+      return done(records, [audit(ctx, "record.opened_local", current.title, current.id, "ready_local")], current.title, current.summary, {
+        tone: "info",
+        selectId: current.id,
+        navigate: path,
+      });
+    }
     return done(records, [], current ? current.title : "Nothing selected", current?.summary || "There is no record in this register yet.", {
       tone: "info",
       selectId: current?.id,

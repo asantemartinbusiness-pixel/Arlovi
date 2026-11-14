@@ -3,10 +3,11 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { findScreen, screenPath, type ScreenInfo } from "@/app/catalog";
+import { detailRoute } from "@/domain/create";
 import { importCsv, reduceAction } from "@/domain/engine";
 import { findBookingConflict, quantityOnHand } from "@/domain/ops";
 import { canOpenApp } from "@/domain/ops";
-import type { Rec, Role } from "@/domain/types";
+import type { Audit, Rec, Role } from "@/domain/types";
 import { byId, currencyFor, inOrg, orgFromSlug, slugFor, touch } from "@/domain/types";
 import {
   BookingPage,
@@ -39,6 +40,7 @@ import {
   RecordView,
   TimelineView,
 } from "@/views/present";
+import { AgentDesk, DealDesk, InvoiceDesk, LedgerDesk, MissionDesk, ProjectDesk, TaskDesk } from "@/views/desks";
 
 const ACTOR: Record<Role, string> = {
   owner: "Maya Chen",
@@ -79,14 +81,15 @@ export function ScreenRoute() {
   const loaded = records;
   const organizationId = orgId;
   const tab = screen.tabs.includes(tabParam ?? "") ? (tabParam as string) : screen.tabs[0];
-  const rows = filterTab(inOrg(loaded, organizationId, screen.collection), tab, screen.tabs);
-  const selected = byId(loaded, selectedId) ?? rows[0];
+  const focusId = match.params.id;
+  const viewRows = rowsForScreen(screen, loaded, organizationId, tab, focusId);
+  const selected = byId(loaded, selectedId) ?? viewRows[0];
 
-  async function commit(next: Rec[]) {
-    await persistAll(next, []);
+  async function commit(next: Rec[], evts: Audit[] = []) {
+    await persistAll(next, evts);
   }
 
-  async function run(action: string) {
+  async function run(action: string, options?: { title?: string; summary?: string }) {
     const effect = reduceAction(loaded, {
       screen,
       action,
@@ -96,10 +99,13 @@ export function ScreenRoute() {
       now: new Date().toISOString(),
       selectedId: selected?.id,
       ids: () => crypto.randomUUID(),
+      title: options?.title,
+      summary: options?.summary,
     });
     await persistAll(effect.records, effect.events);
     if (effect.selectId) setSelectedId(effect.selectId);
-    if (effect.overlay) setOverlay(effect.overlay);
+    if (effect.navigate) setOverlay(null);
+    else if (effect.overlay) setOverlay(effect.overlay);
     if (effect.tool) ui.setTool(effect.tool);
     if (effect.ask) ui.setAsk(true, effect.ask);
     if (effect.pickFile) fileRef.current?.click();
@@ -168,7 +174,7 @@ export function ScreenRoute() {
           <button key={name} className="btn-ghost" type="button" onClick={() => setOverlay(name)}>{name}</button>
         ))}
       </div>
-      <p className="sr" role="status">{status}</p>
+      <p className="meta" role="status">{status}</p>
       {denied ? (
         <section className="card">
           <h2>Outside this role</h2>
@@ -176,17 +182,30 @@ export function ScreenRoute() {
         </section>
       ) : (
         <div role="tabpanel" aria-labelledby={`${screen.id}-${tab}`}>
+          <p className="meta">{viewRows.length} records in {tab}</p>
           <Workspace
             screen={screen}
             tab={tab}
-            records={records}
-            events={events.filter((event) => event.organizationId === orgId)}
-            orgId={orgId}
-            rows={rows}
+            records={loaded}
+            events={events.filter((event) => event.organizationId === organizationId)}
+            orgId={organizationId}
+            rows={viewRows}
             selected={selected}
+            actor={ACTOR[ui.role]}
+            canPost={ui.role === "owner" || ui.role === "finance"}
             onSelect={setSelectedId}
+            onOpen={(id) => {
+              const rec = byId(loaded, id);
+              const path = rec ? detailRoute(rec.collection) : undefined;
+              if (!path) {
+                setSelectedId(id);
+                return;
+              }
+              navigate(path.replace(":org", slugFor(organizationId)).replace(":id", id));
+            }}
+            onNavigate={(path) => navigate(path)}
             onSave={saveRecord}
-            onRecords={async (next) => { await commit(next); }}
+            onRecords={async (next, evts) => { await commit(next, evts ?? []); }}
           />
         </div>
       )}
@@ -219,7 +238,20 @@ export function ScreenRoute() {
           <Dialog.Content className={overlay && /inspect|drawer|detail|preview|context/i.test(overlay) ? "drawer" : "modal"} aria-describedby="overlay-copy">
             <Dialog.Title>{overlay}</Dialog.Title>
             <p id="overlay-copy">{selected ? selected.summary || selected.title : "No record selected yet."}</p>
-            {selected && (
+            {overlay && /new|create|composer|setup|builder/i.test(overlay) ? (
+              <form
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  const data = new FormData(event.currentTarget);
+                  await run("Create", { title: String(data.get("title") ?? ""), summary: String(data.get("summary") ?? "") });
+                  setOverlay(null);
+                }}
+              >
+                <label className="field"><span>Title</span><input name="title" aria-label="Title" /></label>
+                <label className="field"><span>Summary</span><textarea name="summary" aria-label="Summary" /></label>
+                <button className="btn" type="submit">Create record</button>
+              </form>
+            ) : selected && (
               <form
                 onSubmit={async (event) => {
                   event.preventDefault();
@@ -247,6 +279,24 @@ export function ScreenRoute() {
   );
 }
 
+function rowsForScreen(screen: ScreenInfo, records: Rec[], orgId: string, tab: string, focusId?: string): Rec[] {
+  if (screen.id === "ARL-HQ-006" || screen.id === "ARL-TEAM-005") {
+    const name = tab.toLowerCase();
+    if (name.includes("department")) return inOrg(records, orgId, "departments");
+    const members = inOrg(records, orgId, "members");
+    if (name.includes("ai")) return members.filter((member) => member.fields.kind === "ai" || member.tags.includes("ai"));
+    if (name.includes("people") || name.includes("human")) return members.filter((member) => member.fields.kind === "human" || member.tags.includes("human"));
+    return members;
+  }
+  if (screen.route.includes("/projects/:id/board")) {
+    return filterTab(inOrg(records, orgId, "tasks").filter((task) => !focusId || task.parentId === focusId), tab, screen.tabs);
+  }
+  if (screen.route.includes("/missions/:id/tasks")) {
+    return filterTab(inOrg(records, orgId, "missionTasks").filter((task) => !focusId || task.parentId === focusId), tab, screen.tabs);
+  }
+  return filterTab(inOrg(records, orgId, screen.collection), tab, screen.tabs);
+}
+
 function onTabKey(event: KeyboardEvent, screen: ScreenInfo, tab: string, go: (tab: string) => void) {
   const index = screen.tabs.indexOf(tab);
   if (event.key === "ArrowRight") go(screen.tabs[(index + 1) % screen.tabs.length]);
@@ -263,12 +313,24 @@ function Workspace(props: {
   orgId: string;
   rows: Rec[];
   selected?: Rec;
+  actor: string;
+  canPost: boolean;
   onSelect: (id: string) => void;
+  onOpen: (id: string) => void;
+  onNavigate: (path: string) => void;
   onSave: (record: Rec) => Promise<void>;
-  onRecords: (records: Rec[]) => Promise<void>;
+  onRecords: (records: Rec[], events?: Audit[]) => Promise<void>;
 }) {
-  const { screen, records, orgId, rows, selected, onSelect, onSave, onRecords } = props;
+  const { screen, records, orgId, rows, selected, onSelect, onOpen, onSave, onRecords, tab } = props;
+  const desk = { record: selected as Rec, records, actor: props.actor, canPost: props.canPost, onSave, onRecords, onNavigate: props.onNavigate };
   const route = screen.route;
+  if (route.includes("/fin/ledger")) return <LedgerDesk records={records} orgId={orgId} selectedId={selected?.id} onSelect={onSelect} />;
+  if (route.includes("/fin/invoices/:id") && selected?.collection === "invoices") return <InvoiceDesk {...desk} record={selected} />;
+  if (route === "/o/:org/crm/deals/:id" && selected) return <DealDesk {...desk} record={selected} />;
+  if (route === "/o/:org/mission/missions/:id" && selected) return <MissionDesk {...desk} record={selected} />;
+  if (route === "/o/:org/project/projects/:id" && selected) return <ProjectDesk {...desk} record={selected} />;
+  if (route === "/o/:org/project/tasks/:id" && selected) return <TaskDesk {...desk} record={selected} />;
+  if (route === "/o/:org/team/agents/:id" && selected?.collection === "agents") return <AgentDesk {...desk} record={selected} />;
   const editor = selected && isEditor(screen, selected);
   if (screen.archetype === "dashboard" || (screen.archetype === "report" && !editor)) {
     return (
@@ -442,13 +504,23 @@ function Workspace(props: {
     );
   }
   if (screen.archetype === "board") {
+    if (/list|forecast|team/.test(tab.toLowerCase())) {
+      return <DataTable rows={rows} currency={currencyFor(orgId)} selectedId={selected?.id} onSelect={onSelect} onOpen={onOpen} />;
+    }
+    const cardId = rows.some((row) => row.id === selected?.id) ? selected?.id : undefined;
     return (
       <Board
         rows={rows}
+        tab={tab}
+        selectedId={cardId}
         onSelect={onSelect}
         onMove={async (id, status) => {
           const current = byId(records, id);
           if (!current) return;
+          if (/owner|assignee/.test(tab.toLowerCase())) {
+            await onSave({ ...current, fields: { ...current.fields, assignee: status } });
+            return;
+          }
           await onSave({ ...current, status, fields: { ...current.fields, stage: status } });
         }}
       />
@@ -510,7 +582,7 @@ function Workspace(props: {
       </section>
     );
   }
-  return <DataTable rows={rows} currency={currencyFor(orgId)} selectedId={selected?.id} onSelect={onSelect} />;
+  return <DataTable rows={rows} currency={currencyFor(orgId)} selectedId={selected?.id} onSelect={onSelect} onOpen={onOpen} />;
 }
 
 function isEditor(screen: ScreenInfo, record: Rec): boolean {
