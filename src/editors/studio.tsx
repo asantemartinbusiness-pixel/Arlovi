@@ -6,8 +6,8 @@ import type { Rec } from "@/domain/types";
 import { currencyFor, formatMoney } from "@/domain/types";
 import { downloadFile } from "@/runtime/db";
 
-function saveBody(record: Rec, body: unknown, onSave: (record: Rec) => void) {
-  onSave({ ...record, body });
+async function saveBody(record: Rec, body: unknown, onSave: (record: Rec) => void | Promise<void>) {
+  await onSave({ ...record, body });
 }
 
 export function DocumentEditor({ record, onSave }: { record: Rec; onSave: (record: Rec) => void }) {
@@ -146,7 +146,9 @@ export function DesignEditor({ record, onSave }: { record: Rec; onSave: (record:
   const nodes = ((record.body as { nodes?: DesignNode[] })?.nodes ?? []);
   const [selected, setSelected] = useState(nodes[0]?.id ?? "");
   const current = nodes.find((node) => node.id === selected) ?? nodes[0];
-  function write(next: DesignNode[]) { saveBody(record, { nodes: next }, onSave); }
+  async function write(next: DesignNode[]) {
+    await saveBody(record, { nodes: next }, onSave);
+  }
   function nudge(dx: number, dy: number) {
     if (!current) return;
     write(nodes.map((node) => node.id === current.id ? { ...node, x: node.x + dx, y: node.y + dy } : node));

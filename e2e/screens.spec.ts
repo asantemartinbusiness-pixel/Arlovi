@@ -54,13 +54,15 @@ test("a new design stays editable after reload", async ({ page }) => {
   await page.goto("/o/northline/design/files");
   await page.locator("#main").getByRole("button", { name: "New file", exact: true }).click();
   await expect(page).toHaveURL(/\/design\/files\/.+/);
-  const layers = page.locator("#main .editor aside");
+  const layers = page.locator("#main section.editor > aside").first();
+  await expect(layers).toBeVisible();
   const before = await layers.getByRole("button", { name: /^rect/ }).count();
   await page.locator("#main").getByRole("button", { name: "Add rectangle" }).click();
-  await expect(layers.getByRole("button", { name: /^rect/ })).toHaveCount(before + 1);
-  await page.getByRole("status").filter({ hasText: /Saved|layer/ }).first().waitFor({ state: "visible", timeout: 5000 }).catch(() => undefined);
+  await expect(page.getByRole("status")).toContainText("Saved", { timeout: 15_000 });
+  const afterAdd = await layers.getByRole("button", { name: /^rect/ }).count();
+  expect(afterAdd).toBe(before + 1);
   await page.reload();
-  await expect(layers.getByRole("button", { name: /^rect/ })).toHaveCount(before + 1);
+  await expect(layers.getByRole("button", { name: /^rect/ })).toHaveCount(afterAdd);
 });
 
 test("an AI employee appears in the directory and on the organization chart", async ({ page }) => {
