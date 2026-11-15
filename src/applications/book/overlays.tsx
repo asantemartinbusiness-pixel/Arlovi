@@ -455,7 +455,7 @@ export function ServiceEditor({ context, close }: { context: ScreenContext; clos
   const data = useBookData();
   const { org, now } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = useRecord(payload?.id ?? context.selectedId);
+  const existing = useRecord(payload?.id);
   const existingBody = bodyOf<ServiceBody>(existing, {});
   const [title, setTitle] = useState(existing?.title ?? "");
   const [minutes, setMinutes] = useState(String(existing?.fields.minutes ?? 45));
@@ -607,7 +607,7 @@ export function ResourceEditor({ context, close }: { context: ScreenContext; clo
   const data = useBookData();
   const { org } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = useRecord(payload?.id ?? context.selectedId);
+  const existing = useRecord(payload?.id);
   const [title, setTitle] = useState(existing?.title ?? "");
   const [kind, setKind] = useState(String(existing?.fields.kind ?? "person"));
   const [hours, setHours] = useState(String(existing?.fields.workingHours ?? "Mon–Fri 09:00–17:00"));
@@ -783,7 +783,7 @@ export function PrivacyPolicy() {
 
 export function ReminderTemplateEditor({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = useRecord(payload?.id ?? context.selectedId);
+  const existing = useRecord(payload?.id);
   const existingBody = bodyOf<{ subject?: string; body?: string }>(existing, {});
   const [title, setTitle] = useState(existing?.title ?? "");
   const [channel, setChannel] = useState(String(existing?.fields.channel ?? "email"));

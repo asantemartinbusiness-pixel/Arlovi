@@ -14,13 +14,14 @@ import {
   bodyOf, evaluateSegment, networkOf, rollUp, useMarketData,
   type AudienceBody, type CampaignBody, type ChannelPlan, type PostBody, type SiteBody,
 } from "./data";
+import { attributionFilter, PageChecksCard, useAttributionFilter } from "./actions";
 
 /* ====================================================================== *
  * MARKET panels. Each tab in the approved contract renders its own panel.
  * ====================================================================== */
 
 const toneForStatus = (status: string) =>
-  status === "active" ? "success" : status === "approval" ? "warning" : status === "completed" ? "neutral" : "info";
+  status === "active" || status === "approved" ? "success" : status === "approval" ? "warning" : status === "completed" ? "neutral" : "info";
 
 function channelTotals(channels: ChannelPlan[]) {
   return channels.reduce(
@@ -254,7 +255,7 @@ export function MarketingOverview({ context, lens }: { context: ScreenContext; l
 export function CampaignLibrary({ context, state }: { context: ScreenContext; state: string }) {
   const data = useMarketData();
   const { org } = useWorkspace();
-  const map: Record<string, string[]> = { All: [], Draft: ["draft"], Approval: ["approval"], Active: ["active"], Completed: ["completed", "archived"] };
+  const map: Record<string, string[]> = { All: [], Draft: ["draft"], Approval: ["approval", "approved"], Active: ["active"], Completed: ["completed", "archived"] };
   const wanted = map[state] ?? [];
   const rows = wanted.length === 0 ? data.campaigns : data.campaigns.filter((campaign) => wanted.includes(campaign.status));
 
@@ -271,6 +272,8 @@ export function CampaignLibrary({ context, state }: { context: ScreenContext; st
       rows={rows}
       rowId={(row) => row.id}
       label={`${state} campaigns`}
+      selectedId={context.selectedId}
+      onSelect={(id) => context.select(id)}
       onOpen={(id) => context.navigate(`/o/${org.slug}/market/campaigns/${id}`)}
       columns={[
         { key: "title", header: "Campaign", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary} ${String(row.fields.objective ?? "")}` },
@@ -1132,7 +1135,7 @@ export function LandingPages({ context, lens }: { context: ScreenContext; lens: 
         <Card span={3} title="Pages">
           <Stack gap={2}>
             {pages.map((item) => (
-              <button key={item.id} type="button" className="ds-record-card" aria-selected={item.id === page?.id} onClick={() => setSelected(item.id)}>
+              <button key={item.id} type="button" className="ds-record-card" aria-pressed={item.id === page?.id} onClick={() => { setSelected(item.id); context.select(item.id); }}>
                 <strong style={{ textAlign: "start" }}>{item.title}</strong>
                 <span className="ds-subtle">/{String(item.fields.slug)}</span>
               </button>
@@ -1168,6 +1171,7 @@ export function LandingPages({ context, lens }: { context: ScreenContext; lens: 
     const groups = [...new Set(variants.map((item) => String(item.fields.campaignId)))];
     return (
       <Stack gap={4}>
+        <PageChecksCard context={context} />
         {groups.map((campaignId) => {
           const members = variants.filter((item) => String(item.fields.campaignId) === campaignId);
           const campaign = data.campaigns.find((item) => item.id === campaignId);
@@ -1195,7 +1199,7 @@ export function LandingPages({ context, lens }: { context: ScreenContext; lens: 
             </Card>
           );
         })}
-        {groups.length === 0 && <Empty title="No tests" >A test needs two pages linked to the same campaign with different variants.</Empty>}
+        {groups.length === 0 && <Empty title="No variant tests" >A variant test needs two pages linked to the same campaign with different variants.</Empty>}
       </Stack>
     );
   }
@@ -1257,8 +1261,11 @@ export function Attribution({ context, lens }: { context: ScreenContext; lens: s
   const data = useMarketData();
   const { org, now } = useWorkspace();
   const [model, setModel] = useState<(typeof MODELS)[number]>("Last touch");
-  const channels = rollUp(data.campaigns);
-  const totals = channelTotals(channels);
+  const filter = useAttributionFilter();
+  const inFilter = (network: string) => filter.networks.length === 0 || filter.networks.includes(network);
+  const allChannels = rollUp(data.campaigns);
+  const channels = allChannels.filter((channel) => inFilter(channel.network));
+  const totals = channelTotals(allChannels);
   const touches = useMemo(() => {
     const map = new Map<string, { network: string; firstTouch: number; lastTouch: number; assisted: number }>();
     for (const campaign of data.campaigns) {
@@ -1273,6 +1280,13 @@ export function Attribution({ context, lens }: { context: ScreenContext; lens: s
     }
     return [...map.values()];
   }, [data.campaigns]);
+  const shownTouches = touches.filter((touch) => inFilter(touch.network));
+  const filterNote = filter.networks.length > 0 && (
+    <Notice tone="info" title={`Filtered to ${filter.networks.map((network) => networkOf(network).label).join(", ")}`}
+      actions={<Button size="sm" variant="ghost" onClick={() => attributionFilter.set({ networks: [] })}>Clear filter</Button>}>
+      Order totals and the unattributed figure still count every order.
+    </Notice>
+  );
 
   const orders = data.orders.filter((order) => order.status !== "cancelled");
   const unattributed = Math.max(0, orders.length - totals.conversions);
@@ -1350,15 +1364,32 @@ export function Attribution({ context, lens }: { context: ScreenContext; lens: s
   }
 
   if (lens === "Models") {
+    const credit = (row: { firstTouch: number; lastTouch: number; assisted: number }, name: (typeof MODELS)[number]) =>
+      name === "First touch" ? row.firstTouch : name === "Last touch" ? row.lastTouch : name === "Linear" ? Math.round((row.firstTouch + row.lastTouch + row.assisted) / 3) : 0;
     return (
       <Stack gap={4}>
+        {filterNote}
+        <Card title="Models side by side" subtitle="Conversions credited to each channel under every model, from the same stored touches" flush>
+          <DataGrid
+            rows={shownTouches}
+            rowId={(row) => row.network}
+            label="Attribution model comparison"
+            filterable={false}
+            columns={[
+              { key: "network", header: "Channel", primary: true, cell: (row) => networkOf(row.network).label },
+              ...(["First touch", "Last touch", "Linear"] as const).map((name) => ({ key: name, header: name, align: "end" as const, cell: (row: { firstTouch: number; lastTouch: number; assisted: number }) => String(credit(row, name)) })),
+              { key: "spread", header: "Spread", align: "end", cell: (row) => { const values = (["First touch", "Last touch", "Linear"] as const).map((name) => credit(row, name)); return String(Math.max(...values) - Math.min(...values)); } },
+            ]}
+            summary={<span>{unattributed} orders are unattributed under every model.</span>}
+          />
+        </Card>
         <Row gap={3} wrap>
           <Field label="Attribution model"><Select value={model} onChange={(event) => setModel(event.target.value as (typeof MODELS)[number])}>{MODELS.map((item) => <option key={item}>{item}</option>)}</Select></Field>
           <Button variant="secondary" onClick={() => context.openOverlay("Attribution model", { model })}>How this model works</Button>
         </Row>
         <Card title={`${model} by channel`} subtitle="The same stored touches, read a different way" flush>
           <DataGrid
-            rows={model === "Unattributed" ? [{ network: "none", firstTouch: unattributed, lastTouch: unattributed, assisted: unattributed }] : touches}
+            rows={model === "Unattributed" ? [{ network: "none", firstTouch: unattributed, lastTouch: unattributed, assisted: unattributed }] : shownTouches}
             rowId={(row) => row.network}
             label="Attribution by model"
             filterable={false}
@@ -1378,6 +1409,7 @@ export function Attribution({ context, lens }: { context: ScreenContext; lens: s
 
   return (
     <Stack gap={4}>
+      {filterNote}
       <StatRow>
         <Stat label="Orders" value={String(orders.length)} meta="Excluding cancellations" />
         <Stat label="Claimed conversions" value={String(totals.conversions)} meta="Across all channels" />
@@ -1429,12 +1461,14 @@ export function MarketTemplates({ context, state }: { context: ScreenContext; st
         <Card key={template.id} span={4} title={template.title} subtitle={template.summary}
           actions={<Row gap={1}><Pill>{String(template.fields.kind)}</Pill><Pill tone={template.status === "approved" ? "success" : template.status === "archived" ? "neutral" : "warning"}>{template.status}</Pill></Row>}
           footer={<>
-            <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Template editor", { id: template.id })}>Edit</Button>
-            <Button size="sm" variant="ghost" onClick={() => context.openOverlay("approval", { id: template.id })}>Review</Button>
-            <Button size="sm" variant="ghost" onClick={() => context.openOverlay("global update impact", { id: template.id })}>Impact</Button>
+            <Button size="sm" variant={context.selectedId === template.id ? "primary" : "secondary"} aria-pressed={context.selectedId === template.id} onClick={() => context.select(context.selectedId === template.id ? undefined : template.id)}>{context.selectedId === template.id ? "Selected" : "Select"}</Button>
+            <Button size="sm" variant="ghost" onClick={() => { context.select(template.id); context.openOverlay("Template editor", { id: template.id }); }}>Edit</Button>
+            <Button size="sm" variant="ghost" onClick={() => { context.select(template.id); context.openOverlay("approval", { id: template.id }); }}>Review</Button>
+            <Button size="sm" variant="ghost" onClick={() => { context.select(template.id); context.openOverlay("global update impact", { id: template.id }); }}>Impact</Button>
           </>}>
           <Properties rows={[
             { label: "Version", value: String(template.fields.version ?? 1) },
+            { label: "Published", value: template.fields.publishedVersion ? `version ${String(template.fields.publishedVersion)}` : "Not published" },
             { label: "Used by", value: `${template.fields.usedBy ?? 0} live items` },
             { label: "Brand checked", value: template.fields.brandChecked === true ? <Pill tone="success">Yes</Pill> : <Pill tone="warning">Not checked</Pill> },
             { label: "Updated", value: context.relative(template.updatedAt) },

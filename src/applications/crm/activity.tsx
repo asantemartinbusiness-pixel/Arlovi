@@ -596,9 +596,26 @@ export function ForecastHistory({ context }: { context: ScreenContext }) {
 
   return (
     <Stack gap={4}>
-      <Notice tone="warning" title="Historical accuracy cannot be measured here">
-        This workspace does not keep a snapshot of what the forecast said last month, so there is nothing honest to compare a past forecast against. What can be shown is what closed and what was invoiced.
-      </Notice>
+      {(() => {
+        const snapshots = data.preferences.filter((record) => record.fields.kind === "salesForecastSnapshot").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        return snapshots.length === 0 ? (
+          <Notice tone="warning" title="Historical accuracy cannot be measured yet">
+            No forecast has been reviewed, so there is no snapshot of what the forecast said to compare against. Use Review to freeze one. What can be shown meanwhile is what closed and what was invoiced.
+          </Notice>
+        ) : (
+          <Card eyebrow="REVIEWED" prov="human" title="Reviewed forecasts" subtitle="Snapshots frozen when someone reviewed the forecast">
+            <Stack gap={2}>
+              {snapshots.map((snapshot) => (
+                <Row key={snapshot.id} gap={3}>
+                  <span className="ds-num ds-subtle">{context.date(snapshot.createdAt)}</span>
+                  <span className="ds-grow">{String(snapshot.fields.reviewedBy ?? snapshot.createdBy)} · {snapshot.summary}</span>
+                  <Money minor={Number(snapshot.fields.weightedMinor ?? 0)} context={context} bold />
+                </Row>
+              ))}
+            </Stack>
+          </Card>
+        );
+      })()}
       <Card eyebrow="OUTCOMES" prov="posted" title="Closed won against invoiced" subtitle="Deals closed in the month and invoices issued in the same month">
         <LineChart
           title="Closed won and invoiced by month"

@@ -469,7 +469,8 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
 export function StageChangeValidation({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCrmData();
   const move = useStageMove(context);
-  const deal = data.deals.find((item) => item.id === context.selectedId);
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const deal = data.deals.find((item) => item.id === (payload?.id ?? context.selectedId ?? context.params.id));
   const [target, setTarget] = useState(deal ? stageOf(deal).id : "discovery");
   const [busy, setBusy] = useState(false);
   if (!deal) return <Empty title="Select a deal first">Choose a card on the board, then validate a stage change.</Empty>;

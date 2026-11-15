@@ -214,8 +214,26 @@ export function PhotoCanvas({ handle, bank, paintTarget = "layer", showSelection
     }
 
     const start = toImage(event.clientX, event.clientY);
+    const cloning = paintTarget === "layer" && photoUi.get().tool === "clone";
+    /* Clone stamp: copy pixels from the sampled point (Alt-click), keeping
+       the offset between it and the first dab for the whole stroke. */
+    const source = photoUi.get().cloneSource ?? { x: start.x + 60, y: start.y };
+    const offset = { x: source.x - start.x, y: source.y - start.y };
+    const snapshot = cloning ? makeCanvas(width, height) : null;
+    if (snapshot) context2d(snapshot).drawImage(canvas, 0, 0);
+    const cloneDab = (point: Pt) => {
+      if (!snapshot) return;
+      const radius = Math.max(0.5, photoUi.get().brush.size / 2);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.globalAlpha = photoUi.get().brush.opacity;
+      ctx.drawImage(snapshot, -offset.x, -offset.y);
+      ctx.restore();
+    };
     const brush = { ...photoUi.get().brush, color: paintTarget === "mask" ? (photoUi.get().brush.mode === "erase" ? "#ffffff" : "#000000") : photoUi.get().brush.color, mode: paintTarget === "mask" ? "paint" as const : photoUi.get().brush.mode };
-    brushDab(ctx, start, brush);
+    if (cloning) cloneDab(start); else brushDab(ctx, start, brush);
     painting.current = { layerId: layer.id, canvas, last: start };
     paintPreview();
 
@@ -224,7 +242,7 @@ export function PhotoCanvas({ handle, bank, paintTarget = "layer", showSelection
         const live = painting.current;
         if (!live) return;
         const next = toImage(point.x, point.y);
-        for (const dab of strokePoints(live.last, next, Math.max(1, brush.size / 6))) brushDab(ctx, dab, brush);
+        for (const dab of strokePoints(live.last, next, Math.max(1, brush.size / 6))) { if (cloning) cloneDab(dab); else brushDab(ctx, dab, brush); }
         live.last = next;
         paintPreview();
       },
@@ -240,7 +258,7 @@ export function PhotoCanvas({ handle, bank, paintTarget = "layer", showSelection
               ? { ...item, mask: data, maskEnabled: true }
               : { ...item, src: data, naturalWidth: width, naturalHeight: height, w: item.w || width, h: item.h || height })
             : item)),
-        }), paintTarget === "mask" ? "Paint on the mask" : photoUi.get().brush.mode === "erase" ? "Erase" : "Brush stroke");
+        }), paintTarget === "mask" ? "Paint on the mask" : cloning ? "Clone stamp" : photoUi.get().brush.mode === "erase" ? "Erase" : "Brush stroke");
         bumpPixels();
       },
     });
@@ -291,6 +309,11 @@ export function PhotoCanvas({ handle, bank, paintTarget = "layer", showSelection
       const hex = `#${[pixel[0], pixel[1], pixel[2]].map((value) => value.toString(16).padStart(2, "0")).join("")}`;
       photoUi.set((c) => ({ ...c, brush: { ...c.brush, color: hex } }));
       onSample?.(hex);
+      return;
+    }
+    if (tool === "clone" && event.altKey) {
+      const point = toImage(event.clientX, event.clientY);
+      photoUi.set((c) => ({ ...c, cloneSource: point }));
       return;
     }
     if (tool === "brush" || tool === "eraser" || tool === "clone") {

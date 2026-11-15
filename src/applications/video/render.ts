@@ -283,16 +283,24 @@ export function renderFrame(canvas: HTMLCanvasElement, doc: VideoDoc, time: numb
   if (options.captions) {
     const caption = captionAt(doc, time, options.language ?? "en");
     if (caption) {
-      const size = Math.round(height / 22);
+      const style = doc.captionStyle ?? { position: "bottom", scale: 1, box: true };
+      const size = Math.round((height / 22) * style.scale);
       ctx.font = `600 ${size}px Inter, sans-serif`;
       ctx.textAlign = "center";
       const text = caption.text;
       const metrics = ctx.measureText(text);
       const padding = size * 0.5;
-      ctx.fillStyle = "rgba(0,0,0,0.66)";
-      ctx.fillRect(width / 2 - metrics.width / 2 - padding, height - size * 3, metrics.width + padding * 2, size * 1.7);
+      const top = style.position === "top" ? size * 1.3 : height - size * 3;
+      if (style.box) {
+        ctx.fillStyle = "rgba(0,0,0,0.66)";
+        ctx.fillRect(width / 2 - metrics.width / 2 - padding, top, metrics.width + padding * 2, size * 1.7);
+      } else {
+        ctx.strokeStyle = "rgba(0,0,0,0.85)";
+        ctx.lineWidth = Math.max(2, size / 8);
+        ctx.strokeText(text, width / 2, top + size * 1.1);
+      }
       ctx.fillStyle = caption.reviewed ? "#FFFFFF" : "#FFE2A8";
-      ctx.fillText(text, width / 2, height - size * 1.9);
+      ctx.fillText(text, width / 2, top + size * 1.1);
       ctx.textAlign = "start";
     }
   }

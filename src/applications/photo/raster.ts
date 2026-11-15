@@ -74,6 +74,8 @@ export interface PhotoLayer {
   w: number;
   h: number;
   rotation: number;
+  /** Mirror the layer horizontally about its centre. */
+  flipX?: boolean;
   /** An adjustment layer with this set only affects the layer directly below. */
   clipToBelow?: boolean;
   parentId?: string;
@@ -627,6 +629,7 @@ export function compositeDoc(
     const cy = (layer.y + layer.h / 2) * scaleY;
     paint.translate(cx, cy);
     if (layer.rotation) paint.rotate((layer.rotation * Math.PI) / 180);
+    if (layer.flipX) paint.scale(-1, 1);
     paint.translate(-cx, -cy);
 
     if (layer.kind === "fill" && layer.color) {

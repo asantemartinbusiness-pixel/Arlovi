@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Pill } from "@/design-system";
 import { clamp } from "@/applications/visual/geometry";
 import { dragPointer, useMeasure, useStore, type DocHandle } from "@/applications/visual/kit";
 import {
-  NUMERIC_PROPERTIES, easeAt, keyframeCount, moveKeyframe, sampleAll, sampleLayer,
+  NUMERIC_PROPERTIES, easeAt, keyframeCount, moveKeyframe, removeKeyframe, sampleAll, sampleLayer,
   type AnimatableProperty, type Easing, type MotionDoc, type MotionLayer, type SampledLayer,
 } from "./anim";
 import { motionUi, setMotionTime } from "./model";
@@ -12,13 +12,20 @@ import { motionUi, setMotionTime } from "./model";
  * The stage: every visible layer sampled at the current time.
  * ====================================================================== */
 
-function LayerShape({ sampled, muted }: { sampled: SampledLayer; muted?: number }) {
+/** Translate to the box, then rotate and scale about the box centre — the same order the CSS export uses. */
+export function layerTransform(sampled: SampledLayer): string {
   const { layer } = sampled;
-  const transform = `translate(${layer.box.x + sampled.x} ${layer.box.y + sampled.y}) rotate(${sampled.rotation} ${layer.box.w / 2} ${layer.box.h / 2}) scale(${sampled.scale})`;
+  const cx = layer.box.w / 2;
+  const cy = layer.box.h / 2;
+  return `translate(${layer.box.x + sampled.x} ${layer.box.y + sampled.y}) translate(${cx} ${cy}) rotate(${sampled.rotation}) scale(${sampled.scale}) translate(${-cx} ${-cy})`;
+}
+
+export function LayerShape({ sampled, muted, selected, missing }: { sampled: SampledLayer; muted?: number; selected?: boolean; missing?: boolean }) {
+  const { layer } = sampled;
   const opacity = muted ?? sampled.opacity;
   const filter = sampled.blur > 0 ? `blur(${sampled.blur}px)` : undefined;
   return (
-    <g transform={transform} opacity={opacity} style={{ filter }} data-layer={layer.id}>
+    <g transform={layerTransform(sampled)} opacity={opacity} style={{ filter }} data-layer={layer.id}>
       {layer.kind === "ellipse" && <ellipse cx={layer.box.w / 2} cy={layer.box.h / 2} rx={layer.box.w / 2} ry={layer.box.h / 2} fill={sampled.colour} />}
       {layer.kind === "rect" && <rect width={layer.box.w} height={layer.box.h} rx={layer.radius ?? 0} fill={sampled.colour} />}
       {layer.kind === "path" && layer.path && <path d={layer.path} fill={sampled.colour} />}
@@ -36,17 +43,40 @@ function LayerShape({ sampled, muted }: { sampled: SampledLayer; muted?: number 
           {layer.text}
         </text>
       )}
+      {missing && (
+        <rect width={layer.box.w} height={layer.box.h} fill="none" strokeWidth={2} strokeDasharray="6 4" style={{ stroke: "var(--warning)" }} />
+      )}
+      {selected && (
+        <rect
+          x={-3} y={-3} width={layer.box.w + 6} height={layer.box.h + 6}
+          fill="none" strokeWidth={1.5} strokeDasharray="4 3" pointerEvents="none"
+          style={{ stroke: "var(--accent)" }}
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
     </g>
   );
 }
 
+/**
+ * The time the reduced-motion alternative shows: the first frame for a
+ * static alternative, the final frame (faded in) for a cross-fade.
+ */
+export function reducedFrame(doc: MotionDoc, time: number): { time: number; fade: number } {
+  if (doc.reducedMotion.strategy === "static-first-frame") return { time: 0, fade: 1 };
+  if (doc.reducedMotion.strategy === "cross-fade") return { time: doc.duration, fade: Math.min(1, time / 0.4) };
+  return { time, fade: 1 };
+}
+
 export function Stage({
-  doc, time, height = 320, onion = false, selectedId, onSelect, reduced = false,
+  doc, time, height = 320, onion = false, selectedId, onSelect, reduced = false, missingIds, label, onLayerPointerDown,
 }: {
-  doc: MotionDoc; time: number; height?: number; onion?: boolean;
-  selectedId?: string; onSelect?: (id: string) => void; reduced?: boolean;
+  doc: MotionDoc; time: number; height?: number | string; onion?: boolean;
+  selectedId?: string; onSelect?: (id: string) => void; reduced?: boolean; missingIds?: string[]; label?: string;
+  onLayerPointerDown?: (id: string, event: ReactPointerEvent<SVGGElement>) => void;
 }) {
-  const effective = reduced ? (doc.reducedMotion.strategy === "static-first-frame" ? 0 : doc.duration) : time;
+  const alternative = reduced ? reducedFrame(doc, time) : { time, fade: 1 };
+  const effective = alternative.time;
   const sampled = useMemo(() => sampleAll(doc, effective), [doc, effective]);
   const onionFrames = useMemo(() => {
     if (!onion) return [] as { time: number; layers: SampledLayer[] }[];
@@ -66,10 +96,11 @@ export function Stage({
   return (
     <svg
       viewBox={`0 0 ${doc.width} ${doc.height}`}
-      role="img"
-      aria-label={`Composition at ${effective.toFixed(2)} seconds, ${sampled.length} layers`}
+      role={onSelect ? "group" : "img"}
+      aria-label={label ?? `Composition at ${effective.toFixed(2)} seconds, ${sampled.length} layers${reduced ? ", reduced-motion alternative" : ""}`}
       data-testid="motion-stage"
-      style={{ display: "block", width: "100%", height, background: doc.background, borderRadius: 8 }}
+      preserveAspectRatio="xMidYMid meet"
+      style={{ display: "block", width: "100%", height, background: doc.background, borderRadius: 8, opacity: alternative.fade }}
     >
       {onionFrames.map((frame, index) => (
         <g key={index} opacity={doc.onionSkin.opacity} aria-hidden="true">
@@ -77,21 +108,12 @@ export function Stage({
         </g>
       ))}
       {sampled.map((item) => (
-        <g key={item.layer.id} onPointerDown={onSelect ? () => onSelect(item.layer.id) : undefined} style={{ cursor: onSelect ? "pointer" : "default" }}>
-          <LayerShape sampled={item} />
-          {selectedId === item.layer.id && (
-            <rect
-              x={item.layer.box.x + item.x}
-              y={item.layer.box.y + item.y}
-              width={item.layer.box.w}
-              height={item.layer.box.h}
-              fill="none"
-              stroke="#234FE8"
-              strokeWidth={1.5}
-              strokeDasharray="4 3"
-              pointerEvents="none"
-            />
-          )}
+        <g
+          key={item.layer.id}
+          onPointerDown={onSelect ? (event) => { onSelect(item.layer.id); onLayerPointerDown?.(item.layer.id, event); } : undefined}
+          style={{ cursor: onLayerPointerDown ? (item.layer.locked ? "not-allowed" : "move") : onSelect ? "pointer" : "default" }}
+        >
+          <LayerShape sampled={item} selected={selectedId === item.layer.id} missing={Boolean(missingIds?.includes(item.layer.id))} />
         </g>
       ))}
     </svg>
@@ -102,7 +124,7 @@ export function Stage({
  * The keyframe timeline.
  * ====================================================================== */
 
-export function KeyframeTimeline({ handle, height = 230 }: { handle: DocHandle<MotionDoc>; height?: number }) {
+export function KeyframeTimeline({ handle, height = 230, onOpenKeyframe }: { handle: DocHandle<MotionDoc>; height?: number; onOpenKeyframe?: () => void }) {
   const ui = useStore(motionUi);
   const [frameRef, size] = useMeasure<HTMLDivElement>();
   const doc = handle.doc;
@@ -201,10 +223,18 @@ export function KeyframeTimeline({ handle, height = 230 }: { handle: DocHandle<M
                       end: (moved) => { if (moved) handle.beginGesture(); },
                     });
                   }}
+                  onFocus={() => motionUi.set((current) => ({ ...current, selectedLayerId: row.layer.id, selectedProperty: row.property, selectedKeyframeId: keyframe.id }))}
+                  onDoubleClick={() => onOpenKeyframe?.()}
                   onKeyDown={(event) => {
                     const step = event.shiftKey ? 5 / doc.fps : 1 / doc.fps;
                     if (event.key === "ArrowLeft") { event.preventDefault(); handle.edit((current) => moveKeyframe(current, row.layer.id, row.property!, keyframe.id, keyframe.t - step), "Move the keyframe"); }
                     if (event.key === "ArrowRight") { event.preventDefault(); handle.edit((current) => moveKeyframe(current, row.layer.id, row.property!, keyframe.id, keyframe.t + step), "Move the keyframe"); }
+                    if (event.key === "Enter") { event.preventDefault(); onOpenKeyframe?.(); }
+                    if (event.key === "Delete" || event.key === "Backspace") {
+                      event.preventDefault();
+                      handle.edit((current) => removeKeyframe(current, row.layer.id, row.property!, keyframe.id), "Delete the keyframe");
+                      motionUi.set((current) => ({ ...current, selectedKeyframeId: undefined }));
+                    }
                   }}
                 />
               ))}
@@ -235,55 +265,62 @@ export function KeyframeTimeline({ handle, height = 230 }: { handle: DocHandle<M
  * ====================================================================== */
 
 export function EasingGraph({
-  easing, onChange, size = 230, progress,
-}: { easing: Easing; onChange: (next: Easing) => void; size?: number; progress?: number }) {
+  easing, onChange, size = 230, progress, label = "Easing curve",
+}: { easing: Easing; onChange: (next: Easing) => void; size?: number; progress?: number; label?: string }) {
   const points = easing.points ?? [0.25, 0.1, 0.25, 1];
   const curve = useMemo(() => {
     const parts: string[] = [];
-    for (let step = 0; step <= 60; step += 1) {
-      const t = step / 60;
+    for (let step = 0; step <= 80; step += 1) {
+      const t = step / 80;
       const value = easeAt(easing, t);
       parts.push(`${step === 0 ? "M" : "L"} ${(t * size).toFixed(1)} ${(size - value * size).toFixed(1)}`);
     }
     return parts.join(" ");
   }, [easing, size]);
 
+  const write = (index: 0 | 1, x: number, y: number) => {
+    const next: [number, number, number, number] = [...points] as [number, number, number, number];
+    next[index * 2] = Math.round(clamp(x, 0, 1) * 1000) / 1000;
+    next[index * 2 + 1] = Math.round(clamp(y, -0.6, 1.6) * 1000) / 1000;
+    onChange({ kind: "bezier", points: next });
+  };
+
   const dragHandle = (index: 0 | 1) => (event: ReactPointerEvent<SVGCircleElement>) => {
     event.stopPropagation();
+    event.preventDefault();
     const svg = event.currentTarget.ownerSVGElement;
     if (!svg) return;
+    (event.currentTarget as SVGCircleElement).focus();
     dragPointer(event as unknown as ReactPointerEvent, {
       move: (point) => {
-        const rect = svg.getBoundingClientRect();
-        const x = clamp((point.x - rect.left) / rect.width, 0, 1);
-        const y = clamp(1 - (point.y - rect.top) / rect.height, -0.6, 1.6);
-        const next: [number, number, number, number] = [...points] as [number, number, number, number];
-        next[index * 2] = Math.round(x * 1000) / 1000;
-        next[index * 2 + 1] = Math.round(y * 1000) / 1000;
-        onChange({ kind: "bezier", points: next });
+        const matrix = svg.getScreenCTM();
+        if (!matrix) return;
+        const local = new DOMPoint(point.x, point.y).matrixTransform(matrix.inverse());
+        write(index, local.x / size, 1 - local.y / size);
       },
     });
+  };
+
+  const keyHandle = (index: 0 | 1) => (event: React.KeyboardEvent<SVGCircleElement>) => {
+    const step = event.shiftKey ? 0.05 : 0.01;
+    const x = points[index * 2];
+    const y = points[index * 2 + 1];
+    if (event.key === "ArrowLeft") write(index, x - step, y);
+    else if (event.key === "ArrowRight") write(index, x + step, y);
+    else if (event.key === "ArrowUp") write(index, x, y + step);
+    else if (event.key === "ArrowDown") write(index, x, y - step);
+    else return;
+    event.preventDefault();
   };
 
   const editable = easing.kind === "bezier";
   return (
     <svg
-      viewBox={`-20 -40 ${size + 40} ${size + 80}`}
-      role="application"
-      tabIndex={0}
-      aria-label={`Easing curve, ${easing.kind}${editable ? `, control points ${points.join(", ")}` : ""}. Arrow keys move the first control point.`}
-      style={{ width: "100%", background: "#0B1020", borderRadius: 8, touchAction: "none" }}
-      onKeyDown={(event) => {
-        if (!editable) return;
-        const step = event.shiftKey ? 0.05 : 0.01;
-        const next: [number, number, number, number] = [...points] as [number, number, number, number];
-        if (event.key === "ArrowLeft") { event.preventDefault(); next[0] = clamp(next[0] - step, 0, 1); }
-        else if (event.key === "ArrowRight") { event.preventDefault(); next[0] = clamp(next[0] + step, 0, 1); }
-        else if (event.key === "ArrowUp") { event.preventDefault(); next[1] = clamp(next[1] + step, -0.6, 1.6); }
-        else if (event.key === "ArrowDown") { event.preventDefault(); next[1] = clamp(next[1] - step, -0.6, 1.6); }
-        else return;
-        onChange({ kind: "bezier", points: next });
-      }}
+      viewBox={`-20 -60 ${size + 40} ${size + 110}`}
+      role="group"
+      aria-label={`${label}: ${easing.kind}${editable ? `, cubic-bezier(${points.join(", ")})` : ""}`}
+      data-testid="easing-graph"
+      style={{ width: "100%", maxWidth: 420, background: "var(--graphite-900)", borderRadius: 8, touchAction: "none", display: "block" }}
     >
       <rect x={0} y={0} width={size} height={size} fill="rgba(255,255,255,0.04)" />
       {[0.25, 0.5, 0.75].map((fraction) => (
@@ -293,20 +330,38 @@ export function EasingGraph({
         </g>
       ))}
       <line x1={0} y1={size} x2={size} y2={0} stroke="rgba(255,255,255,0.18)" strokeDasharray="4 4" />
-      <path d={curve} fill="none" stroke="#7FB4FF" strokeWidth={2.2} />
+      <path d={curve} fill="none" strokeWidth={2.4} style={{ stroke: "var(--cobalt-300)" }} />
       {editable && (
         <>
-          <line x1={0} y1={size} x2={points[0] * size} y2={size - points[1] * size} stroke="#FFAE7C" strokeWidth={1} />
-          <line x1={size} y1={0} x2={points[2] * size} y2={size - points[3] * size} stroke="#FFAE7C" strokeWidth={1} />
-          <circle cx={points[0] * size} cy={size - points[1] * size} r={7} fill="#FFAE7C" style={{ cursor: "grab" }} onPointerDown={dragHandle(0)} />
-          <circle cx={points[2] * size} cy={size - points[3] * size} r={7} fill="#FFAE7C" style={{ cursor: "grab" }} onPointerDown={dragHandle(1)} />
+          <line x1={0} y1={size} x2={points[0] * size} y2={size - points[1] * size} strokeWidth={1} style={{ stroke: "var(--papaya-400)" }} />
+          <line x1={size} y1={0} x2={points[2] * size} y2={size - points[3] * size} strokeWidth={1} style={{ stroke: "var(--papaya-400)" }} />
+          {([0, 1] as const).map((index) => (
+            <circle
+              key={index}
+              className="mo-handle"
+              cx={points[index * 2] * size}
+              cy={size - points[index * 2 + 1] * size}
+              r={9}
+              tabIndex={0}
+              role="slider"
+              aria-label={`Control point ${index + 1}. Arrow keys move it, Shift for larger steps.`}
+              aria-valuetext={`x ${points[index * 2]}, y ${points[index * 2 + 1]}`}
+              aria-valuenow={points[index * 2 + 1]}
+              aria-valuemin={-0.6}
+              aria-valuemax={1.6}
+              data-testid={`easing-handle-${index + 1}`}
+              style={{ fill: "var(--papaya-400)", cursor: "grab" }}
+              onPointerDown={dragHandle(index)}
+              onKeyDown={keyHandle(index)}
+            />
+          ))}
         </>
       )}
       {progress !== undefined && progress >= 0 && progress <= 1 && (
-        <circle cx={progress * size} cy={size - easeAt(easing, progress) * size} r={5} fill="#36C5BA" stroke="#0B1020" strokeWidth={2} />
+        <circle cx={progress * size} cy={size - easeAt(easing, progress) * size} r={5} strokeWidth={2} style={{ fill: "var(--aqua-400)", stroke: "var(--graphite-900)" }} />
       )}
-      <text x={0} y={size + 20} fontSize={11} fill="rgba(255,255,255,0.6)">time →</text>
-      <text x={-14} y={6} fontSize={11} fill="rgba(255,255,255,0.6)" transform={`rotate(-90 -14 6)`}>value →</text>
+      <text x={0} y={size + 22} fontSize={11} fill="rgba(255,255,255,0.7)">time →</text>
+      <text x={-6} y={-8} fontSize={11} fill="rgba(255,255,255,0.7)">value ↑</text>
     </svg>
   );
 }
@@ -315,34 +370,50 @@ export function EasingGraph({
  * Playback at the real frame rate.
  * ====================================================================== */
 
+/**
+ * Playback at the composition's own frame rate. Time comes from the wall
+ * clock, and the stage only advances when a whole frame has elapsed, so a
+ * 12 fps composition really plays at 12 frames a second on any display.
+ */
 export function useMotionPlayback(doc: MotionDoc | null): { fps: number } {
   const ui = useStore(motionUi);
   const raf = useRef(0);
-  const last = useRef(0);
   const frames = useRef<number[]>([]);
-  const measured = useRef(0);
+  const [measured, setMeasured] = useState(0);
+  const duration = doc?.duration ?? 0;
+  const fps = doc?.fps ?? 30;
 
   useEffect(() => {
-    if (!doc || !ui.playing) return;
-    last.current = performance.now();
+    if (!ui.playing || duration <= 0) return;
+    let origin = performance.now() - motionUi.get().time * 1000;
+    let lastFrame = -1;
+    frames.current = [];
     const tick = (now: number) => {
-      const delta = (now - last.current) / 1000;
-      last.current = now;
-      frames.current.push(now);
-      while (frames.current.length > 1 && now - frames.current[0] > 1000) frames.current.shift();
-      measured.current = frames.current.length;
-      motionUi.set((current) => {
-        const next = current.time + delta;
-        if (next >= doc.duration) return current.loop ? { ...current, time: 0 } : { ...current, time: doc.duration, playing: false };
-        return { ...current, time: next };
-      });
+      let elapsed = (now - origin) / 1000;
+      if (elapsed >= duration) {
+        if (motionUi.get().loop) {
+          origin = now;
+          elapsed = 0;
+        } else {
+          motionUi.set((current) => ({ ...current, time: duration, playing: false }));
+          return;
+        }
+      }
+      const frame = Math.floor(elapsed * fps);
+      if (frame !== lastFrame) {
+        lastFrame = frame;
+        frames.current.push(now);
+        while (frames.current.length > 1 && now - frames.current[0] > 1000) frames.current.shift();
+        motionUi.set((current) => ({ ...current, time: frame / fps }));
+        if (frame % fps === 0) setMeasured(frames.current.length);
+      }
       raf.current = requestAnimationFrame(tick);
     };
     raf.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf.current);
-  }, [doc, ui.playing, ui.loop]);
+  }, [ui.playing, duration, fps]);
 
-  return { fps: measured.current };
+  return { fps: ui.playing ? measured : 0 };
 }
 
 export function TransportRow({ doc, fps }: { doc: MotionDoc; fps: number }) {

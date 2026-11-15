@@ -14,6 +14,10 @@ export interface VideoUi {
   /** Playback rate; J and L step through −2, −1, 0, 1, 2. */
   rate: number;
   selectedClipId?: string;
+  /** The source picked in the media bin. */
+  selectedSourceId?: string;
+  /** The audio track picked in the mixer. */
+  selectedTrackId?: string;
   zoom: number;
   snapToClips: boolean;
   showCaptions: boolean;

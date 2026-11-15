@@ -11,7 +11,7 @@ import { registerApp, type ActionDef, type ScreenContext } from "@/platform/regi
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import {
   EditorFrame, PanelGroup, RecoveryNotice, SaveState, ShortcutTable, downloadBlob,
-  slug, useDoc, useStore, type DocHandle,
+  slug, useStore, type DocHandle,
 } from "@/applications/visual/kit";
 import {
   NEUTRAL_ADJUST, addLayer, bakeCrop, compositeImageData, describeAdjust, exportComposite,
@@ -19,6 +19,8 @@ import {
   newAdjustmentLayer, patchLayer, selectionBoundsOf,
   type Adjust, type PhotoLayer, type RasterDoc,
 } from "./raster";
+import { addToAssetLibrary, batchUi, buildBatch, downloadResults, exportImage, exportUi, heldBatchFiles, runBatch, testSample } from "./jobs";
+import { canUndoShared, editShared, readShared, sharedHandle, undoShared, useSharedDoc } from "@/applications/design/sharedDoc";
 import { PhotoCanvas, useImageBank, LayerThumb, type ImageBank } from "./canvas";
 import { AdjustControls, CurveEditor, HistogramView, LayerProperties, PhotoLayers, useHistogram } from "./panels";
 import {
@@ -31,7 +33,7 @@ import {
 
 function usePhotoDoc(context: ScreenContext) {
   const record = useRecord(context.params.id);
-  const handle = useDoc<RasterDoc>(record, parsePhoto, context.screen.id);
+  const handle = useSharedDoc<RasterDoc>(record, parsePhoto, context.screen.id);
   const bank = useImageBank(handle.doc);
   return { record, handle, bank };
 }
@@ -768,97 +770,18 @@ function moveLayerLocal(doc: RasterDoc, id: string, delta: number): RasterDoc {
 
 /* ---------------------------- PHOTO-006 ---------------------------- */
 
-interface BatchJob {
-  id: string;
-  recordId: string;
-  title: string;
-  state: "queued" | "running" | "done" | "failed";
-  outName?: string;
-  bytes?: number;
-  width?: number;
-  height?: number;
-  reason?: string;
-}
-
 function BatchScreen({ context, lens }: { context: ScreenContext; lens: "Queue" | "Presets" | "Results" | "Failed" }) {
   const photos = useCollection("photos");
-  const [jobs, setJobs] = useState<BatchJob[]>([]);
-  const [chosen, setChosen] = useState<string[]>([]);
-  const [format, setFormat] = useState<"png" | "jpeg" | "webp">("jpeg");
-  const [quality, setQuality] = useState(0.82);
-  const [longEdge, setLongEdge] = useState(1600);
-  const [pattern, setPattern] = useState("{name}-{w}x{h}");
-  const [running, setRunning] = useState(false);
-  const [done, setDone] = useState(0);
-
-  const existingNames = useMemo(() => new Set(jobs.filter((job) => job.state === "done").map((job) => job.outName)), [jobs]);
-
-  const nameFor = (title: string, width: number, height: number): string => {
-    let base = pattern
-      .replace("{name}", slug(title))
-      .replace("{w}", String(width))
-      .replace("{h}", String(height));
-    let candidate = `${base}.${format === "jpeg" ? "jpg" : format}`;
-    let counter = 2;
-    while (existingNames.has(candidate)) {
-      base = `${base}-${counter}`;
-      candidate = `${base}.${format === "jpeg" ? "jpg" : format}`;
-      counter += 1;
-    }
-    return candidate;
-  };
-
-  const build = () => {
-    const next = chosen.map((id) => {
-      const record = photos.find((item) => item.id === id);
-      return { id: `job-${id}`, recordId: id, title: record?.title ?? id, state: "queued" as const };
-    });
-    setJobs(next);
-    setDone(0);
-    context.toast("Queue built", `${next.length} job${next.length === 1 ? "" : "s"} ready. Nothing has been written yet.`);
-  };
-
-  const runOne = async (job: BatchJob): Promise<BatchJob> => {
-    const record = photos.find((item) => item.id === job.recordId);
-    if (!record) return { ...job, state: "failed", reason: "The record is no longer in this workspace." };
-    try {
-      const doc = parsePhoto(record.body);
-      const images = new Map<string, HTMLImageElement>();
-      const masks = new Map<string, HTMLImageElement>();
-      for (const layer of doc.layers) {
-        if (layer.src) images.set(layer.id, await loadImage(layer.src));
-        if (layer.mask) masks.set(layer.id, await loadImage(layer.mask));
-      }
-      const scale = longEdge / Math.max(doc.width, doc.height);
-      const width = Math.max(1, Math.round(doc.width * Math.min(1, scale)));
-      const height = Math.max(1, Math.round(doc.height * Math.min(1, scale)));
-      const result = await exportComposite(doc, images, masks, {
-        format, quality, width, height,
-        background: format === "jpeg" ? "#ffffff" : undefined,
-      });
-      const outName = nameFor(record.title, width, height);
-      downloadBlob(outName, result.blob);
-      return { ...job, state: "done", outName, bytes: result.blob.size, width, height };
-    } catch (error) {
-      return { ...job, state: "failed", reason: error instanceof Error ? error.message : "The browser could not encode this image." };
-    }
-  };
-
-  const execute = async (onlyFailed = false) => {
-    setRunning(true);
-    try {
-      const queue = jobs.filter((job) => (onlyFailed ? job.state === "failed" : job.state === "queued"));
-      for (const job of queue) {
-        setJobs((current) => current.map((item) => (item.id === job.id ? { ...item, state: "running" } : item)));
-        const result = await runOne(job);
-        setJobs((current) => current.map((item) => (item.id === job.id ? result : item)));
-        setDone((current) => current + 1);
-      }
-      context.toast("Batch finished", `${queue.length} file${queue.length === 1 ? "" : "s"} written from this browser.`);
-    } finally {
-      setRunning(false);
-    }
-  };
+  const batch = useStore(batchUi);
+  const { jobs, chosen, format, quality, longEdge, pattern, running, done } = batch;
+  const set = (patch: Partial<typeof batch>) => batchUi.set((current) => ({ ...current, ...patch }));
+  const setFormat = (value: typeof format) => set({ format: value });
+  const setQuality = (value: number) => set({ quality: value });
+  const setLongEdge = (value: number) => set({ longEdge: value });
+  const setPattern = (value: string) => set({ pattern: value });
+  const setChosen = (next: string[] | ((current: string[]) => string[])) => batchUi.set((current) => ({ ...current, chosen: typeof next === "function" ? next(current.chosen) : next }));
+  const build = () => buildBatch(context, new Map(photos.map((row) => [row.id, row.title])));
+  const execute = (onlyFailed = false) => runBatch(context, onlyFailed);
 
   if (lens === "Presets") {
     return (
@@ -890,17 +813,7 @@ function BatchScreen({ context, lens }: { context: ScreenContext; lens: "Queue" 
               variant="primary"
               busy={running}
               disabled={chosen.length === 0}
-              onClick={async () => {
-                setRunning(true);
-                const job = { id: "sample", recordId: chosen[0], title: photos.find((item) => item.id === chosen[0])?.title ?? "", state: "queued" as const };
-                const result = await runOne(job);
-                setRunning(false);
-                context.toast(
-                  result.state === "done" ? "Sample written" : "Sample failed",
-                  result.state === "done" ? `${result.outName} — ${result.width} × ${result.height}, ${((result.bytes ?? 0) / 1024).toFixed(0)} kB.` : result.reason ?? "",
-                  result.state === "done" ? "ok" : "failed",
-                );
-              }}
+              onClick={() => void testSample(context)}
             >
               Test one sample
             </Button>
@@ -1006,16 +919,16 @@ function BatchScreen({ context, lens }: { context: ScreenContext; lens: "Queue" 
 
 function ExportScreen({ context, lens }: { context: ScreenContext; lens: "Export" | "Presets" | "Publish" }) {
   const { record, handle, bank } = usePhotoDoc(context);
-  const [format, setFormat] = useState<"png" | "jpeg" | "webp">("png");
-  const [quality, setQuality] = useState(0.9);
-  const [scale, setScale] = useState(1);
-  const [keepAspect, setKeepAspect] = useState(true);
-  const [width, setWidth] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [preview, setPreview] = useState<{ src: string; bytes: number; width: number; height: number } | null>(null);
+  const settings = useStore(exportUi);
+  const { format, quality, scale, keepAspect, busy, preview } = settings;
+  const set = (patch: Partial<typeof settings>) => exportUi.set((current) => ({ ...current, ...patch }));
+  const setFormat = (value: typeof format) => set({ format: value });
+  const setQuality = (value: number) => set({ quality: value });
+  const setScale = (value: number) => set({ scale: value });
+  const setKeepAspect = (value: boolean) => set({ keepAspect: value });
+  const setWidth = (value: number) => set({ width: value });
   const doc = handle.doc;
-
-  useEffect(() => { if (doc && width === 0) setWidth(doc.width); }, [doc, width]);
+  const width = settings.width || doc?.width || 0;
 
   if (!record) return <MissingPhoto context={context} />;
   if (!doc) return <Empty title="Opening the image…" />;
@@ -1024,25 +937,7 @@ function ExportScreen({ context, lens }: { context: ScreenContext; lens: "Export
   const outHeight = Math.max(1, Math.round(keepAspect ? (width * scale * doc.height) / doc.width : doc.height * scale));
   const hasAlpha = doc.layers.some((layer) => layer.kind === "pixel" && layer.visible);
 
-  const makeFile = async (download: boolean) => {
-    setBusy(true);
-    try {
-      const result = await exportComposite(doc, bank.images, bank.masks, {
-        format, quality, width: outWidth, height: outHeight,
-        background: format === "jpeg" ? "#ffffff" : undefined,
-      });
-      if (download) {
-        downloadBlob(`${slug(record.title)}-${outWidth}x${outHeight}.${format === "jpeg" ? "jpg" : format}`, result.blob);
-        context.toast("Exported", `${outWidth} × ${outHeight}, ${(result.blob.size / 1024).toFixed(0)} kB written from this browser.`);
-      } else {
-        setPreview({ src: URL.createObjectURL(result.blob), bytes: result.blob.size, width: result.width, height: result.height });
-      }
-    } catch (error) {
-      context.toast("Export failed", error instanceof Error ? error.message : "The browser produced no image data.", "failed");
-    } finally {
-      setBusy(false);
-    }
-  };
+  const makeFile = (download: boolean) => exportImage(context, download);
 
   if (lens === "Publish") {
     return (
@@ -1060,28 +955,7 @@ function ExportScreen({ context, lens }: { context: ScreenContext; lens: "Export
             <Button
               variant="primary"
               busy={busy}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  const result = await exportComposite(doc, bank.images, bank.masks, { format: "png", quality: 1, width: Math.min(doc.width, 1200), height: Math.round((Math.min(doc.width, 1200) * doc.height) / doc.width) });
-                  const src = await new Promise<string>((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(String(reader.result));
-                    reader.readAsDataURL(result.blob);
-                  });
-                  await context.mutate.create({
-                    collection: "assets", title: `${record.title} (export)`, status: "ready",
-                    summary: `PNG export at ${result.width} × ${result.height} from ${record.title}.`,
-                    body: { src, width: result.width, height: result.height },
-                    fields: { license: doc.rights.license, credit: doc.rights.credit, bytes: result.blob.size, source: record.id },
-                  }, `Export of ${record.title} added to the asset library`);
-                  context.toast("Added to the asset library", "It is a record in this workspace, with its licence and credit.");
-                } catch (error) {
-                  context.toast("Could not add it", error instanceof Error ? error.message : "The export failed.", "failed");
-                } finally {
-                  setBusy(false);
-                }
-              }}
+              onClick={() => void addToAssetLibrary(context)}
             >
               Add a PNG to the asset library
             </Button>

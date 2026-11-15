@@ -13,6 +13,7 @@ import {
   type AudienceBody, type CampaignBody, type PostBody, type SegmentRule, type SiteBody,
 } from "./data";
 import { NetworkPreview } from "./panels";
+import { pageChecks, retryState, VersionRestoreGrid } from "./actions";
 
 /* ====================================================================== *
  * MARKET overlays. One component per overlay in the approved contract.
@@ -258,7 +259,7 @@ export function PlanApproval({ context, close }: { context: ScreenContext; close
   const data = useMarketData();
   const { now, actor } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const campaign = useRecord(payload?.id ?? context.selectedId) ?? data.campaigns.find((item) => item.status === "approval");
+  const campaign = useRecord(payload?.id ?? context.selectedId ?? context.params.id) ?? data.campaigns.find((item) => item.status === "approval");
   const body = bodyOf<CampaignBody>(campaign, {});
   const audience = data.audiences.find((item) => item.id === String(campaign?.fields.audienceId ?? ""));
   const reach = evaluateSegment(audience, data.contacts, now);
@@ -269,7 +270,8 @@ export function PlanApproval({ context, close }: { context: ScreenContext; close
     { label: "Channel plan has at least one channel", ok: (body.channels ?? []).length > 0 },
     { label: "All creative approved", ok: (body.creatives ?? []).every((creative) => creative.status === "approved"), detail: `${(body.creatives ?? []).filter((creative) => creative.status !== "approved").length} not approved` },
   ] : [];
-  const blocked = checks.some((check) => !check.ok);
+  const alreadyApproved = String(campaign?.fields.approval) === "approved";
+  const blocked = alreadyApproved || checks.some((check) => !check.ok);
 
   if (!campaign) return <Empty title="No campaign is waiting for approval" />;
 
@@ -281,10 +283,10 @@ export function PlanApproval({ context, close }: { context: ScreenContext; close
         event.preventDefault();
         if (blocked) return;
         await context.mutate.patch(campaign.id, {
-          status: "active",
+          status: campaign.status === "active" ? "active" : "approved",
           fields: { ...campaign.fields, approval: "approved", approvedBy: actor, approvedAt: now.toISOString() },
         }, { expectRevision: campaign.revision, event: `Plan approved for ${campaign.title} by ${actor}` });
-        context.toast("Plan approved", `${campaign.title} is recorded as approved and active in this workspace. No provider was told.`);
+        context.toast("Plan approved", `${campaign.title} is recorded as approved by ${actor}. It is not live until a launch is recorded. No provider was told.`);
         close();
       }}
     >
@@ -298,7 +300,9 @@ export function PlanApproval({ context, close }: { context: ScreenContext; close
           </Row>
         ))}
       </Stack>
-      {blocked
+      {alreadyApproved
+        ? <Notice tone="success" title="This plan is already approved">Approved by {String(campaign.fields.approvedBy ?? "someone")} on {context.date(String(campaign.fields.approvedAt ?? ""))}.</Notice>
+        : blocked
         ? <Notice tone="danger" title="This plan cannot be approved yet">Every check above has to pass. Approving a plan with unapproved creative or an empty audience would commit budget against nothing.</Notice>
         : <Notice tone="info" title="What approval does here">The record is marked approved by {actor} with today's date. Scheduling stays local; no advertising or mail provider is connected.</Notice>}
     </form>
@@ -678,7 +682,8 @@ export function DeliveryReceipt({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const post = useRecord(payload?.id ?? context.selectedId) ?? data.socialPosts.find((item) => item.status === "failed");
   if (!post) return <Empty title="Select a post" />;
-  const unknown = post.status === "failed" || !String(post.fields.externalRef);
+  const retry = retryState(post);
+  const unknown = post.status === "failed" && !retry.safe;
   return (
     <Stack gap={4}>
       <Properties rows={[
@@ -690,9 +695,9 @@ export function DeliveryReceipt({ context }: { context: ScreenContext }) {
         { label: "Error", value: String(post.fields.error) || "—" },
       ]} />
       {unknown ? (
-        <Notice tone="danger" title="The publication state is unknown, so a retry is blocked">
-          Nothing was handed to a provider, so there is no receipt to check against. Retrying blindly is exactly how a duplicate post is created, so this item has to be re-approved from its composer instead.
-        </Notice>
+        <Notice tone="danger" title="The publication state is unknown, so a retry is blocked">{retry.reason}</Notice>
+      ) : post.status === "failed" ? (
+        <Notice tone="warning" title="Known not to have been published">{retry.reason} Use "Retry safely" to re-queue it.</Notice>
       ) : (
         <Notice tone="info" title="Recorded locally">
           The reference above is a local identifier, not a provider URL. It records that someone marked this item published in this workspace.
@@ -824,6 +829,15 @@ export function SendReview({ context, close }: { context: ScreenContext; close: 
       onSubmit={async (event) => {
         event.preventDefault();
         if (!confirmed) return;
+        if (testMode) {
+          await context.mutate.patch(campaign.id, {
+            fields: { ...campaign.fields, testSendState: "queued_local", testSendTo: actor, testSendAt: now.toISOString() },
+          }, { expectRevision: campaign.revision, event: `Test send of ${campaign.title} to ${actor} held locally` });
+          await context.mutate.log(`Test send of ${campaign.title} to ${actor} queued locally; no mail provider is connected.`, { entityId: campaign.id, type: "email.test_queued_local", capability: "queued_local" });
+          context.toast("Test send held locally", `The test to ${actor} is recorded against ${campaign.title}. It was not delivered: no mail provider is connected.`);
+          close();
+          return;
+        }
         await context.mutate.patch(campaign.id, {
           fields: { ...campaign.fields, recipientsApprovedBy: actor, recipientsApprovedAt: now.toISOString(), recipientCount: result.members.length },
         }, { expectRevision: campaign.revision, event: `Recipients approved for ${campaign.title}: ${result.members.length} contacts` });
@@ -893,7 +907,7 @@ export function SegmentBuilder({ context, close }: { context: ScreenContext; clo
   const data = useMarketData();
   const { now } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = useRecord(payload?.id ?? context.selectedId);
+  const existing = useRecord(payload?.id);
   const existingBody = bodyOf<AudienceBody>(existing, {});
   const [title, setTitle] = useState(existing?.title ?? "");
   const [rules, setRules] = useState<SegmentRule[]>(existingBody.rules ?? [{ field: "segment", op: "is", value: "trade" }]);
@@ -1331,8 +1345,9 @@ export function PublishConfirm({ context, close }: { context: ScreenContext; clo
   const body = bodyOf<SiteBody>(page, {});
   if (!page) return <Empty title="No page selected" />;
   const blocks = body.blocks ?? [];
+  const checks = pageChecks(page, data.sites.filter((site) => String(site.fields.kind) === "page"));
+  const failing = checks.filter((check) => !check.ok);
   const problems = [
-    ...(String(page.fields.metaTitle) ? [] : ["No meta title is set."]),
     ...(blocks.length === 0 ? ["The page has no blocks."] : []),
     ...(blocks.some((block) => block.kind === "form") ? [] : ["There is no form, so the page cannot record a conversion."]),
   ];
@@ -1344,22 +1359,29 @@ export function PublishConfirm({ context, close }: { context: ScreenContext; clo
         { label: "Blocks", value: String(blocks.length) },
         { label: "Current state", value: <Pill tone={page.fields.published === true ? "success" : "warning"}>{page.fields.published === true ? "Exported locally" : "Draft"}</Pill> },
       ]} />
+      <Stack gap={2}>
+        {checks.map((check) => (
+          <Row key={check.id} gap={2}><Pill tone={check.ok ? "success" : "danger"} dot>{check.ok ? "Pass" : "Fail"}</Pill><span className="ds-grow">{check.label}</span><span className="ds-subtle">{check.detail}</span></Row>
+        ))}
+      </Stack>
+      {failing.length > 0 && <Notice tone="danger" title="Publishing is blocked">{failing.map((check) => check.label).join(", ")} must pass first. The URL, redirects, consent and analytics are verified before anything is exported.</Notice>}
       {problems.length > 0 && <Notice tone="warning" title="Before publishing">{problems.join(" ")}</Notice>}
       <ProviderBoundary id="site.publish" title="There is no host to publish to">
         The previously exported version stays exactly as it is. A failed publish cannot damage it, because publishing here only writes a record and an HTML file in this browser.
       </ProviderBoundary>
       <Button
         variant="primary"
+        disabled={failing.length > 0}
         onClick={async () => {
           await context.mutate.patch(page.id, {
             status: "published",
-            fields: { ...page.fields, published: true, exportedAt: new Date().toISOString() },
+            fields: { ...page.fields, published: true, exportedAt: context.now.toISOString(), publishedBy: context.actor },
           }, { expectRevision: page.revision, event: `${page.title} exported as HTML from this browser` });
           context.toast("Exported", `${page.title} is marked exported. No hosting provider was contacted, so no public URL exists.`);
           close();
         }}
       >
-        Export this version locally
+        Publish by exporting this version
       </Button>
     </Stack>
   );
@@ -1381,13 +1403,7 @@ export function VersionCompare({ context }: { context: ScreenContext }) {
       {page.history.length === 0 ? (
         <Notice tone="info" title="Only the current version exists">A version is stored each time the record is saved. This page has not been edited since it was created.</Notice>
       ) : (
-        <DataGrid rows={page.history} rowId={(row) => row.at} label="Page versions" filterable={false}
-          columns={[
-            { key: "at", header: "Saved", primary: true, cell: (row) => context.dateTime(row.at) },
-            { key: "status", header: "State then", cell: (row) => <Pill>{row.status}</Pill> },
-            { key: "title", header: "Title then", cell: (row) => row.title },
-            { key: "published", header: "Published then", cell: (row) => (row.fields.published === true ? "Yes" : "No") },
-          ]} />
+        <VersionRestoreGrid context={context} page={page} />
       )}
     </Stack>
   );
@@ -1495,7 +1511,7 @@ export function MetricNotes({ context }: { context: ScreenContext }) {
 
 export function TemplateEditor({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = useRecord(payload?.id ?? context.selectedId);
+  const existing = useRecord(payload?.id);
   const existingBody = bodyOf<{ subject?: string; caption?: string; blocks?: string[] }>(existing, {});
   const [title, setTitle] = useState(existing?.title ?? "");
   const [kind, setKind] = useState(String(existing?.fields.kind ?? "email"));

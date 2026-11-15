@@ -74,6 +74,7 @@ export function ForecastNote({ children }: { children: ReactNode }) {
 export const QUOTE_STATUS_TONE: Record<string, "neutral" | "info" | "success" | "warning" | "danger" | "accent"> = {
   draft: "neutral",
   review: "warning",
+  approved: "accent",
   sent: "info",
   accepted: "success",
   expired: "danger",

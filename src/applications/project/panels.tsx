@@ -9,6 +9,7 @@ import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { addDays, daysBetween, startOfWeek } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { LANES, TaskBoard, stageOf, type LaneId } from "./board";
+import { BoardFilterNotice, PortfolioFilterNotice, TaskComments, boardFilter, matchesBoard, matchesPortfolio, pinnedBy, portfolioFilter } from "./actions";
 import { Gantt, createsCycle, criticalPath, dependenciesOf } from "./timeline";
 
 export function useProjectData() {
@@ -38,7 +39,21 @@ function progressOf(tasks: Rec[]): number {
  * ------------------------------------------------------------------ */
 
 export function Portfolio({ context, lens }: { context: ScreenContext; lens: "Overview" | "Departments" | "Timeline" | "Risks" }) {
-  const data = useProjectData();
+  const raw = useProjectData();
+  const filter = portfolioFilter.use();
+  const shown = raw.projects.filter((project) => matchesPortfolio(project, filter));
+  return (
+    <Stack gap={4}>
+      <PortfolioFilterNotice total={raw.projects.length} shown={shown.length} />
+      <PortfolioBody context={context} lens={lens} />
+    </Stack>
+  );
+}
+
+function PortfolioBody({ context, lens }: { context: ScreenContext; lens: "Overview" | "Departments" | "Timeline" | "Risks" }) {
+  const raw = useProjectData();
+  const filter = portfolioFilter.use();
+  const data: typeof raw = { ...raw, projects: raw.projects.filter((project) => matchesPortfolio(project, filter)) };
   const { org, now } = useWorkspace();
   const live = data.projects.filter((project) => project.status !== "done");
   const budget = data.projects.reduce((sum, project) => sum + Number(project.fields.budgetMinor ?? 0), 0);
@@ -189,14 +204,14 @@ export function ProjectDirectory({ context, lens }: { context: ScreenContext; le
   const rows = lens === "Mine"
     ? data.projects.filter((project) => project.ownerName === actor || String(project.fields.owner ?? "") === actor)
     : lens === "Following"
-      ? data.projects.filter((project) => project.tags.includes("high") || project.fields.priority === "high")
+      ? data.projects.filter((project) => pinnedBy(project).includes(actor))
       : lens === "Archived"
         ? data.projects.filter((project) => project.status === "done" || project.status === "archived")
         : data.projects.filter((project) => project.status !== "archived");
 
   return rows.length === 0 ? (
     <Empty title={`No ${lens.toLowerCase()} projects`} icon={<FolderKanban size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Project template")}>Create a project</Button>}>
-      {lens === "Following" ? "High priority projects appear here until following is stored per person." : "Create a project from a template or from scratch."}
+      {lens === "Following" ? `Projects ${actor} pins appear here. Select a project and use Pin or unpin.` : "Create a project from a template or from scratch."}
     </Empty>
   ) : (
     <DataGrid
@@ -407,11 +422,13 @@ export function ProjectOverview({ context, lens }: { context: ScreenContext; len
 
 export function BoardScreen({ context, lens }: { context: ScreenContext; lens: "Board" | "List" | "By owner" | "By sprint" }) {
   const data = useProjectData();
+  const boardFilterValue = boardFilter.use();
   const record = useRecord(context.params.id);
   const project = record ?? data.projects[0];
   const { org } = useWorkspace();
   if (!project) return <Empty title="No project" />;
-  const tasks = tasksOf(data.tasks, project.id);
+  const allTasks = tasksOf(data.tasks, project.id);
+  const tasks = allTasks.filter((task) => matchesBoard(task, boardFilterValue));
 
   async function moveTask(task: Rec, lane: LaneId) {
     const blockers = dependenciesOf(task)
@@ -497,12 +514,15 @@ export function BoardScreen({ context, lens }: { context: ScreenContext; lens: "
   }
 
   return (
-    <TaskBoard
-      context={context}
-      tasks={tasks}
-      onMove={moveTask}
-      onOpen={(task) => { context.select(task.id); context.openOverlay("Task drawer", { id: task.id }); }}
-    />
+    <Stack gap={3}>
+      <BoardFilterNotice total={allTasks.length} shown={tasks.length} />
+      <TaskBoard
+        context={context}
+        tasks={tasks}
+        onMove={moveTask}
+        onOpen={(task) => { context.select(task.id); context.openOverlay("Task drawer", { id: task.id }); }}
+      />
+    </Stack>
   );
 }
 
@@ -531,19 +551,10 @@ export function TaskDetail({ context, lens }: { context: ScreenContext; lens: st
   const checklist = checklistOf(task);
 
   if (lens === "Discussion") {
-    const comments = (task.history ?? []).filter((snapshot) => snapshot.summary && snapshot.summary !== task.summary);
     return (
       <Stack gap={4}>
-        <Card title="Comments" subtitle={`${comments.length} earlier versions of the description are kept`}>
-          <Stack gap={3}>
-            {comments.length === 0 && <span className="ds-subtle">Nothing has been written against this task yet.</span>}
-            {comments.map((snapshot, index) => (
-              <div key={index} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-                <Row gap={2}><strong className="ds-grow">Earlier description</strong><span className="ds-subtle">{context.dateTime(snapshot.at)}</span></Row>
-                <p className="ds-subtle">{snapshot.summary}</p>
-              </div>
-            ))}
-          </Stack>
+        <Card title="Comments" subtitle="Written against this task, each with its author">
+          <TaskComments context={context} taskId={task.id} />
         </Card>
         <form
           className="ds-stack ds-gap-3"

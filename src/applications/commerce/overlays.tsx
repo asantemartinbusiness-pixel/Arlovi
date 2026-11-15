@@ -8,6 +8,7 @@ import { useRecord, useWorkspace } from "@/platform/workspace";
 import { resolveTaxCode, type TaxCategory } from "@/platform/money";
 import { ProviderBoundary, TAX_CATEGORIES, TotalsBlock } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
+import { setStoreLayout, useStorefront } from "./actions";
 import {
   bodyOf, marginOf, onHandFor, orderTotals, reservedFor,
   statusTone, taxCategoryOfProduct, useCommerceData, type OrderBody, type ProductBody,
@@ -102,7 +103,7 @@ export function ProductEditor({ context, close }: { context: ScreenContext; clos
   const data = useCommerceData();
   const { org, now } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = useRecord(payload?.id ?? context.params.id ?? context.selectedId);
+  const existing = useRecord(payload?.id);
   const existingBody = bodyOf<ProductBody>(existing, {});
   const [title, setTitle] = useState(existing?.title ?? "");
   const [sku, setSku] = useState(String(existing?.fields.sku ?? ""));
@@ -618,10 +619,15 @@ export function RefundApproval({ context, close }: { context: ScreenContext; clo
 
 export function ShippingLabel({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCommerceData();
-  const order = useRecord(context.params.id ?? context.selectedId) ?? data.orders[0];
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const order = useRecord(payload?.id ?? context.params.id ?? context.selectedId);
   const [carrier, setCarrier] = useState(String(order?.fields.carrier ?? "Pallet North"));
-  if (!order) return <Empty title="No order" />;
+  if (!order) return <Empty title="Select an order" />;
   const existing = String(order.fields.tracking ?? "");
+  const labelRef = String(order.fields.labelRef ?? "");
+  const awaitingPayment = String(order.fields.payment) === "not_connected";
+  const lines = bodyOf<OrderBody>(order, {}).lines ?? [];
+  const alreadyMoved = data.stockMoves.some((move) => String(move.fields.reference) === order.title && String(move.fields.kind) === "sale");
   return (
     <Stack gap={4}>
       <Properties rows={[
@@ -629,7 +635,10 @@ export function ShippingLabel({ context, close }: { context: ScreenContext; clos
         { label: "Units", value: String((bodyOf<OrderBody>(order, {}).lines ?? []).reduce((sum, line) => sum + line.quantity, 0)) },
         { label: "Ship to", value: bodyOf<OrderBody>(order, {}).shipTo?.city ?? "Not recorded" },
         { label: "Existing tracking", value: existing || "None" },
+        { label: "Label", value: labelRef || "None yet — a local reference is issued at handover" },
+        { label: "Stock", value: alreadyMoved ? "Sale movements already recorded" : `${lines.reduce((sum, line) => sum + line.quantity, 0)} units leave stock as sale movements` },
       ]} />
+      {awaitingPayment && <Notice tone="danger" title="This order is awaiting payment">Nothing ships before payment is recorded, so the financial and physical states cannot drift apart.</Notice>}
       <Field label="Carrier"><Select value={carrier} onChange={(event) => setCarrier(event.target.value)}>{["Pallet North", "Evri Business", "Royal Mail", "Collection"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
       {existing ? (
         <Notice tone="danger" title="This order already has a tracking reference">
@@ -642,15 +651,25 @@ export function ShippingLabel({ context, close }: { context: ScreenContext; clos
       )}
       <Button
         variant="primary"
-        disabled={Boolean(existing)}
+        disabled={Boolean(existing) || awaitingPayment}
         onClick={async () => {
-          const reference = `LOCAL-${Date.now().toString().slice(-6)}`;
+          const reference = labelRef || `LOCAL-${order.title.replace(/[^A-Z0-9]/gi, "")}`;
           const body = bodyOf<OrderBody>(order, {});
-          await context.mutate.patch(order.id, {
+          const saved = await context.mutate.patch(order.id, {
             status: "in_transit",
-            fields: { ...order.fields, carrier, tracking: reference, fulfilment: "shipped" },
-            body: { ...body, timeline: [...(body.timeline ?? []), { at: new Date().toISOString(), label: "Handed to carrier", detail: `${carrier} · local reference ${reference}. No carrier API confirmed this.` }] },
+            fields: { ...order.fields, carrier, tracking: reference, fulfilment: "shipped", labelState: labelRef ? "handed_over" : String(order.fields.labelState ?? ""), handedOverBy: context.actor, handedOverAt: context.now.toISOString() },
+            body: { ...body, timeline: [...(body.timeline ?? []), { at: context.now.toISOString(), label: "Handed to carrier", detail: `${carrier} · local reference ${reference}. No carrier API confirmed this.` }] },
           }, { expectRevision: order.revision, event: `${order.title} handed to ${carrier}` });
+          if (!saved) return;
+          if (!alreadyMoved) {
+            for (const line of lines.filter((item) => item.productId)) {
+              await context.mutate.create({
+                collection: "stockMoves", title: `sale · ${order.title}`, status: "posted", at: context.now.toISOString(),
+                summary: `${line.description} shipped on ${order.title}.`,
+                fields: { productId: line.productId!, warehouseId: String(order.fields.warehouseId ?? ""), quantity: -line.quantity, kind: "sale", reference: order.title },
+              }, `${line.quantity} × ${line.description} left stock on ${order.title}`);
+            }
+          }
           context.toast("Handover recorded", `${order.title} is in transit with the local reference ${reference}.`);
           close();
         }}
@@ -720,34 +739,18 @@ export function RefundConfirmation({ context }: { context: ScreenContext }) {
 
 /* ---------------- COMMERCE-007 / 008 ---------------- */
 
-export function ThemeInspector() {
-  return (
-    <Stack gap={4}>
-      <Properties rows={[
-        { label: "Surface", value: "var(--bg-surface)" },
-        { label: "Accent", value: "var(--accent)" },
-        { label: "Card radius", value: "var(--radius-md)" },
-        { label: "Product grid", value: "repeat(auto-fill, minmax(190px, 1fr))" },
-        { label: "Basket", value: "Sticky above 900px, static below" },
-      ]} />
-      <div className="t4-swatches">
-        {["var(--accent)", "var(--success)", "var(--warning)", "var(--danger)", "var(--bg-sunken)"].map((colour) => <span key={colour} className="t4-swatch" style={{ background: colour }} title={colour} />)}
-      </div>
-      <Notice tone="info">The storefront uses the same tokens as the rest of the workspace, so a theme change is consistent everywhere rather than a second design system.</Notice>
-    </Stack>
-  );
-}
 
 export function TemplatePicker({ context, close }: { context: ScreenContext; close: () => void }) {
-  const [chosen, setChosen] = useState("Shelf and basket");
+  const store = useStorefront();
+  const [chosen, setChosen] = useState(String(store?.fields.layout ?? "Shelf and basket"));
   return (
     <form
       id="storefront-template"
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await context.mutate.log(`Storefront layout set to ${chosen}`, { type: "storefront.layout" });
-        context.toast("Layout recorded", `${chosen} is noted on the workspace activity. The preview renders the bound blocks either way.`);
+        await setStoreLayout(context, chosen);
+        context.toast("Layout template saved", `${chosen} is on the storefront record and goes out with the next published version.`);
         close();
       }}
     >
@@ -761,23 +764,6 @@ export function TemplatePicker({ context, close }: { context: ScreenContext; clo
   );
 }
 
-export function PublicationReview() {
-  const data = useCommerceData();
-  const publishable = data.products.filter((product) => product.status === "active" && product.fields.published === true);
-  return (
-    <Stack gap={4}>
-      <Properties rows={[
-        { label: "Products in the storefront", value: String(publishable.length) },
-        { label: "Active discount codes", value: String(data.promotions.filter((promotion) => promotion.status === "active" && promotion.fields.code).length) },
-        { label: "Checkout", value: "Stops at payment, collects no card data" },
-        { label: "Hosting", value: <Pill tone="warning">Not connected</Pill> },
-      ]} />
-      <ProviderBoundary id="site.publish" title="Nothing is published to the internet">
-        A publish here would export HTML from this browser. The previous export is untouched until a new one succeeds, so a failed publish cannot take a live site down.
-      </ProviderBoundary>
-    </Stack>
-  );
-}
 
 export function ProviderSetup({ context, close }: { context: ScreenContext; close: () => void }) {
   const [note, setNote] = useState("");
@@ -829,27 +815,6 @@ export function CheckoutTest({ context }: { context: ScreenContext }) {
   );
 }
 
-export function PolicyChangeReview({ context, close }: { context: ScreenContext; close: () => void }) {
-  const [guest, setGuest] = useState(true);
-  const [minimum, setMinimum] = useState("0");
-  return (
-    <form
-      id="policy-change"
-      className="ds-stack ds-gap-4"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        await context.mutate.log(`Checkout policy changed: guest checkout ${guest ? "allowed" : "blocked"}, minimum order ${minimum}.`, { type: "commerce.policy" });
-        context.toast("Policy recorded", "The change is in the activity log with who made it.");
-        close();
-      }}
-    >
-      <Checkbox label="Allow guest checkout" checked={guest} onChange={(event) => setGuest(event.target.checked)} />
-      <Field label="Minimum order value in minor units"><TextInput value={minimum} inputMode="numeric" align="end" onChange={(event) => setMinimum(event.target.value)} /></Field>
-      {!guest && <Notice tone="warning" title="Blocking guest checkout turns visitors away">Every held order in this workspace came from a guest. Requiring an account before payment is even possible would lose them.</Notice>}
-      <Notice tone="info">A policy change is recorded with the person who made it, so a drop in orders can be traced to the day it changed.</Notice>
-    </form>
-  );
-}
 
 /* ---------------- COMMERCE-009 ---------------- */
 
@@ -1089,7 +1054,7 @@ export function OfferBuilder({ context, close }: { context: ScreenContext; close
   const data = useCommerceData();
   const { now } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = useRecord(payload?.id ?? context.selectedId);
+  const existing = useRecord(payload?.id);
   const [title, setTitle] = useState(existing?.title ?? "");
   const [kind, setKind] = useState(String(existing?.fields.kind ?? "percent"));
   const [value, setValue] = useState(String(existing?.fields.value ?? 10));

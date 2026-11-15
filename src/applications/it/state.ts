@@ -3,6 +3,10 @@ import type { CheckResult, StorageFacts, WorkspaceCounts } from "./diagnostics";
 
 export interface SessionError { message: string; at: string }
 
+export interface LogFilter { name: string; kind: string; actor: string; text: string }
+
+export const NO_LOG_FILTER: LogFilter = { name: "", kind: "", actor: "", text: "" };
+
 interface ItUi {
   results: CheckResult[];
   counts?: WorkspaceCounts;
@@ -11,6 +15,9 @@ interface ItUi {
   running: boolean;
   sessionErrors: SessionError[];
   restorePreview: string;
+  /** Filter applied to the audit log on the logs screen. Kept for this session only. */
+  logFilter: LogFilter;
+  setLogFilter: (filter: LogFilter) => void;
   setRunning: (running: boolean) => void;
   setResults: (payload: { results: CheckResult[]; counts: WorkspaceCounts; storage: StorageFacts; at: string }) => void;
   noteError: (message: string) => void;
@@ -23,6 +30,8 @@ export const useItUi = create<ItUi>((set) => ({
   running: false,
   sessionErrors: [],
   restorePreview: "",
+  logFilter: NO_LOG_FILTER,
+  setLogFilter: (filter) => set({ logFilter: filter }),
   setRunning: (running) => set({ running }),
   setResults: ({ results, counts, storage, at }) => set({ results, counts, storage, ranAt: at, running: false }),
   noteError: (message) => set((state) => ({ sessionErrors: [{ message, at: new Date().toISOString() }, ...state.sessionErrors].slice(0, 20) })),

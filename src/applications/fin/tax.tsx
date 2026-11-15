@@ -133,7 +133,7 @@ export function TaxCodesTab({ context }: { context: ScreenContext }) {
   );
 }
 
-function periodsWithDocuments(invoices: Rec[]): string[] {
+export function periodsWithDocuments(invoices: Rec[]): string[] {
   const set = new Set<string>();
   for (const invoice of invoices) {
     if (["draft", "void"].includes(invoice.status)) continue;

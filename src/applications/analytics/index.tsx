@@ -19,6 +19,10 @@ import {
   InsightDetail, InsightsOverview, MetricInspector, QuestionComposer, SaveView, ScenarioEditor,
 } from "./overview";
 import { allMeasures, formatMeasure, measureById, runQuery } from "./metrics";
+import {
+  AdjustInputs, CiteFigures, CompareMeasures, CompareScenarios, DeployModel, GrantDataset, RefreshDataset, RefreshModel,
+  ResizeTile, SetFilter, TestMeasure, ValidateModel,
+} from "./actions";
 import "./analytics.css";
 
 /* ====================================================================== *
@@ -92,8 +96,8 @@ export const analyticsApp = registerApp({
         render: (context: ScreenContext) => <InsightsOverview context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Ask question", label: "Ask a question", placement: "primary", run: (context) => context.setTab("AI") },
-        { id: "inspect source", label: "Inspect a figure", placement: "secondary", run: (context) => context.openOverlay("Metric inspector") },
+        { id: "Ask question", label: "Ask a question", placement: "primary", run: (context) => context.openOverlay("ask") },
+        { id: "inspect source", label: "Inspect the source of a figure", placement: "secondary", run: (context) => context.openOverlay("Metric inspector") },
         { id: "save view", label: "Save this view", placement: "overflow", run: (context) => context.openOverlay("save view") },
         { id: "delegate investigation", label: "Delegate an investigation", placement: "overflow", run: (context) => context.openOverlay("delegate investigation") },
       ],
@@ -116,7 +120,7 @@ export const analyticsApp = registerApp({
         render: (context: ScreenContext) => <DashboardDirectory context={context} tab={tab} />,
       })),
       actions: [
-        { id: "Create", label: "New dashboard", placement: "primary", run: (context) => context.openOverlay("Dashboard setup") },
+        { id: "Create", label: "Create a dashboard", placement: "primary", run: (context) => context.openOverlay("Dashboard setup") },
         {
           id: "open", label: "Open", placement: "secondary",
           guard: (context) => (context.selectedId ? undefined : "Select a dashboard first"),
@@ -159,9 +163,9 @@ export const analyticsApp = registerApp({
       tabs: ["Layout", "Data", "Style", "Access"].map((tab) => ({ id: tab, render: () => null })),
       surface: (context) => <DashboardEditor context={context} />,
       actions: [
-        { id: "Drag widget", label: "Add a tile", placement: "primary", run: (context) => context.openOverlay("Widget chooser") },
-        { id: "resize", label: "Sizes", placement: "secondary", run: (context) => context.setTab("Style") },
-        { id: "set filter", label: "Filters", placement: "secondary", run: (context) => context.setTab("Data") },
+        { id: "Drag widget", label: "Place a tile", placement: "primary", run: (context) => context.openOverlay("Widget chooser") },
+        { id: "resize", label: "Resize a tile", placement: "secondary", run: (context) => context.openOverlay("resize tile") },
+        { id: "set filter", label: "Set a filter", placement: "secondary", run: (context) => context.openOverlay("set filter") },
         {
           id: "publish", label: "Publish", placement: "overflow",
           run: async (context) => {
@@ -194,6 +198,8 @@ export const analyticsApp = registerApp({
         { id: "Widget chooser", kind: "modal", title: "Add a tile", width: 620, render: ({ close, ...context }) => <WidgetChooser context={context} close={close} /> },
         { id: "query editor", kind: "drawer", title: "The query behind this tile", width: 540, render: ({ ...context }) => <QueryEditor context={context} /> },
         { id: "share", kind: "modal", title: "Sharing", width: 520, render: ({ close, ...context }) => <SharingPanel context={context} close={close} /> },
+        { id: "resize tile", kind: "modal", title: "Resize a tile", width: 520, render: ({ close, ...context }) => <ResizeTile context={context} close={close} /> },
+        { id: "set filter", kind: "modal", title: "Dashboard filters", width: 640, render: ({ close, ...context }) => <SetFilter context={context} close={close} /> },
       ],
     },
 
@@ -205,9 +211,11 @@ export const analyticsApp = registerApp({
       tabs: ["Content", "Data", "Layout", "Distribution"].map((tab) => ({ id: tab, render: () => null })),
       surface: (context) => <ReportBuilder context={context} />,
       actions: [
-        { id: "Create report", label: "New report", placement: "secondary", run: (context) => context.openOverlay("create report") },
-        { id: "add chart", label: "Add a block", placement: "primary", run: (context) => context.openOverlay("Report block") },
-        { id: "cite", label: "Check the citations", placement: "secondary", run: (context) => context.openOverlay("source inspection") },
+        { id: "Create report", label: "Create a report", placement: "secondary", run: (context) => context.openOverlay("create report") },
+        { id: "add chart", label: "Add a chart", placement: "primary", run: (context) => context.openOverlay("Report block", { kind: "chart" }) },
+        { id: "add block", label: "Add another block", placement: "overflow", run: (context) => context.openOverlay("Report block") },
+        { id: "cite", label: "Cite the figures", placement: "secondary", run: (context) => context.openOverlay("cite figures") },
+        { id: "check citations", label: "Check the citations", placement: "overflow", run: (context) => context.openOverlay("source inspection") },
         {
           id: "publish", label: "Publish", placement: "overflow",
           run: async (context) => {
@@ -257,6 +265,7 @@ export const analyticsApp = registerApp({
         { id: "schedule", kind: "modal", title: "Schedule", width: 520, render: ({ close, ...context }) => <ScheduleOverlay context={context} close={close} /> },
         { id: "source inspection", kind: "drawer", title: "Citations", width: 560, render: ({ ...context }) => <SourceInspection context={context} /> },
         { id: "create report", kind: "modal", title: "New report", width: 520, render: ({ close, ...context }) => <CreateReport context={context} close={close} />, footer: submitFooter("create-report", "Create report") },
+        { id: "cite figures", kind: "modal", title: "Cite the figures", width: 680, render: ({ close, ...context }) => <CiteFigures context={context} close={close} /> },
       ],
     },
 
@@ -271,14 +280,10 @@ export const analyticsApp = registerApp({
       actions: [
         { id: "Browse", label: "Browse", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Select a dataset first"), run: (context) => context.openOverlay("Dataset details") },
         { id: "document", label: "Document", placement: "secondary", run: (context) => context.openOverlay("document dataset") },
-        { id: "grant", label: "Access", placement: "overflow", run: (context) => context.openOverlay("grant review") },
-        {
-          id: "refresh", label: "Refresh", placement: "overflow",
-          run: (context) => {
-            context.toast("Nothing to refresh", "Figures are recomputed from records every time a screen renders, so there is no extract to rebuild.", "info");
-            context.openOverlay("quality");
-          },
-        },
+        { id: "grant", label: "Grant access", placement: "overflow", capability: "manage_policy", run: (context) => context.openOverlay("grant dataset") },
+        { id: "access", label: "Who has access", placement: "overflow", run: (context) => context.openOverlay("grant review") },
+        { id: "refresh", label: "Refresh", placement: "overflow", run: (context) => context.openOverlay("refresh dataset") },
+        { id: "quality", label: "Data quality", placement: "overflow", run: (context) => context.openOverlay("quality") },
         {
           id: "retire", label: "Retire", placement: "overflow", tone: "danger",
           guard: (context) => (context.selectedId ? undefined : "Select a dataset first"),
@@ -307,6 +312,8 @@ export const analyticsApp = registerApp({
         { id: "grant review", kind: "modal", title: "Access to this dataset", width: 520, render: ({ ...context }) => <GrantReview context={context} /> },
         { id: "quality", kind: "drawer", title: "Data quality", width: 560, render: ({ ...context }) => <QualityPanel context={context} /> },
         { id: "document dataset", kind: "modal", title: "Document a dataset", width: 560, render: ({ close, ...context }) => <DocumentDataset context={context} close={close} /> },
+        { id: "grant dataset", kind: "modal", title: "Grant access to a dataset", width: 600, render: ({ close, ...context }) => <GrantDataset context={context} close={close} /> },
+        { id: "refresh dataset", kind: "modal", title: "Refresh a dataset", width: 560, render: ({ close, ...context }) => <RefreshDataset context={context} close={close} /> },
       ],
     },
 
@@ -320,9 +327,10 @@ export const analyticsApp = registerApp({
       })),
       actions: [
         { id: "Define measure", label: "Define a measure", placement: "primary", run: (context) => context.openOverlay("Formula editor") },
-        { id: "test", label: "Validation", placement: "secondary", run: (context) => context.setTab("Validation") },
-        { id: "approve", label: "Impact review", placement: "secondary", run: (context) => context.openOverlay("impact review") },
-        { id: "compare", label: "Lineage", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a measure first"), run: (context) => context.openOverlay("metric QA") },
+        { id: "test", label: "Test a measure", placement: "secondary", run: (context) => context.openOverlay("test measure") },
+        { id: "approve", label: "Approve a version", placement: "secondary", capability: "manage_policy", run: (context) => context.openOverlay("impact review") },
+        { id: "compare", label: "Compare two measures", placement: "overflow", run: (context) => context.openOverlay("compare measures") },
+        { id: "lineage", label: "Lineage", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a measure first"), run: (context) => context.openOverlay("metric QA") },
         {
           id: "export", label: "Export the catalogue", placement: "overflow", capability: "export_data",
           run: (context) => {
@@ -335,6 +343,8 @@ export const analyticsApp = registerApp({
         { id: "Formula editor", kind: "modal", title: "Define a measure", width: 620, render: ({ close, ...context }) => <FormulaEditor context={context} close={close} /> },
         { id: "impact review", kind: "modal", title: "What changing this definition affects", width: 560, render: ({ ...context }) => <ImpactReview context={context} /> },
         { id: "metric QA", kind: "drawer", title: "Metric lineage", width: 580, render: ({ ...context }) => <MetricQA context={context} /> },
+        { id: "test measure", kind: "modal", title: "Test a measure", width: 600, render: ({ close, ...context }) => <TestMeasure context={context} close={close} /> },
+        { id: "compare measures", kind: "drawer", title: "Two measures side by side", width: 720, render: ({ ...context }) => <CompareMeasures context={context} /> },
       ],
     },
 
@@ -348,20 +358,19 @@ export const analyticsApp = registerApp({
       })),
       actions: [
         { id: "Add relation", label: "Add a relation", placement: "primary", run: (context) => context.openOverlay("transform editor") },
-        { id: "validate", label: "Run the tests", placement: "secondary", run: (context) => context.setTab("Tests") },
-        { id: "refresh", label: "Join properties", placement: "overflow", run: (context) => context.openOverlay("Join properties") },
-        {
-          id: "deploy", label: "Deploy", placement: "overflow",
-          run: (context) => {
-            context.toast("Already in effect", "Relations are read when a screen renders, so there is nothing to deploy and no materialised table to rebuild.", "info");
-            context.openOverlay("test");
-          },
-        },
+        { id: "validate", label: "Validate the model", placement: "secondary", run: (context) => context.openOverlay("validate model") },
+        { id: "refresh", label: "Refresh the joins", placement: "overflow", run: (context) => context.openOverlay("refresh model") },
+        { id: "deploy", label: "Deploy", placement: "overflow", capability: "manage_policy", run: (context) => context.openOverlay("deploy model") },
+        { id: "join properties", label: "Join properties", placement: "overflow", run: (context) => context.openOverlay("Join properties") },
+        { id: "tests", label: "Model tests", placement: "overflow", run: (context) => context.openOverlay("test") },
       ],
       overlays: [
         { id: "Join properties", kind: "drawer", title: "Join", width: 540, render: ({ ...context }) => <JoinProperties context={context} /> },
         { id: "transform editor", kind: "modal", title: "Add a relation", width: 560, render: ({ close, ...context }) => <TransformEditor context={context} close={close} /> },
         { id: "test", kind: "drawer", title: "Model tests", width: 540, render: ({ ...context }) => <ModelTest context={context} /> },
+        { id: "validate model", kind: "modal", title: "Validate the data model", width: 620, render: ({ close, ...context }) => <ValidateModel context={context} close={close} /> },
+        { id: "refresh model", kind: "drawer", title: "Refresh the joins", width: 640, render: ({ close, ...context }) => <RefreshModel context={context} close={close} /> },
+        { id: "deploy model", kind: "modal", title: "Deploy the data model", width: 580, render: ({ close, ...context }) => <DeployModel context={context} close={close} /> },
       ],
     },
 
@@ -374,8 +383,8 @@ export const analyticsApp = registerApp({
         render: (context: ScreenContext) => <ForecastScreen context={context} tab={tab} />,
       })),
       actions: [
-        { id: "Adjust inputs", label: "Inputs", placement: "primary", run: (context) => context.setTab("Inputs") },
-        { id: "compare", label: "Scenarios", placement: "secondary", run: (context) => context.setTab("Scenarios") },
+        { id: "Adjust inputs", label: "Adjust inputs", placement: "primary", run: (context) => context.openOverlay("adjust inputs") },
+        { id: "compare", label: "Compare scenarios", placement: "secondary", run: (context) => context.openOverlay("compare scenarios") },
         { id: "save", label: "Save a scenario", placement: "secondary", run: (context) => context.openOverlay("scenario editor") },
         {
           id: "request review", label: "Request a review", placement: "overflow",
@@ -395,6 +404,8 @@ export const analyticsApp = registerApp({
         { id: "Assumption inspector", kind: "drawer", title: "Assumptions", width: 520, render: ({ ...context }) => <AssumptionInspector context={context} /> },
         { id: "scenario editor", kind: "modal", title: "Save a scenario", width: 560, render: ({ close, ...context }) => <ScenarioEditor context={context} close={close} /> },
         { id: "confidence note", kind: "modal", title: "What the band means", width: 520, render: ({ ...context }) => <ConfidenceNote context={context} /> },
+        { id: "adjust inputs", kind: "modal", title: "Adjust a scenario's inputs", width: 600, render: ({ close, ...context }) => <AdjustInputs context={context} close={close} /> },
+        { id: "compare scenarios", kind: "drawer", title: "Scenarios compared", width: 820, render: ({ ...context }) => <CompareScenarios context={context} /> },
       ],
     },
 
@@ -408,7 +419,7 @@ export const analyticsApp = registerApp({
       })),
       actions: [
         { id: "Schedule", label: "Schedule", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Select a report first"), run: (context) => context.openOverlay("schedule") },
-        { id: "test", label: "Prepare a delivery", placement: "secondary", run: (context) => context.openOverlay("Recipient preview") },
+        { id: "test", label: "Test a delivery", placement: "secondary", run: (context) => context.openOverlay("Recipient preview") },
         {
           id: "pause", label: "Pause", placement: "overflow",
           guard: (context) => (context.selectedId ? undefined : "Select a report first"),

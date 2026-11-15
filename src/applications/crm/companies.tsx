@@ -132,7 +132,7 @@ export function CompaniesTable({ context, tab }: { context: ScreenContext; tab: 
   );
 }
 
-function exportCompanies(context: ScreenContext, data: CrmData, rows: Rec[]): void {
+export function exportCompanies(context: ScreenContext, data: CrmData, rows: Rec[]): void {
   const header = "account,industry,city,status,owner,contacts,open_deals,open_value_minor,won_value_minor\n";
   const body = rows.map((company) => {
     const value = companyValue(data, company);

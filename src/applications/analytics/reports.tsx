@@ -342,7 +342,7 @@ export function ReportBuilder({ context }: { context: ScreenContext }) {
 
 export function ReportBlockOverlay({ context, close }: { context: ScreenContext; close: () => void }) {
   const record = useRecord(context.params.id);
-  const [kind, setKind] = useState<BlockKind>("metric");
+  const [kind, setKind] = useState<BlockKind>((context.overlayPayload as { kind?: BlockKind } | undefined)?.kind ?? "metric");
   const [text, setText] = useState("");
   const [measureId, setMeasureId] = useState("revenue.paid");
   const [dimensionId, setDimensionId] = useState("");

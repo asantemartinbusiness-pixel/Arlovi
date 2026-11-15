@@ -3,6 +3,7 @@ import { Button, Notice, Pill, Properties, Row, Stack, type Tone } from "@/desig
 import { CAPABILITY_LABELS, CAPABILITY_TONE, capabilityById } from "@/platform/capability";
 import { addDays, sameDay, startOfMonth, startOfWeek } from "@/platform/clock";
 import type { InvoiceTotals, TaxCategory } from "@/platform/money";
+import type { OverlayDef } from "@/platform/registry";
 import type { Rec } from "@/domain/types";
 
 /* ====================================================================== *
@@ -307,4 +308,101 @@ export function createStore<T>(initial: T) {
       return () => { listeners.delete(listener); };
     },
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * Confirmation for a consequential action. The action that opens it
+ * reads the record first, so the modal states the consequence against
+ * the revision the person actually saw, and the write passes that
+ * revision as expectRevision. One principal button; the record changes
+ * only when it is pressed.
+ * ------------------------------------------------------------------ */
+
+export interface ConfirmSpec {
+  title: string;
+  consequence: ReactNode;
+  facts?: { label: string; value: ReactNode }[];
+  confirmLabel: string;
+  tone?: "danger";
+  /** Capability id from src/platform/capability.ts when the action meets a provider boundary. */
+  boundary?: string;
+  boundaryTitle?: string;
+  boundaryNote?: ReactNode;
+  /** When set, the action cannot go ahead and the button is disabled with this reason. */
+  blocked?: string;
+  /** Performs the write. Returning a string keeps the modal open and shows it as the error. */
+  run: () => Promise<string | void>;
+}
+
+export const CONFIRM_OVERLAY = "confirm";
+
+function ConfirmAction({ spec, close }: { spec: ConfirmSpec | undefined; close: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  if (!spec) return <Notice tone="warning" title="Nothing to confirm">Open this from an action on the screen.</Notice>;
+  return (
+    <Stack gap={4}>
+      {spec.blocked
+        ? <Notice tone="danger" title="This cannot go ahead">{spec.blocked}</Notice>
+        : <Notice tone={spec.tone === "danger" ? "warning" : "info"} title="What this does">{spec.consequence}</Notice>}
+      {spec.facts && spec.facts.length > 0 && <Properties rows={spec.facts} />}
+      {spec.boundary && <ProviderBoundary id={spec.boundary} title={spec.boundaryTitle}>{spec.boundaryNote}</ProviderBoundary>}
+      {error && <Notice tone="danger" title="Nothing was saved">{error}</Notice>}
+      <Row gap={2}>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+        <span className="ds-grow" />
+        <Button
+          variant={spec.tone === "danger" ? "danger" : "primary"}
+          busy={busy}
+          disabled={Boolean(spec.blocked)}
+          title={spec.blocked}
+          onClick={async () => {
+            setBusy(true);
+            setError(undefined);
+            try {
+              const problem = await spec.run();
+              if (typeof problem === "string") { setError(problem); setBusy(false); return; }
+              close();
+            } catch (failure) {
+              setError(failure instanceof Error ? failure.message : String(failure));
+              setBusy(false);
+            }
+          }}
+        >
+          {spec.confirmLabel}
+        </Button>
+      </Row>
+    </Stack>
+  );
+}
+
+/** Add to a screen's overlays; actions open it with openOverlay("confirm", spec). */
+export const confirmOverlay: OverlayDef = {
+  id: CONFIRM_OVERLAY,
+  kind: "modal",
+  width: 580,
+  title: (context) => (context.overlayPayload as ConfirmSpec | undefined)?.title ?? "Confirm",
+  render: ({ close, overlayPayload }) => <ConfirmAction spec={overlayPayload as ConfirmSpec | undefined} close={close} />,
+};
+
+/** Message used when expectRevision catches a concurrent save. */
+export const CHANGED_ELSEWHERE = "The record changed after this was opened. Close, check the latest version and try again.";
+
+/** Build and download a CSV in the browser. Nothing is uploaded. */
+export function downloadCsv(filename: string, header: string[], rows: (string | number | boolean | undefined)[][]): number {
+  const quote = (value: string | number | boolean | undefined) => {
+    const text = value === undefined ? "" : String(value);
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+  const text = [header, ...rows].map((row) => row.map(quote).join(",")).join("\n");
+  const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return rows.length;
 }

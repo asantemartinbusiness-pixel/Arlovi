@@ -329,6 +329,41 @@ export function CrmMetricDrilldown({ context }: { context: ScreenContext }) {
   const { org } = useWorkspace();
   const payload = context.overlayPayload as { metric?: string } | undefined;
   const metric = payload?.metric ?? "pipeline";
+  if (metric === "conversion") {
+    const leads = data.leads;
+    const converted = leads.filter((lead) => lead.status === "converted" || lead.fields.dealId);
+    const qualified = leads.filter((lead) => ["qualified", "converted"].includes(lead.status) || lead.fields.dealId);
+    const closed = data.deals.filter((deal) => ["won", "lost"].includes(stageOf(deal).kind));
+    const won = closed.filter((deal) => stageOf(deal).kind === "won");
+    const pct = (part: number, whole: number) => (whole ? `${Math.round((part / whole) * 100)}%` : "No data");
+    return (
+      <Stack gap={4}>
+        <Notice tone="info" title="Conversion is a ratio of recorded outcomes">
+          Lead to deal counts leads with a linked deal. Win rate counts closed deals only; an open deal is neither a win nor a loss yet.
+        </Notice>
+        <Properties rows={[
+          { label: "Leads recorded", value: String(leads.length) },
+          { label: "Qualified", value: `${qualified.length} · ${pct(qualified.length, leads.length)}` },
+          { label: "Converted to a deal", value: `${converted.length} · ${pct(converted.length, leads.length)}` },
+          { label: "Deals closed", value: String(closed.length) },
+          { label: "Won", value: `${won.length} · ${pct(won.length, closed.length)} win rate` },
+        ]} />
+        <DataGrid
+          rows={closed}
+          rowId={(row) => row.id}
+          label="Closed deals behind the win rate"
+          filterable={false}
+          columns={[
+            { key: "deal", header: "Deal", primary: true, cell: (row) => row.title },
+            { key: "stage", header: "Outcome", cell: (row) => <StagePill deal={row} /> },
+            { key: "reason", header: "Lost reason", cell: (row) => String(row.fields.lostReason ?? "—") },
+            { key: "amount", header: "Amount", align: "end", cell: (row) => <Money minor={row.amountMinor} context={context} /> },
+          ]}
+          onOpen={(id) => { context.closeOverlay(); context.navigate(`/o/${org.slug}/crm/deals/${id}`); }}
+        />
+      </Stack>
+    );
+  }
   const rows = metric === "won"
     ? data.deals.filter((deal) => stageOf(deal).kind === "won")
     : data.deals.filter((deal) => stageOf(deal).kind === "open");

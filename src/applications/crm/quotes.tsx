@@ -34,7 +34,7 @@ export function quoteTotals(data: CrmData, quote: Rec | undefined, jurisdiction:
 
 const QUOTE_TABS: Record<string, (quote: Rec, now: Date) => boolean> = {
   Draft: (quote) => quote.status === "draft",
-  Review: (quote) => quote.status === "review",
+  Review: (quote) => ["review", "approved"].includes(quote.status),
   Sent: (quote, now) => quote.status === "sent" && !isExpired(quote, now),
   Accepted: (quote) => quote.status === "accepted",
   Expired: (quote, now) => isExpired(quote, now) && quote.status !== "accepted",
@@ -492,8 +492,8 @@ export function SendPreview({ context, close }: { context: ScreenContext; close:
             await context.mutate.patch(quote.id, {
               status: "sent",
               body: { ...(quote.body as object ?? {}), sends: [...(((quote.body as { sends?: unknown[] })?.sends) ?? []), { at: new Date().toISOString(), by: context.actor, to, body: drafted }] },
-              fields: { ...quote.fields, sentAt: new Date().toISOString(), sentBy: context.actor, delivery: "not_connected" },
-            }, { expectRevision: quote.revision, event: `Quote ${quote.title} marked sent with a local draft` });
+              fields: { ...quote.fields, sentAt: new Date().toISOString(), sentBy: context.actor, delivery: "queued_local" },
+            }, { expectRevision: quote.revision, event: `Quote ${quote.title} issued; the message is queued locally and was not delivered` });
             await context.mutate.create({
               collection: "activities",
               title: `Quote ${String(quote.fields.number ?? quote.title)} sent`,
@@ -504,12 +504,12 @@ export function SendPreview({ context, close }: { context: ScreenContext; close:
               parentId: String(quote.fields.dealId ?? quote.parentId ?? ""),
               fields: { kind: "email", dealId: String(quote.fields.dealId ?? ""), contactId: String(quote.fields.contactId ?? ""), delivery: "not_connected", owner: context.actor },
             }, `Activity logged for quote ${quote.title}`);
-            context.toast("Marked sent, kept as a draft", `The message for ${to} is stored on the quote and logged as an activity. No mail provider is connected.`, "info");
+            context.toast("Issued, not delivered", `The quote is issued and the message for ${to} is queued on it. No mail provider is connected, so nothing left this browser.`, "info");
             setBusy(false);
             close();
           }}
         >
-          Mark sent and keep the draft
+          Issue and queue the message
         </Button>
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>

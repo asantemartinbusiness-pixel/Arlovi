@@ -25,7 +25,7 @@ export function RequisitionForm({ context, close }: { context: ScreenContext; cl
   const data = useProcData();
   const { org, now, actor } = useWorkspace();
   const payload = context.overlayPayload as { id?: string; productIds?: string[] } | undefined;
-  const existing = useRecord(payload?.id ?? context.selectedId);
+  const existing = useRecord(payload?.id);
   const existingBody = bodyOf<PoBody>(existing, {});
   const seeded: PoLine[] = (payload?.productIds ?? []).map((productId, index) => {
     const product = data.products.find((item) => item.id === productId);
@@ -285,7 +285,7 @@ export function StockAlert({ context }: { context: ScreenContext }) {
 export function SupplierForm({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useProcData();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = useRecord(payload?.id ?? context.params.id ?? context.selectedId);
+  const existing = useRecord(payload?.id);
   const [title, setTitle] = useState(existing?.title ?? "");
   const [email, setEmail] = useState(String(existing?.fields.email ?? ""));
   const [terms, setTerms] = useState(String(existing?.fields.terms ?? "30 days"));
@@ -466,7 +466,7 @@ export function PoEditor({ context, close }: { context: ScreenContext; close: ()
   const data = useProcData();
   const { org, now, actor } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = useRecord(payload?.id ?? context.selectedId);
+  const existing = useRecord(payload?.id);
   const existingBody = bodyOf<PoBody>(existing, {});
   const approvedRequisitions = data.purchaseOrders.filter((item) => String(item.fields.kind) === "requisition" && item.status === "approved");
   const [fromRequisition, setFromRequisition] = useState("");
@@ -691,7 +691,7 @@ export function SendPreview({ context, close }: { context: ScreenContext; close:
 export function LocationEditor({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useProcData();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = useRecord(payload?.id ?? context.selectedId);
+  const existing = useRecord(payload?.id);
   const [title, setTitle] = useState(existing?.title ?? "");
   const [code, setCode] = useState(String(existing?.fields.code ?? ""));
   const [capacity, setCapacity] = useState(String(existing?.fields.capacityUnits ?? 500));
@@ -817,12 +817,27 @@ export function TransferForm({ context, close }: { context: ScreenContext; close
 }
 
 export function ScanOverlay({ context, close }: { context: ScreenContext; close: () => void }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const target = useRecord(payload?.id);
+  const data = useProcData();
+  if (payload?.id && !target) return <Empty title="Loading the record" />;
+  if (target?.collection === "receipts" && target.status !== "expected") {
+    return (
+      <Notice tone="warning" title={`${target.title} has already been counted`}>
+        It was received as {target.status}. Counting it again would add the same goods twice; record a discrepancy against it instead.
+      </Notice>
+    );
+  }
+  const presetOrder = target?.collection === "purchaseOrders" ? target.id : target ? String(target.fields.purchaseOrderId ?? "") : "";
+  if (data.purchaseOrders.length === 0) return <Empty title="No purchase order to receive against yet" />;
+  return <ScanOverlayForm key={target?.id ?? "new"} context={context} close={close} receipt={target?.collection === "receipts" ? target : undefined} presetOrder={presetOrder} />;
+}
+
+function ScanOverlayForm({ context, close, receipt, presetOrder }: { context: ScreenContext; close: () => void; receipt: Rec | undefined; presetOrder: string }) {
   const data = useProcData();
   const { org, now, actor } = useWorkspace();
-  const payload = context.overlayPayload as { id?: string } | undefined;
-  const receipt = useRecord(payload?.id ?? context.selectedId);
   const openOrders = data.purchaseOrders.filter((order) => isPurchaseOrder(order) && ["approved", "sent"].includes(order.status));
-  const [orderId, setOrderId] = useState(String(receipt?.fields.purchaseOrderId ?? openOrders[0]?.id ?? ""));
+  const [orderId, setOrderId] = useState(presetOrder || String(openOrders[0]?.id ?? ""));
   const order = data.purchaseOrders.find((item) => item.id === orderId);
   const supplier = data.suppliers.find((item) => item.id === String(order?.fields.supplierId ?? ""));
   const outstanding = outstandingFor(order);

@@ -13,7 +13,7 @@ import { freshness } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { downloadCsv } from "@/applications/t6kit/kit";
 import {
-  CATEGORIES, CONNECTOR_ENTRIES, authorisationSteps, entryById, entryForRecord,
+  CATEGORIES, CONNECTOR_ENTRIES, adapterChecks, adapterOperations, authorisationSteps, entryById, entryForRecord,
   type ConnectorEntry,
 } from "./catalog";
 
@@ -156,9 +156,15 @@ function ConnectorCard({ entry, context }: { entry: ConnectorEntry; context: Scr
 
 export function ConnectorPreview({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const entry = entryById(payload?.id ?? "") ?? CONNECTOR_ENTRIES[0];
+  const [chosen, setChosen] = useState(payload?.id ?? CONNECTOR_ENTRIES[0]?.capability.id ?? "");
+  const entry = entryById(chosen) ?? CONNECTOR_ENTRIES[0];
   return (
     <Stack gap={3}>
+      <Field label="Connector" htmlFor="preview-connector">
+        <Select id="preview-connector" value={entry.capability.id} onChange={(event) => setChosen(event.target.value)}>
+          {CONNECTOR_ENTRIES.map((item) => <option key={item.capability.id} value={item.capability.id}>{item.capability.label}</option>)}
+        </Select>
+      </Field>
       <Properties rows={[
         { label: "Capability", value: entry.capability.label },
         { label: "Provider", value: entry.capability.provider },
@@ -780,6 +786,11 @@ export function ConnectionDetail({ context, lens }: { context: ScreenContext; le
  * ================================================================ */
 
 export function CapabilityRegistry({ context, lens }: { context: ScreenContext; lens: "Actions" | "Reads" | "Webhooks" | "Versions" }) {
+  const connectorRecords = useCollection("connectors");
+  const retired = new Set(connectorRecords.flatMap((record) => {
+    const entry = entryForRecord(record.fields);
+    return String(record.fields.retiredOps ?? "").split(",").filter(Boolean).map((op) => `${entry?.capability.id ?? ""}|${op}`);
+  }));
   const direction = lens === "Actions" ? "action" : lens === "Reads" ? "read" : "webhook";
 
   if (lens === "Versions") {
@@ -822,7 +833,7 @@ export function CapabilityRegistry({ context, lens }: { context: ScreenContext; 
           { key: "capability", header: "Capability", cell: (row) => row.entry.capability.label, filterValue: (row) => row.entry.capability.label },
           { key: "summary", header: "What it does", cell: (row) => row.operation.summary },
           { key: "local", header: "Done here instead", cell: (row) => row.operation.localEquivalent },
-          { key: "state", header: "Usable", cell: (row) => <Pill tone="danger">no — {CAPABILITY_LABELS[row.entry.capability.state].toLowerCase()}</Pill> },
+          { key: "state", header: "Usable", cell: (row) => (retired.has(`${row.entry.capability.id}|${row.operation.name}`) ? <Pill tone="danger">retired</Pill> : <Pill tone="danger">no — {CAPABILITY_LABELS[row.entry.capability.state].toLowerCase()}</Pill>) },
         ]}
         onOpen={(id) => context.openOverlay("Capability inspector", { id: id.split("-").slice(0, -1).join("-") })}
       />
@@ -1142,20 +1153,21 @@ export function CustomConnectors({ context, lens }: { context: ScreenContext; le
         <Notice tone="info" title="A contract test runs against the declaration, not against a provider">
           It checks that the operation names, kinds and scopes are the shape the registry expects. It cannot check that a provider behaves, because nothing is called.
         </Notice>
-        <div className="t6-checks">
-          {[
-            { label: "Operation names are unique within the adapter", state: "pass" },
-            { label: "Every action declares at least one write scope", state: "pass" },
-            { label: "Every operation names a local equivalent", state: "pass" },
-            { label: "A live call succeeds", state: "fail" },
-          ].map((check) => (
-            <div key={check.label} className="t6-check" data-state={check.state}>
-              <span className="t6-check-dot" aria-hidden="true" />
-              <div><strong>{check.label}</strong></div>
-              <Pill tone={check.state === "pass" ? "success" : "danger"}>{check.state === "pass" ? "checked" : "cannot run"}</Pill>
+        {custom.length === 0 && <Empty title="No adapter to test" icon={<Plug size={20} />}>Create an adapter and register an operation first.</Empty>}
+        {custom.map((record) => (
+          <Card key={record.id} eyebrow="CONTRACT TESTS" prov="human" title={record.title} subtitle={record.fields.testResult ? `Recorded: ${String(record.fields.testResult)}` : "Not recorded yet"}
+            footer={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("contract tests", { id: record.id })}>Run and record</Button>}>
+            <div className="t6-checks">
+              {[...adapterChecks(adapterOperations(record.body)), { label: "A live call succeeds", state: "fail" as const, detail: "Cannot run: no provider is reachable." }].map((check) => (
+                <div key={check.label} className="t6-check" data-state={check.state}>
+                  <span className="t6-check-dot" aria-hidden="true" />
+                  <div><strong>{check.label}</strong><p className="ds-subtle">{check.detail}</p></div>
+                  <Pill tone={check.state === "pass" ? "success" : "danger"}>{check.state === "pass" ? "passes" : check.label.startsWith("A live") ? "cannot run" : "fails"}</Pill>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </Card>
+        ))}
       </Stack>
     );
   }
@@ -1179,11 +1191,17 @@ export function CustomConnectors({ context, lens }: { context: ScreenContext; le
 
   return (
     <Stack gap={4}>
-      <Row gap={2}><Button variant="primary" onClick={() => context.setTab("Editor")}>New adapter</Button></Row>
+      <Row gap={2}><Button variant="primary" onClick={() => context.openOverlay("create adapter")}>New adapter</Button></Row>
       {custom.length === 0
         ? <Empty title="No custom adapter yet" icon={<Plug size={20} />}>An adapter declares operations against the same contract the built-in capabilities use, so a mission does not know the difference.</Empty>
         : <Grid>{custom.map((record) => (
-          <Card key={record.id} span={6} eyebrow="CUSTOM" prov="human" title={record.title} subtitle={record.summary} actions={<Pill tone="warning" dot>{record.status}</Pill>} />
+          <Card key={record.id} span={6} eyebrow="CUSTOM" prov="human" title={record.title} subtitle={record.summary} actions={<Pill tone="warning" dot>{record.status.replace(/_/g, " ")}</Pill>}
+            footer={<>
+              <Button size="sm" variant="secondary" onClick={() => context.openOverlay("capability validation", { id: record.id })}>Register an operation</Button>
+              <Button size="sm" variant="ghost" onClick={() => context.openOverlay("contract tests", { id: record.id })}>Tests</Button>
+            </>}>
+            <p className="ds-subtle">{adapterOperations(record.body).map((operation) => operation.name).join(", ") || "No operation registered."}</p>
+          </Card>
         ))}</Grid>}
       <Notice tone="info" title="Sandboxed by having nothing to run in">
         There is no execution environment here, so an adapter is a declaration and a set of contract tests. That is a real limit, not a staged one.

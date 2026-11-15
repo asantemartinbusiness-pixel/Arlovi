@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Film, Clapperboard, FolderOpen, SlidersHorizontal, Captions, Palette,
   Download, MessageSquare, Scissors, MousePointer2, MoveHorizontal, Split,
@@ -11,15 +11,18 @@ import { registerApp, type ActionDef, type ScreenContext } from "@/platform/regi
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import {
   EditorFrame, PanelGroup, RecoveryNotice, SaveState, downloadBlob, downloadText,
-  slug, useDoc, useStore, type DocHandle,
+  slug, useStore, type DocHandle,
 } from "@/applications/visual/kit";
+import { canUndoShared, editShared, readShared, sharedHandle, undoShared, useSharedDoc } from "@/applications/design/sharedDoc";
+import { CAPABILITY_LABELS } from "@/platform/capability";
+import { RENDER_PRESETS, cancelRender, closeInterrupted, heldFile, isInterrupted, latestHeld, renderUi, startRender } from "./exporter";
 import {
   captionIssues, captionsToSrt, captionsToVtt, clipEnd, clipsOnTrack, dbToGain,
   measureLoudness, mixAudio, patchClip, renderSamples, rippleDelete, sequenceDuration,
-  snapFrame, sourceOf, splitClip, timecode, trimClip, splitCaption,
+  moveClip, snapFrame, sourceOf, splitClip, timecode, trimClip, splitCaption, captionAt,
   type Clip, type MediaSource, type RenderJob, type VideoDoc,
 } from "./timeline";
-import { contactSheet, exportWebm, frameDataUrl, frameScopes, playSamples, recorderSupport } from "./render";
+import { contactSheet, frameDataUrl, frameScopes, playSamples, recorderSupport } from "./render";
 import { MixWaveform, PreviewMonitor, TimelineView, TransportBar, transportKeys, useTransport } from "./parts";
 import { parseVideo, setPlayhead, setVideoTool, starterVideo, videoUi, type VideoTool } from "./model";
 
@@ -27,9 +30,9 @@ import { parseVideo, setPlayhead, setVideoTool, starterVideo, videoUi, type Vide
  * VIDEO — Video Production & Editing
  * ====================================================================== */
 
-function useVideoDoc(context: ScreenContext) {
-  const record = useRecord(context.params.id);
-  const handle = useDoc<VideoDoc>(record, parseVideo, context.screen.id);
+function useVideoDoc(context: ScreenContext, id?: string) {
+  const record = useRecord(id ?? context.params.id);
+  const handle = useSharedDoc<VideoDoc>(record, parseVideo, context.screen.id);
   useTransport(handle.doc);
   return { record, handle };
 }
@@ -206,7 +209,7 @@ function TimelineScreen({ context, actions }: { context: ScreenContext; actions:
           <span>Tool: {ui.tool}</span>
           {clip && <span>{clip.name}: <span className="ds-num">{timecode(clip.start, doc?.fps ?? 25)}</span> → <span className="ds-num">{timecode(clipEnd(clip), doc?.fps ?? 25)}</span></span>}
           <span className="ds-grow" />
-          <span>J K L shuttle · arrows step a frame, Shift a second · I and O set in and out</span>
+          <span>J K L shuttle · arrows step a frame, Shift a second · I and O set in and out · ⌘Z undo, ⇧⌘Z redo</span>
         </>
       }
     >
@@ -214,7 +217,14 @@ function TimelineScreen({ context, actions }: { context: ScreenContext; actions:
         tabIndex={0}
         role="application"
         aria-label="Timeline and programme monitor. J, K and L shuttle; arrow keys step one frame."
-        onKeyDown={(event) => { if (doc && transportKeys(event, doc)) event.preventDefault(); }}
+        onKeyDown={(event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+            event.preventDefault();
+            if (event.shiftKey) handle.redo(); else handle.undo();
+            return;
+          }
+          if (doc && transportKeys(event, doc)) event.preventDefault();
+        }}
         style={{ position: "absolute", inset: 0, display: "grid", gridTemplateRows: "minmax(0, 1fr) auto", outline: "none" }}
       >
         <div style={{ display: "grid", placeContent: "center", background: "#07070A", minHeight: 0, padding: 10 }}>
@@ -485,6 +495,7 @@ function ExportPanel({ handle, context, record }: { handle: DocHandle<VideoDoc>;
 
 function MediaBin({ context, lens }: { context: ScreenContext; lens: "Media" | "Folders" | "Proxy" | "Missing" }) {
   const { record, handle } = useVideoDoc(context);
+  const ui = useStore(videoUi);
   const [auditioning, setAuditioning] = useState<string | null>(null);
   if (!record) return <MissingProject context={context} />;
   const doc = handle.doc;
@@ -589,6 +600,16 @@ function MediaBin({ context, lens }: { context: ScreenContext; lens: "Media" | "
             prov={source.license === "Unknown" ? "unknown" : "human"}
             title={source.name}
             subtitle={<><span className="ds-num">{timecode(source.duration, doc.fps)}</span> · used by <span className="ds-num">{doc.clips.filter((clip) => clip.sourceId === source.id).length}</span> clips</>}
+            actions={
+              <Button
+                size="sm"
+                variant={ui.selectedSourceId === source.id ? "primary" : "ghost"}
+                aria-pressed={ui.selectedSourceId === source.id}
+                onClick={() => videoUi.set((current) => ({ ...current, selectedSourceId: current.selectedSourceId === source.id ? undefined : source.id }))}
+              >
+                {ui.selectedSourceId === source.id ? "Selected" : "Select"}
+              </Button>
+            }
           >
             <Stack gap={2}>
               {source.kind === "audio" ? (
@@ -599,7 +620,11 @@ function MediaBin({ context, lens }: { context: ScreenContext; lens: "Media" | "
               <Properties rows={[
                 { label: "Licence", value: source.license },
                 { label: "Credit", value: source.credit },
+                { label: "Proxy", value: source.proxy === "generated" ? "generated on demand" : "none recorded" },
               ]} />
+              {(source.tags ?? []).length > 0 && (
+                <Row gap={1} wrap>{(source.tags ?? []).map((tag) => <Pill key={tag}>{tag}</Pill>)}</Row>
+              )}
               <Row gap={1} wrap>
                 <Button
                   size="sm"
@@ -1009,6 +1034,17 @@ function CaptionScreen({ context, lens }: { context: ScreenContext; lens: "Trans
 
 /* ---------------------------- VIDEO-006 ---------------------------- */
 
+const BUILT_IN_PRESETS: { name: string; effects: { kind: Clip["effects"][number]["kind"]; amount: number }[] }[] = [
+  { name: "Showroom warm", effects: [{ kind: "exposure", amount: 8 }, { kind: "temperature", amount: 30 }, { kind: "saturation", amount: 12 }] },
+  { name: "Cool product", effects: [{ kind: "contrast", amount: 14 }, { kind: "temperature", amount: -24 }, { kind: "saturation", amount: -6 }] },
+  { name: "Press monochrome", effects: [{ kind: "contrast", amount: 18 }, { kind: "saturation", amount: -100 }] },
+  { name: "Soft focus", effects: [{ kind: "blur", amount: 14 }, { kind: "exposure", amount: 6 }] },
+];
+
+function presetEffects(preset: { effects: { kind: Clip["effects"][number]["kind"]; amount: number }[] }): Clip["effects"] {
+  return preset.effects.map((effect, index) => ({ id: `fx-${index}-${Date.now().toString(36)}`, kind: effect.kind, amount: effect.amount, bypassed: false }));
+}
+
 function EffectsScreen({ context, lens }: { context: ScreenContext; lens: "Colour" | "Effects" | "Presets" | "Compare" }) {
   const { record, handle } = useVideoDoc(context);
   const ui = useStore(videoUi);
@@ -1036,12 +1072,7 @@ function EffectsScreen({ context, lens }: { context: ScreenContext; lens: "Colou
   }
 
   if (lens === "Presets") {
-    const presets = [
-      { name: "Showroom warm", effects: [{ kind: "exposure" as const, amount: 8 }, { kind: "temperature" as const, amount: 30 }, { kind: "saturation" as const, amount: 12 }] },
-      { name: "Cool product", effects: [{ kind: "contrast" as const, amount: 14 }, { kind: "temperature" as const, amount: -24 }, { kind: "saturation" as const, amount: -6 }] },
-      { name: "Press monochrome", effects: [{ kind: "contrast" as const, amount: 18 }, { kind: "saturation" as const, amount: -100 }] },
-      { name: "Soft focus", effects: [{ kind: "blur" as const, amount: 14 }, { kind: "exposure" as const, amount: 6 }] },
-    ];
+    const presets = [...BUILT_IN_PRESETS, ...(doc.effectPresets ?? [])];
     return (
       <Grid>
         {presets.map((preset) => (
@@ -1059,7 +1090,7 @@ function EffectsScreen({ context, lens }: { context: ScreenContext; lens: "Colou
                 disabled={!clip}
                 onClick={() => {
                   if (!clip) return;
-                  handle.edit((current) => patchClip(current, clip.id, { effects: preset.effects.map((effect, index) => ({ id: `fx-${index}-${Date.now().toString(36)}`, kind: effect.kind, amount: effect.amount, bypassed: false })) }), `Apply ${preset.name}`);
+                  handle.edit((current) => patchClip(current, clip.id, { effects: presetEffects(preset) }), `Apply ${preset.name}`);
                   context.toast("Applied", `${preset.name} is on ${clip.name}.`);
                 }}
               >
@@ -1122,59 +1153,20 @@ function Scopes({ scopes }: { scopes: { r: number[]; g: number[]; b: number[]; l
 
 function ExportScreen({ context, lens }: { context: ScreenContext; lens: "Export" | "Queue" | "History" | "Failures" }) {
   const { record, handle } = useVideoDoc(context);
-  const [preset, setPreset] = useState("720p WebM");
-  const [progress, setProgress] = useState<{ frame: number; frames: number } | null>(null);
-  const [cancel] = useState<{ cancelled: boolean }>({ cancelled: false });
-  const [busy, setBusy] = useState(false);
+  const render = useStore(renderUi);
+  const preset = render.preset;
+  const setPreset = (value: string) => renderUi.set((current) => ({ ...current, preset: value }));
   const support = useMemo(() => recorderSupport(), []);
   if (!record) return <MissingProject context={context} />;
   const doc = handle.doc;
   if (!doc) return <Empty title="Opening the project…" />;
 
-  const presets: Record<string, { width: number; height: number; fps: number; bitrate: number }> = {
-    "1080p WebM": { width: 1920, height: 1080, fps: doc.fps, bitrate: 8_000_000 },
-    "720p WebM": { width: 1280, height: 720, fps: doc.fps, bitrate: 4_000_000 },
-    "Square 1080 WebM": { width: 1080, height: 1080, fps: doc.fps, bitrate: 5_000_000 },
-    "480p WebM (small)": { width: 854, height: 480, fps: doc.fps, bitrate: 1_600_000 },
-  };
-
-  const addJob = (job: RenderJob) => handle.edit((current) => ({ ...current, renders: [job, ...current.renders] }), "Record a render job");
-  const patchJob = (id: string, patch: Partial<RenderJob>) => handle.edit((current) => ({ ...current, renders: current.renders.map((item) => (item.id === id ? { ...item, ...patch } : item)) }), "Update a render job");
-
-  const runExport = async () => {
-    const settings = presets[preset];
-    const id = `job-${Date.now().toString(36)}`;
-    cancel.cancelled = false;
-    setBusy(true);
-    addJob({ id, at: new Date().toISOString(), by: context.actor, preset, state: "running", note: "Drawing every frame onto a canvas and recording the stream." });
-    try {
-      const result = await exportWebm(doc, {
-        ...settings,
-        captions: videoUi.get().showCaptions,
-        signal: cancel,
-        onProgress: (value) => setProgress({ frame: value.frame, frames: value.frames }),
-      });
-      if (cancel.cancelled) {
-        patchJob(id, { state: "cancelled", note: "Stopped before the end. Nothing was written." });
-        context.toast("Cancelled", "The render stopped and no file was written.", "blocked");
-        return;
-      }
-      const name = `${slug(record.title)}-${settings.height}p.webm`;
-      downloadBlob(name, result.blob);
-      patchJob(id, {
-        state: "done", artifact: name, bytes: result.blob.size, frames: result.frames,
-        note: `${result.frames} frames recorded as ${result.mimeType}. The file was verified to be ${result.blob.size} bytes before it was offered.`,
-      });
-      context.toast("Export finished", `${name} — ${result.frames} frames, ${(result.blob.size / 1024 / 1024).toFixed(2)} MB. It downloaded from this browser.`);
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : "The browser could not encode the sequence.";
-      patchJob(id, { state: "failed", note: reason });
-      context.toast("Export failed", reason, "failed");
-    } finally {
-      setBusy(false);
-      setProgress(null);
-    }
-  };
+  const presets: Record<string, { width: number; height: number; fps: number; bitrate: number }> = Object.fromEntries(
+    Object.entries(RENDER_PRESETS).map(([key, value]) => [key, { ...value, fps: doc.fps }]),
+  );
+  const busy = render.busy;
+  const progress = render.progress;
+  const runExport = () => startRender(context, record.title, preset);
 
   if (lens === "Queue" || lens === "History" || lens === "Failures") {
     const rows = doc.renders.filter((job) => (lens === "Queue" ? job.state === "queued" || job.state === "running" : lens === "Failures" ? job.state === "failed" || job.state === "cancelled" : job.state === "done"));
@@ -1201,7 +1193,18 @@ function ExportScreen({ context, lens }: { context: ScreenContext; lens: "Export
               { key: "artifact", header: "File", cell: (row) => (row.artifact ? <span className="ds-num">{row.artifact}</span> : "none") },
               { key: "bytes", header: "Bytes", align: "end", cell: (row) => (row.bytes ? <span className="ds-num">{(row.bytes / 1024 / 1024).toFixed(2)} MB</span> : "—") },
               { key: "frames", header: "Frames", align: "end", cell: (row) => (row.frames ? <span className="ds-num">{row.frames}</span> : "—") },
-              { key: "note", header: "What happened", cell: (row) => row.note },
+              { key: "note", header: "What happened", cell: (row) => (isInterrupted(row) ? <>Interrupted: no page in this browser is rendering it. {row.note}</> : row.note) },
+              ...(lens === "Queue" ? [{
+                key: "resume", header: "Resume", cell: (row: RenderJob) => (isInterrupted(row) ? (
+                  <Row gap={1}>
+                    <Button size="sm" variant="secondary" disabled={busy} onClick={() => void startRender(context, record.title, row.preset, row.id)}>Resume</Button>
+                    <Button size="sm" variant="ghost" onClick={() => void closeInterrupted(context, row.id)}>Close</Button>
+                  </Row>
+                ) : <Pill tone="info">rendering here</Pill>),
+              }] : []),
+              ...(lens === "History" ? [{
+                key: "delivery", header: "Publishing", cell: (row: RenderJob) => (row.delivery ? <Pill tone="info">{CAPABILITY_LABELS[row.delivery.state]}</Pill> : <span className="ds-subtle">not requested</span>),
+              }] : []),
             ]}
           />
         )}
@@ -1214,7 +1217,7 @@ function ExportScreen({ context, lens }: { context: ScreenContext; lens: "Export
       <Card span={5} eyebrow="EXPORT" prov="human" title="Render settings">
         <Stack gap={3}>
           <Field label="Preset">
-            <Select value={preset} onChange={(event) => setPreset(event.target.value)}>
+            <Select value={preset} disabled={busy} onChange={(event) => setPreset(event.target.value)}>
               {Object.keys(presets).map((key) => <option key={key}>{key}</option>)}
             </Select>
           </Field>
@@ -1247,7 +1250,7 @@ function ExportScreen({ context, lens }: { context: ScreenContext; lens: "Export
             <Button variant="primary" busy={busy} disabled={!support.webm} onClick={() => void runExport()}>
               {support.webm ? `Render ${Math.round(doc.duration * presets[preset].fps)} frames to WebM` : "WebM is unavailable here"}
             </Button>
-            {busy && <Button variant="outline-danger" onClick={() => { cancel.cancelled = true; context.toast("Stopping", "The render stops at the next frame."); }}>Cancel</Button>}
+            {busy && <Button variant="outline-danger" onClick={() => cancelRender(context)}>Cancel</Button>}
           </Row>
         </Stack>
       </Card>
@@ -1340,12 +1343,8 @@ function ReviewScreen({ context, lens }: { context: ScreenContext; lens: "Commen
             />
           )}
         </Card>
-        <Card span={12} eyebrow="COMPARE" prov="human" title="Compare the cut" subtitle="The frame at the playhead, with and without the title track">
-          <Grid>
-            <Card span={6} pad="tight"><PreviewMonitor doc={doc} time={ui.playhead} height={200} onlyTrack={doc.tracks.find((track) => track.kind === "video")?.id} /><p className="vx-mini">Picture only</p></Card>
-            <Card span={6} pad="tight"><PreviewMonitor doc={doc} time={ui.playhead} height={200} captions /><p className="vx-mini">Everything, with captions</p></Card>
-          </Grid>
-          <TransportBar doc={doc} handle={handle} />
+        <Card span={12} eyebrow="COMPARE" prov="posted" title="Compare with a saved version" subtitle="The current cut against a snapshot the record kept">
+          <VersionCompare context={context} />
         </Card>
       </Grid>
     );
@@ -1355,7 +1354,7 @@ function ReviewScreen({ context, lens }: { context: ScreenContext; lens: "Commen
     return (
       <Stack gap={4}>
         <Notice tone="info" title="An approval binds to a revision, not to the project">
-          Each decision records the record revision it was given at. An edit afterwards raises the revision and the approval is shown as out of date.
+          Each decision records the cut digest and the record revision it was given at. Any edit to the cut changes the digest, and the approval is then shown as given for another cut.
         </Notice>
         <Card eyebrow="DECISIONS" prov="posted" title="Review decisions" subtitle={<><span className="ds-num">{doc.reviews.length}</span> recorded · the record is at revision <span className="ds-num">{record.revision}</span></>}>
           {doc.reviews.length === 0 ? <Empty title="Nothing recorded yet" /> : (
@@ -1368,8 +1367,8 @@ function ReviewScreen({ context, lens }: { context: ScreenContext; lens: "Commen
                     {review.digest && <p className="vx-mini">Cut digest <span className="ds-num">{review.digest}</span></p>}
                   </div>
                   <Pill tone={review.state === "approved" ? "success" : review.state === "changes" ? "warning" : "info"} dot>{review.state}</Pill>
-                  <Pill tone={review.revision === record.revision ? "success" : "warning"}>
-                    {review.revision === record.revision ? <>covers revision <span className="ds-num">{review.revision}</span></> : <>given at <span className="ds-num">{review.revision}</span>, now <span className="ds-num">{record.revision}</span></>}
+                  <Pill tone={review.digest === cutDigest(doc) ? "success" : "warning"}>
+                    {review.digest === cutDigest(doc) ? <>covers this cut (<span className="ds-num">{review.digest}</span>)</> : <>given for another cut, at revision <span className="ds-num">{review.revision}</span></>}
                   </Pill>
                 </Row>
               ))}
@@ -1384,7 +1383,7 @@ function ReviewScreen({ context, lens }: { context: ScreenContext; lens: "Commen
   }
 
   if (lens === "Delivery") {
-    const approved = doc.reviews.find((review) => review.state === "approved" && review.revision === record.revision);
+    const approved = doc.reviews.find((review) => review.state === "approved" && review.digest === cutDigest(doc));
     const done = doc.renders.filter((job) => job.state === "done");
     return (
       <Stack gap={4}>
@@ -1544,7 +1543,7 @@ function NewSequence({ context, close }: { context: ScreenContext; close: () => 
 }
 
 function MediaImport({ context, close }: { context: ScreenContext; close: () => void }) {
-  const { record, handle } = useVideoDoc(context);
+  const { record, handle } = useVideoDoc(context, (context.overlayPayload as { id?: string } | undefined)?.id);
   const [name, setName] = useState("");
   const [kind, setKind] = useState<"video" | "audio">("video");
   const [license, setLicense] = useState("Unknown");
@@ -1581,7 +1580,7 @@ function MediaImport({ context, close }: { context: ScreenContext; close: () => 
               license, credit: "not recorded", proxy: "generated",
             }],
           }), `Add the source ${name}`);
-          context.toast("Source added", "Drag it onto a track from the media bin, or use Create a clip on the timeline.");
+          context.toast("Source added", `${name} is in the media bin of ${record.title}. Nothing was uploaded: the picture is generated.`);
           close();
         }}
       >
@@ -1941,15 +1940,17 @@ function ReviewMarker({ context }: { context: ScreenContext }) {
 }
 
 function VersionComparison({ context }: { context: ScreenContext }) {
-  return <ReviewScreen context={context} lens="Versions" />;
+  return <VersionCompare context={context} />;
 }
 
 function FinalSignoff({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, handle } = useVideoDoc(context);
-  const [state, setState] = useState<"approved" | "changes" | "pending">("approved");
+  const preset = (context.overlayPayload as { state?: "approved" | "changes" | "pending" } | undefined)?.state;
+  const [state, setState] = useState<"approved" | "changes" | "pending">(preset ?? "approved");
   const [note, setNote] = useState("");
   if (!record || !handle.doc) return <Empty title="Open a project first" />;
   const doc = handle.doc;
+  const openNotes = doc.markers.filter((marker) => !marker.resolved).length;
   return (
     <form
       id="video-signoff"
@@ -1967,6 +1968,11 @@ function FinalSignoff({ context, close }: { context: ScreenContext; close: () =>
       <Notice tone="info" title={`This binds to revision ${record.revision} and digest ${cutDigest(doc)}`}>
         The digest is computed from every clip's source, position and duration. Change the cut and the approval no longer matches it.
       </Notice>
+      {state === "approved" && openNotes > 0 && (
+        <Notice tone="warning" title={`${openNotes} review notes are still open`}>
+          Approving does not close them. They stay open on the Comments tab and anyone delivering this cut will see them.
+        </Notice>
+      )}
       <Field label="Decision">
         <Select value={state} onChange={(event) => setState(event.target.value as "approved")}>
           <option value="approved">Approved</option>
@@ -1979,35 +1985,458 @@ function FinalSignoff({ context, close }: { context: ScreenContext; close: () =>
   );
 }
 
-async function withVideo(context: ScreenContext, change: (doc: VideoDoc) => VideoDoc, event: string): Promise<void> {
-  const id = context.params.id;
-  if (!id) return;
-  const { db } = await import("@/runtime/db");
-  const record = await db.records.get(id);
-  if (!record) return;
-  await context.mutate.patch(id, { body: change(parseVideo(record.body)) }, { event });
+function editVideoResult(context: ScreenContext, change: (doc: VideoDoc) => VideoDoc, label: string) {
+  return editShared<VideoDoc>(context, parseVideo, change, label);
+}
+
+async function editVideo(context: ScreenContext, change: (doc: VideoDoc) => VideoDoc, label: string): Promise<void> {
+  await editShared<VideoDoc>(context, parseVideo, change, label);
+}
+
+function openVideo(context: ScreenContext): VideoDoc | undefined {
+  return sharedHandle<VideoDoc>(context.params.id)?.doc ?? undefined;
+}
+
+const needsClip = () => (videoUi.get().selectedClipId ? undefined : "Select a clip on the timeline first");
+const needsProject = (context: ScreenContext) => (context.params.id ? undefined : "Open a project first");
+
+/** Every clip boundary on the timeline, in order. */
+function editPoints(doc: VideoDoc): number[] {
+  return [...new Set(doc.clips.flatMap((clip) => [clip.start, clipEnd(clip)]).map((time) => snapFrame(time, doc.fps)))].sort((a, b) => a - b);
 }
 
 const TIMELINE_ACTIONS: ActionDef[] = [
   {
-    id: "Trim", label: "Trim one frame off the end", placement: "toolbar",
-    guard: () => (videoUi.get().selectedClipId ? undefined : "Select a clip first"),
-    run: (context) => withVideo(context, (doc) => trimClip(doc, videoUi.get().selectedClipId!, "end", -1 / doc.fps), "Trimmed a frame"),
+    id: "Trim", label: "Trim one frame off the end", placement: "toolbar", shortcut: "Alt+←",
+    guard: needsClip,
+    run: (context) => editVideo(context, (doc) => trimClip(doc, videoUi.get().selectedClipId!, "end", -1 / doc.fps), "Trim one frame off the end"),
   },
   {
     id: "split", label: "Split at the playhead", placement: "primary",
-    guard: () => (videoUi.get().selectedClipId ? undefined : "Select a clip first"),
-    run: (context) => withVideo(context, (doc) => splitClip(doc, videoUi.get().selectedClipId!, videoUi.get().playhead).doc, "Split a clip"),
+    guard: needsClip,
+    run: async (context) => {
+      const result = await editVideoResult(context, (doc) => splitClip(doc, videoUi.get().selectedClipId!, videoUi.get().playhead).doc, "Split at the playhead");
+      if (!result) context.toast("Nothing to split", "The playhead is not inside the selected clip, or it is within a frame of an edge.", "blocked");
+    },
   },
   {
     id: "ripple", label: "Ripple delete", placement: "overflow", tone: "danger",
-    guard: () => (videoUi.get().selectedClipId ? undefined : "Select a clip first"),
-    run: (context) => withVideo(context, (doc) => rippleDelete(doc, videoUi.get().selectedClipId!), "Ripple deleted a clip"),
+    guard: needsClip,
+    run: async (context) => {
+      const id = videoUi.get().selectedClipId!;
+      await editVideo(context, (doc) => rippleDelete(doc, id), "Ripple delete");
+      videoUi.set((current) => ({ ...current, selectedClipId: undefined }));
+    },
   },
-  { id: "drag clips", label: "Select tool", placement: "overflow", run: () => setVideoTool("select") },
-  { id: "scrub", label: "Go to the start", placement: "secondary", run: () => videoUi.set((current) => ({ ...current, playhead: 0, playing: false })) },
-  { id: "undo", label: "Transitions", placement: "secondary", run: (context) => context.openOverlay("transition editor") },
+  {
+    id: "drag clips", label: "Move the clip to the playhead", placement: "overflow",
+    guard: needsClip,
+    run: async (context) => {
+      const id = videoUi.get().selectedClipId!;
+      const result = await editVideoResult(context, (doc) => moveClip(doc, id, videoUi.get().playhead), "Move the clip to the playhead");
+      if (!result) context.toast("The clip did not move", "It is locked, or it already starts at the playhead.", "blocked");
+      else {
+        const moved = result.clips.find((clip) => clip.id === id);
+        if (moved && Math.abs(moved.start - snapFrame(videoUi.get().playhead, result.fps)) > 1e-6) {
+          context.toast("Moved beside a neighbour", `The playhead would overlap another clip, so it starts at ${timecode(moved.start, result.fps)} instead.`, "info");
+        }
+      }
+    },
+  },
+  { id: "select tool", label: "Select tool (V)", placement: "overflow", run: () => setVideoTool("select") },
+  {
+    id: "scrub", label: "Scrub to the next edit", placement: "secondary",
+    guard: needsProject,
+    run: (context) => {
+      const doc = openVideo(context);
+      if (!doc) return;
+      const playhead = videoUi.get().playhead;
+      const next = editPoints(doc).find((time) => time > playhead + 1e-6) ?? 0;
+      videoUi.set((current) => ({ ...current, playhead: next, playing: false }));
+    },
+  },
+  {
+    id: "undo", label: "Undo", placement: "secondary", shortcut: "⌘Z",
+    guard: (context) => (canUndoShared(context) ? undefined : "Nothing to undo yet"),
+    run: (context) => { if (!undoShared(context)) context.toast("Nothing to undo", "The editor has no steps to take back.", "blocked"); },
+  },
+  { id: "transitions", label: "Transitions…", placement: "overflow", run: (context) => context.openOverlay("transition editor") },
 ];
+
+/* ------------------------- new action overlays ------------------------- */
+
+function TagSource({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = useVideoDoc(context);
+  const ui = useStore(videoUi);
+  const source = handle.doc?.sources.find((item) => item.id === ui.selectedSourceId);
+  const [text, setText] = useState((source?.tags ?? []).join(", "));
+  if (!record || !handle.doc) return <Empty title="Open a project first" />;
+  if (!source) return <Notice tone="info" title="Select a source">Pick a source in the media bin with its Select button, then tag it.</Notice>;
+  return (
+    <form
+      id="video-tag-source"
+      className="ds-stack ds-gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const tags = [...new Set(text.split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean))];
+        handle.edit((current) => ({ ...current, sources: current.sources.map((item) => (item.id === source.id ? { ...item, tags } : item)) }), `Tag ${source.name}`);
+        void context.mutate.log(`Tagged ${source.name}: ${tags.join(", ") || "no tags"}`, { entityId: record.id, type: "update" });
+        close();
+      }}
+    >
+      <Properties rows={[{ label: "Source", value: source.name }, { label: "Kind", value: source.kind }]} />
+      <Field label="Tags" hint="Separate tags with commas.">
+        <TextInput value={text} onChange={(event) => setText(event.target.value)} placeholder="b-roll, showroom, approved" autoFocus />
+      </Field>
+      <Notice tone="info" title="A tag is not a licence">Tags help find a source. Its rights are recorded on its licence, which is set in the inspector.</Notice>
+    </form>
+  );
+}
+
+function AutomationPoint({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = useVideoDoc(context);
+  const ui = useStore(videoUi);
+  const audio = handle.doc?.tracks.filter((track) => track.kind === "audio") ?? [];
+  const [trackId, setTrackId] = useState(ui.selectedTrackId ?? audio[0]?.id ?? "");
+  const [time, setTime] = useState(String(ui.playhead.toFixed(2)));
+  const [gain, setGain] = useState("-6");
+  const [error, setError] = useState<string | null>(null);
+  if (!record || !handle.doc) return <Empty title="Open a project first" />;
+  const doc = handle.doc;
+  const track = doc.tracks.find((item) => item.id === trackId);
+  return (
+    <form
+      id="video-automation"
+      className="ds-stack ds-gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const at = Number(time);
+        const db = Number(gain);
+        if (!track) { setError("Choose an audio track."); return; }
+        if (!Number.isFinite(at) || at < 0 || at > doc.duration) { setError(`The time must be between 0 and ${doc.duration.toFixed(2)} seconds.`); return; }
+        if (!Number.isFinite(db) || db < -60 || db > 12) { setError("Gain must be between −60 and +12 dB."); return; }
+        const point = { id: `au-${Date.now().toString(36)}`, time: snapFrame(at, doc.fps), gainDb: db };
+        handle.edit((current) => ({
+          ...current,
+          tracks: current.tracks.map((item) => (item.id === track.id
+            ? { ...item, automation: [...(item.automation ?? []).filter((existing) => Math.abs(existing.time - point.time) > 1e-6), point].sort((a, b) => a.time - b.time) }
+            : item)),
+        }), `Automate ${track.name}`);
+        void context.mutate.log(`Gain automation on ${track.name}: ${db} dB at ${timecode(point.time, doc.fps)}`, { entityId: record.id, type: "update" });
+        close();
+      }}
+    >
+      {error && <Notice tone="danger" title="Not written">{error}</Notice>}
+      <Field label="Track">
+        <Select value={trackId} onChange={(event) => setTrackId(event.target.value)}>
+          {audio.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </Select>
+      </Field>
+      <Row gap={3} wrap>
+        <Field label="At (seconds)"><TextInput type="number" step={1 / doc.fps} value={time} onChange={(event) => setTime(event.target.value)} /></Field>
+        <Field label="Gain (dB)"><TextInput type="number" step={0.5} value={gain} onChange={(event) => setGain(event.target.value)} /></Field>
+      </Row>
+      {track && (track.automation ?? []).length > 0 && (
+        <PanelGroup title={`Points on ${track.name}`}>
+          <Stack gap={1}>
+            {(track.automation ?? []).map((point) => (
+              <Row key={point.id} gap={2} className="ds-panel" style={{ padding: "var(--space-1) var(--space-2)" }}>
+                <span className="ds-num">{timecode(point.time, doc.fps)}</span>
+                <span className="ds-grow ds-num">{point.gainDb.toFixed(1)} dB</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handle.edit((current) => ({ ...current, tracks: current.tracks.map((item) => (item.id === track.id ? { ...item, automation: (item.automation ?? []).filter((existing) => existing.id !== point.id) } : item)) }), "Remove an automation point")}
+                >
+                  Remove
+                </Button>
+              </Row>
+            ))}
+          </Stack>
+        </PanelGroup>
+      )}
+      <Notice tone="info" title="Applied to the samples">Gain between two points is interpolated in decibels and multiplied into the mix, so the meters, the waveform and the WAV export all hear it.</Notice>
+    </form>
+  );
+}
+
+function mixProblems(doc: VideoDoc): string[] {
+  const loudness = measureLoudness(mixAudio(doc, 0, doc.duration, 8000));
+  const problems: string[] = [];
+  if (loudness.clippedSamples > 0) problems.push(`${loudness.clippedSamples} samples are at full scale: the mix clips.`);
+  if (loudness.approximateLufs > doc.loudnessTarget + 1) problems.push(`It measures about ${loudness.approximateLufs} LUFS, louder than the ${doc.loudnessTarget} LUFS target.`);
+  if (loudness.approximateLufs < doc.loudnessTarget - 1) problems.push(`It measures about ${loudness.approximateLufs} LUFS, quieter than the ${doc.loudnessTarget} LUFS target.`);
+  return problems;
+}
+
+async function writeMix(context: ScreenContext): Promise<void> {
+  const doc = await readShared<VideoDoc>(context, parseVideo);
+  const id = context.params.id;
+  if (!doc || !id) return;
+  const { db } = await import("@/runtime/db");
+  const record = await db.records.get(id);
+  const samples = mixAudio(doc, 0, doc.duration, 22050);
+  const name = `${slug(record?.title ?? "mix")}-mix.wav`;
+  downloadBlob(name, wavFromSamples(samples, 22050));
+  await context.mutate.log(`Exported the mix as ${name}`, { entityId: id, type: "export" });
+  context.toast("Mix written", `${name}: ${doc.duration.toFixed(1)}s of 16-bit PCM at 22.05 kHz, encoded in this browser.`);
+}
+
+function ExportMixWarning({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = useVideoDoc(context);
+  if (!record || !handle.doc) return <Empty title="Open a project first" />;
+  const problems = mixProblems(handle.doc);
+  return (
+    <Stack gap={3}>
+      {problems.length === 0 ? <Notice tone="success" title="The mix passes">No clipping, and the loudness is within a unit of the target.</Notice> : (
+        <Notice tone="danger" title="The mix fails its checks">
+          <ul>{problems.map((problem) => <li key={problem}>{problem}</li>)}</ul>
+        </Notice>
+      )}
+      <Notice tone="warning" title="An approximate meter">RMS with a fixed offset, not a gated K-weighted measurement. Fix the level on the Mixer tab or export anyway with the failures stated.</Notice>
+      <Row gap={2}>
+        <Button variant="ghost" onClick={close}>Keep mixing</Button>
+        <span className="ds-grow" />
+        <Button variant={problems.length ? "outline-danger" : "primary"} onClick={async () => { await writeMix(context); close(); }}>{problems.length ? "Export the WAV anyway" : "Export the WAV"}</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+function CaptionStyleEditor({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = useVideoDoc(context);
+  const ui = useStore(videoUi);
+  const current = handle.doc?.captionStyle ?? { position: "bottom" as const, scale: 1, box: true };
+  const [position, setPosition] = useState<"bottom" | "top">(current.position);
+  const [scale, setScale] = useState(current.scale);
+  const [box, setBox] = useState(current.box);
+  if (!record || !handle.doc) return <Empty title="Open a project first" />;
+  const preview: VideoDoc = { ...handle.doc, captionStyle: { position, scale, box } };
+  const cue = handle.doc.captions.find((caption) => caption.language === ui.language);
+  return (
+    <form
+      id="video-caption-style"
+      className="ds-stack ds-gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        handle.edit((doc) => ({ ...doc, captionStyle: { position, scale, box } }), "Style the captions");
+        void context.mutate.log(`Caption style: ${position}, ${Math.round(scale * 100)}%, ${box ? "boxed" : "outlined"}`, { entityId: record.id, type: "update" });
+        close();
+      }}
+    >
+      <PreviewMonitor doc={preview} time={cue ? (cue.start + cue.end) / 2 : ui.playhead} height={180} captions />
+      <Row gap={3} wrap>
+        <Field label="Position">
+          <Select value={position} onChange={(event) => setPosition(event.target.value as "bottom")}>
+            <option value="bottom">Bottom</option>
+            <option value="top">Top</option>
+          </Select>
+        </Field>
+        <Field label={`Size ${Math.round(scale * 100)}%`}>
+          <input className="vx-range" type="range" min={0.6} max={1.6} step={0.05} value={scale} aria-label="Caption size" onChange={(event) => setScale(Number(event.target.value))} />
+        </Field>
+      </Row>
+      <Checkbox label="Draw a box behind the text (otherwise an outline)" checked={box} onChange={(event) => setBox(event.target.checked)} />
+      <Notice tone="info" title="Burned into the picture only when exported with captions">The SRT and WebVTT files carry text and timings; a player draws them in its own style.</Notice>
+    </form>
+  );
+}
+
+function ApplyPreset({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = useVideoDoc(context);
+  const ui = useStore(videoUi);
+  if (!record || !handle.doc) return <Empty title="Open a project first" />;
+  const doc = handle.doc;
+  const clip = doc.clips.find((item) => item.id === ui.selectedClipId);
+  if (!clip) return <Notice tone="info" title="Select a clip">A preset replaces one clip's effect stack.</Notice>;
+  const presets = [...BUILT_IN_PRESETS, ...(doc.effectPresets ?? [])];
+  return (
+    <Stack gap={2}>
+      {clip.effects.length > 0 && <Notice tone="warning" title={`${clip.name} already has ${clip.effects.length} effects`}>Applying a preset replaces them. Undo takes it back.</Notice>}
+      {presets.map((preset, index) => (
+        <Row key={`${preset.name}-${index}`} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
+          <div className="ds-grow">
+            <strong>{preset.name}</strong>
+            <p className="vx-mini">{preset.effects.map((effect) => `${effect.kind} ${effect.amount}`).join(" · ")}</p>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              handle.edit((current) => patchClip(current, clip.id, { effects: presetEffects(preset) }), `Apply ${preset.name}`);
+              void context.mutate.log(`Applied ${preset.name} to ${clip.name}`, { entityId: record.id, type: "update" });
+              close();
+            }}
+          >
+            Apply
+          </Button>
+        </Row>
+      ))}
+    </Stack>
+  );
+}
+
+function SavePreset({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = useVideoDoc(context);
+  const ui = useStore(videoUi);
+  const [name, setName] = useState("");
+  if (!record || !handle.doc) return <Empty title="Open a project first" />;
+  const doc = handle.doc;
+  const clip = doc.clips.find((item) => item.id === ui.selectedClipId);
+  if (!clip) return <Notice tone="info" title="Select a clip">A preset is saved from one clip's effect stack.</Notice>;
+  if (clip.effects.length === 0) return <Notice tone="info" title={`${clip.name} has no effects`}>Grade the clip first; an empty stack is not worth a preset.</Notice>;
+  const taken = [...BUILT_IN_PRESETS, ...(doc.effectPresets ?? [])].some((preset) => preset.name.toLowerCase() === name.trim().toLowerCase());
+  return (
+    <form
+      id="video-save-preset"
+      className="ds-stack ds-gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!name.trim() || taken) return;
+        handle.edit((current) => ({
+          ...current,
+          effectPresets: [...(current.effectPresets ?? []), { id: `pre-${Date.now().toString(36)}`, name: name.trim(), effects: clip.effects.filter((effect) => !effect.bypassed).map((effect) => ({ kind: effect.kind, amount: effect.amount })), by: context.actor, at: new Date().toISOString() }],
+        }), `Save the preset ${name.trim()}`);
+        close();
+      }}
+    >
+      <Properties rows={[
+        { label: "From", value: clip.name },
+        { label: "Effects", value: clip.effects.filter((effect) => !effect.bypassed).map((effect) => `${effect.kind} ${effect.amount}`).join(" · ") || "every effect is bypassed" },
+      ]} />
+      <Field label="Preset name" required error={taken ? "A preset already has this name." : undefined}>
+        <TextInput value={name} onChange={(event) => setName(event.target.value)} required autoFocus placeholder="Warm interior" />
+      </Field>
+      <p className="vx-mini">Bypassed effects are left out. The preset is saved with this project and appears on the Presets tab.</p>
+    </form>
+  );
+}
+
+function GradePreview({ context }: { context: ScreenContext }) {
+  const { record, handle } = useVideoDoc(context);
+  const ui = useStore(videoUi);
+  if (!record || !handle.doc) return <Empty title="Open a project first" />;
+  const doc = handle.doc;
+  const clip = doc.clips.find((item) => item.id === ui.selectedClipId);
+  return (
+    <Stack gap={3}>
+      <PreviewMonitor doc={doc} time={ui.playhead} height={260} bypassEffects={ui.bypassEffects} />
+      <TransportBar doc={doc} handle={handle} />
+      <p className="vx-mini">
+        {clip ? <>Playing {clip.name} with {clip.effects.filter((effect) => !effect.bypassed).length} live effects. </> : null}
+        Every frame is rendered with the effect stack as it is now{ui.bypassEffects ? ", but effects are bypassed" : ""}. The export draws the same frames; its encoder is the browser's, so check the file.
+      </p>
+    </Stack>
+  );
+}
+
+function RenderPreview({ context }: { context: ScreenContext }) {
+  const { record, handle } = useVideoDoc(context);
+  const [sheet, setSheet] = useState<{ url: string; times: number[]; blob: Blob } | null>(null);
+  const doc = handle.doc;
+  useEffect(() => {
+    if (!doc) return undefined;
+    let url = "";
+    const made = contactSheet(doc, 4, 3, 240);
+    made.canvas.toBlob((blob) => {
+      if (!blob) return;
+      url = URL.createObjectURL(blob);
+      setSheet({ url, times: made.times, blob });
+    }, "image/png");
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [doc]);
+  if (!record || !doc) return <Empty title="Open a project first" />;
+  return (
+    <Stack gap={3}>
+      {sheet ? <img src={sheet.url} alt={`Twelve frames of ${record.title}, from ${timecode(sheet.times[0], doc.fps)} to ${timecode(sheet.times[sheet.times.length - 1], doc.fps)}`} style={{ width: "100%", borderRadius: 6 }} /> : <p className="ds-subtle">Rendering twelve frames…</p>}
+      <p className="vx-mini">Twelve frames drawn just now by the same renderer the export uses, evenly spaced across the sequence. This is a preview of the picture, not of the encoder.</p>
+      <Button variant="secondary" disabled={!sheet} onClick={() => { if (sheet) downloadBlob(`${slug(record.title)}-preview.png`, sheet.blob); }}>Download the preview (PNG)</Button>
+    </Stack>
+  );
+}
+
+function PublishRender({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = useVideoDoc(context);
+  const [destination, setDestination] = useState("Company video channel");
+  if (!record || !handle.doc) return <Empty title="Open a project first" />;
+  const doc = handle.doc;
+  const job = doc.renders.find((item) => item.state === "done");
+  const approved = doc.reviews.find((review) => review.state === "approved" && review.digest === cutDigest(doc));
+  if (!job) return <Notice tone="warning" title="Nothing has been rendered">Publishing needs a finished, verified render. Export first.</Notice>;
+  return (
+    <form
+      id="video-publish"
+      className="ds-stack ds-gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const delivery = { state: "queued_local" as const, at: new Date().toISOString(), by: context.actor, destination, note: "No video host is connected. The request is recorded here and nothing left this browser." };
+        handle.edit((current) => ({ ...current, renders: current.renders.map((item) => (item.id === job.id ? { ...item, delivery } : item)) }), `Queue ${job.artifact} for publishing`);
+        void context.mutate.log(`Publishing ${job.artifact} to ${destination} queued locally; no host is connected`, { entityId: record.id, type: "publish", capability: "queued_local" });
+        context.toast("Queued locally, not published", `${job.artifact} is recorded as ${CAPABILITY_LABELS.queued_local.toLowerCase()} for ${destination}. No video host is connected, so nothing left this browser.`, "info");
+        close();
+      }}
+    >
+      <Properties rows={[
+        { label: "File", value: <span className="ds-num">{job.artifact}</span> },
+        { label: "Size", value: <span className="ds-num">{((job.bytes ?? 0) / 1024 / 1024).toFixed(2)} MB</span> },
+        { label: "Approval", value: approved ? `approved by ${approved.by} for this cut` : "no approval covers this cut" },
+        { label: "Video host", value: <Pill tone="warning">{CAPABILITY_LABELS.not_connected}</Pill> },
+      ]} />
+      {!approved && <Notice tone="warning" title="This cut is not approved">Publishing an unapproved cut is allowed, and it is stated on the request.</Notice>}
+      <Field label="Destination"><TextInput value={destination} onChange={(event) => setDestination(event.target.value)} required /></Field>
+      <Notice tone="warning" title="Nothing is uploaded">No video host is connected. Publishing records the request against the render as queued locally; the file stays on this machine until a host is connected.</Notice>
+    </form>
+  );
+}
+
+function VersionCompare({ context }: { context: ScreenContext }) {
+  const { record, handle } = useVideoDoc(context);
+  const ui = useStore(videoUi);
+  const [index, setIndex] = useState(0);
+  if (!record || !handle.doc) return <Empty title="Open a project first" />;
+  const doc = handle.doc;
+  const snapshots = record.history.filter((item) => item.body);
+  if (snapshots.length === 0) return <Empty title="No saved version to compare with">The record keeps a snapshot each time it is saved over. Edit and save the cut, then compare.</Empty>;
+  const snapshot = snapshots[Math.min(index, snapshots.length - 1)];
+  const before = parseVideo(snapshot.body);
+  const key = (clip: Clip) => `${clip.sourceId}:${clip.start.toFixed(3)}:${clip.duration.toFixed(3)}:${clip.sourceIn.toFixed(3)}`;
+  const beforeKeys = new Set(before.clips.map(key));
+  const nowKeys = new Set(doc.clips.map(key));
+  const added = doc.clips.filter((clip) => !beforeKeys.has(key(clip)));
+  const removed = before.clips.filter((clip) => !nowKeys.has(key(clip)));
+  return (
+    <Stack gap={3}>
+      <Field label="Saved version">
+        <Select value={index} onChange={(event) => setIndex(Number(event.target.value))}>
+          {snapshots.map((item, position) => <option key={position} value={position}>{context.dateTime(item.at)}</option>)}
+        </Select>
+      </Field>
+      <Properties rows={[
+        { label: "Digest then", value: <span className="ds-num">{cutDigest(before)}</span> },
+        { label: "Digest now", value: <span className="ds-num">{cutDigest(doc)}</span> },
+        { label: "Duration", value: <><span className="ds-num">{timecode(before.duration, before.fps)}</span> → <span className="ds-num">{timecode(doc.duration, doc.fps)}</span></> },
+        { label: "Clips", value: <><span className="ds-num">{before.clips.length}</span> → <span className="ds-num">{doc.clips.length}</span></> },
+        { label: "Changed or added", value: added.length === 0 ? "none" : added.map((clip) => `${clip.name} at ${timecode(clip.start, doc.fps)}`).join(", ") },
+        { label: "Gone or changed", value: removed.length === 0 ? "none" : removed.map((clip) => `${clip.name} at ${timecode(clip.start, before.fps)}`).join(", ") },
+      ]} />
+      <Grid>
+        <Card span={6} pad="tight"><PreviewMonitor doc={before} time={ui.playhead} height={180} /><p className="vx-mini">Saved {context.relative(snapshot.at)}</p></Card>
+        <Card span={6} pad="tight"><PreviewMonitor doc={doc} time={ui.playhead} height={180} /><p className="vx-mini">Now</p></Card>
+      </Grid>
+      <TransportBar doc={doc} handle={handle} />
+    </Stack>
+  );
+}
+
+function formFooter(form: string, label: string) {
+  return ({ close }: { close: () => void }) => (
+    <>
+      <Button variant="ghost" onClick={close}>Cancel</Button>
+      <span className="ds-grow" />
+      <Button variant="primary" type="submit" form={form}>{label}</Button>
+    </>
+  );
+}
 
 registerApp({
   code: "VIDEO",
@@ -2038,9 +2467,14 @@ registerApp({
         render: (context: ScreenContext) => <ProjectList context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Create", label: "Create", placement: "primary", run: (context) => context.openOverlay("new sequence") },
+        { id: "Create", label: "Create a sequence", placement: "primary", run: (context) => context.openOverlay("new sequence") },
         {
           id: "import media", label: "Import media", placement: "secondary",
+          guard: (context) => (context.selectedId ? undefined : "Select a project first"),
+          run: (context) => context.openOverlay("Media import", { id: context.selectedId }),
+        },
+        {
+          id: "media bin", label: "Open the media bin", placement: "overflow",
           guard: (context) => (context.selectedId ? undefined : "Select a project first"),
           run: (context) => { context.navigate(context.path("/o/:org/video/projects/:id/media", context.selectedId)); },
         },
@@ -2065,7 +2499,7 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "Media import", kind: "modal", title: "Add a source", width: 520, render: ({ close, ...context }) => <MediaImport context={context} close={close} /> },
+        { id: "Media import", kind: "modal", title: "Import media", width: 520, render: ({ close, ...context }) => <MediaImport context={context} close={close} /> },
         { id: "new sequence", kind: "modal", title: "New sequence", width: 520, render: ({ close, ...context }) => <NewSequence context={context} close={close} />, footer: ({ close }) => (<><Button variant="ghost" onClick={close}>Cancel</Button><span className="ds-grow" /><Button variant="primary" type="submit" form="video-new-sequence">Create</Button></>) },
         { id: "project settings", kind: "drawer", title: "Project", width: 420, render: ({ ...context }) => <ProjectSettings context={context} /> },
       ],
@@ -2094,19 +2528,60 @@ registerApp({
         render: (context: ScreenContext) => <MediaBin context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Import", label: "Add a source", placement: "primary", run: (context) => context.openOverlay("Media inspector") },
-        { id: "relink", label: "Relink", placement: "secondary", run: (context) => context.openOverlay("relink file") },
+        { id: "Import", label: "Import a source", placement: "primary", guard: needsProject, run: (context) => context.openOverlay("Media import") },
+        { id: "relink", label: "Relink", placement: "secondary", guard: needsProject, run: (context) => context.openOverlay("relink file") },
         {
-          id: "tag", label: "Mark the rights as company-owned", placement: "overflow",
-          run: (context) => withVideo(context, (doc) => ({ ...doc, sources: doc.sources.map((source) => (source.license === "Unknown" ? { ...source, license: "Company-owned" } : source)) }), "Recorded the rights on every unknown source"),
+          id: "tag", label: "Tag the selected source", placement: "overflow",
+          guard: () => (videoUi.get().selectedSourceId ? undefined : "Select a source in the bin first"),
+          run: (context) => context.openOverlay("tag source"),
         },
-        { id: "proxy generate", label: "Proxies", placement: "overflow", run: (context) => context.setTab("Proxy") },
-        { id: "audition", label: "Missing media", placement: "secondary", run: (context) => context.setTab("Missing") },
+        {
+          id: "proxy generate", label: "Generate proxies", placement: "overflow",
+          guard: needsProject,
+          run: async (context) => {
+            const doc = await readShared<VideoDoc>(context, parseVideo);
+            if (!doc) return;
+            const pending = doc.sources.filter((source) => source.proxy !== "generated" && !source.missing);
+            const offline = doc.sources.filter((source) => source.missing).length;
+            if (pending.length === 0) {
+              context.toast("Nothing to generate", `Every present source already has its on-demand proxy.${offline ? ` ${offline} offline sources cannot have one until they are relinked.` : ""}`, "info");
+              return;
+            }
+            await editVideo(context, (current) => ({ ...current, sources: current.sources.map((source) => (source.proxy !== "generated" && !source.missing ? { ...source, proxy: "generated" } : source)) }), `Generate proxies for ${pending.length} sources`);
+            context.toast("Proxies generated", `${pending.length} sources now render at preview size on demand; there is no file to transcode.${offline ? ` ${offline} offline sources were skipped.` : ""}`);
+          },
+        },
+        {
+          id: "audition", label: "Audition the selected source", placement: "secondary",
+          guard: (context) => {
+            const doc = openVideo(context);
+            const source = doc?.sources.find((item) => item.id === videoUi.get().selectedSourceId);
+            if (!source) return "Select a source in the bin first";
+            if (source.missing) return "The source is offline";
+            if (source.kind !== "audio") return "Only audio sources can be auditioned; a picture source shows in the inspector";
+            return undefined;
+          },
+          run: async (context) => {
+            const doc = openVideo(context);
+            const source = doc?.sources.find((item) => item.id === videoUi.get().selectedSourceId);
+            if (!source) return;
+            try {
+              const seconds = Math.min(source.duration, 4);
+              const player = await playSamples(renderSamples(source, seconds, 22050), 22050);
+              window.setTimeout(() => player.stop(), seconds * 1000);
+              context.toast("Auditioning", `${seconds.toFixed(1)}s of ${source.name}, played from the generated samples through Web Audio.`, "info");
+            } catch (error) {
+              context.toast("Cannot play", error instanceof Error ? error.message : "Audio is unavailable.", "failed");
+            }
+          },
+        },
       ],
       overlays: [
         { id: "Media inspector", kind: "drawer", title: "Source", width: 460, render: ({ ...context }) => <MediaInspector context={context} /> },
         { id: "relink file", kind: "modal", title: "Relink", width: 520, render: ({ close, ...context }) => <RelinkFile context={context} close={close} /> },
         { id: "license", kind: "drawer", title: "Rights", width: 440, render: ({ ...context }) => <LicenceDrawer context={context} /> },
+        { id: "Media import", kind: "modal", title: "Import a source", width: 520, render: ({ close, ...context }) => <MediaImport context={context} close={close} /> },
+        { id: "tag source", kind: "modal", title: "Tag a source", width: 460, render: ({ close, ...context }) => <TagSource context={context} close={close} />, footer: formFooter("video-tag-source", "Save the tags") },
       ],
     },
 
@@ -2118,20 +2593,37 @@ registerApp({
       })),
       actions: [
         {
-          id: "Adjust gain", label: "Pull every track down 1 dB", placement: "secondary",
-          run: (context) => withVideo(context, (doc) => ({ ...doc, tracks: doc.tracks.map((track) => (track.kind === "audio" ? { ...track, gainDb: (track.gainDb ?? 0) - 1 } : track)) }), "Lowered every audio track by 1 dB"),
+          id: "Adjust gain", label: "Adjust gain: every audio track −1 dB", placement: "secondary",
+          guard: needsProject,
+          run: (context) => editVideo(context, (doc) => ({ ...doc, tracks: doc.tracks.map((track) => (track.kind === "audio" ? { ...track, gainDb: (track.gainDb ?? 0) - 1 } : track)) }), "Lower every audio track by 1 dB"),
         },
         {
-          id: "mute", label: "Mute every audio track", placement: "overflow",
-          run: (context) => withVideo(context, (doc) => ({ ...doc, tracks: doc.tracks.map((track) => (track.kind === "audio" ? { ...track, muted: !track.muted } : track)) }), "Muted the audio tracks"),
+          id: "mute", label: "Mute or unmute every audio track", placement: "overflow",
+          guard: needsProject,
+          run: (context) => editVideo(context, (doc) => {
+            const audio = doc.tracks.filter((track) => track.kind === "audio");
+            const mute = audio.some((track) => !track.muted);
+            return { ...doc, tracks: doc.tracks.map((track) => (track.kind === "audio" ? { ...track, muted: mute } : track)) };
+          }, "Mute or unmute the audio tracks"),
         },
-        { id: "automate", label: "Effects", placement: "overflow", run: (context) => context.setTab("Effects") },
-        { id: "export mix", label: "Loudness", placement: "primary", run: (context) => context.setTab("Loudness") },
+        { id: "automate", label: "Automate gain…", placement: "overflow", guard: needsProject, run: (context) => context.openOverlay("automation point") },
+        {
+          id: "export mix", label: "Export the mix (WAV)", placement: "primary",
+          guard: needsProject,
+          run: async (context) => {
+            const doc = await readShared<VideoDoc>(context, parseVideo);
+            if (!doc) return;
+            if (mixProblems(doc).length > 0) context.openOverlay("export mix check");
+            else await writeMix(context);
+          },
+        },
       ],
       overlays: [
         { id: "Mixer property", kind: "drawer", title: "Track", width: 420, render: ({ ...context }) => <MixerProperty context={context} /> },
         { id: "loudness review", kind: "modal", title: "Loudness", width: 560, render: ({ ...context }) => <LoudnessReview context={context} /> },
         { id: "voice cleanup", kind: "modal", title: "Voice cleanup", width: 520, render: () => <VoiceCleanup /> },
+        { id: "automation point", kind: "modal", title: "Gain automation", width: 520, render: ({ close, ...context }) => <AutomationPoint context={context} close={close} />, footer: formFooter("video-automation", "Write the point") },
+        { id: "export mix check", kind: "modal", title: "Before the mix is exported", width: 520, render: ({ close, ...context }) => <ExportMixWarning context={context} close={close} /> },
       ],
     },
 
@@ -2143,32 +2635,75 @@ registerApp({
       })),
       actions: [
         {
-          id: "Correct", label: "Add a cue at the playhead", placement: "primary",
-          run: (context) => withVideo(context, (doc) => ({
+          id: "Correct", label: "Correct the cue at the playhead", placement: "primary",
+          guard: (context) => {
+            const doc = openVideo(context);
+            if (!doc) return "Open a project first";
+            return captionAt(doc, videoUi.get().playhead, videoUi.get().language) ? undefined : "No cue at the playhead in this language";
+          },
+          run: (context) => {
+            const doc = openVideo(context);
+            const cue = doc ? captionAt(doc, videoUi.get().playhead, videoUi.get().language) : undefined;
+            if (cue) context.openOverlay("Caption editor", { id: cue.id });
+          },
+        },
+        {
+          id: "add cue", label: "Add a cue at the playhead", placement: "secondary",
+          guard: needsProject,
+          run: (context) => editVideo(context, (doc) => ({
             ...doc,
             captions: [...doc.captions, { id: `cap-${Date.now().toString(36)}`, start: videoUi.get().playhead, end: Math.min(doc.duration, videoUi.get().playhead + 2.5), text: "", reviewed: false, language: videoUi.get().language }].sort((a, b) => a.start - b.start),
-          }), "Added a caption cue"),
+          }), "Add a caption cue"),
         },
         {
           id: "split cue", label: "Split the cue at the playhead", placement: "secondary",
-          run: (context) => withVideo(context, (doc) => {
-            const caption = doc.captions.find((item) => videoUi.get().playhead > item.start && videoUi.get().playhead < item.end);
+          guard: (context) => {
+            const doc = openVideo(context);
+            return doc && captionAt(doc, videoUi.get().playhead, videoUi.get().language) ? undefined : "No cue at the playhead";
+          },
+          run: (context) => editVideo(context, (doc) => {
+            const caption = captionAt(doc, videoUi.get().playhead, videoUi.get().language);
             return caption ? splitCaption(doc, caption.id, videoUi.get().playhead) : doc;
           }, "Split a caption cue"),
         },
-        { id: "time", label: "Review", placement: "secondary", run: (context) => context.setTab("Review") },
-        { id: "style", label: "Languages", placement: "overflow", run: (context) => context.setTab("Languages") },
+        {
+          id: "time", label: "Time: end the cue at the playhead", placement: "secondary",
+          guard: (context) => {
+            const doc = openVideo(context);
+            if (!doc) return "Open a project first";
+            const playhead = videoUi.get().playhead;
+            return doc.captions.some((cue) => cue.language === videoUi.get().language && cue.start < playhead) ? undefined : "No cue starts before the playhead";
+          },
+          run: async (context) => {
+            let note = "";
+            await editVideo(context, (doc) => {
+              const playhead = snapFrame(videoUi.get().playhead, doc.fps);
+              const cues = doc.captions.filter((cue) => cue.language === videoUi.get().language).sort((a, b) => a.start - b.start);
+              const cue = [...cues].reverse().find((item) => item.start < playhead);
+              if (!cue) return doc;
+              const next = cues.find((item) => item.start > cue.start);
+              const end = next && next.start < playhead ? next.start : playhead;
+              if (end !== playhead) note = `It stops at ${timecode(end, doc.fps)}, where the next cue begins, rather than overlapping it.`;
+              if (Math.abs(end - cue.end) < 1e-6) return doc;
+              return { ...doc, captions: doc.captions.map((item) => (item.id === cue.id ? { ...item, end, reviewed: false } : item)) };
+            }, "Retime a cue to the playhead");
+            if (note) context.toast("Retimed without an overlap", note, "info");
+          },
+        },
+        { id: "style", label: "Style the captions…", placement: "overflow", guard: needsProject, run: (context) => context.openOverlay("caption style") },
         {
           id: "export SRT", label: "Export SRT", placement: "overflow",
+          guard: needsProject,
           run: async (context) => {
             const id = context.params.id;
-            if (!id) return;
+            const doc = await readShared<VideoDoc>(context, parseVideo);
+            if (!doc || !id) return;
             const { db } = await import("@/runtime/db");
             const record = await db.records.get(id);
-            if (!record) return;
-            const doc = parseVideo(record.body);
-            downloadText(`${slug(record.title)}.srt`, captionsToSrt(doc.captions, videoUi.get().language), "application/x-subrip");
-            context.toast("SRT written", `${doc.captions.filter((caption) => caption.language === videoUi.get().language).length} cues with millisecond timings.`);
+            const cues = doc.captions.filter((caption) => caption.language === videoUi.get().language);
+            downloadText(`${slug(record?.title ?? "captions")}.srt`, captionsToSrt(doc.captions, videoUi.get().language), "application/x-subrip");
+            const drafts = cues.filter((caption) => !caption.reviewed).length;
+            context.toast("SRT written", `${cues.length} cues with millisecond timings.${drafts ? ` ${drafts} have not been checked by a person.` : ""}`, drafts ? "info" : "ok");
           },
         },
       ],
@@ -2176,6 +2711,7 @@ registerApp({
         { id: "Caption editor", kind: "drawer", title: "Cue", width: 460, render: ({ ...context }) => <CaptionEditorOverlay context={context} /> },
         { id: "speaker verification", kind: "modal", title: "Speakers", width: 520, render: ({ ...context }) => <SpeakerVerification context={context} /> },
         { id: "language review", kind: "modal", title: "Languages", width: 520, render: ({ ...context }) => <LanguageReview context={context} /> },
+        { id: "caption style", kind: "modal", title: "Caption style", width: 560, render: ({ close, ...context }) => <CaptionStyleEditor context={context} close={close} />, footer: formFooter("video-caption-style", "Apply the style") },
       ],
     },
 
@@ -2186,24 +2722,44 @@ registerApp({
         render: (context: ScreenContext) => <EffectsScreen context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Apply", label: "Presets", placement: "primary", run: (context) => context.setTab("Presets") },
+        { id: "Apply", label: "Apply a preset…", placement: "primary", guard: needsClip, run: (context) => context.openOverlay("apply preset") },
         {
-          id: "reorder", label: "Reverse the effect order", placement: "overflow",
-          guard: () => (videoUi.get().selectedClipId ? undefined : "Select a clip first"),
-          run: (context) => withVideo(context, (doc) => patchClip(doc, videoUi.get().selectedClipId!, { effects: [...(doc.clips.find((clip) => clip.id === videoUi.get().selectedClipId)?.effects ?? [])].reverse() }), "Reversed the effect order"),
+          id: "reorder", label: "Reorder: reverse the effect stack", placement: "overflow",
+          guard: needsClip,
+          run: (context) => editVideo(context, (doc) => {
+            const clip = doc.clips.find((item) => item.id === videoUi.get().selectedClipId);
+            if (!clip || clip.effects.length < 2) return doc;
+            return patchClip(doc, clip.id, { effects: [...clip.effects].reverse() });
+          }, "Reverse the effect order"),
         },
-        { id: "preview", label: "Compare", placement: "secondary", run: (context) => context.setTab("Compare") },
+        {
+          id: "preview", label: "Preview the grade", placement: "secondary",
+          guard: needsClip,
+          run: (context) => {
+            const doc = openVideo(context);
+            const clip = doc?.clips.find((item) => item.id === videoUi.get().selectedClipId);
+            if (clip && doc) videoUi.set((current) => ({ ...current, playhead: snapFrame(clip.start, doc.fps), playing: true, rate: 1 }));
+            context.openOverlay("grade preview");
+          },
+        },
+        { id: "compare", label: "Compare with and without", placement: "overflow", run: (context) => context.setTab("Compare") },
         { id: "bypass", label: "Bypass every effect", placement: "secondary", run: () => videoUi.set((current) => ({ ...current, bypassEffects: !current.bypassEffects })) },
         {
-          id: "reset", label: "Clear the grade", placement: "overflow", tone: "danger",
-          guard: () => (videoUi.get().selectedClipId ? undefined : "Select a clip first"),
-          run: (context) => withVideo(context, (doc) => patchClip(doc, videoUi.get().selectedClipId!, { effects: [] }), "Cleared the grade"),
+          id: "reset", label: "Reset the grade", placement: "overflow", tone: "danger",
+          guard: needsClip,
+          run: (context) => editVideo(context, (doc) => {
+            const clip = doc.clips.find((item) => item.id === videoUi.get().selectedClipId);
+            return clip && clip.effects.length > 0 ? patchClip(doc, clip.id, { effects: [] }) : doc;
+          }, "Reset the grade"),
         },
+        { id: "save preset", label: "Save the grade as a preset…", placement: "overflow", guard: needsClip, run: (context) => context.openOverlay("preset save") },
       ],
       overlays: [
         { id: "Effect inspector", kind: "drawer", title: "Effects", width: 440, render: ({ ...context }) => <EffectInspectorOverlay context={context} /> },
         { id: "scope display", kind: "modal", title: "Scopes", width: 560, render: ({ ...context }) => <ScopeOverlay context={context} /> },
-        { id: "preset save", kind: "modal", title: "Presets", width: 620, render: ({ ...context }) => <EffectsScreen context={context} lens="Presets" /> },
+        { id: "preset save", kind: "modal", title: "Save a preset", width: 480, render: ({ close, ...context }) => <SavePreset context={context} close={close} />, footer: formFooter("video-save-preset", "Save the preset") },
+        { id: "apply preset", kind: "modal", title: "Apply a preset", width: 520, render: ({ close, ...context }) => <ApplyPreset context={context} close={close} /> },
+        { id: "grade preview", kind: "modal", title: "Preview the grade", width: 620, render: ({ ...context }) => <GradePreview context={context} /> },
       ],
     },
 
@@ -2214,16 +2770,59 @@ registerApp({
         render: (context: ScreenContext) => <ExportScreen context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Render preview", label: "Contact sheet", placement: "secondary", run: (context) => context.setTab("Export") },
-        { id: "export", label: "Export", placement: "primary", run: (context) => context.setTab("Export") },
-        { id: "cancel", label: "Queue", placement: "overflow", run: (context) => context.setTab("Queue") },
-        { id: "download", label: "History", placement: "overflow", run: (context) => context.setTab("History") },
-        { id: "publish", label: "Compatibility", placement: "secondary", run: (context) => context.openOverlay("compatibility") },
+        { id: "Render preview", label: "Render a preview", placement: "secondary", guard: needsProject, run: (context) => context.openOverlay("render preview") },
+        {
+          id: "export", label: "Export to WebM", placement: "primary",
+          guard: (context) => {
+            if (!context.params.id) return "Open a project first";
+            const support = recorderSupport();
+            if (!support.webm) return support.reason;
+            return renderUi.get().busy ? "A render is already running" : undefined;
+          },
+          run: async (context) => {
+            const { db } = await import("@/runtime/db");
+            const record = context.params.id ? await db.records.get(context.params.id) : undefined;
+            if (!record) return;
+            context.setTab("Export");
+            await startRender(context, record.title, renderUi.get().preset);
+          },
+        },
+        {
+          id: "cancel", label: "Cancel the render", placement: "overflow", tone: "danger",
+          guard: () => (renderUi.get().busy ? undefined : "Nothing is rendering"),
+          run: (context) => cancelRender(context),
+        },
+        {
+          id: "download", label: "Download the last render", placement: "overflow",
+          guard: (context) => {
+            const doc = openVideo(context);
+            return doc && latestHeld(doc) ? undefined : "No render from this session is held; render again to download";
+          },
+          run: (context) => {
+            const doc = openVideo(context);
+            const job = doc ? latestHeld(doc) : undefined;
+            const file = job ? heldFile(job.id) : undefined;
+            if (!file) return;
+            downloadBlob(file.name, file.blob);
+            context.toast("Downloaded again", `${file.name}, ${(file.blob.size / 1024 / 1024).toFixed(2)} MB, the same bytes the render produced.`);
+          },
+        },
+        {
+          id: "publish", label: "Publish…", placement: "secondary",
+          guard: (context) => {
+            const doc = openVideo(context);
+            return doc?.renders.some((job) => job.state === "done") ? undefined : "Render a file first";
+          },
+          run: (context) => context.openOverlay("publish render"),
+        },
+        { id: "compatibility", label: "What this browser can encode", placement: "overflow", run: (context) => context.openOverlay("compatibility") },
       ],
       overlays: [
         { id: "Render settings", kind: "modal", title: "Render", width: 760, render: ({ ...context }) => <RenderSettings context={context} /> },
         { id: "compatibility", kind: "modal", title: "What this browser can encode", width: 560, render: () => <Compatibility /> },
         { id: "delivery confirmation", kind: "drawer", title: "Delivery", width: 460, render: ({ ...context }) => <DeliveryConfirmation context={context} /> },
+        { id: "render preview", kind: "modal", title: "Render preview", width: 760, render: ({ ...context }) => <RenderPreview context={context} /> },
+        { id: "publish render", kind: "modal", title: "Publish a render", width: 520, render: ({ close, ...context }) => <PublishRender context={context} close={close} />, footer: formFooter("video-publish", "Queue for publishing") },
       ],
     },
 
@@ -2234,34 +2833,38 @@ registerApp({
         render: (context: ScreenContext) => <ReviewScreen context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Comment timestamp", label: "Comment here", placement: "primary", run: (context) => context.openOverlay("Review marker") },
-        { id: "compare", label: "Compare versions", placement: "secondary", run: (context) => context.setTab("Versions") },
-        { id: "approve", label: "Record a decision", placement: "secondary", run: (context) => context.openOverlay("final signoff") },
+        { id: "Comment timestamp", label: "Comment at the playhead", placement: "primary", guard: needsProject, run: (context) => context.openOverlay("Review marker") },
+        { id: "compare", label: "Compare versions", placement: "secondary", guard: needsProject, run: (context) => context.openOverlay("version comparison") },
+        { id: "approve", label: "Approve this cut", placement: "secondary", guard: needsProject, run: (context) => context.openOverlay("final signoff", { state: "approved" }) },
         {
           id: "assign edit", label: "Assign every open note", placement: "overflow",
+          guard: needsProject,
           run: async (context) => {
             const id = context.params.id;
-            if (!id) return;
+            const doc = await readShared<VideoDoc>(context, parseVideo);
+            if (!id || !doc) return;
             const { db } = await import("@/runtime/db");
             const record = await db.records.get(id);
             if (!record) return;
-            const doc = parseVideo(record.body);
-            const open = doc.markers.filter((marker) => !marker.resolved);
-            if (open.length === 0) { context.toast("Nothing to assign", "No open notes on this cut.", "info"); return; }
+            const open = doc.markers.filter((marker) => !marker.resolved && !marker.taskId);
+            if (open.length === 0) { context.toast("Nothing to assign", "Every open note already has a task, or none is open.", "info"); return; }
+            const made: Record<string, string> = {};
             for (const marker of open) {
-              await context.mutate.create({
+              const task = await context.mutate.create({
                 collection: "tasks", title: `Edit note at ${timecode(marker.time, doc.fps)}: ${marker.text.slice(0, 50)}`,
                 status: "todo", summary: `From the review of ${record.title}.`, parentId: record.id,
                 fields: { assignee: context.actor, timecode: timecode(marker.time, doc.fps), source: "video review" },
               }, "Edit task created from a review note");
+              made[marker.id] = task.id;
             }
-            context.toast("Assigned", `${open.length} tasks created in Projects, each with its timecode.`);
+            await editVideo(context, (current) => ({ ...current, markers: current.markers.map((marker) => (made[marker.id] ? { ...marker, taskId: made[marker.id] } : marker)) }), "Link the notes to their tasks");
+            context.toast("Assigned", `${open.length} tasks created in Projects for ${context.actor}, each with its timecode.`);
           },
         },
       ],
       overlays: [
         { id: "Review marker", kind: "modal", title: "Timecoded note", width: 720, render: ({ ...context }) => <ReviewMarker context={context} /> },
-        { id: "version comparison", kind: "modal", title: "Compare", width: 820, render: ({ ...context }) => <VersionComparison context={context} /> },
+        { id: "version comparison", kind: "modal", title: "Compare versions", width: 820, render: ({ ...context }) => <VersionComparison context={context} /> },
         { id: "final signoff", kind: "modal", title: "Record a decision", width: 560, render: ({ close, ...context }) => <FinalSignoff context={context} close={close} />, footer: ({ close }) => (<><Button variant="ghost" onClick={close}>Cancel</Button><span className="ds-grow" /><Button variant="primary" type="submit" form="video-signoff">Record</Button></>) },
       ],
     },

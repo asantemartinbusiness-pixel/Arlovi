@@ -299,7 +299,7 @@ export function IncidentQueue({ context, lens }: { context: ScreenContext; lens:
   if (rows.length === 0) {
     return (
       <Empty title={`No ${lens.toLowerCase()} incidents`} icon={<CheckCircle2 size={20} />}
-        action={<Button variant="primary" onClick={() => context.openOverlay("Incident detail", { create: true })}>Open an incident</Button>}>
+        action={<Button variant="primary" onClick={() => context.openOverlay("incident create")}>Open an incident</Button>}>
         An incident here is a real problem with this workspace or with something it depends on.
       </Empty>
     );
@@ -808,10 +808,17 @@ export function RestoreConfirmation({ context, close }: { context: ScreenContext
  * ================================================================ */
 
 export function LogsAndTracing({ context, lens }: { context: ScreenContext; lens: "Traces" | "Logs" | "Metrics" | "Sampling" }) {
-  const events = useEvents(undefined, 400);
+  const allEvents = useEvents(undefined, 400);
   const { ui } = useDiagnostics(context);
   const { org } = useWorkspace();
   const [redact, setRedact] = useState(true);
+  const filter = useItUi((state) => state.logFilter);
+  const clearFilter = useItUi((state) => state.setLogFilter);
+  const bookmarks = useCollection("logBookmarks");
+  const filtering = Boolean(filter.kind || filter.actor || filter.text);
+  const events = lens === "Logs" && filtering
+    ? allEvents.filter((event) => (!filter.kind || event.type === filter.kind) && (!filter.actor || event.actor === filter.actor) && (!filter.text || event.message.toLowerCase().includes(filter.text.toLowerCase())))
+    : allEvents;
 
   if (lens === "Traces") {
     const timed = ui.results.filter((result) => result.tookMs !== undefined);
@@ -896,8 +903,24 @@ export function LogsAndTracing({ context, lens }: { context: ScreenContext; lens
             events.map((event) => [event.at, event.actor, event.type, event.message, event.screenId ?? ""]));
           context.toast("Exported", `${events.length} log entries written to CSV.`);
         }}>Export the log</Button>
-        <Button variant="ghost" onClick={() => context.openOverlay("saved filter")}>Saved filters</Button>
+        <Button variant="ghost" onClick={() => context.openOverlay("saved filter")}>Filter</Button>
+        {filtering && <Pill tone="info" dot>{`Filtered: ${filter.name} · ${events.length} of ${allEvents.length}`}</Pill>}
+        {filtering && <Button size="sm" variant="ghost" onClick={() => clearFilter({ name: "", kind: "", actor: "", text: "" })}>Clear filter</Button>}
       </Row>
+      {bookmarks.length > 0 && (
+        <Card eyebrow="BOOKMARKS" prov="human" title="Bookmarked entries" subtitle={`${bookmarks.length} kept by people in this workspace`}>
+          <Stack gap={2}>
+            {bookmarks.map((bookmark) => (
+              <Row key={bookmark.id} gap={2} wrap>
+                <span className="ds-num ds-subtle">{context.dateTime(bookmark.at)}</span>
+                <span className="ds-grow">{bookmark.title}</span>
+                <span className="ds-subtle">{bookmark.summary} · {bookmark.createdBy}</span>
+                <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Trace waterfall", { id: String(bookmark.fields.eventId ?? "") })}>Inspect</Button>
+              </Row>
+            ))}
+          </Stack>
+        </Card>
+      )}
       {events.length === 0 ? <Empty title="No log entries" icon={<Activity size={20} />} /> : (
         <DataGrid
           rows={events}
@@ -936,6 +959,15 @@ export function Remediation({ context, lens }: { context: ScreenContext; lens: "
         <Notice tone="info" title="A proposal is derived from a check that failed">
           Nothing is proposed on a hunch. Each row below exists because a diagnostic returned a result that needs action, and names the step that would address it.
         </Notice>
+        {incidents.some((record) => String(record.fields.kind ?? "") === "remediation") && (
+          <Card eyebrow="APPROVED" prov="human" title="Approved remediations" subtitle="Approved by a person; approval does not run them">
+            <Stack gap={2}>
+              {incidents.filter((record) => String(record.fields.kind ?? "") === "remediation").map((record) => (
+                <Row key={record.id} gap={2} wrap><span className="ds-grow"><strong>{record.title}</strong> — {record.summary}</span><span className="ds-subtle">{String(record.fields.approvedBy ?? "")}</span><Pill tone="success">{record.status}</Pill></Row>
+              ))}
+            </Stack>
+          </Card>
+        )}
         {ui.results.length === 0 ? (
           <Empty title="No checks have run" icon={<Cpu size={20} />} action={<Button variant="primary" busy={ui.running} onClick={() => void run()}>Run the checks</Button>}>
             There is nothing to propose until something has been measured.
@@ -1026,7 +1058,11 @@ export function Remediation({ context, lens }: { context: ScreenContext; lens: "
           </Card>
         ))}
         {runbooks.map((record) => (
-          <Card key={record.id} span={6} eyebrow="RUNBOOK" prov="human" title={record.title} subtitle={record.summary} />
+          <Card key={record.id} span={6} eyebrow="RUNBOOK" prov="human" title={record.title} subtitle={record.summary}
+            actions={<Pill tone={record.status === "paused" ? "warning" : "success"}>{record.status}</Pill>}
+            footer={<Button size="sm" variant="secondary" disabled={record.status === "paused"} onClick={() => context.openOverlay("execute runbook", { id: record.id })}>Execute</Button>}>
+            {record.fields.lastRunAt ? <p className="ds-subtle ds-num">{`Last run ${context.dateTime(String(record.fields.lastRunAt))}: ${String(record.fields.lastOutcome ?? "")}`}</p> : <p className="ds-subtle">Not executed yet.</p>}
+          </Card>
         ))}
       </Grid>
     </Stack>

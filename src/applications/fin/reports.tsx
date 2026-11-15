@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { BarChart3, FileDown } from "lucide-react";
 import {
   BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextInput,
@@ -17,9 +18,9 @@ import { Amount, LedgerHealth, SourceNote, StatementRow } from "./parts";
 
 /* ---------------------------- FIN-012 ---------------------------- */
 
-type Statement = "pl" | "bs" | "cf" | "tb" | "aged";
+export type Statement = "pl" | "bs" | "cf" | "tb" | "aged";
 
-const STATEMENT_LABEL: Record<Statement, string> = {
+export const STATEMENT_LABEL: Record<Statement, string> = {
   pl: "Profit and loss",
   bs: "Balance sheet",
   cf: "Cash flow",
@@ -30,8 +31,15 @@ const STATEMENT_LABEL: Record<Statement, string> = {
 export function StatementsTab({ context }: { context: ScreenContext }) {
   const data = useFinData();
   const { org, now } = useWorkspace();
-  const [statement, setStatement] = useState<Statement>("pl");
-  const [period, setPeriod] = useState<string>("all");
+  const [params] = useSearchParams();
+  const wanted = params.get("statement");
+  const wantedPeriod = params.get("period");
+  const [statement, setStatement] = useState<Statement>(wanted && wanted in STATEMENT_LABEL ? (wanted as Statement) : "pl");
+  const [period, setPeriod] = useState<string>(wantedPeriod ?? "all");
+  useEffect(() => {
+    if (wanted && wanted in STATEMENT_LABEL) setStatement(wanted as Statement);
+    if (wantedPeriod) setPeriod(wantedPeriod);
+  }, [wanted, wantedPeriod]);
 
   const scoped = trialForRange(data.accounts, data.journals, org.id, period === "all" ? undefined : { period });
   const rows = period === "all" ? data.trialRows : scoped.rows;
@@ -220,7 +228,7 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
   );
 }
 
-function exportStatement(context: ScreenContext, statement: Statement, rows: TrialRow[], period: string): void {
+export function exportStatement(context: ScreenContext, statement: Statement, rows: TrialRow[], period: string): void {
   const header = "code,name,type,debit_minor,credit_minor,balance_minor\n";
   const body = rows.map((row) => [row.code, row.name, row.type, row.debitMinor, row.creditMinor, row.balanceMinor]
     .map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");

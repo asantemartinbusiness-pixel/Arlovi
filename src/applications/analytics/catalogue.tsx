@@ -627,7 +627,11 @@ export function ImpactReview({ context }: { context: ScreenContext }) {
   const definitions = useCollection("metricDefinitions");
   const dashboards = useCollection("dashboards");
   const reports = useCollection("reports");
-  const definition = definitions.find((record) => record.id === context.selectedId) ?? definitions[0];
+  const [chosen, setChosen] = useState<string>();
+  const definition = definitions.find((record) => record.id === chosen)
+    ?? definitions.find((record) => record.id === context.selectedId || String(record.fields.measureId ?? "") === context.selectedId)
+    ?? definitions.find((record) => record.status !== "approved")
+    ?? definitions[0];
 
   if (!definition) {
     return <Notice tone="info" title="No definition has been changed in this workspace">Every measure is at the version the product shipped, so no historical meaning has moved.</Notice>;
@@ -638,9 +642,15 @@ export function ImpactReview({ context }: { context: ScreenContext }) {
 
   return (
     <Stack gap={4}>
+      <Field label="Definition">
+        <Select aria-label="Definition" value={definition.id} onChange={(event) => setChosen(event.target.value)}>
+          {definitions.map((record) => <option key={record.id} value={record.id}>{record.title} · v{String(record.fields.version ?? 1)} · {record.status}</option>)}
+        </Select>
+      </Field>
       <Properties rows={[
         { label: "Measure", value: definition.title },
         { label: "Version", value: <span className="ds-num">v{String(definition.fields.version ?? 1)}</span> },
+        { label: "Approved by", value: definition.fields.approvedBy ? `${String(definition.fields.approvedBy)} at v${String(definition.fields.approvedVersion ?? "")}` : "Not approved" },
         { label: "State", value: <Pill tone={definition.status === "approved" ? "success" : "warning"} dot>{definition.status}</Pill> },
         { label: "Dashboards reading it", value: String(affectedDashboards.length) },
         { label: "Reports reading it", value: String(affectedReports.length) },
@@ -653,10 +663,14 @@ export function ImpactReview({ context }: { context: ScreenContext }) {
       <Row gap={2}>
         <Button
           variant="primary"
-          disabled={definition.status === "approved"}
+          disabled={definition.status === "approved" || !context.can("manage_policy")}
+          title={!context.can("manage_policy") ? "Approving a definition needs the Owner view" : undefined}
           onClick={async () => {
-            await context.mutate.patch(definition.id, { status: "approved" }, { expectRevision: definition.revision, event: `Measure ${definition.title} approved at v${String(definition.fields.version ?? 1)}` });
-            context.toast("Approved", `${definition.title} is approved at version ${String(definition.fields.version ?? 1)}.`);
+            const saved = await context.mutate.patch(definition.id, {
+              status: "approved",
+              fields: { ...definition.fields, approvedBy: context.actor, approvedAt: new Date().toISOString(), approvedVersion: Number(definition.fields.version ?? 1) },
+            }, { expectRevision: definition.revision, event: `Measure ${definition.title} approved at v${String(definition.fields.version ?? 1)} by ${context.actor}` });
+            if (saved) context.toast("Approved", `${definition.title} is approved at version ${String(definition.fields.version ?? 1)} by ${context.actor}.`);
           }}
         >
           Approve this version

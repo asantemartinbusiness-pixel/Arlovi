@@ -2,11 +2,18 @@ import { Activity, FileText, HardDrive, Server, ShieldAlert, Siren, Wrench } fro
 import { Button, Notice, Properties, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { closeFooter, submitFooter } from "@/applications/t6kit/kit";
+import { openAct } from "@/applications/t6kit/act";
+import {
+  IncidentComparisonPanel, IncidentDetailPanel, ReleaseDiff, ReleaseGatesOverlay, ReportBuilderPanel, SavedFilterForm,
+  acknowledgeIncident, addMonitor, alertThreshold, approveProposal, approveRelease, approveRepair, assignIncident,
+  bookmarkOverlay, closeIncident, deployRelease, downloadReliability, executeRunbookOverlay, exportSecurityAudit,
+  isolateConnector, mergeIncidents, pageOwner, pauseRunbook, proposalOverlay, reliabilityRows, resolveIncident,
+  revokeAccess, rollbackRelease, runDiagnosticsNow, runbookEditor, shareLog, testRelease,
+} from "./actions";
 import {
   BackupOverlay, HealthTestOverlay, IncidentCreate, IncidentDetail, IncidentQueue, LogsAndTracing,
-  OperationsHome, RedactionRules, Releases, ReliabilityReports, Remediation, ReportBuilder,
-  RestoreConfirmation, SavedFilter, SecurityCentre, ServiceInspector, SystemHealth, TraceWaterfall,
-  MonitorRule,
+  OperationsHome, RedactionRules, Releases, ReliabilityReports, Remediation,
+  RestoreConfirmation, SecurityCentre, ServiceInspector, SystemHealth, TraceWaterfall,
 } from "./panels";
 
 /* ====================================================================== *
@@ -65,20 +72,6 @@ function EscalationRules({ context }: { context: ScreenContext }) {
   );
 }
 
-function MergeReview({ context }: { context: ScreenContext }) {
-  return (
-    <Stack gap={3}>
-      <Notice tone="warning" title="Two incidents are merged only with evidence">
-        A shared description is not evidence. A merge needs the same audit entries, or the same failing check, to explain both. Without that the register keeps them apart, even when they look alike.
-      </Notice>
-      <Properties rows={[
-        { label: "Evidence required", value: "A common audit entry or a common failing check" },
-        { label: "Not sufficient", value: "A similar title, a similar time, or a hunch" },
-      ]} />
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/it/health`)}>Run the checks to gather evidence</Button>
-    </Stack>
-  );
-}
 
 function MitigationNote({ context, close }: { context: ScreenContext; close: () => void }) {
   return (
@@ -100,33 +93,7 @@ function MitigationNote({ context, close }: { context: ScreenContext; close: () 
   );
 }
 
-function ReleaseGates({ context }: { context: ScreenContext }) {
-  return (
-    <Stack gap={3}>
-      <ul className="t6-steps">
-        <li className="t6-step" data-state="done"><span className="t6-step-n">1</span>Model and content checks</li>
-        <li className="t6-step" data-state="done"><span className="t6-step-n">2</span>Accessibility and link checks</li>
-        <li className="t6-step" data-state="current"><span className="t6-step-n">3</span>A person approves</li>
-        <li className="t6-step" data-state="blocked"><span className="t6-step-n">4</span>Host or runtime</li>
-      </ul>
-      <Notice tone="warning" title="A failing gate blocks promotion; it is not a warning to click past">
-        The publish review in the websites application and the release review in the app builder both refuse while a check is failing. That is the same rule, applied in the two places it matters.
-      </Notice>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites`)}>Open the sites</Button>
-    </Stack>
-  );
-}
 
-function RollbackConfirmation({ context }: { context: ScreenContext }) {
-  return (
-    <Stack gap={3}>
-      <Notice tone="warning" title="A rollback restores a record, not a server">
-        Nothing is serving, so rolling back means writing an earlier revision of a record back over the current one. Every record keeps up to twenty-five revisions.
-      </Notice>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/it/health`)}>Take a backup first</Button>
-    </Stack>
-  );
-}
 
 function SessionRevoke({ context }: { context: ScreenContext }) {
   return (
@@ -159,27 +126,7 @@ function PolicySimulation({ context }: { context: ScreenContext }) {
   );
 }
 
-function IncidentComparison({ context }: { context: ScreenContext }) {
-  return (
-    <Stack gap={3}>
-      <Notice tone="info" title="Comparison needs two incidents with recorded causes">
-        Where a cause was not written down, the comparison says so rather than inferring one from the title.
-      </Notice>
-      <Button variant="secondary" onClick={() => context.setTab("Root causes")}>Open the recorded causes</Button>
-    </Stack>
-  );
-}
 
-function ProposalPanel({ context }: { context: ScreenContext }) {
-  return (
-    <Stack gap={3}>
-      <Notice tone="info" title="A structural proposal needs a cause that repeats">
-        One incident is an event. The same cause twice is a pattern worth fixing. The root causes tab counts them, and says plainly when the sample is too small to act on.
-      </Notice>
-      <Button variant="secondary" onClick={() => context.setTab("Root causes")}>See the counts</Button>
-    </Stack>
-  );
-}
 
 export const itApp = registerApp({
   code: "IT",
@@ -216,11 +163,13 @@ export const itApp = registerApp({
       })),
       actions: [
         { id: "run check", label: "Run the checks", placement: "primary", run: (context) => { context.setTab("Health"); context.openOverlay("health test"); } },
-        { id: "open issue", label: "Open an incident", placement: "secondary", run: (context) => context.openOverlay("incident create") },
+        { id: "open issue", label: "Open an issue (incident)", placement: "secondary", run: (context) => context.openOverlay("incident create") },
         { id: "Inspect service", label: "Inspect a group", placement: "overflow", run: (context) => context.openOverlay("Service inspector") },
-        { id: "acknowledge", label: "Full diagnostics", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/it/health`) },
+        { id: "acknowledge", label: "Acknowledge an incident", placement: "overflow", run: openAct("acknowledge incident") },
+        { id: "full diagnostics", label: "Full diagnostics", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/it/health`) },
       ],
       overlays: [
+        acknowledgeIncident,
         { id: "Service inspector", kind: "drawer", title: "Checks", width: 600, render: ({ ...context }) => <ServiceInspector context={context} /> },
         { id: "incident create", kind: "modal", title: "Open an incident", width: 620, render: ({ close, ...context }) => <IncidentCreate context={context} close={close} />, footer: submitFooter("incident-create", "Open the incident") },
         { id: "health test", kind: "modal", title: "Health checks", width: 620, render: ({ ...context }) => <HealthTestOverlay context={context} />, footer: closeFooter() },
@@ -236,25 +185,33 @@ export const itApp = registerApp({
         render: (context: ScreenContext) => <IncidentQueue context={context} lens={lens} />,
       })),
       actions: [
-        { id: "assign", label: "Open an incident", placement: "primary", run: (context) => context.openOverlay("Incident detail") },
         {
-          id: "escalate", label: "Change severity", placement: "secondary",
+          id: "Assign", label: "Assign", placement: "primary",
+          guard: (context) => (context.selectedId ? undefined : "Select an incident first"),
+          run: openAct("assign incident"),
+        },
+        { id: "open incident", label: "Open an incident", placement: "secondary", run: (context) => context.openOverlay("incident create") },
+        {
+          id: "escalate", label: "Escalate severity", placement: "secondary",
           guard: (context) => (context.selectedId ? undefined : "Select an incident first"),
           run: (context) => context.openOverlay("severity change"),
         },
-        { id: "merge", label: "Merge", placement: "overflow", run: (context) => context.openOverlay("merge review") },
-        { id: "page owner", label: "Escalation rules", placement: "overflow", run: (context) => context.openOverlay("escalation rules") },
+        { id: "merge", label: "Merge with evidence", placement: "overflow", run: openAct("merge review") },
+        { id: "page owner", label: "Page the owner", placement: "overflow", run: openAct("page owner") },
+        { id: "escalation rules", label: "Escalation rules", placement: "overflow", run: (context) => context.openOverlay("escalation rules") },
+        { id: "incident detail", label: "Incident detail", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select an incident first"), run: (context) => context.openOverlay("Incident detail", { id: context.selectedId }) },
         {
           id: "resolve", label: "Resolve", placement: "overflow",
-          guard: (context) => (context.selectedId ? undefined : "Select an incident first"),
-          run: (context) => context.navigate(`/o/${context.org.slug}/it/incidents/${context.selectedId}?tab=Remediation`),
+          run: openAct("resolve incident"),
         },
       ],
       overlays: [
-        { id: "Incident detail", kind: "modal", title: "Open an incident", width: 620, render: ({ close, ...context }) => <IncidentCreate context={context} close={close} />, footer: submitFooter("incident-create", "Open the incident") },
+        { id: "Incident detail", kind: "drawer", title: "Incident", width: 540, render: ({ ...context }) => <IncidentDetailPanel context={context} /> },
+        { id: "incident create", kind: "modal", title: "Open an incident", width: 620, render: ({ close, ...context }) => <IncidentCreate context={context} close={close} />, footer: submitFooter("incident-create", "Open the incident") },
+        assignIncident, pageOwner, resolveIncident,
         { id: "severity change", kind: "modal", title: "Change severity", width: 520, render: ({ close, ...context }) => <SeverityChange context={context} close={close} />, footer: submitFooter("severity-change", "Change severity") },
         { id: "escalation rules", kind: "drawer", title: "Escalation", width: 500, render: ({ ...context }) => <EscalationRules context={context} /> },
-        { id: "merge review", kind: "modal", title: "Merging incidents", width: 540, render: ({ ...context }) => <MergeReview context={context} />, footer: closeFooter() },
+        mergeIncidents,
       ],
     },
 
@@ -267,19 +224,22 @@ export const itApp = registerApp({
         render: (context: ScreenContext) => <IncidentDetail context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Acknowledge", label: "Take it", placement: "primary", run: async (context) => {
+        { id: "Acknowledge", label: "Acknowledge and take it", placement: "primary", run: async (context) => {
           const repo = await import("@/platform/repo");
           const record = context.params.id ? await repo.getRecord(context.params.id) : undefined;
           if (!record) return;
-          await context.mutate.patch(record.id, { status: "investigating", fields: { ...record.fields, owner: context.actor } }, { expectRevision: record.revision, event: `${context.actor} took ${record.title}` });
-          context.toast("Taken", `${record.title} is assigned to you and marked investigating.`);
+          if (record.fields.acknowledgedAt) { context.toast("Already acknowledged", `${String(record.fields.acknowledgedBy)} acknowledged it.`, "info"); return; }
+          await context.mutate.patch(record.id, { status: record.status === "open" ? "investigating" : record.status, ownerName: context.actor, fields: { ...record.fields, owner: context.actor, acknowledgedBy: context.actor, acknowledgedAt: context.now.toISOString() } }, { expectRevision: record.revision, event: `${context.actor} acknowledged and took ${record.title}` });
+          context.toast("Acknowledged", `${record.title} is acknowledged, assigned to you and marked investigating.`);
         } },
-        { id: "approve repair", label: "Remediation", placement: "secondary", run: (context) => context.setTab("Remediation") },
-        { id: "assign", label: "Severity", placement: "overflow", run: (context) => context.openOverlay("severity change") },
-        { id: "close", label: "Add a note", placement: "overflow", run: (context) => context.openOverlay("mitigation note") },
+        { id: "approve repair", label: "Approve the repair", placement: "secondary", run: openAct("Remediation approval") },
+        { id: "assign", label: "Assign", placement: "overflow", run: openAct("assign incident") },
+        { id: "close", label: "Close", placement: "overflow", run: openAct("close incident") },
+        { id: "add note", label: "Add a note", placement: "overflow", run: (context) => context.openOverlay("mitigation note") },
+        { id: "change severity", label: "Change severity", placement: "overflow", run: (context) => context.openOverlay("severity change") },
       ],
       overlays: [
-        { id: "Remediation approval", kind: "drawer", title: "Remediation", width: 620, render: ({ ...context }) => <IncidentDetail context={context} lens="Remediation" /> },
+        approveRepair, assignIncident, closeIncident,
         { id: "affected work", kind: "drawer", title: "Evidence", width: 620, render: ({ ...context }) => <IncidentDetail context={context} lens="Evidence" /> },
         { id: "mitigation note", kind: "modal", title: "Add a note", width: 520, render: ({ close, ...context }) => <MitigationNote context={context} close={close} />, footer: submitFooter("mitigation-note", "Record the note") },
         { id: "severity change", kind: "modal", title: "Change severity", width: 520, render: ({ close, ...context }) => <SeverityChange context={context} close={close} />, footer: submitFooter("severity-change", "Change severity") },
@@ -295,14 +255,15 @@ export const itApp = registerApp({
         render: (context: ScreenContext) => <SystemHealth context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Drill down", label: "Run the checks", placement: "primary", run: (context) => { context.setTab("Services"); context.openOverlay("health test"); } },
-        { id: "export", label: "Backup and restore", placement: "secondary", capability: "export_data", run: (context) => context.openOverlay("Backup and restore") },
-        { id: "add monitor", label: "Monitor rule", placement: "overflow", run: (context) => context.openOverlay("monitor rule") },
-        { id: "alert threshold", label: "Service detail", placement: "overflow", run: (context) => context.openOverlay("Service health detail") },
+        { id: "Drill down", label: "Drill into the checks", placement: "primary", run: (context) => context.openOverlay("Service health detail") },
+        { id: "run checks", label: "Run the checks", placement: "secondary", run: (context) => { context.setTab("Services"); context.openOverlay("health test"); } },
+        { id: "export", label: "Export a backup", placement: "secondary", capability: "export_data", run: (context) => context.openOverlay("Backup and restore") },
+        { id: "add monitor", label: "Add a monitor", placement: "overflow", run: (context) => context.openOverlay("monitor rule") },
+        { id: "alert threshold", label: "Change an alert threshold", placement: "overflow", run: (context) => context.openOverlay("alert threshold") },
       ],
       overlays: [
         { id: "Service health detail", kind: "drawer", title: "Checks", width: 620, render: ({ ...context }) => <ServiceInspector context={context} /> },
-        { id: "monitor rule", kind: "modal", title: "Monitor", width: 540, render: ({ ...context }) => <MonitorRule context={context} />, footer: closeFooter() },
+        addMonitor, alertThreshold,
         { id: "Backup and restore", kind: "drawer", title: "Backup and restore", width: 720, render: ({ ...context }) => <BackupOverlay context={context} /> },
         { id: "Restore confirmation", kind: "modal", title: "Replace the workspace", tone: "danger", width: 560, blocking: true, render: ({ close, ...context }) => <RestoreConfirmation context={context} close={close} /> },
         { id: "health test", kind: "modal", title: "Health checks", width: 620, render: ({ ...context }) => <HealthTestOverlay context={context} />, footer: closeFooter() },
@@ -327,15 +288,17 @@ export const itApp = registerApp({
         render: (context: ScreenContext) => <LogsAndTracing context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Filter", label: "Saved filters", placement: "primary", run: (context) => context.openOverlay("saved filter") },
+        { id: "Filter", label: "Filter the log", placement: "primary", run: (context) => context.openOverlay("saved filter") },
         { id: "inspect", label: "Inspect an entry", placement: "secondary", run: (context) => context.openOverlay("Trace waterfall") },
-        { id: "bookmark", label: "Redaction rules", placement: "overflow", run: (context) => context.openOverlay("redaction rules") },
-        { id: "share authorized", label: "Export", placement: "overflow", capability: "export_data", run: (context) => context.setTab("Logs") },
+        { id: "bookmark", label: "Bookmark an entry", placement: "overflow", run: (context) => context.openOverlay("bookmark entry") },
+        { id: "share authorized", label: "Share with an authorised reader", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("share log") },
+        { id: "redaction", label: "Redaction rules", placement: "overflow", run: (context) => context.openOverlay("redaction rules") },
       ],
       overlays: [
         { id: "Trace waterfall", kind: "drawer", title: "Entry", width: 560, render: ({ ...context }) => <TraceWaterfall context={context} /> },
         { id: "redaction rules", kind: "modal", title: "Redaction", width: 600, render: () => <RedactionRules />, footer: closeFooter() },
-        { id: "saved filter", kind: "modal", title: "Saved filter", width: 480, render: ({ ...context }) => <SavedFilter context={context} />, footer: closeFooter() },
+        { id: "saved filter", kind: "modal", title: "Filter the log", width: 480, render: ({ close, ...context }) => <SavedFilterForm context={context} close={close} />, footer: submitFooter("saved-filter", "Apply the filter") },
+        bookmarkOverlay, shareLog,
       ],
     },
 
@@ -348,23 +311,21 @@ export const itApp = registerApp({
         render: (context: ScreenContext) => <Remediation context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Test runbook", label: "Run the verification runbook", placement: "primary", run: (context) => context.setTab("Runbooks") },
-        { id: "approve", label: "Proposals", placement: "secondary", run: (context) => context.setTab("Proposals") },
-        { id: "execute", label: "Runbook detail", placement: "overflow", run: (context) => context.openOverlay("Runbook editor") },
-        { id: "pause", label: "Failures", placement: "overflow", run: (context) => context.setTab("Failures") },
+        {
+          id: "Test runbook", label: "Test the verification runbook", placement: "primary",
+          run: async (context) => {
+            const totals = await runDiagnosticsNow(context);
+            context.setTab("Runs");
+            context.toast("Runbook tested", `${totals.pass} passed, ${totals.warn} to review, ${totals.fail} failed. The run is on the Runs tab.`, totals.fail ? "blocked" : "ok");
+          },
+        },
+        { id: "approve", label: "Approve a proposal", placement: "secondary", run: (context) => context.openOverlay("approve proposal") },
+        { id: "execute", label: "Execute a runbook", placement: "overflow", run: (context) => context.openOverlay("execute runbook") },
+        { id: "pause", label: "Pause or resume a runbook", placement: "overflow", run: (context) => context.openOverlay("pause runbook") },
+        { id: "edit runbook", label: "Edit a runbook", placement: "overflow", run: (context) => context.openOverlay("Runbook editor") },
       ],
       overlays: [
-        {
-          id: "Runbook editor", kind: "drawer", title: "Runbook", width: 560,
-          render: ({ ...context }) => (
-            <Stack gap={3}>
-              <Notice tone="warning" title="A runbook step is allowed only if it is reversible">
-                Reading storage, writing a backup and re-running a query all qualify. Reconnecting a provider and rotating a credential do not, and are marked as needing a person.
-              </Notice>
-              <Button variant="secondary" onClick={() => context.setTab("Runbooks")}>Back to the runbooks</Button>
-            </Stack>
-          ),
-        },
+        runbookEditor, approveProposal, executeRunbookOverlay, pauseRunbook,
         {
           id: "remediation impact", kind: "modal", title: "Impact", width: 540,
           render: () => (
@@ -387,15 +348,16 @@ export const itApp = registerApp({
         render: (context: ScreenContext) => <Releases context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Approve release", label: "Release gates", placement: "primary", run: (context) => context.openOverlay("release gates") },
-        { id: "test", label: "Run the checks", placement: "secondary", run: (context) => context.navigate(`/o/${context.org.slug}/it/health`) },
-        { id: "deploy", label: "What is waiting", placement: "overflow", run: (context) => context.setTab("Production") },
-        { id: "rollback", label: "Rollback", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("rollback confirmation") },
+        { id: "Approve release", label: "Approve a release", placement: "primary", run: (context) => context.openOverlay("approve release") },
+        { id: "test", label: "Test a release", placement: "secondary", run: (context) => context.openOverlay("test release") },
+        { id: "deploy", label: "Deploy", placement: "overflow", run: (context) => context.openOverlay("deploy release") },
+        { id: "rollback", label: "Roll back", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("rollback confirmation") },
+        { id: "gates", label: "Release gates", placement: "overflow", run: (context) => context.openOverlay("release gates") },
       ],
       overlays: [
-        { id: "Diff review", kind: "drawer", title: "Release", width: 560, render: ({ ...context }) => <ReportBuilder context={context} /> },
-        { id: "release gates", kind: "modal", title: "Release gates", width: 560, render: ({ ...context }) => <ReleaseGates context={context} />, footer: closeFooter() },
-        { id: "rollback confirmation", kind: "modal", title: "Rollback", tone: "danger", width: 520, render: ({ ...context }) => <RollbackConfirmation context={context} />, footer: closeFooter() },
+        { id: "Diff review", kind: "drawer", title: "What changed on the release", width: 560, render: ({ ...context }) => <ReleaseDiff context={context} /> },
+        { id: "release gates", kind: "modal", title: "Release gates", width: 560, render: ({ ...context }) => <ReleaseGatesOverlay context={context} />, footer: closeFooter() },
+        rollbackRelease, approveRelease, deployRelease, testRelease,
       ],
     },
 
@@ -408,15 +370,19 @@ export const itApp = registerApp({
         render: (context: ScreenContext) => <SecurityCentre context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Investigate", label: "Audit trail", placement: "primary", run: (context) => context.setTab("Audit") },
-        { id: "revoke", label: "Sessions", placement: "secondary", run: (context) => context.openOverlay("session revoke") },
-        { id: "isolate", label: "Policy simulation", placement: "overflow", run: (context) => context.openOverlay("policy simulation") },
-        { id: "export", label: "Export the audit", placement: "overflow", capability: "export_data", run: (context) => context.setTab("Audit") },
+        { id: "Investigate", label: "Investigate (open a security incident)", placement: "primary", run: (context) => context.openOverlay("Security incident") },
+        { id: "revoke", label: "Revoke a connector's access", placement: "secondary", run: (context) => context.openOverlay("revoke access") },
+        { id: "isolate", label: "Isolate an integration", placement: "overflow", run: (context) => context.openOverlay("isolate") },
+        { id: "export", label: "Export the audit", placement: "overflow", capability: "export_data", run: (context) => exportSecurityAudit(context) },
+        { id: "audit trail", label: "Audit trail", placement: "overflow", run: (context) => context.setTab("Audit") },
+        { id: "sessions", label: "Sessions", placement: "overflow", run: (context) => context.openOverlay("session revoke") },
+        { id: "simulate policy", label: "Policy simulation", placement: "overflow", run: (context) => context.openOverlay("policy simulation") },
       ],
       overlays: [
         { id: "Security incident", kind: "modal", title: "Open an incident", width: 620, render: ({ close, ...context }) => <IncidentCreate context={context} close={close} />, footer: submitFooter("incident-create", "Open the incident") },
         { id: "session revoke", kind: "modal", title: "Sessions", width: 520, render: ({ ...context }) => <SessionRevoke context={context} />, footer: closeFooter() },
         { id: "policy simulation", kind: "drawer", title: "Policy", width: 500, render: ({ ...context }) => <PolicySimulation context={context} /> },
+        revokeAccess, isolateConnector,
       ],
     },
 
@@ -429,15 +395,24 @@ export const itApp = registerApp({
         render: (context: ScreenContext) => <ReliabilityReports context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Generate", label: "Build a report", placement: "primary", run: (context) => context.openOverlay("Report builder") },
+        { id: "Generate", label: "Generate a report", placement: "primary", run: (context) => context.openOverlay("Report builder") },
         { id: "compare", label: "Compare incidents", placement: "secondary", run: (context) => context.openOverlay("incident comparison") },
         { id: "propose remediation", label: "Propose a fix", placement: "overflow", run: (context) => context.openOverlay("proposal") },
-        { id: "export", label: "Export", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("Report builder") },
+        {
+          id: "export", label: "Export", placement: "overflow", capability: "export_data",
+          run: async (context) => {
+            const repo = await import("@/platform/repo");
+            const rows = reliabilityRows(await repo.listByCollection(context.org.id, "incidents"));
+            downloadReliability(context.org.slug, rows, "all");
+            await context.mutate.log(`Reliability report exported: ${rows.length} incidents.`, { type: "export" });
+            context.toast("Exported", `${rows.length} incidents written to CSV, counted from the register.`);
+          },
+        },
       ],
       overlays: [
-        { id: "Report builder", kind: "drawer", title: "Report", width: 560, render: ({ ...context }) => <ReportBuilder context={context} /> },
-        { id: "incident comparison", kind: "modal", title: "Comparison", width: 520, render: ({ ...context }) => <IncidentComparison context={context} />, footer: closeFooter() },
-        { id: "proposal", kind: "modal", title: "Proposal", width: 520, render: ({ ...context }) => <ProposalPanel context={context} />, footer: closeFooter() },
+        { id: "Report builder", kind: "drawer", title: "Generate a report", width: 560, render: ({ ...context }) => <ReportBuilderPanel context={context} /> },
+        { id: "incident comparison", kind: "modal", title: "Compare incidents", width: 640, render: ({ ...context }) => <IncidentComparisonPanel context={context} />, footer: closeFooter() },
+        proposalOverlay(),
       ],
     },
   },

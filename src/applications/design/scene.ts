@@ -103,12 +103,12 @@ export interface DesignDoc {
   colors: ColorToken[];
   effects: EffectStyle[];
   breakpoints: { id: string; name: string; width: number }[];
-  comments: { id: string; pageId: string; x: number; y: number; author: string; at: string; text: string; resolved: boolean; nodeId?: string }[];
-  reviews: { id: string; version: number; by: string; at: string; state: "approved" | "changes" | "pending"; note: string }[];
+  comments: { id: string; pageId: string; x: number; y: number; author: string; at: string; text: string; resolved: boolean; nodeId?: string; taskId?: string }[];
+  reviews: { id: string; version: number; digest?: string; by: string; at: string; state: "approved" | "changes" | "pending"; note: string }[];
   versions: { id: string; at: string; by: string; label: string; nodeCount: number }[];
   assets: { id: string; name: string; kind: "image" | "icon"; src?: string; license: string; credit: string; width: number; height: number }[];
   exports: { id: string; nodeId: string; format: "svg" | "png"; scale: number; suffix: string }[];
-  prototype: { startNodeId?: string; device: string };
+  prototype: { startNodeId?: string; device: string; publication?: { state: "queued_local"; at: string; by: string; digest: string } };
   unsupported: string[];
 }
 

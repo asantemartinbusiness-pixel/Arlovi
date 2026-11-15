@@ -16,6 +16,7 @@ import {
 } from "./data";
 import type { CrmData } from "./data";
 import { ActivityPill, CapabilityNotice, ConsentPill, Money, StagePill } from "./parts";
+import { MergeGroups } from "./actions";
 
 /* ---------------------------- CRM-002 ---------------------------- */
 
@@ -261,11 +262,16 @@ export function ContactForm({ context, close }: { context: ScreenContext; close:
 export function MergePreview({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCrmData();
   const payload = context.overlayPayload as { ids?: string[] } | undefined;
-  const rows = (payload?.ids ?? []).map((id) => data.contacts.find((contact) => contact.id === id)).filter((contact): contact is Rec => Boolean(contact));
+  const [picked, setPicked] = useState<string[] | undefined>(payload?.ids);
+  const rows = (picked ?? []).map((id) => data.contacts.find((contact) => contact.id === id)).filter((contact): contact is Rec => Boolean(contact));
   const [keepId, setKeepId] = useState(rows[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
+  const groups = useMemo(() => duplicateGroups(data.contacts), [data.contacts]);
 
-  if (rows.length < 2) return <Empty title="Choose two records to merge">Open the Duplicates tab and review a group there.</Empty>;
+  if (rows.length < 2) {
+    const forSelected = context.selectedId ? groups.filter((group) => group.rows.some((row) => row.id === context.selectedId)) : [];
+    return <MergeGroups groups={forSelected.length ? forSelected : groups} context={context} onPick={(ids) => { setPicked(ids); setKeepId(ids[0]); }} />;
+  }
 
   const keep = rows.find((row) => row.id === keepId) ?? rows[0];
   const others = rows.filter((row) => row.id !== keep.id);
@@ -319,7 +325,7 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
       <Properties rows={[
         { label: "Deals that will point at the kept record", value: String(mergedDeals.length) },
         { label: "Invoices that will point at it", value: String(mergedInvoices.length) },
-        { label: "Records removed", value: String(others.length) },
+        { label: "Records kept as merged evidence", value: String(others.length) },
       ]} />
       <Row gap={2}>
         <Button
@@ -336,7 +342,8 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
             }
             if (anySuppressed) { fields.suppressed = true; delete fields.consent; }
             else if (consents.length > 0) fields.consent = consents[0];
-            fields.mergedFrom = others.map((row) => row.id).join(" ");
+            fields.mergedFrom = [String(keep.fields.mergedFrom ?? ""), ...others.map((row) => row.id)].filter(Boolean).join(" ");
+            fields.mergedBy = context.actor;
             await context.mutate.patch(keep.id, {
               status: anySuppressed ? "suppressed" : keep.status,
               fields,
@@ -349,7 +356,11 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
               for (const invoice of invoicesOfContact(data, other.id)) {
                 await context.mutate.patch(invoice.id, { parentId: keep.id, fields: { ...invoice.fields, contactId: keep.id } }, { event: `${invoice.title} repointed to the merged contact` });
               }
-              await context.mutate.remove(other.id, `Duplicate contact ${other.title} merged into ${keep.title}`);
+              // Keep the merged-away record as evidence: its fields, consent and history stay readable.
+              await context.mutate.patch(other.id, {
+                status: "merged",
+                fields: { ...other.fields, mergedInto: keep.id, mergedAt: new Date().toISOString(), mergedBy: context.actor },
+              }, { expectRevision: other.revision, event: `Duplicate contact ${other.title} merged into ${keep.title}; the original record is kept` });
             }
             context.toast("Contacts merged", `${others.length} record${others.length === 1 ? "" : "s"} merged into ${keep.title}. ${anySuppressed ? "The suppression survived the merge." : "The earliest consent was kept."}`);
             setBusy(false);
@@ -684,8 +695,15 @@ export function ContactFiles({ context }: { context: ScreenContext }) {
   if (!contact) return <Empty title="No contact selected" />;
   const quotes = data.quotes.filter((quote) => String(quote.fields.contactId ?? "") === contact.id);
   const threads = data.threads.filter((thread) => String(thread.fields.to ?? "") === String(contact.fields.email ?? "~"));
+  const attached = ((contact.body as { attached?: { id: string; collection: string; title: string; by: string; at: string }[] })?.attached) ?? [];
   return (
     <Grid>
+      <Card prov="human" span={12} title="Attached records" subtitle={`${attached.length} linked by hand`}>
+        <Stack gap={2}>
+          {attached.map((item) => <Row key={item.id} gap={3}><Pill>{item.collection}</Pill><span className="ds-grow">{item.title}</span><span className="ds-subtle">{item.by}, {context.date(item.at)}</span></Row>)}
+          {attached.length === 0 && <span className="ds-subtle">Nothing attached. Use Attach a record.</span>}
+        </Stack>
+      </Card>
       <Card prov="human" span={6} title="Quotes" subtitle={`${quotes.length} documents`} flush>
         {quotes.length === 0 ? <div className="ds-card-body"><span className="ds-subtle">No quote for this person.</span></div> : (
           <DataGrid
@@ -778,7 +796,7 @@ export function ActivityComposer({ context, close }: { context: ScreenContext; c
   const { contact } = useContact(context);
   const data = useCrmData();
   const { now } = useWorkspace();
-  const [kind, setKind] = useState("call");
+  const [kind, setKind] = useState((context.overlayPayload as { kind?: string } | undefined)?.kind ?? "call");
   const [title, setTitle] = useState("");
   const [when, setWhen] = useState(now.toISOString().slice(0, 16));
   const [outcome, setOutcome] = useState("");

@@ -11,17 +11,19 @@ import { registerApp, type ActionDef, type ScreenContext } from "@/platform/regi
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import {
   EditorFrame, PanelGroup, RecoveryNotice, SaveState, ShortcutTable, downloadBlob, downloadText,
-  slug, useDoc, useStore, type DocHandle,
+  slug, useStore, type DocHandle,
 } from "@/applications/visual/kit";
+import { canUndoShared, editShared, readShared, sharedHandle, undoShared, useSharedDoc } from "./sharedDoc";
+import { CAPABILITY_LABELS } from "@/platform/capability";
 import { fitRect, rectCenter } from "@/applications/visual/geometry";
 import {
-  absoluteRect, activePage, applyAutoLayout, childrenOf, contrastRatio, createComponent,
+  absoluteRect, activePage, addNode, applyAutoLayout, isEditable, makeNode, childrenOf, contrastRatio, createComponent,
   detachInstance, findDuplicates, flatten, fontAvailable, FONT_STACK, groupNodes, instancesOf,
   instantiate, layoutConflicts, pageBounds, parentOf, patchNode, patchNodes, removeNodes, reorder,
   resizeFrame, selectionBounds, updatePage, wcagGrade,
   type DesignDoc, type SceneNode, type ScenePage,
 } from "./scene";
-import { ellipseToPath, polygonToPath, rectToPath, simplifyPath, combinePaths, joinEnds, offsetPath, setAnchorType, splitSegment, pathLength, subpathCount } from "./path";
+import { ellipseToPath, polygonToPath, rectToPath, simplifyPath, combinePaths, joinEnds, moveHandle, offsetPath, setAnchorType, splitSegment, pathLength, subpathCount } from "./path";
 import { NodeView, pageToSvg, svgToPng } from "./render";
 import { DesignCanvas, PathCanvas } from "./canvas";
 import { DesignThumb, GeometryInspector, LayersPanel, PagesPanel } from "./panels";
@@ -33,7 +35,7 @@ import { designUi, importSvg, parseDesign, requestFit, setSelection, setTool, st
 
 function useDesignDoc(context: ScreenContext) {
   const record = useRecord(context.params.id);
-  const handle = useDoc<DesignDoc>(record, parseDesign, context.screen.id);
+  const handle = useSharedDoc<DesignDoc>(record, parseDesign, context.screen.id);
   return { record, handle };
 }
 
@@ -860,6 +862,24 @@ function PathInspector({ handle, context, tab }: { handle: DocHandle<DesignDoc>;
             { label: "In handle", value: `${Math.round(anchor.in.x)}, ${Math.round(anchor.in.y)}` },
             { label: "Out handle", value: `${Math.round(anchor.out.x)}, ${Math.round(anchor.out.y)}` },
           ]} />
+          <div className="vx-fieldrow">
+            {(["in", "out"] as const).flatMap((which) => (["x", "y"] as const).map((axis) => (
+              <div key={`${which}${axis}`}>
+                <label className="vx-label" htmlFor={`handle-${which}-${axis}`}>{which === "in" ? "In" : "Out"} handle {axis}</label>
+                <input
+                  id={`handle-${which}-${axis}`}
+                  className="vx-num"
+                  type="number"
+                  value={Math.round(anchor[which][axis])}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    if (!Number.isFinite(value)) return;
+                    handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { path: moveHandle(path, anchor.id, which, { x: axis === "x" ? value : anchor[which].x, y: axis === "y" ? value : anchor[which].y }) })), "Adjust a handle");
+                  }}
+                />
+              </div>
+            )))}
+          </div>
           <Field label="Point type">
             <Select value={anchor.type} onChange={(event) => handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { path: setAnchorType(path, anchor.id, event.target.value as "smooth") })), "Point type")}>
               <option value="corner">Corner — handles move freely</option>
@@ -1861,8 +1881,10 @@ function ReviewScreen({ context, lens }: { context: ScreenContext; lens: "Commen
                     <p className="ds-subtle">{review.note}</p>
                   </div>
                   <Pill tone={review.state === "approved" ? "success" : review.state === "changes" ? "warning" : "info"} dot>{review.state}</Pill>
-                  <Pill tone={review.version === record.revision ? "success" : "warning"}>
-                    {review.version === record.revision ? `covers revision ${review.version}` : `given at revision ${review.version}, file is now ${record.revision}`}
+                  <Pill tone={review.digest ? (review.digest === designDigest(doc) ? "success" : "warning") : "warning"}>
+                    {review.digest
+                      ? (review.digest === designDigest(doc) ? `covers this version (${review.digest})` : `given for an earlier version, at revision ${review.version}`)
+                      : `given at revision ${review.version}; no digest was recorded`}
                   </Pill>
                   <span className="vx-mini">{context.dateTime(review.at)}</span>
                 </Row>
@@ -2031,93 +2053,536 @@ function submitFooter(formId: string, label: string) {
 }
 
 async function withDoc(context: ScreenContext, change: (doc: DesignDoc) => DesignDoc, event: string): Promise<void> {
-  const id = context.params.id;
-  if (!id) return;
-  const { db } = await import("@/runtime/db");
-  const record = await db.records.get(id);
-  if (!record) return;
-  await context.mutate.patch(id, { body: change(parseDesign(record.body)) }, { event });
+  await editShared<DesignDoc>(context, parseDesign, change, event);
 }
+
+function openDesign(context: ScreenContext): DesignDoc | undefined {
+  return sharedHandle<DesignDoc>(context.params.id)?.doc ?? undefined;
+}
+
+/** A digest of what the file draws, so an approval binds to this exact design. */
+export function designDigest(doc: DesignDoc): string {
+  const material = JSON.stringify(doc.pages.map((page) => ({ id: page.id, children: page.children, nodes: page.nodes, background: page.background })))
+    + JSON.stringify(doc.components.map((component) => [component.id, component.version, component.nodes]));
+  let hash = 2166136261;
+  for (let index = 0; index < material.length; index += 1) {
+    hash ^= material.charCodeAt(index);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+/** The frame the selection names: the selected frame itself. */
+function selectedFrame(doc: DesignDoc | undefined): SceneNode | undefined {
+  if (!doc) return undefined;
+  const node = activePage(doc).nodes[designUi.get().selected[0]];
+  return node?.kind === "frame" ? node : undefined;
+}
+
+const needsSelection = () => (designUi.get().selected.length ? undefined : "Select a layer first");
+
+/** Refuse an edit that would touch a hidden or locked layer, or one inside a locked group. */
+function editableSelection(context: ScreenContext): string | undefined {
+  const selected = designUi.get().selected;
+  if (selected.length === 0) return "Select a layer first";
+  const doc = openDesign(context);
+  if (!doc) return undefined;
+  const page = activePage(doc);
+  const blocked = selected.find((id) => page.nodes[id] && !isEditable(page, id));
+  return blocked ? `${page.nodes[blocked].name} is hidden or locked` : undefined;
+}
+
+/** The component behind the selected instance, if one is selected. */
+function selectedComponentId(doc: DesignDoc | undefined): string | undefined {
+  if (!doc) return undefined;
+  const node = activePage(doc).nodes[designUi.get().selected[0]];
+  return node?.kind === "instance" ? node.componentId : undefined;
+}
+
+/** The path the path screen is editing: the chosen one, or the selected path layer. Never the first one found. */
+function targetPathId(doc: DesignDoc | undefined): string | undefined {
+  if (!doc) return undefined;
+  const page = activePage(doc);
+  const ui = designUi.get();
+  if (ui.pathNodeId && page.nodes[ui.pathNodeId]?.path) return ui.pathNodeId;
+  const selected = ui.selected.find((id) => page.nodes[id]?.path);
+  return selected;
+}
+
+const needsPath = (context: ScreenContext) => (targetPathId(openDesign(context)) ? undefined : "Choose a path layer first");
 
 const CANVAS_ACTIONS: ActionDef[] = [
   {
     id: "Select", label: "Select all", placement: "toolbar", shortcut: "⌘A",
-    run: async (context) => {
-      const id = context.params.id;
-      if (!id) return;
-      const { db } = await import("@/runtime/db");
-      const record = await db.records.get(id);
-      if (!record) return;
-      const doc = parseDesign(record.body);
+    run: (context) => {
+      const doc = openDesign(context);
+      if (!doc) return;
       const page = activePage(doc);
       setSelection(childrenOf(page, page.id).filter((node) => node.visible && !node.locked).map((node) => node.id));
       setTool("select");
     },
   },
-  { id: "draw", label: "Insert…", placement: "toolbar", run: (context) => context.openOverlay("Insert tools") },
-  { id: "drag", label: "Hand tool", placement: "overflow", run: () => setTool("hand") },
-  { id: "resize", label: "Resize…", placement: "overflow", guard: () => (designUi.get().selected.length ? undefined : "Select a layer first"), run: (context) => context.openOverlay("style inspector") },
+  {
+    id: "draw", label: "Draw a rectangle", placement: "toolbar",
+    guard: (context) => (openDesign(context) ? undefined : "Open a file first"),
+    run: async (context) => {
+      const doc = openDesign(context);
+      if (!doc) return;
+      const view = designUi.get().view;
+      const centre = { x: (450 - view.x) / view.zoom, y: (280 - view.y) / view.zoom };
+      const node = makeNode("rect", { x: Math.round(centre.x - 80), y: Math.round(centre.y - 50), w: 160, h: 100 }, { name: "Rectangle", fill: { type: "solid", color: doc.colors[0]?.value ?? "#234FE8" } });
+      await withDoc(context, (current) => updatePage(current, (page) => addNode(page, node, page.id)), "Draw a rectangle");
+      setSelection([node.id]);
+    },
+  },
+  { id: "insert", label: "Insert tools…", placement: "overflow", run: (context) => context.openOverlay("Insert tools") },
+  { id: "drag", label: "Drag the selection by…", placement: "overflow", guard: editableSelection, run: (context) => context.openOverlay("move selection") },
+  { id: "hand", label: "Hand tool (H)", placement: "overflow", run: () => setTool("hand") },
+  { id: "resize", label: "Resize…", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("style inspector") },
   {
     id: "rotate", label: "Rotate 15°", placement: "overflow",
-    guard: () => (designUi.get().selected.length ? undefined : "Select a layer first"),
-    run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => patchNodes(page, designUi.get().selected, (node) => ({ rotation: Math.round((node.rotation + 15) % 360) }))), "Rotated the selection by 15 degrees"),
+    guard: editableSelection,
+    run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => patchNodes(page, designUi.get().selected, (node) => ({ rotation: Math.round((node.rotation + 15) % 360) }))), "Rotate the selection by 15 degrees"),
   },
   {
-    id: "crop", label: "Crop frame to selection", placement: "overflow",
-    guard: () => (designUi.get().selected.length ? undefined : "Select a layer first"),
-    run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => {
-      const ids = designUi.get().selected;
-      const bounds = selectionBounds(page, ids);
-      const parentId = parentOf(page, ids[0]);
-      if (!bounds || !parentId || parentId === page.id) return page;
-      const frame = page.nodes[parentId];
-      if (!frame) return page;
-      const offset = absoluteRect(page, frame);
-      let next = patchNode(page, parentId, { x: frame.x + (bounds.x - offset.x), y: frame.y + (bounds.y - offset.y), w: bounds.w, h: bounds.h });
-      for (const child of childrenOf(page, parentId)) {
-        next = patchNode(next, child.id, { x: child.x - (bounds.x - offset.x), y: child.y - (bounds.y - offset.y) });
-      }
-      return next;
-    }), "Cropped the frame to the selection"),
+    id: "crop", label: "Crop the frame to the selection", placement: "overflow",
+    guard: editableSelection,
+    run: async (context) => {
+      let reason = "";
+      await withDoc(context, (doc) => updatePage(doc, (page) => {
+        const ids = designUi.get().selected;
+        const bounds = selectionBounds(page, ids);
+        const parentId = parentOf(page, ids[0]);
+        if (!bounds || !parentId || parentId === page.id) { reason = "The selection is not inside a frame."; return page; }
+        const frame = page.nodes[parentId];
+        if (!frame) return page;
+        const offset = absoluteRect(page, frame);
+        let next = patchNode(page, parentId, { x: frame.x + (bounds.x - offset.x), y: frame.y + (bounds.y - offset.y), w: bounds.w, h: bounds.h });
+        for (const child of childrenOf(page, parentId)) {
+          next = patchNode(next, child.id, { x: child.x - (bounds.x - offset.x), y: child.y - (bounds.y - offset.y) });
+        }
+        return next;
+      }), "Crop the frame to the selection");
+      if (reason) context.toast("Nothing cropped", reason, "blocked");
+    },
   },
   { id: "zoom", label: "Zoom to fit", placement: "secondary", shortcut: "0", run: () => requestFit() },
   {
-    id: "pan", label: "Centre on selection", placement: "overflow",
-    run: async (context) => {
-      const id = context.params.id;
-      if (!id) return;
-      const { db } = await import("@/runtime/db");
-      const record = await db.records.get(id);
-      if (!record) return;
-      const doc = parseDesign(record.body);
+    id: "pan", label: "Pan to the selection", placement: "overflow",
+    run: (context) => {
+      const doc = openDesign(context);
+      if (!doc) return;
       const page = activePage(doc);
       const bounds = selectionBounds(page, designUi.get().selected) ?? pageBounds(page);
       designUi.set((current) => ({ ...current, view: fitRect(bounds, 900, 560, 80) }));
     },
   },
+  {
+    id: "undo", label: "Undo", placement: "overflow", shortcut: "⌘Z",
+    guard: (context) => (canUndoShared(context) ? undefined : "Nothing to undo yet"),
+    run: (context) => { undoShared(context); },
+  },
 ];
 
 const PATH_ACTIONS: ActionDef[] = [
-  { id: "Add point", label: "Pen tool", placement: "primary", run: () => setTool("pen") },
-  { id: "adjust handle", label: "Point inspector", placement: "secondary", run: (context) => context.openOverlay("Point inspector") },
   {
-    id: "join", label: "Close the path", placement: "secondary",
-    run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => {
-      const nodeId = designUi.get().pathNodeId ?? Object.values(page.nodes).find((node) => node.kind === "path")?.id;
-      const node = nodeId ? page.nodes[nodeId] : undefined;
-      return node?.path ? patchNode(page, node.id, { path: joinEnds(node.path) }) : page;
-    }), "Closed the path"),
+    id: "Add point", label: "Add a point", placement: "primary",
+    guard: needsPath,
+    run: async (context) => {
+      const doc = openDesign(context);
+      const nodeId = targetPathId(doc);
+      if (!doc || !nodeId) return;
+      const path = activePage(doc).nodes[nodeId].path!;
+      const after = designUi.get().selectedAnchors[0] ?? path.anchors[path.anchors.length - (path.closed ? 1 : 2)]?.id;
+      const id = `a-${Date.now().toString(36)}`;
+      const next = after ? splitSegment(path, after, id) : path;
+      if (next === path) { context.toast("No segment to split", "A path needs two points before one can be added between them; use the pen tool to start one.", "blocked"); return; }
+      await withDoc(context, (current) => updatePage(current, (page) => patchNode(page, nodeId, { path: next })), "Add a point");
+      designUi.set((current) => ({ ...current, selectedAnchors: [id] }));
+    },
   },
-  { id: "subtract", label: "Combine…", placement: "overflow", run: (context) => context.setTab("Boolean") },
+  { id: "pen", label: "Pen tool (P)", placement: "overflow", run: () => setTool("pen") },
+  {
+    id: "adjust handle", label: "Adjust the point's handles…", placement: "secondary",
+    guard: (context) => needsPath(context) ?? (designUi.get().selectedAnchors.length ? undefined : "Select a point on the path first"),
+    run: (context) => context.openOverlay("Point inspector"),
+  },
+  {
+    id: "join", label: "Join the ends", placement: "secondary",
+    guard: needsPath,
+    run: async (context) => {
+      const doc = openDesign(context);
+      const nodeId = targetPathId(doc);
+      if (!nodeId) return;
+      const node = activePage(doc!).nodes[nodeId];
+      if (node.path?.closed) { context.toast("Already closed", `${node.name} is a closed contour.`, "info"); return; }
+      await withDoc(context, (current) => updatePage(current, (page) => patchNode(page, nodeId, { path: joinEnds(page.nodes[nodeId].path!) })), "Join the path ends");
+    },
+  },
+  {
+    id: "subtract", label: "Subtract the second selected path", placement: "overflow",
+    guard: (context) => {
+      const doc = openDesign(context);
+      if (!doc) return "Open a file first";
+      const page = activePage(doc);
+      const paths = designUi.get().selected.filter((id) => page.nodes[id]?.path);
+      return paths.length === 2 ? undefined : "Select exactly two path layers: the shape to keep, then the one to cut";
+    },
+    run: async (context) => {
+      const selected = designUi.get().selected;
+      await withDoc(context, (doc) => updatePage(doc, (page) => {
+        const [keepId, cutId] = selected.filter((id) => page.nodes[id]?.path);
+        const keep = page.nodes[keepId];
+        const cut = page.nodes[cutId];
+        if (!keep?.path || !cut?.path) return page;
+        const combined = combinePaths(keep.path, cut.path, { x: cut.x - keep.x, y: cut.y - keep.y }, "subtract");
+        return removeNodes(patchNode(page, keep.id, { path: combined }), [cut.id]);
+      }), "Subtract a path");
+      setSelection(selected.slice(0, 1));
+      context.toast("Subtracted with the even-odd rule", "The second path is now a contour of the first. No intersection geometry was computed, so where they overlap the result is the even-odd fill.", "info");
+    },
+  },
+  { id: "combine", label: "Combine options…", placement: "overflow", run: (context) => context.setTab("Boolean") },
   {
     id: "simplify", label: "Simplify", placement: "overflow",
-    run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => {
-      const nodeId = designUi.get().pathNodeId ?? Object.values(page.nodes).find((node) => node.kind === "path")?.id;
-      const node = nodeId ? page.nodes[nodeId] : undefined;
-      return node?.path ? patchNode(page, node.id, { path: simplifyPath(node.path, 4) }) : page;
-    }), "Simplified the path"),
+    guard: needsPath,
+    run: (context) => withDoc(context, (doc) => {
+      const nodeId = targetPathId(doc);
+      return nodeId ? updatePage(doc, (page) => patchNode(page, nodeId, { path: simplifyPath(page.nodes[nodeId].path!, 4) })) : doc;
+    }, "Simplify the path"),
   },
 ];
+
+/* --------------------------- action overlays --------------------------- */
+
+function MoveSelection({ context, close }: { context: ScreenContext; close: () => void }) {
+  const ui = useStore(designUi);
+  const [dx, setDx] = useState("10");
+  const [dy, setDy] = useState("0");
+  return (
+    <form
+      id="design-move-selection"
+      className="ds-stack ds-gap-3"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        const x = Number(dx);
+        const y = Number(dy);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+        await withDoc(context, (doc) => updatePage(doc, (page) => patchNodes(page, ui.selected.filter((id) => isEditable(page, id)), (node) => ({ x: node.x + x, y: node.y + y }))), `Drag the selection ${x}, ${y}`);
+        close();
+      }}
+    >
+      <p className="ds-prose">The keyboard equivalent of dragging: move the {ui.selected.length} selected layer{ui.selected.length === 1 ? "" : "s"} by an exact distance. Arrow keys on the canvas nudge by 1px, with Shift by 10px.</p>
+      <Row gap={3} wrap>
+        <Field label="Across (px)"><TextInput type="number" value={dx} onChange={(event) => setDx(event.target.value)} autoFocus /></Field>
+        <Field label="Down (px)"><TextInput type="number" value={dy} onChange={(event) => setDy(event.target.value)} /></Field>
+      </Row>
+    </form>
+  );
+}
+
+function SwapInstance({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = useDesignDoc(context);
+  const ui = useStore(designUi);
+  if (!record || !handle.doc) return <Empty title="Open a file first" />;
+  const doc = handle.doc;
+  const page = activePage(doc);
+  const node = page.nodes[ui.selected[0]];
+  if (node?.kind !== "instance") return <Notice tone="info" title="Select an instance">Swapping replaces the component an instance points at.</Notice>;
+  const others = doc.components.filter((component) => component.id !== node.componentId);
+  return (
+    <Stack gap={2}>
+      <Properties rows={[
+        { label: "Instance", value: node.name },
+        { label: "Now", value: doc.components.find((component) => component.id === node.componentId)?.name ?? "missing component" },
+        { label: "Overrides kept", value: Object.keys(node.overrides ?? {}).length },
+      ]} />
+      {others.length === 0 ? <Empty title="No other component to swap to">Create another component first.</Empty> : others.map((component) => {
+        const root = component.nodes[component.root];
+        return (
+          <Row key={component.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
+            <span className="ds-grow">{component.name} <span className="vx-mini">v{component.version}</span></span>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, {
+                  componentId: component.id, name: component.name,
+                  w: root?.w ?? node.w, h: root?.h ?? node.h, fill: root?.fill ?? node.fill, radius: root?.radius ?? node.radius,
+                })), `Swap ${node.name} to ${component.name}`);
+                void context.mutate.log(`Swapped ${node.name} to ${component.name}`, { entityId: record.id, type: "update" });
+                close();
+              }}
+            >
+              Swap to this
+            </Button>
+          </Row>
+        );
+      })}
+    </Stack>
+  );
+}
+
+function TokenEditor({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = useDesignDoc(context);
+  const [tokenId, setTokenId] = useState(handle.doc?.colors[0]?.id ?? "");
+  const token = handle.doc?.colors.find((item) => item.id === tokenId);
+  const [name, setName] = useState(token?.name ?? "");
+  const [value, setValue] = useState(token?.value ?? "#234FE8");
+  if (!record || !handle.doc) return <Empty title="Open a file first" />;
+  const doc = handle.doc;
+  if (doc.colors.length === 0) return <Empty title="No colour tokens yet">Create one with New colour token.</Empty>;
+  const uses = doc.pages.reduce((sum, page) => sum + Object.values(page.nodes).filter((node) => node.styleRefs?.fill === tokenId || node.fill?.color?.toLowerCase() === token?.value.toLowerCase()).length, 0);
+  const valid = /^#[0-9a-f]{6}$/i.test(value);
+  return (
+    <form
+      id="design-token-editor"
+      className="ds-stack ds-gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!token || !valid || !name.trim()) return;
+        const old = token.value.toLowerCase();
+        handle.edit((current) => ({
+          ...current,
+          colors: current.colors.map((item) => (item.id === token.id ? { ...item, name: name.trim(), value } : item)),
+          pages: current.pages.map((page) => ({
+            ...page,
+            nodes: Object.fromEntries(Object.entries(page.nodes).map(([id, node]) => [id, (node.styleRefs?.fill === token.id || node.fill?.color?.toLowerCase() === old) && node.fill
+              ? { ...node, fill: { ...node.fill, color: value } }
+              : node])),
+          })),
+        }), `Edit the token ${name.trim()}`);
+        void context.mutate.log(`Colour token ${name.trim()} set to ${value}; ${uses} layers follow it`, { entityId: record.id, type: "update" });
+        close();
+      }}
+    >
+      <Field label="Token">
+        <Select value={tokenId} onChange={(event) => { const next = doc.colors.find((item) => item.id === event.target.value); setTokenId(event.target.value); setName(next?.name ?? ""); setValue(next?.value ?? "#000000"); }}>
+          {doc.colors.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.value}</option>)}
+        </Select>
+      </Field>
+      <Row gap={3} wrap>
+        <Field label="Name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} required /></Field>
+        <Field label="Value" error={valid ? undefined : "Use a six-digit hex value, like #234FE8."}><TextInput value={value} onChange={(event) => setValue(event.target.value)} /></Field>
+        <Field label="Pick"><input type="color" aria-label="Pick the token colour" value={valid ? value : "#000000"} onChange={(event) => setValue(event.target.value)} /></Field>
+      </Row>
+      <Notice tone={uses > 0 ? "warning" : "info"} title={`${uses} layer${uses === 1 ? "" : "s"} use this token`}>Saving changes their fill to the new value. Undo puts every one back.</Notice>
+    </form>
+  );
+}
+
+function ApplyStyle({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = useDesignDoc(context);
+  const ui = useStore(designUi);
+  if (!record || !handle.doc) return <Empty title="Open a file first" />;
+  const doc = handle.doc;
+  const page = activePage(doc);
+  const nodes = ui.selected.map((id) => page.nodes[id]).filter(Boolean);
+  if (nodes.length === 0) return <Notice tone="info" title="Select a layer">Pick the layers first, then the style.</Notice>;
+  const texts = nodes.filter((node) => node.kind === "text");
+  const shapes = nodes.filter((node) => node.kind !== "text");
+  const apply = (change: (node: SceneNode) => Partial<SceneNode>, label: string, ids: string[]) => {
+    handle.edit((current) => updatePage(current, (p) => patchNodes(p, ids.filter((id) => isEditable(p, id)), change)), label);
+    void context.mutate.log(label, { entityId: record.id, type: "update" });
+    close();
+  };
+  return (
+    <Stack gap={3}>
+      <PanelGroup title={`Text style · ${texts.length} text layer${texts.length === 1 ? "" : "s"}`}>
+        {texts.length === 0 ? <p className="vx-mini">No text layer is selected.</p> : (
+          <Stack gap={1}>
+            {doc.textStyles.map((style) => (
+              <Row key={style.id} gap={2} className="ds-panel" style={{ padding: "var(--space-1) var(--space-2)" }}>
+                <span className="ds-grow" style={{ fontFamily: style.family }}>{style.name} <span className="vx-mini">{style.family} {style.size}/{style.weight}</span></span>
+                <Button size="sm" variant="secondary" onClick={() => apply((node) => ({ textStyle: { ...node.textStyle!, size: style.size, weight: style.weight, family: style.family, lineHeight: style.lineHeight, letterSpacing: style.letterSpacing, styleId: style.id } }), `Apply ${style.name}`, texts.map((node) => node.id))}>Apply</Button>
+              </Row>
+            ))}
+          </Stack>
+        )}
+      </PanelGroup>
+      <PanelGroup title={`Colour token · ${shapes.length} shape${shapes.length === 1 ? "" : "s"}`}>
+        {shapes.length === 0 ? <p className="vx-mini">No shape layer is selected.</p> : (
+          <Stack gap={1}>
+            {doc.colors.map((token) => (
+              <Row key={token.id} gap={2} className="ds-panel" style={{ padding: "var(--space-1) var(--space-2)" }}>
+                <span aria-hidden="true" style={{ width: 16, height: 16, borderRadius: 4, background: token.value, border: "1px solid var(--border-default)" }} />
+                <span className="ds-grow">{token.name} <span className="ds-num vx-mini">{token.value}</span></span>
+                <Button size="sm" variant="secondary" onClick={() => apply((node) => ({ fill: { type: "solid", color: token.value }, styleRefs: { ...node.styleRefs, fill: token.id } }), `Apply ${token.name}`, shapes.map((node) => node.id))}>Apply</Button>
+              </Row>
+            ))}
+          </Stack>
+        )}
+      </PanelGroup>
+      {nodes.some((node) => !isEditable(page, node.id)) && <Notice tone="warning" title="Locked or hidden layers are skipped">They keep their current style.</Notice>}
+    </Stack>
+  );
+}
+
+function LinkScreens({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = useDesignDoc(context);
+  const ui = useStore(designUi);
+  const page = handle.doc ? activePage(handle.doc) : undefined;
+  const frames = page ? childrenOf(page, page.id).filter((item) => item.kind === "frame") : [];
+  const [from, setFrom] = useState(ui.selected[0] ?? "");
+  const [to, setTo] = useState("");
+  const [trigger, setTrigger] = useState<"click" | "hover" | "drag" | "key">("click");
+  if (!record || !handle.doc || !page) return <Empty title="Open a file first" />;
+  const layers = flatten(page).map((entry) => entry.node).filter((node) => node.visible);
+  return (
+    <form
+      id="design-link-screens"
+      className="ds-stack ds-gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const source = page.nodes[from];
+        const target = page.nodes[to];
+        if (!source || !target || from === to) return;
+        handle.edit((current) => updatePage(current, (p) => patchNode(p, from, { link: { to, trigger, transition: source.link?.transition ?? "dissolve", duration: source.link?.duration ?? 300 } })), `Link ${source.name} to ${target.name}`);
+        void context.mutate.log(`Linked ${source.name} to ${target.name} on ${trigger}`, { entityId: record.id, type: "update" });
+        close();
+      }}
+    >
+      <Field label="From (the hotspot)" required>
+        <Select value={from} onChange={(event) => setFrom(event.target.value)} required>
+          <option value="">Choose a layer</option>
+          {layers.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}
+        </Select>
+      </Field>
+      <Field label="To (the destination screen)" required>
+        <Select value={to} onChange={(event) => setTo(event.target.value)} required>
+          <option value="">Choose a frame</option>
+          {frames.filter((frame) => frame.id !== from).map((frame) => <option key={frame.id} value={frame.id}>{frame.name}</option>)}
+        </Select>
+      </Field>
+      <Field label="Trigger">
+        <Select value={trigger} onChange={(event) => setTrigger(event.target.value as "click")}>
+          {["click", "hover", "drag", "key"].map((option) => <option key={option} value={option}>{option}</option>)}
+        </Select>
+      </Field>
+      {trigger === "hover" && <Notice tone="warning" title="Hover has no touch equivalent">Add a click link as well before the prototype is shared.</Notice>}
+    </form>
+  );
+}
+
+function PublishPrototype({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = useDesignDoc(context);
+  if (!record || !handle.doc) return <Empty title="Open a file first" />;
+  const doc = handle.doc;
+  const page = activePage(doc);
+  const links = Object.values(page.nodes).filter((node) => node.link).length;
+  return (
+    <form
+      id="design-publish-prototype"
+      className="ds-stack ds-gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const publication = { state: "queued_local" as const, at: new Date().toISOString(), by: context.actor, digest: designDigest(doc) };
+        handle.edit((current) => ({ ...current, prototype: { ...current.prototype, publication } }), "Queue the prototype for publishing");
+        void context.mutate.log("Prototype publication queued locally; no hosting is connected", { entityId: record.id, type: "publish", capability: "queued_local" });
+        context.toast("Queued locally, not published", "No hosting provider is connected, so no link exists and nothing left this browser. The request is recorded on the file.", "info");
+        close();
+      }}
+    >
+      <Properties rows={[
+        { label: "Start screen", value: doc.prototype.startNodeId ? page.nodes[doc.prototype.startNodeId]?.name ?? "missing" : "the first frame" },
+        { label: "Links on this page", value: links },
+        { label: "Device", value: doc.prototype.device },
+        { label: "Hosting", value: <Pill tone="warning">{CAPABILITY_LABELS.not_connected}</Pill> },
+        { label: "Last request", value: doc.prototype.publication ? `${CAPABILITY_LABELS[doc.prototype.publication.state]} by ${doc.prototype.publication.by}, ${context.relative(doc.prototype.publication.at)}` : "none" },
+      ]} />
+      <Notice tone="warning" title="A prototype is not a product">It has no backend: forms submit nothing and data on its screens is drawn, not loaded. Anyone shown it should be told so.</Notice>
+      <Notice tone="info" title="What publishing does here">It records the request against this version of the file as queued locally. No URL is created until a hosting provider is connected.</Notice>
+    </form>
+  );
+}
+
+function CropAsset({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = useDesignDoc(context);
+  const images = handle.doc?.assets.filter((asset) => asset.kind === "image" && asset.src) ?? [];
+  const [assetId, setAssetId] = useState(images[0]?.id ?? "");
+  const asset = images.find((item) => item.id === assetId);
+  const [rect, setRect] = useState({ x: 0, y: 0, w: asset?.width ?? 0, h: asset?.height ?? 0 });
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (!record || !handle.doc) return <Empty title="Open a file first" />;
+  if (images.length === 0) return <Empty title="No image with pixels to crop">Add an image asset first. Icons are vectors and are resized, not cropped.</Empty>;
+  const field = (key: "x" | "y" | "w" | "h", label: string) => (
+    <Field label={label}><TextInput type="number" value={rect[key]} onChange={(event) => setRect((current) => ({ ...current, [key]: Math.round(Number(event.target.value)) }))} /></Field>
+  );
+  return (
+    <form
+      id="design-crop-asset"
+      className="ds-stack ds-gap-3"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (!asset?.src) return;
+        if (rect.w < 1 || rect.h < 1 || rect.x < 0 || rect.y < 0 || rect.x + rect.w > asset.width || rect.y + rect.h > asset.height) {
+          setError(`The crop must sit inside the ${asset.width} × ${asset.height} image.`);
+          return;
+        }
+        setBusy(true);
+        try {
+          const image = new Image();
+          await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error("The image could not be decoded.")); image.src = asset.src!; });
+          const canvas = document.createElement("canvas");
+          canvas.width = rect.w;
+          canvas.height = rect.h;
+          canvas.getContext("2d")?.drawImage(image, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h);
+          const src = canvas.toDataURL("image/png");
+          handle.edit((current) => ({
+            ...current,
+            assets: current.assets.map((item) => (item.id === asset.id ? { ...item, src, width: rect.w, height: rect.h } : item)),
+          }), `Crop ${asset.name}`);
+          void context.mutate.log(`Cropped ${asset.name} to ${rect.w} × ${rect.h}; licence and credit kept`, { entityId: record.id, type: "update" });
+          close();
+        } catch (failure) {
+          setError(failure instanceof Error ? failure.message : "The crop failed.");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {error && <Notice tone="danger" title="Not cropped">{error}</Notice>}
+      <Field label="Asset">
+        <Select value={assetId} onChange={(event) => { const next = images.find((item) => item.id === event.target.value); setAssetId(event.target.value); setRect({ x: 0, y: 0, w: next?.width ?? 0, h: next?.height ?? 0 }); }}>
+          {images.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.width} × {item.height}</option>)}
+        </Select>
+      </Field>
+      {asset?.src && <img src={asset.src} alt={asset.name} style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 6 }} />}
+      <Row gap={2} wrap>{field("x", "Left")}{field("y", "Top")}{field("w", "Width")}{field("h", "Height")}</Row>
+      <Properties rows={[{ label: "Licence kept", value: asset?.license ?? "" }, { label: "Credit kept", value: asset?.credit ?? "" }]} />
+      {busy && <p className="vx-mini">Cropping in this browser…</p>}
+    </form>
+  );
+}
+
+async function batchExport(context: ScreenContext): Promise<void> {
+  const doc = openDesign(context) ?? await readShared<DesignDoc>(context, parseDesign);
+  const id = context.params.id;
+  if (!doc || !id) return;
+  const { db } = await import("@/runtime/db");
+  const record = await db.records.get(id);
+  const base = slug(record?.title ?? "design");
+  let written = 0;
+  const skipped: string[] = [];
+  for (const spec of doc.exports) {
+    const page = doc.pages.find((item) => item.nodes[spec.nodeId]);
+    const node = page?.nodes[spec.nodeId];
+    if (!page || !node) { skipped.push(spec.nodeId); continue; }
+    const bounds = absoluteRect(page, node);
+    const svg = pageToSvg(page, bounds);
+    const name = `${base}-${slug(node.name)}${spec.suffix}`;
+    if (spec.format === "svg") downloadText(`${name}.svg`, svg, "image/svg+xml");
+    else downloadBlob(`${name}@${spec.scale}x.png`, await svgToPng(svg, bounds.w, bounds.h, spec.scale));
+    written += 1;
+  }
+  await context.mutate.log(`Batch export: ${written} files written${skipped.length ? `, ${skipped.length} skipped` : ""}`, { entityId: id, type: "export" });
+  context.toast(
+    written ? "Batch export written" : "Nothing exported",
+    written ? `${written} file${written === 1 ? "" : "s"} downloaded from this browser, at the scale and format each export setting names.${skipped.length ? ` ${skipped.length} settings point at layers that no longer exist and were skipped.` : ""}` : "No export settings point at a layer. Add them on the Exports tab.",
+    written ? "ok" : "blocked",
+  );
+}
 
 registerApp({
   code: "DESIGN",
@@ -2218,6 +2683,7 @@ registerApp({
         { id: "fill picker", kind: "drawer", title: "Fill", width: 380, render: ({ ...context }) => <FillPicker context={context} /> },
         { id: "style inspector", kind: "drawer", title: "Properties", width: 400, render: ({ ...context }) => <InspectorOverlay context={context} /> },
         { id: "export", kind: "modal", title: "Export", width: 520, render: ({ ...context }) => <ExportOverlay context={context} /> },
+        { id: "move selection", kind: "modal", title: "Drag the selection", width: 440, render: ({ close, ...context }) => <MoveSelection context={context} close={close} />, footer: submitFooter("design-move-selection", "Move") },
       ],
     },
 
@@ -2231,18 +2697,23 @@ registerApp({
         { id: "Rename", label: "Rename layer", placement: "primary", guard: () => (designUi.get().selected.length === 1 ? undefined : "Select one layer"), run: (context) => context.openOverlay("Layer context") },
         {
           id: "group", label: "Group", placement: "secondary",
-          guard: () => (designUi.get().selected.length > 1 ? undefined : "Select two or more layers"),
-          run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => groupNodes(page, designUi.get().selected).page), "Grouped layers"),
+          guard: (context) => (designUi.get().selected.length > 1 ? editableSelection(context) : "Select two or more layers"),
+          run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => groupNodes(page, designUi.get().selected).page), "Group layers"),
         },
         {
-          id: "reorder", label: "Bring forwards", placement: "overflow",
-          guard: () => (designUi.get().selected.length ? undefined : "Select a layer"),
-          run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => designUi.get().selected.reduce((acc, id) => reorder(acc, id, 1), page)), "Reordered layers"),
+          id: "reorder", label: "Reorder: bring forwards", placement: "overflow", shortcut: "⌘]",
+          guard: editableSelection,
+          run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => designUi.get().selected.reduce((acc, id) => reorder(acc, id, 1), page)), "Bring the selection forwards"),
+        },
+        {
+          id: "send backwards", label: "Send backwards", placement: "overflow", shortcut: "⌘[",
+          guard: editableSelection,
+          run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => designUi.get().selected.reduce((acc, id) => reorder(acc, id, -1), page)), "Send the selection backwards"),
         },
         {
           id: "lock", label: "Lock or unlock", placement: "secondary",
           guard: () => (designUi.get().selected.length ? undefined : "Select a layer"),
-          run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => patchNodes(page, designUi.get().selected, (node) => ({ locked: !node.locked }))), "Locked or unlocked layers"),
+          run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => patchNodes(page, designUi.get().selected, (node) => ({ locked: !node.locked }))), "Lock or unlock layers"),
         },
         {
           id: "isolate", label: "Isolate", placement: "overflow",
@@ -2252,7 +2723,19 @@ registerApp({
             context.toast("Isolation", designUi.get().isolate ? "Only that layer and its children are editable." : "Isolation off.");
           },
         },
-        { id: "select", label: "Clear the selection", placement: "overflow", run: () => setSelection([]) },
+        {
+          id: "select", label: "Select every editable layer", placement: "overflow",
+          run: (context) => {
+            const doc = openDesign(context);
+            if (!doc) return;
+            const page = activePage(doc);
+            const ids = childrenOf(page, page.id).filter((node) => isEditable(page, node.id)).map((node) => node.id);
+            setSelection(ids);
+            const skipped = childrenOf(page, page.id).length - ids.length;
+            if (skipped > 0) context.toast(`${ids.length} layers selected`, `${skipped} hidden or locked layers were left out so they cannot be edited by accident.`, "info");
+          },
+        },
+        { id: "clear selection", label: "Clear the selection", placement: "overflow", run: () => setSelection([]) },
       ],
       overlays: [
         { id: "Layer context", kind: "modal", title: "Layer", width: 460, render: ({ close, ...context }) => <LayerContext context={context} close={close} /> },
@@ -2296,28 +2779,58 @@ registerApp({
         render: (context: ScreenContext) => <LayoutScreen context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Set size", label: "Frame size…", placement: "primary", run: (context) => context.openOverlay("Layout inspector") },
+        { id: "Set size", label: "Set the frame size…", placement: "primary", guard: (context) => (selectedFrame(openDesign(context)) ? undefined : "Select a frame first"), run: (context) => context.openOverlay("Layout inspector") },
         {
-          id: "reorder", label: "Reverse the order", placement: "overflow",
+          id: "reorder", label: "Reorder: move the child later", placement: "overflow",
+          guard: (context) => {
+            const doc = openDesign(context);
+            if (!doc) return "Open a file first";
+            const page = activePage(doc);
+            const id = designUi.get().selected[0];
+            const parent = id ? parentOf(page, id) : undefined;
+            if (!parent || !page.nodes[parent]?.layout) return "Select a child of an auto layout frame";
+            return isEditable(page, id) ? undefined : "The layer is hidden or locked";
+          },
           run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => {
-            const frameId = Object.values(page.nodes).find((node) => node.kind === "frame")?.id;
-            if (!frameId) return page;
-            const kids = [...(page.children[frameId] ?? [])].reverse();
-            return applyAutoLayout({ ...page, children: { ...page.children, [frameId]: kids } }, frameId);
-          }), "Reversed the child order"),
+            const id = designUi.get().selected[0];
+            const parent = parentOf(page, id);
+            return parent ? applyAutoLayout(reorder(page, id, 1), parent) : page;
+          }), "Move the child later in the layout"),
         },
         {
-          id: "wrap", label: "Toggle wrapping", placement: "secondary",
+          id: "reverse", label: "Reverse the frame's children", placement: "overflow",
+          guard: (context) => (selectedFrame(openDesign(context))?.layout ? undefined : "Select an auto layout frame"),
           run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => {
-            const frame = Object.values(page.nodes).find((node) => node.kind === "frame" && node.layout);
+            const frame = selectedFrame(doc);
+            if (!frame) return page;
+            return applyAutoLayout({ ...page, children: { ...page.children, [frame.id]: [...(page.children[frame.id] ?? [])].reverse() } }, frame.id);
+          }), "Reverse the child order"),
+        },
+        {
+          id: "wrap", label: "Wrap or unwrap the frame", placement: "secondary",
+          guard: (context) => (selectedFrame(openDesign(context))?.layout ? undefined : "Select an auto layout frame"),
+          run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => {
+            const frame = selectedFrame(doc);
             if (!frame?.layout) return page;
             return applyAutoLayout(patchNode(page, frame.id, { layout: { ...frame.layout, wrap: !frame.layout.wrap } }), frame.id);
-          }), "Toggled wrapping"),
+          }), "Toggle wrapping"),
         },
-        { id: "preview width", label: "Breakpoint preview", placement: "secondary", run: (context) => context.openOverlay("breakpoint preview") },
+        { id: "preview width", label: "Preview at each breakpoint", placement: "secondary", run: (context) => context.openOverlay("breakpoint preview") },
         {
-          id: "apply rules", label: "Re-run auto layout", placement: "overflow",
-          run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => Object.values(page.nodes).filter((node) => node.layout).reduce((acc, node) => applyAutoLayout(acc, node.id), page)), "Re-ran auto layout on every frame"),
+          id: "apply rules", label: "Apply the layout rules", placement: "overflow",
+          guard: (context) => (openDesign(context) ? undefined : "Open a file first"),
+          run: async (context) => {
+            const frame = selectedFrame(openDesign(context));
+            const next = await editShared<DesignDoc>(context, parseDesign, (doc) => updatePage(doc, (page) => (frame
+              ? applyAutoLayout(page, frame.id)
+              : Object.values(page.nodes).filter((node) => node.layout).reduce((acc, node) => applyAutoLayout(acc, node.id), page))), frame ? `Apply the layout rules to ${frame.name}` : "Apply the layout rules to every frame");
+            const doc = next ?? openDesign(context);
+            if (!doc) return;
+            const page = activePage(doc);
+            const conflicts = Object.values(page.nodes).filter((node) => node.layout && (!frame || node.id === frame.id)).flatMap((node) => layoutConflicts(page, node.id));
+            if (conflicts.length > 0) context.openOverlay("constraint conflict");
+            else context.toast("Layout applied", "Every child sits where its rules put it, with no conflicting constraint.");
+          },
         },
       ],
       overlays: [
@@ -2337,21 +2850,32 @@ registerApp({
         {
           id: "Create component", label: "Create a component", placement: "primary",
           guard: () => (designUi.get().selected.length === 1 ? undefined : "Select one frame or group"),
-          run: (context) => withDoc(context, (doc) => createComponent(doc, designUi.get().selected[0], activePage(doc).nodes[designUi.get().selected[0]]?.name ?? "Component").doc, "Created a component"),
+          run: (context) => withDoc(context, (doc) => createComponent(doc, designUi.get().selected[0], activePage(doc).nodes[designUi.get().selected[0]]?.name ?? "Component").doc, "Create a component"),
         },
         { id: "publish", label: "Publish to the library", placement: "secondary", run: (context) => context.openOverlay("library publish") },
-        { id: "swap", label: "Swap an instance", placement: "overflow", run: (context) => context.openOverlay("Variant editor") },
+        {
+          id: "swap", label: "Swap the selected instance…", placement: "overflow",
+          guard: (context) => (selectedComponentId(openDesign(context)) ? undefined : "Select an instance first"),
+          run: (context) => context.openOverlay("swap instance"),
+        },
+        { id: "add property", label: "Add a variant property…", placement: "overflow", run: (context) => context.openOverlay("Variant editor") },
         {
           id: "detach", label: "Detach the selected instance", placement: "overflow", tone: "danger",
           guard: () => (designUi.get().selected.length === 1 ? undefined : "Select one instance"),
-          run: (context) => withDoc(context, (doc) => detachInstance(doc, designUi.get().selected[0]), "Detached an instance"),
+          run: (context) => withDoc(context, (doc) => detachInstance(doc, designUi.get().selected[0]), "Detach an instance"),
         },
-        { id: "inspect uses", label: "Where it is used", placement: "secondary", run: (context) => context.setTab("Usage") },
+        {
+          id: "inspect uses", label: "Inspect where it is used", placement: "secondary",
+          guard: (context) => (selectedComponentId(openDesign(context)) ? undefined : "Select an instance first"),
+          run: (context) => context.openOverlay("breaking-change diff"),
+        },
+        { id: "usage tab", label: "Usage across the file", placement: "overflow", run: (context) => context.setTab("Usage") },
       ],
       overlays: [
         { id: "Variant editor", kind: "modal", title: "Component property", width: 480, render: ({ close, ...context }) => <VariantEditor context={context} close={close} />, footer: submitFooter("variant-editor", "Add the property") },
         { id: "library publish", kind: "modal", title: "Publish to the library", width: 520, render: ({ close, ...context }) => <PublishComponent context={context} close={close} /> },
         { id: "breaking-change diff", kind: "drawer", title: "Instances affected", width: 460, render: ({ ...context }) => <BreakingChange context={context} /> },
+        { id: "swap instance", kind: "modal", title: "Swap an instance", width: 480, render: ({ close, ...context }) => <SwapInstance context={context} close={close} /> },
       ],
     },
 
@@ -2364,25 +2888,22 @@ registerApp({
       actions: [
         {
           id: "Create style", label: "New text style", placement: "primary",
-          run: (context) => withDoc(context, (doc) => ({ ...doc, textStyles: [...doc.textStyles, { id: `ts-${Date.now().toString(36)}`, name: `Style ${doc.textStyles.length + 1}`, family: "Inter", size: 18, weight: 500, lineHeight: 1.4, letterSpacing: 0 }] }), "Created a text style"),
+          run: (context) => withDoc(context, (doc) => ({ ...doc, textStyles: [...doc.textStyles, { id: `ts-${Date.now().toString(36)}`, name: `Style ${doc.textStyles.length + 1}`, family: "Inter", size: 18, weight: 500, lineHeight: 1.4, letterSpacing: 0 }] }), "Create a text style"),
         },
+        { id: "edit token", label: "Edit a colour token…", placement: "secondary", guard: (context) => (openDesign(context)?.colors.length ? undefined : "There is no colour token yet"), run: (context) => context.openOverlay("token editor") },
         {
-          id: "edit token", label: "New colour token", placement: "secondary",
-          run: (context) => withDoc(context, (doc) => ({ ...doc, colors: [...doc.colors, { id: `tok-${Date.now().toString(36)}`, name: `Colour ${doc.colors.length + 1}`, value: "#234FE8", group: "Custom" }] }), "Created a colour token"),
+          id: "new token", label: "New colour token", placement: "overflow",
+          run: (context) => withDoc(context, (doc) => ({ ...doc, colors: [...doc.colors, { id: `tok-${Date.now().toString(36)}`, name: `Colour ${doc.colors.length + 1}`, value: "#234FE8", group: "Custom" }] }), "Create a colour token"),
         },
-        {
-          id: "apply to selection", label: "Apply the first style", placement: "overflow",
-          guard: () => (designUi.get().selected.length ? undefined : "Select a layer"),
-          run: (context) => withDoc(context, (doc) => updatePage(doc, (page) => patchNodes(page, designUi.get().selected, (node) => (node.kind === "text" && node.textStyle
-            ? { textStyle: { ...node.textStyle, size: doc.textStyles[0].size, weight: doc.textStyles[0].weight, family: doc.textStyles[0].family, styleId: doc.textStyles[0].id } }
-            : { fill: { type: "solid", color: doc.colors[0].value } }))), "Applied a style to the selection"),
-        },
-        { id: "inspect contrast", label: "Contrast check", placement: "secondary", run: (context) => context.openOverlay("style impact") },
+        { id: "apply to selection", label: "Apply a style to the selection…", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("apply style") },
+        { id: "inspect contrast", label: "Inspect contrast", placement: "secondary", run: (context) => context.openOverlay("style impact") },
       ],
       overlays: [
         { id: "Font browser", kind: "drawer", title: "Fonts", width: 420, render: () => <FontBrowser /> },
         { id: "gradient editor", kind: "modal", title: "Gradient", width: 520, render: ({ ...context }) => <GradientEditor context={context} /> },
         { id: "style impact", kind: "drawer", title: "Style impact", width: 440, render: ({ ...context }) => <StyleImpact context={context} /> },
+        { id: "token editor", kind: "modal", title: "Edit a colour token", width: 520, render: ({ close, ...context }) => <TokenEditor context={context} close={close} />, footer: submitFooter("design-token-editor", "Save the token") },
+        { id: "apply style", kind: "modal", title: "Apply a style", width: 520, render: ({ close, ...context }) => <ApplyStyle context={context} close={close} /> },
       ],
     },
 
@@ -2393,10 +2914,20 @@ registerApp({
         render: (context: ScreenContext) => <PrototypeScreen context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Link screens", label: "Link screens", placement: "primary", run: (context) => { setTool("link"); context.navigate(context.path("/o/:org/design/files/:id", context.params.id) + "?tab=Prototype"); } },
-        { id: "set trigger", label: "Interaction editor", placement: "secondary", run: (context) => context.openOverlay("Interaction editor") },
+        { id: "Link screens", label: "Link screens…", placement: "primary", guard: (context) => (openDesign(context) ? undefined : "Open a file first"), run: (context) => context.openOverlay("link screens") },
+        { id: "link tool", label: "Link on the canvas", placement: "overflow", run: (context) => { setTool("link"); context.navigate(context.path("/o/:org/design/files/:id", context.params.id) + "?tab=Prototype"); } },
+        {
+          id: "set trigger", label: "Set the trigger…", placement: "secondary",
+          guard: (context) => {
+            const doc = openDesign(context);
+            const node = doc ? activePage(doc).nodes[designUi.get().selected[0]] : undefined;
+            if (!node) return "Select a linked layer first";
+            return node.link ? undefined : "Link the layer to a screen first";
+          },
+          run: (context) => context.openOverlay("Interaction editor"),
+        },
         { id: "run preview", label: "Run the preview", placement: "secondary", run: (context) => context.setTab("Preview") },
-        { id: "publish prototype", label: "Publish", placement: "overflow", run: (context) => context.openOverlay("device preview") },
+        { id: "publish prototype", label: "Publish the prototype…", placement: "overflow", run: (context) => context.openOverlay("publish prototype") },
       ],
       overlays: [
         { id: "Interaction editor", kind: "drawer", title: "Interaction", width: 420, render: ({ ...context }) => <InteractionOverlay context={context} /> },
@@ -2412,6 +2943,8 @@ registerApp({
           </Stack>
         ) },
         { id: "device preview", kind: "modal", title: "Device and publication", width: 560, render: ({ ...context }) => <DevicePreview context={context} /> },
+        { id: "link screens", kind: "modal", title: "Link screens", width: 480, render: ({ close, ...context }) => <LinkScreens context={context} close={close} />, footer: submitFooter("design-link-screens", "Link") },
+        { id: "publish prototype", kind: "modal", title: "Publish the prototype", width: 520, render: ({ close, ...context }) => <PublishPrototype context={context} close={close} />, footer: submitFooter("design-publish-prototype", "Queue for publishing") },
       ],
     },
 
@@ -2424,19 +2957,26 @@ registerApp({
       actions: [
         { id: "Replace asset", label: "Add or replace an asset", placement: "primary", run: (context) => context.openOverlay("Asset picker") },
         {
-          id: "crop", label: "Crop an asset", placement: "overflow",
-          run: (context) => { context.openOverlay("Asset picker"); context.toast("Cropping", "Assets are cropped in the photo editor, which works on real pixels. Add the asset here, then open it in Photo."); },
+          id: "crop", label: "Crop an asset…", placement: "overflow",
+          guard: (context) => (openDesign(context)?.assets.some((asset) => asset.kind === "image" && asset.src) ? undefined : "No image asset with pixels to crop"),
+          run: (context) => context.openOverlay("crop asset"),
         },
-        { id: "batch export", label: "Export settings", placement: "secondary", run: (context) => context.openOverlay("export settings") },
         {
-          id: "organize", label: "Sort assets by name", placement: "overflow",
-          run: (context) => withDoc(context, (doc) => ({ ...doc, assets: [...doc.assets].sort((a, b) => a.name.localeCompare(b.name)) }), "Sorted the assets"),
+          id: "batch export", label: "Batch export", placement: "secondary",
+          guard: (context) => (openDesign(context)?.exports.length ? undefined : "Add export settings on the Exports tab first"),
+          run: (context) => batchExport(context),
+        },
+        { id: "export settings", label: "Export settings", placement: "overflow", run: (context) => context.openOverlay("export settings") },
+        {
+          id: "organize", label: "Organise: sort the assets by name", placement: "overflow",
+          run: (context) => withDoc(context, (doc) => ({ ...doc, assets: [...doc.assets].sort((a, b) => a.name.localeCompare(b.name)) }), "Sort the assets by name"),
         },
       ],
       overlays: [
         { id: "Asset picker", kind: "modal", title: "Add an asset", width: 520, render: ({ close, ...context }) => <AssetPicker context={context} close={close} /> },
         { id: "export settings", kind: "modal", title: "Export settings", width: 520, render: ({ ...context }) => <ExportOverlay context={context} /> },
         { id: "license note", kind: "drawer", title: "Licence", width: 400, render: ({ ...context }) => <LicenceNote context={context} /> },
+        { id: "crop asset", kind: "modal", title: "Crop an asset", width: 560, render: ({ close, ...context }) => <CropAsset context={context} close={close} />, footer: submitFooter("design-crop-asset", "Crop") },
       ],
     },
 
@@ -2448,27 +2988,30 @@ registerApp({
       })),
       actions: [
         { id: "Annotate", label: "Annotate", placement: "primary", run: (context) => context.openOverlay("Comment editor") },
-        { id: "approve", label: "Record a decision", placement: "secondary", run: (context) => context.openOverlay("signoff") },
-        { id: "compare", label: "Compare versions", placement: "secondary", run: (context) => context.setTab("Diff") },
+        { id: "approve", label: "Approve this version", placement: "secondary", run: (context) => context.openOverlay("signoff", { state: "approved" }) },
+        { id: "compare", label: "Compare versions", placement: "secondary", run: (context) => context.openOverlay("version compare") },
         {
           id: "assign fixes", label: "Assign the open comments", placement: "overflow",
           run: async (context) => {
             const id = context.params.id;
-            if (!id) return;
+            const doc = openDesign(context) ?? await readShared<DesignDoc>(context, parseDesign);
+            if (!id || !doc) return;
             const { db } = await import("@/runtime/db");
             const record = await db.records.get(id);
             if (!record) return;
-            const doc = parseDesign(record.body);
-            const open = doc.comments.filter((comment) => !comment.resolved);
-            if (open.length === 0) { context.toast("Nothing to assign", "No open comments on this file.", "info"); return; }
+            const open = doc.comments.filter((comment) => !comment.resolved && !comment.taskId);
+            if (open.length === 0) { context.toast("Nothing to assign", "Every open comment already has a task, or none is open.", "info"); return; }
+            const made: Record<string, string> = {};
             for (const comment of open) {
-              await context.mutate.create({
+              const task = await context.mutate.create({
                 collection: "tasks", title: `Design fix: ${comment.text.slice(0, 60) || "comment"} (${record.title})`,
                 status: "todo", summary: `From a comment pin on ${record.title} at ${Math.round(comment.x)}, ${Math.round(comment.y)}.`,
                 parentId: record.id, fields: { assignee: context.actor, source: "design review" },
               }, "Design fix task created");
+              made[comment.id] = task.id;
             }
-            context.toast("Assigned", `${open.length} task${open.length === 1 ? "" : "s"} created in Projects, each linked to this file.`);
+            await withDoc(context, (current) => ({ ...current, comments: current.comments.map((comment) => (made[comment.id] ? { ...comment, taskId: made[comment.id] } : comment)) }), "Link the comments to their tasks");
+            context.toast("Assigned", `${open.length} task${open.length === 1 ? "" : "s"} created in Projects for ${context.actor}, each linked to this file.`);
           },
         },
       ],
@@ -2845,7 +3388,7 @@ function VariantEditor({ context, close }: { context: ScreenContext; close: () =
   const [values, setValues] = useState("default, hover, disabled");
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const doc = handle.doc;
-  const component = doc.components.find((item) => item.id === ui.selected[0]) ?? doc.components[0];
+  const component = doc.components.find((item) => item.id === (activePage(doc).nodes[ui.selected[0]]?.componentId ?? ui.selected[0])) ?? doc.components[0];
   if (!component) return <Empty title="No components yet">Create one from a frame first.</Empty>;
   return (
     <form
@@ -2875,7 +3418,7 @@ function PublishComponent({ context, close }: { context: ScreenContext; close: (
   const ui = useStore(designUi);
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const doc = handle.doc;
-  const component = doc.components.find((item) => item.id === ui.selected[0]) ?? doc.components.find((item) => !item.published) ?? doc.components[0];
+  const component = doc.components.find((item) => item.id === (activePage(doc).nodes[ui.selected[0]]?.componentId ?? ui.selected[0])) ?? doc.components.find((item) => !item.published) ?? doc.components[0];
   if (!component) return <Empty title="Nothing to publish" />;
   const uses = instancesOf(doc, component.id);
   return (
@@ -2909,8 +3452,8 @@ function BreakingChange({ context }: { context: ScreenContext }) {
   const ui = useStore(designUi);
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const doc = handle.doc;
-  const component = doc.components.find((item) => item.id === ui.selected[0]) ?? doc.components[0];
-  if (!component) return <Empty title="No component selected" />;
+  const component = doc.components.find((item) => item.id === (activePage(doc).nodes[ui.selected[0]]?.componentId ?? ui.selected[0]));
+  if (!component) return <Empty title="No component selected">Select an instance to see every place its component is used.</Empty>;
   const uses = instancesOf(doc, component.id);
   return (
     <Stack gap={3}>
@@ -3176,7 +3719,8 @@ function CommentEditor({ context, close }: { context: ScreenContext; close: () =
 
 function SignOff({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, handle } = useDesignDoc(context);
-  const [state, setState] = useState<"approved" | "changes" | "pending">("approved");
+  const preset = (context.overlayPayload as { state?: "approved" | "changes" | "pending" } | undefined)?.state;
+  const [state, setState] = useState<"approved" | "changes" | "pending">(preset ?? "approved");
   const [note, setNote] = useState("");
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   return (
@@ -3187,13 +3731,14 @@ function SignOff({ context, close }: { context: ScreenContext; close: () => void
         event.preventDefault();
         handle.edit((current) => ({
           ...current,
-          reviews: [{ id: `r-${Date.now().toString(36)}`, version: record.revision, by: context.actor, at: new Date().toISOString(), state, note }, ...current.reviews],
+          reviews: [{ id: `r-${Date.now().toString(36)}`, version: record.revision, digest: designDigest(current), by: context.actor, at: new Date().toISOString(), state, note }, ...current.reviews],
         }), "Record a review");
-        context.toast("Decision recorded", `Bound to revision ${record.revision}. A later edit will show the approval as out of date.`);
+        void context.mutate.log(`Design review: ${state} by ${context.actor}, version ${designDigest(handle.doc!)}`, { entityId: record.id, type: "approve" });
+        context.toast("Decision recorded", `Bound to version ${designDigest(handle.doc!)} of the design. Any later edit changes it, and the approval then shows as given for an earlier version.`);
         close();
       }}
     >
-      <Notice tone="info" title={`This decision binds to revision ${record.revision}`}>
+      <Notice tone="info" title={`This decision binds to version ${designDigest(handle.doc)} (revision ${record.revision})`}>
         It does not carry forward to future edits. The reviews tab shows when an approval no longer covers the current file.
       </Notice>
       <Field label="Decision">

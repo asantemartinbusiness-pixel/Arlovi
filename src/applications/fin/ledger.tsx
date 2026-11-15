@@ -72,8 +72,11 @@ export function JournalForm({ context, close }: { context: ScreenContext; close:
     try {
       const body = { date, memo: memo || "Journal entry", lines: lines.map(({ key: _key, ...line }) => line) };
       const amount = lines.reduce((sum, line) => sum + line.debitMinor, 0);
+      const recheck = checkPosting({ lines, period: periodOf(date), locked: data.locked, accounts: data.accounts });
+      if (post && recheck.reason) { setError(recheck.reason); setBusy(undefined); return; }
       const fields: Record<string, string | number | boolean> = { date, source: "manual" };
       if (reference) fields.reference = reference;
+      if (post) { fields.postedBy = context.actor; fields.postedAt = new Date().toISOString(); }
       if (existing) {
         const saved = await context.mutate.patch(existing.id, {
           title: memo || existing.title,
@@ -273,7 +276,7 @@ function PostedJournal({ context, journal, close }: { context: ScreenContext; jo
         { label: "Ledger date", value: <span className="ds-num">{context.date(journalDate(journal))}</span> },
         { label: "Period", value: periodOf(journalDate(journal)) },
         { label: "Status", value: <Pill tone={journal.status === "reversed" ? "warning" : "success"} dot>{journal.status}</Pill> },
-        { label: "Posted by", value: journal.updatedBy },
+        { label: "Posted by", value: String(journal.fields.postedBy ?? journal.createdBy ?? journal.updatedBy) },
         { label: "Narrative", value: journalMemo(journal) },
         ...(reverses ? [{ label: "Reverses", value: reverses }] : []),
         ...(reversal ? [{ label: "Reversed by", value: reversal.title }] : []),
@@ -452,7 +455,7 @@ export function LedgerJournals({ context }: { context: ScreenContext }) {
                 if (journal.status !== "draft") continue;
                 const check = checkPosting({ lines: journalLines(journal), period: periodOf(journalDate(journal)), locked: data.locked, accounts: data.accounts });
                 if (check.reason) { refused += 1; continue; }
-                await context.mutate.patch(journal.id, { status: "posted" }, { expectRevision: journal.revision, event: `Posted journal ${journal.title}` });
+                await context.mutate.patch(journal.id, { status: "posted", fields: { ...journal.fields, postedBy: context.actor, postedAt: new Date().toISOString() } }, { expectRevision: journal.revision, event: `Posted journal ${journal.title}` });
                 posted += 1;
               }
               context.toast(

@@ -5,7 +5,7 @@ import { forecast, stageOf, type Forecast, type Stage } from "@/domain/crm-pipel
 
 const COLLECTIONS = [
   "deals", "contacts", "companies", "leads", "quotes", "activities", "invoices",
-  "workflows", "workflowRuns", "campaigns", "tickets", "templates", "emailThreads", "messages", "members",
+  "workflows", "workflowRuns", "campaigns", "tickets", "templates", "emailThreads", "messages", "members", "preferences",
 ];
 
 export interface CrmData {
@@ -24,6 +24,7 @@ export interface CrmData {
   threads: Rec[];
   messages: Rec[];
   members: Rec[];
+  preferences: Rec[];
   forecast: Forecast;
   owners: string[];
 }
@@ -34,7 +35,8 @@ export function useCrmData(): CrmData {
   void org;
   return useMemo(() => ({
     deals: data.deals,
-    contacts: data.contacts,
+    // A merged-away contact is kept as evidence but is no longer a live record.
+    contacts: data.contacts.filter((contact) => contact.status !== "merged"),
     companies: data.companies,
     leads: data.leads,
     quotes: data.quotes,
@@ -48,6 +50,7 @@ export function useCrmData(): CrmData {
     threads: data.emailThreads,
     messages: data.messages,
     members: data.members,
+    preferences: data.preferences,
     forecast: forecast(data.deals),
     owners: [...new Set(data.deals.map((deal) => String(deal.fields.owner ?? deal.ownerName)))].sort(),
   }), [data]);

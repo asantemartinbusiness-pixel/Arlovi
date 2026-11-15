@@ -267,3 +267,47 @@ export function authorisationSteps(entry: ConnectorEntry): WizardStep[] {
     { id: "verify", title: "Verify with a read", detail: "A connection counts as working only after one real read succeeds.", state: "blocked" },
   ];
 }
+
+/* ------------------------- Custom adapters ------------------------- */
+
+export interface AdapterOperation { name: string; kind: string; scopes: string[]; localEquivalent: string }
+
+export function adapterOperations(body: unknown): AdapterOperation[] {
+  const row = body && typeof body === "object" ? (body as { operations?: unknown }) : {};
+  if (!Array.isArray(row.operations)) return [];
+  return row.operations.map((raw) => {
+    const item = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+    return {
+      name: typeof item.name === "string" ? item.name : "",
+      kind: typeof item.kind === "string" ? item.kind : "",
+      scopes: Array.isArray(item.scopes) ? item.scopes.filter((scope): scope is string => typeof scope === "string") : [],
+      localEquivalent: typeof item.localEquivalent === "string" ? item.localEquivalent : "",
+    };
+  });
+}
+
+/** Problems with one declaration, checked against the operation contract. */
+export function declarationProblems(row: Record<string, unknown>): string[] {
+  const problems: string[] = [];
+  if (typeof row.name !== "string" || !/^[a-z][a-z0-9_]*$/.test(row.name)) problems.push("name is required: lower case letters, digits and underscores.");
+  if (!["action", "read", "webhook"].includes(String(row.kind))) problems.push('kind must be "action", "read" or "webhook".');
+  if (!Array.isArray(row.scopes) || row.scopes.length === 0) problems.push("scopes must list at least one scope.");
+  if (typeof row.localEquivalent !== "string" || !row.localEquivalent) problems.push("localEquivalent is required: every operation must say what happens while it is not connected.");
+  return problems;
+}
+
+/** Contract tests over an adapter's real declarations. A live call is never claimed. */
+export function adapterChecks(operations: AdapterOperation[]): { label: string; state: "pass" | "fail"; detail: string }[] {
+  const names = operations.map((operation) => operation.name);
+  const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
+  const actionsWithoutWrite = operations.filter((operation) => operation.kind === "action" && !operation.scopes.some((scope) => /write|send|create|update|delete/i.test(scope)));
+  const noLocal = operations.filter((operation) => !operation.localEquivalent);
+  const badKind = operations.filter((operation) => !["action", "read", "webhook"].includes(operation.kind));
+  return [
+    { label: "At least one operation is declared", state: operations.length ? "pass" : "fail", detail: `${operations.length} declared` },
+    { label: "Operation names are unique within the adapter", state: duplicates.length ? "fail" : "pass", detail: duplicates.length ? `Repeated: ${[...new Set(duplicates)].join(", ")}` : "No repeats" },
+    { label: "Every operation has a valid kind", state: badKind.length ? "fail" : "pass", detail: badKind.length ? badKind.map((operation) => operation.name).join(", ") : "action, read or webhook" },
+    { label: "Every action declares a write scope", state: actionsWithoutWrite.length ? "fail" : "pass", detail: actionsWithoutWrite.length ? actionsWithoutWrite.map((operation) => operation.name).join(", ") : "Each action names one" },
+    { label: "Every operation names a local equivalent", state: noLocal.length ? "fail" : "pass", detail: noLocal.length ? noLocal.map((operation) => operation.name).join(", ") : "Each says what happens while not connected" },
+  ];
+}

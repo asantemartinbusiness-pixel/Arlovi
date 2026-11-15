@@ -533,7 +533,7 @@ export function DashboardEditor({ context }: { context: ScreenContext }) {
   );
 }
 
-function CrossWidgetCheck({ body }: { body: DashboardBody }) {
+export function CrossWidgetCheck({ body }: { body: DashboardBody }) {
   const mismatches = body.filters.flatMap((filter) => {
     const dimension = dimensionById(filter.dimensionId);
     if (!dimension) return [];

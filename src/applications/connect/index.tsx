@@ -2,13 +2,20 @@ import { Boxes, HeartPulse, Plug, Receipt, RefreshCcw, Shapes, Wand2 } from "luc
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { closeFooter, submitFooter } from "@/applications/t6kit/kit";
 import {
-  ActionReceipts, CapabilityInspector, CapabilityRegistry, ConflictResolver, ConnectionDetail,
+  ActionReceipts, CapabilityInspector, CapabilityRegistry, ConnectionDetail,
   ConnectionWizard, Connections, ConnectorDetail, ConnectorHealth, ConnectorPreview, ConsentStatus,
   CustomConnectors, ExternalOAuth, MappingEditor, Marketplace, ProviderEvidence, ReceiptDetail,
   RetryReview, RevokeGrant, RiskSummary, ScopeReview, SyncCentre,
 } from "./panels";
 import { CONNECTOR_ENTRIES } from "./catalog";
 import { Button, Notice, Properties, Stack } from "@/design-system";
+import { openAct } from "@/applications/t6kit/act";
+import {
+  CompareConnectors, ProviderLimits, SchemaDiff, attemptAuthorisation, cancelAuthorisation, chooseTargetsOverlay,
+  contactOwner, createAdapter, disableOverlay, exportReceipts, installConnector, limitAgentsOverlay, openConnectorIncident,
+  openMission, reconcileReceipts, reconnectConnection, registerAction, requestCapability, resolveConflict, retireOperation,
+  retrySync, rotateAuth, runAdapterTests, runHealthTest, submitAdapter, testConnection, testMock, transferOwner,
+} from "./actions";
 
 /* ====================================================================== *
  * CONNECT — Integrations & Connectors
@@ -18,26 +25,6 @@ import { Button, Notice, Properties, Stack } from "@/design-system";
  * walks to the point where it cannot continue and says why.
  * ====================================================================== */
 
-function InstallWizard({ context }: { context: ScreenContext }) {
-  const payload = context.overlayPayload as { id?: string } | undefined;
-  const entry = CONNECTOR_ENTRIES.find((item) => item.capability.id === payload?.id) ?? CONNECTOR_ENTRIES[0];
-  return (
-    <Stack gap={3}>
-      <Notice tone="warning" title="There is nothing to install">
-        A connector is not software that is installed here; it is an authorisation held against a provider account. Without a server to complete that authorisation, installing would only set a label.
-      </Notice>
-      <Properties rows={[
-        { label: "Capability", value: entry.capability.label },
-        { label: "Provider", value: entry.capability.provider },
-        { label: "Would request", value: <span className="ds-num">{`${entry.scopes.length} scopes`}</span> },
-        { label: "Instead", value: entry.capability.localEquivalent },
-      ]} />
-      <Button variant="secondary" onClick={() => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/connect/connect/${entry.capability.id}`); }}>
-        Walk the authorisation and see where it stops
-      </Button>
-    </Stack>
-  );
-}
 
 function ScopeChangePanel({ context }: { context: ScreenContext }) {
   return (
@@ -106,20 +93,6 @@ function MitigationPanel({ context }: { context: ScreenContext }) {
   );
 }
 
-function ApprovalPanel({ context }: { context: ScreenContext }) {
-  return (
-    <Stack gap={3}>
-      <Notice tone="info" title="Approval widens what agents may ask for">
-        Publishing an adapter adds operations to the registry. That is a decision a person makes, and it is recorded, because an agent will later choose an operation by name.
-      </Notice>
-      <Button variant="primary" onClick={async () => {
-        await context.mutate.log("Custom adapter submitted for approval. It cannot be used until a person approves it and a provider exists.", { type: "capability", capability: "configuration_required" });
-        context.toast("Submitted", "The submission is recorded in the receipts as awaiting approval.", "blocked");
-        context.closeOverlay();
-      }}>Submit for approval</Button>
-    </Stack>
-  );
-}
 
 export const connectApp = registerApp({
   code: "CONNECT",
@@ -155,13 +128,15 @@ export const connectApp = registerApp({
       })),
       actions: [
         { id: "Browse", label: "Browse by category", placement: "primary", run: (context) => context.setTab("Categories") },
-        { id: "inspect requirements", label: "What one needs", placement: "secondary", run: (context) => context.openOverlay("Connector preview") },
-        { id: "compare", label: "Capability registry", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/connect/capabilities`) },
+        { id: "inspect requirements", label: "Inspect requirements", placement: "secondary", run: (context) => context.openOverlay("Connector preview") },
+        { id: "compare", label: "Compare connectors", placement: "overflow", run: (context) => context.openOverlay("compare connectors") },
         { id: "install", label: "Install", placement: "overflow", run: (context) => context.openOverlay("install wizard") },
+        { id: "capability registry", label: "Capability registry", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/connect/capabilities`) },
       ],
       overlays: [
         { id: "Connector preview", kind: "drawer", title: "Connector", width: 520, render: ({ ...context }) => <ConnectorPreview context={context} /> },
-        { id: "install wizard", kind: "modal", title: "Install", width: 560, render: ({ ...context }) => <InstallWizard context={context} />, footer: closeFooter() },
+        installConnector,
+        { id: "compare connectors", kind: "modal", title: "Compare connectors", width: 820, render: ({ ...context }) => <CompareConnectors context={context} />, footer: closeFooter() },
         { id: "risk summary", kind: "modal", title: "Risk", width: 560, render: ({ ...context }) => <RiskSummary context={context} />, footer: closeFooter() },
       ],
     },
@@ -176,14 +151,18 @@ export const connectApp = registerApp({
       })),
       actions: [
         { id: "Connect", label: "Connect", placement: "primary", run: (context) => context.navigate(`/o/${context.org.slug}/connect/connect/${context.params.id ?? CONNECTOR_ENTRIES[0].capability.id}`) },
-        { id: "test", label: "Authorisation preview", placement: "secondary", run: (context) => context.openOverlay("Authorization preview") },
-        { id: "view docs", label: "Provider limits", placement: "overflow", run: (context) => context.openOverlay("provider limits") },
-        { id: "request capability", label: "Scopes explained", placement: "overflow", run: (context) => context.openOverlay("scope explanation") },
+        { id: "test", label: "Test the connection", placement: "secondary", run: (context) => context.openOverlay("test connection") },
+        { id: "view docs", label: "View the documentation", placement: "overflow", run: (context) => context.setTab("Help") },
+        { id: "request capability", label: "Request a capability", placement: "overflow", run: (context) => context.openOverlay("request capability") },
+        { id: "authorisation preview", label: "Authorisation preview", placement: "overflow", run: (context) => context.openOverlay("Authorization preview") },
+        { id: "provider limits", label: "Provider limits", placement: "overflow", run: (context) => context.openOverlay("provider limits") },
+        { id: "scopes explained", label: "Scopes explained", placement: "overflow", run: (context) => context.openOverlay("scope explanation") },
       ],
       overlays: [
         { id: "Authorization preview", kind: "drawer", title: "Authorisation", width: 560, render: ({ ...context }) => <ExternalOAuth context={context} /> },
         { id: "scope explanation", kind: "drawer", title: "Scopes", width: 520, render: ({ ...context }) => <ScopeReview context={context} /> },
-        { id: "provider limits", kind: "modal", title: "Provider limits", width: 560, render: ({ ...context }) => <RiskSummary context={context} />, footer: closeFooter() },
+        { id: "provider limits", kind: "modal", title: "Provider limits", width: 560, render: ({ ...context }) => <ProviderLimits context={context} />, footer: closeFooter() },
+        testConnection, requestCapability,
       ],
     },
 
@@ -196,13 +175,14 @@ export const connectApp = registerApp({
         render: (context: ScreenContext) => <ConnectionWizard context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Authorize", label: "Attempt the authorisation", placement: "primary", run: (context) => context.setTab("Test") },
-        { id: "choose targets", label: "Review the scopes", placement: "secondary", run: (context) => context.openOverlay("scope review") },
-        { id: "test", label: "Consent record", placement: "overflow", run: (context) => context.openOverlay("consent status") },
-        { id: "cancel", label: "Leave it unconnected", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/connect/marketplace`) },
+        { id: "Authorize", label: "Authorise", placement: "primary", run: (context) => context.openOverlay("External OAuth") },
+        { id: "choose targets", label: "Choose the scopes to request", placement: "secondary", run: (context) => context.openOverlay("choose targets") },
+        { id: "test", label: "Test the connection", placement: "overflow", run: (context) => context.openOverlay("test connection") },
+        { id: "cancel", label: "Cancel and leave it unconnected", placement: "overflow", run: (context) => context.openOverlay("cancel authorisation") },
+        { id: "consent record", label: "Consent record", placement: "overflow", run: (context) => context.openOverlay("consent status") },
       ],
       overlays: [
-        { id: "External OAuth", kind: "modal", title: "Leaving for the provider", tone: "danger", width: 560, render: ({ ...context }) => <ExternalOAuth context={context} />, footer: closeFooter() },
+        attemptAuthorisation, chooseTargetsOverlay(), testConnection, cancelAuthorisation,
         { id: "scope review", kind: "drawer", title: "Scopes", width: 540, render: ({ ...context }) => <ScopeReview context={context} /> },
         { id: "consent status", kind: "drawer", title: "Consent", width: 520, render: ({ ...context }) => <ConsentStatus context={context} /> },
       ],
@@ -222,15 +202,17 @@ export const connectApp = registerApp({
           guard: (context) => (context.selectedId ? undefined : "Select a connection first"),
           run: (context) => context.navigate(`/o/${context.org.slug}/connect/connections/${context.selectedId}`),
         },
-        { id: "reconnect", label: "Reconnect", placement: "secondary", run: (context) => context.openOverlay("reconnect") },
-        { id: "suspend", label: "Scope change", placement: "overflow", run: (context) => context.openOverlay("scope change") },
-        { id: "transfer owner", label: "Revoke", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("revoke grant") },
+        { id: "reconnect", label: "Reconnect", placement: "secondary", run: openAct("reconnect") },
+        { id: "suspend", label: "Suspend", placement: "overflow", tone: "danger", run: openAct("suspend connection") },
+        { id: "transfer owner", label: "Transfer owner", placement: "overflow", run: openAct("transfer owner") },
+        { id: "scope change", label: "Scope change", placement: "overflow", run: (context) => context.openOverlay("scope change") },
+        { id: "revoke", label: "Revoke", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("revoke grant") },
       ],
       overlays: [
         { id: "Account inspector", kind: "drawer", title: "Account", width: 520, render: ({ ...context }) => <ConsentStatus context={context} /> },
         { id: "scope change", kind: "modal", title: "Change scopes", width: 520, render: ({ ...context }) => <ScopeChangePanel context={context} />, footer: closeFooter() },
         { id: "revoke grant", kind: "modal", title: "Revoke", tone: "danger", width: 520, render: ({ ...context }) => <RevokeGrant context={context} />, footer: closeFooter() },
-        { id: "reconnect", kind: "modal", title: "Reconnect", width: 520, render: ({ ...context }) => <ReconnectDialog context={context} />, footer: closeFooter() },
+        reconnectConnection, transferOwner, disableOverlay("suspend connection", "Suspend", "suspended"),
       ],
     },
 
@@ -243,16 +225,18 @@ export const connectApp = registerApp({
         render: (context: ScreenContext) => <ConnectionDetail context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Test", label: "Run a health test", placement: "primary", run: (context) => context.navigate(`/o/${context.org.slug}/connect/health`) },
-        { id: "limit agents", label: "What agents may use", placement: "secondary", run: (context) => context.setTab("Capabilities") },
-        { id: "rotate auth", label: "Keys and grant", placement: "overflow", run: (context) => context.setTab("Security") },
-        { id: "disable", label: "Revoke", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("revoke grant") },
+        { id: "Test", label: "Test this connection", placement: "primary", run: (context) => context.openOverlay("test connection") },
+        { id: "limit agents", label: "Limit what agents may use", placement: "secondary", run: (context) => context.openOverlay("limit agents") },
+        { id: "rotate auth", label: "Rotate the authorisation", placement: "overflow", run: (context) => context.openOverlay("rotate auth") },
+        { id: "disable", label: "Disable", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("disable connection") },
+        { id: "revoke", label: "Revoke", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("revoke grant") },
       ],
       overlays: [
         { id: "Permission matrix", kind: "drawer", title: "Permissions", width: 620, render: ({ ...context }) => <ConnectorDetail context={context} lens="Permissions" /> },
         { id: "health run", kind: "modal", title: "Health test", width: 560, render: ({ ...context }) => <HealthReport context={context} />, footer: closeFooter() },
         { id: "reconnect dialog", kind: "modal", title: "Reconnect", width: 520, render: ({ ...context }) => <ReconnectDialog context={context} />, footer: closeFooter() },
         { id: "revoke grant", kind: "modal", title: "Revoke", tone: "danger", width: 520, render: ({ ...context }) => <RevokeGrant context={context} />, footer: closeFooter() },
+        testConnection, limitAgentsOverlay(), rotateAuth, disableOverlay("disable connection", "Disable", "disabled"),
       ],
     },
 
@@ -266,33 +250,15 @@ export const connectApp = registerApp({
       })),
       actions: [
         { id: "Inspect schema", label: "Inspect a schema", placement: "primary", run: (context) => context.openOverlay("Capability inspector") },
-        { id: "compare", label: "Versions", placement: "secondary", run: (context) => context.setTab("Versions") },
-        { id: "test mock", label: "Why a mock is not offered", placement: "overflow", run: (context) => context.openOverlay("schema diff") },
-        { id: "retire", label: "Version impact", placement: "overflow", run: (context) => context.openOverlay("version impact") },
+        { id: "compare", label: "Compare schemas", placement: "secondary", run: (context) => context.openOverlay("schema diff") },
+        { id: "test mock", label: "Test against the mock", placement: "overflow", run: (context) => context.openOverlay("test mock") },
+        { id: "retire", label: "Retire an operation", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("version impact") },
+        { id: "versions", label: "Versions", placement: "overflow", run: (context) => context.setTab("Versions") },
       ],
       overlays: [
         { id: "Capability inspector", kind: "drawer", title: "Capability", width: 560, render: ({ ...context }) => <CapabilityInspector context={context} /> },
-        {
-          id: "schema diff", kind: "modal", title: "Mock responses", width: 560,
-          render: () => (
-            <Notice tone="warning" title="No mock response is offered">
-              A mock would produce data that looks like a provider answered. Every surface here would then be showing an invented figure. The registry shows the schema instead, and nothing pretends to return rows.
-            </Notice>
-          ),
-          footer: closeFooter(),
-        },
-        {
-          id: "version impact", kind: "modal", title: "Version impact", width: 560,
-          render: ({ ...context }) => (
-            <Stack gap={3}>
-              <Notice tone="info" title="Raising a contract version is a breaking change for missions">
-                A mission names an operation. If the operation's shape changes, every mission that uses it has to be reviewed. That is why the version sits on the contract rather than on the provider.
-              </Notice>
-              <Button variant="secondary" onClick={() => context.setTab("Versions")}>See the versions</Button>
-            </Stack>
-          ),
-          footer: closeFooter(),
-        },
+        { id: "schema diff", kind: "modal", title: "Schema diff", width: 640, render: ({ ...context }) => <SchemaDiff context={context} />, footer: closeFooter() },
+        testMock, retireOperation,
       ],
     },
 
@@ -305,14 +271,13 @@ export const connectApp = registerApp({
         render: (context: ScreenContext) => <SyncCentre context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Retry safe sync", label: "Retry", placement: "primary", run: (context) => context.openOverlay("run receipt") },
-        { id: "change mapping", label: "Edit a mapping", placement: "secondary", run: (context) => context.openOverlay("Mapping editor") },
-        { id: "inspect conflict", label: "Conflicts", placement: "overflow", run: (context) => context.setTab("Conflicts") },
+        { id: "Retry safe sync", label: "Retry a safe sync", placement: "primary", run: (context) => context.openOverlay("run receipt") },
+        { id: "change mapping", label: "Change a mapping", placement: "secondary", run: (context) => context.openOverlay("Mapping editor") },
+        { id: "inspect conflict", label: "Inspect a conflict", placement: "overflow", run: (context) => { context.setTab("Conflicts"); context.openOverlay("conflict resolver"); } },
       ],
       overlays: [
         { id: "Mapping editor", kind: "modal", title: "Mapping", width: 560, render: ({ close, ...context }) => <MappingEditor context={context} close={close} />, footer: submitFooter("mapping-editor", "Record the mapping") },
-        { id: "conflict resolver", kind: "drawer", title: "Conflict", width: 520, render: ({ ...context }) => <ConflictResolver context={context} /> },
-        { id: "run receipt", kind: "modal", title: "Retry", width: 520, render: ({ ...context }) => <RetryReview context={context} />, footer: closeFooter() },
+        resolveConflict, retrySync,
       ],
     },
 
@@ -325,14 +290,16 @@ export const connectApp = registerApp({
         render: (context: ScreenContext) => <ConnectorHealth context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Run health test", label: "Run the health test", placement: "primary", run: (context) => context.setTab("Overview") },
-        { id: "open incident", label: "Open an incident", placement: "secondary", run: (context) => context.navigate(`/o/${context.org.slug}/it/incidents`) },
-        { id: "contact owner", label: "Mitigation", placement: "overflow", run: (context) => context.openOverlay("mitigation") },
+        { id: "Run health test", label: "Run the health test", placement: "primary", run: (context) => runHealthTest(context) },
+        { id: "open incident", label: "Open an incident", placement: "secondary", run: (context) => context.openOverlay("open incident") },
+        { id: "contact owner", label: "Contact the owner", placement: "overflow", run: (context) => context.openOverlay("contact owner") },
+        { id: "mitigation", label: "Mitigation", placement: "overflow", run: (context) => context.openOverlay("mitigation") },
       ],
       overlays: [
         { id: "Health report", kind: "modal", title: "Health report", width: 560, render: ({ ...context }) => <HealthReport context={context} />, footer: closeFooter() },
         { id: "reconnect request", kind: "modal", title: "Reconnect", width: 520, render: ({ ...context }) => <ReconnectDialog context={context} />, footer: closeFooter() },
         { id: "mitigation", kind: "drawer", title: "Mitigation", width: 620, render: ({ ...context }) => <MitigationPanel context={context} /> },
+        openConnectorIncident, contactOwner,
       ],
     },
 
@@ -345,10 +312,11 @@ export const connectApp = registerApp({
         render: (context: ScreenContext) => <CustomConnectors context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Create adapter", label: "New adapter", placement: "primary", run: (context) => context.setTab("Editor") },
-        { id: "test", label: "Contract tests", placement: "secondary", run: (context) => context.setTab("Tests") },
-        { id: "register action", label: "Validate a declaration", placement: "overflow", run: (context) => context.openOverlay("capability validation") },
+        { id: "Create adapter", label: "Create an adapter", placement: "primary", run: (context) => context.openOverlay("create adapter") },
+        { id: "test", label: "Run the contract tests", placement: "secondary", run: (context) => context.openOverlay("contract tests") },
+        { id: "register action", label: "Register an operation", placement: "overflow", run: (context) => context.openOverlay("capability validation") },
         { id: "submit for use", label: "Submit for approval", placement: "overflow", run: (context) => context.openOverlay("approval") },
+        { id: "editor", label: "Draft in the editor", placement: "overflow", run: (context) => context.setTab("Editor") },
       ],
       overlays: [
         {
@@ -367,11 +335,7 @@ export const connectApp = registerApp({
           ),
           footer: closeFooter(),
         },
-        {
-          id: "capability validation", kind: "drawer", title: "Validation", width: 560,
-          render: ({ ...context }) => <CustomConnectors context={context} lens="Tests" />,
-        },
-        { id: "approval", kind: "modal", title: "Approval", width: 520, render: ({ ...context }) => <ApprovalPanel context={context} />, footer: closeFooter() },
+        registerAction, submitAdapter, createAdapter, runAdapterTests,
       ],
     },
 
@@ -385,14 +349,16 @@ export const connectApp = registerApp({
       })),
       actions: [
         { id: "Inspect", label: "Inspect a receipt", placement: "primary", run: (context) => context.openOverlay("Receipt detail") },
-        { id: "export", label: "Export", placement: "secondary", capability: "export_data", run: (context) => context.toast("Export is in the table", "Use Export CSV in the toolbar so the file matches the tab you are reading.") },
-        { id: "reconcile", label: "Provider evidence", placement: "overflow", run: (context) => context.openOverlay("provider evidence") },
-        { id: "open mission", label: "Missions", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/mission/missions`) },
+        { id: "export", label: "Export", placement: "secondary", capability: "export_data", run: (context) => exportReceipts(context) },
+        { id: "reconcile", label: "Reconcile", placement: "overflow", run: (context) => context.openOverlay("reconcile receipts") },
+        { id: "open mission", label: "Open the mission", placement: "overflow", run: (context) => context.openOverlay("open mission") },
+        { id: "provider evidence", label: "Provider evidence", placement: "overflow", run: (context) => context.openOverlay("provider evidence") },
       ],
       overlays: [
         { id: "Receipt detail", kind: "drawer", title: "Receipt", width: 540, render: ({ ...context }) => <ReceiptDetail context={context} /> },
         { id: "provider evidence", kind: "modal", title: "Provider evidence", width: 520, render: () => <ProviderEvidence />, footer: closeFooter() },
         { id: "retry review", kind: "modal", title: "Retry", width: 520, render: ({ ...context }) => <RetryReview context={context} />, footer: closeFooter() },
+        reconcileReceipts, openMission,
       ],
     },
   },

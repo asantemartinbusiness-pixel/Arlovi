@@ -11,6 +11,18 @@ import {
   PositionEditor, Recruitment, Scheduling, SegmentedInspector, StaffingSummary, computePayroll,
 } from "./panels";
 import { RoleViewNote, submitFooter } from "./kit";
+import { kitOverlays, needsSelection } from "./opsKit";
+import {
+  AssignCourse, AssignReviewer, ApplicantMessage, BalanceAdjust, DirectoryFilter, MentorAssign, MetricDetail,
+  ProfileEditor, ReconcileRun, ScheduleInterview, StageDecision, TimeCorrection, acknowledgePolicy, acknowledgeReview,
+  approveHours, approveLeave, completeModule, declineLeave, exportRun, prepareRun, rescindQueuedGrants, submitReview,
+  swapShift, validateRun, verifyCompletion, viewEmployee,
+} from "./actions";
+import { listByCollection } from "@/platform/repo";
+
+function payrollRecords(context: ScreenContext, collection: string) {
+  return listByCollection(context.org.id, collection);
+}
 import "./hr.css";
 
 /** Focus a control the screen already renders, rather than faking an action. */
@@ -31,7 +43,9 @@ function MailBoundary() {
 
 function OffboardingConfirmation({ context, close }: { context: ScreenContext; close: () => void }) {
   const employee = useRecord(context.params.id);
+  const tasks = useCollections(["tasks"]).tasks;
   if (!employee) return <Empty title="Open an employee first" />;
+  const queued = tasks.filter((task) => task.fields.employeeId === employee.id && task.fields.group === "IT access" && task.status !== "done" && task.status !== "rescinded");
   return (
     <Stack gap={4}>
       <p className="ds-prose">
@@ -42,6 +56,7 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
         { label: "Record", value: employee.title },
         { label: "Current status", value: employee.status },
         { label: "Access grants affected", value: "All recorded grants" },
+        { label: "Queued grants rescinded", value: String(queued.length) },
       ]} />
       <Notice tone="warning" title="What this does not do">
         No identity provider is connected, so this records the decision. Someone still has to turn off the real accounts.
@@ -56,8 +71,9 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
               status: "alumni",
               endAt: new Date().toISOString(),
               fields: { ...employee.fields, accessRevoked: true },
-            }, { expectRevision: employee.revision, event: `${employee.title} offboarded; access grants recorded as revoked` });
-            context.toast("Offboarding recorded", `${employee.title} is now alumni and every grant is marked revoked.`);
+            }, { expectRevision: employee.revision, event: `${employee.title} offboarded by ${context.actor}; access grants recorded as revoked` });
+            const rescinded = await rescindQueuedGrants(context, employee.id, tasks);
+            context.toast("Offboarding recorded", `${employee.title} is now alumni, every grant is marked revoked and ${rescinded} queued grant${rescinded === 1 ? " was" : "s were"} rescinded.`);
             close();
           }}
         >
@@ -138,10 +154,14 @@ export const hrApp = registerApp({
       actions: [
         { id: "approve request", label: "Approve leave", placement: "primary", capability: "edit_people", run: (context) => context.openOverlay("leave approval") },
         { id: "start hire", label: "Start a hire", placement: "secondary", capability: "edit_people", run: (context) => context.openOverlay("new position") },
-        { id: "View employee", label: "Employee directory", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/hr/employees`) },
-        { id: "inspect metric", label: "Coverage detail", placement: "overflow", run: (context) => context.openOverlay("Staffing alert") },
+        { id: "View employee", label: "View an employee", placement: "overflow", run: (context) => viewEmployee(context) },
+        { id: "inspect metric", label: "Inspect a metric", placement: "overflow", run: (context) => context.openOverlay("metric detail") },
+        { id: "employee directory", label: "Employee directory", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/hr/employees`) },
+        { id: "coverage detail", label: "Coverage detail", placement: "overflow", run: (context) => context.openOverlay("Staffing alert") },
       ],
       overlays: [
+        ...kitOverlays,
+        { id: "metric detail", kind: "drawer", title: "Where each figure comes from", width: 520, render: ({ ...context }) => <MetricDetail context={context} /> },
         { id: "Staffing alert", kind: "drawer", title: "Coverage over the next week", width: 520, render: ({ ...context }) => <StaffingSummary context={context} /> },
         { id: "leave approval", kind: "drawer", title: "Leave decision", width: 520, render: ({ ...context }) => <LeaveApproval context={context} /> },
         { id: "new position", kind: "modal", title: "Open a position", width: 560, render: ({ close, ...context }) => <PositionEditor context={context} close={close} />, footer: submitFooter("hr-position", "Open position") },
@@ -159,9 +179,10 @@ export const hrApp = registerApp({
         { id: "invite", label: "Invite someone", placement: "primary", capability: "edit_people", run: (context) => context.openOverlay("Invite employee") },
         { id: "open profile", label: "Open profile", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select a person first"), run: (context) => context.navigate(`/o/${context.org.slug}/hr/employees/${context.selectedId}`) },
         { id: "Search", label: "Search the directory", placement: "overflow", run: () => focusWithin('input[type="search"]') },
-        { id: "filter", label: "Filter by team", placement: "overflow", run: (context) => context.setTab("Teams") },
+        { id: "filter", label: "Filter by team", placement: "overflow", run: (context) => context.openOverlay("team filter") },
       ],
       overlays: [
+        { id: "team filter", kind: "modal", title: "Filter the directory by team", width: 440, render: ({ close, ...context }) => <DirectoryFilter context={context} close={close} /> },
         { id: "Invite employee", kind: "modal", title: "Invite someone to the workspace", width: 520,
           render: ({ close, ...context }) => (
             <form id="hr-invite" className="ds-stack ds-gap-4" onSubmit={async (event) => {
@@ -219,12 +240,13 @@ export const hrApp = registerApp({
         render: (context: ScreenContext) => <EmployeeProfile context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Update profile", label: "Update profile", placement: "primary", capability: "edit_people", run: (context) => context.openOverlay("Contract upload") },
-        { id: "request change", label: "Request a change", placement: "secondary", run: (context) => context.openOverlay("access request") },
+        { id: "Update profile", label: "Update profile", placement: "primary", capability: "edit_people", run: (context) => context.openOverlay("profile editor") },
+        { id: "request change", label: "Request an access change", placement: "secondary", run: (context) => context.openOverlay("access request") },
         { id: "upload document", label: "Add a document", placement: "overflow", run: (context) => context.openOverlay("Contract upload") },
         { id: "offboard", label: "Offboard", placement: "overflow", tone: "danger", capability: "edit_people", run: (context) => context.openOverlay("offboarding confirmation") },
       ],
       overlays: [
+        { id: "profile editor", kind: "modal", title: "Update profile", width: 520, render: ({ close, ...context }) => <ProfileEditor context={context} close={close} />, footer: submitFooter("hr-profile", "Save the profile") },
         { id: "Contract upload", kind: "modal", title: "Add a document to the people file", width: 520,
           render: ({ close, ...context }) => (
             <form id="hr-document" className="ds-stack ds-gap-4" onSubmit={async (event) => {
@@ -266,14 +288,16 @@ export const hrApp = registerApp({
       })),
       actions: [
         { id: "Create role", label: "Create a role", placement: "primary", capability: "edit_people", run: (context) => context.openOverlay("Job spec editor") },
-        { id: "review applicant", label: "Review a candidate", placement: "secondary", run: (context) => context.openOverlay("candidate profile") },
-        { id: "schedule", label: "Schedule an interview", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/comms/calendar`) },
-        { id: "issue offer", label: "Review an offer", placement: "overflow", capability: "edit_people", run: (context) => context.openOverlay("offer approval") },
+        { id: "review applicant", label: "Review a candidate", placement: "secondary", run: (context) => context.openOverlay("candidate profile", context.selectedId ? { id: context.selectedId } : undefined) },
+        { id: "schedule", label: "Schedule an interview", placement: "overflow", run: (context) => context.openOverlay("schedule interview", context.selectedId ? { id: context.selectedId } : undefined) },
+        { id: "issue offer", label: "Issue an offer", placement: "overflow", capability: "edit_people", run: (context) => context.openOverlay("offer approval") },
+        { id: "open calendar", label: "Open the calendar", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/comms/calendar`) },
       ],
       overlays: [
+        { id: "schedule interview", kind: "modal", title: "Schedule an interview", width: 560, render: ({ close, ...context }) => <ScheduleInterview context={context} close={close} />, footer: submitFooter("hr-interview", "Schedule the interview") },
         { id: "Job spec editor", kind: "modal", title: "Job specification", width: 600, render: ({ close, ...context }) => <PositionEditor context={context} close={close} />, footer: submitFooter("hr-position", "Save position") },
         { id: "candidate profile", kind: "drawer", title: "Candidate", width: 520, render: ({ ...context }) => <CandidateProfileOverlay context={context} /> },
-        { id: "offer approval", kind: "modal", title: "Offer approval", width: 560, render: ({ close, ...context }) => <OfferApproval context={context} close={close} /> },
+        { id: "offer approval", kind: "modal", title: "Issue an offer", width: 560, render: ({ close, ...context }) => <OfferApproval context={context} close={close} /> },
       ],
     },
 
@@ -287,11 +311,16 @@ export const hrApp = registerApp({
       })),
       actions: [
         { id: "record assessment", label: "Record a scorecard", placement: "primary", run: (context) => context.openOverlay("interviewer scorecard") },
-        { id: "Review", label: "Move stage", placement: "secondary", capability: "edit_people", run: (context) => context.openOverlay("interviewer scorecard") },
-        { id: "message", label: "Communications", placement: "overflow", run: (context) => context.openOverlay("Applicant communications") },
-        { id: "schedule", label: "Schedule", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/comms/calendar`) },
+        { id: "Review", label: "Review and move stage", placement: "secondary", capability: "edit_people", run: (context) => context.openOverlay("stage decision") },
+        { id: "message", label: "Message the candidate", placement: "overflow", run: (context) => context.openOverlay("message candidate") },
+        { id: "schedule", label: "Schedule an interview", placement: "overflow", run: (context) => context.openOverlay("schedule interview", { id: context.params.id }) },
+        { id: "communications", label: "Communications history", placement: "overflow", run: (context) => context.openOverlay("Applicant communications") },
+        { id: "preview rejection", label: "Preview the rejection", placement: "overflow", run: (context) => context.openOverlay("rejection preview") },
       ],
       overlays: [
+        { id: "stage decision", kind: "modal", title: "Review and move stage", width: 560, render: ({ close, ...context }) => <StageDecision context={context} close={close} />, footer: submitFooter("hr-stage", "Record the decision") },
+        { id: "message candidate", kind: "modal", title: "Message the candidate", width: 560, render: ({ close, ...context }) => <ApplicantMessage context={context} close={close} />, footer: submitFooter("hr-applicant-message", "Keep as a draft") },
+        { id: "schedule interview", kind: "modal", title: "Schedule an interview", width: 560, render: ({ close, ...context }) => <ScheduleInterview context={context} close={close} />, footer: submitFooter("hr-interview", "Schedule the interview") },
         { id: "Applicant communications", kind: "drawer", title: "Communications with this candidate", width: 480, render: ({ ...context }) => (
           <Stack gap={3}>
             <Properties rows={[
@@ -326,11 +355,14 @@ export const hrApp = registerApp({
       })),
       actions: [
         { id: "Launch checklist", label: "Launch a checklist", placement: "primary", capability: "edit_people", run: (context) => context.openOverlay("Onboarding template") },
-        { id: "grant request", label: "Access requests", placement: "secondary", run: (context) => context.openOverlay("IT access") },
-        { id: "assign mentor", label: "Assign a mentor", placement: "overflow", run: (context) => context.openOverlay("Onboarding template") },
-        { id: "verify completion", label: "Welcome note", placement: "overflow", run: (context) => context.openOverlay("welcome preview") },
+        { id: "grant request", label: "Decide access requests", placement: "secondary", capability: "edit_people", run: (context) => context.openOverlay("IT access") },
+        { id: "assign mentor", label: "Assign a mentor", placement: "overflow", capability: "edit_people", run: (context) => context.openOverlay("assign mentor") },
+        { id: "verify completion", label: "Verify completion", placement: "overflow", capability: "edit_people", run: (context) => verifyCompletion(context) },
+        { id: "welcome note", label: "Welcome note", placement: "overflow", run: (context) => context.openOverlay("welcome preview") },
       ],
       overlays: [
+        ...kitOverlays,
+        { id: "assign mentor", kind: "modal", title: "Assign a mentor", width: 500, render: ({ close, ...context }) => <MentorAssign context={context} close={close} />, footer: submitFooter("hr-mentor", "Assign the mentor") },
         { id: "Onboarding template", kind: "modal", title: "Launch an onboarding checklist", width: 560, render: ({ close, ...context }) => <OnboardingLaunch context={context} close={close} />, footer: submitFooter("hr-onboarding", "Launch checklist") },
         { id: "IT access", kind: "drawer", title: "Access requests for this starter", width: 500, render: ({ ...context }) => <ITAccess context={context} /> },
         { id: "welcome preview", kind: "modal", title: "Welcome note", width: 520, render: ({ ...context }) => (
@@ -354,11 +386,15 @@ export const hrApp = registerApp({
       })),
       actions: [
         { id: "Request leave", label: "Request leave", placement: "primary", run: (context) => context.openOverlay("Leave form") },
-        { id: "approve", label: "Approvals", placement: "secondary", capability: "edit_people", run: (context) => context.setTab("Approvals") },
-        { id: "decline", label: "Decide a request", placement: "overflow", capability: "edit_people", guard: (context) => (context.selectedId ? undefined : "Select a request on the Approvals tab"), run: (context) => context.openOverlay("conflict review") },
-        { id: "adjust balance", label: "Adjust a balance", placement: "overflow", capability: "edit_people", run: (context) => context.openOverlay("policy explanation") },
+        { id: "approve", label: "Approve leave", placement: "secondary", capability: "edit_people", run: (context) => approveLeave(context) },
+        { id: "decline", label: "Decline leave", placement: "overflow", capability: "edit_people", run: (context) => declineLeave(context) },
+        { id: "adjust balance", label: "Adjust a balance", placement: "overflow", capability: "edit_people", run: (context) => context.openOverlay("balance adjustment") },
+        { id: "check cover", label: "Check cover", placement: "overflow", run: (context) => context.openOverlay("conflict review") },
+        { id: "explain balance", label: "How a balance is worked out", placement: "overflow", run: (context) => context.openOverlay("policy explanation") },
       ],
       overlays: [
+        ...kitOverlays,
+        { id: "balance adjustment", kind: "modal", title: "Adjust a leave balance", width: 500, render: ({ close, ...context }) => <BalanceAdjust context={context} close={close} />, footer: submitFooter("hr-balance", "Adjust the balance") },
         { id: "Leave form", kind: "modal", title: "Request leave", width: 560, render: ({ close, ...context }) => <LeaveForm context={context} close={close} />, footer: submitFooter("hr-leave-form", "Send the request") },
         { id: "policy explanation", kind: "drawer", title: "How this balance is worked out", width: 480, render: ({ ...context }) => <BalanceExplainer context={context} /> },
         { id: "conflict review", kind: "drawer", title: "Cover on these days", width: 520, render: ({ ...context }) => <StaffingSummary context={context} /> },
@@ -373,14 +409,18 @@ export const hrApp = registerApp({
         render: (context: ScreenContext) => <Scheduling context={context} lens={lens} />,
       })),
       actions: [
-        { id: "approve hours", label: "Approve hours", placement: "primary", capability: "edit_people", run: (context) => context.setTab("Timesheets") },
-        { id: "Drag shift", label: "Edit a shift", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select a shift on the roster"), run: (context) => context.openOverlay("Shift edit") },
-        { id: "swap", label: "Overtime approvals", placement: "overflow", run: (context) => context.openOverlay("overtime approval") },
-        { id: "export", label: "Export the roster", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("time correction") },
+        { id: "approve hours", label: "Approve hours", placement: "primary", capability: "edit_people", run: (context) => approveHours(context) },
+        { id: "Drag shift", label: "Move a shift", placement: "secondary", guard: needsSelection("a shift on the roster"), run: (context) => context.openOverlay("Shift edit") },
+        { id: "swap", label: "Swap shifts", placement: "overflow", capability: "edit_people", run: (context) => swapShift(context) },
+        { id: "export", label: "Export hours", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("export hours") },
+        { id: "overtime approvals", label: "Overtime approvals", placement: "overflow", run: (context) => context.openOverlay("overtime approval") },
+        { id: "correct time", label: "Correct a time entry", placement: "overflow", capability: "edit_people", run: (context) => context.openOverlay("time correction") },
       ],
       overlays: [
+        ...kitOverlays,
         { id: "Shift edit", kind: "modal", title: "Shift", width: 520, render: ({ close, ...context }) => <ShiftEdit context={context} close={close} />, footer: submitFooter("hr-shift", "Save shift") },
-        { id: "time correction", kind: "modal", title: "Export hours", width: 520, render: ({ ...context }) => <ExportHours context={context} /> },
+        { id: "time correction", kind: "modal", title: "Correct a time entry", width: 520, render: ({ close, ...context }) => <TimeCorrection context={context} close={close} />, footer: submitFooter("hr-time-correction", "Save the correction") },
+        { id: "export hours", kind: "modal", title: "Export hours", width: 520, render: ({ ...context }) => <ExportHours context={context} /> },
         { id: "overtime approval", kind: "drawer", title: "Overtime", width: 480, render: ({ ...context }) => <Overtime context={context} /> },
       ],
     },
@@ -393,13 +433,15 @@ export const hrApp = registerApp({
         render: (context: ScreenContext) => <Payroll context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Prepare run", label: "Prepare a run", placement: "primary", capability: "view_payroll", run: (context) => context.openOverlay("Payroll review") },
-        { id: "approve", label: "Approve", placement: "secondary", capability: "view_payroll", run: (context) => context.openOverlay("submission signoff") },
-        { id: "validate", label: "Exceptions", placement: "overflow", capability: "view_payroll", run: (context) => context.openOverlay("exception report") },
-        { id: "export", label: "Export CSV", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("exception report") },
-        { id: "reconcile", label: "Reconcile to the ledger", placement: "overflow", capability: "view_payroll", run: (context) => context.navigate(`/o/${context.org.slug}/fin/ledger`) },
+        { id: "Prepare run", label: "Prepare a run", placement: "primary", capability: "view_payroll", run: async (context) => prepareRun(context, await payrollRecords(context, "payrollRuns"), await payrollRecords(context, "employees")) },
+        { id: "approve", label: "Approve the run", placement: "secondary", capability: "view_payroll", run: (context) => context.openOverlay("submission signoff") },
+        { id: "validate", label: "Validate the run", placement: "overflow", capability: "view_payroll", run: async (context) => validateRun(context, await payrollRecords(context, "payrollRuns"), await payrollRecords(context, "employees"), await payrollRecords(context, "shifts")) },
+        { id: "export", label: "Export CSV", placement: "overflow", capability: "export_data", run: async (context) => exportRun(context, await payrollRecords(context, "payrollRuns"), await payrollRecords(context, "employees")) },
+        { id: "reconcile", label: "Reconcile to the ledger", placement: "overflow", capability: "view_payroll", run: (context) => context.openOverlay("reconcile run") },
+        { id: "exceptions", label: "Exceptions", placement: "overflow", capability: "view_payroll", run: (context) => context.openOverlay("exception report") },
       ],
       overlays: [
+        { id: "reconcile run", kind: "modal", title: "Reconcile the run to the ledger", width: 560, render: ({ close, ...context }) => <ReconcileRun context={context} close={close} /> },
         { id: "Payroll review", kind: "drawer", title: "Payroll run", width: 620, render: ({ ...context }) => <PayrollReview context={context} /> },
         { id: "exception report", kind: "modal", title: "Payroll exceptions", width: 600, render: ({ ...context }) => <PayrollExceptions context={context} /> },
         { id: "submission signoff", kind: "modal", title: "Approve this run", tone: "danger", width: 560, render: ({ close, ...context }) => <PayrollSignoff context={context} close={close} /> },
@@ -415,11 +457,15 @@ export const hrApp = registerApp({
       })),
       actions: [
         { id: "Create review", label: "Create a review", placement: "primary", capability: "edit_people", run: (context) => context.openOverlay("Review form") },
-        { id: "assign reviewer", label: "Calibration", placement: "secondary", capability: "edit_people", run: (context) => context.openOverlay("calibration panel") },
-        { id: "submit", label: "Confidentiality", placement: "overflow", run: (context) => context.openOverlay("confidentiality control") },
-        { id: "acknowledge", label: "Acknowledge a review", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a review on the Team tab"), run: (context) => context.openOverlay("Review form") },
+        { id: "assign reviewer", label: "Assign a reviewer", placement: "secondary", capability: "edit_people", run: (context) => context.openOverlay("assign reviewer") },
+        { id: "submit", label: "Submit a review", placement: "overflow", run: (context) => submitReview(context) },
+        { id: "acknowledge", label: "Acknowledge a review", placement: "overflow", run: (context) => acknowledgeReview(context) },
+        { id: "calibration", label: "Calibration", placement: "overflow", run: (context) => context.openOverlay("calibration panel") },
+        { id: "confidentiality", label: "Who sees a review", placement: "overflow", run: (context) => context.openOverlay("confidentiality control") },
       ],
       overlays: [
+        ...kitOverlays,
+        { id: "assign reviewer", kind: "modal", title: "Assign a reviewer", width: 500, render: ({ close, ...context }) => <AssignReviewer context={context} close={close} />, footer: submitFooter("hr-reviewer", "Assign the reviewer") },
         { id: "Review form", kind: "modal", title: "Review", width: 600, render: ({ close, ...context }) => <ReviewForm context={context} close={close} />, footer: submitFooter("hr-review", "Save review") },
         { id: "calibration panel", kind: "drawer", title: "Calibration", width: 540, render: ({ ...context }) => <Calibration context={context} /> },
         { id: "confidentiality control", kind: "modal", title: "Who sees this review", width: 520, render: () => (
@@ -444,11 +490,14 @@ export const hrApp = registerApp({
         render: (context: ScreenContext) => <Learning context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Assign course", label: "Build a course", placement: "primary", capability: "edit_knowledge", run: (context) => context.openOverlay("Course builder") },
-        { id: "acknowledge policy", label: "Policies", placement: "secondary", run: (context) => context.setTab("Policies") },
-        { id: "complete module", label: "My learning", placement: "overflow", run: (context) => context.setTab("My learning") },
+        { id: "Assign course", label: "Assign a course", placement: "primary", capability: "edit_people", run: (context) => context.openOverlay("assign course") },
+        { id: "acknowledge policy", label: "Acknowledge a policy", placement: "secondary", run: (context) => acknowledgePolicy(context) },
+        { id: "complete module", label: "Complete a module", placement: "overflow", run: (context) => completeModule(context) },
+        { id: "build course", label: "Build a course", placement: "overflow", capability: "edit_knowledge", run: (context) => context.openOverlay("Course builder") },
       ],
       overlays: [
+        ...kitOverlays,
+        { id: "assign course", kind: "modal", title: "Assign a course", width: 520, render: ({ close, ...context }) => <AssignCourse context={context} close={close} />, footer: submitFooter("hr-assign-course", "Assign the course") },
         { id: "Course builder", kind: "modal", title: "Course", width: 560, render: ({ close, ...context }) => <CourseBuilder context={context} close={close} />, footer: submitFooter("hr-course", "Save course") },
         { id: "quiz", kind: "modal", title: "Check what was understood", width: 560, render: ({ ...context }) => <Quiz context={context} /> },
         { id: "policy publication", kind: "modal", title: "Publish a revision", tone: "danger", width: 560, render: ({ close, ...context }) => <PolicyPublication context={context} close={close} /> },
@@ -464,8 +513,10 @@ export const hrApp = registerApp({
 function OfferApproval({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCollections(["applicants", "positions"]);
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const applicant = data.applicants.find((row) => row.id === (payload?.id ?? context.selectedId)) ?? data.applicants.find((row) => row.fields.stage === "offer");
-  if (!applicant) return <Empty title="No offer is drafted" icon={<UserPlus size={20} />} />;
+  const applicant = data.applicants.find((row) => row.id === (payload?.id ?? context.selectedId) && row.collection === "applicants") ?? data.applicants.find((row) => row.fields.stage === "offer" && row.fields.offerIssuedBy === undefined);
+  if (!applicant) return <Empty title="No candidate is at the offer stage" icon={<UserPlus size={20} />}>Move a candidate to offer from their profile first.</Empty>;
+  const issued = applicant.fields.offerIssuedBy !== undefined;
+  const scored = Number(applicant.fields.rating ?? 0) > 0;
   const position = data.positions.find((row) => row.id === applicant.fields.positionId);
   return (
     <Stack gap={4}>
@@ -474,22 +525,26 @@ function OfferApproval({ context, close }: { context: ScreenContext; close: () =
         { label: "Role", value: position?.title ?? String(applicant.fields.role ?? "") },
         { label: "Hiring manager", value: String(position?.fields.hiringManager ?? "") },
         { label: "Range", value: context.can("view_payroll") && position ? `${context.money(Number(position.fields.salaryLowMinor ?? 0))} – ${context.money(Number(position.fields.salaryHighMinor ?? 0))}` : "Hidden in this role view" },
+        { label: "Scorecard", value: scored ? `${String(applicant.fields.rating)} of 5` : "None recorded" },
+        { label: "Offer", value: issued ? `Issued by ${String(applicant.fields.offerIssuedBy)} — awaiting the candidate's answer` : "Not issued" },
       ]} />
+      {!scored && <Notice tone="danger" title="No scorecard on record">An offer needs a recorded, evidence-based scorecard by an accountable person first.</Notice>}
+      <p className="ds-prose">Issuing records the offer as made by {context.actor} and keeps the letter as a local draft. The candidate is not hired until they accept and somebody records it.</p>
       <MailBoundary />
       <Row gap={2}>
         <Button variant="ghost" onClick={close}>Close</Button>
         <span className="ds-grow" />
         <Button
           variant="primary"
-          disabled={!context.can("edit_people")}
+          disabled={!context.can("edit_people") || issued || !scored}
           onClick={async () => {
-            await context.mutate.patch(applicant.id, { status: "hired", fields: { ...applicant.fields, stage: "hired", offerApprovedBy: context.actor } }, { expectRevision: applicant.revision, event: `Offer approved for ${applicant.title} by ${context.actor}` });
-            if (position) await context.mutate.patch(position.id, { status: "filled" }, { event: `${position.title} filled` });
-            context.toast("Offer approved", `${applicant.title} is recorded as hired. Sending the offer still needs a connected mailbox.`);
+            await context.mutate.patch(applicant.id, { fields: { ...applicant.fields, stage: "offer", offerIssuedBy: context.actor, offerIssuedAt: new Date().toISOString(), offerDelivery: "queued_local" } }, { expectRevision: applicant.revision, event: `Offer issued to ${applicant.title} by ${context.actor}; letter kept as a local draft` });
+            await context.mutate.log(`Offer letter for ${applicant.title} queued locally — no mail service is connected, so nothing has left this browser.`, { entityId: applicant.id, type: "boundary", capability: "queued_local" });
+            context.toast("Offer issued", `Recorded against ${applicant.title} by ${context.actor}. The letter is a local draft; nothing was sent.`);
             close();
           }}
         >
-          Approve the offer
+          Issue the offer
         </Button>
       </Row>
     </Stack>
@@ -605,7 +660,7 @@ function BalanceExplainer({ context: _context }: { context: ScreenContext }) {
 function ShiftEdit({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const shift = useRecord(payload?.id ?? context.selectedId);
-  const data = useCollections(["employees"]);
+  const data = useCollections(["employees", "shifts"]);
   if (!shift) return <Empty title="Select a shift" icon={<CalendarDays size={20} />} />;
   return (
     <form
@@ -616,11 +671,21 @@ function ShiftEdit({ context, close }: { context: ScreenContext; close: () => vo
         const form = new FormData(event.currentTarget);
         const employeeId = String(form.get("employee") ?? "");
         const employee = data.employees.find((row) => row.id === employeeId);
+        const hours = Number(form.get("hours") ?? 8);
+        const day = String(form.get("day") ?? "");
+        const time = String(form.get("time") ?? "");
+        const startAt = day && time ? new Date(`${day}T${time}:00.000Z`) : shift.startAt ? new Date(shift.startAt) : new Date();
+        const endAt = new Date(startAt.getTime() + hours * 3_600_000);
+        const clash = data.shifts.find((row) => row.id !== shift.id && row.fields.kind === "shift" && row.fields.employeeId === employeeId && row.startAt && row.endAt && new Date(row.startAt) < endAt && new Date(row.endAt) > startAt);
+        if (clash) { context.toast("Shift not moved", `${employee?.title ?? "That person"} already works ${context.dateTime(clash.startAt)}. Nothing changed.`, "blocked"); return; }
+        const moved = shift.startAt !== startAt.toISOString();
         await context.mutate.patch(shift.id, {
           title: `${String(form.get("place") ?? "")} · ${(employee?.title ?? "").split(" ")[0]}`,
-          fields: { ...shift.fields, employeeId, employeeName: employee?.title ?? "", place: String(form.get("place") ?? ""), hours: Number(form.get("hours") ?? 8), overtime: Number(form.get("hours") ?? 8) > 8 },
-        }, { expectRevision: shift.revision, event: `Shift reassigned to ${employee?.title ?? "another person"}` });
-        context.toast("Shift saved", "The roster record changed; nothing was only announced.");
+          startAt: startAt.toISOString(),
+          endAt: endAt.toISOString(),
+          fields: { ...shift.fields, employeeId, employeeName: employee?.title ?? "", place: String(form.get("place") ?? ""), hours, overtime: hours > 8, timezone: context.org.timezone },
+        }, { expectRevision: shift.revision, event: moved ? `Shift moved to ${startAt.toISOString()} for ${employee?.title ?? "another person"} by ${context.actor}` : `Shift reassigned to ${employee?.title ?? "another person"}` });
+        context.toast(moved ? "Shift moved" : "Shift saved", "The roster record changed; nothing was only announced.");
         close();
       }}
     >
@@ -632,12 +697,17 @@ function ShiftEdit({ context, close }: { context: ScreenContext; close: () => vo
       <Field label="Place">
         <Select name="place" defaultValue={String(shift.fields.place ?? "")}>{["Showroom", "Workshop bench", "Despatch"].map((place) => <option key={place}>{place}</option>)}</Select>
       </Field>
-      <Field label="Hours"><TextInput name="hours" inputMode="numeric" align="end" defaultValue={String(shift.fields.hours ?? 8)} /></Field>
+      <Row gap={3}>
+        <Field label="Day"><TextInput name="day" type="date" defaultValue={shift.startAt?.slice(0, 10) ?? ""} /></Field>
+        <Field label="Start (UTC)"><TextInput name="time" type="time" defaultValue={shift.startAt?.slice(11, 16) ?? "09:00"} /></Field>
+        <Field label="Hours"><TextInput name="hours" inputMode="numeric" align="end" defaultValue={String(shift.fields.hours ?? 8)} /></Field>
+      </Row>
       <Properties rows={[
-        { label: "Starts", value: context.dateTime(shift.startAt) },
-        { label: "Ends", value: context.dateTime(shift.endAt) },
+        { label: "Starts now", value: context.dateTime(shift.startAt) },
+        { label: "Ends now", value: context.dateTime(shift.endAt) },
         { label: "Time zone", value: context.org.timezone },
       ]} />
+      {shift.fields.timezone !== undefined && String(shift.fields.timezone) !== context.org.timezone && <Notice tone="warning" title="Cross-location shift">This shift was recorded in {String(shift.fields.timezone)}. Check working-time rules for both locations.</Notice>}
       <Notice tone="info">More than eight hours is recorded as overtime and appears on the exceptions tab.</Notice>
     </form>
   );

@@ -28,6 +28,8 @@ export interface Track {
   /** Audio tracks: gain in decibels. */
   gainDb?: number;
   pan?: number;
+  /** Audio tracks: gain automation points, interpolated linearly in the mix. */
+  automation?: { id: string; time: number; gainDb: number }[];
 }
 
 export interface Transform {
@@ -107,6 +109,8 @@ export interface MediaSource {
   credit: string;
   proxy?: "none" | "generated";
   sampleRate?: number;
+  /** Free tags a person puts on a source to find it again. */
+  tags?: string[];
 }
 
 export interface RenderJob {
@@ -120,6 +124,8 @@ export interface RenderJob {
   bytes?: number;
   frames?: number;
   note: string;
+  /** Publishing stops at the provider boundary: this is the local record of the request. */
+  delivery?: { state: "queued_local"; at: string; by: string; destination: string; note: string };
 }
 
 export interface VideoDoc {
@@ -133,12 +139,16 @@ export interface VideoDoc {
   transitions: Transition[];
   captions: Caption[];
   sources: MediaSource[];
-  markers: { id: string; time: number; text: string; author: string; at: string; resolved: boolean }[];
+  markers: { id: string; time: number; text: string; author: string; at: string; resolved: boolean; taskId?: string }[];
   reviews: { id: string; at: string; by: string; state: "approved" | "changes" | "pending"; note: string; revision: number; digest?: string }[];
   renders: RenderJob[];
   /** Loudness target for the mix, in LUFS. */
   loudnessTarget: number;
   activeClipId?: string;
+  /** How captions are drawn on the picture and in the export. */
+  captionStyle?: { position: "bottom" | "top"; scale: number; box: boolean };
+  /** Effect stacks a person saved under a name. */
+  effectPresets?: { id: string; name: string; effects: { kind: ClipEffect["kind"]; amount: number }[]; by: string; at: string }[];
 }
 
 /* ====================================================================== *
@@ -510,6 +520,21 @@ export function measureLoudness(samples: Float32Array): LoudnessReport {
   };
 }
 
+/** Gain automation at a time: held before the first point and after the last, linear between. */
+export function automationAt(points: { time: number; gainDb: number }[], time: number): number {
+  if (points.length === 0) return 0;
+  if (time <= points[0].time) return points[0].gainDb;
+  for (let index = 1; index < points.length; index += 1) {
+    const a = points[index - 1];
+    const b = points[index];
+    if (time <= b.time) {
+      const span = b.time - a.time;
+      return span <= 0 ? b.gainDb : a.gainDb + ((time - a.time) / span) * (b.gainDb - a.gainDb);
+    }
+  }
+  return points[points.length - 1].gainDb;
+}
+
 /** Mix every audible audio clip at a time window into one buffer. */
 export function mixAudio(doc: VideoDoc, from: number, seconds: number, sampleRate = 8000): Float32Array {
   const count = Math.max(1, Math.floor(seconds * sampleRate));
@@ -519,6 +544,7 @@ export function mixAudio(doc: VideoDoc, from: number, seconds: number, sampleRat
     if (track.kind !== "audio" || track.muted) continue;
     if (soloed && !track.solo) continue;
     const trackGain = dbToGain(track.gainDb ?? 0);
+    const points = [...(track.automation ?? [])].sort((a, b) => a.time - b.time);
     for (const clip of clipsOnTrack(doc, track.id)) {
       const source = doc.sources.find((item) => item.id === clip.sourceId);
       if (!source || source.missing) continue;
@@ -533,7 +559,8 @@ export function mixAudio(doc: VideoDoc, from: number, seconds: number, sampleRat
         let envelope = 1;
         if (clip.fadeIn > 0 && t < clip.start + clip.fadeIn) envelope *= (t - clip.start) / clip.fadeIn;
         if (clip.fadeOut > 0 && t > clipEnd(clip) - clip.fadeOut) envelope *= (clipEnd(clip) - t) / clip.fadeOut;
-        out[writeAt + index] = clamp(out[writeAt + index] + samples[index] * clipGain * trackGain * clamp(envelope, 0, 1), -1, 1);
+        const automated = points.length > 0 ? dbToGain(automationAt(points, t)) : 1;
+        out[writeAt + index] = clamp(out[writeAt + index] + samples[index] * clipGain * trackGain * automated * clamp(envelope, 0, 1), -1, 1);
       }
     }
   }

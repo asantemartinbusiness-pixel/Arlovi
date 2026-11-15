@@ -12,7 +12,7 @@ import {
   CUSTOMER_TAX_STATUSES, TAX_CATEGORIES, blankLine, documentDate, documentTotals, readLines, statusFor, taxCategoryLabel, writeLines,
 } from "@/domain/fin-invoice";
 import type { CustomerTaxStatus, DocumentTotals, InvoiceLine, TaxCategory } from "@/domain/fin-invoice";
-import { accountCode, accountType, ageBuckets, daysOverdue } from "@/domain/fin-ledger";
+import { accountCode, accountType, ageBuckets, checkPosting, daysOverdue } from "@/domain/fin-ledger";
 import type { JLine } from "@/domain/fin-ledger";
 import { contactOf, openInvoices, outstandingMinor, useFinData } from "./data";
 import type { FinData } from "./data";
@@ -1424,9 +1424,10 @@ export function ApproveInvoice({ context, close }: { context: ScreenContext; clo
 
   const posting = issueLines(data, totals, invoice);
   const period = (invoice.at ?? context.now.toISOString()).slice(0, 7);
+  const gate = posting.problem ? undefined : checkPosting({ lines: posting.lines, period, locked: data.locked, accounts: data.accounts });
   const blocked = posting.problem
     ?? (totals.grossMinor <= 0 ? "The invoice has no positive value to post." : undefined)
-    ?? (data.locked.includes(period) ? `${period} is a closed period.` : undefined);
+    ?? gate?.reason;
 
   return (
     <Stack gap={4}>
@@ -1479,7 +1480,7 @@ export function ApproveInvoice({ context, close }: { context: ScreenContext; clo
             at: `${date}T09:00:00.000Z`,
             parentId: invoice.id,
             tags: ["ledger", "invoice"],
-            fields: { date, source: "invoice", invoiceId: invoice.id },
+            fields: { date, source: "invoice", invoiceId: invoice.id, postedBy: context.actor, approvedBy: context.actor },
             body: { date, memo: invoice.title, lines: posting.lines },
           }, `Issued ${invoice.title} and posted a balanced journal`);
           const versions = ((invoice.body as { versions?: unknown[] })?.versions ?? []) as unknown[];
@@ -1490,8 +1491,11 @@ export function ApproveInvoice({ context, close }: { context: ScreenContext; clo
               ...(invoice.body as object ?? {}),
               versions: [...versions, { at: new Date().toISOString(), by: context.actor, note: "Issued and posted", grossMinor: totals.grossMinor }],
             },
-            fields: { ...invoice.fields, journalId: journal.id, netMinor: totals.netMinor, taxMinor: totals.taxMinor, issuedAt: new Date().toISOString() },
-          }, { expectRevision: invoice.revision, event: `${invoice.title} approved and issued` });
+            fields: {
+              ...invoice.fields, journalId: journal.id, netMinor: totals.netMinor, taxMinor: totals.taxMinor,
+              issuedAt: new Date().toISOString(), approvedBy: context.actor, approvedAt: new Date().toISOString(),
+            },
+          }, { expectRevision: invoice.revision, event: `${invoice.title} approved by ${context.actor} and issued` });
           setBusy(false);
           context.toast("Invoice issued", `${context.money(totals.grossMinor)} is on the ledger as a balanced journal. The invoice is now immutable.`);
           close();

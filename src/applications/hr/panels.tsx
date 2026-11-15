@@ -11,6 +11,7 @@ import { useCollection, useCollections, useRecord, useWorkspace } from "@/platfo
 import { addDays, daysBetween, startOfMonth, startOfWeek } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { EmploymentPill, RoleViewNote, leaveBalance, salaryText } from "./kit";
+import { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./actions";
 
 /* ------------------------------------------------------------------ *
  * Shared reads
@@ -290,6 +291,7 @@ export function StaffingSummary({ context }: { context: ScreenContext }) {
 export function EmployeeDirectory({ context, lens }: { context: ScreenContext; lens: "People" | "Teams" | "Contractors" | "Alumni" }) {
   const data = useHrData();
   const { org } = useWorkspace();
+  const team = useDirectoryTeam();
 
   if (lens === "Teams") {
     return (
@@ -317,11 +319,12 @@ export function EmployeeDirectory({ context, lens }: { context: ScreenContext; l
     );
   }
 
-  const rows = lens === "Contractors"
+  const allRows = lens === "Contractors"
     ? data.employees.filter((employee) => employee.fields.employment === "contractor")
     : lens === "Alumni"
       ? data.employees.filter((employee) => employee.status === "alumni")
       : humans(data.employees);
+  const rows = team ? allRows.filter((employee) => employee.fields.departmentId === team) : allRows;
 
   const agents = aiEmployees(data.members);
 
@@ -344,10 +347,17 @@ export function EmployeeDirectory({ context, lens }: { context: ScreenContext; l
     />
   );
 
-  if (lens !== "People") return grid;
+  const filterNote = team ? (
+    <Notice tone="info" title={`Filtered to ${departmentName(data.departments, team)}`}>
+      <Row gap={2}><span className="ds-grow">{rows.length} of {allRows.length} shown.</span><Button size="sm" variant="ghost" onClick={() => setDirectoryTeam("")}>Clear the filter</Button></Row>
+    </Notice>
+  ) : null;
+
+  if (lens !== "People") return filterNote ? <Stack gap={3}>{filterNote}{grid}</Stack> : grid;
 
   return (
     <Stack gap={5}>
+      {filterNote}
       <Card title="People" subtitle={`${rows.length} employed · contact details follow each person's privacy setting`} flush>{grid}</Card>
       <Card
         title="AI employees"
@@ -1023,7 +1033,7 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
                   size="sm"
                   variant="primary"
                   onClick={async () => {
-                    await context.mutate.patch(request.id, { status: "approved" }, { expectRevision: request.revision, event: `Leave approved for ${leavePerson(request, data.employees)}` });
+                    await context.mutate.patch(request.id, { status: "approved", fields: { ...request.fields, decidedBy: context.actor, decidedAt: new Date().toISOString() } }, { expectRevision: request.revision, event: `Leave approved for ${leavePerson(request, data.employees)} by ${context.actor}` });
                     if (employee) {
                       await context.mutate.patch(employee.id, { fields: { ...employee.fields, leaveTaken: Number(employee.fields.leaveTaken ?? 0) + requested } }, { event: "Leave balance updated after approval" });
                     }
@@ -1036,7 +1046,7 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
                   size="sm"
                   variant="outline-danger"
                   onClick={async () => {
-                    await context.mutate.patch(request.id, { status: "declined" }, { expectRevision: request.revision, event: `Leave declined for ${leavePerson(request, data.employees)}` });
+                    await context.mutate.patch(request.id, { status: "declined", fields: { ...request.fields, decidedBy: context.actor, decidedAt: new Date().toISOString() } }, { expectRevision: request.revision, event: `Leave declined for ${leavePerson(request, data.employees)} by ${context.actor}` });
                     context.toast("Leave declined", "The request is recorded as declined with the decision maker's name.");
                   }}
                 >
@@ -1566,10 +1576,7 @@ export function Learning({ context, lens }: { context: ScreenContext; lens: "Cou
                 <Button
                   size="sm"
                   variant="primary"
-                  onClick={async () => {
-                    await context.mutate.patch(policy.id, { fields: { ...policy.fields, acknowledged: Number(policy.fields.acknowledged ?? 0) + 1 } }, { event: `${context.actor} acknowledged ${policy.title}` });
-                    context.toast("Acknowledged", `${policy.title} v${String(policy.fields.version ?? "")} is recorded against your name.`);
-                  }}
+                  onClick={() => recordAcknowledgement(context, policy)}
                 >
                   Acknowledge
                 </Button>
@@ -1624,20 +1631,7 @@ export function Learning({ context, lens }: { context: ScreenContext; lens: "Cou
   }
 
   if (lens === "My learning") {
-    return (
-      <Stack gap={3}>
-        {courses.slice(0, 4).map((course, index) => (
-          <Card key={course.id} title={course.title} subtitle={`${String(course.fields.minutes ?? 0)} minutes · ${course.fields.required === true ? "required" : "optional"}`}
-            actions={<Pill tone={index === 0 ? "success" : index === 1 ? "info" : "neutral"}>{index === 0 ? "Complete" : index === 1 ? "In progress" : "Not started"}</Pill>}
-            footer={<Button size="sm" variant={index === 0 ? "ghost" : "primary"} onClick={() => context.openOverlay("quiz", { id: course.id })}>{index === 0 ? "Review" : "Continue"}</Button>}>
-            <Stack gap={2}>
-              <p className="ds-subtle">{course.summary}</p>
-              <Meter value={index === 0 ? 100 : index === 1 ? 45 : 0} max={100} label={`${course.title} progress`} tone={index === 0 ? "success" : undefined} />
-            </Stack>
-          </Card>
-        ))}
-      </Stack>
-    );
+    return <MyLearning context={context} />;
   }
 
   return courses.length === 0 ? <Empty title="No courses" icon={<GraduationCap size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Course builder")}>Build a course</Button>} /> : (
@@ -1762,7 +1756,7 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
         <Button
           variant="primary"
           onClick={async () => {
-            await context.mutate.patch(chosen.id, { status: "approved" }, { expectRevision: chosen.revision, event: `Leave approved for ${String(chosen.fields.employeeName ?? "")}` });
+            await context.mutate.patch(chosen.id, { status: "approved", fields: { ...chosen.fields, decidedBy: context.actor, decidedAt: new Date().toISOString() } }, { expectRevision: chosen.revision, event: `Leave approved for ${String(chosen.fields.employeeName ?? "")} by ${context.actor}` });
             if (employee) await context.mutate.patch(employee.id, { fields: { ...employee.fields, leaveTaken: Number(employee.fields.leaveTaken ?? 0) + days } }, { event: "Leave balance updated after approval" });
             context.toast("Leave approved", "The request and the balance both changed.");
             context.closeOverlay();
@@ -1773,7 +1767,7 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
         <Button
           variant="outline-danger"
           onClick={async () => {
-            await context.mutate.patch(chosen.id, { status: "declined" }, { expectRevision: chosen.revision, event: `Leave declined for ${String(chosen.fields.employeeName ?? "")}` });
+            await context.mutate.patch(chosen.id, { status: "declined", fields: { ...chosen.fields, decidedBy: context.actor, decidedAt: new Date().toISOString() } }, { expectRevision: chosen.revision, event: `Leave declined for ${String(chosen.fields.employeeName ?? "")} by ${context.actor}` });
             context.toast("Leave declined", "Recorded as declined against the request.");
             context.closeOverlay();
           }}
