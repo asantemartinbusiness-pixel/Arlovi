@@ -1,0 +1,2946 @@
+[
+ {
+  "screen": "ARL-DOCS-001",
+  "title": "Document Library",
+  "route": "/o/:org/docs/files",
+  "contractActions": [
+   "Create",
+   "upload",
+   "move",
+   "search",
+   "share"
+  ],
+  "contractOverlays": [
+   "New doc",
+   "folder selector",
+   "sharing",
+   "trash confirm"
+  ],
+  "edge": "Confidential documents excluded from broad preview",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New document",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"New doc\""
+   },
+   {
+    "id": "upload",
+    "label": "Upload",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"New doc\""
+   },
+   {
+    "id": "search",
+    "label": "Search",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: context.toast(\"Search is on the page\", \"The search field above the list reads titles, tags and \u2014 for documents that are not confidential \u2014"
+   },
+   {
+    "id": "move",
+    "label": "Move to folder",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"folder selector\""
+   },
+   {
+    "id": "share",
+    "label": "Share",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"sharing\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DOCS-002",
+  "title": "Document Editor",
+  "route": "/o/:org/docs/documents/:id",
+  "contractActions": [
+   "Type",
+   "format",
+   "insert",
+   "comment",
+   "accept changes",
+   "export"
+  ],
+  "contractOverlays": [
+   "Styles",
+   "insert table",
+   "citations",
+   "link",
+   "export"
+  ],
+  "edge": "Autosave conflict creates merge/recoverable version",
+  "declared": [
+   {
+    "id": "Type",
+    "label": "Focus the page",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: void 0"
+   },
+   {
+    "id": "format",
+    "label": "Formatting",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void 0"
+   },
+   {
+    "id": "insert",
+    "label": "Insert",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"insert table\""
+   },
+   {
+    "id": "comment",
+    "label": "Comment",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"citations\""
+   },
+   {
+    "id": "accept changes",
+    "label": "Accept changes",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Review\""
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"export\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DOCS-003",
+  "title": "Outline & Navigation",
+  "route": "/o/:org/docs/documents/:id/outline",
+  "contractActions": [
+   "Reorder heading",
+   "jump",
+   "collapse",
+   "add section"
+  ],
+  "contractOverlays": [
+   "Heading properties",
+   "document structure warning"
+  ],
+  "edge": "Reorder preserves references and anchored comments",
+  "declared": [
+   {
+    "id": "add section",
+    "label": "Add section",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Headings\""
+   },
+   {
+    "id": "jump",
+    "label": "Open the editor",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to context.path(\"/o/:org/docs/documents/:id\", context.params.id"
+   },
+   {
+    "id": "Reorder heading",
+    "label": "How reordering works",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: context.toast(\"Reordering moves a whole section\", \"The heading and every block under it move together, and anchored comments and bookmarks"
+   },
+   {
+    "id": "collapse",
+    "label": "Collapse all",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: context.toast(\"Use the chevrons\", \"Each heading has a collapse control in the tree.\", \"info\")"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DOCS-004",
+  "title": "Review & Comments",
+  "route": "/o/:org/docs/documents/:id/review",
+  "contractActions": [
+   "Suggest edit",
+   "accept/reject",
+   "mention",
+   "approve"
+  ],
+  "contractOverlays": [
+   "Comment thread",
+   "diff",
+   "reviewer assignment"
+  ],
+  "edge": "Approval cannot silently erase unresolved mandatory review",
+  "declared": [
+   {
+    "id": "approve",
+    "label": "Approve",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Approvals\""
+   },
+   {
+    "id": "Suggest edit",
+    "label": "Suggest an edit",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Changes\""
+   },
+   {
+    "id": "accept/reject",
+    "label": "Accept or reject",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Changes\""
+   },
+   {
+    "id": "mention",
+    "label": "Mention someone",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Comments\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DOCS-005",
+  "title": "Templates",
+  "route": "/o/:org/docs/templates",
+  "contractActions": [
+   "Create",
+   "use",
+   "edit master",
+   "retire"
+  ],
+  "contractOverlays": [
+   "Template editor",
+   "token mapping",
+   "change impact"
+  ],
+  "edge": "Existing signed document not silently updated by template change",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New template",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Template editor\""
+   },
+   {
+    "id": "use",
+    "label": "Use a template",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Template editor\""
+   },
+   {
+    "id": "edit master",
+    "label": "Edit master",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Template editor\""
+   },
+   {
+    "id": "retire",
+    "label": "Retire",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.selectedId; if (!id) return; await context.mutate.patch(id, { status: \"retired\" }, { event: \"Template retired\" }); con"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DOCS-006",
+  "title": "Publishing & Export",
+  "route": "/o/:org/docs/documents/:id/publish",
+  "contractActions": [
+   "Preview",
+   "export",
+   "request e-sign",
+   "revoke link"
+  ],
+  "contractOverlays": [
+   "PDF settings",
+   "link permissions",
+   "signature request"
+  ],
+  "edge": "Public link access must be clearly bounded and revocable",
+  "declared": [
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Export\""
+   },
+   {
+    "id": "Preview",
+    "label": "Preview",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Export\""
+   },
+   {
+    "id": "request e-sign",
+    "label": "Request signature",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"signature request\""
+   },
+   {
+    "id": "revoke link",
+    "label": "Revoke a link",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Share\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DOCS-007",
+  "title": "Document Insights",
+  "route": "/o/:org/docs/documents/:id/insights",
+  "contractActions": [
+   "Review suggestion",
+   "apply selected",
+   "inspect citations"
+  ],
+  "contractOverlays": [
+   "Suggestion diff",
+   "source inspection",
+   "style settings"
+  ],
+  "edge": "No unreviewed legal advice or fabricated source citations",
+  "declared": [
+   {
+    "id": "apply selected",
+    "label": "Apply selected",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Writing\""
+   },
+   {
+    "id": "Review suggestion",
+    "label": "Review suggestions",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Writing\""
+   },
+   {
+    "id": "inspect citations",
+    "label": "Inspect citations",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Sources\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-SHEETS-001",
+  "title": "Workbook Library",
+  "route": "/o/:org/sheets/workbooks",
+  "contractActions": [
+   "Create",
+   "import",
+   "duplicate",
+   "search",
+   "archive"
+  ],
+  "contractOverlays": [
+   "Import mapper",
+   "new workbook",
+   "share"
+  ],
+  "edge": "Large files processed without silent formula loss",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New workbook",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"new workbook\""
+   },
+   {
+    "id": "import",
+    "label": "Import CSV",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Import mapper\""
+   },
+   {
+    "id": "duplicate",
+    "label": "Duplicate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.selectedId; if (!id) return; const source = await __vite_ssr_dynamic_import__(\"/src/platform/repo.ts\").then((module) ="
+   },
+   {
+    "id": "search",
+    "label": "Search",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: context.toast(\"Search is on the page\", \"The field above the list searches titles, summaries and tags.\", \"info\")"
+   },
+   {
+    "id": "archive",
+    "label": "Archive",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { if (!context.selectedId) return; await context.mutate.patch(context.selectedId, { status: \"archived\" }, { event: \"Workbook archived\" });"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-SHEETS-002",
+  "title": "Grid Editor",
+  "route": "/o/:org/sheets/workbooks/:id",
+  "contractActions": [
+   "Edit cell",
+   "paste",
+   "fill",
+   "sort",
+   "filter",
+   "freeze",
+   "undo"
+  ],
+  "contractOverlays": [
+   "Format cells",
+   "data validation",
+   "named range",
+   "chart picker"
+  ],
+  "edge": "Deterministic recalculation and dependency graph required",
+  "declared": [
+   {
+    "id": "Edit cell",
+    "label": "Edit cell",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void 0"
+   },
+   {
+    "id": "paste",
+    "label": "Paste",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void 0"
+   },
+   {
+    "id": "fill",
+    "label": "Fill",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Data\""
+   },
+   {
+    "id": "sort",
+    "label": "Sort",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Data\""
+   },
+   {
+    "id": "filter",
+    "label": "Filter",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"data validation\""
+   },
+   {
+    "id": "freeze",
+    "label": "Freeze",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"View\""
+   },
+   {
+    "id": "undo",
+    "label": "Undo",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void 0"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-SHEETS-003",
+  "title": "Formula Manager",
+  "route": "/o/:org/sheets/workbooks/:id/formulas",
+  "contractActions": [
+   "Inspect",
+   "fix selected",
+   "recalculate",
+   "compare"
+  ],
+  "contractOverlays": [
+   "Formula inspector",
+   "function help",
+   "circular reference"
+  ],
+  "edge": "Circular formulas and unsupported functions show explicit errors",
+  "declared": [
+   {
+    "id": "recalculate",
+    "label": "Recalculate",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: context.toast(\"Recalculated\", \"The dependency graph is rebuilt and every formula re-evaluated in topological order.\")"
+   },
+   {
+    "id": "Inspect",
+    "label": "Inspect a formula",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"All\""
+   },
+   {
+    "id": "fix selected",
+    "label": "Fix selected",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Errors\""
+   },
+   {
+    "id": "compare",
+    "label": "Compare dependencies",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Dependencies\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-SHEETS-004",
+  "title": "Data Tables",
+  "route": "/o/:org/sheets/workbooks/:id/tables",
+  "contractActions": [
+   "Create table",
+   "edit schema",
+   "import",
+   "connect"
+  ],
+  "contractOverlays": [
+   "Column editor",
+   "import schema",
+   "relation preview"
+  ],
+  "edge": "Schema change protects references and dependent apps",
+  "declared": [
+   {
+    "id": "Create table",
+    "label": "Create table",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Column editor\""
+   },
+   {
+    "id": "edit schema",
+    "label": "Edit schema",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Column editor\""
+   },
+   {
+    "id": "import",
+    "label": "Import",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to context.path(\"/o/:org/sheets/workbooks/:id/io\", context.params.id"
+   },
+   {
+    "id": "connect",
+    "label": "Connect a source",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: context.toast(\"No external source is connected\", \"A table reads cells in this workbook. Connecting a database would need a provider, and no"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-SHEETS-005",
+  "title": "Charts & Dashboards",
+  "route": "/o/:org/sheets/workbooks/:id/charts",
+  "contractActions": [
+   "Create chart",
+   "change type",
+   "drill down",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Series editor",
+   "formatting inspector",
+   "calculation note"
+  ],
+  "edge": "Chart series updates correctly on changed range",
+  "declared": [
+   {
+    "id": "Create chart",
+    "label": "New chart",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Series editor\""
+   },
+   {
+    "id": "change type",
+    "label": "Change type",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Charts\""
+   },
+   {
+    "id": "drill down",
+    "label": "Drill down",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Pivot\""
+   },
+   {
+    "id": "publish",
+    "label": "Send to a deck",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Presentation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-SHEETS-006",
+  "title": "Import & Export",
+  "route": "/o/:org/sheets/workbooks/:id/io",
+  "contractActions": [
+   "Upload",
+   "map columns",
+   "test",
+   "publish",
+   "export"
+  ],
+  "contractOverlays": [
+   "Import wizard",
+   "compatibility report",
+   "rollback"
+  ],
+  "edge": "Never silently coerce dates, currencies or formula types",
+  "declared": [
+   {
+    "id": "Upload",
+    "label": "Upload a CSV",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Import wizard\""
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Exports\""
+   },
+   {
+    "id": "map columns",
+    "label": "Map columns",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Import wizard\""
+   },
+   {
+    "id": "test",
+    "label": "Compatibility report",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"compatibility report\""
+   },
+   {
+    "id": "publish",
+    "label": "Roll back an import",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"rollback\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-SHEETS-007",
+  "title": "Collaboration & Versioning",
+  "route": "/o/:org/sheets/workbooks/:id/collab",
+  "contractActions": [
+   "Comment",
+   "compare",
+   "protect",
+   "restore",
+   "merge"
+  ],
+  "contractOverlays": [
+   "Conflict resolver",
+   "protected range",
+   "restore confirmation"
+  ],
+  "edge": "Two users editing same cell require conflict strategy",
+  "declared": [
+   {
+    "id": "Comment",
+    "label": "Comment on a cell",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `${context.path(\"/o/:org/sheets/workbooks/:id\", context.params.id"
+   },
+   {
+    "id": "compare",
+    "label": "Compare",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Changes\""
+   },
+   {
+    "id": "protect",
+    "label": "Protect a range",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"protected range\""
+   },
+   {
+    "id": "restore",
+    "label": "Restore a version",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"History\""
+   },
+   {
+    "id": "merge",
+    "label": "Resolve a conflict",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Conflict resolver\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PRESENT-001",
+  "title": "Presentation Library",
+  "route": "/o/:org/present/decks",
+  "contractActions": [
+   "Create deck",
+   "import",
+   "duplicate",
+   "present"
+  ],
+  "contractOverlays": [
+   "Import",
+   "new deck",
+   "template preview"
+  ],
+  "edge": "Font and media substitutions disclosed on import",
+  "declared": [
+   {
+    "id": "Create deck",
+    "label": "New deck",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"new deck\""
+   },
+   {
+    "id": "import",
+    "label": "Import",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Import\""
+   },
+   {
+    "id": "duplicate",
+    "label": "Duplicate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.selectedId; if (!id) return; const source = await __vite_ssr_dynamic_import__(\"/src/platform/repo.ts\").then((module) ="
+   },
+   {
+    "id": "present",
+    "label": "Present",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/present/decks/${context.selectedId}/present`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PRESENT-002",
+  "title": "Slide Editor",
+  "route": "/o/:org/present/decks/:id",
+  "contractActions": [
+   "Insert slide",
+   "drag object",
+   "align",
+   "resize",
+   "comment",
+   "undo"
+  ],
+  "contractOverlays": [
+   "Layout picker",
+   "image insert",
+   "properties",
+   "AI suggestion"
+  ],
+  "edge": "Selected objects remain editable after AI changes",
+  "declared": [
+   {
+    "id": "Insert slide",
+    "label": "Insert slide",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Layout picker\""
+   },
+   {
+    "id": "drag object",
+    "label": "Move object",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void 0"
+   },
+   {
+    "id": "align",
+    "label": "Align",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Design\""
+   },
+   {
+    "id": "resize",
+    "label": "Resize",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void 0"
+   },
+   {
+    "id": "comment",
+    "label": "Comment",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"properties\""
+   },
+   {
+    "id": "undo",
+    "label": "Undo",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void 0"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PRESENT-003",
+  "title": "Master & Theme Editor",
+  "route": "/o/:org/present/decks/:id/theme",
+  "contractActions": [
+   "Change master",
+   "create layout",
+   "preview impact"
+  ],
+  "contractOverlays": [
+   "Theme editor",
+   "global apply review",
+   "font resolver"
+  ],
+  "edge": "Theme updates do not silently overwrite customized objects",
+  "declared": [
+   {
+    "id": "Change master",
+    "label": "Change theme",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Theme editor\""
+   },
+   {
+    "id": "create layout",
+    "label": "Layouts",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Layouts\""
+   },
+   {
+    "id": "preview impact",
+    "label": "Preview the impact",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"global apply review\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PRESENT-004",
+  "title": "Charts & Data",
+  "route": "/o/:org/present/decks/:id/data",
+  "contractActions": [
+   "Insert chart",
+   "link sheet",
+   "update data",
+   "show labels"
+  ],
+  "contractOverlays": [
+   "Dataset picker",
+   "chart inspector",
+   "unlink warning"
+  ],
+  "edge": "Source freshness and stale chart snapshot visible",
+  "declared": [
+   {
+    "id": "Insert chart",
+    "label": "Insert chart",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Dataset picker\""
+   },
+   {
+    "id": "link sheet",
+    "label": "Link a workbook",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Dataset picker\""
+   },
+   {
+    "id": "update data",
+    "label": "Check freshness",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Refresh\""
+   },
+   {
+    "id": "show labels",
+    "label": "Inspect a chart",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Sources\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PRESENT-005",
+  "title": "Transitions & Animation",
+  "route": "/o/:org/present/decks/:id/animation",
+  "contractActions": [
+   "Add animation",
+   "sequence",
+   "test",
+   "reduce motion"
+  ],
+  "contractOverlays": [
+   "Motion inspector",
+   "playback",
+   "accessibility review"
+  ],
+  "edge": "Presentation remains understandable with animations disabled",
+  "declared": [
+   {
+    "id": "Add animation",
+    "label": "Add animation",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Motion inspector\""
+   },
+   {
+    "id": "test",
+    "label": "Play",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Preview\""
+   },
+   {
+    "id": "sequence",
+    "label": "Sequence",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Objects\""
+   },
+   {
+    "id": "reduce motion",
+    "label": "Accessibility review",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"accessibility review\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PRESENT-006",
+  "title": "Presenter Mode",
+  "route": "/o/:org/present/decks/:id/present",
+  "contractActions": [
+   "Present",
+   "advance",
+   "annotate",
+   "end",
+   "export notes"
+  ],
+  "contractOverlays": [
+   "Display selector",
+   "rehearsal report",
+   "access confirmation"
+  ],
+  "edge": "Private notes never appear on public display",
+  "declared": [
+   {
+    "id": "Present",
+    "label": "Audience display",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Display selector\""
+   },
+   {
+    "id": "advance",
+    "label": "Presenter view",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Presenter\""
+   },
+   {
+    "id": "annotate",
+    "label": "Annotate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: context.toast(\"Annotation is not implemented\", \"Drawing over a live slide needs an overlay surface this editor does not have. Say it plainl"
+   },
+   {
+    "id": "end",
+    "label": "Rehearsal",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Rehearsal\""
+   },
+   {
+    "id": "export notes",
+    "label": "Export notes",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const record = await __vite_ssr_dynamic_import__(\"/src/platform/repo.ts\").then((module) => context.params.id ? module.getRecord(context.p"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PRESENT-007",
+  "title": "Review & Publish",
+  "route": "/o/:org/present/decks/:id/review",
+  "contractActions": [
+   "Resolve",
+   "approve",
+   "export",
+   "share"
+  ],
+  "contractOverlays": [
+   "Version comparison",
+   "export settings",
+   "approval"
+  ],
+  "edge": "Export quality and editable format tested",
+  "declared": [
+   {
+    "id": "approve",
+    "label": "Record an approval",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"approval\""
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"export settings\""
+   },
+   {
+    "id": "Resolve",
+    "label": "Resolve comments",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Comments\""
+   },
+   {
+    "id": "share",
+    "label": "Publish",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Publish\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DESIGN-001",
+  "title": "Design Files",
+  "route": "/o/:org/design/files",
+  "contractActions": [
+   "New file",
+   "import SVG",
+   "duplicate",
+   "fork",
+   "archive"
+  ],
+  "contractOverlays": [
+   "File setup",
+   "import issues",
+   "sharing"
+  ],
+  "edge": "Imported fonts and vector effects disclose unsupported features",
+  "declared": [
+   {
+    "id": "New file",
+    "label": "New file",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"File setup\""
+   },
+   {
+    "id": "import SVG",
+    "label": "Import SVG",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"import issues\""
+   },
+   {
+    "id": "duplicate",
+    "label": "Duplicate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const { db } = await __vite_ssr_dynamic_import__(\"/src/runtime/db.ts\"); const record = await db.records.get(context.selectedId); if (!rec"
+   },
+   {
+    "id": "fork",
+    "label": "Fork from a template",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const { db } = await __vite_ssr_dynamic_import__(\"/src/runtime/db.ts\"); const record = await db.records.get(context.selectedId); if (!rec"
+   },
+   {
+    "id": "archive",
+    "label": "Archive",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { await context.mutate.patch(context.selectedId, { status: \"archived\" }, { event: \"Design file archived\" }); context.toast(\"Archived\", \"The"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DESIGN-002",
+  "title": "Design Canvas",
+  "route": "/o/:org/design/files/:id",
+  "contractActions": [
+   "Select",
+   "draw",
+   "drag",
+   "resize",
+   "rotate",
+   "crop",
+   "zoom",
+   "pan"
+  ],
+  "contractOverlays": [
+   "Insert tools",
+   "fill picker",
+   "style inspector",
+   "export"
+  ],
+  "edge": "Unsaved operations recovered; large canvas virtualized",
+  "declared": [
+   {
+    "id": "Select",
+    "label": "Select all",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.params.id; if (!id) return; const { db } = await __vite_ssr_dynamic_import__(\"/src/runtime/db.ts\"); const record = awa"
+   },
+   {
+    "id": "draw",
+    "label": "Insert\u2026",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Insert tools\""
+   },
+   {
+    "id": "drag",
+    "label": "Hand tool",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: (0,__vite_ssr_import_13__.setTool)(\"hand\")"
+   },
+   {
+    "id": "resize",
+    "label": "Resize\u2026",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"style inspector\""
+   },
+   {
+    "id": "rotate",
+    "label": "Rotate 15\u00b0",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withDoc(context, (doc) => (0,__vite_ssr_import_8__.updatePage)(doc, (page) => (0,__vite_ssr_import_8__.patchNodes)(page, __vite_ssr_import_"
+   },
+   {
+    "id": "crop",
+    "label": "Crop frame to selection",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withDoc(context, (doc) => (0,__vite_ssr_import_8__.updatePage)(doc, (page) => { const ids = __vite_ssr_import_13__.designUi.get().selected;"
+   },
+   {
+    "id": "zoom",
+    "label": "Zoom to fit",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: (0,__vite_ssr_import_13__.requestFit)()"
+   },
+   {
+    "id": "pan",
+    "label": "Centre on selection",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: { const id = context.params.id; if (!id) return; const { db } = await __vite_ssr_dynamic_import__(\"/src/runtime/db.ts\"); const record = awa"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DESIGN-003",
+  "title": "Layers & Pages",
+  "route": "/o/:org/design/files/:id/layers",
+  "contractActions": [
+   "Rename",
+   "group",
+   "reorder",
+   "lock",
+   "isolate",
+   "select"
+  ],
+  "contractOverlays": [
+   "Layer context",
+   "move-to-page",
+   "component detach"
+  ],
+  "edge": "Hidden/locked layers cannot be edited accidentally",
+  "declared": [
+   {
+    "id": "Rename",
+    "label": "Rename layer",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Layer context\""
+   },
+   {
+    "id": "group",
+    "label": "Group",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withDoc(context, (doc) => (0,__vite_ssr_import_8__.updatePage)(doc, (page) => (0,__vite_ssr_import_8__.groupNodes)(page, __vite_ssr_import_"
+   },
+   {
+    "id": "reorder",
+    "label": "Bring forwards",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withDoc(context, (doc) => (0,__vite_ssr_import_8__.updatePage)(doc, (page) => __vite_ssr_import_13__.designUi.get().selected.reduce((acc, i"
+   },
+   {
+    "id": "lock",
+    "label": "Lock or unlock",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withDoc(context, (doc) => (0,__vite_ssr_import_8__.updatePage)(doc, (page) => (0,__vite_ssr_import_8__.patchNodes)(page, __vite_ssr_import_"
+   },
+   {
+    "id": "isolate",
+    "label": "Isolate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { __vite_ssr_import_13__.designUi.set((current) => ({ ...current, isolate: current.isolate ? void 0 : current.selected[0] })); context.toas"
+   },
+   {
+    "id": "select",
+    "label": "Clear the selection",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: (0,__vite_ssr_import_13__.setSelection)([])"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DESIGN-004",
+  "title": "Vector Path Editor",
+  "route": "/o/:org/design/files/:id/paths",
+  "contractActions": [
+   "Add point",
+   "adjust handle",
+   "join",
+   "subtract",
+   "simplify"
+  ],
+  "contractOverlays": [
+   "Point inspector",
+   "path operations",
+   "stroke editing"
+  ],
+  "edge": "Path exports preserve scale and fill rules",
+  "declared": [
+   {
+    "id": "Add point",
+    "label": "Pen tool",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: (0,__vite_ssr_import_13__.setTool)(\"pen\")"
+   },
+   {
+    "id": "adjust handle",
+    "label": "Point inspector",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Point inspector\""
+   },
+   {
+    "id": "join",
+    "label": "Close the path",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withDoc(context, (doc) => (0,__vite_ssr_import_8__.updatePage)(doc, (page) => { const nodeId = __vite_ssr_import_13__.designUi.get().pathNo"
+   },
+   {
+    "id": "subtract",
+    "label": "Combine\u2026",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Boolean\""
+   },
+   {
+    "id": "simplify",
+    "label": "Simplify",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withDoc(context, (doc) => (0,__vite_ssr_import_8__.updatePage)(doc, (page) => { const nodeId = __vite_ssr_import_13__.designUi.get().pathNo"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DESIGN-005",
+  "title": "Auto Layout & Responsive",
+  "route": "/o/:org/design/files/:id/layout",
+  "contractActions": [
+   "Set size",
+   "reorder",
+   "wrap",
+   "preview width",
+   "apply rules"
+  ],
+  "contractOverlays": [
+   "Layout inspector",
+   "constraint conflict",
+   "breakpoint preview"
+  ],
+  "edge": "Mixed fixed and responsive child constraints validated",
+  "declared": [
+   {
+    "id": "Set size",
+    "label": "Frame size\u2026",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Layout inspector\""
+   },
+   {
+    "id": "reorder",
+    "label": "Reverse the order",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withDoc(context, (doc) => (0,__vite_ssr_import_8__.updatePage)(doc, (page) => { const frameId = Object.values(page.nodes).find((node) => no"
+   },
+   {
+    "id": "wrap",
+    "label": "Toggle wrapping",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withDoc(context, (doc) => (0,__vite_ssr_import_8__.updatePage)(doc, (page) => { const frame = Object.values(page.nodes).find((node) => node"
+   },
+   {
+    "id": "preview width",
+    "label": "Breakpoint preview",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"breakpoint preview\""
+   },
+   {
+    "id": "apply rules",
+    "label": "Re-run auto layout",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withDoc(context, (doc) => (0,__vite_ssr_import_8__.updatePage)(doc, (page) => Object.values(page.nodes).filter((node) => node.layout).reduc"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DESIGN-006",
+  "title": "Components & Variants",
+  "route": "/o/:org/design/files/:id/components",
+  "contractActions": [
+   "Create component",
+   "publish",
+   "swap",
+   "detach",
+   "inspect uses"
+  ],
+  "contractOverlays": [
+   "Variant editor",
+   "library publish",
+   "breaking-change diff"
+  ],
+  "edge": "Global component change shows affected instances",
+  "declared": [
+   {
+    "id": "Create component",
+    "label": "Create a component",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withDoc(context, (doc) => (0,__vite_ssr_import_8__.createComponent)(doc, __vite_ssr_import_13__.designUi.get().selected[0], (0,__vite_ssr_i"
+   },
+   {
+    "id": "publish",
+    "label": "Publish to the library",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"library publish\""
+   },
+   {
+    "id": "swap",
+    "label": "Swap an instance",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Variant editor\""
+   },
+   {
+    "id": "detach",
+    "label": "Detach the selected instance",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withDoc(context, (doc) => (0,__vite_ssr_import_8__.detachInstance)(doc, __vite_ssr_import_13__.designUi.get().selected[0]), \"Detached an in"
+   },
+   {
+    "id": "inspect uses",
+    "label": "Where it is used",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Usage\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DESIGN-007",
+  "title": "Typography & Styles",
+  "route": "/o/:org/design/files/:id/styles",
+  "contractActions": [
+   "Create style",
+   "edit token",
+   "apply to selection",
+   "inspect contrast"
+  ],
+  "contractOverlays": [
+   "Font browser",
+   "gradient editor",
+   "style impact"
+  ],
+  "edge": "Unavailable font is substituted only with disclosure",
+  "declared": [
+   {
+    "id": "Create style",
+    "label": "New text style",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withDoc(context, (doc) => ({ ...doc, textStyles: [...doc.textStyles, { id: `ts-${Date.now().toString(36)}`, name: `Style ${doc.textStyles.l"
+   },
+   {
+    "id": "edit token",
+    "label": "New colour token",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withDoc(context, (doc) => ({ ...doc, colors: [...doc.colors, { id: `tok-${Date.now().toString(36)}`, name: `Colour ${doc.colors.length + 1}"
+   },
+   {
+    "id": "apply to selection",
+    "label": "Apply the first style",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withDoc(context, (doc) => (0,__vite_ssr_import_8__.updatePage)(doc, (page) => (0,__vite_ssr_import_8__.patchNodes)(page, __vite_ssr_import_"
+   },
+   {
+    "id": "inspect contrast",
+    "label": "Contrast check",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"style impact\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DESIGN-008",
+  "title": "Prototype & Interactions",
+  "route": "/o/:org/design/files/:id/prototype",
+  "contractActions": [
+   "Link screens",
+   "set trigger",
+   "run preview",
+   "publish prototype"
+  ],
+  "contractOverlays": [
+   "Interaction editor",
+   "transition options",
+   "device preview"
+  ],
+  "edge": "Prototype cannot masquerade as connected production backend",
+  "declared": [
+   {
+    "id": "Link screens",
+    "label": "Link screens",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to context.path(\"/o/:org/design/files/:id\", context.params.id"
+   },
+   {
+    "id": "set trigger",
+    "label": "Interaction editor",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Interaction editor\""
+   },
+   {
+    "id": "run preview",
+    "label": "Run the preview",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Preview\""
+   },
+   {
+    "id": "publish prototype",
+    "label": "Publish",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"device preview\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DESIGN-009",
+  "title": "Assets & Export",
+  "route": "/o/:org/design/files/:id/assets",
+  "contractActions": [
+   "Replace asset",
+   "crop",
+   "batch export",
+   "organize"
+  ],
+  "contractOverlays": [
+   "Asset picker",
+   "export settings",
+   "license note"
+  ],
+  "edge": "Rights and licensing metadata preserved",
+  "declared": [
+   {
+    "id": "Replace asset",
+    "label": "Add or replace an asset",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Asset picker\""
+   },
+   {
+    "id": "crop",
+    "label": "Crop an asset",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Asset picker\""
+   },
+   {
+    "id": "batch export",
+    "label": "Export settings",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"export settings\""
+   },
+   {
+    "id": "organize",
+    "label": "Sort assets by name",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withDoc(context, (doc) => ({ ...doc, assets: [...doc.assets].sort((a, b) => a.name.localeCompare(b.name)) }), \"Sorted the assets\")"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-DESIGN-010",
+  "title": "Design Review",
+  "route": "/o/:org/design/files/:id/review",
+  "contractActions": [
+   "Annotate",
+   "approve",
+   "compare",
+   "assign fixes"
+  ],
+  "contractOverlays": [
+   "Comment editor",
+   "version compare",
+   "signoff"
+  ],
+  "edge": "Approval binds to specific version not future edits",
+  "declared": [
+   {
+    "id": "Annotate",
+    "label": "Annotate",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Comment editor\""
+   },
+   {
+    "id": "approve",
+    "label": "Record a decision",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"signoff\""
+   },
+   {
+    "id": "compare",
+    "label": "Compare versions",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Diff\""
+   },
+   {
+    "id": "assign fixes",
+    "label": "Assign the open comments",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.params.id; if (!id) return; const { db } = await __vite_ssr_dynamic_import__(\"/src/runtime/db.ts\"); const record = awa"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PHOTO-001",
+  "title": "Photo Library",
+  "route": "/o/:org/photo/photos",
+  "contractActions": [
+   "Upload",
+   "tag",
+   "select",
+   "compare",
+   "open"
+  ],
+  "contractOverlays": [
+   "Bulk import",
+   "asset detail",
+   "license"
+  ],
+  "edge": "Corrupt or unsupported format does not compromise library",
+  "declared": [
+   {
+    "id": "Upload",
+    "label": "Upload",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Bulk import\""
+   },
+   {
+    "id": "tag",
+    "label": "Tag",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const { db } = await __vite_ssr_dynamic_import__(\"/src/runtime/db.ts\"); const record = await db.records.get(context.selectedId); if (!rec"
+   },
+   {
+    "id": "select",
+    "label": "Clear the selection",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: context.select(void 0)"
+   },
+   {
+    "id": "compare",
+    "label": "Compare",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"asset detail\""
+   },
+   {
+    "id": "open",
+    "label": "Open",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to context.path(\"/o/:org/photo/photos/:id\", context.selectedId"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PHOTO-002",
+  "title": "Raster Editor",
+  "route": "/o/:org/photo/photos/:id",
+  "contractActions": [
+   "Crop",
+   "brush",
+   "clone",
+   "transform",
+   "paint",
+   "undo"
+  ],
+  "contractOverlays": [
+   "Tool options",
+   "canvas size",
+   "adjustment layer"
+  ],
+  "edge": "Destructive transformations versioned and restorable",
+  "declared": [
+   {
+    "id": "Crop",
+    "label": "Crop",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const draft = __vite_ssr_import_10__.photoUi.get().cropDraft; if (!draft || draft.rect.w < 4 || draft.rect.h < 4) { (0,__vite_ssr_import_"
+   },
+   {
+    "id": "brush",
+    "label": "Brush",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: (0,__vite_ssr_import_10__.setPhotoTool)(\"brush\")"
+   },
+   {
+    "id": "clone",
+    "label": "Clone",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { (0,__vite_ssr_import_10__.setPhotoTool)(\"clone\"); context.toast(\"Clone is the brush for now\", \"Sampling from another part of the image is"
+   },
+   {
+    "id": "transform",
+    "label": "Rotate the layer 90\u00b0",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withPhoto(context, (doc) => (0,__vite_ssr_import_7__.patchLayer)(doc, doc.activeLayerId, { rotation: ((0,__vite_ssr_import_7__.layerById)(d"
+   },
+   {
+    "id": "paint",
+    "label": "Eraser",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: (0,__vite_ssr_import_10__.setPhotoTool)(\"eraser\")"
+   },
+   {
+    "id": "undo",
+    "label": "Undo",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { context.toast(\"Use \u2318Z on the canvas\", \"The editor's undo stack is on the canvas toolbar and on \u2318Z; it holds every step of this session.\","
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PHOTO-003",
+  "title": "Selections & Masks",
+  "route": "/o/:org/photo/photos/:id/masks",
+  "contractActions": [
+   "Lasso",
+   "select subject",
+   "refine edge",
+   "invert",
+   "mask"
+  ],
+  "contractOverlays": [
+   "Selection options",
+   "refinement",
+   "quick mask"
+  ],
+  "edge": "Selection persists correctly across image transforms",
+  "declared": [
+   {
+    "id": "Lasso",
+    "label": "Lasso",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: (0,__vite_ssr_import_10__.setPhotoTool)(\"lasso\")"
+   },
+   {
+    "id": "select subject",
+    "label": "Select the subject",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Selection options\""
+   },
+   {
+    "id": "refine edge",
+    "label": "Refine the edge",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Refine\""
+   },
+   {
+    "id": "invert",
+    "label": "Invert",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withPhoto(context, (doc) => ({ ...doc, selection: doc.selection ? { ...doc.selection, inverted: !doc.selection.inverted } : void 0 }), \"Inv"
+   },
+   {
+    "id": "mask",
+    "label": "Quick mask",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"quick mask\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PHOTO-004",
+  "title": "Adjustments & Colour",
+  "route": "/o/:org/photo/photos/:id/adjust",
+  "contractActions": [
+   "Adjust slider",
+   "reset",
+   "save preset",
+   "compare"
+  ],
+  "contractOverlays": [
+   "Histogram",
+   "colour picker",
+   "profile warning"
+  ],
+  "edge": "Colour profile conversion identified and tested",
+  "declared": [
+   {
+    "id": "Adjust slider",
+    "label": "Brighten by a third of a stop",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withPhoto(context, (doc) => { const target = doc.layers.filter((layer) => layer.kind === \"adjustment\").at(-1); if (!target?.adjust) return"
+   },
+   {
+    "id": "reset",
+    "label": "Reset",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withPhoto(context, (doc) => { const target = doc.layers.filter((layer) => layer.kind === \"adjustment\").at(-1); return target ? (0,__vite_ss"
+   },
+   {
+    "id": "save preset",
+    "label": "Save as a preset",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withPhoto(context, (doc) => { const target = doc.layers.filter((layer) => layer.kind === \"adjustment\").at(-1); if (!target?.adjust) return"
+   },
+   {
+    "id": "compare",
+    "label": "Compare",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: __vite_ssr_import_10__.photoUi.set((current) => ({ ...current, compare: !current.compare }))"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PHOTO-005",
+  "title": "Compositing & Layers",
+  "route": "/o/:org/photo/photos/:id/layers",
+  "contractActions": [
+   "Reorder",
+   "group",
+   "blend",
+   "transform",
+   "replace"
+  ],
+  "contractOverlays": [
+   "Blend picker",
+   "layer properties",
+   "linked object"
+  ],
+  "edge": "AI results never silently flatten editable layer hierarchy",
+  "declared": [
+   {
+    "id": "Reorder",
+    "label": "Raise the layer",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withPhoto(context, (doc) => moveLayerLocal(doc, doc.activeLayerId, 1), \"Raised a layer\")"
+   },
+   {
+    "id": "group",
+    "label": "Group",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Groups\""
+   },
+   {
+    "id": "blend",
+    "label": "Blend mode\u2026",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Blend picker\""
+   },
+   {
+    "id": "transform",
+    "label": "Flip the layer",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withPhoto(context, (doc) => (0,__vite_ssr_import_7__.patchLayer)(doc, doc.activeLayerId, { rotation: ((0,__vite_ssr_import_7__.layerById)(d"
+   },
+   {
+    "id": "replace",
+    "label": "Place an asset",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"linked object\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PHOTO-006",
+  "title": "Batch Processing",
+  "route": "/o/:org/photo/batch",
+  "contractActions": [
+   "Build batch",
+   "test sample",
+   "execute",
+   "download"
+  ],
+  "contractOverlays": [
+   "Preset editor",
+   "overwrite confirmation",
+   "result report"
+  ],
+  "edge": "Jobs resumable; output collisions handled deterministically",
+  "declared": [
+   {
+    "id": "Build batch",
+    "label": "Build the batch",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Queue\""
+   },
+   {
+    "id": "test sample",
+    "label": "Test one sample",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Presets\""
+   },
+   {
+    "id": "execute",
+    "label": "Run the queue",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Queue\""
+   },
+   {
+    "id": "download",
+    "label": "Results",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Results\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PHOTO-007",
+  "title": "Photo Export",
+  "route": "/o/:org/photo/photos/:id/export",
+  "contractActions": [
+   "Set format",
+   "preview",
+   "export",
+   "upload to asset library"
+  ],
+  "contractOverlays": [
+   "Export preview",
+   "rights",
+   "profile handling"
+  ],
+  "edge": "Aspect ratio and transparency not silently altered",
+  "declared": [
+   {
+    "id": "Set format",
+    "label": "Formats",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Export\""
+   },
+   {
+    "id": "preview",
+    "label": "Preview the real file",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Export preview\""
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Export\""
+   },
+   {
+    "id": "upload to asset library",
+    "label": "Add to the asset library",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Publish\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-LAYOUT-001",
+  "title": "Publication Library",
+  "route": "/o/:org/layout/publications",
+  "contractActions": [
+   "New publication",
+   "import",
+   "duplicate",
+   "open"
+  ],
+  "contractOverlays": [
+   "Page preset",
+   "import review",
+   "share"
+  ],
+  "edge": "Print metric units and bleed preserved on import",
+  "declared": [
+   {
+    "id": "New publication",
+    "label": "New publication",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Page preset\""
+   },
+   {
+    "id": "import",
+    "label": "Import copy",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"import review\""
+   },
+   {
+    "id": "duplicate",
+    "label": "Duplicate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const { db } = await __vite_ssr_dynamic_import__(\"/src/runtime/db.ts\"); const record = await db.records.get(context.selectedId); if (!rec"
+   },
+   {
+    "id": "open",
+    "label": "Open",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to context.path(\"/o/:org/layout/publications/:id\", context.selectedId"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-LAYOUT-002",
+  "title": "Publication Editor",
+  "route": "/o/:org/layout/publications/:id",
+  "contractActions": [
+   "Create page",
+   "place frame",
+   "flow text",
+   "snap",
+   "export"
+  ],
+  "contractOverlays": [
+   "Frame editor",
+   "page settings",
+   "overset warning"
+  ],
+  "edge": "Overset text must never vanish silently",
+  "declared": [
+   {
+    "id": "Create page",
+    "label": "Add a page",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withPublication(context, (doc) => { const id = `pg-${Date.now().toString(36)}`; return { ...doc, pages: [...doc.pages, { id, masterId: doc."
+   },
+   {
+    "id": "place frame",
+    "label": "Place a frame",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: (0,__vite_ssr_import_9__.setLayoutTool)(\"text\")"
+   },
+   {
+    "id": "flow text",
+    "label": "Thread frames",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: (0,__vite_ssr_import_9__.setLayoutTool)(\"thread\")"
+   },
+   {
+    "id": "snap",
+    "label": "Guides",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: __vite_ssr_import_9__.layoutUi.set((current) => ({ ...current, showGuides: !current.showGuides }))"
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `${context.path(\"/o/:org/layout/publications/:id/preflight\", context.params.id"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-LAYOUT-003",
+  "title": "Master Pages",
+  "route": "/o/:org/layout/publications/:id/masters",
+  "contractActions": [
+   "Create master",
+   "apply",
+   "override",
+   "preview"
+  ],
+  "contractOverlays": [
+   "Master editor",
+   "override confirmation"
+  ],
+  "edge": "Global master change shows impact on all spreads",
+  "declared": [
+   {
+    "id": "Create master",
+    "label": "Create a master",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withPublication(context, (doc) => ({ ...doc, masters: [...doc.masters, { id: `mp-${Date.now().toString(36)}`, name: `Master ${doc.masters.l"
+   },
+   {
+    "id": "apply",
+    "label": "Apply to pages",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Master editor\""
+   },
+   {
+    "id": "override",
+    "label": "Override a frame",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"override confirmation\""
+   },
+   {
+    "id": "preview",
+    "label": "Usage",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Usage\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-LAYOUT-004",
+  "title": "Typography & Flow",
+  "route": "/o/:org/layout/publications/:id/typography",
+  "contractActions": [
+   "Edit styles",
+   "link frames",
+   "adjust tracking",
+   "inspect overset"
+  ],
+  "contractOverlays": [
+   "Text style",
+   "flow options",
+   "preflight issue"
+  ],
+  "edge": "Page break and thread order remain deterministic",
+  "declared": [
+   {
+    "id": "Edit styles",
+    "label": "New paragraph style",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withPublication(context, (doc) => ({ ...doc, paragraphStyles: [...doc.paragraphStyles, { ...__vite_ssr_import_9__.BASE_STYLES[0], id: `ps-$"
+   },
+   {
+    "id": "link frames",
+    "label": "Flow",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Flow\""
+   },
+   {
+    "id": "adjust tracking",
+    "label": "Tighten the tracking",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withPublication(context, (doc) => ({ ...doc, paragraphStyles: doc.paragraphStyles.map((style, index) => index === 0 ? { ...style, tracking:"
+   },
+   {
+    "id": "inspect overset",
+    "label": "Overset",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"preflight issue\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-LAYOUT-005",
+  "title": "Print & Preflight",
+  "route": "/o/:org/layout/publications/:id/preflight",
+  "contractActions": [
+   "Inspect issue",
+   "fix",
+   "proof",
+   "export press PDF"
+  ],
+  "contractOverlays": [
+   "Preflight detail",
+   "export setup",
+   "missing asset"
+  ],
+  "edge": "Noncompliant print output blocked or clearly warned",
+  "declared": [
+   {
+    "id": "Inspect issue",
+    "label": "Findings",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Preflight detail\""
+   },
+   {
+    "id": "fix",
+    "label": "Set a 3mm bleed",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withPublication(context, (doc) => ({ ...doc, bleed: (0,__vite_ssr_import_7__.mm)(3) }), \"Set a 3mm bleed\")"
+   },
+   {
+    "id": "proof",
+    "label": "Proof",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Proof\""
+   },
+   {
+    "id": "export press PDF",
+    "label": "Export",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Export\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-VIDEO-001",
+  "title": "Video Projects",
+  "route": "/o/:org/video/projects",
+  "contractActions": [
+   "Create",
+   "import media",
+   "duplicate",
+   "open"
+  ],
+  "contractOverlays": [
+   "Media import",
+   "new sequence",
+   "project settings"
+  ],
+  "edge": "Footage privacy/licensing checked on ingest",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "Create",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"new sequence\""
+   },
+   {
+    "id": "import media",
+    "label": "Import media",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to context.path(\"/o/:org/video/projects/:id/media\", context.selectedId"
+   },
+   {
+    "id": "duplicate",
+    "label": "Duplicate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const { db } = await __vite_ssr_dynamic_import__(\"/src/runtime/db.ts\"); const record = await db.records.get(context.selectedId); if (!rec"
+   },
+   {
+    "id": "open",
+    "label": "Open",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to context.path(\"/o/:org/video/projects/:id\", context.selectedId"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-VIDEO-002",
+  "title": "Video Timeline",
+  "route": "/o/:org/video/projects/:id",
+  "contractActions": [
+   "Trim",
+   "split",
+   "ripple",
+   "drag clips",
+   "scrub",
+   "undo"
+  ],
+  "contractOverlays": [
+   "Clip property",
+   "transition editor",
+   "proxy status"
+  ],
+  "edge": "Timeline timebase stable across variable frame rate assets",
+  "declared": [
+   {
+    "id": "Trim",
+    "label": "Trim one frame off the end",
+    "placement": "toolbar",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withVideo(context, (doc) => (0,__vite_ssr_import_7__.trimClip)(doc, __vite_ssr_import_10__.videoUi.get().selectedClipId, \"end\", -1 / doc.fp"
+   },
+   {
+    "id": "split",
+    "label": "Split at the playhead",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withVideo(context, (doc) => (0,__vite_ssr_import_7__.splitClip)(doc, __vite_ssr_import_10__.videoUi.get().selectedClipId, __vite_ssr_import"
+   },
+   {
+    "id": "ripple",
+    "label": "Ripple delete",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withVideo(context, (doc) => (0,__vite_ssr_import_7__.rippleDelete)(doc, __vite_ssr_import_10__.videoUi.get().selectedClipId), \"Ripple delet"
+   },
+   {
+    "id": "drag clips",
+    "label": "Select tool",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: (0,__vite_ssr_import_10__.setVideoTool)(\"select\")"
+   },
+   {
+    "id": "scrub",
+    "label": "Go to the start",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: __vite_ssr_import_10__.videoUi.set((current) => ({ ...current, playhead: 0, playing: false }))"
+   },
+   {
+    "id": "undo",
+    "label": "Transitions",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"transition editor\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-VIDEO-003",
+  "title": "Media Bin",
+  "route": "/o/:org/video/projects/:id/media",
+  "contractActions": [
+   "Import",
+   "relink",
+   "tag",
+   "proxy generate",
+   "audition"
+  ],
+  "contractOverlays": [
+   "Media inspector",
+   "relink file",
+   "license"
+  ],
+  "edge": "Missing footage never silently replaced with unrelated media",
+  "declared": [
+   {
+    "id": "Import",
+    "label": "Add a source",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Media inspector\""
+   },
+   {
+    "id": "relink",
+    "label": "Relink",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"relink file\""
+   },
+   {
+    "id": "tag",
+    "label": "Mark the rights as company-owned",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withVideo(context, (doc) => ({ ...doc, sources: doc.sources.map((source) => source.license === \"Unknown\" ? { ...source, license: \"Company-o"
+   },
+   {
+    "id": "proxy generate",
+    "label": "Proxies",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Proxy\""
+   },
+   {
+    "id": "audition",
+    "label": "Missing media",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Missing\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-VIDEO-004",
+  "title": "Audio Mixer",
+  "route": "/o/:org/video/projects/:id/audio",
+  "contractActions": [
+   "Adjust gain",
+   "mute",
+   "automate",
+   "export mix"
+  ],
+  "contractOverlays": [
+   "Mixer property",
+   "loudness review",
+   "voice cleanup"
+  ],
+  "edge": "Audio export warns about clipping and loudness failures",
+  "declared": [
+   {
+    "id": "Adjust gain",
+    "label": "Pull every track down 1 dB",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withVideo(context, (doc) => ({ ...doc, tracks: doc.tracks.map((track) => track.kind === \"audio\" ? { ...track, gainDb: (track.gainDb ?? 0) -"
+   },
+   {
+    "id": "mute",
+    "label": "Mute every audio track",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withVideo(context, (doc) => ({ ...doc, tracks: doc.tracks.map((track) => track.kind === \"audio\" ? { ...track, muted: !track.muted } : track"
+   },
+   {
+    "id": "automate",
+    "label": "Effects",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Effects\""
+   },
+   {
+    "id": "export mix",
+    "label": "Loudness",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Loudness\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-VIDEO-005",
+  "title": "Captions & Transcript",
+  "route": "/o/:org/video/projects/:id/captions",
+  "contractActions": [
+   "Correct",
+   "split cue",
+   "time",
+   "style",
+   "export SRT"
+  ],
+  "contractOverlays": [
+   "Caption editor",
+   "speaker verification",
+   "language review"
+  ],
+  "edge": "Subtitle text not treated as word-perfect without review",
+  "declared": [
+   {
+    "id": "Correct",
+    "label": "Add a cue at the playhead",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withVideo(context, (doc) => ({ ...doc, captions: [...doc.captions, { id: `cap-${Date.now().toString(36)}`, start: __vite_ssr_import_10__.vi"
+   },
+   {
+    "id": "split cue",
+    "label": "Split the cue at the playhead",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: withVideo(context, (doc) => { const caption = doc.captions.find((item) => __vite_ssr_import_10__.videoUi.get().playhead > item.start && __v"
+   },
+   {
+    "id": "time",
+    "label": "Review",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Review\""
+   },
+   {
+    "id": "style",
+    "label": "Languages",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Languages\""
+   },
+   {
+    "id": "export SRT",
+    "label": "Export SRT",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.params.id; if (!id) return; const { db } = await __vite_ssr_dynamic_import__(\"/src/runtime/db.ts\"); const record = awa"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-VIDEO-006",
+  "title": "Colour & Effects",
+  "route": "/o/:org/video/projects/:id/effects",
+  "contractActions": [
+   "Apply",
+   "reorder",
+   "preview",
+   "bypass",
+   "reset"
+  ],
+  "contractOverlays": [
+   "Effect inspector",
+   "scope display",
+   "preset save"
+  ],
+  "edge": "Effect rendering may differ; export preflight required",
+  "declared": [
+   {
+    "id": "Apply",
+    "label": "Presets",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Presets\""
+   },
+   {
+    "id": "reorder",
+    "label": "Reverse the effect order",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withVideo(context, (doc) => (0,__vite_ssr_import_7__.patchClip)(doc, __vite_ssr_import_10__.videoUi.get().selectedClipId, { effects: [...do"
+   },
+   {
+    "id": "preview",
+    "label": "Compare",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Compare\""
+   },
+   {
+    "id": "bypass",
+    "label": "Bypass every effect",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: __vite_ssr_import_10__.videoUi.set((current) => ({ ...current, bypassEffects: !current.bypassEffects }))"
+   },
+   {
+    "id": "reset",
+    "label": "Clear the grade",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: withVideo(context, (doc) => (0,__vite_ssr_import_7__.patchClip)(doc, __vite_ssr_import_10__.videoUi.get().selectedClipId, { effects: [] }),"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-VIDEO-007",
+  "title": "Video Export & Render",
+  "route": "/o/:org/video/projects/:id/export",
+  "contractActions": [
+   "Render preview",
+   "export",
+   "cancel",
+   "download",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Render settings",
+   "compatibility",
+   "delivery confirmation"
+  ],
+  "edge": "Render is resumable; no success claimed before artifact verified",
+  "declared": [
+   {
+    "id": "Render preview",
+    "label": "Contact sheet",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Export\""
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Export\""
+   },
+   {
+    "id": "cancel",
+    "label": "Queue",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Queue\""
+   },
+   {
+    "id": "download",
+    "label": "History",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"History\""
+   },
+   {
+    "id": "publish",
+    "label": "Compatibility",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"compatibility\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-VIDEO-008",
+  "title": "Video Review",
+  "route": "/o/:org/video/projects/:id/review",
+  "contractActions": [
+   "Comment timestamp",
+   "compare",
+   "approve",
+   "assign edit"
+  ],
+  "contractOverlays": [
+   "Review marker",
+   "version comparison",
+   "final signoff"
+  ],
+  "edge": "Approved cut locked to immutable asset digest",
+  "declared": [
+   {
+    "id": "Comment timestamp",
+    "label": "Comment here",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Review marker\""
+   },
+   {
+    "id": "compare",
+    "label": "Compare versions",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Versions\""
+   },
+   {
+    "id": "approve",
+    "label": "Record a decision",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"final signoff\""
+   },
+   {
+    "id": "assign edit",
+    "label": "Assign every open note",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.params.id; if (!id) return; const { db } = await __vite_ssr_dynamic_import__(\"/src/runtime/db.ts\"); const record = awa"
+   }
+  ],
+  "missingActions": []
+ }
+]

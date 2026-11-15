@@ -1,0 +1,2398 @@
+[
+ {
+  "screen": "ARL-WEB-001",
+  "title": "Website Directory",
+  "route": "/o/:org/web/sites",
+  "contractActions": [
+   "Create",
+   "duplicate",
+   "open",
+   "archive",
+   "inspect health"
+  ],
+  "contractOverlays": [
+   "Site setup",
+   "domain attach",
+   "publish status"
+  ],
+  "edge": "Unknown deployment state not shown as live",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New site",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Site setup\""
+   },
+   {
+    "id": "open",
+    "label": "Open",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/web/sites/${context.selectedId}`"
+   },
+   {
+    "id": "duplicate",
+    "label": "Duplicate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const source = await __vite_ssr_dynamic_import__(\"/src/platform/repo.ts\").then((module) => module.getRecord(context.selectedId ?? \"\")); i"
+   },
+   {
+    "id": "archive",
+    "label": "Archive",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { await context.mutate.patch(context.selectedId, { status: \"archived\" }, { event: \"Site archived\" }); context.toast(\"Site archived\", \"It st"
+   },
+   {
+    "id": "inspect health",
+    "label": "Inspect health",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"publish status\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-WEB-002",
+  "title": "Site Dashboard",
+  "route": "/o/:org/web/sites/:id",
+  "contractActions": [
+   "Open editor",
+   "preview",
+   "view logs",
+   "deploy"
+  ],
+  "contractOverlays": [
+   "Deploy inspector",
+   "domain check",
+   "site settings"
+  ],
+  "edge": "Analytics consent and source gaps marked",
+  "declared": [
+   {
+    "id": "Open editor",
+    "label": "Open the builder",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/web/sites/${context.params.id ?? \"\"}/builder`"
+   },
+   {
+    "id": "preview",
+    "label": "Preview",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Settings\""
+   },
+   {
+    "id": "view logs",
+    "label": "View logs",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/web/sites/${context.params.id ?? \"\"}/deploy?tab=Logs`"
+   },
+   {
+    "id": "deploy",
+    "label": "Deploy",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Publish review\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-WEB-003",
+  "title": "Visual Page Builder",
+  "route": "/o/:org/web/sites/:id/builder",
+  "contractActions": [
+   "Drag component",
+   "edit text",
+   "resize",
+   "reorder",
+   "undo"
+  ],
+  "contractOverlays": [
+   "Element inspector",
+   "insert panel",
+   "AI edit diff"
+  ],
+  "edge": "Visual preview reflects actual responsive browser layout",
+  "declared": [
+   {
+    "id": "Drag component",
+    "label": "Insert a block",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"insert panel\""
+   },
+   {
+    "id": "edit text",
+    "label": "Edit the selection",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Element inspector\""
+   },
+   {
+    "id": "resize",
+    "label": "Next breakpoint",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: { const next = __vite_ssr_import_12__.useWebUi.getState().cycleBreakpoint(); context.toast(\"Breakpoint changed\", `The canvas now renders at"
+   },
+   {
+    "id": "reorder",
+    "label": "Reorder blocks",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Build\""
+   },
+   {
+    "id": "undo",
+    "label": "Undo",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const sites = await __vite_ssr_dynamic_import__(\"/src/platform/repo.ts\").then((module) => module.listByCollection(context.org.id, \"sites\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-WEB-004",
+  "title": "Component Library",
+  "route": "/o/:org/web/sites/:id/components",
+  "contractActions": [
+   "Create",
+   "import",
+   "update",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Component property",
+   "breaking change",
+   "token update"
+  ],
+  "edge": "Global edit preview before broad replacement",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "Extract a section",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Component property\""
+   },
+   {
+    "id": "import",
+    "label": "Import",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"token update\""
+   },
+   {
+    "id": "update",
+    "label": "Update everywhere",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"breaking change\""
+   },
+   {
+    "id": "publish",
+    "label": "Share with the workspace",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Component property\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-WEB-005",
+  "title": "CMS Editor",
+  "route": "/o/:org/web/sites/:id/cms",
+  "contractActions": [
+   "Create collection",
+   "edit entry",
+   "bulk publish",
+   "import"
+  ],
+  "contractOverlays": [
+   "Schema editor",
+   "entry detail",
+   "migration preview"
+  ],
+  "edge": "Schema migration must preserve published content",
+  "declared": [
+   {
+    "id": "Create collection",
+    "label": "New collection",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Schema editor\""
+   },
+   {
+    "id": "edit entry",
+    "label": "New entry",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"entry detail\""
+   },
+   {
+    "id": "bulk publish",
+    "label": "Publish entries",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Entries\""
+   },
+   {
+    "id": "import",
+    "label": "Import CSV",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Import\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-WEB-006",
+  "title": "Site Navigation",
+  "route": "/o/:org/web/sites/:id/navigation",
+  "contractActions": [
+   "Reorder",
+   "add route",
+   "preview",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Link picker",
+   "redirect rules",
+   "broken link scan"
+  ],
+  "edge": "Deleting route surfaces incoming links and SEO implications",
+  "declared": [
+   {
+    "id": "add route",
+    "label": "Add a route",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Link picker\""
+   },
+   {
+    "id": "Reorder",
+    "label": "Reorder",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: context.toast(\"Reordering\", \"Drag a grip, or use the Move up and Move down buttons on each link.\")"
+   },
+   {
+    "id": "preview",
+    "label": "Preview at 390px",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Mobile\""
+   },
+   {
+    "id": "publish",
+    "label": "Publish review",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Publish review\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-WEB-007",
+  "title": "Forms & Integrations",
+  "route": "/o/:org/web/sites/:id/forms",
+  "contractActions": [
+   "Edit form",
+   "test",
+   "set webhook",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Field editor",
+   "consent inspector",
+   "submission routing"
+  ],
+  "edge": "Form submission never exposed to wrong tenant",
+  "declared": [
+   {
+    "id": "Edit form",
+    "label": "Edit fields",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Fields\""
+   },
+   {
+    "id": "test",
+    "label": "Test a submission",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Fields\""
+   },
+   {
+    "id": "set webhook",
+    "label": "Set a webhook",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"submission routing\""
+   },
+   {
+    "id": "publish",
+    "label": "Consent text",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"consent inspector\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-WEB-008",
+  "title": "SEO & Accessibility",
+  "route": "/o/:org/web/sites/:id/quality",
+  "contractActions": [
+   "Run audit",
+   "view issue",
+   "apply proposed fix",
+   "retest"
+  ],
+  "contractOverlays": [
+   "Issue detail",
+   "code diff",
+   "audit report"
+  ],
+  "edge": "Claims of accessibility compliance require verified tests",
+  "declared": [
+   {
+    "id": "Run audit",
+    "label": "Run the audit",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const sites = await __vite_ssr_dynamic_import__(\"/src/platform/repo.ts\").then((module) => module.listByCollection(context.org.id, \"sites\""
+   },
+   {
+    "id": "view issue",
+    "label": "Inspect an issue",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Issue detail\""
+   },
+   {
+    "id": "apply proposed fix",
+    "label": "See the diff",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"code diff\""
+   },
+   {
+    "id": "retest",
+    "label": "Export the report",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"audit report\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-WEB-009",
+  "title": "Domains & Publishing",
+  "route": "/o/:org/web/sites/:id/deploy",
+  "contractActions": [
+   "Verify domain",
+   "publish",
+   "rollback",
+   "inspect"
+  ],
+  "contractOverlays": [
+   "Publish review",
+   "DNS instructions",
+   "deployment issue"
+  ],
+  "edge": "Published site only marked live after health checks",
+  "declared": [
+   {
+    "id": "publish",
+    "label": "Publish",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Publish review\""
+   },
+   {
+    "id": "Verify domain",
+    "label": "Verify a domain",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"domain check\""
+   },
+   {
+    "id": "rollback",
+    "label": "Roll back",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"deployment issue\""
+   },
+   {
+    "id": "inspect",
+    "label": "DNS records",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"DNS instructions\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-WEB-010",
+  "title": "Web Analytics",
+  "route": "/o/:org/web/sites/:id/analytics",
+  "contractActions": [
+   "Build chart",
+   "compare periods",
+   "export",
+   "inspect"
+  ],
+  "contractOverlays": [
+   "Metric source",
+   "event setup",
+   "attribution note"
+  ],
+  "edge": "Cookie consent respected and measured loss disclosed",
+  "declared": [
+   {
+    "id": "Build chart",
+    "label": "Choose an event",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"event setup\""
+   },
+   {
+    "id": "compare periods",
+    "label": "Compare periods",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Conversion\""
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Conversion\""
+   },
+   {
+    "id": "inspect",
+    "label": "Where a figure comes from",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Metric source\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BUILD-001",
+  "title": "App Project Library",
+  "route": "/o/:org/build/projects",
+  "contractActions": [
+   "Create",
+   "import repo",
+   "clone",
+   "open"
+  ],
+  "contractOverlays": [
+   "Project setup",
+   "Git import",
+   "environment config"
+  ],
+  "edge": "Imported code scanned and sandboxed",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New project",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Project setup\""
+   },
+   {
+    "id": "open",
+    "label": "Open",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/build/projects/${context.selectedId}`"
+   },
+   {
+    "id": "import repo",
+    "label": "Import a repository",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Git import\""
+   },
+   {
+    "id": "clone",
+    "label": "Clone",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const repo = await __vite_ssr_dynamic_import__(\"/src/platform/repo.ts\"); const source = await repo.getRecord(context.selectedId ?? \"\"); i"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BUILD-002",
+  "title": "Application Overview",
+  "route": "/o/:org/build/projects/:id",
+  "contractActions": [
+   "Open builder",
+   "ask engineer",
+   "run tests",
+   "create issue"
+  ],
+  "contractOverlays": [
+   "Incident inspector",
+   "release preview",
+   "task creation"
+  ],
+  "edge": "Environment labels prevent production/staging confusion",
+  "declared": [
+   {
+    "id": "Open builder",
+    "label": "Open the builder",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/build/projects/${context.params.id ?? \"\"}/builder`"
+   },
+   {
+    "id": "run tests",
+    "label": "Run the checks",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Tests\""
+   },
+   {
+    "id": "create issue",
+    "label": "Create a task",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"task creation\""
+   },
+   {
+    "id": "ask engineer",
+    "label": "Failing checks",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Incident inspector\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BUILD-003",
+  "title": "Visual App Builder",
+  "route": "/o/:org/build/projects/:id/builder",
+  "contractActions": [
+   "Add component",
+   "edit styles",
+   "bind record",
+   "simulate"
+  ],
+  "contractOverlays": [
+   "Component inspector",
+   "expression editor",
+   "binding test"
+  ],
+  "edge": "AI modifications shown as diff and reversible",
+  "declared": [
+   {
+    "id": "Add component",
+    "label": "Add a component",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Design\""
+   },
+   {
+    "id": "bind record",
+    "label": "Bind the selection",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Component inspector\""
+   },
+   {
+    "id": "edit styles",
+    "label": "Widths",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Responsive\""
+   },
+   {
+    "id": "simulate",
+    "label": "Run the preview",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Preview\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BUILD-004",
+  "title": "Code Editor",
+  "route": "/o/:org/build/projects/:id/code",
+  "contractActions": [
+   "Edit",
+   "search",
+   "branch",
+   "commit",
+   "run safe command"
+  ],
+  "contractOverlays": [
+   "File search",
+   "diff review",
+   "command authorization"
+  ],
+  "edge": "No unrestricted secrets or filesystem access from prompt content",
+  "declared": [
+   {
+    "id": "Edit",
+    "label": "Edit the model instead",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/build/projects/${context.params.id ?? \"\"}/builder?tab=Data`"
+   },
+   {
+    "id": "search",
+    "label": "Search the files",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"File search\""
+   },
+   {
+    "id": "commit",
+    "label": "Review the output",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"diff review\""
+   },
+   {
+    "id": "run safe command",
+    "label": "Run a command",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"command authorization\""
+   },
+   {
+    "id": "branch",
+    "label": "Change history",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Source control\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BUILD-005",
+  "title": "Database Designer",
+  "route": "/o/:org/build/projects/:id/database",
+  "contractActions": [
+   "Create table",
+   "alter schema",
+   "seed",
+   "validate policy"
+  ],
+  "contractOverlays": [
+   "Column editor",
+   "migration diff",
+   "access policy"
+  ],
+  "edge": "Destructive migrations demand backup and explicit authorization",
+  "declared": [
+   {
+    "id": "Create table",
+    "label": "New entity",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: { const repo = await __vite_ssr_dynamic_import__(\"/src/platform/repo.ts\"); const projects = await repo.listByCollection(context.org.id, \"ap"
+   },
+   {
+    "id": "alter schema",
+    "label": "Field detail",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Column editor\""
+   },
+   {
+    "id": "validate policy",
+    "label": "Access policy",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Policies\""
+   },
+   {
+    "id": "seed",
+    "label": "Migration check",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"migration diff\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BUILD-006",
+  "title": "API & Functions",
+  "route": "/o/:org/build/projects/:id/api",
+  "contractActions": [
+   "Define endpoint",
+   "test",
+   "deploy",
+   "inspect trace"
+  ],
+  "contractOverlays": [
+   "Request builder",
+   "auth inspector",
+   "function diff"
+  ],
+  "edge": "Authorization cannot be silently removed by AI patch",
+  "declared": [
+   {
+    "id": "Define endpoint",
+    "label": "Define an endpoint",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Request builder\""
+   },
+   {
+    "id": "test",
+    "label": "Authorisation",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"auth inspector\""
+   },
+   {
+    "id": "deploy",
+    "label": "Contracts",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Contracts\""
+   },
+   {
+    "id": "inspect trace",
+    "label": "Function source",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Functions\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BUILD-007",
+  "title": "Authentication & Roles",
+  "route": "/o/:org/build/projects/:id/auth",
+  "contractActions": [
+   "Create role",
+   "revoke session",
+   "configure provider"
+  ],
+  "contractOverlays": [
+   "Role editor",
+   "policy simulator",
+   "authentication issue"
+  ],
+  "edge": "New user does not inherit organization owner rights",
+  "declared": [
+   {
+    "id": "Create role",
+    "label": "New role",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Role editor\""
+   },
+   {
+    "id": "configure provider",
+    "label": "Providers",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Providers\""
+   },
+   {
+    "id": "revoke session",
+    "label": "Sessions",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Sessions\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BUILD-008",
+  "title": "Testing & QA",
+  "route": "/o/:org/build/projects/:id/tests",
+  "contractActions": [
+   "Run suite",
+   "inspect failure",
+   "approve fix",
+   "export"
+  ],
+  "contractOverlays": [
+   "Test report",
+   "AI patch review",
+   "flaky test tracker"
+  ],
+  "edge": "Green UI not sufficient for unverified backend effects",
+  "declared": [
+   {
+    "id": "Run suite",
+    "label": "Run the suites",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Suites\""
+   },
+   {
+    "id": "inspect failure",
+    "label": "Open the report",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Test report\""
+   },
+   {
+    "id": "approve fix",
+    "label": "Proposed changes",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"AI patch review\""
+   },
+   {
+    "id": "export",
+    "label": "Flaky checks",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"flaky test tracker\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BUILD-009",
+  "title": "Deployments & Environments",
+  "route": "/o/:org/build/projects/:id/deploy",
+  "contractActions": [
+   "Promote",
+   "rollback",
+   "inspect config",
+   "pause"
+  ],
+  "contractOverlays": [
+   "Release approval",
+   "diff",
+   "rollback impact"
+  ],
+  "edge": "No automatic production promotion after failed gates",
+  "declared": [
+   {
+    "id": "Promote",
+    "label": "Promote",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Release approval\""
+   },
+   {
+    "id": "rollback",
+    "label": "Roll back",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"rollback impact\""
+   },
+   {
+    "id": "inspect config",
+    "label": "Environments",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Environments\""
+   },
+   {
+    "id": "pause",
+    "label": "Build logs",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Logs\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BUILD-010",
+  "title": "Integrations & Secrets",
+  "route": "/o/:org/build/projects/:id/integrations",
+  "contractActions": [
+   "Attach integration",
+   "rotate secret",
+   "test",
+   "revoke"
+  ],
+  "contractOverlays": [
+   "Secret input",
+   "webhook test",
+   "revocation"
+  ],
+  "edge": "Secrets never rendered in AI chat or logs",
+  "declared": [
+   {
+    "id": "Attach integration",
+    "label": "Integration directory",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/connect/marketplace`"
+   },
+   {
+    "id": "test",
+    "label": "Health",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Health\""
+   },
+   {
+    "id": "rotate secret",
+    "label": "Keys",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Secret input\""
+   },
+   {
+    "id": "revoke",
+    "label": "Webhooks",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Webhooks\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BUILD-011",
+  "title": "App Analytics & Monitoring",
+  "route": "/o/:org/build/projects/:id/monitor",
+  "contractActions": [
+   "Inspect event",
+   "create incident",
+   "tune monitor",
+   "export"
+  ],
+  "contractOverlays": [
+   "Trace viewer",
+   "alert rule",
+   "budget panel"
+  ],
+  "edge": "PII redacted from trace summaries",
+  "declared": [
+   {
+    "id": "Inspect event",
+    "label": "Read path",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Trace viewer\""
+   },
+   {
+    "id": "create incident",
+    "label": "Failing checks",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Incident inspector\""
+   },
+   {
+    "id": "tune monitor",
+    "label": "Alert rule",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"alert rule\""
+   },
+   {
+    "id": "export",
+    "label": "Budget",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"budget panel\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FORMS-001",
+  "title": "Forms Directory",
+  "route": "/o/:org/forms/forms",
+  "contractActions": [
+   "Create",
+   "duplicate",
+   "archive",
+   "review responses"
+  ],
+  "contractOverlays": [
+   "New form",
+   "duplicate confirm",
+   "share"
+  ],
+  "edge": "Sensitive forms flagged for access and retention",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New form",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"New form\""
+   },
+   {
+    "id": "review responses",
+    "label": "Review responses",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/forms/forms/${context.selectedId}/submissions`"
+   },
+   {
+    "id": "duplicate",
+    "label": "Duplicate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"duplicate confirm\""
+   },
+   {
+    "id": "archive",
+    "label": "Archive",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { await context.mutate.patch(context.selectedId, { status: \"archived\" }, { event: \"Form archived\" }); context.toast(\"Form archived\", \"Its s"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FORMS-002",
+  "title": "Visual Form Builder",
+  "route": "/o/:org/forms/forms/:id",
+  "contractActions": [
+   "Insert field",
+   "reorder",
+   "change type",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Field inspector",
+   "validation",
+   "publish review"
+  ],
+  "edge": "Keyboard/single-pointer alternative for drag sorting",
+  "declared": [
+   {
+    "id": "Insert field",
+    "label": "Add a field",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Build\""
+   },
+   {
+    "id": "change type",
+    "label": "Edit the selection",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Field inspector\""
+   },
+   {
+    "id": "reorder",
+    "label": "Reorder",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Build\""
+   },
+   {
+    "id": "publish",
+    "label": "Publish",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"publish review\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FORMS-003",
+  "title": "Conditional Logic",
+  "route": "/o/:org/forms/forms/:id/logic",
+  "contractActions": [
+   "Create condition",
+   "connect",
+   "test",
+   "fix"
+  ],
+  "contractOverlays": [
+   "Rule editor",
+   "invalid path",
+   "scenario tester"
+  ],
+  "edge": "Required hidden fields cannot block submission",
+  "declared": [
+   {
+    "id": "Create condition",
+    "label": "New rule",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Rule editor\""
+   },
+   {
+    "id": "test",
+    "label": "Test a scenario",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Test\""
+   },
+   {
+    "id": "connect",
+    "label": "Check the branches",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"invalid path\""
+   },
+   {
+    "id": "fix",
+    "label": "Scenario tester",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"scenario tester\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FORMS-004",
+  "title": "Form Submissions",
+  "route": "/o/:org/forms/forms/:id/submissions",
+  "contractActions": [
+   "Inspect",
+   "assign",
+   "export",
+   "delete under policy"
+  ],
+  "contractOverlays": [
+   "Submission drawer",
+   "privacy control",
+   "route retry"
+  ],
+  "edge": "Consent/PII handled according to retention rules",
+  "declared": [
+   {
+    "id": "Inspect",
+    "label": "Inspect",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Submission drawer\""
+   },
+   {
+    "id": "export",
+    "label": "Export CSV",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: context.toast(\"Export is in the grid\", \"Use Export CSV in the table toolbar so the export matches the tab you are looking at.\")"
+   },
+   {
+    "id": "assign",
+    "label": "Routing",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"route retry\""
+   },
+   {
+    "id": "delete under policy",
+    "label": "Retention",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"privacy control\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FORMS-005",
+  "title": "Form Design & Publish",
+  "route": "/o/:org/forms/forms/:id/publish",
+  "contractActions": [
+   "Style",
+   "preview",
+   "generate link",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Theme inspector",
+   "access control",
+   "embed tester"
+  ],
+  "edge": "Published form version remains traceable to submissions",
+  "declared": [
+   {
+    "id": "publish",
+    "label": "Publish a version",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"publish review\""
+   },
+   {
+    "id": "generate link",
+    "label": "Share",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"share\""
+   },
+   {
+    "id": "Style",
+    "label": "Appearance",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Theme inspector\""
+   },
+   {
+    "id": "preview",
+    "label": "Test the embed",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"embed tester\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FORMS-006",
+  "title": "Form Analytics",
+  "route": "/o/:org/forms/forms/:id/analytics",
+  "contractActions": [
+   "Compare",
+   "export",
+   "create experiment"
+  ],
+  "contractOverlays": [
+   "Metric methods",
+   "test report",
+   "field insight"
+  ],
+  "edge": "Privacy-safe analytics; no invented completion data",
+  "declared": [
+   {
+    "id": "compare",
+    "label": "How each figure is made",
+    "placement": "primary",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"Metric methods\""
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/forms/forms/${context.params.id ?? \"\"}/submissions`"
+   },
+   {
+    "id": "create experiment",
+    "label": "Field insight",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"field insight\""
+   }
+  ],
+  "missingActions": [
+   "Compare"
+  ]
+ },
+ {
+  "screen": "ARL-CONNECT-001",
+  "title": "Integration Marketplace",
+  "route": "/o/:org/connect/marketplace",
+  "contractActions": [
+   "Browse",
+   "compare",
+   "install",
+   "inspect requirements"
+  ],
+  "contractOverlays": [
+   "Connector preview",
+   "install wizard",
+   "risk summary"
+  ],
+  "edge": "Unverified provider claims not advertised as supported",
+  "declared": [
+   {
+    "id": "Browse",
+    "label": "Browse by category",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Categories\""
+   },
+   {
+    "id": "inspect requirements",
+    "label": "What one needs",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Connector preview\""
+   },
+   {
+    "id": "compare",
+    "label": "Capability registry",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/connect/capabilities`"
+   },
+   {
+    "id": "install",
+    "label": "Install",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"install wizard\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CONNECT-002",
+  "title": "Connector Detail",
+  "route": "/o/:org/connect/marketplace/:id",
+  "contractActions": [
+   "Connect",
+   "test",
+   "view docs",
+   "request capability"
+  ],
+  "contractOverlays": [
+   "Authorization preview",
+   "scope explanation",
+   "provider limits"
+  ],
+  "edge": "Read and publish scopes clearly differentiated",
+  "declared": [
+   {
+    "id": "Connect",
+    "label": "Connect",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/connect/connect/${context.params.id ?? __vite_ssr_import_5__.CONNE"
+   },
+   {
+    "id": "test",
+    "label": "Authorisation preview",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Authorization preview\""
+   },
+   {
+    "id": "view docs",
+    "label": "Provider limits",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"provider limits\""
+   },
+   {
+    "id": "request capability",
+    "label": "Scopes explained",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"scope explanation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CONNECT-003",
+  "title": "Connection Wizard",
+  "route": "/o/:org/connect/connect/:id",
+  "contractActions": [
+   "Authorize",
+   "choose targets",
+   "test",
+   "cancel"
+  ],
+  "contractOverlays": [
+   "External OAuth",
+   "scope review",
+   "consent status"
+  ],
+  "edge": "Failed OAuth must not leave phantom connected status",
+  "declared": [
+   {
+    "id": "Authorize",
+    "label": "Attempt the authorisation",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Test\""
+   },
+   {
+    "id": "choose targets",
+    "label": "Review the scopes",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"scope review\""
+   },
+   {
+    "id": "test",
+    "label": "Consent record",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"consent status\""
+   },
+   {
+    "id": "cancel",
+    "label": "Leave it unconnected",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/connect/marketplace`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CONNECT-004",
+  "title": "Installed Connections",
+  "route": "/o/:org/connect/connections",
+  "contractActions": [
+   "Inspect",
+   "reconnect",
+   "suspend",
+   "transfer owner"
+  ],
+  "contractOverlays": [
+   "Account inspector",
+   "scope change",
+   "revoke grant"
+  ],
+  "edge": "Revocation terminates new calls and invalidates cached grants",
+  "declared": [
+   {
+    "id": "Inspect",
+    "label": "Inspect",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/connect/connections/${context.selectedId}`"
+   },
+   {
+    "id": "reconnect",
+    "label": "Reconnect",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"reconnect\""
+   },
+   {
+    "id": "suspend",
+    "label": "Scope change",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"scope change\""
+   },
+   {
+    "id": "transfer owner",
+    "label": "Revoke",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"revoke grant\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CONNECT-005",
+  "title": "Connection Detail",
+  "route": "/o/:org/connect/connections/:id",
+  "contractActions": [
+   "Test",
+   "limit agents",
+   "rotate auth",
+   "disable"
+  ],
+  "contractOverlays": [
+   "Permission matrix",
+   "health run",
+   "reconnect dialog"
+  ],
+  "edge": "Stale authorization cannot be used for queued mission",
+  "declared": [
+   {
+    "id": "Test",
+    "label": "Run a health test",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/connect/health`"
+   },
+   {
+    "id": "limit agents",
+    "label": "What agents may use",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Capabilities\""
+   },
+   {
+    "id": "rotate auth",
+    "label": "Keys and grant",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Security\""
+   },
+   {
+    "id": "disable",
+    "label": "Revoke",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"revoke grant\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CONNECT-006",
+  "title": "Capability Registry",
+  "route": "/o/:org/connect/capabilities",
+  "contractActions": [
+   "Inspect schema",
+   "test mock",
+   "retire",
+   "compare"
+  ],
+  "contractOverlays": [
+   "Capability inspector",
+   "schema diff",
+   "version impact"
+  ],
+  "edge": "Provider-specific unsupported operation blocked",
+  "declared": [
+   {
+    "id": "Inspect schema",
+    "label": "Inspect a schema",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Capability inspector\""
+   },
+   {
+    "id": "compare",
+    "label": "Versions",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Versions\""
+   },
+   {
+    "id": "test mock",
+    "label": "Why a mock is not offered",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"schema diff\""
+   },
+   {
+    "id": "retire",
+    "label": "Version impact",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"version impact\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CONNECT-007",
+  "title": "Synchronization Centre",
+  "route": "/o/:org/connect/sync",
+  "contractActions": [
+   "Retry safe sync",
+   "inspect conflict",
+   "change mapping"
+  ],
+  "contractOverlays": [
+   "Mapping editor",
+   "conflict resolver",
+   "run receipt"
+  ],
+  "edge": "Out-of-order webhooks and duplicate events deduplicated",
+  "declared": [
+   {
+    "id": "Retry safe sync",
+    "label": "Retry",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"run receipt\""
+   },
+   {
+    "id": "change mapping",
+    "label": "Edit a mapping",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Mapping editor\""
+   },
+   {
+    "id": "inspect conflict",
+    "label": "Conflicts",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Conflicts\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CONNECT-008",
+  "title": "Connector Health",
+  "route": "/o/:org/connect/health",
+  "contractActions": [
+   "Run health test",
+   "open incident",
+   "contact owner"
+  ],
+  "contractOverlays": [
+   "Health report",
+   "reconnect request",
+   "mitigation"
+  ],
+  "edge": "Provider outages not falsely marked internally repairable",
+  "declared": [
+   {
+    "id": "Run health test",
+    "label": "Run the health test",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Overview\""
+   },
+   {
+    "id": "open incident",
+    "label": "Open an incident",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/it/incidents`"
+   },
+   {
+    "id": "contact owner",
+    "label": "Mitigation",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"mitigation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CONNECT-009",
+  "title": "Custom Connectors",
+  "route": "/o/:org/connect/custom",
+  "contractActions": [
+   "Create adapter",
+   "register action",
+   "test",
+   "submit for use"
+  ],
+  "contractOverlays": [
+   "Secret setup",
+   "capability validation",
+   "approval"
+  ],
+  "edge": "Third-party tool instructions treated as untrusted",
+  "declared": [
+   {
+    "id": "Create adapter",
+    "label": "New adapter",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Editor\""
+   },
+   {
+    "id": "test",
+    "label": "Contract tests",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Tests\""
+   },
+   {
+    "id": "register action",
+    "label": "Validate a declaration",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"capability validation\""
+   },
+   {
+    "id": "submit for use",
+    "label": "Submit for approval",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"approval\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CONNECT-010",
+  "title": "Action Receipts",
+  "route": "/o/:org/connect/receipts",
+  "contractActions": [
+   "Inspect",
+   "export",
+   "reconcile",
+   "open mission"
+  ],
+  "contractOverlays": [
+   "Receipt detail",
+   "provider evidence",
+   "retry review"
+  ],
+  "edge": "Provider request accepted is not automatically success",
+  "declared": [
+   {
+    "id": "Inspect",
+    "label": "Inspect a receipt",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Receipt detail\""
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: context.toast(\"Export is in the table\", \"Use Export CSV in the toolbar so the file matches the tab you are reading.\")"
+   },
+   {
+    "id": "reconcile",
+    "label": "Provider evidence",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"provider evidence\""
+   },
+   {
+    "id": "open mission",
+    "label": "Missions",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/mission/missions`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-IT-001",
+  "title": "IT Operations Home",
+  "route": "/o/:org/it/home",
+  "contractActions": [
+   "Inspect service",
+   "open issue",
+   "run check",
+   "acknowledge"
+  ],
+  "contractOverlays": [
+   "Service inspector",
+   "incident create",
+   "health test"
+  ],
+  "edge": "Third-party incident clearly differentiated from owned infrastructure",
+  "declared": [
+   {
+    "id": "run check",
+    "label": "Run the checks",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"health test\""
+   },
+   {
+    "id": "open issue",
+    "label": "Open an incident",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"incident create\""
+   },
+   {
+    "id": "Inspect service",
+    "label": "Inspect a group",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Service inspector\""
+   },
+   {
+    "id": "acknowledge",
+    "label": "Full diagnostics",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/it/health`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-IT-002",
+  "title": "Incident Queue",
+  "route": "/o/:org/it/incidents",
+  "contractActions": [
+   "Assign",
+   "escalate",
+   "merge",
+   "resolve",
+   "page owner"
+  ],
+  "contractOverlays": [
+   "Incident detail",
+   "severity change",
+   "escalation rules"
+  ],
+  "edge": "Multiple symptoms merged only with evidence",
+  "declared": [
+   {
+    "id": "assign",
+    "label": "Open an incident",
+    "placement": "primary",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"Incident detail\""
+   },
+   {
+    "id": "escalate",
+    "label": "Change severity",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"severity change\""
+   },
+   {
+    "id": "merge",
+    "label": "Merge",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"merge review\""
+   },
+   {
+    "id": "page owner",
+    "label": "Escalation rules",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"escalation rules\""
+   },
+   {
+    "id": "resolve",
+    "label": "Resolve",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/it/incidents/${context.selectedId}?tab=Remediation`"
+   }
+  ],
+  "missingActions": [
+   "Assign"
+  ]
+ },
+ {
+  "screen": "ARL-IT-003",
+  "title": "Incident Detail",
+  "route": "/o/:org/it/incidents/:id",
+  "contractActions": [
+   "Acknowledge",
+   "assign",
+   "approve repair",
+   "close"
+  ],
+  "contractOverlays": [
+   "Remediation approval",
+   "affected work",
+   "mitigation note"
+  ],
+  "edge": "Incident cannot resolve until health verified",
+  "declared": [
+   {
+    "id": "Acknowledge",
+    "label": "Take it",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: { const repo = await __vite_ssr_dynamic_import__(\"/src/platform/repo.ts\"); const record = context.params.id ? await repo.getRecord(context."
+   },
+   {
+    "id": "approve repair",
+    "label": "Remediation",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Remediation\""
+   },
+   {
+    "id": "assign",
+    "label": "Severity",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"severity change\""
+   },
+   {
+    "id": "close",
+    "label": "Add a note",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"mitigation note\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-IT-004",
+  "title": "System Health",
+  "route": "/o/:org/it/health",
+  "contractActions": [
+   "Drill down",
+   "add monitor",
+   "alert threshold",
+   "export"
+  ],
+  "contractOverlays": [
+   "Service health detail",
+   "monitor rule",
+   "scale request"
+  ],
+  "edge": "Privacy-safe telemetry; no sensitive payload exposure",
+  "declared": [
+   {
+    "id": "Drill down",
+    "label": "Run the checks",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"health test\""
+   },
+   {
+    "id": "export",
+    "label": "Backup and restore",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Backup and restore\""
+   },
+   {
+    "id": "add monitor",
+    "label": "Monitor rule",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"monitor rule\""
+   },
+   {
+    "id": "alert threshold",
+    "label": "Service detail",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Service health detail\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-IT-005",
+  "title": "Logs & Tracing",
+  "route": "/o/:org/it/traces",
+  "contractActions": [
+   "Filter",
+   "inspect",
+   "bookmark",
+   "share authorized"
+  ],
+  "contractOverlays": [
+   "Trace waterfall",
+   "redaction rules",
+   "saved filter"
+  ],
+  "edge": "Secrets and personal data never surfaced by default",
+  "declared": [
+   {
+    "id": "Filter",
+    "label": "Saved filters",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"saved filter\""
+   },
+   {
+    "id": "inspect",
+    "label": "Inspect an entry",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Trace waterfall\""
+   },
+   {
+    "id": "bookmark",
+    "label": "Redaction rules",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"redaction rules\""
+   },
+   {
+    "id": "share authorized",
+    "label": "Export",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Logs\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-IT-006",
+  "title": "Automated Remediation",
+  "route": "/o/:org/it/remediation",
+  "contractActions": [
+   "Test runbook",
+   "approve",
+   "execute",
+   "pause"
+  ],
+  "contractOverlays": [
+   "Runbook editor",
+   "remediation impact",
+   "verify result"
+  ],
+  "edge": "No autonomous privilege escalation or blind production patch",
+  "declared": [
+   {
+    "id": "Test runbook",
+    "label": "Run the verification runbook",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Runbooks\""
+   },
+   {
+    "id": "approve",
+    "label": "Proposals",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Proposals\""
+   },
+   {
+    "id": "execute",
+    "label": "Runbook detail",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Runbook editor\""
+   },
+   {
+    "id": "pause",
+    "label": "Failures",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Failures\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-IT-007",
+  "title": "Release Management",
+  "route": "/o/:org/it/releases",
+  "contractActions": [
+   "Approve release",
+   "deploy",
+   "test",
+   "rollback"
+  ],
+  "contractOverlays": [
+   "Diff review",
+   "release gates",
+   "rollback confirmation"
+  ],
+  "edge": "Failing security and functional gates block promotion",
+  "declared": [
+   {
+    "id": "Approve release",
+    "label": "Release gates",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"release gates\""
+   },
+   {
+    "id": "test",
+    "label": "Run the checks",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/it/health`"
+   },
+   {
+    "id": "deploy",
+    "label": "What is waiting",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Production\""
+   },
+   {
+    "id": "rollback",
+    "label": "Rollback",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"rollback confirmation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-IT-008",
+  "title": "Security Centre",
+  "route": "/o/:org/it/security",
+  "contractActions": [
+   "Investigate",
+   "revoke",
+   "isolate",
+   "export"
+  ],
+  "contractOverlays": [
+   "Security incident",
+   "session revoke",
+   "policy simulation"
+  ],
+  "edge": "AI never becomes self-authorizing security administrator",
+  "declared": [
+   {
+    "id": "Investigate",
+    "label": "Audit trail",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Audit\""
+   },
+   {
+    "id": "revoke",
+    "label": "Sessions",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"session revoke\""
+   },
+   {
+    "id": "isolate",
+    "label": "Policy simulation",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"policy simulation\""
+   },
+   {
+    "id": "export",
+    "label": "Export the audit",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Audit\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-IT-009",
+  "title": "Reliability Reports",
+  "route": "/o/:org/it/reports",
+  "contractActions": [
+   "Generate",
+   "compare",
+   "propose remediation",
+   "export"
+  ],
+  "contractOverlays": [
+   "Report builder",
+   "incident comparison",
+   "proposal"
+  ],
+  "edge": "Numbers sourced from real incidents, never model estimate alone",
+  "declared": [
+   {
+    "id": "Generate",
+    "label": "Build a report",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Report builder\""
+   },
+   {
+    "id": "compare",
+    "label": "Compare incidents",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"incident comparison\""
+   },
+   {
+    "id": "propose remediation",
+    "label": "Propose a fix",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"proposal\""
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Report builder\""
+   }
+  ],
+  "missingActions": []
+ }
+]

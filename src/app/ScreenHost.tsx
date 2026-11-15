@@ -26,7 +26,10 @@ export function ScreenHost() {
 
   useEffect(() => {
     setSelectedId(match?.params.id);
-    setOverlay(null);
+    /* An overlay can be deep-linked with ?overlay=<id>, so a dialog can be
+       bookmarked or shared, and so every overlay can be opened in testing. */
+    const linked = new URLSearchParams(window.location.search).get("overlay");
+    setOverlay(linked ? { id: linked } : null);
   }, [match?.screen.id, match?.params.id]);
 
   const app = screen ? getApp(screen.applicationCode) : undefined;

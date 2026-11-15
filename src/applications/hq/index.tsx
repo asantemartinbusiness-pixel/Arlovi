@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useMemo, useState, type JSX } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Building2, CalendarDays, Clock, Compass, Flag, Landmark, Network, Target, Users,
 } from "lucide-react";
@@ -8,9 +8,15 @@ import {
   Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Avatar,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
-import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
+import { useCollection, useCollections, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import { freshness, resolveRange, addDays, sameDay } from "@/platform/clock";
 import { Building } from "@/applications/hq/pieces";
+import {
+  AddResource, ArrangeCards, AssignLeader, AssignTaskTo, AssignWork, ChooseScope, FindColleague, HOME_CARDS,
+  LinkMission, MessageTeam, OpenDepartment, RecommendationsManager, ReorderDepartments, RequestHelp, ReviewGoal,
+  SetPrimaryOffice, StartConversation, TimelineFilter, guardSelection, listField, openDepartmentAppFor,
+  openLatestDraft, pinTask, prioritizeTask, sortDepartments, timelineFilter, usePref, writePref, type Insight,
+} from "@/applications/hq/actions";
 import type { Rec } from "@/domain/types";
 
 /* ====================================================================== *
@@ -87,11 +93,40 @@ function StateOfPlay({
   );
 }
 
+/** Recommendations computed from records in this workspace. Never inferred. */
+export function useHomeInsights(): Insight[] {
+  const data = useHqData();
+  const { now, org } = useWorkspace();
+  return useMemo(() => {
+    const overdue = data.invoices.filter((invoice) => invoice.dueAt && new Date(invoice.dueAt) < now && invoice.status !== "paid");
+    const latestPost = data.journals.filter((journal) => journal.status === "posted").map((journal) => journal.at ?? journal.updatedAt).sort().at(-1);
+    const ledgerAge = freshness(latestPost, now, 3);
+    const list: Insight[] = [];
+    if (overdue.length) list.push({ id: "overdue", title: `${overdue.length} invoice${overdue.length === 1 ? "" : "s"} past due`, body: `Oldest is ${overdue[0].title}. Chasing is local; no mail provider is connected.`, to: `/o/${org.slug}/fin/invoices` });
+    if (ledgerAge.stale) list.push({ id: "ledger", title: "The ledger has not been posted recently", body: ledgerAge.known ? `Last posting was ${ledgerAge.days} days ago.` : "No posting date is recorded.", to: `/o/${org.slug}/fin/ledger` });
+    for (const objective of data.objectives) {
+      const target = Number(objective.fields.target ?? 0);
+      const current = Number(objective.fields.current ?? 0);
+      if (objective.status === "active" && target > 0 && current / target < 0.6) {
+        list.push({ id: objective.id, title: `${objective.title} is behind`, body: `${current} of ${target} ${String(objective.fields.measure ?? "")}.`, to: `/o/${org.slug}/hq/goals` });
+      }
+    }
+    return list;
+  }, [data.invoices, data.journals, data.objectives, now, org.slug]);
+}
+
 function ExecutiveHome({ context, range }: { context: ScreenContext; range: "today" | "week" }) {
   const data = useHqData();
   const { now, org } = useWorkspace();
   const window = resolveRange(range === "today" ? "today" : "week", now);
-  const [dismissed, setDismissed] = useState<string[]>([]);
+  const allInsights = useHomeInsights();
+  const cardsPref = usePref("homeCards");
+  const dismissPref = usePref("dismissedInsights");
+  const hidden = listField(cardsPref, "hidden");
+  const savedOrder = listField(cardsPref, "order");
+  const order = savedOrder.length === HOME_CARDS.length ? savedOrder : HOME_CARDS.map((card) => card.key);
+  const dismissed = listField(dismissPref, "ids");
+  const insights = allInsights.filter((insight) => !dismissed.includes(insight.id));
 
   const receivable = data.invoices
     .filter((invoice) => !["paid", "void", "draft"].includes(invoice.status))
@@ -104,19 +139,135 @@ function ExecutiveHome({ context, range }: { context: ScreenContext; range: "tod
   const active = data.missions.filter((mission) => ["running", "executing", "dispatched"].includes(mission.status));
   const dueInWindow = data.tasks.filter((task) => task.dueAt && new Date(task.dueAt) >= window.start && new Date(task.dueAt) < window.end);
 
-  const insights = useMemo(() => {
-    const list: { id: string; title: string; body: string; to?: string }[] = [];
-    if (overdue.length) list.push({ id: "overdue", title: `${overdue.length} invoice${overdue.length === 1 ? "" : "s"} past due`, body: `Oldest is ${overdue[0].title}. Chasing is local; no mail provider is connected.`, to: `/o/${org.slug}/fin/invoices` });
-    if (ledgerAge.stale) list.push({ id: "ledger", title: "The ledger has not been posted recently", body: ledgerAge.known ? `Last posting was ${ledgerAge.days} days ago.` : "No posting date is recorded.", to: `/o/${org.slug}/fin/ledger` });
-    for (const objective of data.objectives.slice(0, 2)) {
-      const target = Number(objective.fields.target ?? 0);
-      const current = Number(objective.fields.current ?? 0);
-      if (target > 0 && current / target < 0.6) {
-        list.push({ id: objective.id, title: `${objective.title} is behind`, body: `${current} of ${target} ${String(objective.fields.measure ?? "")}.`, to: `/o/${org.slug}/hq/goals` });
-      }
-    }
-    return list.filter((item) => !dismissed.includes(item.id));
-  }, [overdue, ledgerAge, data.objectives, dismissed, org.slug]);
+  async function dismiss(id: string) {
+    await writePref(context, "dismissedInsights", "Dismissed recommendations", { ids: [...dismissed, id].join(",") });
+    context.toast("Recommendation dismissed", "Restore it from Dismiss recommendation in the actions menu.");
+  }
+
+  const cards: Record<string, JSX.Element> = {
+    stats: (
+      <div className="ds-col-12" key="stats">
+        <StatRow>
+          <Stat
+            label="Receivable"
+            value={context.money(receivable)}
+            prov="posted"
+            meta={`${data.invoices.filter((i) => !["paid", "void", "draft"].includes(i.status)).length} open invoices`}
+            onClick={() => context.openOverlay("metric inspector", { metric: "receivable" })}
+          />
+          <Stat
+            label="Overdue"
+            value={context.money(overdue.reduce((sum, i) => sum + (i.amountMinor ?? 0), 0))}
+            prov="posted"
+            meta={`${overdue.length} past due`}
+            onClick={() => context.openOverlay("metric inspector", { metric: "overdue" })}
+          />
+          <Stat
+            label="Ledger posted"
+            value={ledgerAge.known ? context.date(latestPost) : "Unavailable"}
+            unavailable={!ledgerAge.known}
+            prov={ledgerAge.known && !ledgerAge.stale ? "posted" : "unknown"}
+            meta={ledgerAge.known ? `${ledgerAge.days} days ago${ledgerAge.stale ? " · stale" : ""}` : "No posting recorded"}
+            onClick={() => context.openOverlay("metric inspector", { metric: "ledger" })}
+          />
+          <Stat label="Bank feed" value="Not connected" unavailable meta="Balances come from posted journals" />
+        </StatRow>
+      </div>
+    ),
+    waiting: (
+      <Card key="waiting" span={7} title="Waiting on you" eyebrow="Decisions" prov="human" subtitle={`${window.label} · ${approvals.length} items`}>
+        {approvals.length === 0 ? (
+          <Empty title="Nothing to approve" icon={<Flag size={20} />}>Approvals appear here when a record is submitted for a decision.</Empty>
+        ) : (
+          <Stack gap={2}>
+            {approvals.slice(0, 5).map((record) => (
+              <Row key={record.id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
+                <div className="ds-grow">
+                  <strong>{record.title}</strong>
+                  <p className="ds-subtle">{record.summary}</p>
+                </div>
+                {record.amountMinor !== undefined && <strong className="ds-num">{context.money(record.amountMinor)}</strong>}
+                <Button size="sm" variant="secondary" onClick={() => context.navigate(record.collection === "missions" ? `/o/${org.slug}/mission/missions/${record.id}` : `/o/${org.slug}/fin/invoices/${record.id}`)}>Review</Button>
+              </Row>
+            ))}
+          </Stack>
+        )}
+      </Card>
+    ),
+    missions: (
+      <Card key="missions" span={5} title="Active missions" eyebrow="AI workforce" prov="agent" subtitle={`${active.length} running`}>
+        {active.length === 0 ? (
+          <Empty title="No mission is running" icon={<Compass size={20} />}>Start one from Missions to see progress here.</Empty>
+        ) : (
+          <Stack gap={3}>
+            {active.map((mission) => {
+              const budget = Number(mission.fields.budgetMinor ?? 0);
+              const spent = Number(mission.fields.spentMinor ?? 0);
+              return (
+                <div key={mission.id}>
+                  <Row gap={2}>
+                    <Link to={`/o/${org.slug}/mission/missions/${mission.id}`} className="ds-grow" style={{ fontWeight: 600, color: "inherit", textDecoration: "none" }}>{mission.title}</Link>
+                    <Pill tone="info" dot>{mission.status}</Pill>
+                  </Row>
+                  <p className="ds-subtle" style={{ marginBlock: 4 }}>{mission.summary}</p>
+                  {budget > 0 && (
+                    <>
+                      <Meter value={spent} max={budget} label={`${mission.title} budget used`} tone={spent > budget * 0.9 ? "warning" : undefined} />
+                      <span className="ds-subtle">{context.money(spent)} of {context.money(budget)} committed locally</span>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </Stack>
+        )}
+      </Card>
+    ),
+    due: (
+      <Card key="due" span={7} title={range === "today" ? "Due today" : "Due this week"} subtitle={`${dueInWindow.length} items between ${context.date(window.start)} and ${context.date(addDays(window.end, -1))}`}>
+        {dueInWindow.length === 0
+          ? <Empty title="Nothing is dated in this window" icon={<CalendarDays size={20} />}>Work with a date appears here.</Empty>
+          : (
+            <DataGrid
+              rows={dueInWindow}
+              rowId={(row) => row.id}
+              label="Work due"
+              filterable={false}
+              columns={[
+                { key: "title", header: "Item", primary: true, cell: (row) => row.title, sortValue: (row) => row.title },
+                { key: "owner", header: "Owner", cell: (row) => <Row gap={2}><Avatar name={String(row.fields.assignee ?? row.ownerName)} size="sm" />{String(row.fields.assignee ?? row.ownerName)}</Row> },
+                { key: "due", header: "Due", align: "end", cell: (row) => context.date(row.dueAt), sortValue: (row) => row.dueAt ?? "" },
+              ]}
+              onOpen={(id) => context.navigate(`/o/${org.slug}/project/tasks/${id}`)}
+            />
+          )}
+      </Card>
+    ),
+    recommended: (
+      <Card key="recommended" span={5} title="Recommended" eyebrow="Computed here" prov="agent" subtitle="Derived from records in this workspace, never inferred">
+        {insights.length === 0 ? (
+          <Empty title="No recommendations" icon={<Target size={20} />}>
+            {dismissed.length > 0 ? `${dismissed.length} dismissed. Restore them from Dismiss recommendation.` : "Recommendations are computed from records here, never invented."}
+          </Empty>
+        ) : (
+          <Stack gap={2}>
+            {insights.map((insight) => (
+              <div key={insight.id} className="ds-panel" style={{ padding: "var(--space-3)" }}>
+                <strong>{insight.title}</strong>
+                <p className="ds-subtle">{insight.body}</p>
+                <Row gap={2} style={{ marginBlockStart: "var(--space-2)" }}>
+                  {insight.to && <Button size="sm" variant="secondary" onClick={() => context.navigate(insight.to!)}>Open</Button>}
+                  <Button size="sm" variant="ghost" onClick={() => void dismiss(insight.id)}>Dismiss</Button>
+                </Row>
+              </div>
+            ))}
+          </Stack>
+        )}
+      </Card>
+    ),
+  };
+
+  const visible = order.filter((key) => !hidden.includes(key));
 
   return (
     <Stack gap={5}>
@@ -128,119 +279,13 @@ function ExecutiveHome({ context, range }: { context: ScreenContext; range: "tod
         ledgerDays={ledgerAge.known ? ledgerAge.days : null}
         ledgerStale={ledgerAge.stale}
       />
-
-      <StatRow>
-        <Stat
-          label="Receivable"
-          value={context.money(receivable)}
-          prov="posted"
-          meta={`${data.invoices.filter((i) => !["paid", "void", "draft"].includes(i.status)).length} open invoices`}
-          onClick={() => context.openOverlay("metric inspector", { metric: "receivable" })}
-        />
-        <Stat
-          label="Overdue"
-          value={context.money(overdue.reduce((sum, i) => sum + (i.amountMinor ?? 0), 0))}
-          prov="posted"
-          meta={`${overdue.length} past due`}
-          onClick={() => context.openOverlay("metric inspector", { metric: "overdue" })}
-        />
-        <Stat
-          label="Ledger posted"
-          value={ledgerAge.known ? context.date(latestPost) : "Unavailable"}
-          unavailable={!ledgerAge.known}
-          prov={ledgerAge.known && !ledgerAge.stale ? "posted" : "unknown"}
-          meta={ledgerAge.known ? `${ledgerAge.days} days ago${ledgerAge.stale ? " · stale" : ""}` : "No posting recorded"}
-          onClick={() => context.openOverlay("metric inspector", { metric: "ledger" })}
-        />
-        <Stat label="Bank feed" value="Not connected" unavailable meta="Balances come from posted journals" />
-      </StatRow>
-
-      <Grid>
-        <Card span={7} title="Waiting on you" eyebrow="Decisions" prov="human" subtitle={`${window.label} · ${approvals.length} items`}>
-          {approvals.length === 0 ? (
-            <Empty title="Nothing to approve" icon={<Flag size={20} />}>Approvals appear here when a record is submitted for a decision.</Empty>
-          ) : (
-            <Stack gap={2}>
-              {approvals.slice(0, 5).map((record) => (
-                <Row key={record.id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-                  <div className="ds-grow">
-                    <strong>{record.title}</strong>
-                    <p className="ds-subtle">{record.summary}</p>
-                  </div>
-                  {record.amountMinor !== undefined && <strong className="ds-num">{context.money(record.amountMinor)}</strong>}
-                  <Button size="sm" variant="secondary" onClick={() => context.navigate(record.collection === "missions" ? `/o/${org.slug}/mission/missions/${record.id}` : `/o/${org.slug}/fin/invoices/${record.id}`)}>Review</Button>
-                </Row>
-              ))}
-            </Stack>
-          )}
-        </Card>
-
-        <Card span={5} title="Active missions" eyebrow="AI workforce" prov="agent" subtitle={`${active.length} running`}>
-          {active.length === 0 ? (
-            <Empty title="No mission is running" icon={<Compass size={20} />}>Start one from Missions to see progress here.</Empty>
-          ) : (
-            <Stack gap={3}>
-              {active.map((mission) => {
-                const budget = Number(mission.fields.budgetMinor ?? 0);
-                const spent = Number(mission.fields.spentMinor ?? 0);
-                return (
-                  <div key={mission.id}>
-                    <Row gap={2}>
-                      <Link to={`/o/${org.slug}/mission/missions/${mission.id}`} className="ds-grow" style={{ fontWeight: 600, color: "inherit", textDecoration: "none" }}>{mission.title}</Link>
-                      <Pill tone="info" dot>{mission.status}</Pill>
-                    </Row>
-                    <p className="ds-subtle" style={{ marginBlock: 4 }}>{mission.summary}</p>
-                    {budget > 0 && (
-                      <>
-                        <Meter value={spent} max={budget} label={`${mission.title} budget used`} tone={spent > budget * 0.9 ? "warning" : undefined} />
-                        <span className="ds-subtle">{context.money(spent)} of {context.money(budget)} committed locally</span>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </Stack>
-          )}
-        </Card>
-
-        <Card span={7} title={range === "today" ? "Due today" : "Due this week"} subtitle={`${dueInWindow.length} items between ${context.date(window.start)} and ${context.date(addDays(window.end, -1))}`}>
-          {dueInWindow.length === 0
-            ? <Empty title="Nothing is dated in this window" icon={<CalendarDays size={20} />}>Work with a date appears here.</Empty>
-            : (
-              <DataGrid
-                rows={dueInWindow}
-                rowId={(row) => row.id}
-                label="Work due"
-                filterable={false}
-                columns={[
-                  { key: "title", header: "Item", primary: true, cell: (row) => row.title, sortValue: (row) => row.title },
-                  { key: "owner", header: "Owner", cell: (row) => <Row gap={2}><Avatar name={String(row.fields.assignee ?? row.ownerName)} size="sm" />{String(row.fields.assignee ?? row.ownerName)}</Row> },
-                  { key: "due", header: "Due", align: "end", cell: (row) => context.date(row.dueAt), sortValue: (row) => row.dueAt ?? "" },
-                ]}
-                onOpen={(id) => context.navigate(`/o/${org.slug}/project/tasks/${id}`)}
-              />
-            )}
-        </Card>
-
-        <Card span={5} title="Recommended" eyebrow="Computed here" prov="agent" subtitle="Derived from records in this workspace, never inferred">
-          {insights.length === 0 ? (
-            <Empty title="No recommendations" icon={<Target size={20} />}>Recommendations are computed from records here, never invented.</Empty>
-          ) : (
-            <Stack gap={2}>
-              {insights.map((insight) => (
-                <div key={insight.id} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-                  <strong>{insight.title}</strong>
-                  <p className="ds-subtle">{insight.body}</p>
-                  <Row gap={2} style={{ marginBlockStart: "var(--space-2)" }}>
-                    {insight.to && <Button size="sm" variant="secondary" onClick={() => context.navigate(insight.to!)}>Open</Button>}
-                    <Button size="sm" variant="ghost" onClick={() => setDismissed((current) => [...current, insight.id])}>Dismiss</Button>
-                  </Row>
-                </div>
-              ))}
-            </Stack>
-          )}
-        </Card>
-      </Grid>
+      {visible.length === 0 ? (
+        <Empty title="Every card is hidden" icon={<Compass size={20} />} action={<Button variant="secondary" onClick={() => context.openOverlay("Widget picker")}>Arrange cards</Button>}>
+          Choose which cards Executive Home shows.
+        </Empty>
+      ) : (
+        <Grid>{visible.map((key) => cards[key]).filter(Boolean)}</Grid>
+      )}
     </Stack>
   );
 }
@@ -275,17 +320,29 @@ function MyWorkspace({ context, view }: { context: ScreenContext; view: "Today" 
   const today = mine.filter((task) => task.dueAt && sameDay(new Date(task.dueAt), now));
   const upcoming = mine.filter((task) => task.dueAt && new Date(task.dueAt) > now);
   const done = mine.filter((task) => task.status === "done");
-  const rows = view === "Today" ? (today.length ? today : mine.filter((task) => task.status !== "done")) : view === "Upcoming" ? upcoming : view === "History" ? done : mine;
+  const pinned = mine.filter((task) => task.tags.includes("pinned"));
+  const rows = view === "Today"
+    ? (today.length ? today : mine.filter((task) => task.status !== "done"))
+    : view === "Upcoming" ? upcoming : view === "History" ? done : pinned;
+  const meetingsToday = data.meetings
+    .filter((meeting) => meeting.startAt && sameDay(new Date(meeting.startAt), now))
+    .sort((a, b) => (a.startAt ?? "").localeCompare(b.startAt ?? ""));
 
   return (
     <Grid>
-      <Card span={8} title={view === "History" ? "Completed work" : "Assigned to you"} subtitle={`${rows.length} items`} flush>
+      <Card span={8} title={view === "History" ? "Completed work" : view === "Saved" ? "Pinned work" : "Assigned to you"} subtitle={`${rows.length} items · select a row to prioritise or pin it`} flush>
         <DataGrid
           rows={rows}
           rowId={(row) => row.id}
           label="My work"
+          selectedId={context.selectedId}
+          onSelect={(id) => context.select(id)}
+          empty={view === "Saved"
+            ? <Empty title="Nothing pinned" icon={<Flag size={20} />}>Select a task and choose Pin item to keep it here.</Empty>
+            : undefined}
           columns={[
-            { key: "title", header: "Task", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
+            { key: "title", header: "Task", primary: true, cell: (row) => <Row gap={2}>{row.tags.includes("pinned") && <Pill tone="accent">Pinned</Pill>}{row.title}</Row>, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
+            { key: "priority", header: "Priority", cell: (row) => <Pill tone={row.fields.priority === "high" ? "danger" : "neutral"}>{String(row.fields.priority ?? "normal")}</Pill>, sortValue: (row) => (row.fields.priority === "high" ? 0 : 1) },
             { key: "stage", header: "Stage", cell: (row) => <Pill tone={row.status === "done" ? "success" : row.status === "review" ? "warning" : "neutral"}>{String(row.fields.stage ?? row.status)}</Pill> },
             { key: "due", header: "Due", align: "end", cell: (row) => context.date(row.dueAt), sortValue: (row) => row.dueAt ?? "~" },
           ]}
@@ -298,19 +355,18 @@ function MyWorkspace({ context, view }: { context: ScreenContext; view: "Today" 
       </Card>
 
       <Card span={4} title="Your day" subtitle={context.date(now, { weekday: "long", day: "numeric", month: "long" })}>
-        <Stack gap={3}>
-          {["09:00", "11:30", "15:00"].map((slot, index) => {
-            const meeting = data.meetings[index];
-            return (
-              <Row key={slot} gap={3} style={{ alignItems: "flex-start" }}>
-                <strong className="ds-num" style={{ width: 48 }}>{slot}</strong>
-                <div className="ds-grow">
-                  {meeting ? <><strong>{meeting.title}</strong><p className="ds-subtle">{meeting.summary}</p></> : <span className="ds-subtle">Open</span>}
-                </div>
+        {meetingsToday.length === 0 ? (
+          <Empty title="No meetings today" icon={<CalendarDays size={20} />}>Meetings with a start time today appear here, in your local time.</Empty>
+        ) : (
+          <Stack gap={3}>
+            {meetingsToday.map((meeting) => (
+              <Row key={meeting.id} gap={3} style={{ alignItems: "flex-start" }}>
+                <strong className="ds-num" style={{ width: 48 }}>{context.date(meeting.startAt, { hour: "2-digit", minute: "2-digit" })}</strong>
+                <div className="ds-grow"><strong>{meeting.title}</strong><p className="ds-subtle">{meeting.summary}</p></div>
               </Row>
-            );
-          })}
-        </Stack>
+            ))}
+          </Stack>
+        )}
       </Card>
 
       <Card span={4} title="Drafts" subtitle={`${data.documents.filter((doc) => doc.status === "draft").length} unfinished`}>
@@ -477,11 +533,12 @@ function DepartmentsDirectory({ context, scope }: { context: ScreenContext; scop
   const data = useHqData();
   const { org, actor } = useWorkspace();
   const mine = data.members.find((member) => member.title === actor)?.fields.departmentId;
+  const ordered = sortDepartments(data.departments);
   const rows = scope === "My departments"
-    ? data.departments.filter((dept) => dept.id === mine)
+    ? ordered.filter((dept) => dept.id === mine)
     : scope === "Pinned"
-      ? data.departments.filter((dept) => dept.tags.includes("pinned"))
-      : data.departments;
+      ? ordered.filter((dept) => dept.tags.includes("pinned"))
+      : ordered;
 
   if (rows.length === 0) {
     return <Empty title={scope === "Pinned" ? "No pinned departments" : "No departments"} icon={<Building2 size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Create department")}>Create department</Button>}>Departments group people, agents and work.</Empty>;
@@ -607,7 +664,10 @@ function DepartmentWorkspace({ context, lens }: { context: ScreenContext; lens: 
 
 function OrgChart({ context, lens }: { context: ScreenContext; lens: "People" | "Departments" | "AI employees" }) {
   const data = useHqData();
-  const [mode, setMode] = useState<"tree" | "list">("tree");
+  const [params] = useSearchParams();
+  const mode = params.get("view") === "list" ? "list" : "tree";
+  const zoom = ZOOM_LEVELS.includes(Number(params.get("zoom"))) ? Number(params.get("zoom")) : 1;
+  const setMode = (next: "tree" | "list") => setQuery(context, { view: next === "list" ? "list" : null });
   const members = lens === "AI employees"
     ? data.members.filter((member) => member.fields.kind === "ai")
     : lens === "People"
@@ -624,6 +684,13 @@ function OrgChart({ context, lens }: { context: ScreenContext; lens: "People" | 
           <button type="button" aria-pressed={mode === "tree"} onClick={() => setMode("tree")} className="ds-btn" data-size="sm">Chart</button>
           <button type="button" aria-pressed={mode === "list"} onClick={() => setMode("list")} className="ds-btn" data-size="sm">List</button>
         </div>
+        {mode === "tree" && (
+          <div className="ds-btn-group" role="group" aria-label="Chart zoom">
+            <button type="button" className="ds-btn" data-size="sm" aria-label="Zoom out" disabled={zoom === ZOOM_LEVELS[0]} onClick={() => stepZoom(context, zoom, -1)}>−</button>
+            <button type="button" className="ds-btn" data-size="sm" aria-label="Reset zoom" onClick={() => setQuery(context, { zoom: null })}><span className="ds-num">{Math.round(zoom * 100)}%</span></button>
+            <button type="button" className="ds-btn" data-size="sm" aria-label="Zoom in" disabled={zoom === ZOOM_LEVELS[ZOOM_LEVELS.length - 1]} onClick={() => stepZoom(context, zoom, 1)}>+</button>
+          </div>
+        )}
         <span className="ds-subtle">{members.length} nodes · the list is the accessible equivalent of the chart</span>
       </Row>
 
@@ -638,9 +705,13 @@ function OrgChart({ context, lens }: { context: ScreenContext; lens: "People" | 
             { key: "dept", header: "Department", cell: (row) => data.departments.find((dept) => dept.id === row.fields.departmentId)?.title ?? "Unassigned" },
             { key: "kind", header: "Kind", cell: (row) => <Pill tone={row.fields.kind === "ai" ? "accent" : "neutral"}>{row.fields.kind === "ai" ? "AI" : "Person"}</Pill> },
           ]}
-          onSelect={(id) => { context.select(id); context.openOverlay("Member inspector", { id }); }}
+          selectedId={context.selectedId}
+          onSelect={(id) => context.select(id)}
+          onOpen={(id) => { context.select(id); context.openOverlay("Member inspector", { id }); }}
         />
       ) : (
+        <div style={{ overflow: "auto", maxHeight: "72vh" }} role="region" aria-label="Organisation chart, scroll to pan" tabIndex={0}>
+        <div style={{ transform: `scale(${zoom})`, transformOrigin: "0 0", width: `${100 / zoom}%` }}>
         <Grid>
           {byDept.map(({ dept, members: team }) => (
             <Card key={dept.id} span={4} title={dept.title} subtitle={`Lead ${String(dept.fields.lead ?? "unassigned")}`}>
@@ -670,15 +741,35 @@ function OrgChart({ context, lens }: { context: ScreenContext; lens: "People" | 
             </Card>
           )}
         </Grid>
+        </div>
+        </div>
       )}
     </Stack>
   );
 }
 
+const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5];
+
+/** View state lives in the address so it survives reloads and can be shared. */
+function setQuery(context: ScreenContext, changes: Record<string, string | null>) {
+  const next = new URLSearchParams(window.location.search);
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === null) next.delete(key); else next.set(key, value);
+  }
+  const query = next.toString();
+  context.navigate(`${window.location.pathname}${query ? `?${query}` : ""}`);
+}
+
+function stepZoom(context: ScreenContext, current: number, delta: number) {
+  const index = ZOOM_LEVELS.indexOf(current);
+  const next = ZOOM_LEVELS[Math.max(0, Math.min(ZOOM_LEVELS.length - 1, index + delta))];
+  setQuery(context, { zoom: next === 1 ? null : String(next) });
+}
+
 /* ---------------------------- HQ-007 ---------------------------- */
 
 function CompanyGoals({ context, state }: { context: ScreenContext; state: string }) {
-  const objectives = useCollection("objectives");
+  const { objectives, missions } = useCollections(["objectives", "missions"]);
   const map: Record<string, string[]> = { Active: ["active", "in_progress"], Proposed: ["proposed", "draft"], Achieved: ["achieved", "done"], Archived: ["archived"] };
   const rows = objectives.filter((objective) => (map[state] ?? ["active"]).includes(objective.status));
 
@@ -702,8 +793,9 @@ function CompanyGoals({ context, state }: { context: ScreenContext; state: strin
             footer={<>
               <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Goal editor", { id: objective.id })}>Edit</Button>
               <Button size="sm" variant="ghost" onClick={() => context.openOverlay("target change review", { id: objective.id })}>Change target</Button>
+              <Button size="sm" variant="ghost" onClick={() => { context.select(objective.id); context.openOverlay("review goal"); }}>Review</Button>
               <span className="ds-grow" />
-              <span className="ds-subtle">Reviewed {context.relative(objective.updatedAt)}</span>
+              <span className="ds-subtle">{objective.fields.reviewedAt ? `Reviewed ${context.relative(String(objective.fields.reviewedAt))}` : "Not yet reviewed"}</span>
             </>}
           >
             <Stack gap={3}>
@@ -713,6 +805,8 @@ function CompanyGoals({ context, state }: { context: ScreenContext; state: strin
                 { label: "Current", value: String(current) },
                 { label: "Target", value: target ? String(target) : "Not set" },
                 { label: "Owner", value: objective.ownerName },
+                { label: "Mission", value: missions.find((mission) => mission.id === objective.fields.missionId)?.title ?? "None linked" },
+                ...(objective.fields.confidence ? [{ label: "Confidence", value: <Pill tone={objective.fields.confidence === "on_track" ? "success" : objective.fields.confidence === "at_risk" ? "warning" : "danger"}>{String(objective.fields.confidence).replace(/_/g, " ")}</Pill> }] : []),
               ]} />
               {ratio >= 1 && objective.status !== "achieved" && (
                 <Notice tone="info">The measure has reached its target. Marking an objective achieved requires confirming the measure, not a summary.</Notice>
@@ -729,6 +823,7 @@ function CompanyGoals({ context, state }: { context: ScreenContext; state: strin
 
 function LocationsAndEntities({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useCollections(["locations", "legalEntities", "brands"]);
+  const scopePref = usePref("locationScope");
   const { org } = useWorkspace();
   if (lens === "Legal entities") {
     const rows = data.legalEntities.length ? data.legalEntities : [];
@@ -756,12 +851,27 @@ function LocationsAndEntities({ context, lens }: { context: ScreenContext; lens:
       </Card>
     );
   }
+  const scopeIds = listField(scopePref, "ids");
+  const inScope = scopeIds.length ? data.locations.filter((location) => scopeIds.includes(location.id)) : data.locations;
   return (
+    <Stack gap={3}>
+    {scopeIds.length > 0 && (
+      <Notice tone="info" title={`Scoped to ${inScope.length} of ${data.locations.length} locations`}
+        actions={<Button size="sm" variant="ghost" onClick={() => context.openOverlay("scope preview")}>Change scope</Button>}>
+        Locations outside the scope are hidden here, not removed.
+      </Notice>
+    )}
     <Grid>
-      {data.locations.map((location) => (
+      {inScope.map((location) => (
         <Card key={location.id} span={4} title={location.title} subtitle={location.summary}
+          prov={context.selectedId === location.id ? "human" : undefined}
           actions={location.tags.includes("primary") ? <Pill tone="accent">Primary</Pill> : undefined}
-          footer={<Button size="sm" variant="ghost" onClick={() => context.openOverlay("Location form", { id: location.id })}>Edit details</Button>}>
+          footer={<>
+            <Button size="sm" variant={context.selectedId === location.id ? "soft" : "ghost"} aria-pressed={context.selectedId === location.id} onClick={() => context.select(location.id)}>
+              {context.selectedId === location.id ? "Selected" : "Select"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Location form", { id: location.id })}>Edit details</Button>
+          </>}>
           <Properties rows={[
             { label: "Kind", value: String(location.fields.kind ?? "Office") },
             { label: "Time zone", value: String(location.fields.timezone ?? org.timezone) },
@@ -770,6 +880,7 @@ function LocationsAndEntities({ context, lens }: { context: ScreenContext; lens:
       ))}
       {data.locations.length === 0 && <Empty title="No locations" action={<Button variant="primary" onClick={() => context.openOverlay("Location form")}>Add location</Button>} />}
     </Grid>
+    </Stack>
   );
 }
 
@@ -777,12 +888,31 @@ function LocationsAndEntities({ context, lens }: { context: ScreenContext; lens:
 
 function CompanyTimeline({ context, lens }: { context: ScreenContext; lens: string }) {
   const events = useCollection("timelineEvents");
-  const filtered = lens === "All" ? events : events.filter((event) => String(event.fields.kind ?? "").toLowerCase() === lens.toLowerCase().replace(/s$/, ""));
+  useSearchParams();
+  const filter = timelineFilter();
+  const byKind = lens === "All" ? events : events.filter((event) => String(event.fields.kind ?? "").toLowerCase() === lens.toLowerCase().replace(/s$/, ""));
+  const filtered = byKind.filter((event) => {
+    const at = (event.at ?? event.updatedAt).slice(0, 10);
+    if (filter.from && at < filter.from) return false;
+    if (filter.to && at > filter.to) return false;
+    if (filter.q && !`${event.title} ${event.summary}`.toLowerCase().includes(filter.q.toLowerCase())) return false;
+    return true;
+  });
   const sorted = [...filtered].sort((a, b) => (b.at ?? b.updatedAt).localeCompare(a.at ?? a.updatedAt));
+  const filtering = Boolean(filter.from || filter.to || filter.q);
 
-  if (sorted.length === 0) return <Empty title={`No ${lens.toLowerCase()} events`} icon={<Clock size={20} />} />;
+  const notice = filtering ? (
+    <Notice tone="info" title={`Filtered: ${sorted.length} of ${byKind.length} events`}
+      actions={<Button size="sm" variant="ghost" onClick={() => setQuery(context, { from: null, to: null, q: null })}>Clear filter</Button>}>
+      {[filter.from && `from ${filter.from}`, filter.to && `to ${filter.to}`, filter.q && `containing “${filter.q}”`].filter(Boolean).join(", ")}
+    </Notice>
+  ) : null;
+
+  if (sorted.length === 0) return <Stack gap={3}>{notice}<Empty title={`No ${lens.toLowerCase()} events${filtering ? " match the filter" : ""}`} icon={<Clock size={20} />} /></Stack>;
 
   return (
+    <Stack gap={3}>
+    {notice}
     <ol className="ds-stack ds-gap-4">
       {sorted.map((event) => (
         <li key={event.id}>
@@ -791,9 +921,9 @@ function CompanyTimeline({ context, lens }: { context: ScreenContext; lens: stri
               <strong className="ds-num">{context.date(event.at ?? event.updatedAt)}</strong>
               <div className="ds-subtle">{context.relative(event.at ?? event.updatedAt)}</div>
             </div>
-            <div className="ds-panel ds-grow" style={{ padding: "var(--space-4)" }}>
+            <div className="ds-panel ds-grow" style={{ padding: "var(--space-4)", outline: context.selectedId === event.id ? "2px solid var(--accent)" : undefined }}>
               <Row gap={2}>
-                <strong className="ds-grow">{event.title}</strong>
+                <button type="button" className="ds-grow" style={{ textAlign: "start", fontWeight: 650 }} aria-pressed={context.selectedId === event.id} onClick={() => context.select(event.id)}>{event.title}</button>
                 <Pill tone="neutral">{String(event.fields.kind ?? "event")}</Pill>
               </Row>
               <p className="ds-subtle" style={{ marginBlockStart: 4 }}>{event.summary}</p>
@@ -806,6 +936,7 @@ function CompanyTimeline({ context, lens }: { context: ScreenContext; lens: stri
         </li>
       ))}
     </ol>
+    </Stack>
   );
 }
 
@@ -813,7 +944,6 @@ function CompanyTimeline({ context, lens }: { context: ScreenContext; lens: stri
 
 function WorkplaceDirectory({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useCollections(["members", "departments", "skills"]);
-  const { org } = useWorkspace();
   if (lens === "Departments") return <DepartmentsDirectory context={context} scope="All" />;
   if (lens === "Skills") {
     return data.skills.length === 0
@@ -829,8 +959,12 @@ function WorkplaceDirectory({ context, lens }: { context: ScreenContext; lens: s
       {rows.map((member) => (
         <Card key={member.id} span={4} title={<Row gap={2}><Avatar name={member.title} kind={member.fields.kind === "ai" ? "ai" : "human"} />{member.title}</Row>} subtitle={String(member.fields.title ?? "")}
           footer={<>
-            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/comms/channels`)}>Message</Button>
-            <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Profile quick view", { id: member.id })}>Profile</Button>
+            <Button size="sm" variant="secondary" onClick={() => { context.select(member.id); context.openOverlay("start conversation"); }}>Message</Button>
+            <Button size="sm" variant="ghost" onClick={() => { context.select(member.id); context.openOverlay("Profile quick view", { id: member.id }); }}>Profile</Button>
+            <span className="ds-grow" />
+            <Button size="sm" variant={context.selectedId === member.id ? "soft" : "ghost"} aria-pressed={context.selectedId === member.id} onClick={() => context.select(member.id)}>
+              {context.selectedId === member.id ? "Selected" : "Select"}
+            </Button>
           </>}>
           <p className="ds-subtle">{member.summary}</p>
           <Row gap={2} style={{ marginBlockStart: "var(--space-2)" }}>
@@ -1118,17 +1252,12 @@ export const hqApp = registerApp({
         { id: "Ask Chief of Staff", label: "Ask Arlovi", placement: "primary", run: (context) => context.navigate(`/o/${context.org.slug}/ai/chat`) },
         { id: "rearrange cards", label: "Arrange cards", placement: "secondary", run: (context) => context.openOverlay("Widget picker") },
         { id: "drill into metric", label: "Inspect a metric", placement: "overflow", run: (context) => context.openOverlay("metric inspector", { metric: "receivable" }) },
-        { id: "dismiss recommendation", label: "Save this view", placement: "overflow", run: (context) => context.openOverlay("save view dialog") },
+        { id: "dismiss recommendation", label: "Dismiss a recommendation", placement: "overflow", run: (context) => context.openOverlay("recommendations") },
+        { id: "save view", label: "Save this view", placement: "overflow", run: (context) => context.openOverlay("save view dialog") },
       ],
       overlays: [
-        { id: "Widget picker", kind: "drawer", title: "Arrange cards", description: "Choose what Executive Home shows.", render: () => (
-          <Stack gap={3}>
-            {["Waiting on you", "Active missions", "Due work", "Recommended", "Receivable", "Ledger freshness"].map((card) => (
-              <Checkbox key={card} label={card} defaultChecked />
-            ))}
-            <Notice tone="info">Card arrangement is kept per person in this browser.</Notice>
-          </Stack>
-        ) },
+        { id: "Widget picker", kind: "drawer", title: "Arrange cards", description: "Choose what Executive Home shows, and in what order.", render: ({ close, ...context }) => <ArrangeCards context={context} close={close} />, footer: submitFooter("hq-arrange", "Save arrangement") },
+        { id: "recommendations", kind: "drawer", title: "Recommendations", width: 480, render: ({ ...context }) => <RecommendationsDrawer context={context} /> },
         { id: "metric inspector", kind: "drawer", title: "Where this figure comes from", width: 520, render: ({ ...context }) => <MetricInspector context={context} /> },
         { id: "save view dialog", kind: "modal", title: "Save this view", width: 460, render: ({ close, ...context }) => <SaveViewDialog context={context} close={close} />, footer: submitFooter("save-view", "Save view") },
       ],
@@ -1142,10 +1271,12 @@ export const hqApp = registerApp({
         render: (context: ScreenContext) => <MyWorkspace context={context} view={view} />,
       })),
       actions: [
-        { id: "Prioritize task", label: "Quick task", placement: "primary", run: (context) => context.openOverlay("Quick task") },
-        { id: "open draft", label: "Open drafts", placement: "secondary", run: (context) => context.navigate(`/o/${context.org.slug}/docs/files`) },
-        { id: "request help", label: "Request help", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/ai/chat`) },
-        { id: "pin item", label: "Preferences", placement: "overflow", run: (context) => context.openOverlay("personal preferences") },
+        { id: "Prioritize task", label: "Prioritise", placement: "primary", guard: (context) => guardSelection(context, "a task"), run: (context) => prioritizeTask(context) },
+        { id: "quick task", label: "Quick task", placement: "secondary", run: (context) => context.openOverlay("Quick task") },
+        { id: "open draft", label: "Open latest draft", placement: "secondary", run: (context) => openLatestDraft(context) },
+        { id: "request help", label: "Request help", placement: "overflow", run: (context) => context.openOverlay("request help") },
+        { id: "pin item", label: "Pin item", placement: "overflow", guard: (context) => guardSelection(context, "a task"), run: (context) => pinTask(context) },
+        { id: "preferences", label: "Preferences", placement: "overflow", run: (context) => context.openOverlay("personal preferences") },
       ],
       overlays: [
         { id: "Quick task", kind: "modal", title: "Quick task", width: 460,
@@ -1163,10 +1294,8 @@ export const hqApp = registerApp({
             </form>
           ),
           footer: submitFooter("quick-task", "Add task") },
-        { id: "work item inspector", kind: "drawer", title: "Work item", render: ({ ...context }) => {
-          const record = context.selectedId;
-          return record ? <Properties rows={[{ label: "Record", value: record }]} /> : <Empty title="Select a task" />;
-        } },
+        { id: "work item inspector", kind: "drawer", title: "Work item", render: ({ ...context }) => <WorkItemInspector context={context} /> },
+        { id: "request help", kind: "modal", title: "Request help", width: 520, render: ({ close, ...context }) => <RequestHelp context={context} close={close} />, footer: submitFooter("hq-help", "Ask for help") },
         { id: "personal preferences", kind: "modal", title: "Personal preferences", width: 480, render: () => (
           <Stack gap={3}>
             <Checkbox label="Show completed work in Today" />
@@ -1215,12 +1344,16 @@ export const hqApp = registerApp({
       })),
       actions: [
         { id: "create department", label: "New department", placement: "primary", capability: "edit_people", run: (context) => context.openOverlay("Create department") },
-        { id: "assign leader", label: "Organisation chart", placement: "secondary", run: (context) => context.navigate(`/o/${context.org.slug}/hq/organization`) },
-        { id: "Open department", label: "Workplace directory", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/hq/directory`) },
-        { id: "reorder directory", label: "Impact preview", placement: "overflow", run: (context) => context.openOverlay("organizational impact preview") },
+        { id: "assign leader", label: "Assign a leader", placement: "secondary", capability: "edit_people", run: (context) => context.openOverlay("assign leader") },
+        { id: "Open department", label: "Open a department", placement: "overflow", run: (context) => context.openOverlay("open department") },
+        { id: "reorder directory", label: "Reorder the directory", placement: "overflow", run: (context) => context.openOverlay("reorder directory") },
+        { id: "impact preview", label: "Impact preview", placement: "overflow", run: (context) => context.openOverlay("organizational impact preview") },
       ],
       overlays: [
         { id: "Create department", kind: "modal", title: "New department", width: 520, render: ({ close, ...context }) => <CreateDepartment context={context} close={close} />, footer: submitFooter("create-department", "Create department") },
+        { id: "assign leader", kind: "modal", title: "Assign a leader", width: 480, render: ({ close, ...context }) => <AssignLeader context={context} close={close} />, footer: submitFooter("hq-leader", "Assign") },
+        { id: "open department", kind: "modal", title: "Open a department", width: 460, render: ({ close, ...context }) => <OpenDepartment context={context} close={close} /> },
+        { id: "reorder directory", kind: "modal", title: "Reorder the directory", width: 480, render: ({ close, ...context }) => <ReorderDepartments context={context} close={close} />, footer: submitFooter("hq-reorder", "Save order") },
         { id: "organizational impact preview", kind: "drawer", title: "Organisational impact", width: 460, render: ({ ...context }) => {
           const payload = context.overlayPayload as { departmentId?: string } | undefined;
           return <Building departmentId={payload?.departmentId} context={context} />;
@@ -1237,12 +1370,17 @@ export const hqApp = registerApp({
         render: (context: ScreenContext) => <DepartmentWorkspace context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Assign work", label: "Assign work", placement: "primary", run: (context) => context.navigate(`/o/${context.org.slug}/project/tasks`) },
-        { id: "message team", label: "Message team", placement: "secondary", run: (context) => context.navigate(`/o/${context.org.slug}/comms/channels`) },
-        { id: "add resource", label: "Settings", placement: "overflow", run: (context) => context.openOverlay("Department settings") },
-        { id: "open department app", label: "Invite member", placement: "overflow", run: (context) => context.openOverlay("invite member") },
+        { id: "Assign work", label: "Assign work", placement: "primary", run: (context) => context.openOverlay("assign work") },
+        { id: "message team", label: "Message team", placement: "secondary", run: (context) => context.openOverlay("message team") },
+        { id: "add resource", label: "Add a resource", placement: "overflow", run: (context) => context.openOverlay("add resource") },
+        { id: "open department app", label: "Open the department's app", placement: "overflow", run: (context) => openDepartmentAppFor(context) },
+        { id: "settings", label: "Department settings", placement: "overflow", run: (context) => context.openOverlay("Department settings") },
+        { id: "invite", label: "Invite a member", placement: "overflow", run: (context) => context.openOverlay("invite member") },
       ],
       overlays: [
+        { id: "assign work", kind: "modal", title: "Assign work", width: 540, render: ({ close, ...context }) => <AssignWork context={context} close={close} />, footer: submitFooter("hq-assign-work", "Assign") },
+        { id: "message team", kind: "modal", title: "Message the team", width: 540, render: ({ close, ...context }) => <MessageTeam context={context} close={close} />, footer: submitFooter("hq-message-team", "Post message") },
+        { id: "add resource", kind: "modal", title: "Add a resource", width: 520, render: ({ close, ...context }) => <AddResource context={context} close={close} />, footer: submitFooter("hq-resource", "Add resource") },
         { id: "Department settings", kind: "modal", title: "Department settings", width: 520, render: ({ ...context }) => <Properties rows={[{ label: "Department", value: context.params.id ?? "—" }, { label: "Private records", value: "Visible to members only" }]} /> },
         { id: "invite member", kind: "modal", title: "Invite a member", width: 460, render: () => (
           <Stack gap={3}>
@@ -1266,8 +1404,9 @@ export const hqApp = registerApp({
       actions: [
         { id: "modify reporting line", label: "Change reporting line", placement: "primary", capability: "edit_people", guard: (context) => (context.selectedId ? undefined : "Select a member first"), run: (context) => context.openOverlay("change manager") },
         { id: "focus node", label: "Inspect member", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select a member first"), run: (context) => context.openOverlay("Member inspector") },
-        { id: "switch tree/list", label: "Directory", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/hq/directory`) },
-        { id: "Pan zoom", label: "Departments", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/hq/departments`) },
+        { id: "switch tree/list", label: "Switch chart / list", placement: "secondary", run: (context) => setQuery(context, { view: new URLSearchParams(window.location.search).get("view") === "list" ? null : "list" }) },
+        { id: "Pan zoom", label: "Zoom in", placement: "overflow", run: (context) => stepZoom(context, Number(new URLSearchParams(window.location.search).get("zoom") ?? 1) || 1, 1) },
+        { id: "zoom out", label: "Zoom out", placement: "overflow", run: (context) => stepZoom(context, Number(new URLSearchParams(window.location.search).get("zoom") ?? 1) || 1, -1) },
       ],
       overlays: [
         { id: "Member inspector", kind: "drawer", title: "Member", render: ({ ...context }) => <MemberInspector context={context} /> },
@@ -1285,16 +1424,17 @@ export const hqApp = registerApp({
       })),
       actions: [
         { id: "Create objective", label: "New objective", placement: "primary", run: (context) => context.openOverlay("Goal editor") },
-        { id: "link mission", label: "Link a mission", placement: "secondary", run: (context) => context.navigate(`/o/${context.org.slug}/mission/missions`) },
-        { id: "update measure", label: "Change a target", placement: "overflow", run: (context) => context.openOverlay("target change review") },
-        { id: "review goal", label: "Related work", placement: "overflow", run: (context) => context.openOverlay("related work inspector") },
+        { id: "link mission", label: "Link a mission", placement: "secondary", run: (context) => context.openOverlay("link mission") },
+        { id: "update measure", label: "Update the measure", placement: "overflow", run: (context) => context.openOverlay("target change review") },
+        { id: "review goal", label: "Review a goal", placement: "overflow", run: (context) => context.openOverlay("review goal") },
+        { id: "related work", label: "Related work", placement: "overflow", run: (context) => context.openOverlay("related work inspector") },
       ],
       overlays: [
         { id: "Goal editor", kind: "modal", title: "Objective", width: 560, render: ({ close, ...context }) => <GoalEditor context={context} close={close} />, footer: submitFooter("goal-editor", "Save objective") },
         { id: "target change review", kind: "modal", title: "Change a target", tone: "danger", width: 520, render: ({ close, ...context }) => <GoalEditor context={context} close={close} />, footer: submitFooter("goal-editor", "Apply new target") },
-        { id: "related work inspector", kind: "drawer", title: "Related work", render: ({ ...context }) => {
-          return <Empty title="Linked work" >Missions and projects linked to this objective appear here. Open Missions to link one in {context.org.shortName}.</Empty>;
-        } },
+        { id: "related work inspector", kind: "drawer", title: "Related work", render: ({ ...context }) => <RelatedWork context={context} /> },
+        { id: "link mission", kind: "modal", title: "Link a mission", width: 520, render: ({ close, ...context }) => <LinkMission context={context} close={close} />, footer: submitFooter("hq-link-mission", "Link mission") },
+        { id: "review goal", kind: "modal", title: "Review a goal", width: 540, render: ({ close, ...context }) => <ReviewGoal context={context} close={close} />, footer: submitFooter("hq-review-goal", "Record review") },
       ],
     },
 
@@ -1307,19 +1447,24 @@ export const hqApp = registerApp({
       })),
       actions: [
         { id: "Add location", label: "Add location", placement: "primary", run: (context) => context.openOverlay("Location form") },
-        { id: "set primary office", label: "Scope preview", placement: "secondary", run: (context) => context.openOverlay("scope preview") },
-        { id: "choose scope", label: "Duplicate check", placement: "overflow", run: (context) => context.openOverlay("duplicate checker") },
-        { id: "edit local details", label: "Company overview", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/hq/company`) },
+        { id: "set primary office", label: "Set primary office", placement: "secondary", run: (context) => context.openOverlay("set primary office") },
+        { id: "choose scope", label: "Choose scope", placement: "overflow", run: (context) => context.openOverlay("scope preview") },
+        { id: "edit local details", label: "Edit local details", placement: "overflow", guard: (context) => guardSelection(context, "a location"), run: (context) => context.openOverlay("Location form", { id: context.selectedId }) },
+        { id: "duplicate check", label: "Duplicate check", placement: "overflow", run: (context) => context.openOverlay("duplicate checker") },
       ],
       overlays: [
         { id: "Location form", kind: "modal", title: "Location", width: 520, render: ({ close, ...context }) => <LocationForm context={context} close={close} />, footer: submitFooter("location-form", "Save location") },
-        { id: "scope preview", kind: "drawer", title: "Regional scope", render: ({ ...context }) => (
-          <Properties rows={[
-            { label: "Reporting currency", value: context.org.currency },
-            { label: "Tax jurisdiction", value: context.org.jurisdiction },
-            { label: "Time zone", value: context.org.timezone },
-          ]} />
-        ) },
+        { id: "scope preview", kind: "drawer", title: "Choose scope", width: 480, render: ({ close, ...context }) => (
+          <Stack gap={4}>
+            <Properties rows={[
+              { label: "Reporting currency", value: context.org.currency },
+              { label: "Tax jurisdiction", value: context.org.jurisdiction },
+              { label: "Time zone", value: context.org.timezone },
+            ]} />
+            <ChooseScope context={context} close={close} />
+          </Stack>
+        ), footer: submitFooter("hq-scope", "Apply scope") },
+        { id: "set primary office", kind: "modal", title: "Set the primary office", width: 480, render: ({ close, ...context }) => <SetPrimaryOffice context={context} close={close} />, footer: submitFooter("hq-primary", "Set primary") },
         { id: "duplicate checker", kind: "modal", title: "Duplicate check", width: 460, render: ({ ...context }) => (
           <p>Location names are checked for duplicates when saved, so transfers between {context.org.shortName} sites resolve to one place.</p>
         ) },
@@ -1336,8 +1481,8 @@ export const hqApp = registerApp({
       actions: [
         { id: "add milestone", label: "Add milestone", placement: "primary", run: (context) => context.openOverlay("add annotation") },
         { id: "export history", label: "Export history", placement: "secondary", capability: "export_data", run: (context) => context.openOverlay("export selection") },
-        { id: "Filter", label: "Inspect an event", placement: "overflow", run: (context) => context.openOverlay("Event inspector") },
-        { id: "inspect source", label: "Company overview", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/hq/company`) },
+        { id: "Filter", label: "Filter", placement: "secondary", run: (context) => context.openOverlay("timeline filter") },
+        { id: "inspect source", label: "Inspect source", placement: "overflow", guard: (context) => guardSelection(context, "an event"), run: (context) => context.openOverlay("Event inspector", { id: context.selectedId }) },
       ],
       overlays: [
         { id: "Event inspector", kind: "drawer", title: "Event", render: ({ ...context }) => {
@@ -1366,6 +1511,7 @@ export const hqApp = registerApp({
             </form>
           ),
           footer: submitFooter("milestone", "Add milestone") },
+        { id: "timeline filter", kind: "modal", title: "Filter the timeline", width: 500, render: ({ close, ...context }) => <TimelineFilter context={context} close={close} />, footer: submitFooter("hq-timeline-filter", "Apply filter") },
         { id: "export selection", kind: "modal", title: "Export history", width: 460, render: ({ ...context }) => <ExportTimeline context={context} /> },
       ],
     },
@@ -1378,13 +1524,17 @@ export const hqApp = registerApp({
         render: (context: ScreenContext) => <WorkplaceDirectory context={context} lens={lens} />,
       })),
       actions: [
-        { id: "start conversation", label: "Start a conversation", placement: "primary", run: (context) => context.navigate(`/o/${context.org.slug}/comms/channels`) },
-        { id: "assign task", label: "Assign a task", placement: "secondary", run: (context) => context.navigate(`/o/${context.org.slug}/project/tasks`) },
-        { id: "Find colleague", label: "Organisation chart", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/hq/organization`) },
-        { id: "view profile", label: "Presence settings", placement: "overflow", run: (context) => context.openOverlay("presence settings") },
+        { id: "start conversation", label: "Start a conversation", placement: "primary", run: (context) => context.openOverlay("start conversation") },
+        { id: "assign task", label: "Assign a task", placement: "secondary", run: (context) => context.openOverlay("assign task") },
+        { id: "Find colleague", label: "Find a colleague", placement: "secondary", run: (context) => context.openOverlay("find colleague") },
+        { id: "view profile", label: "View profile", placement: "overflow", guard: (context) => guardSelection(context, "a person"), run: (context) => context.openOverlay("Profile quick view", { id: context.selectedId }) },
+        { id: "presence", label: "Presence settings", placement: "overflow", run: (context) => context.openOverlay("presence settings") },
       ],
       overlays: [
         { id: "Profile quick view", kind: "drawer", title: "Profile", render: ({ ...context }) => <MemberInspector context={context} /> },
+        { id: "start conversation", kind: "modal", title: "Start a conversation", width: 520, render: ({ close, ...context }) => <StartConversation context={context} close={close} />, footer: submitFooter("hq-conversation", "Send") },
+        { id: "assign task", kind: "modal", title: "Assign a task", width: 520, render: ({ close, ...context }) => <AssignTaskTo context={context} close={close} />, footer: submitFooter("hq-assign-task", "Assign") },
+        { id: "find colleague", kind: "modal", title: "Find a colleague", width: 520, render: ({ close, ...context }) => <FindColleague context={context} close={close} /> },
         { id: "presence settings", kind: "modal", title: "Presence and privacy", width: 480, render: () => (
           <Stack gap={3}>
             <Checkbox label="Show my working hours in the directory" defaultChecked />
@@ -1396,6 +1546,61 @@ export const hqApp = registerApp({
     },
   },
 });
+
+function RecommendationsDrawer({ context }: { context: ScreenContext }) {
+  const insights = useHomeInsights();
+  return <RecommendationsManager context={context} insights={insights} />;
+}
+
+function WorkItemInspector({ context }: { context: ScreenContext }) {
+  const task = useRecord(context.selectedId);
+  const events = useEvents(task?.id, 8);
+  if (!task) return <Empty title="Select a task">Choose a row in your work list to see it here.</Empty>;
+  return (
+    <Stack gap={4}>
+      <h3>{task.title}</h3>
+      <Properties rows={[
+        { label: "Stage", value: <Pill>{String(task.fields.stage ?? task.status)}</Pill> },
+        { label: "Priority", value: <Pill tone={task.fields.priority === "high" ? "danger" : "neutral"}>{String(task.fields.priority ?? "normal")}</Pill> },
+        { label: "Owner", value: String(task.fields.assignee ?? task.ownerName) },
+        { label: "Due", value: context.date(task.dueAt) },
+        { label: "Pinned", value: task.tags.includes("pinned") ? "Yes" : "No" },
+      ]} />
+      {task.summary && <p className="ds-prose">{task.summary}</p>}
+      <Stack gap={2}>
+        <h4 className="ds-eyebrow">Activity</h4>
+        {events.length === 0 && <span className="ds-subtle">No recorded activity.</span>}
+        {events.map((event) => <Row key={event.id} gap={2}><span className="ds-subtle ds-num">{context.relative(event.at)}</span><span>{event.message}</span></Row>)}
+      </Stack>
+      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/project/tasks/${task.id}`)}>Open the task</Button>
+    </Stack>
+  );
+}
+
+function RelatedWork({ context }: { context: ScreenContext }) {
+  const data = useCollections(["objectives", "missions", "projects"]);
+  const linked = data.objectives.filter((objective) => objective.fields.missionId);
+  if (linked.length === 0) {
+    return <Empty title="Nothing linked yet">Use Link a mission to record which mission works towards an objective.</Empty>;
+  }
+  return (
+    <Stack gap={3}>
+      {linked.map((objective) => {
+        const mission = data.missions.find((item) => item.id === objective.fields.missionId);
+        return (
+          <div key={objective.id} className="ds-panel" style={{ padding: "var(--space-3)" }}>
+            <strong>{objective.title}</strong>
+            <Row gap={2} style={{ marginBlockStart: 6 }}>
+              <span className="ds-subtle ds-grow">{mission ? mission.title : "Linked mission no longer exists"}</span>
+              {mission && <Pill tone="info">{mission.status.replace(/_/g, " ")}</Pill>}
+              {mission && <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}`)}>Open</Button>}
+            </Row>
+          </div>
+        );
+      })}
+    </Stack>
+  );
+}
 
 function EventInspector({ id, context }: { id?: string; context: ScreenContext }) {
   const event = useRecord(id);

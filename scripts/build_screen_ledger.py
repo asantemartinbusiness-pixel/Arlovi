@@ -1,13 +1,23 @@
 #!/usr/bin/env python3
 """Build the implementation ledger from measured evidence only.
 
-Inputs (all produced by tests, never written by hand):
-  docs/implementation/registry-coverage.json  - vitest registry-contract test
-  docs/implementation/screen-sweep.json       - playwright contract sweep
+A screen is VERIFIED only when all three kinds of evidence agree:
 
-Output:
-  docs/implementation/SCREEN_LEDGER.csv
-  docs/implementation/SCREEN_LEDGER.md
+  1. Contract   every contract tab, action and overlay is declared by the
+                application that owns the screen
+                (docs/implementation/registry-coverage.json, written by
+                tests/unit/registry-contract.test.ts)
+  2. Exercised  in a real browser, the screen loaded, every tab rendered a
+                panel, every contract overlay opened and was implemented, and
+                every enabled action ran, all with no console error
+                (docs/implementation/deep-sweep/<APP>.json, written by
+                e2e/deep.spec.ts)
+  3. Semantics  each contract action was judged to perform the action it is
+                named for, not routed to a related surface
+                (docs/implementation/semantic-audit.json, one sign-off per
+                application, recorded from the remediation reviews)
+
+Nothing in the output is written by hand.
 """
 import csv
 import json
@@ -18,51 +28,67 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs" / "implementation"
 
 
-def load(name):
-    path = DOCS / name
+def load(path, default=None):
     if not path.exists():
-        print(f"missing {path}; run the tests that produce it first", file=sys.stderr)
-        return None
+        return default
     return json.loads(path.read_text())
 
 
 def main():
-    coverage = load("registry-coverage.json")
+    coverage = load(DOCS / "registry-coverage.json")
     if coverage is None:
+        print("missing registry-coverage.json; run: npx vitest run tests/unit/registry-contract.test.ts", file=sys.stderr)
         return 1
-    sweep = load("screen-sweep.json") or []
-    sweep_by_id = {row["id"]: row for row in sweep}
+
+    sweep = {}
+    sweep_dir = DOCS / "deep-sweep"
+    if sweep_dir.exists():
+        for file in sweep_dir.glob("*.json"):
+            for result in json.loads(file.read_text()):
+                sweep[result["id"]] = result
+
+    semantic = load(DOCS / "semantic-audit.json", {"applications": {}})["applications"]
 
     rows = []
     for row in coverage["rows"]:
-        swept = sweep_by_id.get(row["id"])
-        contract_complete = (
+        contract_ok = (
             row["implementation"].startswith("bespoke")
-            and not row["missingTabs"]
-            and not row["missingActions"]
-            and not row["missingOverlays"]
+            and not row["missingTabs"] and not row["missingActions"] and not row["missingOverlays"]
         )
-        rendered = bool(swept and swept.get("heading") and not swept.get("errors"))
-        if contract_complete and rendered:
+        result = sweep.get(row["id"])
+        if result:
+            checks = result["checks"]
+            failing = [c for c in checks if not c["ok"]]
+            exercised_ok = not failing
+            counts = {kind: sum(1 for c in checks if c["kind"] == kind and c["ok"]) for kind in ("tab", "overlay", "action")}
+            guarded = len(result.get("guarded", []))
+        else:
+            failing, exercised_ok, counts, guarded = [], False, {"tab": 0, "overlay": 0, "action": 0}, 0
+        signed = semantic.get(row["app"], {}).get("signedOff", False)
+
+        if contract_ok and exercised_ok and signed:
             status = "verified"
+        elif contract_ok and exercised_ok:
+            status = "exercised"
         elif row["implementation"].startswith("bespoke"):
             status = "implemented"
-        elif row["implementation"] == "app-fallback":
-            status = "app-fallback"
         else:
-            status = "legacy"
+            status = "not-built"
+
         rows.append({
             "id": row["id"],
             "application": row["app"],
             "title": row["title"],
             "route": row["route"],
             "status": status,
-            "implementation": row["implementation"],
-            "tabs": f'{min(row["tabsDeclared"], row["tabsRequired"])}/{row["tabsRequired"]}',
-            "actions": f'{min(row["actionsDeclared"], row["actionsRequired"])}/{row["actionsRequired"]}',
-            "overlays": f'{min(row["overlaysDeclared"], row["overlaysRequired"])}/{row["overlaysRequired"]}',
-            "rendered": "yes" if rendered else ("no" if swept else "not swept"),
-            "console_errors": len(swept.get("errors", [])) if swept else "",
+            "contract": "complete" if contract_ok else "incomplete",
+            "swept": "yes" if result else "no",
+            "tabs_exercised": f'{counts["tab"]}/{row["tabsRequired"]}',
+            "overlays_exercised": f'{counts["overlay"]}/{row["overlaysRequired"]}',
+            "actions_exercised": counts["action"],
+            "actions_guarded": guarded,
+            "semantic_signoff": "yes" if signed else "no",
+            "failing": "; ".join(f'{c["kind"]} {c["name"]}: {c.get("note") or "failed"}' for c in failing)[:400],
             "missing": "; ".join(row["missingTabs"] + row["missingActions"] + row["missingOverlays"])[:300],
         })
 
@@ -71,28 +97,28 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
 
-    totals = coverage["totals"]
-    counts = {}
+    tally = {}
     for row in rows:
-        counts[row["status"]] = counts.get(row["status"], 0) + 1
+        tally[row["status"]] = tally.get(row["status"], 0) + 1
     by_app = {}
     for row in rows:
-        entry = by_app.setdefault(row["application"], {"total": 0, "verified": 0, "implemented": 0, "legacy": 0, "app-fallback": 0})
+        entry = by_app.setdefault(row["application"], {"total": 0, "verified": 0, "exercised": 0, "implemented": 0, "not-built": 0})
         entry["total"] += 1
         entry[row["status"]] += 1
 
+    totals = coverage["totals"]
     lines = [
         "# Arlovi screen ledger",
         "",
-        "Generated by `scripts/build_screen_ledger.py` from the registry contract test and the",
-        "Playwright contract sweep. Nothing in this file is written by hand.",
+        "Generated by `scripts/build_screen_ledger.py` from three kinds of measured evidence.",
+        "Nothing in this file is written by hand.",
         "",
         "| Status | Meaning | Screens |",
         "| --- | --- | ---: |",
-        "| verified | Every contract tab, action and overlay is declared by its application, and the screen rendered in a real browser with no console error | %d |" % counts.get("verified", 0),
-        "| implemented | The application owns the screen, but part of its contract is still missing or it did not render cleanly | %d |" % counts.get("implemented", 0),
-        "| app-fallback | Rendered by the application's own fallback, not a bespoke screen definition | %d |" % counts.get("app-fallback", 0),
-        "| legacy | Still rendered by the pre-rebuild generic renderer | %d |" % counts.get("legacy", 0),
+        f'| verified | Contract complete, every interaction exercised clean in a browser, and the application\'s actions signed off as doing what they are named for | {tally.get("verified", 0)} |',
+        f'| exercised | Contract complete and exercised clean, but the semantic action audit is not signed off | {tally.get("exercised", 0)} |',
+        f'| implemented | Owned by its application, but part of the contract is missing or an interaction failed in the browser | {tally.get("implemented", 0)} |',
+        f'| not-built | Not yet owned by an application module | {tally.get("not-built", 0)} |',
         "",
         "## Contract coverage",
         "",
@@ -105,15 +131,16 @@ def main():
         "",
         "## By application",
         "",
-        "| Application | Screens | Verified | Implemented | Fallback | Legacy |",
-        "| --- | ---: | ---: | ---: | ---: | ---: |",
+        "| Application | Screens | Verified | Exercised | Implemented | Not built | Semantic sign-off |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | --- |",
     ]
     for code in sorted(by_app):
         entry = by_app[code]
-        lines.append(f'| {code} | {entry["total"]} | {entry["verified"]} | {entry["implemented"]} | {entry["app-fallback"]} | {entry["legacy"]} |')
-    lines += ["", "Per-screen detail is in `SCREEN_LEDGER.csv`.", ""]
+        signed = "yes" if semantic.get(code, {}).get("signedOff") else "no"
+        lines.append(f'| {code} | {entry["total"]} | {entry["verified"]} | {entry["exercised"]} | {entry["implemented"]} | {entry["not-built"]} | {signed} |')
+    lines += ["", "Per-screen detail, including every failing check, is in `SCREEN_LEDGER.csv`.", ""]
     (DOCS / "SCREEN_LEDGER.md").write_text("\n".join(lines))
-    print(f'ledger written: {counts}')
+    print(f"ledger written: {tally}")
     return 0
 
 
