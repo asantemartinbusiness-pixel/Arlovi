@@ -259,5 +259,138 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-PHOTO-005",
+  "title": "Compositing & Layers",
+  "route": "/o/northline/photo/photos/nl-photos-001/layers",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Layers",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Groups",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Effects",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Blend picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "layer properties",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "linked object",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Group with the layer below",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Blend mode…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reorder: raise the layer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Lower the layer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Transform: flip the layer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Place an asset as a new layer",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Replace the layer's pixels…"
+  ]
+ },
+ {
+  "id": "ARL-PHOTO-006",
+  "title": "Batch Processing",
+  "route": "/o/northline/photo/batch",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Queue",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Presets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Results",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Failed",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Preset editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "overwrite confirmation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "result report",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Test one sample",
+   "Run the queue",
+   "Build the batch",
+   "Download the results"
+  ]
  }
 ]

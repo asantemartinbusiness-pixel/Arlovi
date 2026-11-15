@@ -198,5 +198,146 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-LAYOUT-004",
+  "title": "Typography & Flow",
+  "route": "/o/northline/layout/publications/nl-publications-001/typography",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Paragraph",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Character",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Flow",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Accessibility",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Text style",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "flow options",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "preflight issue",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Link frames…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect overset text",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit a paragraph style…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New paragraph style",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Adjust the tracking…",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-LAYOUT-005",
+  "title": "Print & Preflight",
+  "route": "/o/northline/layout/publications/nl-publications-001/preflight",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Preflight",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Proof",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Preflight detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "export setup",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "missing asset",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect the findings",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Fix what can be fixed",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open a proof",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export a press PDF",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]
