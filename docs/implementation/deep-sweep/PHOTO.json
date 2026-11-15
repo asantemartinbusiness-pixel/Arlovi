@@ -392,5 +392,68 @@
    "Build the batch",
    "Download the results"
   ]
+ },
+ {
+  "id": "ARL-PHOTO-007",
+  "title": "Photo Export",
+  "route": "/o/northline/photo/photos/nl-photos-001/export",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Presets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Publish",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Export preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "rights",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "profile handling",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set the format…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview the real file",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add to the asset library",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]

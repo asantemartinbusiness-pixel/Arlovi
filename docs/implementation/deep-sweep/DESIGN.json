@@ -539,5 +539,139 @@
   "guarded": [
    "Set the trigger…"
   ]
+ },
+ {
+  "id": "ARL-DESIGN-009",
+  "title": "Assets & Export",
+  "route": "/o/northline/design/files/nl-designs-001/assets",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Assets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Symbols",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exports",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Asset picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "export settings",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "license note",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Replace or add an asset…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export settings",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Organise: sort the assets by name",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Batch export",
+   "Crop an asset…"
+  ]
+ },
+ {
+  "id": "ARL-DESIGN-010",
+  "title": "Design Review",
+  "route": "/o/northline/design/files/nl-designs-001/review",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Comments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Reviews",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Diff",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Comment editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "version compare",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "signoff",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve this version",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare versions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Annotate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign the open comments",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]

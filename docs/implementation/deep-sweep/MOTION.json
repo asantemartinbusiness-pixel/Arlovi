@@ -75,26 +75,22 @@
    {
     "kind": "tab",
     "name": "Animate",
-    "ok": false,
-    "note": "no tabpanel (selected: Animate)"
+    "ok": true
    },
    {
     "kind": "tab",
     "name": "Design",
-    "ok": false,
-    "note": "no tabpanel (selected: Design)"
+    "ok": true
    },
    {
     "kind": "tab",
     "name": "Effects",
-    "ok": false,
-    "note": "no tabpanel (selected: Effects)"
+    "ok": true
    },
    {
     "kind": "tab",
     "name": "Preview",
-    "ok": false,
-    "note": "no tabpanel (selected: Preview)"
+    "ok": true
    },
    {
     "kind": "overlay",
@@ -156,26 +152,22 @@
    {
     "kind": "tab",
     "name": "Curves",
-    "ok": false,
-    "note": "no tabpanel (selected: Curves)"
+    "ok": true
    },
    {
     "kind": "tab",
     "name": "Timing",
-    "ok": false,
-    "note": "no tabpanel (selected: Timing)"
+    "ok": true
    },
    {
     "kind": "tab",
     "name": "Presets",
-    "ok": false,
-    "note": "no tabpanel (selected: Presets)"
+    "ok": true
    },
    {
     "kind": "tab",
     "name": "Spring",
-    "ok": false,
-    "note": "no tabpanel (selected: Spring)"
+    "ok": true
    },
    {
     "kind": "overlay",
@@ -212,155 +204,6 @@
    "Stagger",
    "Edit easing",
    "Timing preview"
-  ]
- },
- {
-  "id": "ARL-MOTION-004",
-  "title": "Interactive Motion",
-  "route": "/o/northline/motion/projects/nl-motions-001/interactive",
-  "checks": [
-   {
-    "kind": "load",
-    "name": "render",
-    "ok": true
-   },
-   {
-    "kind": "tab",
-    "name": "States",
-    "ok": false,
-    "note": "no tabpanel (selected: States)"
-   },
-   {
-    "kind": "tab",
-    "name": "Triggers",
-    "ok": false,
-    "note": "no tabpanel (selected: Triggers)"
-   },
-   {
-    "kind": "tab",
-    "name": "Preview",
-    "ok": false,
-    "note": "no tabpanel (selected: Preview)"
-   },
-   {
-    "kind": "tab",
-    "name": "Export",
-    "ok": false,
-    "note": "no tabpanel (selected: Export)"
-   },
-   {
-    "kind": "overlay",
-    "name": "State inspector",
-    "ok": true
-   },
-   {
-    "kind": "overlay",
-    "name": "interaction guard",
-    "ok": true
-   },
-   {
-    "kind": "overlay",
-    "name": "device preview",
-    "ok": true
-   },
-   {
-    "kind": "action",
-    "name": "Test pointer, keyboard and touch",
-    "ok": true
-   },
-   {
-    "kind": "action",
-    "name": "Bind a trigger",
-    "ok": true
-   },
-   {
-    "kind": "action",
-    "name": "State inspector",
-    "ok": true
-   },
-   {
-    "kind": "action",
-    "name": "Device preview",
-    "ok": true
-   }
-  ],
-  "guarded": [
-   "Export the interactions",
-   "Remove the trigger"
-  ]
- },
- {
-  "id": "ARL-MOTION-005",
-  "title": "Motion Export",
-  "route": "/o/northline/motion/projects/nl-motions-001/export",
-  "checks": [
-   {
-    "kind": "load",
-    "name": "render",
-    "ok": true
-   },
-   {
-    "kind": "tab",
-    "name": "Formats",
-    "ok": false,
-    "note": "no tabpanel (selected: Formats)"
-   },
-   {
-    "kind": "tab",
-    "name": "Presets",
-    "ok": false,
-    "note": "no tabpanel (selected: Presets)"
-   },
-   {
-    "kind": "tab",
-    "name": "Queue",
-    "ok": false,
-    "note": "no tabpanel (selected: Queue)"
-   },
-   {
-    "kind": "tab",
-    "name": "History",
-    "ok": false,
-    "note": "no tabpanel (selected: History)"
-   },
-   {
-    "kind": "overlay",
-    "name": "Export options",
-    "ok": true
-   },
-   {
-    "kind": "overlay",
-    "name": "reduced-motion review",
-    "ok": true
-   },
-   {
-    "kind": "overlay",
-    "name": "compatibility",
-    "ok": true
-   },
-   {
-    "kind": "action",
-    "name": "Test the reduced-motion fallback",
-    "ok": true
-   },
-   {
-    "kind": "action",
-    "name": "Render video or GIF",
-    "ok": true
-   },
-   {
-    "kind": "action",
-    "name": "Export a file",
-    "ok": true
-   },
-   {
-    "kind": "action",
-    "name": "Compatibility matrix",
-    "ok": true
-   }
-  ],
-  "guarded": [
-   "Publish"
   ]
  }
 ]

@@ -129,5 +129,221 @@
    "Ripple delete",
    "Move the clip to the playhead"
   ]
+ },
+ {
+  "id": "ARL-VIDEO-003",
+  "title": "Media Bin",
+  "route": "/o/northline/video/projects/nl-videos-001/media",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Media",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Folders",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Proxy",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Missing",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Media inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "relink file",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "license",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Relink",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Import a source",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Tag the selected source",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Generate proxies",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Audition the selected source"
+  ]
+ },
+ {
+  "id": "ARL-VIDEO-004",
+  "title": "Audio Mixer",
+  "route": "/o/northline/video/projects/nl-videos-001/audio",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tracks",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Mixer",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Effects",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Loudness",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Mixer property",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "loudness review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "voice cleanup",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Adjust gain: every audio track −1 dB",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export the mix (WAV)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Mute or unmute every audio track",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Automate gain…",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-VIDEO-005",
+  "title": "Captions & Transcript",
+  "route": "/o/northline/video/projects/nl-videos-001/captions",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Transcript",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Captions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Languages",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Caption editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "speaker verification",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "language review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a cue at the playhead",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Split the cue at the playhead",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Time: end the cue at the playhead",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Correct the cue at the playhead",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Style the captions…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export SRT",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]
