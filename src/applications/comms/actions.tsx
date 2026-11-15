@@ -605,6 +605,7 @@ export async function blockSender(context: ScreenContext): Promise<void> {
   const thread = await recordOf(context, context.params.id, "emailThreads");
   if (!thread) { context.toast("Open a thread first", "Nothing was blocked.", "blocked"); return; }
   const sender = String(thread.fields.from ?? "");
+  if (!sender.trim()) { context.toast("No sender to block", "This thread has no sender address on record (it is your own draft). Nothing was blocked.", "blocked"); return; }
   askFirst(context, {
     title: `Block ${sender}`,
     body: `Future threads from ${sender} are filed in Spam by a rule in this workspace, and this thread moves to Spam now. Nothing in a message from this sender can change the rule or any agent policy.`,

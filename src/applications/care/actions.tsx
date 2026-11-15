@@ -36,7 +36,8 @@ export function ReassignCase({ context, close }: { context: ScreenContext; close
   const { now } = useWorkspace();
   const candidates = data.tickets.filter((ticket) => isOpen(ticket) && (!payload?.breachedOnly || ["breached", "at_risk"].includes(slaState(ticket, policyFor(ticket, data.slas), now).status)));
   const initial = candidates.find((row) => row.id === (payload?.id ?? context.selectedId))?.id ?? candidates[0]?.id ?? "";
-  const [ticketId, setTicketId] = useState(initial);
+  const [ticketIdRaw, setTicketId] = useState<string | null>(null);
+  const ticketId = ticketIdRaw ?? initial;
   const ticket = candidates.find((row) => row.id === ticketId);
   return (
     <form
