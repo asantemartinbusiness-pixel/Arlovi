@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
 
 /*
@@ -22,7 +23,11 @@ interface Contract {
 }
 
 const catalog = JSON.parse(readFileSync(new URL("../src/generated/catalog.json", import.meta.url), "utf8")) as { screens: Contract[] };
-const OUT = new URL("../docs/implementation/deep-sweep/", import.meta.url);
+/* DEEP_SWEEP_OUT writes results elsewhere during a run, to be copied into the
+   repository once at the end, rather than changing tracked files per screen. */
+const OUT = process.env.DEEP_SWEEP_OUT
+  ? pathToFileURL(`${process.env.DEEP_SWEEP_OUT.replace(/\/$/, "")}/`)
+  : new URL("../docs/implementation/deep-sweep/", import.meta.url);
 const CLOCK = "clock=2026-11-14T09:30:00Z";
 const ONLY = (process.env.APPS ?? "").split(",").map((code) => code.trim()).filter(Boolean);
 const NOT_BUILT = /This overlay is not implemented yet/;
