@@ -740,9 +740,7 @@ export function evaluateWorkbook(input: WorkbookInput): EvaluationResult {
     const env: EvalEnv = {
       now,
       cell: (sheetName, address) => readCell(sheetName ?? entry.sheetName, address),
-      range: (sheetName, from, to) => expandRange(`${from}:${to}`).map((address) => {
-        try { return readCell(sheetName ?? entry.sheetName, address); } catch (error) { throw error; }
-      }),
+      range: (sheetName, from, to) => expandRange(`${from}:${to}`).map((address) => readCell(sheetName ?? entry.sheetName, address)),
       grid: (sheetName, from, to) => {
         const box = rangeBox(`${from}:${to}`);
         if (!box) throw new EvalError("#REF!");

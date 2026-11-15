@@ -74,7 +74,6 @@
 .auto-edge-label {
   font-size: 10px;
   fill: var(--fg-muted);
-  font-family: var(--font-sans);
 }
 
 .auto-node {
@@ -222,7 +221,6 @@
 .auto-timeline-dot[data-tone="info"] { border-color: var(--info); color: var(--info); }
 
 .auto-code {
-  font-family: var(--font-mono);
   font-size: var(--text-xs);
   background: var(--bg-sunken);
   border: 1px solid var(--border-subtle);

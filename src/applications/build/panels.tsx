@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Activity, Boxes, Code2, GitBranch, KeyRound, Rocket, ShieldCheck, TestTube2 } from "lucide-react";
 import {
   BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties,
-  Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Row, Select, Stack, Stat, StatRow, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
@@ -238,13 +238,13 @@ export function AppOverview({ context, lens }: { context: ScreenContext; lens: "
     return (
       <Stack gap={5}>
         <StatRow>
-          <Stat label="Entities" value={String(model.entities.length)} meta={`${model.entities.reduce((sum, entity) => sum + entity.fields.length, 0)} fields`} />
-          <Stat label="Screens" value={String(model.screens.length)} meta={`${model.screens.reduce((sum, screen) => sum + screen.components.length, 0)} components`} />
-          <Stat label="Model checks" value={`${totals.fail} failing`} meta={`${totals.warn} to review · ${totals.pass} passing`} onClick={() => context.setTab("Tests")} />
+          <Stat prov="posted" label="Entities" value={String(model.entities.length)} meta={`${model.entities.reduce((sum, entity) => sum + entity.fields.length, 0)} fields`} />
+          <Stat prov="posted" label="Screens" value={String(model.screens.length)} meta={`${model.screens.reduce((sum, screen) => sum + screen.components.length, 0)} components`} />
+          <Stat prov="posted" label="Model checks" value={`${totals.fail} failing`} meta={`${totals.warn} to review · ${totals.pass} passing`} onClick={() => context.setTab("Tests")} />
           <Stat label="Deployed" value="Not deployed" unavailable meta="No runtime is connected" />
         </StatRow>
         <Grid>
-          <Card span={7} title="Release state" subtitle={lastRelease ? `Last attempt ${context.dateTime(lastRelease.at)}` : "Never attempted"}
+          <Card span={7} eyebrow="RELEASE" prov="posted" title="Release state" subtitle={lastRelease ? `Last attempt ${context.dateTime(lastRelease.at)}` : "Never attempted"}
             footer={<Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/deploy`)}>Deployments</Button>}>
             <Properties rows={[
               { label: "Environment label", value: <Pill tone={model.settings.environment === "production" ? "danger" : model.settings.environment === "staging" ? "warning" : "neutral"} dot>{model.settings.environment}</Pill> },
@@ -253,7 +253,7 @@ export function AppOverview({ context, lens }: { context: ScreenContext; lens: "
             ]} />
             <BoundaryNotice id="site.publish" action="Deploying this app" />
           </Card>
-          <Card span={5} title="Backlog" subtitle={`${totals.fail + totals.warn} items from the model itself`}>
+          <Card span={5} eyebrow="BACKLOG" prov="posted" title="Backlog" subtitle={`${totals.fail + totals.warn} items from the model itself`}>
             {totals.fail + totals.warn === 0 ? <Notice tone="success" title="Nothing outstanding">Every check on the model passes.</Notice> : (
               <Stack gap={2}>
                 {issues.filter((issue) => issue.level !== "pass").slice(0, 6).map((issue) => (
@@ -265,7 +265,7 @@ export function AppOverview({ context, lens }: { context: ScreenContext; lens: "
               </Stack>
             )}
           </Card>
-          <Card span={7} title="Activity" subtitle="Audit events on this project">
+          <Card span={7} eyebrow="ACTIVITY" prov="posted" title="Activity" subtitle="Audit events on this project">
             {events.length === 0 ? <Empty title="Nothing recorded yet" /> : (
               <Stack gap={2}>
                 {events.slice(0, 6).map((event) => (
@@ -277,7 +277,7 @@ export function AppOverview({ context, lens }: { context: ScreenContext; lens: "
               </Stack>
             )}
           </Card>
-          <Card span={5} title="Users" subtitle="Roles defined in this app">
+          <Card span={5} eyebrow="ACCESS" prov="human" title="Users" subtitle="Roles defined in this app">
             <Stack gap={2}>
               {model.roles.map((role) => (
                 <Row key={role.id} gap={2}>
@@ -422,7 +422,7 @@ export function CodeScreen({ context, lens }: { context: ScreenContext; lens: "F
           {files.map((item) => (
             <button key={item.path} type="button" className="ds-record-card" aria-current={item.path === file?.path ? "true" : undefined} onClick={() => setPath(item.path)}>
               <Row gap={2}>
-                <span className="ds-grow ds-truncate" style={{ textAlign: "start", fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }}>{item.path}</span>
+                <span className="ds-grow ds-truncate ds-num" style={{ textAlign: "start", fontSize: "var(--text-xs)" }}>{item.path}</span>
                 <Pill tone={item.path.startsWith("src/") && generatedFiles(model).some((generated) => generated.path === item.path) ? "accent" : "neutral"}>
                   {generatedFiles(model).some((generated) => generated.path === item.path) ? "generated" : "kept"}
                 </Pill>
@@ -675,7 +675,7 @@ export function ApiScreen({ context, lens }: { context: ScreenContext; lens: "En
   if (lens === "Contracts") {
     return (
       <Stack gap={4}>
-        <Card title="Generated contracts" subtitle="src/api.ts, produced from the endpoint list">
+        <Card eyebrow="GENERATED" prov="human" title="Generated contracts" subtitle="src/api.ts, produced from the endpoint list">
           <pre className="t6-code">{generatedFiles(model).find((file) => file.path === "src/api.ts")?.content ?? ""}</pre>
         </Card>
         <Notice tone="info" title="Authorisation is part of the type">
@@ -852,9 +852,9 @@ export function TestsScreen({ context, lens }: { context: ScreenContext; lens: "
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Checks" value={String(issues.length)} meta="Computed from the model" />
-          <Stat label="Failing" value={String(totals.fail)} meta="Would block a release" />
-          <Stat label="To review" value={String(totals.warn)} meta="Judgement" />
+          <Stat prov="posted" label="Checks" value={String(issues.length)} meta="Computed from the model" />
+          <Stat prov="posted" label="Failing" value={String(totals.fail)} meta="Would block a release" />
+          <Stat prov="posted" label="To review" value={String(totals.warn)} meta="Judgement" />
           <Stat label="Last recorded run" value={lastRun ? context.dateTime(lastRun) : "Never"} unavailable={!lastRun} meta={lastRun ? context.relative(lastRun) : "Run the suites to record one"} />
         </StatRow>
         <Grid>
@@ -884,7 +884,7 @@ export function TestsScreen({ context, lens }: { context: ScreenContext; lens: "
             }, { event: `Model checks run: ${totals.fail} failing, ${totals.warn} to review, ${totals.pass} passing` });
             context.toast("Checks recorded", `${issues.length} checks computed. ${totals.fail} failing.`, totals.fail ? "blocked" : "ok");
           }}>Run the suites</Button>
-          <Button variant="secondary" capability-hint="export" onClick={() => {
+          <Button variant="secondary" onClick={() => {
             downloadCsv(`${context.org.slug}-${record.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-checks.csv`,
               ["area", "level", "check", "detail"],
               issues.map((issue) => [issue.area, issue.level, issue.title, issue.detail]));
@@ -920,12 +920,12 @@ export function TestsScreen({ context, lens }: { context: ScreenContext; lens: "
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Entities" value={`${entitiesUsed.size} of ${model.entities.length}`} meta="Used by at least one component" />
-          <Stat label="Components bound" value={`${resolved.length} of ${bound.length}`} meta="Resolve to an entity" />
-          <Stat label="Entities reading data" value={String(model.entities.filter((entity) => entity.collection).length)} meta="Bound to a workspace collection" />
+          <Stat prov="posted" label="Entities" value={`${entitiesUsed.size} of ${model.entities.length}`} meta="Used by at least one component" />
+          <Stat prov="posted" label="Components bound" value={`${resolved.length} of ${bound.length}`} meta="Resolve to an entity" />
+          <Stat prov="posted" label="Entities reading data" value={String(model.entities.filter((entity) => entity.collection).length)} meta="Bound to a workspace collection" />
           <Stat label="Line coverage" value="Unavailable" unavailable meta="No test runner executes the generated code" />
         </StatRow>
-        <Card title="Entities by use" subtitle="An entity nothing reads is usually a leftover">
+        <Card eyebrow="COVERAGE" prov="posted" title="Entities by use" subtitle="An entity nothing reads is usually a leftover">
           <BarChart
             title="Components per entity"
             height={Math.max(180, model.entities.length * 32)}
@@ -1141,7 +1141,7 @@ export function IntegrationsScreen({ context, lens }: { context: ScreenContext; 
         <Notice tone="danger" title="No secret is stored in this workspace">
           This browser has no safe place to keep a credential: anything written here would sit in IndexedDB in plain text, readable by anything else on the page. So nothing is stored, nothing is generated, and the fields below are deliberately absent.
         </Notice>
-        <Card title="What a key would need" subtitle="The shape, without the value">
+        <Card eyebrow="SECRETS" prov="unknown" title="What a key would need" subtitle="The shape, without the value">
           <div className="t6-matrix-wrap">
             <table className="t6-matrix">
               <caption className="ds-sr-only">Environment keys this app would need</caption>
@@ -1183,8 +1183,8 @@ export function IntegrationsScreen({ context, lens }: { context: ScreenContext; 
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Connected providers" value="0" meta={`${connectors.length} recorded, none connected`} />
-          <Stat label="Calls made" value="0" meta="This workspace makes no network calls" />
+          <Stat prov="posted" label="Connected providers" value="0" meta={`${connectors.length} recorded, none connected`} />
+          <Stat prov="posted" label="Calls made" value="0" meta="This workspace makes no network calls" />
           <Stat label="Error rate" value="Unavailable" unavailable meta="No calls to measure" />
           <Stat label="Quota" value="Unavailable" unavailable meta="Reported by a provider, not by us" />
         </StatRow>
@@ -1234,8 +1234,8 @@ export function MonitorScreen({ context, lens }: { context: ScreenContext; lens:
       <Stack gap={5}>
         <StatRow>
           <Stat label="Runtime errors" value="Unavailable" unavailable meta="The app does not run anywhere" onClick={() => context.openOverlay("Trace viewer")} />
-          <Stat label="Model failures" value={String(totals.fail)} meta="Measured from the design" />
-          <Stat label="Warnings" value={String(totals.warn)} meta="Measured from the design" />
+          <Stat prov="posted" label="Model failures" value={String(totals.fail)} meta="Measured from the design" />
+          <Stat prov="posted" label="Warnings" value={String(totals.warn)} meta="Measured from the design" />
           <Stat label="Last check" value={record.fields.lastCheckAt ? context.relative(String(record.fields.lastCheckAt)) : "Never"} unavailable={!record.fields.lastCheckAt} meta="Recorded on the project record" />
         </StatRow>
         <Notice tone="warning" title="There is no runtime to report errors">
@@ -1264,12 +1264,12 @@ export function MonitorScreen({ context, lens }: { context: ScreenContext; lens:
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Generated code" value={`${(bytes / 1024).toFixed(1)} kB`} meta={`${generated.length} files, measured`} />
-          <Stat label="Components" value={String(model.screens.reduce((sum, screen) => sum + screen.components.length, 0))} meta="Across every screen" />
+          <Stat prov="posted" label="Generated code" value={`${(bytes / 1024).toFixed(1)} kB`} meta={`${generated.length} files, measured`} />
+          <Stat prov="posted" label="Components" value={String(model.screens.reduce((sum, screen) => sum + screen.components.length, 0))} meta="Across every screen" />
           <Stat label="Response time" value="Unavailable" unavailable meta="Nothing serves a request" />
           <Stat label="Throughput" value="Unavailable" unavailable meta="Nothing serves a request" />
         </StatRow>
-        <Card title="Generated output by file" subtitle="Byte counts from generating the files now">
+        <Card eyebrow="MEASURED" prov="posted" title="Generated output by file" subtitle="Byte counts from generating the files now">
           <BarChart
             title="Generated bytes per file"
             height={200}
@@ -1307,9 +1307,9 @@ export function MonitorScreen({ context, lens }: { context: ScreenContext; lens:
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Hosting" value="£0.00" meta="Nothing is hosted" />
-        <Stat label="Database" value="£0.00" meta="Records live in this browser" />
-        <Stat label="Model calls" value="£0.00" meta="No model provider is connected" />
+        <Stat prov="posted" label="Hosting" value="£0.00" meta="Nothing is hosted" />
+        <Stat prov="posted" label="Database" value="£0.00" meta="Records live in this browser" />
+        <Stat prov="posted" label="Model calls" value="£0.00" meta="No model provider is connected" />
         <Stat label="Forecast" value="Unavailable" unavailable meta="A forecast needs a price and a volume" onClick={() => context.openOverlay("budget panel")} />
       </StatRow>
       <Notice tone="info" title="Nought is accurate, a forecast would not be">

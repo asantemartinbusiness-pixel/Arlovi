@@ -46,10 +46,10 @@ export function BillsTable({ context, tab }: { context: ScreenContext; tab: stri
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label={`${tab}`} value={String(rows.length)} meta={`${data.bills.length} bills in total`} />
-        <Stat label="Value in view" value={context.money(total)} />
-        <Stat label="Unpaid overall" value={context.money(unpaid.reduce((sum, bill) => sum + Number(bill.amountMinor ?? 0), 0))} meta={`${unpaid.length} bills`} />
-        <Stat label="Past due" value={String(unpaid.filter((bill) => daysOverdue(bill, now)).length)} meta="Beyond the supplier's terms" />
+        <Stat prov="human" label={`${tab}`} value={String(rows.length)} meta={`${data.bills.length} bills in total`} />
+        <Stat prov="posted" label="Value in view" value={context.money(total)} />
+        <Stat prov="human" label="Unpaid overall" value={context.money(unpaid.reduce((sum, bill) => sum + Number(bill.amountMinor ?? 0), 0))} meta={`${unpaid.length} bills`} />
+        <Stat prov="human" label="Past due" value={String(unpaid.filter((bill) => daysOverdue(bill, now)).length)} meta="Beyond the supplier's terms" />
       </StatRow>
 
       <DataGrid
@@ -105,7 +105,7 @@ export function BillsTable({ context, tab }: { context: ScreenContext; tab: stri
       />
 
       <Grid>
-        <Card span={6} title="Payables ageing" subtitle="Unpaid bills by days past due">
+        <Card prov="human" span={6} title="Payables ageing" subtitle="Unpaid bills by days past due">
           <Stack gap={2}>
             {ageBuckets(unpaid, now).map((bucket) => (
               <Row key={bucket.bucket} gap={3}>
@@ -117,7 +117,7 @@ export function BillsTable({ context, tab }: { context: ScreenContext; tab: stri
             <SourceNote>Computed from {unpaid.length} unpaid bill records at {context.date(now)}.</SourceNote>
           </Stack>
         </Card>
-        <Card span={6} title="Paying a supplier" subtitle="What this workspace can do">
+        <Card prov="posted" span={6} title="Paying a supplier" subtitle="What this workspace can do">
           <Stack gap={3}>
             <Notice tone="warning" title="No bank transfer can be authorised from here">
               Scheduling a payment records the intent and posts nothing until a person confirms the money left. There is no bank mandate, and no agent can move money.
@@ -202,11 +202,11 @@ export function BillCapture({ context, close }: { context: ScreenContext; close:
         There is no document-extraction service connected. The fields below are what you type; the file name is recorded so the paper can be found again.
       </Notice>
       <Row gap={3} wrap>
-        <Field label="Bill number" required><TextInput value={number} onChange={(event) => setNumber(event.target.value)} required placeholder="BILL-255" /></Field>
-        <Field label="Terms" hint="Days from today"><TextInput align="end" inputMode="numeric" value={String(dueDays)} onChange={(event) => setDueDays(Number(event.target.value.replace(/\D/g, "")) || 0)} /></Field>
+        <Field label="Bill number" required><TextInput aria-label="Bill number" value={number} onChange={(event) => setNumber(event.target.value)} required placeholder="BILL-255" /></Field>
+        <Field label="Terms" hint="Days from today"><TextInput aria-label="Terms" align="end" inputMode="numeric" value={String(dueDays)} onChange={(event) => setDueDays(Number(event.target.value.replace(/\D/g, "")) || 0)} /></Field>
       </Row>
       <Field label="Supplier" hint="A bill with no supplier record is held as an exception rather than guessed.">
-        <Select value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
+        <Select aria-label="Supplier" value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
           <option value="">No match</option>
           {data.suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.title} · {String(supplier.fields.terms ?? "")}</option>)}
         </Select>
@@ -214,22 +214,22 @@ export function BillCapture({ context, close }: { context: ScreenContext; close:
       <Row gap={3} wrap>
         <Field label="Net amount"><MoneyInput label="Net amount" currency={org.currency} valueMinor={net} onChangeMinor={setNet} /></Field>
         <Field label="Tax category">
-          <Select value={category} onChange={(event) => setCategory(event.target.value as TaxCategory)}>
+          <Select aria-label="Tax category" value={category} onChange={(event) => setCategory(event.target.value as TaxCategory)}>
             {TAX_CATEGORIES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
           </Select>
         </Field>
         <Field label="Post to">
-          <Select value={accountCodeValue} onChange={(event) => setAccountCodeValue(event.target.value)}>
+          <Select aria-label="Post to" value={accountCodeValue} onChange={(event) => setAccountCodeValue(event.target.value)}>
             {expenseAccounts.map((account) => <option key={account.id} value={accountCode(account)}>{accountCode(account)} {account.title}</option>)}
           </Select>
         </Field>
       </Row>
       <Field label="File name" hint="The document stays wherever you keep it. Nothing is uploaded.">
-        <TextInput value={filename} onChange={(event) => setFilename(event.target.value)} placeholder="bill-255.pdf" />
+        <TextInput aria-label="File name" value={filename} onChange={(event) => setFilename(event.target.value)} placeholder="bill-255.pdf" />
       </Field>
-      <Field label="What it is for"><TextArea value={note} rows={2} onChange={(event) => setNote(event.target.value)} /></Field>
+      <Field label="What it is for"><TextArea aria-label="What it is for" value={note} rows={2} onChange={(event) => setNote(event.target.value)} /></Field>
 
-      <Card title="Resolved tax" subtitle={`${org.jurisdiction} rules at ${context.date(now)}`}>
+      <Card prov="posted" title="Resolved tax" subtitle={`${org.jurisdiction} rules at ${context.date(now)}`}>
         <Row gap={3} wrap>
           {totals.byCode.map((group) => (
             <span key={group.code.code} className="ds-row ds-gap-2">
@@ -278,7 +278,7 @@ export function MatchInspector({ context, close }: { context: ScreenContext; clo
         { label: "Net", value: <Amount minor={Number(bill.fields.netMinor ?? 0)} context={context} /> },
         { label: "Tax", value: <Amount minor={Number(bill.fields.taxMinor ?? 0)} context={context} /> },
         { label: "Gross", value: <Amount minor={bill.amountMinor} context={context} bold /> },
-        { label: "Due", value: context.date(bill.dueAt) },
+        { label: "Due", value: <span className="ds-num">{context.date(bill.dueAt)}</span> },
         { label: "Attachment", value: attachment?.filename ? `${attachment.filename}, kept locally` : "None recorded" },
         { label: "Ledger journal", value: journal ? journal.title : "Nothing posted" },
       ]} />
@@ -296,7 +296,7 @@ export function MatchInspector({ context, close }: { context: ScreenContext; clo
       )}
 
       <Field label="Match to a supplier">
-        <Select value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
+        <Select aria-label="Match to a supplier" value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
           <option value="">No match</option>
           {data.suppliers.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
         </Select>
@@ -386,9 +386,9 @@ export function PaymentAuthorization({ context, close }: { context: ScreenContex
         No bank mandate exists in this workspace. Confirming below posts the ledger entry for money you have already sent, and marks the bills paid.
       </Notice>
       <Row gap={3} wrap>
-        <Field label="Payment date" required><TextInput type="date" value={date} onChange={(event) => setDate(event.target.value)} required /></Field>
+        <Field label="Payment date" required><TextInput aria-label="Payment date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required /></Field>
         <Field label="Paid from" required>
-          <Select value={accountId || cash[0]?.id || ""} onChange={(event) => setAccountId(event.target.value)}>
+          <Select aria-label="Paid from" value={accountId || cash[0]?.id || ""} onChange={(event) => setAccountId(event.target.value)}>
             {cash.map((account) => <option key={account.id} value={account.id}>{accountCode(account)} {account.title}</option>)}
           </Select>
         </Field>
@@ -484,10 +484,10 @@ export function ExpensesTable({ context, tab }: { context: ScreenContext; tab: s
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label={tab} value={String(rows.length)} meta={`${data.expenses.length} claims in total`} />
-        <Stat label="Value in view" value={context.money(total)} />
-        <Stat label="Without a receipt" value={String(noReceipt.length)} meta={noReceipt.length ? "Cannot be approved" : "Every claim has one"} />
-        <Stat label="Recoverable tax" value={context.money(rows.reduce((sum, expense) => sum + recoverableTax(expense, context.org.jurisdiction, context.now), 0))} meta="Only where the category allows it" />
+        <Stat prov="human" label={tab} value={String(rows.length)} meta={`${data.expenses.length} claims in total`} />
+        <Stat prov="posted" label="Value in view" value={context.money(total)} />
+        <Stat prov="human" label="Without a receipt" value={String(noReceipt.length)} meta={noReceipt.length ? "Cannot be approved" : "Every claim has one"} />
+        <Stat prov="human" label="Recoverable tax" value={context.money(rows.reduce((sum, expense) => sum + recoverableTax(expense, context.org.jurisdiction, context.now), 0))} meta="Only where the category allows it" />
       </StatRow>
 
       {tab === "My expenses" && (
@@ -598,30 +598,30 @@ export function ReceiptCapture({ context, close }: { context: ScreenContext; clo
       }}
     >
       <Row gap={3} wrap>
-        <Field label="What it was for" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
+        <Field label="What it was for" required><TextInput aria-label="What it was for" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
         <Field label="Amount" required><MoneyInput label="Amount" currency={org.currency} valueMinor={amount} onChangeMinor={setAmount} /></Field>
       </Row>
       <Row gap={3} wrap>
         <Field label="Category">
-          <Select value={category} onChange={(event) => setCategory(event.target.value)}>
+          <Select aria-label="Category" value={category} onChange={(event) => setCategory(event.target.value)}>
             {["travel", "materials", "marketing", "entertaining", "delivery", "software", "other"].map((item) => <option key={item}>{item}</option>)}
           </Select>
         </Field>
         <Field label="Posts to">
-          <Select value={code} onChange={(event) => setCode(event.target.value)}>
+          <Select aria-label="Posts to" value={code} onChange={(event) => setCode(event.target.value)}>
             {expenseAccounts.map((account) => <option key={account.id} value={accountCode(account)}>{accountCode(account)} {account.title}</option>)}
           </Select>
         </Field>
         <Field label="Tax category" hint="Entertaining is outside the scope and nothing is recoverable.">
-          <Select value={taxCategory} onChange={(event) => setTaxCategory(event.target.value as TaxCategory)}>
+          <Select aria-label="Tax category" value={taxCategory} onChange={(event) => setTaxCategory(event.target.value as TaxCategory)}>
             {TAX_CATEGORIES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
           </Select>
         </Field>
       </Row>
       <Field label="Receipt file name" hint="The image stays on your device. Only the name and the date are recorded.">
-        <TextInput value={filename} onChange={(event) => setFilename(event.target.value)} placeholder="rail-16-nov.jpg" />
+        <TextInput aria-label="Receipt file name" value={filename} onChange={(event) => setFilename(event.target.value)} placeholder="rail-16-nov.jpg" />
       </Field>
-      <Field label="Note"><TextArea value={note} rows={2} onChange={(event) => setNote(event.target.value)} /></Field>
+      <Field label="Note"><TextArea aria-label="Note" value={note} rows={2} onChange={(event) => setNote(event.target.value)} /></Field>
       {needsReceipt && (
         <Notice tone="warning" title="A receipt is required above 1.00">
           The claim can still be submitted, and it will be flagged so an approver can see why it is blocked.
@@ -652,7 +652,7 @@ export function ExpenseDetail({ context, close }: { context: ScreenContext; clos
       <Properties rows={[
         { label: "Claim", value: expense.title },
         { label: "Claimant", value: String(expense.fields.claimant ?? expense.ownerName) },
-        { label: "Date", value: context.date(expense.at) },
+        { label: "Date", value: <span className="ds-num">{context.date(expense.at)}</span> },
         { label: "Amount", value: <Amount minor={expense.amountMinor} context={context} bold /> },
         { label: "Category", value: String(expense.fields.category ?? "uncategorised") },
         { label: "Posts to", value: String(expense.fields.accountCode ?? "Not set") },
@@ -770,7 +770,7 @@ export function ApprovalChain({ context }: { context: ScreenContext }) {
           </Row>
         ))}
       </Stack>
-      <Card title={`${waiting.length} claims in review`} subtitle="Everything that needs a decision now" flush>
+      <Card prov="human" title={`${waiting.length} claims in review`} subtitle="Everything that needs a decision now" flush>
         {waiting.length === 0 ? <div className="ds-card-body"><span className="ds-subtle">Nothing is waiting.</span></div> : (
           <DataGrid
             rows={waiting}

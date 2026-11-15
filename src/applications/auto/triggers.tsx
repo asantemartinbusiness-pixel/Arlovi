@@ -76,11 +76,10 @@ export function TriggerConfiguration({ context }: { context: ScreenContext }) {
     const dstShift = occurrences.find((item) => item.dstShift);
     return (
       <Grid>
-        <Card span={6} title="Recurrence" subtitle={describeSchedule(schedule)}>
+        <Card span={6} eyebrow="RECURRENCE" prov="human" title="Recurrence" subtitle={describeSchedule(schedule)}>
           <Stack gap={4}>
             <Field label="Frequency">
-              <Select
-                value={schedule.frequency}
+              <Select aria-label="Frequency" value={schedule.frequency}
                 onChange={(event) => context.mutate.patch(record.id, { fields: { ...record.fields, scheduleFrequency: event.target.value } }, { event: "Schedule frequency changed" })}
               >
                 {["hourly", "daily", "weekly", "monthly"].map((value) => <option key={value} value={value}>{value}</option>)}
@@ -88,15 +87,14 @@ export function TriggerConfiguration({ context }: { context: ScreenContext }) {
             </Field>
             <Row gap={2}>
               <Field label="Hour">
-                <TextInput type="number" min={0} max={23} value={String(schedule.hour)} onChange={(event) => context.mutate.patch(record.id, { fields: { ...record.fields, scheduleHour: Number(event.target.value) } }, { event: "Schedule hour changed" })} />
+                <TextInput aria-label="Hour" type="number" min={0} max={23} value={String(schedule.hour)} onChange={(event) => context.mutate.patch(record.id, { fields: { ...record.fields, scheduleHour: Number(event.target.value) } }, { event: "Schedule hour changed" })} />
               </Field>
               <Field label="Minute">
-                <TextInput type="number" min={0} max={59} value={String(schedule.minute)} onChange={(event) => context.mutate.patch(record.id, { fields: { ...record.fields, scheduleMinute: Number(event.target.value) } }, { event: "Schedule minute changed" })} />
+                <TextInput aria-label="Minute" type="number" min={0} max={59} value={String(schedule.minute)} onChange={(event) => context.mutate.patch(record.id, { fields: { ...record.fields, scheduleMinute: Number(event.target.value) } }, { event: "Schedule minute changed" })} />
               </Field>
             </Row>
             <Field label="Time zone" hint="Firings are resolved in this zone, so a clock change moves the UTC instant, not the local time.">
-              <Select
-                value={schedule.timezone}
+              <Select aria-label="Time zone" value={schedule.timezone}
                 onChange={(event) => { void context.mutate.patch(record.id, { fields: { ...record.fields, scheduleTimezone: event.target.value } }, { event: "Schedule time zone changed" }); patchTrigger({ timezone: event.target.value }, "Trigger time zone changed"); }}
               >
                 {["Europe/London", "America/New_York", "Europe/Paris", "Australia/Sydney", "UTC"].map((zone) => <option key={zone} value={zone}>{zone}</option>)}
@@ -108,7 +106,7 @@ export function TriggerConfiguration({ context }: { context: ScreenContext }) {
           </Stack>
         </Card>
 
-        <Card span={6} title="Next eight firings" subtitle={`Computed in ${schedule.timezone} from the workspace clock`}>
+        <Card span={6} eyebrow="FIRINGS" prov="agent" title="Next eight firings" subtitle={`Computed in ${schedule.timezone} from the workspace clock`}>
           {dstShift && (
             <Notice tone="warning" title="A clock change falls inside this window">
               The zone offset changes at {dstShift.localLabel}. The local time stays as configured and the UTC instant moves by the offset difference, which is what a correct scheduler does.
@@ -133,28 +131,25 @@ export function TriggerConfiguration({ context }: { context: ScreenContext }) {
     const filters = config.filters ?? [];
     return (
       <Grid>
-        <Card span={7} title="Filters applied before a record is bound" subtitle={`${matched.length} of ${pool.filter((item) => item.collection === config.collection).length} ${config.collection ?? "records"} pass`}>
+        <Card span={7} eyebrow="FILTERS" prov="human" title="Filters applied before a record is bound" subtitle={`${matched.length} of ${pool.filter((item) => item.collection === config.collection).length} ${config.collection ?? "records"} pass`}>
           <Stack gap={3}>
             {filters.length === 0 && <p className="ds-subtle">No filter. Every record the event selects is a candidate.</p>}
             {filters.map((filter, index) => (
               <Row key={`${filter.field}-${index}`} gap={2} wrap className="ds-panel" style={{ padding: "var(--space-3)" }}>
                 <Field label="Field">
-                  <TextInput
-                    value={filter.field}
+                  <TextInput aria-label="Field" value={filter.field}
                     onChange={(event) => patchTrigger({ filters: filters.map((item, position) => (position === index ? { ...item, field: event.target.value } : item)) }, "Filter field changed")}
                   />
                 </Field>
                 <Field label="Test">
-                  <Select
-                    value={filter.op}
+                  <Select aria-label="Test" value={filter.op}
                     onChange={(event) => patchTrigger({ filters: filters.map((item, position) => (position === index ? { ...item, op: event.target.value as ConditionOp } : item)) }, "Filter test changed")}
                   >
                     {CONDITION_OPS.map((op) => <option key={op.id} value={op.id}>{op.label}</option>)}
                   </Select>
                 </Field>
                 <Field label="Value">
-                  <TextInput
-                    value={filter.value}
+                  <TextInput aria-label="Value" value={filter.value}
                     onChange={(event) => patchTrigger({ filters: filters.map((item, position) => (position === index ? { ...item, value: event.target.value } : item)) }, "Filter value changed")}
                   />
                 </Field>
@@ -173,7 +168,7 @@ export function TriggerConfiguration({ context }: { context: ScreenContext }) {
           </Stack>
         </Card>
 
-        <Card span={5} title="Records that pass right now" subtitle="Evaluated against this company's records as you type">
+        <Card span={5} eyebrow="MATCHES" prov="posted" title="Records that pass right now" subtitle="Evaluated against this company's records as you type">
           {matched.length === 0 ? (
             <Empty title="Nothing passes the filters" icon={<Inbox size={20} />}>A run started now would fail at the trigger, because there is nothing to work on.</Empty>
           ) : (
@@ -197,13 +192,15 @@ export function TriggerConfiguration({ context }: { context: ScreenContext }) {
     return (
       <Stack gap={5}>
         <StatRow>
-          <Stat label="Deliveries recorded" value={String(deliveries.length)} meta="Each one keeps its idempotency key" />
-          <Stat label="Accepted" value={String(deliveries.filter((item) => item.verdict === "accepted").length)} meta="First delivery of a key, in order" />
-          <Stat label="Duplicates dropped" value={String(deliveries.filter((item) => item.verdict === "duplicate").length)} meta="Same key seen twice" />
-          <Stat label="Out of order" value={String(deliveries.filter((item) => item.verdict === "reordered").length)} meta="Older event than one already handled" />
+          <Stat prov="agent" label="Deliveries recorded" value={String(deliveries.length)} meta="Each one keeps its idempotency key" />
+          <Stat prov="agent" label="Accepted" value={String(deliveries.filter((item) => item.verdict === "accepted").length)} meta="First delivery of a key, in order" />
+          <Stat prov="agent" label="Duplicates dropped" value={String(deliveries.filter((item) => item.verdict === "duplicate").length)} meta="Same key seen twice" />
+          <Stat prov="agent" label="Out of order" value={String(deliveries.filter((item) => item.verdict === "reordered").length)} meta="Older event than one already handled" />
         </StatRow>
 
         <Card
+          eyebrow="DELIVERIES"
+          prov="agent"
           title="Test deliveries"
           subtitle="A test delivery records what the trigger would have received, and is de-duplicated by key"
           actions={<Button variant="secondary" onClick={() => context.openOverlay("sample inspection")}>Inspect a sample payload</Button>}
@@ -236,16 +233,16 @@ export function TriggerConfiguration({ context }: { context: ScreenContext }) {
   /* Events */
   return (
     <Grid>
-      <Card span={5} title="App events" subtitle="Events a trigger can watch in this company">
+      <Card span={5} eyebrow="EVENTS" prov="human" title="App events" subtitle="Events a trigger can watch in this company">
         <Stack gap={4}>
           <Field label="Collection watched">
-            <Select value={config.collection ?? ""} onChange={(event) => patchTrigger({ collection: event.target.value }, "Trigger collection changed")}>
+            <Select aria-label="Collection watched" value={config.collection ?? ""} onChange={(event) => patchTrigger({ collection: event.target.value }, "Trigger collection changed")}>
               <option value="">Choose a collection</option>
               {["invoices", "bills", "quotes", "orders", "deals", "leads", "tasks", "tickets", "expenses"].map((name) => <option key={name} value={name}>{name}</option>)}
             </Select>
           </Field>
           <Field label="Event">
-            <Select value={config.event ?? "record.matches"} onChange={(event) => patchTrigger({ event: event.target.value as WfNodeConfig["event"] }, "Trigger event changed")}>
+            <Select aria-label="Event" value={config.event ?? "record.matches"} onChange={(event) => patchTrigger({ event: event.target.value as WfNodeConfig["event"] }, "Trigger event changed")}>
               <option value="record.matches">Any record in the collection</option>
               <option value="record.overdue">Past its due date and not closed</option>
               <option value="schedule">On the recurrence set on the Schedules tab</option>
@@ -261,7 +258,7 @@ export function TriggerConfiguration({ context }: { context: ScreenContext }) {
         </Stack>
       </Card>
 
-      <Card span={4} title="What this company holds" subtitle="Counts from the collections this graph reads">
+      <Card span={4} eyebrow="RECORDS" prov="posted" title="What this company holds" subtitle="Counts from the collections this graph reads">
         {collectionsWithCounts.length === 0 ? (
           <Empty title="Nothing loaded" >Choose a collection to see how many records a trigger would see.</Empty>
         ) : (
@@ -269,7 +266,7 @@ export function TriggerConfiguration({ context }: { context: ScreenContext }) {
         )}
       </Card>
 
-      <Card span={3} title="Webhooks" subtitle="Inbound endpoint">
+      <Card span={3} eyebrow="WEBHOOK" prov="unknown" title="Webhooks" subtitle="Inbound endpoint">
         <Stack gap={3}>
           <Properties rows={[
             { label: "Path", value: <code className="ds-num" style={{ fontSize: "var(--text-xs)" }}>{String(record.fields.webhookPath ?? `/hooks/${record.id}`)}</code> },
@@ -283,9 +280,9 @@ export function TriggerConfiguration({ context }: { context: ScreenContext }) {
         </Stack>
       </Card>
 
-      <Card span={12} title="Sample payload" subtitle="The projection a step would actually see, from a real record">
+      <Card span={12} eyebrow="SAMPLE" prov="posted" title="Sample payload" subtitle="The projection a step would actually see, from a real record">
         {matched[0] ? (
-          <pre className="auto-code">{JSON.stringify({
+          <pre className="auto-code ds-num">{JSON.stringify({
             id: matched[0].id, title: matched[0].title, status: matched[0].status,
             amountMinor: matched[0].amountMinor, currency: matched[0].currency,
             dueAt: matched[0].dueAt, owner: matched[0].ownerName, ...matched[0].fields,
@@ -317,10 +314,10 @@ export function WebhookSetup({ context, close }: { context: ScreenContext; close
         Nothing is hosted from this browser, so no provider can post to it. Recording a test delivery below exercises the de-duplication and ordering rules on real rows instead.
       </Notice>
       <Field label="Idempotency key" hint="Use the same key twice to see the duplicate dropped.">
-        <TextInput value={key} onChange={(event) => setKey(event.target.value)} placeholder="evt-1001" />
+        <TextInput aria-label="Idempotency key" value={key} onChange={(event) => setKey(event.target.value)} placeholder="evt-1001" />
       </Field>
       <Field label="Payload status field">
-        <TextInput value={status} onChange={(event) => setStatus(event.target.value)} />
+        <TextInput aria-label="Payload status field" value={status} onChange={(event) => setStatus(event.target.value)} />
       </Field>
       <Button
         variant="primary"
@@ -357,23 +354,23 @@ export function ScheduleRecurrence({ context, close }: { context: ScreenContext;
   return (
     <Stack gap={4}>
       <Field label="Frequency">
-        <Select value={value.frequency} onChange={(event) => setSpec({ ...value, frequency: event.target.value })}>
+        <Select aria-label="Frequency" value={value.frequency} onChange={(event) => setSpec({ ...value, frequency: event.target.value })}>
           {["hourly", "daily", "weekly", "monthly"].map((item) => <option key={item} value={item}>{item}</option>)}
         </Select>
       </Field>
       <Row gap={2}>
-        <Field label="Hour"><TextInput type="number" min={0} max={23} value={String(value.hour)} onChange={(event) => setSpec({ ...value, hour: Number(event.target.value) })} /></Field>
-        <Field label="Minute"><TextInput type="number" min={0} max={59} value={String(value.minute)} onChange={(event) => setSpec({ ...value, minute: Number(event.target.value) })} /></Field>
+        <Field label="Hour"><TextInput aria-label="Hour" type="number" min={0} max={23} value={String(value.hour)} onChange={(event) => setSpec({ ...value, hour: Number(event.target.value) })} /></Field>
+        <Field label="Minute"><TextInput aria-label="Minute" type="number" min={0} max={59} value={String(value.minute)} onChange={(event) => setSpec({ ...value, minute: Number(event.target.value) })} /></Field>
       </Row>
       {value.frequency === "weekly" && (
         <Field label="Weekday">
-          <Select value={String(value.weekday)} onChange={(event) => setSpec({ ...value, weekday: Number(event.target.value) })}>
+          <Select aria-label="Weekday" value={String(value.weekday)} onChange={(event) => setSpec({ ...value, weekday: Number(event.target.value) })}>
             {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((name, index) => <option key={name} value={index + 1}>{name}</option>)}
           </Select>
         </Field>
       )}
       <Field label="Time zone">
-        <Select value={value.timezone} onChange={(event) => setSpec({ ...value, timezone: event.target.value })}>
+        <Select aria-label="Time zone" value={value.timezone} onChange={(event) => setSpec({ ...value, timezone: event.target.value })}>
           {["Europe/London", "America/New_York", "Europe/Paris", "Australia/Sydney", "UTC"].map((zone) => <option key={zone} value={zone}>{zone}</option>)}
         </Select>
       </Field>
@@ -421,13 +418,13 @@ export function SampleInspection({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <Field label="Record sampled">
-        <Select value={String(index)} onChange={(event) => setIndex(Number(event.target.value))}>
+        <Select aria-label="Record sampled" value={String(index)} onChange={(event) => setIndex(Number(event.target.value))}>
           {matched.map((item, position) => <option key={item.id} value={position}>{item.title}</option>)}
         </Select>
       </Field>
       {chosen ? (
         <>
-          <pre className="auto-code">{JSON.stringify({ id: chosen.id, title: chosen.title, status: chosen.status, amountMinor: chosen.amountMinor, dueAt: chosen.dueAt, ...chosen.fields }, null, 2)}</pre>
+          <pre className="auto-code ds-num">{JSON.stringify({ id: chosen.id, title: chosen.title, status: chosen.status, amountMinor: chosen.amountMinor, dueAt: chosen.dueAt, ...chosen.fields }, null, 2)}</pre>
           <Properties rows={[
             { label: "Collection", value: chosen.collection },
             { label: "Owner", value: chosen.ownerName },
@@ -457,12 +454,12 @@ export function TriggerSelection({ context, close }: { context: ScreenContext; c
   return (
     <Stack gap={4}>
       <Field label="Collection">
-        <Select value={collection} onChange={(item) => setCollection(item.target.value)}>
+        <Select aria-label="Collection" value={collection} onChange={(item) => setCollection(item.target.value)}>
           {["invoices", "bills", "quotes", "orders", "deals", "leads", "tasks", "tickets", "expenses"].map((name) => <option key={name} value={name}>{name}</option>)}
         </Select>
       </Field>
       <Field label="Event">
-        <Select value={event} onChange={(item) => setEvent(item.target.value as WfNodeConfig["event"])}>
+        <Select aria-label="Event" value={event} onChange={(item) => setEvent(item.target.value as WfNodeConfig["event"])}>
           <option value="record.matches">Any record in the collection</option>
           <option value="record.overdue">Past its due date and not closed</option>
           <option value="schedule">On a recurrence</option>

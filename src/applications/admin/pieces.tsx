@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { Button, Field, Notice, Pill, Properties, Row, Stack, TextInput } from "@/design-system";
 import { applications } from "@/app/catalog";
 import { canOpen, can as roleCan, ROLE_LABELS, type Capability } from "@/platform/policy";
@@ -115,4 +115,31 @@ export function useOrganisationRecord(): Rec | undefined {
   const { org } = useWorkspace();
   const data = useCollections(["organizations"]);
   return data.organizations.find((record) => record.id === org.id);
+}
+
+/* ------------------------------------------------------------------ *
+ * Local primitive: state seeded from a record that loads asynchronously.
+ * Reads here are live queries, so an overlay mounts one render before its
+ * record arrives; plain useState would capture the empty value and show a
+ * blank form. This adjusts the field while the seed is still settling.
+ * ------------------------------------------------------------------ */
+export function useSeeded<T extends string | number | boolean>(seed: T): [T, (next: T) => void] {
+  const [value, setValue] = useState(seed);
+  const [seen, setSeen] = useState(seed);
+  if (seed !== seen) {
+    setSeen(seed);
+    setValue(seed);
+  }
+  return [value, setValue];
+}
+
+/** The same, for a comma-separated list held on a record. */
+export function useSeededList(seedCsv: string): [string[], Dispatch<SetStateAction<string[]>>] {
+  const [value, setValue] = useState<string[]>(() => csvList(seedCsv));
+  const [seen, setSeen] = useState(seedCsv);
+  if (seedCsv !== seen) {
+    setSeen(seedCsv);
+    setValue(csvList(seedCsv));
+  }
+  return [value, setValue];
 }

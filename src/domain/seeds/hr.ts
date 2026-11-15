@@ -47,8 +47,8 @@ interface Person {
 
 const STUDIO = "nl-departments-001";
 const COMMERCIAL = "nl-departments-002";
-const WORKSHOP = "nl-departments-020";
-const PEOPLE_OPS = "nl-departments-021";
+const WORKSHOP = "nl-departments-030";
+const PEOPLE_OPS = "nl-departments-031";
 
 const NORTHLINE_PEOPLE: Person[] = [
   { n: 20, name: "Elena Voss", title: "People lead", departmentId: PEOPLE_OPS, manager: "Maya Chen", employment: "full-time", status: "active", office: "Clerkenwell studio", salaryMinor: 6_200_000, startOffsetDays: -1_420, allowance: 25, taken: 11, pronouns: "she/her", skills: "Employment law, onboarding, payroll inputs", summary: "Runs people operations, payroll inputs and the policy library." },
@@ -66,6 +66,9 @@ const NORTHLINE_PEOPLE: Person[] = [
   { n: 32, name: "Yvonne Serrano", title: "Studio manager", departmentId: STUDIO, manager: "Maya Chen", employment: "full-time", status: "notice", office: "Clerkenwell studio", salaryMinor: 4_700_000, startOffsetDays: -1_890, allowance: 25, taken: 22, pronouns: "she/her", skills: "Scheduling, supplier liaison", summary: "Working notice. Handover to Rowan Patel is in progress.", endOffsetDays: 34 },
   { n: 33, name: "Oliver Grant", title: "Maker", departmentId: WORKSHOP, manager: "Rowan Patel", employment: "full-time", status: "alumni", office: "Clerkenwell workshop", salaryMinor: 3_300_000, startOffsetDays: -1_240, allowance: 25, taken: 25, pronouns: "he/him", skills: "Brass work, assembly", summary: "Left in the summer for a furniture workshop in Margate.", endOffsetDays: -126 },
 ];
+
+/** Offset so these ids cannot collide with another application's member fixtures. */
+const AI_BASE = 800;
 
 const AI_EMPLOYEES = [
   { n: 20, name: "Wren Ashby", title: "Customer care agent", departmentId: COMMERCIAL, summary: "Drafts care replies from approved articles. A person sends every reply.", scope: "Care inbox, knowledge base (read)", concurrency: 4 },
@@ -329,7 +332,7 @@ function policyRecords(ctx: SeedContext): Rec[] {
     { n: 27, title: "Grievance and disciplinary", version: "1.0", summary: "Stages, who hears each stage and the right to be accompanied.", ack: false, offset: -510 },
   ];
   return rows.map((row) => ctx.rec({
-    org: "nl", collection: "policies", n: row.n, title: row.title, status: "published",
+    org: "nl", collection: "policies", n: 800 + row.n, title: row.title, status: "published",
     summary: row.summary, owner: "Elena Voss", at: dayOf(ctx.now, row.offset),
     dueAt: dayOf(ctx.now, row.offset + 365), tags: ["hr"],
     fields: { kind: "hr", version: row.version, acknowledgementRequired: row.ack, acknowledged: row.ack ? 9 : 0, audience: "All employees" },
@@ -354,11 +357,11 @@ function courseRecords(ctx: SeedContext): Rec[] {
 
 registerSeed("hr", (ctx) => {
   const records: Rec[] = [
-    ctx.rec({ org: "nl", collection: "departments", n: 20, title: "Workshop", summary: "Bench, finishing and despatch.", fields: { lead: "Rowan Patel", members: 3 } }),
-    ctx.rec({ org: "nl", collection: "departments", n: 21, title: "People & Operations", summary: "Hiring, payroll inputs, policy and the studio calendar.", fields: { lead: "Elena Voss", members: 1 } }),
+    ctx.rec({ org: "nl", collection: "departments", n: 30, title: "Workshop", summary: "Bench, finishing and despatch.", fields: { lead: "Rowan Patel", members: 3 } }),
+    ctx.rec({ org: "nl", collection: "departments", n: 31, title: "People & Operations", summary: "Hiring, payroll inputs, policy and the studio calendar.", fields: { lead: "Elena Voss", members: 1 } }),
     ...employeeRecords(ctx),
     ...AI_EMPLOYEES.map((agent) => ctx.rec({
-      org: "nl", collection: "members", n: agent.n, title: agent.name, summary: agent.summary,
+      org: "nl", collection: "members", n: AI_BASE + agent.n, title: agent.name, summary: agent.summary,
       tags: ["ai"],
       fields: {
         kind: "ai", role: "agent", departmentId: agent.departmentId, title: agent.title,

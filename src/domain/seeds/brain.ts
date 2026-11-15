@@ -66,115 +66,115 @@ registerSeed("brain", (ctx) => {
   });
 
   const records: Rec[] = [
-    source(20, "Trade price list — November", {
+    source(60, "Trade price list — November", {
       kind: "file", status: "indexed", classification: "internal", owner: "Maya Chen", freshnessDays: -13, scanned: true, pages: 4,
       summary: "Signed-off price sheet for trade accounts, parsed in this browser.",
       extracted: ["Arc Lamp — £900 ex VAT", "Pendant trio — £1,450 ex VAT", "Collar spare — £38 ex VAT"],
     }),
-    source(21, "Showroom opening hours board", {
+    source(61, "Showroom opening hours board", {
       kind: "media", status: "review", classification: "public", owner: "Priya Shah", freshnessDays: -4, scanned: true,
       summary: "Photograph of the board by the door. Text typed in by hand.",
       extracted: ["Tue–Fri 10:00–18:00", "Saturday 10:00–17:00"],
       note: "The typed hours disagree with the location record, which is why a conflict is open.",
     }),
-    source(22, "northline.example trade page", {
+    source(62, "northline.example trade page", {
       kind: "website", status: "indexed", classification: "public", owner: "Priya Shah", freshnessDays: -30, scanned: true,
       summary: "Saved copy of the public trade page as it stood a month ago.",
       extracted: ["Prices shown excluding VAT", "Lead time 4 weeks"],
       note: "A saved copy, not a live fetch: nothing in this browser can re-crawl the page.",
     }),
-    source(23, "Thames Brass supply agreement", {
+    source(63, "Thames Brass supply agreement", {
       kind: "file", status: "indexed", classification: "confidential", owner: "Maya Chen", freshnessDays: -60, scanned: true, pages: 9,
       summary: "Supply agreement under review. Payment terms and the sole-source clause were extracted.",
       extracted: ["Payment terms: 30 days", "No exclusivity granted to Northline", "Collar price fixed for 6 months"],
     }),
-    source(24, "Bank statement export — October", {
+    source(64, "Bank statement export — October", {
       kind: "file", status: "quarantined", classification: "confidential", owner: "Jonah Adeyemi", freshnessDays: -14, scanned: false,
       summary: "CSV export dropped into intake. Held until a person reviews it.",
       note: "No scanner is connected, so the file is isolated and excluded from retrieval until a person marks it reviewed.",
     }),
-    source(25, "Glaze supplier catalogue", {
+    source(65, "Glaze supplier catalogue", {
       kind: "file", status: "failed", classification: "internal", owner: "Maya Chen", freshnessDays: -2, scanned: false,
       summary: "Parsing stopped: the file declares 1,400 pages and no page text could be read.",
       note: "Isolated and reported rather than partially indexed.",
     }),
-    source(26, "Accounting system export", {
+    source(66, "Accounting system export", {
       kind: "integration", status: "not_connected", classification: "confidential", owner: "Jonah Adeyemi", freshnessDays: -45, scanned: false,
       summary: "A linked accounting service would refresh ledger figures. Nothing is connected.",
       note: "The last figures came from a manual export, so their age is the export date, not today.",
     }),
-    source(27, "Customer care article set", {
+    source(67, "Customer care article set", {
       kind: "file", status: "indexed", classification: "internal", owner: "Priya Shah", freshnessDays: -20, scanned: true, pages: 11,
       summary: "Approved replies for shades, lead times and warranty.",
       extracted: ["Warranty: 24 months on shades", "Replacement shade lead time: 3 weeks"],
     }),
-    source(28, "Studio voice and tone note", {
+    source(68, "Studio voice and tone note", {
       kind: "file", status: "indexed", classification: "internal", owner: "Maya Chen", freshnessDays: -90, scanned: true, pages: 2,
       summary: "Two pages on how Northline writes. The brand voice rules cite this.",
       extracted: ["Warm, precise, never theatrical", "No superlatives in trade copy"],
     }),
-    source(29, "Winter run production notes", {
+    source(69, "Winter run production notes", {
       kind: "media", status: "review", classification: "internal", owner: "Maya Chen", freshnessDays: -6, scanned: true,
       summary: "Photographs of the bench notes for the winter run.",
       extracted: ["Collar batch 42 approved", "Warm glaze approved for winter"],
     }),
 
-    fact(20, "Arc Lamp trade price", {
+    fact(60, "Arc Lamp trade price", {
       status: "verified", summary: "£900 excluding VAT for trade accounts, effective 1 November.",
       subject: "Arc Lamp", predicate: "trade price", value: "£900 ex VAT", sourceId: "nl-sources-060",
       domain: "pricing", owner: "Maya Chen", validFromDays: -13, confidence: 95,
     }),
-    fact(21, "Pendant trio trade price", {
+    fact(61, "Pendant trio trade price", {
       status: "verified", summary: "£1,450 excluding VAT, from the November price list.",
       subject: "Pendant trio", predicate: "trade price", value: "£1,450 ex VAT", sourceId: "nl-sources-060",
       domain: "pricing", owner: "Maya Chen", validFromDays: -13, confidence: 95,
     }),
-    fact(22, "Saturday closing time", {
+    fact(62, "Saturday closing time", {
       status: "conflicting", summary: "The board photograph says 17:00; the location record says 18:00.",
       subject: "Showroom", predicate: "Saturday closing time", value: "17:00", sourceId: "nl-sources-061",
       domain: "operations", owner: "Priya Shah", validFromDays: -4, confidence: 45,
     }),
-    fact(23, "Supplier payment terms", {
+    fact(63, "Supplier payment terms", {
       status: "verified", summary: "Thames Brass invoices are due 30 days after issue.",
       subject: "Thames Brass", predicate: "payment terms", value: "30 days", sourceId: "nl-sources-063",
       domain: "supply", owner: "Jonah Adeyemi", validFromDays: -60, confidence: 90,
     }),
-    fact(24, "Brass collar price fixed until spring", {
+    fact(64, "Brass collar price fixed until spring", {
       status: "verified", summary: "The collar price is fixed for six months from the agreement date.",
       subject: "Brass collar", predicate: "price fixed until", value: day(120), sourceId: "nl-sources-063",
       domain: "supply", owner: "Maya Chen", validFromDays: -60, validToDays: 120, confidence: 85,
     }),
-    fact(25, "Shade warranty", {
+    fact(65, "Shade warranty", {
       status: "verified", summary: "24 months on shades, from the approved article set.",
       subject: "Shade", predicate: "warranty", value: "24 months", sourceId: "nl-sources-067",
       domain: "care", owner: "Priya Shah", validFromDays: -20, confidence: 90,
     }),
-    fact(26, "Replacement shade lead time", {
+    fact(66, "Replacement shade lead time", {
       status: "proposed", summary: "Three weeks, taken from the article set but not confirmed against production.",
       subject: "Replacement shade", predicate: "lead time", value: "3 weeks", sourceId: "nl-sources-067",
       domain: "care", owner: "Priya Shah", validFromDays: -20, confidence: 60,
     }),
-    fact(27, "Public lead time", {
+    fact(67, "Public lead time", {
       status: "expired", summary: "Four weeks on the saved trade page. The page copy is a month old.",
       subject: "Northline", predicate: "published lead time", value: "4 weeks", sourceId: "nl-sources-062",
       domain: "operations", owner: "Priya Shah", validFromDays: -30, validToDays: -3, confidence: 40,
     }),
-    fact(28, "October closing bank balance", {
+    fact(68, "October closing bank balance", {
       status: "proposed", summary: "A figure appears in the quarantined statement export. It is not usable until the file is reviewed.",
       subject: "Operating bank", predicate: "closing balance", value: "Unavailable — source quarantined", sourceId: "nl-sources-064",
       domain: "finance", owner: "Jonah Adeyemi", validFromDays: -14, confidence: 20,
     }),
-    fact(29, "Winter glaze approved", {
+    fact(69, "Winter glaze approved", {
       status: "verified", summary: "The warm glaze is approved for the winter run.",
       subject: "Winter run", predicate: "glaze", value: "Warm", sourceId: "nl-sources-069",
       domain: "production", owner: "Maya Chen", validFromDays: -6, confidence: 80,
     }),
-    fact(30, "Brand voice rule", {
+    fact(70, "Brand voice rule", {
       status: "verified", summary: "Warm, precise, never theatrical. No superlatives in trade copy.",
       subject: "Northline", predicate: "voice", value: "Warm, precise, never theatrical", sourceId: "nl-sources-068",
       domain: "brand", owner: "Maya Chen", validFromDays: -90, confidence: 85,
     }),
-    fact(31, "Collar spare price", {
+    fact(71, "Collar spare price", {
       status: "proposed", summary: "£38 ex VAT in the price list. Nobody has confirmed it against a sale.",
       subject: "Collar spare", predicate: "trade price", value: "£38 ex VAT", sourceId: "nl-sources-060",
       domain: "pricing", owner: "Maya Chen", validFromDays: -13, confidence: 55,

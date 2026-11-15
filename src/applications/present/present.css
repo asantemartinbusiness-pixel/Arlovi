@@ -25,7 +25,7 @@
   padding-inline: var(--space-2);
 }
 
-.px-body { display: grid; grid-template-columns: 196px minmax(0, 1fr) var(--inspector-w); flex: 1; min-height: 0; }
+.px-body { display: grid; grid-template-columns: 208px minmax(0, 1fr) var(--inspector-w); flex: 1; min-height: 0; }
 .px-sorter {
   border-inline-end: 1px solid var(--border-default); background: var(--bg-surface);
   overflow: auto; min-height: 0; padding: var(--space-3);
@@ -37,7 +37,7 @@
   display: flex; flex-direction: column; gap: var(--space-5);
 }
 .px-centre { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.px-scroll { overflow: auto; min-height: 0; padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); align-items: center; }
+.px-scroll { overflow: auto; min-width: 0; min-height: 0; padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); align-items: center; }
 
 /* Slide sorter --------------------------------------------------------- */
 .px-thumb {
@@ -59,9 +59,11 @@
 .px-thumb-row { display: flex; align-items: center; gap: 2px; }
 
 /* Stage ---------------------------------------------------------------- */
-.px-stagewrap { display: flex; justify-content: center; width: 100%; }
+.px-stagewrap { display: flex; justify-content: center; width: 100%; min-width: 0; }
+.px-stageframe { position: relative; flex: none; }
 .px-stage {
-  position: relative; flex: none; transform-origin: top left;
+  position: absolute; inset-block-start: 0; inset-inline-start: 0;
+  transform-origin: top left;
   box-shadow: var(--shadow-3); overflow: hidden;
   border-radius: 4px;
 }
@@ -101,15 +103,16 @@
   padding: var(--space-4); font-size: var(--text-md); line-height: 1.6; white-space: pre-wrap;
   min-height: 140px; overflow: auto;
 }
-.px-timer { font-family: var(--font-mono); font-size: var(--text-3xl); font-weight: 700; color: var(--fg-strong); }
+/* The figure itself carries .ds-num, which supplies the data face. */
+.px-timer { font-size: var(--text-3xl); font-weight: 700; color: var(--fg-strong); }
 .px-audience {
-  position: fixed; inset: 0; z-index: 90; background: #000;
+  position: fixed; inset: 0; z-index: 90; background: var(--graphite-900);
   display: flex; align-items: center; justify-content: center;
 }
 .px-audience-bar {
   position: fixed; inset-inline: 0; inset-block-end: 0; z-index: 91;
   display: flex; align-items: center; gap: var(--space-3);
-  padding: var(--space-3) var(--space-4); background: rgb(0 0 0 / 70%); color: #fff;
+  padding: var(--space-3) var(--space-4); background: var(--bg-overlay); color: var(--paper-0);
 }
 
 .px-status {

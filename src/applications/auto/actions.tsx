@@ -66,7 +66,7 @@ export function ActionNodes({ context }: { context: ScreenContext }) {
     const authorised = PROVIDER_CAPABILITIES.filter((capability) => capability.state === "verified_external");
     return (
       <Grid>
-        <Card span={7} title="AI steps in this graph" subtitle={`${aiNodes.length} step${aiNodes.length === 1 ? "" : "s"} name the model capability`}>
+        <Card span={7} eyebrow="AI STEPS" prov="unknown" machine title="AI steps in this graph" subtitle={`${aiNodes.length} step${aiNodes.length === 1 ? "" : "s"} name the model capability`}>
           <Stack gap={4}>
             <Notice tone="warning" title={`${model.label} — ${CAPABILITY_LABELS[model.state]}`}>
               {model.note} {model.localEquivalent} An AI step therefore stops at the boundary and records that it did not run; it never produces an invented answer.
@@ -91,7 +91,7 @@ export function ActionNodes({ context }: { context: ScreenContext }) {
           </Stack>
         </Card>
 
-        <Card span={5} title="Tools an AI step may use" subtitle="Only capabilities that are verified externally">
+        <Card span={5} eyebrow="CAPABILITIES" prov="unknown" title="Tools an AI step may use" subtitle="Only capabilities that are verified externally">
           {authorised.length === 0 ? (
             <Empty title="No tool is authorised" icon={<Bot size={20} />}>
               Every capability in this workspace is unconnected, so an AI step has no tool it may call. The list fills in when a connection is verified.
@@ -110,7 +110,7 @@ export function ActionNodes({ context }: { context: ScreenContext }) {
   if (context.tab === "Approval") {
     return (
       <Grid>
-        <Card span={7} title="Approval gates" subtitle={`${approvals.length} gate${approvals.length === 1 ? "" : "s"} in this graph`}>
+        <Card span={7} eyebrow="APPROVALS" prov="human" title="Approval gates" subtitle={`${approvals.length} gate${approvals.length === 1 ? "" : "s"} in this graph`}>
           {approvals.length === 0 ? (
             <Empty title="No approval gate" icon={<ShieldCheck size={20} />}>
               A gate stops the run and keeps the steps after it unexecuted until a person decides. Add one from the builder palette.
@@ -124,8 +124,7 @@ export function ActionNodes({ context }: { context: ScreenContext }) {
                   <div key={node.id} className="ds-panel" style={{ padding: "var(--space-3)" }}>
                     <Row gap={2}><strong className="ds-grow">{node.label}</strong><Pill tone={node.config?.approvers ? "success" : "danger"} dot>{node.config?.approvers ? "approver set" : "no approver"}</Pill></Row>
                     <Field label="Approver">
-                      <TextInput
-                        value={node.config?.approvers ?? ""}
+                      <TextInput aria-label="Approver" value={node.config?.approvers ?? ""}
                         onChange={(event) => patchNode(node.id, { approvers: event.target.value }, "Approver changed")}
                         placeholder="A person or a role"
                       />
@@ -141,7 +140,7 @@ export function ActionNodes({ context }: { context: ScreenContext }) {
           )}
         </Card>
 
-        <Card span={5} title="Who can decide" subtitle="From the role view's capabilities">
+        <Card span={5} eyebrow="POLICY" prov="human" title="Who can decide" subtitle="From the role view's capabilities">
           <Properties rows={[
             { label: "This view", value: context.role },
             { label: "May run automations", value: <Pill tone={context.can("run_automation") ? "success" : "warning"}>{context.can("run_automation") ? "yes" : "no"}</Pill> },
@@ -160,7 +159,7 @@ export function ActionNodes({ context }: { context: ScreenContext }) {
     const cycles = findCycles(graph);
     return (
       <Grid>
-        <Card span={6} title="Conditions" subtitle={`${conditions.length} branch point${conditions.length === 1 ? "" : "s"}`}>
+        <Card span={6} eyebrow="BRANCHES" prov="human" title="Conditions" subtitle={`${conditions.length} branch point${conditions.length === 1 ? "" : "s"}`}>
           {conditions.length === 0 ? (
             <Empty title="No condition" icon={<GitBranch size={20} />}>Every run takes the same path. A condition makes the path depend on the record.</Empty>
           ) : (
@@ -183,7 +182,7 @@ export function ActionNodes({ context }: { context: ScreenContext }) {
           )}
         </Card>
 
-        <Card span={6} title="Loops and limits" subtitle="A cycle is allowed only with a limit">
+        <Card span={6} eyebrow="LIMITS" prov="agent" title="Loops and limits" subtitle="A cycle is allowed only with a limit">
           <Stack gap={4}>
             {cycles.length === 0
               ? <Notice tone="success" title="No cycle in this graph">Every path moves forward, so the run ends at a leaf.</Notice>
@@ -209,10 +208,10 @@ export function ActionNodes({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={5}>
       <StatRow>
-        <Stat label="Action steps" value={String(actions.length)} meta={`${graph.nodes.length} nodes in total`} />
-        <Stat label="Would leave the workspace" value={String(actions.filter((node) => node.config?.kind === "provider.call").length)} meta="Each one stops at the provider boundary" />
-        <Stat label="High impact" value={String(actions.filter((node) => node.config?.impact === "high").length)} meta="Never executed from a dry run" />
-        <Stat label="With retries" value={String(actions.filter((node) => Number(node.config?.retries ?? 0) > 0).length)} meta="Attempts and backoff are recorded per step" />
+        <Stat prov="human" label="Action steps" value={String(actions.length)} meta={`${graph.nodes.length} nodes in total`} />
+        <Stat prov="unknown" label="Would leave the workspace" value={String(actions.filter((node) => node.config?.kind === "provider.call").length)} meta="Each one stops at the provider boundary" />
+        <Stat prov="human" label="High impact" value={String(actions.filter((node) => node.config?.impact === "high").length)} meta="Never executed from a dry run" />
+        <Stat prov="human" label="With retries" value={String(actions.filter((node) => Number(node.config?.retries ?? 0) > 0).length)} meta="Attempts and backoff are recorded per step" />
       </StatRow>
 
       {actions.length === 0 ? (
@@ -234,7 +233,7 @@ export function ActionNodes({ context }: { context: ScreenContext }) {
               >
                 <Stack gap={3}>
                   <Field label="What this step does">
-                    <Select value={node.config?.kind ?? ""} onChange={(event) => patchNode(node.id, { kind: event.target.value as WfNodeConfig["kind"] }, "Action kind changed")}>
+                    <Select aria-label="What this step does" value={node.config?.kind ?? ""} onChange={(event) => patchNode(node.id, { kind: event.target.value as WfNodeConfig["kind"] }, "Action kind changed")}>
                       <option value="">Choose an action</option>
                       {ACTION_KINDS.map((kind) => <option key={kind.id} value={kind.id}>{kind.label}</option>)}
                     </Select>
@@ -243,7 +242,7 @@ export function ActionNodes({ context }: { context: ScreenContext }) {
                   {node.config?.kind === "provider.call" && (
                     <>
                       <Field label="Capability">
-                        <Select value={node.config.capability ?? ""} onChange={(event) => patchNode(node.id, { capability: event.target.value }, "Capability changed")}>
+                        <Select aria-label="Capability" value={node.config.capability ?? ""} onChange={(event) => patchNode(node.id, { capability: event.target.value }, "Capability changed")}>
                           <option value="">Choose a capability</option>
                           {PROVIDER_CAPABILITIES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
                         </Select>
@@ -259,40 +258,40 @@ export function ActionNodes({ context }: { context: ScreenContext }) {
                   {node.config?.kind === "record.create" && (
                     <>
                       <Field label="Destination collection">
-                        <Select value={node.config.target ?? ""} onChange={(event) => patchNode(node.id, { target: event.target.value }, "Destination changed")}>
+                        <Select aria-label="Destination collection" value={node.config.target ?? ""} onChange={(event) => patchNode(node.id, { target: event.target.value }, "Destination changed")}>
                           <option value="">Choose a collection</option>
                           {AUTOMATION_COLLECTIONS.map((name) => <option key={name} value={name}>{name}</option>)}
                         </Select>
                       </Field>
                       <Field label="Title mapping" hint="Braces insert a binding, for example {record.title}.">
-                        <TextInput value={node.config.titleExpr ?? ""} onChange={(event) => patchNode(node.id, { titleExpr: event.target.value }, "Title mapping changed")} />
+                        <TextInput aria-label="Title mapping" value={node.config.titleExpr ?? ""} onChange={(event) => patchNode(node.id, { titleExpr: event.target.value }, "Title mapping changed")} />
                       </Field>
                       <Field label="Summary mapping">
-                        <TextInput value={node.config.summaryExpr ?? ""} onChange={(event) => patchNode(node.id, { summaryExpr: event.target.value }, "Summary mapping changed")} />
+                        <TextInput aria-label="Summary mapping" value={node.config.summaryExpr ?? ""} onChange={(event) => patchNode(node.id, { summaryExpr: event.target.value }, "Summary mapping changed")} />
                       </Field>
                     </>
                   )}
 
                   {node.config?.kind === "log.note" && (
                     <Field label="Log line">
-                      <TextInput value={node.config.summaryExpr ?? ""} onChange={(event) => patchNode(node.id, { summaryExpr: event.target.value }, "Log line changed")} />
+                      <TextInput aria-label="Log line" value={node.config.summaryExpr ?? ""} onChange={(event) => patchNode(node.id, { summaryExpr: event.target.value }, "Log line changed")} />
                     </Field>
                   )}
 
                   <Row gap={2} wrap>
                     <Field label="Retries">
-                      <Select value={String(node.config?.retries ?? 0)} onChange={(event) => patchNode(node.id, { retries: Number(event.target.value) }, "Retries changed")}>
+                      <Select aria-label="Retries" value={String(node.config?.retries ?? 0)} onChange={(event) => patchNode(node.id, { retries: Number(event.target.value) }, "Retries changed")}>
                         {[0, 1, 2, 3, 5].map((count) => <option key={count} value={count}>{count}</option>)}
                       </Select>
                     </Field>
                     <Field label="On failure">
-                      <Select value={node.config?.onError ?? "halt"} onChange={(event) => patchNode(node.id, { onError: event.target.value as "halt" | "continue" }, "Failure policy changed")}>
+                      <Select aria-label="On failure" value={node.config?.onError ?? "halt"} onChange={(event) => patchNode(node.id, { onError: event.target.value as "halt" | "continue" }, "Failure policy changed")}>
                         <option value="halt">Stop the run</option>
                         <option value="continue">Record and continue</option>
                       </Select>
                     </Field>
                     <Field label="Impact">
-                      <Select value={node.config?.impact ?? "low"} onChange={(event) => patchNode(node.id, { impact: event.target.value as "low" | "high" }, "Impact changed")}>
+                      <Select aria-label="Impact" value={node.config?.impact ?? "low"} onChange={(event) => patchNode(node.id, { impact: event.target.value as "low" | "high" }, "Impact changed")}>
                         <option value="low">Low</option>
                         <option value="high">High</option>
                       </Select>
@@ -341,14 +340,14 @@ export function ActionParameter({ context, close }: { context: ScreenContext; cl
   return (
     <Stack gap={4}>
       <Field label="Step">
-        <Select value={node.id} onChange={(event) => updateDraft(record.id, { selectedNodeId: event.target.value })}>
+        <Select aria-label="Step" value={node.id} onChange={(event) => updateDraft(record.id, { selectedNodeId: event.target.value })}>
           {actions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
         </Select>
       </Field>
-      <Field label="Title mapping"><TextInput value={node.config?.titleExpr ?? ""} onChange={(event) => patch({ titleExpr: event.target.value }, "Title mapping changed")} /></Field>
-      <Field label="Summary mapping"><TextInput value={node.config?.summaryExpr ?? ""} onChange={(event) => patch({ summaryExpr: event.target.value }, "Summary mapping changed")} /></Field>
+      <Field label="Title mapping"><TextInput aria-label="Title mapping" value={node.config?.titleExpr ?? ""} onChange={(event) => patch({ titleExpr: event.target.value }, "Title mapping changed")} /></Field>
+      <Field label="Summary mapping"><TextInput aria-label="Summary mapping" value={node.config?.summaryExpr ?? ""} onChange={(event) => patch({ summaryExpr: event.target.value }, "Summary mapping changed")} /></Field>
       <Field label="Retries">
-        <Select value={String(node.config?.retries ?? 0)} onChange={(event) => patch({ retries: Number(event.target.value) }, "Retries changed")}>
+        <Select aria-label="Retries" value={String(node.config?.retries ?? 0)} onChange={(event) => patch({ retries: Number(event.target.value) }, "Retries changed")}>
           {[0, 1, 2, 3, 5].map((count) => <option key={count} value={count}>{count}</option>)}
         </Select>
       </Field>
@@ -405,7 +404,7 @@ export function VariableSelector({ context, close }: { context: ScreenContext; c
       {!node && <Notice tone="warning" title="No action step selected">Choose Insert a variable on an action card to put a binding into one of its templates.</Notice>}
       {node && (
         <Field label="Insert into">
-          <Select value={target} onChange={(event) => setTarget(event.target.value as typeof target)}>
+          <Select aria-label="Insert into" value={target} onChange={(event) => setTarget(event.target.value as typeof target)}>
             <option value="titleExpr">Title mapping</option>
             <option value="summaryExpr">Summary mapping</option>
           </Select>

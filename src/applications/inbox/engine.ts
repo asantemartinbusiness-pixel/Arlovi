@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { Rec, Role } from "@/domain/types";
 import {
   buildAttention, filterForRole, PRIORITY_LABEL, PRIORITY_TONE, type AttentionItem, type Priority,
@@ -239,4 +239,34 @@ export function groupBy<T>(rows: T[], key: (row: T) => string): { label: string;
 
 export function csv(value: unknown): string[] {
   return typeof value === "string" && value.trim().length > 0 ? value.split(",").map((part) => part.trim()).filter(Boolean) : [];
+}
+
+/* ------------------------------------------------------------------ *
+ * Local primitive: state seeded from a record that loads asynchronously.
+ *
+ * Every read in this workspace is a live query, so an overlay mounts one
+ * render before its record exists. Plain useState would capture the empty
+ * value and show a blank form. This adjusts the field while the person has
+ * not touched it, which is React's documented "derive state during render"
+ * pattern, and stops as soon as the seed stops changing.
+ * ------------------------------------------------------------------ */
+export function useSeeded<T extends string | number | boolean>(seed: T): [T, (next: T) => void] {
+  const [value, setValue] = useState(seed);
+  const [seen, setSeen] = useState(seed);
+  if (seed !== seen) {
+    setSeen(seed);
+    setValue(seed);
+  }
+  return [value, setValue];
+}
+
+/** The same, for a comma-separated list held on a record. */
+export function useSeededList(seedCsv: string): [string[], Dispatch<SetStateAction<string[]>>] {
+  const [value, setValue] = useState<string[]>(() => csv(seedCsv));
+  const [seen, setSeen] = useState(seedCsv);
+  if (seedCsv !== seen) {
+    setSeen(seedCsv);
+    setValue(csv(seedCsv));
+  }
+  return [value, setValue];
 }

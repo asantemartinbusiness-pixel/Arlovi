@@ -6,10 +6,10 @@ import {
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { resolveTaxCode, type TaxCategory } from "@/platform/money";
-import { ProviderBoundary, TAX_CATEGORIES, TotalsBlock } from "@/applications/growth/kit";
+import { ProviderBoundary, TAX_CATEGORIES, TotalsBlock } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import {
-  bodyOf, customerStatusOfContact, marginOf, onHandFor, orderTotals, reservedFor,
+  bodyOf, marginOf, onHandFor, orderTotals, reservedFor,
   statusTone, taxCategoryOfProduct, useCommerceData, type OrderBody, type ProductBody,
 } from "./data";
 
@@ -720,8 +720,7 @@ export function RefundConfirmation({ context }: { context: ScreenContext }) {
 
 /* ---------------- COMMERCE-007 / 008 ---------------- */
 
-export function ThemeInspector({ context }: { context: ScreenContext }) {
-  void context;
+export function ThemeInspector() {
   return (
     <Stack gap={4}>
       <Properties rows={[
@@ -762,7 +761,7 @@ export function TemplatePicker({ context, close }: { context: ScreenContext; clo
   );
 }
 
-export function PublicationReview({ context }: { context: ScreenContext }) {
+export function PublicationReview() {
   const data = useCommerceData();
   const publishable = data.products.filter((product) => product.status === "active" && product.fields.published === true);
   return (
@@ -1322,5 +1321,3 @@ export function ReportSchedule({ context, close }: { context: ScreenContext; clo
     </form>
   );
 }
-
-export { customerStatusOfContact };

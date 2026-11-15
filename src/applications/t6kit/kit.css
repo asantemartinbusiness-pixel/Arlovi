@@ -1,4 +1,7 @@
-/* Team 6 builder primitives. Scoped to .t6-* so nothing leaks into the design system. */
+/* Team 6 builder primitives. Scoped to .t6-* so nothing leaks into the design system.
+   Every interface colour is a design-system token. The only literal colours are
+   inside a previewed customer document, where they come from that document's own
+   theme (a site or form the user is designing), not from Arlovi's palette. */
 
 .t6-reorder { display: flex; flex-direction: column; gap: var(--space-2); }
 
@@ -55,18 +58,20 @@
 .t6-minifield > span { font-weight: 600; }
 
 /* ---- Builder shell: a full-chrome editor layout ---- */
-.t6-shell { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.t6-shell { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; max-width: 100%; }
 .t6-shell-bar {
   display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
   padding: var(--space-3) var(--page-pad); border-block-end: 1px solid var(--border-default);
-  background: var(--bg-surface);
+  background: var(--bg-surface); min-width: 0; max-width: 100%;
 }
-.t6-shell-tabs { padding-inline: var(--page-pad); background: var(--bg-surface); }
-.t6-shell-body { flex: 1; min-height: 0; display: grid; gap: 0; grid-template-columns: 248px minmax(0, 1fr) 320px; }
+/* A toolbar scrolls inside itself rather than widening the page. */
+.t6-shell-bar > .ds-toolbar { min-width: 0; max-width: 100%; flex: 1 1 320px; border-bottom: 0; }
+.t6-shell-tabs { padding-inline: var(--page-pad); background: var(--bg-surface); min-width: 0; max-width: 100%; overflow-x: auto; }
+.t6-shell-body { flex: 1; min-height: 0; min-width: 0; max-width: 100%; display: grid; gap: 0; grid-template-columns: 248px minmax(0, 1fr) 320px; }
 .t6-shell-body[data-panes="2"] { grid-template-columns: 248px minmax(0, 1fr); }
 .t6-shell-body[data-panes="1"] { grid-template-columns: minmax(0, 1fr); }
 .t6-pane {
-  min-width: 0; overflow: auto; padding: var(--space-4);
+  min-width: 0; max-width: 100%; overflow: auto; padding: var(--space-4);
   border-inline-end: 1px solid var(--border-default); background: var(--bg-surface);
 }
 .t6-pane:last-child { border-inline-end: 0; }
@@ -79,9 +84,10 @@
 }
 
 /* ---- Device frame for breakpoint preview ---- */
-.t6-device { display: flex; justify-content: center; }
+.t6-device { display: flex; justify-content: center; min-width: 0; max-width: 100%; }
 .t6-device-frame {
-  background: #fff; color: #17223a; border-radius: var(--radius-lg);
+  /* Chrome around a preview. The previewed document supplies its own colours. */
+  background: var(--bg-surface); border-radius: var(--radius-lg);
   border: 1px solid var(--border-strong); box-shadow: var(--shadow-2);
   overflow: hidden; max-width: 100%;
 }
@@ -95,16 +101,16 @@
 .t6-render { font-family: var(--font-sans); line-height: 1.5; }
 .t6-render h1, .t6-render h2, .t6-render h3 { margin: 0 0 8px; line-height: 1.2; }
 .t6-render p { margin: 0; }
-.t6-render-block { position: relative; padding: 20px; border-block-end: 1px solid rgba(23, 34, 58, 0.08); }
+.t6-render-block { position: relative; padding: 20px; border-block-end: 1px solid color-mix(in srgb, currentColor 10%, transparent); }
 .t6-render-block[data-selected="true"] { outline: 2px solid var(--accent); outline-offset: -2px; }
 .t6-render-cols { display: grid; gap: 14px; }
-.t6-render-tile { background: rgba(23, 34, 58, 0.05); border-radius: 10px; padding: 14px; }
+.t6-render-tile { background: color-mix(in srgb, currentColor 7%, transparent); border-radius: 10px; padding: 14px; }
 .t6-render-img {
-  display: grid; place-items: center; background: rgba(23, 34, 58, 0.07);
-  border-radius: 10px; color: rgba(23, 34, 58, 0.55); font-size: 13px; min-height: 96px;
+  display: grid; place-items: center; background: color-mix(in srgb, currentColor 9%, transparent);
+  border-radius: 10px; opacity: 0.75; font-size: 13px; min-height: 96px;
 }
-.t6-render-price { border: 1px solid rgba(23, 34, 58, 0.14); border-radius: 12px; padding: 16px; }
-.t6-render-foot { background: rgba(23, 34, 58, 0.06); font-size: 13px; }
+.t6-render-price { border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius: 12px; padding: 16px; }
+.t6-render-foot { background: color-mix(in srgb, currentColor 8%, transparent); font-size: 13px; }
 
 /* ---- Entity / schema canvas ---- */
 .t6-entities { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
@@ -116,6 +122,7 @@
 
 /* ---- Code surface ---- */
 .t6-code {
+  max-width: 100%;
   font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.6;
   background: var(--bg-sunken); border: 1px solid var(--border-default); border-radius: var(--radius-md);
   padding: var(--space-3); overflow: auto; max-height: 520px; white-space: pre; tab-size: 2;

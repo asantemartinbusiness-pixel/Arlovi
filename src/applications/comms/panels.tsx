@@ -89,14 +89,14 @@ export function CommsHome({ context, lens }: { context: ScreenContext; lens: "Ov
   return (
     <Stack gap={5}>
       <StatRow>
-        <Stat label="Unread" value={String(unread)} meta={`across ${channels.length} channels`} onClick={() => context.setTab("Channels")} />
-        <Stat label="Mentions" value={String(mentions.length)} meta={mentions.length ? `latest ${context.relative(mentions.at(-1)?.at)}` : "Nobody has mentioned you"} />
-        <Stat label="Meetings today" value={String(today.length)} meta={today[0] ? `next ${context.dateTime(today[0].startAt)}` : "Nothing in the diary"} onClick={() => context.setTab("Calendar")} />
+        <Stat label="Unread" value={String(unread)} prov="human" meta={`across ${channels.length} channels`} onClick={() => context.setTab("Channels")} />
+        <Stat label="Mentions" value={String(mentions.length)} prov="human" meta={mentions.length ? `latest ${context.relative(mentions.at(-1)?.at)}` : "Nobody has mentioned you"} />
+        <Stat label="Meetings today" value={String(today.length)} prov="human" meta={today[0] ? `next ${context.dateTime(today[0].startAt)}` : "Nothing in the diary"} onClick={() => context.setTab("Calendar")} />
         <Stat label="Mail delivery" value="Not connected" unavailable meta="Drafts are kept locally" />
       </StatRow>
 
       <Grid>
-        <Card span={7} title="Unread channels" subtitle={`${channels.filter((channel) => Number(channel.fields.unread ?? 0) > 0).length} with something new`}>
+        <Card span={7} eyebrow="CHANNELS" prov="human" title="Unread channels" subtitle={`${channels.filter((channel) => Number(channel.fields.unread ?? 0) > 0).length} with something new`}>
           {channels.filter((channel) => Number(channel.fields.unread ?? 0) > 0).length === 0 ? (
             <Empty title="Everything is read" icon={<Hash size={20} />} />
           ) : (
@@ -116,7 +116,7 @@ export function CommsHome({ context, lens }: { context: ScreenContext; lens: "Ov
           )}
         </Card>
 
-        <Card span={5} title="Mentions" subtitle="Where somebody named you">
+        <Card span={5} eyebrow="MENTIONS" prov="human" title="Mentions" subtitle="Where somebody named you">
           {mentions.length === 0 ? <Empty title="No mentions" icon={<AtSign size={20} />} /> : (
             <Stack gap={2}>
               {mentions.map((message) => (
@@ -130,7 +130,7 @@ export function CommsHome({ context, lens }: { context: ScreenContext; lens: "Ov
           <Notice tone="info">A mention notifies somebody. It gives them no access to a file or a tool they did not already have.</Notice>
         </Card>
 
-        <Card span={7} title="Today" subtitle={context.date(now, { weekday: "long", day: "numeric", month: "long" })}>
+        <Card span={7} eyebrow="DIARY" prov="human" title="Today" subtitle={context.date(now, { weekday: "long", day: "numeric", month: "long" })}>
           {today.length === 0 ? <Empty title="Nothing in the diary today" icon={<CalendarDays size={20} />} /> : (
             <Stack gap={2}>
               {today.map((meeting) => (
@@ -147,7 +147,7 @@ export function CommsHome({ context, lens }: { context: ScreenContext; lens: "Ov
           )}
         </Card>
 
-        <Card span={5} title="Announcements" subtitle={`${data.announcements.filter((post) => post.status === "published").length} published`}>
+        <Card span={5} eyebrow="ANNOUNCEMENTS" prov="human" title="Announcements" subtitle={`${data.announcements.filter((post) => post.status === "published").length} published`}>
           <Stack gap={2}>
             {data.announcements.filter((post) => post.status === "published").slice(0, 3).map((post) => (
               <div key={post.id} className="ds-panel" style={{ padding: "var(--space-3)" }}>
@@ -442,7 +442,7 @@ export function EmailThread({ context, lens }: { context: ScreenContext; lens: "
     const contact = data.contacts.find((row) => String(row.fields.email ?? "") === String(thread.fields.from ?? "") || String(row.fields.email ?? "") === String(thread.fields.to ?? ""));
     return (
       <Grid>
-        <Card span={6} title="Contact" subtitle={contact ? String(contact.fields.company ?? "") : "No matching contact"}>
+        <Card span={6} eyebrow="CONTACT" prov="human" title="Contact" subtitle={contact ? String(contact.fields.company ?? "") : "No matching contact"}>
           {contact ? (
             <Properties rows={[
               { label: "Name", value: contact.title },
@@ -451,7 +451,7 @@ export function EmailThread({ context, lens }: { context: ScreenContext; lens: "
             ]} />
           ) : <span className="ds-subtle">No contact in this workspace matches the address on this thread.</span>}
         </Card>
-        <Card span={6} title="Labels and links">
+        <Card span={6} eyebrow="LINKS" prov="human" title="Labels and links">
           <Row gap={2} wrap>
             {String(thread.fields.labels ?? "").split(",").filter(Boolean).map((label) => <Pill key={label}>{label}</Pill>)}
           </Row>
@@ -645,7 +645,7 @@ export function MeetingRoom({ context, lens }: { context: ScreenContext; lens: "
 
   return (
     <Grid>
-      <Card span={8} title={meeting.title} subtitle={`${context.dateTime(meeting.startAt)} · ${String(meeting.fields.minutes ?? 0)} minutes · ${String(meeting.fields.where ?? "")}`}>
+      <Card span={8} eyebrow="MEETING" prov="human" title={meeting.title} subtitle={<span><span className="ds-num">{context.dateTime(meeting.startAt)}</span> · {String(meeting.fields.minutes ?? 0)} minutes · {String(meeting.fields.where ?? "")}</span>}>
         <Stack gap={4}>
           <div className="ds-panel" style={{ padding: "var(--space-6)", textAlign: "center" }}>
             <Video size={28} aria-hidden="true" />
@@ -667,11 +667,11 @@ export function MeetingRoom({ context, lens }: { context: ScreenContext; lens: "
           </Row>
         </Stack>
       </Card>
-      <Card span={4} title="Agenda">
+      <Card span={4} eyebrow="AGENDA" prov="human" title="Agenda">
         <p>{String(meeting.fields.agenda ?? "No agenda recorded.")}</p>
         <Properties rows={[
           { label: "Organiser", value: String(meeting.fields.organizer ?? "") },
-          { label: "Attendees", value: String(attendees.length) },
+          { label: "Attendees", value: <span className="ds-num">{String(attendees.length)}</span> },
           { label: "Recording", value: <Pill tone="warning">Not possible here</Pill> },
         ]} />
       </Card>
@@ -796,7 +796,7 @@ export function Preferences({ context, lens }: { context: ScreenContext; lens: "
   if (lens === "Availability") {
     return (
       <Grid>
-        <Card span={6} title="Working hours" subtitle={`All times in ${org.timezone}`}>
+        <Card span={6} eyebrow="HOURS" prov="human" title="Working hours" subtitle={`All times in ${org.timezone}`}>
           <form
             className="ds-stack ds-gap-4"
             onSubmit={async (event) => {
@@ -817,7 +817,7 @@ export function Preferences({ context, lens }: { context: ScreenContext; lens: "
             <Row gap={2}><Button type="submit" variant="primary" disabled={!record}>Save</Button></Row>
           </form>
         </Card>
-        <Card span={6} title="Quiet hours">
+        <Card span={6} eyebrow="QUIET HOURS" prov="human" title="Quiet hours">
           <Properties rows={[
             { label: "Quiet hours", value: String(record?.fields.quietHours ?? "Not set") },
             { label: "Time zone", value: org.timezone },
@@ -868,7 +868,7 @@ export function Preferences({ context, lens }: { context: ScreenContext; lens: "
 
   return (
     <Grid>
-      <Card span={7} title="Mail identity" subtitle={mine ? "Your identity in this workspace" : "The identity on record"}>
+      <Card span={7} eyebrow="IDENTITY" prov="human" title="Mail identity" subtitle={mine ? "Your identity in this workspace" : "The identity on record"}>
         {record ? (
           <form
             className="ds-stack ds-gap-4"
@@ -888,7 +888,7 @@ export function Preferences({ context, lens }: { context: ScreenContext; lens: "
           </form>
         ) : <Empty title="No identity recorded" icon={<Mail size={20} />} />}
       </Card>
-      <Card span={5} title="Mailbox connection">
+      <Card span={5} eyebrow="PROVIDER" prov="unknown" title="Mailbox connection">
         <Stack gap={3}>
           <Properties rows={[
             { label: "Provider", value: "None" },

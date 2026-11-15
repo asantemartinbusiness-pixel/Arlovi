@@ -73,10 +73,10 @@ export function InvoiceList({ context, tab }: { context: ScreenContext; tab: str
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label={`${tab} invoices`} value={String(rows.length)} meta={`of ${data.invoices.length} in total`} />
-        <Stat label="Gross value" value={context.money(total)} meta="Net plus resolved tax" />
-        <Stat label="Outstanding" value={context.money(outstanding)} meta="Gross less payments recorded" />
-        <Stat
+        <Stat prov="posted" label={`${tab} invoices`} value={String(rows.length)} meta={`of ${data.invoices.length} in total`} />
+        <Stat prov="posted" label="Gross value" value={context.money(total)} meta="Net plus resolved tax" />
+        <Stat prov="posted" label="Outstanding" value={context.money(outstanding)} meta="Gross less payments recorded" />
+        <Stat prov="unknown"
           label="Unresolved tax"
           value={String(unresolved.length)}
           meta={unresolved.length ? "Held as UNKNOWN, never as zero" : "Every line resolves to a code"}
@@ -135,7 +135,7 @@ export function InvoiceList({ context, tab }: { context: ScreenContext; tab: str
       />
 
       <Grid>
-        <Card span={6} title="Ageing in this view" subtitle="Days past the due date">
+        <Card prov="posted" span={6} title="Ageing in this view" subtitle="Days past the due date">
           <Stack gap={2}>
             {ageBuckets(rows.filter((row) => ["awaiting_payment", "part_paid"].includes(row.status)), now).map((bucket) => (
               <Row key={bucket.bucket} gap={3}>
@@ -146,7 +146,7 @@ export function InvoiceList({ context, tab }: { context: ScreenContext; tab: str
             ))}
           </Stack>
         </Card>
-        <Card span={6} title="Sending" subtitle="What happens when you press Send" actions={<CapabilityPill id="email.send" />}>
+        <Card prov="posted" span={6} title="Sending" subtitle="What happens when you press Send" actions={<CapabilityPill id="email.send" />}>
           <CapabilityNotice id="email.send" />
           <SourceNote>A reminder is written as a draft against the invoice with its recipient and body, and the invoice records that a reminder exists. Nothing leaves this browser, so a duplicate send is impossible.</SourceNote>
         </Card>
@@ -195,7 +195,7 @@ export function InvoiceHeader({ context }: { context: ScreenContext }) {
   if (!invoice) return null;
   const late = daysOverdue(invoice, context.now);
   return (
-    <Card flush>
+    <Card prov="posted" flush>
       <div className="ds-card-body">
         <Row gap={4} wrap>
           <div className="ds-grow">
@@ -209,8 +209,8 @@ export function InvoiceHeader({ context }: { context: ScreenContext }) {
           </div>
           <Properties rows={[
             { label: "Customer", value: customer?.title ?? "Not linked" },
-            { label: "Issued", value: context.date(invoice.at) },
-            { label: "Due", value: context.date(invoice.dueAt) },
+            { label: "Issued", value: <span className="ds-num">{context.date(invoice.at)}</span> },
+            { label: "Due", value: <span className="ds-num">{context.date(invoice.dueAt)}</span> },
           ]} />
           <div style={{ textAlign: "end" }}>
             <span className="ds-stat-label">Gross</span>
@@ -233,7 +233,7 @@ export function InvoiceOverview({ context }: { context: ScreenContext }) {
 
   return (
     <Grid>
-      <Card span={5} title="Customer and billing" subtitle={customer ? String(customer.fields.email ?? "") : "No contact record is linked"}>
+      <Card prov="human" span={5} title="Customer and billing" subtitle={customer ? String(customer.fields.email ?? "") : "No contact record is linked"}>
         {customer ? (
           <Stack gap={3}>
             <Properties rows={[
@@ -254,11 +254,11 @@ export function InvoiceOverview({ context }: { context: ScreenContext }) {
         )}
       </Card>
 
-      <Card span={4} title="Tax" subtitle={`${org.jurisdiction} rules at ${context.date(documentDate(invoice, context.now))}`}>
+      <Card prov="posted" span={4} title="Tax" subtitle={`${org.jurisdiction} rules at ${context.date(documentDate(invoice, context.now))}`}>
         <TaxSummary totals={totals} context={context} />
       </Card>
 
-      <Card span={3} title="Totals">
+      <Card prov="posted" span={3} title="Totals">
         <StatementRow
           context={context}
           rows={[
@@ -273,12 +273,12 @@ export function InvoiceOverview({ context }: { context: ScreenContext }) {
         />
       </Card>
 
-      <Card span={6} title="Ledger posting" subtitle={journal ? "This invoice is on the ledger" : "Nothing has been posted yet"}>
+      <Card prov="posted" span={6} title="Ledger posting" subtitle={journal ? "This invoice is on the ledger" : "Nothing has been posted yet"}>
         {journal ? (
           <Stack gap={3}>
             <Properties rows={[
               { label: "Journal", value: journal.title },
-              { label: "Ledger date", value: context.date(journal.at) },
+              { label: "Ledger date", value: <span className="ds-num">{context.date(journal.at)}</span> },
               { label: "Status", value: <Pill tone={journal.status === "posted" ? "success" : "warning"} dot>{journal.status}</Pill> },
               { label: "Value", value: <Amount minor={journal.amountMinor} context={context} bold /> },
             ]} />
@@ -291,7 +291,7 @@ export function InvoiceOverview({ context }: { context: ScreenContext }) {
         )}
       </Card>
 
-      <Card span={6} title="Versions" subtitle="An issued invoice is immutable; each change is a version">
+      <Card prov="posted" span={6} title="Versions" subtitle="An issued invoice is immutable; each change is a version">
         <InvoiceVersions invoice={invoice} context={context} />
       </Card>
     </Grid>
@@ -416,7 +416,7 @@ export function LineEditor({ context, close }: { context: ScreenContext; close?:
     <Stack gap={4}>
       <Row gap={3} wrap>
         <Field label="Customer tax status" hint="Overrides the status on the contact record for this document only.">
-          <Select value={state.status} onChange={(event) => { setDirty(true); setState((current) => ({ ...current, status: event.target.value as CustomerTaxStatus })); }}>
+          <Select aria-label="Customer tax status" value={state.status} onChange={(event) => { setDirty(true); setState((current) => ({ ...current, status: event.target.value as CustomerTaxStatus })); }}>
             {CUSTOMER_TAX_STATUSES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
           </Select>
         </Field>
@@ -660,7 +660,7 @@ export function InvoicePayments({ context }: { context: ScreenContext }) {
 
   return (
     <Grid>
-      <Card span={7} title="Payment allocations" subtitle={`${all.length} receipt${all.length === 1 ? "" : "s"} posted against this invoice`} flush>
+      <Card prov="human" span={7} title="Payment allocations" subtitle={`${all.length} receipt${all.length === 1 ? "" : "s"} posted against this invoice`} flush>
         {all.length === 0 ? (
           <Empty title="No payment recorded">
             Recording a payment posts a balanced receipt: cash debited, receivables credited. No payment provider confirms it.
@@ -680,7 +680,7 @@ export function InvoicePayments({ context }: { context: ScreenContext }) {
           />
         )}
       </Card>
-      <Card span={5} title="Settlement">
+      <Card prov="posted" span={5} title="Settlement">
         <Stack gap={3}>
           <StatementRow
             context={context}
@@ -703,7 +703,7 @@ export function InvoicePayments({ context }: { context: ScreenContext }) {
           <SourceNote>Settlement is computed from posted receipt journals, not from a bank feed. The figure moves only when a journal is posted.</SourceNote>
         </Stack>
       </Card>
-      <Card span={12} title="Receivables ageing for this customer" subtitle="Every open invoice on the same contact">
+      <Card prov="human" span={12} title="Receivables ageing for this customer" subtitle="Every open invoice on the same contact">
         <CustomerAgeing context={context} />
       </Card>
     </Grid>
@@ -741,7 +741,7 @@ export function InvoiceActivity({ context }: { context: ScreenContext }) {
 
   return (
     <Grid>
-      <Card span={7} title="History" subtitle={`${events.length} recorded events, newest first`}>
+      <Card prov="posted" span={7} title="History" subtitle={`${events.length} recorded events, newest first`}>
         {events.length === 0 ? (
           <Empty title="Nothing recorded yet">Saving, approving, reminding and paying all write an entry here.</Empty>
         ) : (
@@ -761,7 +761,7 @@ export function InvoiceActivity({ context }: { context: ScreenContext }) {
           </ol>
         )}
       </Card>
-      <Card span={5} title="Reminders drafted" subtitle="Held locally, never sent" actions={<CapabilityPill id="email.send" />}>
+      <Card prov="unknown" span={5} title="Reminders drafted" subtitle="Held locally, never sent" actions={<CapabilityPill id="email.send" />}>
         {reminders.length === 0 ? (
           <Empty title="No reminder drafted">A reminder is a record on this invoice with its recipient and body.</Empty>
         ) : (
@@ -778,7 +778,7 @@ export function InvoiceActivity({ context }: { context: ScreenContext }) {
           </Stack>
         )}
       </Card>
-      <Card span={12} title="Record snapshots" subtitle={`Revision ${invoice.revision}`}>
+      <Card prov="posted" span={12} title="Record snapshots" subtitle={`Revision ${invoice.revision}`}>
         {invoice.history.length === 0 ? <span className="ds-subtle">No earlier snapshot.</span> : (
           <DataGrid
             rows={invoice.history}
@@ -893,31 +893,31 @@ export function NewInvoice({ context, close }: { context: ScreenContext; close: 
     >
       <Row gap={3} wrap>
         <Field label="Invoice number" required hint={`Next free number is ${suggested}`}>
-          <TextInput value={number} invalid={duplicate} onChange={(event) => setNumber(event.target.value)} required />
+          <TextInput aria-label="Invoice number" value={number} invalid={duplicate} onChange={(event) => setNumber(event.target.value)} required />
         </Field>
         <Field label="Payment terms" hint="Days from today">
-          <TextInput align="end" inputMode="numeric" value={String(dueDays)} onChange={(event) => setDueDays(Number(event.target.value.replace(/\D/g, "")) || 0)} />
+          <TextInput aria-label="Payment terms" align="end" inputMode="numeric" value={String(dueDays)} onChange={(event) => setDueDays(Number(event.target.value.replace(/\D/g, "")) || 0)} />
         </Field>
       </Row>
       {duplicate && <Notice tone="danger" title="That number is already used">Two invoices with the same number make a payment allocation ambiguous.</Notice>}
       <Field label="Customer" required hint="The tax status on the contact decides which rate the engine can resolve.">
-        <Select value={contactId} onChange={(event) => setContactId(event.target.value)} required>
+        <Select aria-label="Customer" value={contactId} onChange={(event) => setContactId(event.target.value)} required>
           <option value="">No customer</option>
           {data.contacts.map((contact) => <option key={contact.id} value={contact.id}>{contact.title}{contact.fields.taxStatus ? ` · ${String(contact.fields.taxStatus)}` : " · no tax status"}</option>)}
         </Select>
       </Field>
       <Row gap={3} wrap>
-        <Field label="First line"><TextInput value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Arc Lamp, brushed brass" /></Field>
-        <Field label="Qty"><TextInput align="end" inputMode="decimal" value={String(quantity)} onChange={(event) => setQuantity(Number(event.target.value.replace(/[^0-9.]/g, "")) || 0)} /></Field>
+        <Field label="First line"><TextInput aria-label="First line" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Arc Lamp, brushed brass" /></Field>
+        <Field label="Qty"><TextInput aria-label="Qty" align="end" inputMode="decimal" value={String(quantity)} onChange={(event) => setQuantity(Number(event.target.value.replace(/[^0-9.]/g, "")) || 0)} /></Field>
         <Field label="Unit price"><MoneyInput label="Unit price" currency={org.currency} valueMinor={unit} onChangeMinor={setUnit} /></Field>
         <Field label="Tax category">
-          <Select value={category} onChange={(event) => setCategory(event.target.value as TaxCategory)}>
+          <Select aria-label="Tax category" value={category} onChange={(event) => setCategory(event.target.value as TaxCategory)}>
             {TAX_CATEGORIES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
           </Select>
         </Field>
       </Row>
 
-      <Card title="Resolved before you save" subtitle={`${org.jurisdiction} · ${CUSTOMER_TAX_STATUSES.find((entry) => entry.value === status)?.label} · ${context.date(date)}`}>
+      <Card prov="posted" title="Resolved before you save" subtitle={`${org.jurisdiction} · ${CUSTOMER_TAX_STATUSES.find((entry) => entry.value === status)?.label} · ${context.date(date)}`}>
         <TaxSummary totals={preview} context={context} />
       </Card>
 
@@ -947,7 +947,7 @@ export function EmailPreview({ context, close }: { context: ScreenContext; close
         { label: "Attachment", value: "The document preview below, rendered in this browser" },
       ]} />
       <Field label="Message" hint="Edit it before it is kept as a draft against the invoice.">
-        <TextArea value={drafted} rows={10} onChange={(event) => setBody(event.target.value)} />
+        <TextArea aria-label="Message" value={drafted} rows={10} onChange={(event) => setBody(event.target.value)} />
       </Field>
       <Row gap={2}>
         <Button
@@ -1090,15 +1090,15 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
           <MoneyInput label="Amount received" currency={context.org.currency} valueMinor={amount} onChangeMinor={setAmount} />
         </Field>
         <Field label="Date received" required>
-          <TextInput type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
+          <TextInput aria-label="Date received" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
         </Field>
         <Field label="Into" required>
-          <Select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+          <Select aria-label="Into" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
             {cashAccounts.map((account) => <option key={account.id} value={account.id}>{accountCode(account)} {account.title}</option>)}
           </Select>
         </Field>
         <Field label="Method">
-          <Select value={method} onChange={(event) => setMethod(event.target.value)}>
+          <Select aria-label="Method" value={method} onChange={(event) => setMethod(event.target.value)}>
             {["Bank transfer", "Card, taken elsewhere", "Cash", "Cheque", "Offset"].map((item) => <option key={item}>{item}</option>)}
           </Select>
         </Field>
@@ -1178,7 +1178,7 @@ export function VoidReason({ context, close }: { context: ScreenContext; close: 
         </Notice>
       )}
       <Field label="Reason" required hint="Recorded on the document and in the audit trail.">
-        <TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required />
+        <TextArea aria-label="Reason" value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required />
       </Field>
       <Row gap={2}>
         <Button
@@ -1404,6 +1404,101 @@ export function InvoiceInspector({ context }: { context: ScreenContext }) {
       <SourceNote>
         {data.journals.filter((journal) => String(journal.fields.invoiceId ?? "") === invoice.id).length} ledger journals reference this invoice.
       </SourceNote>
+    </Stack>
+  );
+}
+
+/** Approving a draft invoice freezes a version and posts the balanced journal. */
+export function ApproveInvoice({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { invoice, data, totals } = useInvoice(context);
+  const [busy, setBusy] = useState(false);
+  if (!invoice) return <Empty title="No invoice selected" />;
+
+  if (invoice.status !== "draft") {
+    return (
+      <Notice tone="warning" title={`${invoice.title} is already ${invoice.status.replace(/_/g, " ")}`}>
+        An issued invoice is immutable. Correct it with a credit note from the Void action.
+      </Notice>
+    );
+  }
+
+  const posting = issueLines(data, totals, invoice);
+  const period = (invoice.at ?? context.now.toISOString()).slice(0, 7);
+  const blocked = posting.problem
+    ?? (totals.grossMinor <= 0 ? "The invoice has no positive value to post." : undefined)
+    ?? (data.locked.includes(period) ? `${period} is a closed period.` : undefined);
+
+  return (
+    <Stack gap={4}>
+      <Notice tone={blocked ? "danger" : "info"} title={blocked ? "This invoice cannot be approved" : "Approving posts a balanced journal"}>
+        {blocked ?? "Receivables are debited with the gross, each revenue account is credited with its net, and the tax control account takes the resolved tax. The invoice then becomes immutable."}
+      </Notice>
+      {!blocked && (
+        <div className="ds-grid-wrap">
+          <div className="ds-grid-scroll">
+            <table className="ds-table">
+              <caption className="ds-sr-only">Journal that will be posted</caption>
+              <thead><tr><th>Account</th><th data-align="end">Debit</th><th data-align="end">Credit</th></tr></thead>
+              <tbody>
+                {posting.lines.map((line, index) => {
+                  const account = data.accounts.find((item) => item.id === line.accountId);
+                  return (
+                    <tr key={`${line.accountId}-${index}`}>
+                      <td className="ds-table-primary">{account ? `${String(account.fields.code)} ${account.title}` : "Account missing"}</td>
+                      <td data-align="end" className="ds-num">{line.debitMinor ? context.money(line.debitMinor) : "—"}</td>
+                      <td data-align="end" className="ds-num">{line.creditMinor ? context.money(line.creditMinor) : "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <th scope="row" style={{ textAlign: "start" }}>Totals</th>
+                  <td data-align="end" className="ds-num">{context.money(posting.lines.reduce((sum, line) => sum + line.debitMinor, 0))}</td>
+                  <td data-align="end" className="ds-num">{context.money(posting.lines.reduce((sum, line) => sum + line.creditMinor, 0))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+      <Button
+        variant="primary"
+        busy={busy}
+        disabled={Boolean(blocked) || !context.can("post_journal")}
+        title={!context.can("post_journal") ? "Posting needs the Finance or Owner role view" : blocked}
+        onClick={async () => {
+          setBusy(true);
+          const date = (invoice.at ?? context.now.toISOString()).slice(0, 10);
+          const journal = await context.mutate.create({
+            collection: "journals",
+            title: `Issue ${invoice.title}`,
+            status: "posted",
+            summary: `Receivable raised for ${invoice.title}.`,
+            amountMinor: totals.grossMinor,
+            at: `${date}T09:00:00.000Z`,
+            parentId: invoice.id,
+            tags: ["ledger", "invoice"],
+            fields: { date, source: "invoice", invoiceId: invoice.id },
+            body: { date, memo: invoice.title, lines: posting.lines },
+          }, `Issued ${invoice.title} and posted a balanced journal`);
+          const versions = ((invoice.body as { versions?: unknown[] })?.versions ?? []) as unknown[];
+          await context.mutate.patch(invoice.id, {
+            status: "awaiting_payment",
+            amountMinor: totals.grossMinor,
+            body: {
+              ...(invoice.body as object ?? {}),
+              versions: [...versions, { at: new Date().toISOString(), by: context.actor, note: "Issued and posted", grossMinor: totals.grossMinor }],
+            },
+            fields: { ...invoice.fields, journalId: journal.id, netMinor: totals.netMinor, taxMinor: totals.taxMinor, issuedAt: new Date().toISOString() },
+          }, { expectRevision: invoice.revision, event: `${invoice.title} approved and issued` });
+          setBusy(false);
+          context.toast("Invoice issued", `${context.money(totals.grossMinor)} is on the ledger as a balanced journal. The invoice is now immutable.`);
+          close();
+        }}
+      >
+        Approve and post {context.money(totals.grossMinor)}
+      </Button>
     </Stack>
   );
 }

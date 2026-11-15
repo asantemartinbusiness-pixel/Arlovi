@@ -108,10 +108,10 @@ export function ChartOfAccounts({ context, type }: { context: ScreenContext; typ
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label={type ? `${ACCOUNT_TYPE_LABEL[type]} balance` : "Accounts"} value={type ? context.money(totalMinor) : String(scoped.length)} meta={type ? `${scoped.length} accounts` : `${postedTo.size} have postings`} />
-        <Stat label="Posted debits" value={context.money(data.trialDebit)} meta="Across every posted journal" />
-        <Stat label="Posted credits" value={context.money(data.trialCredit)} meta={data.trialDebit === data.trialCredit ? "Equal to debits" : "Does not match debits"} />
-        <Stat label="Never posted to" value={String(scoped.filter((account) => !postedTo.has(account.id)).length)} meta="Safe to deactivate or rename" />
+        <Stat prov="posted" label={type ? `${ACCOUNT_TYPE_LABEL[type]} balance` : "Accounts"} value={type ? context.money(totalMinor) : String(scoped.length)} meta={type ? `${scoped.length} accounts` : `${postedTo.size} have postings`} />
+        <Stat prov="posted" label="Posted debits" value={context.money(data.trialDebit)} meta="Across every posted journal" />
+        <Stat prov="posted" label="Posted credits" value={context.money(data.trialCredit)} meta={data.trialDebit === data.trialCredit ? "Equal to debits" : "Does not match debits"} />
+        <Stat prov="unknown" label="Never posted to" value={String(scoped.filter((account) => !postedTo.has(account.id)).length)} meta="Safe to deactivate or rename" />
       </StatRow>
 
       <Row gap={3} wrap>
@@ -149,7 +149,7 @@ export function ChartOfAccounts({ context, type }: { context: ScreenContext; typ
           {tree.map((node) => {
             const expanded = open.includes(node.group) || tree.length <= 3;
             return (
-              <Card key={node.group} flush>
+              <Card prov="posted" key={node.group} flush>
                 <button
                   type="button"
                   className="ds-card-head"
@@ -262,19 +262,19 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
     >
       <Row gap={3} wrap>
         <Field label="Code" required hint="Four digits. The first two group the account in the tree.">
-          <TextInput value={code} inputMode="numeric" align="end" invalid={Boolean(code) && (!codeValid || duplicate)} onChange={(event) => setCode(event.target.value)} required />
+          <TextInput aria-label="Code" value={code} inputMode="numeric" align="end" invalid={Boolean(code) && (!codeValid || duplicate)} onChange={(event) => setCode(event.target.value)} required />
         </Field>
         <Field label="Type" required hint={isDebitNormal(type) ? "Debit normal: a positive balance is a debit." : "Credit normal: a positive balance is a credit."}>
-          <Select value={type} onChange={(event) => setType(event.target.value as AccountType)} disabled={hasPostings}>
+          <Select aria-label="Type" value={type} onChange={(event) => setType(event.target.value as AccountType)} disabled={hasPostings}>
             {ACCOUNT_TYPES.map((item) => <option key={item} value={item}>{ACCOUNT_TYPE_LABEL[item]}</option>)}
           </Select>
         </Field>
       </Row>
       <Field label="Account name" required>
-        <TextInput value={title} onChange={(event) => setTitle(event.target.value)} required />
+        <TextInput aria-label="Account name" value={title} onChange={(event) => setTitle(event.target.value)} required />
       </Field>
       <Field label="What it is for">
-        <TextArea value={summary} onChange={(event) => setSummary(event.target.value)} rows={2} />
+        <TextArea aria-label="What it is for" value={summary} onChange={(event) => setSummary(event.target.value)} rows={2} />
       </Field>
       <Checkbox label="Treat as a cash account in the cash flow statement" checked={cash} onChange={(event) => setCash(event.target.checked)} />
       {duplicate && <Notice tone="danger" title={`Code ${code.trim()} is already used`}>Two accounts with the same code make a trial balance ambiguous.</Notice>}
@@ -292,11 +292,23 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
   );
 }
 
-export function AccountHistory({ context }: { context: ScreenContext }) {
+export function AccountHistory({ context, close }: { context: ScreenContext; close?: () => void }) {
   const data = useFinData();
   const { org } = useWorkspace();
-  const payload = context.overlayPayload as { id?: string } | undefined;
+  const payload = context.overlayPayload as { id?: string; export?: boolean } | undefined;
   const account = data.accounts.find((item) => item.id === (payload?.id ?? context.selectedId));
+
+  if (payload?.export) {
+    return (
+      <Stack gap={4}>
+        <Notice tone="info" title="The file is written in this browser">
+          {data.accounts.length} accounts with their posted debits, credits and balances. Nothing is uploaded.
+        </Notice>
+        <Button variant="primary" onClick={() => { exportAccounts(context, data.accounts, data.trialRows); close?.(); }}>Download the CSV</Button>
+      </Stack>
+    );
+  }
+
   if (!account) return <Empty title="Select an account" />;
   const row = data.trialRows.find((item) => item.accountId === account.id);
   const entries = data.journals
@@ -337,6 +349,7 @@ export function AccountHistory({ context }: { context: ScreenContext }) {
           onOpen={() => { context.closeOverlay(); context.navigate(`/o/${org.slug}/fin/ledger`); }}
         />
       )}
+      <CategoryMapper context={context} accountCode={accountCode(account)} />
       {entries.some((journal) => journal.status === "draft") && (
         <Notice tone="info" title="Draft journals are not in this balance">
           {entries.filter((journal) => journal.status === "draft").length} draft journal mentions this account. A draft moves nothing until it is posted.
@@ -438,7 +451,7 @@ export function DeactivationImpact({ context, close }: { context: ScreenContext;
   );
 }
 
-export function CategoryMapper({ context, close }: { context: ScreenContext; close: () => void }) {
+export function CategoryMapper({ context, accountCode: fixedCode, close }: { context: ScreenContext; accountCode?: string; close?: () => void }) {
   const data = useFinData();
   const [category, setCategory] = useState("travel");
   const categories = useMemo(() => {
@@ -449,7 +462,7 @@ export function CategoryMapper({ context, close }: { context: ScreenContext; clo
   }, [data.expenses, data.bills]);
   const current = data.expenses.filter((expense) => String(expense.fields.category ?? "") === category);
   const mapped = current.map((expense) => String(expense.fields.accountCode ?? "")).filter(Boolean);
-  const [target, setTarget] = useState(mapped[0] ?? "6000");
+  const [target, setTarget] = useState(fixedCode ?? mapped[0] ?? "6000");
   const [busy, setBusy] = useState(false);
 
   return (
@@ -459,12 +472,12 @@ export function CategoryMapper({ context, close }: { context: ScreenContext; clo
       </Notice>
       <Row gap={3} wrap>
         <Field label="Category">
-          <Select value={category} onChange={(event) => setCategory(event.target.value)}>
+          <Select aria-label="Category" value={category} onChange={(event) => setCategory(event.target.value)}>
             {categories.map((item) => <option key={item} value={item}>{item}</option>)}
           </Select>
         </Field>
         <Field label="Post to account">
-          <Select value={target} onChange={(event) => setTarget(event.target.value)}>
+          <Select aria-label="Post to account" value={target} onChange={(event) => setTarget(event.target.value)}>
             {data.accounts.filter((account) => ["expense", "asset"].includes(accountType(account)) && account.status !== "inactive")
               .map((account) => <option key={account.id} value={accountCode(account)}>{accountCode(account)} {account.title}</option>)}
           </Select>
@@ -487,12 +500,12 @@ export function CategoryMapper({ context, close }: { context: ScreenContext; clo
             }
             context.toast("Mapping applied", `${current.length} ${current.length === 1 ? "claim" : "claims"} now code to ${target}.`);
             setBusy(false);
-            close();
+            close?.();
           }}
         >
           Apply to {current.length} {current.length === 1 ? "claim" : "claims"}
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
+        {close && <Button variant="ghost" onClick={close}>Cancel</Button>}
       </Row>
     </Stack>
   );
@@ -513,7 +526,7 @@ export function PeriodLockCard() {
   const data = useFinData();
   const { org } = useWorkspace();
   return (
-    <Card title="Closed periods" subtitle="A journal cannot be posted into a closed month" actions={<Lock size={16} aria-hidden="true" />}>
+    <Card prov="posted" title="Closed periods" subtitle="A journal cannot be posted into a closed month" actions={<Lock size={16} aria-hidden="true" />}>
       <Stack gap={2}>
         {data.locked.length === 0 ? <span className="ds-subtle">No period is closed.</span> : data.locked.map((period) => (
           <Row key={period} gap={2}>

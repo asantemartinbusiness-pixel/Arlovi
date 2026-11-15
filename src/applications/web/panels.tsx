@@ -10,7 +10,7 @@ import {
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import { freshness } from "@/platform/clock";
-import { BoundaryNotice, SortableRow, ReorderArea, move, slugify } from "@/applications/t6kit/kit";
+import { BoundaryNotice, SortableRow, ReorderArea, move, plural, slugify } from "@/applications/t6kit/kit";
 import {
   BLOCK_LABELS, auditSite, exportBytes, issueCounts, liveState, makeBlock, makePage, pageHtml,
   readSite, type CmsCollection, type CmsEntry, type CmsField, type NavLink, type SiteModel,
@@ -46,7 +46,7 @@ export function SiteStatusStrip({ context }: { context: ScreenContext }) {
     <>
       <strong>{record.title}</strong>
       <span aria-hidden="true">·</span>
-      <span>{site.pages.length} pages</span>
+      <span className="ds-num">{plural(site.pages.length, "page")}</span>
       <span aria-hidden="true">·</span>
       <Pill tone={state.tone === "neutral" ? "neutral" : state.tone}>{state.label}</Pill>
       <span aria-hidden="true">·</span>
@@ -152,13 +152,13 @@ export function SiteDashboard({ context, lens }: { context: ScreenContext; lens:
     return (
       <Stack gap={5}>
         <StatRow>
-          <Stat label="Pages" value={String(site.pages.length)} meta={`${site.pages.reduce((sum, page) => sum + page.blocks.length, 0)} blocks`} />
-          <Stat label="Export size" value={`${(exportBytes(site) / 1024).toFixed(1)} kB`} meta="Measured by generating every page" />
-          <Stat label="Quality issues" value={String(counts.fail + counts.warn)} meta={`${counts.fail} failing · ${counts.warn} to review`} onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/quality`)} />
+          <Stat prov="posted" label="Pages" value={String(site.pages.length)} meta={`${site.pages.reduce((sum, page) => sum + page.blocks.length, 0)} blocks`} />
+          <Stat prov="posted" label="Export size" value={`${(exportBytes(site) / 1024).toFixed(1)} kB`} meta="Measured by generating every page" />
+          <Stat prov="posted" label="Quality issues" value={String(counts.fail + counts.warn)} meta={`${counts.fail} failing · ${counts.warn} to review`} onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/quality`)} />
           <Stat label="Visits" value="Unavailable" unavailable meta="No analytics source connected" />
         </StatRow>
         <Grid>
-          <Card span={7} title="Publication" subtitle={state.detail}
+          <Card span={7} eyebrow="PUBLICATION" prov="posted" title="Publication" subtitle={state.detail}
             footer={<>
               <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Deploy inspector")}>Deploy inspector</Button>
               <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/deploy`)}>Domains and publishing</Button>
@@ -171,7 +171,7 @@ export function SiteDashboard({ context, lens }: { context: ScreenContext; lens:
             ]} />
             <BoundaryNotice id="site.publish" action="Publishing" />
           </Card>
-          <Card span={5} title="Health" subtitle={`${issues.length} checks computed from the model`}>
+          <Card span={5} eyebrow="QUALITY" prov="posted" title="Health" subtitle={`${issues.length} checks computed from the model`}>
             <Stack gap={2}>
               {(["SEO", "Accessibility", "Performance", "Links"] as const).map((area) => {
                 const slice = issueCounts(issues.filter((issue) => issue.area === area));
@@ -186,7 +186,7 @@ export function SiteDashboard({ context, lens }: { context: ScreenContext; lens:
               })}
             </Stack>
           </Card>
-          <Card span={7} title="Form submissions reaching this site" subtitle={`${siteSubmissions.length} records in ${context.org.shortName}`}>
+          <Card span={7} eyebrow="SUBMISSIONS" prov="posted" title="Form submissions reaching this site" subtitle={`${siteSubmissions.length} records in ${context.org.shortName}`}>
             {siteSubmissions.length === 0
               ? <Empty title="No submissions yet" icon={<Inbox size={20} />}>A form block bound to a form writes a record here when someone submits it.</Empty>
               : <Stack gap={2}>{siteSubmissions.slice(0, 5).map((row) => (
@@ -196,7 +196,7 @@ export function SiteDashboard({ context, lens }: { context: ScreenContext; lens:
                 </Row>
               ))}</Stack>}
           </Card>
-          <Card span={5} title="Recent activity" subtitle="Audit events for this record">
+          <Card span={5} eyebrow="ACTIVITY" prov="posted" title="Recent activity" subtitle="Audit events for this record">
             {events.length === 0 ? <Empty title="Nothing recorded yet" /> : (
               <Stack gap={2}>
                 {events.slice(0, 6).map((event) => (
@@ -268,7 +268,7 @@ export function SiteDashboard({ context, lens }: { context: ScreenContext; lens:
   if (lens === "Analytics") {
     return (
       <Grid>
-        <Card span={6} title="What is measured" subtitle="Only what this browser can observe">
+        <Card span={6} eyebrow="MEASURED" prov="posted" title="What is measured" subtitle="Only what this browser can observe">
           <Properties rows={[
             { label: "Form submissions", value: `${siteSubmissions.length} records` },
             { label: "Builder edits", value: `${events.length} audit events` },
@@ -276,7 +276,7 @@ export function SiteDashboard({ context, lens }: { context: ScreenContext; lens:
             { label: "Export size", value: `${(exportBytes(site) / 1024).toFixed(1)} kB` },
           ]} />
         </Card>
-        <Card span={6} title="What is not measured" subtitle="Left blank rather than filled in">
+        <Card span={6} eyebrow="NOT MEASURED" prov="unknown" title="What is not measured" subtitle="Left blank rather than filled in">
           <Stack gap={3}>
             <Properties rows={[
               { label: "Visits", value: <Pill tone="warning">Unavailable</Pill> },
@@ -294,7 +294,7 @@ export function SiteDashboard({ context, lens }: { context: ScreenContext; lens:
   const age = freshness(record.updatedAt, now, 14);
   return (
     <Grid>
-      <Card span={6} title="Site record" subtitle={`Revision ${record.revision}`}>
+      <Card span={6} eyebrow="RECORD" prov="human" title="Site record" subtitle={`Revision ${record.revision}`}>
         <Properties rows={[
           { label: "Title", value: record.title },
           { label: "Summary", value: record.summary || "Not recorded" },
@@ -661,7 +661,7 @@ export function SiteNavigation({ context, lens }: { context: ScreenContext; lens
 
   return (
     <Grid>
-      <Card span={7} title={`${lens} menu`} subtitle={`${links.length} links · drag the grip or use the move buttons`}
+      <Card span={7} eyebrow="NAVIGATION" prov="human" title={`${lens} menu`} subtitle={`${links.length} links · drag the grip or use the move buttons`}
         footer={<>
           <Button size="sm" variant="primary" onClick={() => context.openOverlay("Link picker", { which })}>Add a route</Button>
           <Button size="sm" variant="ghost" onClick={() => context.openOverlay("broken link scan")}>Scan for broken links</Button>
@@ -705,7 +705,7 @@ export function SiteNavigation({ context, lens }: { context: ScreenContext; lens
           </ReorderArea>
         )}
       </Card>
-      <Card span={5} title="Page structure" subtitle={`${site.pages.length} pages`}>
+      <Card span={5} eyebrow="STRUCTURE" prov="posted" title="Page structure" subtitle={`${site.pages.length} pages`}>
         <Stack gap={2}>
           {site.pages.map((page) => {
             const incoming = [...site.nav.header, ...site.nav.footer].filter((link) => link.target === page.path).length
@@ -824,7 +824,7 @@ export function SiteForms({ context, lens }: { context: ScreenContext; lens: "Fo
             <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Field editor", { formId: active.id })}>Add a field</Button>
           </Stack>
         </Card>
-        <Card span={5} title="Test it" subtitle="A real submission against the bound record">
+        <Card span={5} eyebrow="TEST" prov="human" title="Test it" subtitle="A real submission against the bound record">
           <SiteFormTester context={context} formRecordId={active.formRecordId} fields={active.fields} consent={active.consent} />
         </Card>
       </Grid>
@@ -878,7 +878,7 @@ export function SiteForms({ context, lens }: { context: ScreenContext; lens: "Fo
           {siteForms.length === 0 && <Empty title="No forms to route" icon={<Inbox size={20} />} />}
         </Stack>
       </Card>
-      <Card span={5} title="Notification" subtitle="What a submission would trigger">
+      <Card span={5} eyebrow="NOTIFICATION" prov="unknown" title="Notification" subtitle="What a submission would trigger">
         <Stack gap={3}>
           <BoundaryNotice id="email.send" action="Notifying the studio" />
           <Checkbox label="Write an attention item when a submission arrives" defaultChecked />

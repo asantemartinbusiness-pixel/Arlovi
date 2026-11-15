@@ -25,9 +25,9 @@ interface ProjectSeed {
 
 const PROJECTS: ProjectSeed[] = [
   { n: 20, title: "Clerkenwell showroom refit", summary: "New track lighting, a trade counter and a quieter back office.", status: "active", health: "at_risk", priority: "high", programme: "Studio estate", owner: "Priya Shah", departmentId: "nl-departments-002", start: -34, end: 38, budgetMinor: 4_200_000, spentMinor: 2_940_000 },
-  { n: 21, title: "Arc Lamp production run", summary: "Two hundred units for the winter trade list.", status: "active", health: "on_track", priority: "high", programme: "Winter 2026", owner: "Rowan Patel", departmentId: "nl-departments-020", start: -21, end: 27, budgetMinor: 3_600_000, spentMinor: 1_410_000 },
+  { n: 21, title: "Arc Lamp production run", summary: "Two hundred units for the winter trade list.", status: "active", health: "on_track", priority: "high", programme: "Winter 2026", owner: "Rowan Patel", departmentId: "nl-departments-030", start: -21, end: 27, budgetMinor: 3_600_000, spentMinor: 1_410_000 },
   { n: 22, title: "Trade catalogue 2027", summary: "Photography, copy and a printed price list for trade accounts.", status: "planning", health: "on_track", priority: "normal", programme: "Winter 2026", owner: "Amara Bello", departmentId: "nl-departments-002", start: 6, end: 76, budgetMinor: 1_800_000, spentMinor: 120_000 },
-  { n: 23, title: "Workshop safety upgrade", summary: "Extraction, guarding and a refreshed accident procedure.", status: "active", health: "off_track", priority: "high", programme: "Studio estate", owner: "Rowan Patel", departmentId: "nl-departments-020", start: -58, end: 9, budgetMinor: 2_400_000, spentMinor: 2_610_000 },
+  { n: 23, title: "Workshop safety upgrade", summary: "Extraction, guarding and a refreshed accident procedure.", status: "active", health: "off_track", priority: "high", programme: "Studio estate", owner: "Rowan Patel", departmentId: "nl-departments-030", start: -58, end: 9, budgetMinor: 2_400_000, spentMinor: 2_610_000 },
   { n: 24, title: "Storefront refresh", summary: "Rebuild the product pages around the winter collection.", status: "active", health: "on_track", priority: "normal", programme: "Commerce", owner: "Theo Marsh", departmentId: "nl-departments-001", start: -12, end: 44, budgetMinor: 1_200_000, spentMinor: 340_000 },
   { n: 25, title: "Spring collection research", summary: "Material studies and three concept directions.", status: "planning", health: "on_track", priority: "low", programme: "Spring 2027", owner: "Fiona Buchanan", departmentId: "nl-departments-001", start: 20, end: 118, budgetMinor: 900_000, spentMinor: 0 },
   { n: 26, title: "Harrow House install", summary: "Twelve bespoke pendants for a listed townhouse.", status: "done", health: "on_track", priority: "normal", programme: "Commissions", owner: "Maya Chen", departmentId: "nl-departments-001", start: -140, end: -26, budgetMinor: 5_600_000, spentMinor: 5_310_000 },
@@ -99,7 +99,7 @@ function timeEntries(ctx: SeedContext): Rec[] {
     { n: 71, who: "Kenji Watanabe", taskN: 47, project: 26, offset: -27, hours: 6, billable: true, approved: true },
   ];
   return rows.map((row) => ctx.rec({
-    org: "nl", collection: "shifts", n: row.n,
+    org: "nl", collection: "shifts", n: 800 + row.n,
     title: `${row.who.split(" ")[0]} · ${row.hours}h`,
     status: row.approved ? "approved" : "submitted",
     summary: `Logged against ${TASKS.find((task) => task.n === row.taskN)?.title ?? "a task"}.`,
@@ -212,7 +212,7 @@ function objectiveRecords(ctx: SeedContext): Rec[] {
     },
   ];
   return rows.map((row) => ctx.rec({
-    org: "nl", collection: "objectives", n: row.n, title: row.title, status: "active",
+    org: "nl", collection: "objectives", n: 800 + row.n, title: row.title, status: "active",
     summary: row.summary, owner: row.owner, tags: [row.scope.toLowerCase()],
     fields: { measure: row.measure, target: row.target, current: row.current, scope: row.scope, projectIds: row.projects },
     body: { checkIns: row.checkIns },

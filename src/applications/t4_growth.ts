@@ -6,5 +6,9 @@ import "@/domain/seeds/proc";
 import "@/domain/seeds/portal";
 
 import "./market/index";
+import "./commerce/index";
+import "./book/index";
+import "./proc/index";
+import "./portal/index";
 
 export {};

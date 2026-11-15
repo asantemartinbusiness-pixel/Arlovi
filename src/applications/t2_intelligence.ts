@@ -7,4 +7,6 @@ import "@/domain/seeds/team";
 import "@/domain/seeds/mission";
 import "./ai/index";
 import "./brain/index";
+import "./team/index";
+import "./mission/index";
 export {};

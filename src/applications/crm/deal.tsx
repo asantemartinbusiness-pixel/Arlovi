@@ -15,7 +15,6 @@ import {
 import type { CrmData } from "./data";
 import { ActivityPill, CapabilityNotice, ConsentPill, Money, ProbabilityPill, QuoteStatusPill, StagePill } from "./parts";
 import { quoteTotals } from "./quotes";
-import { useStageMove } from "./pipeline";
 
 /* ---------------------------- CRM-007 ---------------------------- *
  * Deal detail: a real 360 built from linked records — activities, quotes,
@@ -34,9 +33,8 @@ export function DealHeader({ context }: { context: ScreenContext }) {
   if (!deal) return null;
   const company = companyOfDeal(data, deal);
   const contact = contactOfDeal(data, deal);
-  const stage = stageOf(deal);
   return (
-    <Card flush>
+    <Card prov="human" flush>
       <div className="ds-card-body">
         <Row gap={4} wrap>
           <div className="ds-grow">
@@ -54,7 +52,7 @@ export function DealHeader({ context }: { context: ScreenContext }) {
           </div>
           <Properties rows={[
             { label: "Expected close", value: deal.fields.closeDate ? context.date(String(deal.fields.closeDate)) : "Not set" },
-            { label: "Created", value: context.date(deal.createdAt) },
+            { label: "Created", value: <span className="ds-num">{context.date(deal.createdAt)}</span> },
             { label: "Last change", value: context.relative(deal.updatedAt) },
           ]} />
           <div style={{ textAlign: "end" }}>
@@ -87,7 +85,7 @@ export function DealOverview({ context }: { context: ScreenContext }) {
 
   return (
     <Grid>
-      <Card span={4} title="Progress" subtitle={`${stage.label} at ${probabilityOf(deal)}%`}>
+      <Card prov="human" span={4} title="Progress" subtitle={`${stage.label} at ${probabilityOf(deal)}%`}>
         <Stack gap={3}>
           <Meter value={stageIndex(stage.id) + 1} max={STAGES.length} label={`${deal.title} stage`} tone={stage.kind === "lost" ? "danger" : stage.kind === "won" ? "success" : undefined} />
           <Properties rows={[
@@ -102,7 +100,7 @@ export function DealOverview({ context }: { context: ScreenContext }) {
         </Stack>
       </Card>
 
-      <Card span={4} title="People" subtitle={company ? `${contactsOfCompany(data, company.id).length} contacts at ${company.title}` : "No account linked"}>
+      <Card prov="human" span={4} title="People" subtitle={company ? `${contactsOfCompany(data, company.id).length} contacts at ${company.title}` : "No account linked"}>
         {contact ? (
           <Stack gap={3}>
             <Row gap={3}>
@@ -136,7 +134,7 @@ export function DealOverview({ context }: { context: ScreenContext }) {
         )}
       </Card>
 
-      <Card span={4} title="Money" subtitle="Quotes and invoices that actually exist">
+      <Card prov="human" span={4} title="Money" subtitle="Quotes and invoices that actually exist">
         <Stack gap={3}>
           <Properties rows={[
             { label: "Deal amount", value: <Money minor={deal.amountMinor} context={context} bold /> },
@@ -159,7 +157,7 @@ export function DealOverview({ context }: { context: ScreenContext }) {
         </Stack>
       </Card>
 
-      <Card span={6} title="Recent activity" subtitle={`${activities.length} logged`} flush>
+      <Card prov="human" span={6} title="Recent activity" subtitle={`${activities.length} logged`} flush>
         {activities.length === 0 ? (
           <div className="ds-card-body"><Empty title="Nothing logged on this deal">A call, meeting or note recorded here is what the stage requirements are judged on.</Empty></div>
         ) : (
@@ -179,7 +177,7 @@ export function DealOverview({ context }: { context: ScreenContext }) {
         )}
       </Card>
 
-      <Card span={6} title="Service history" subtitle={contact ? `${tickets.length} tickets for ${contact.title}` : "No contact linked"}>
+      <Card prov="human" span={6} title="Service history" subtitle={contact ? `${tickets.length} tickets for ${contact.title}` : "No contact linked"}>
         {tickets.length === 0 ? (
           <span className="ds-subtle">No support ticket is recorded for this customer.</span>
         ) : (
@@ -228,7 +226,7 @@ export function DealActivity({ context }: { context: ScreenContext }) {
 
   return (
     <Grid>
-      <Card span={7} title="Logged activity" subtitle={`${activities.length} calls, meetings, emails and notes`} flush>
+      <Card prov="human" span={7} title="Logged activity" subtitle={`${activities.length} calls, meetings, emails and notes`} flush>
         {activities.length === 0 ? (
           <div className="ds-card-body"><Empty title="Nothing logged yet" /></div>
         ) : (
@@ -251,7 +249,7 @@ export function DealActivity({ context }: { context: ScreenContext }) {
           />
         )}
       </Card>
-      <Card span={5} title="Record history" subtitle={`Revision ${deal.revision}`}>
+      <Card prov="human" span={5} title="Record history" subtitle={`Revision ${deal.revision}`}>
         {events.length === 0 ? <span className="ds-subtle">No event recorded against this deal yet.</span> : (
           <ol className="ds-stack ds-gap-3">
             {events.map((event) => (
@@ -291,10 +289,10 @@ export function DealProducts({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Quote" value={String(latest.fields.number ?? latest.title)} meta={`Version ${String(latest.fields.version ?? 1)} · ${latest.status}`} />
-        <Stat label="Net" value={context.money(totals.netMinor)} />
-        <Stat label="Tax" value={context.money(totals.taxMinor)} meta={totals.byCode.map((group) => group.code.code).join(", ")} />
-        <Stat label="Total" value={context.money(totals.grossMinor)} meta={totals.discountMinor ? `After ${context.money(totals.discountMinor)} discount` : "No discount"} />
+        <Stat prov="human" label="Quote" value={String(latest.fields.number ?? latest.title)} meta={`Version ${String(latest.fields.version ?? 1)} · ${latest.status}`} />
+        <Stat prov="human" label="Net" value={context.money(totals.netMinor)} />
+        <Stat prov="human" label="Tax" value={context.money(totals.taxMinor)} meta={totals.byCode.map((group) => group.code.code).join(", ")} />
+        <Stat prov="human" label="Total" value={context.money(totals.grossMinor)} meta={totals.discountMinor ? `After ${context.money(totals.discountMinor)} discount` : "No discount"} />
       </StatRow>
       <div className="ds-grid-wrap">
         <div className="ds-grid-scroll">
@@ -336,7 +334,7 @@ export function DealDocuments({ context }: { context: ScreenContext }) {
 
   return (
     <Grid>
-      <Card span={6} title="Quotes" subtitle={`${quotes.length} version${quotes.length === 1 ? "" : "s"}`} flush>
+      <Card prov="human" span={6} title="Quotes" subtitle={`${quotes.length} version${quotes.length === 1 ? "" : "s"}`} flush>
         {quotes.length === 0 ? (
           <div className="ds-card-body"><Empty title="No quote yet" action={<Button variant="primary" onClick={() => context.openOverlay("Quote builder", { dealId: deal.id })}>Build one</Button>} /></div>
         ) : (
@@ -355,7 +353,7 @@ export function DealDocuments({ context }: { context: ScreenContext }) {
           />
         )}
       </Card>
-      <Card span={6} title="Invoices" subtitle={`${invoices.length} linked`} flush>
+      <Card prov="human" span={6} title="Invoices" subtitle={`${invoices.length} linked`} flush>
         {invoices.length === 0 ? (
           <div className="ds-card-body">
             <Empty title="No invoice linked">
@@ -378,7 +376,7 @@ export function DealDocuments({ context }: { context: ScreenContext }) {
           />
         )}
       </Card>
-      <Card span={12} title="Correspondence" subtitle={`${threads.length} local drafts`}>
+      <Card prov="human" span={12} title="Correspondence" subtitle={`${threads.length} local drafts`}>
         <Stack gap={2}>
           {threads.map((thread) => (
             <Row key={thread.id} gap={3}>
@@ -403,7 +401,7 @@ export function DealTeam({ context }: { context: ScreenContext }) {
 
   return (
     <Grid>
-      <Card span={6} title="Who is on this deal" subtitle={`${collaborators.length + 1} named people`}>
+      <Card prov="human" span={6} title="Who is on this deal" subtitle={`${collaborators.length + 1} named people`}>
         <Stack gap={3}>
           <Row gap={3}>
             <Avatar name={owner} />
@@ -419,7 +417,7 @@ export function DealTeam({ context }: { context: ScreenContext }) {
           <Button size="sm" variant="secondary" onClick={() => context.openOverlay("collaborator picker")}>Add a collaborator</Button>
         </Stack>
       </Card>
-      <Card span={6} title="Who has actually touched it" subtitle="From logged activity, not from the team list">
+      <Card prov="human" span={6} title="Who has actually touched it" subtitle="From logged activity, not from the team list">
         {activityPeople.length === 0 ? (
           <Empty title="Nobody has logged anything" icon={<Users size={20} />} />
         ) : (
@@ -454,12 +452,12 @@ export function CollaboratorPicker({ context, close }: { context: ScreenContext;
   return (
     <Stack gap={4}>
       <Field label="Person" required>
-        <Select value={name} onChange={(event) => setName(event.target.value)}>
+        <Select aria-label="Person" value={name} onChange={(event) => setName(event.target.value)}>
           <option value="">Choose someone</option>
           {data.members.filter((member) => member.fields.kind !== "ai").map((member) => <option key={member.id} value={member.title}>{member.title} · {String(member.fields.title ?? "")}</option>)}
         </Select>
       </Field>
-      <Field label="Their part"><TextInput value={role} onChange={(event) => setRole(event.target.value)} /></Field>
+      <Field label="Their part"><TextInput aria-label="Their part" value={role} onChange={(event) => setRole(event.target.value)} /></Field>
       {collaborators.length > 0 && (
         <Properties rows={collaborators.map((person) => ({ label: person.name, value: person.role }))} />
       )}
@@ -493,7 +491,6 @@ export function CollaboratorPicker({ context, close }: { context: ScreenContext;
 export function ClosureConfirmation({ context, close }: { context: ScreenContext; close: () => void }) {
   const { deal, data } = useDeal(context);
   const { org, now } = useWorkspace();
-  const move = useStageMove(context);
   const [createInvoice, setCreateInvoice] = useState("yes");
   const [busy, setBusy] = useState(false);
   if (!deal) return <Empty title="No deal selected" />;
@@ -547,7 +544,7 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
         </Notice>
       )}
       <Field label="Create the invoice">
-        <Select value={createInvoice} onChange={(event) => setCreateInvoice(event.target.value)}>
+        <Select aria-label="Create the invoice" value={createInvoice} onChange={(event) => setCreateInvoice(event.target.value)}>
           <option value="yes">Yes, create a draft invoice in Finance</option>
           <option value="no">No, I will raise it myself</option>
         </Select>
@@ -626,7 +623,7 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
       <span className="ds-subtle" style={{ fontSize: "var(--text-xs)" }}>
-        {stageOf(deal).label} → {wonStage.label}. {move ? "" : ""}The same stage validation runs here as on the board.
+        {stageOf(deal).label} → {wonStage.label}. The same stage validation runs here as on the board.
       </span>
     </Stack>
   );
@@ -650,7 +647,7 @@ export function RequestApproval({ context, close }: { context: ScreenContext; cl
         { label: "Amount", value: <Money minor={deal.amountMinor} context={context} bold /> },
         { label: "Quotes needing a discount approval", value: String(needsApproval.length) },
       ]} />
-      <Field label="What you are asking for" required><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} required /></Field>
+      <Field label="What you are asking for" required><TextArea aria-label="What you are asking for" value={note} rows={3} onChange={(event) => setNote(event.target.value)} required /></Field>
       <Row gap={2}>
         <Button
           variant="primary"

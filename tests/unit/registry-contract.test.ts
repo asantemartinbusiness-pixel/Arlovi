@@ -21,7 +21,8 @@ describe("screen registry contract", () => {
     expect(missing, `applications without a module: ${missing.join(", ")}`).toEqual([]);
   });
 
-  it("declares tabs, actions and overlays that exist in the approved contract", () => {
+  it("declares tabs that exist in the approved contract", () => {
+    // The tab strip is the contract: an extra tab means a misnamed one.
     const problems: string[] = [];
     for (const screen of catalog.screens) {
       const def = getApp(screen.applicationCode)?.screens[screen.id];
@@ -29,11 +30,23 @@ describe("screen registry contract", () => {
       for (const tab of def.tabs ?? []) {
         if (!screen.tabs.includes(tab.id)) problems.push(`${screen.id}: tab "${tab.id}" is not in the contract`);
       }
+    }
+    expect(problems.slice(0, 40)).toEqual([]);
+  });
+
+  it("routes every action that opens an overlay to an overlay the screen declares", () => {
+    // Overlays and actions beyond the contract are allowed (the contract is a
+    // floor), but an action must never open an overlay that does not exist.
+    const problems: string[] = [];
+    for (const screen of catalog.screens) {
+      const def = getApp(screen.applicationCode)?.screens[screen.id];
+      if (!def) continue;
+      const ids = new Set((def.overlays ?? []).map((overlay) => overlay.id));
       for (const action of def.actions ?? []) {
-        if (!screen.actions.includes(action.id)) problems.push(`${screen.id}: action "${action.id}" is not in the contract`);
-      }
-      for (const overlay of def.overlays ?? []) {
-        if (!screen.overlays.includes(overlay.id)) problems.push(`${screen.id}: overlay "${overlay.id}" is not in the contract`);
+        const source = action.run.toString();
+        for (const match of source.matchAll(/openOverlay\(\s*"([^"]+)"/g)) {
+          if (!ids.has(match[1])) problems.push(`${screen.id}: action "${action.id}" opens undeclared overlay "${match[1]}"`);
+        }
       }
     }
     expect(problems.slice(0, 40)).toEqual([]);

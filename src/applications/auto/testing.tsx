@@ -71,7 +71,7 @@ export function WorkflowTesting({ context }: { context: ScreenContext }) {
 
   if (context.tab === "Test runs") {
     return (
-      <Card title="Dry runs recorded" subtitle={`${testRuns.length} of ${mine.length} runs were dry`} flush>
+      <Card eyebrow="DRY RUNS" prov="agent" title="Dry runs recorded" subtitle={`${testRuns.length} of ${mine.length} runs were dry`} flush>
         {testRuns.length === 0 ? (
           <Empty title="No dry run recorded yet" icon={<FlaskConical size={20} />} action={<Button variant="primary" busy={busy} onClick={() => void runDry()}>Run a dry run</Button>}>
             A dry run evaluates the graph against the records this company holds and stores the trace without writing anything.
@@ -101,6 +101,8 @@ export function WorkflowTesting({ context }: { context: ScreenContext }) {
       <Grid>
         <Card
           span={7}
+          eyebrow="ASSERTIONS"
+          prov="human"
           title="Assertions on this workflow"
           subtitle={`${stored.length} recorded`}
           actions={<Button variant="secondary" onClick={() => context.openOverlay("assertion builder")}>Add an assertion</Button>}
@@ -140,7 +142,7 @@ export function WorkflowTesting({ context }: { context: ScreenContext }) {
           )}
         </Card>
 
-        <Card span={5} title="Result of the last dry run" subtitle={draft.dryRunAt ? context.dateTime(draft.dryRunAt) : "No dry run in this session"}>
+        <Card span={5} eyebrow="LAST RUN" prov="agent" title="Result of the last dry run" subtitle={draft.dryRunAt ? context.dateTime(draft.dryRunAt) : "No dry run in this session"}>
           {dryRun ? (
             <Stack gap={3}>
               <Properties rows={[
@@ -167,7 +169,7 @@ export function WorkflowTesting({ context }: { context: ScreenContext }) {
         .map((step) => ({ id: `${run.id}-${step.index}`, run, step }));
     });
     return (
-      <Card title="Failed and blocked steps" subtitle={`${failures.length} across ${mine.length} run${mine.length === 1 ? "" : "s"}`} flush>
+      <Card eyebrow="FAILURES" prov="agent" title="Failed and blocked steps" subtitle={`${failures.length} across ${mine.length} run${mine.length === 1 ? "" : "s"}`} flush>
         {failures.length === 0 ? (
           <Empty title="No failed or blocked step" icon={<CheckCircle2 size={20} />}>Every recorded step on every path finished. Blocked provider steps would also appear here.</Empty>
         ) : (
@@ -198,13 +200,16 @@ export function WorkflowTesting({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={5}>
       <StatRow>
-        <Stat label="Steps evaluated" value={dryRun ? String(dryRun.steps.length) : "—"} unavailable={!dryRun} meta={dryRun ? dryRun.status.replace(/_/g, " ") : "No dry run yet"} />
-        <Stat label="Branch coverage" value={cover ? `${cover.used.size}/${cover.total}` : "—"} unavailable={!cover} meta="Connections this run actually traversed" />
-        <Stat label="Records written" value={dryRun ? "0" : "—"} unavailable={!dryRun} meta="A dry run never writes" />
-        <Stat label="Steps that would write" value={dryRun ? String(wouldWrite.length) : "—"} unavailable={!dryRun} meta="These would change a record in a live run" />
+        <Stat prov="agent" label="Steps evaluated" value={dryRun ? String(dryRun.steps.length) : "—"} unavailable={!dryRun} meta={dryRun ? dryRun.status.replace(/_/g, " ") : "No dry run yet"} />
+        <Stat prov="agent" label="Branch coverage" value={cover ? `${cover.used.size}/${cover.total}` : "—"} unavailable={!cover} meta="Connections this run actually traversed" />
+        <Stat prov="posted" label="Records written" value={dryRun ? "0" : "—"} unavailable={!dryRun} meta="A dry run never writes" />
+        <Stat prov="agent" label="Steps that would write" value={dryRun ? String(wouldWrite.length) : "—"} unavailable={!dryRun} meta="These would change a record in a live run" />
       </StatRow>
 
       <Card
+        eyebrow="SIMULATION"
+        prov="agent"
+        machine
         title="Dry run"
         subtitle="The interpreter walks the saved graph against this company's records. Nothing is written and no provider is called."
         actions={
@@ -281,30 +286,30 @@ export function AssertionBuilder({ context, close }: { context: ScreenContext; c
   return (
     <Stack gap={4}>
       <Field label="What is asserted">
-        <Select value={subject} onChange={(event) => setSubject(event.target.value as typeof subject)}>
+        <Select aria-label="What is asserted" value={subject} onChange={(event) => setSubject(event.target.value as typeof subject)}>
           <option value="status">The outcome of a step</option>
           <option value="variable">The value of a variable</option>
         </Select>
       </Field>
       {subject === "status" ? (
         <Field label="Step">
-          <Select value={nodeId} onChange={(event) => setNodeId(event.target.value)}>
+          <Select aria-label="Step" value={nodeId} onChange={(event) => setNodeId(event.target.value)}>
             <option value="">Choose a step</option>
             {draft.graph.nodes.map((node) => <option key={node.id} value={node.id}>{node.label}</option>)}
           </Select>
         </Field>
       ) : (
         <Field label="Variable name" hint="A name bound by a variable node, for example atRisk.">
-          <TextInput value={name} onChange={(event) => setName(event.target.value)} />
+          <TextInput aria-label="Variable name" value={name} onChange={(event) => setName(event.target.value)} />
         </Field>
       )}
       <Field label="Test">
-        <Select value={op} onChange={(event) => setOp(event.target.value as ConditionOp)}>
+        <Select aria-label="Test" value={op} onChange={(event) => setOp(event.target.value as ConditionOp)}>
           {CONDITION_OPS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
         </Select>
       </Field>
       <Field label="Expected value">
-        <TextInput value={value} onChange={(event) => setValue(event.target.value)} />
+        <TextInput aria-label="Expected value" value={value} onChange={(event) => setValue(event.target.value)} />
       </Field>
       <Button
         variant="primary"
@@ -341,7 +346,7 @@ export function SimulatedReceipt({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <Field label="Step">
-        <Select value={String(index)} onChange={(event) => setIndex(Number(event.target.value))}>
+        <Select aria-label="Step" value={String(index)} onChange={(event) => setIndex(Number(event.target.value))}>
           {run.steps.map((item, position) => <option key={`${item.nodeId}-${position}`} value={position}>{position + 1}. {item.label}</option>)}
         </Select>
       </Field>
@@ -393,12 +398,12 @@ export function RunComparison({ context }: { context: ScreenContext }) {
     <Stack gap={4}>
       <Row gap={2} wrap>
         <Field label="Run A">
-          <Select value={left} onChange={(event) => setLeft(event.target.value)}>
+          <Select aria-label="Run A" value={left} onChange={(event) => setLeft(event.target.value)}>
             {mine.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
           </Select>
         </Field>
         <Field label="Run B">
-          <Select value={right} onChange={(event) => setRight(event.target.value)}>
+          <Select aria-label="Run B" value={right} onChange={(event) => setRight(event.target.value)}>
             {mine.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
           </Select>
         </Field>

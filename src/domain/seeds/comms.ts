@@ -39,6 +39,9 @@ interface MessageSeed {
   title: string; text: string; thread?: number; reactions?: string; mentions?: string; fileRef?: string; pinned?: boolean;
 }
 
+/** Offset so these ids cannot collide with another application's message fixtures. */
+const MSG = 800;
+
 const MESSAGES: MessageSeed[] = [
   { n: 20, channel: 20, author: "Maya Chen", kind: "human", offsetDays: -2, hour: 9, minute: 12, title: "Warm glaze approved", text: "The warm glaze is approved for the whole winter run. The cool glaze is parked until spring.", reactions: "👍:Theo Marsh,Sable Nguyen,Fiona Buchanan;🎉:Priya Shah", pinned: true },
   { n: 21, channel: 20, author: "Sable Nguyen", kind: "human", offsetDays: -2, hour: 9, minute: 31, title: "Re: Warm glaze approved", text: "Good. I will run the next sixty on the warm batch and keep the two cool samples on the shelf.", thread: 20, reactions: "👍:Maya Chen" },
@@ -184,7 +187,7 @@ registerSeed("comms", (ctx) => {
       },
     })),
     ...MESSAGES.map((message) => ctx.rec({
-      org: "nl", collection: "messages", n: message.n, title: message.title,
+      org: "nl", collection: "messages", n: MSG + message.n, title: message.title,
       status: message.pinned ? "pinned" : "sent",
       summary: message.text, owner: message.author,
       parentId: `nl-channels-${String(message.channel).padStart(3, "0")}`,
@@ -192,7 +195,7 @@ registerSeed("comms", (ctx) => {
       tags: message.kind === "ai" ? ["ai"] : [],
       fields: {
         author: message.author, kind: message.kind,
-        threadRootId: message.thread ? `nl-messages-${String(message.thread).padStart(3, "0")}` : "",
+        threadRootId: message.thread ? `nl-messages-${String(MSG + message.thread).padStart(3, "0")}` : "",
         reactions: message.reactions ?? "", mentions: message.mentions ?? "",
         fileRef: message.fileRef ?? "", pinned: Boolean(message.pinned),
       },
@@ -256,7 +259,7 @@ registerSeed("comms", (ctx) => {
       body: { html: `<p>${post.body}</p>` },
     })),
     ctx.rec({
-      org: "nl", collection: "preferences", n: 20, title: "Maya Chen — mail identity", status: "active",
+      org: "nl", collection: "preferences", n: 820, title: "Maya Chen — mail identity", status: "active",
       summary: "Identity, signature and working hours for the owner view.", owner: "Maya Chen",
       fields: {
         kind: "commsIdentity", address: "maya@northline.example", displayName: "Maya Chen — Northline Atelier",

@@ -13,7 +13,7 @@ import {
   TextInput, Tool, Toolbar, ToolbarSeparator,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
-import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
+import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import { capabilityById } from "@/platform/capability";
 import { downloadFile } from "@/runtime/db";
 import type { Rec } from "@/domain/types";
@@ -108,7 +108,7 @@ function SlideSorter({ editor, context }: { editor: DeckEditor; context: ScreenC
               if (event.key === "ArrowDown") { event.preventDefault(); editor.commit(moveSlide(editor.deck, slide.id, index + 1), "Reorder slides"); }
             }}
           >
-            <div className="px-thumb-frame"><MiniSlide deck={editor.deck} slide={slide} width={150} /></div>
+            <div className="px-thumb-frame"><MiniSlide deck={editor.deck} slide={slide} width={142} /></div>
             <span className="px-thumb-label">
               <strong>{index + 1}</strong>
               <span className="ds-truncate">{slide.title}</span>
@@ -161,6 +161,8 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
           <Card
             key={record.id}
             span={4}
+            eyebrow="DECK"
+            prov="human"
             title={record.title}
             subtitle={record.summary}
             actions={<Pill tone={record.status === "published" ? "success" : record.status === "in_review" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>}
@@ -195,7 +197,9 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
 }
 
 function LibraryInspector({ context }: { context: ScreenContext }) {
-  const record = useRecord(context.selectedId) ?? useCollection("decks")[0];
+  const selected = useRecord(context.selectedId);
+  const decks = useCollection("decks");
+  const record = selected ?? decks[0];
   const { org } = useWorkspace();
   if (!record) return <Empty title="No decks" icon={<Presentation size={18} />} />;
   const deck = readDeck(record.body);
@@ -399,7 +403,7 @@ function ObjectInspector({ editor, context }: { editor: DeckEditor; context: Scr
       <>
         <InspectorSection title="Slide">
           <Field label="Title">
-            <TextInput value={editor.slide.title} onChange={(event) => editor.commitSlide({ ...editor.slide, title: event.target.value }, "Slide title")} />
+            <TextInput aria-label="Title" value={editor.slide.title} onChange={(event) => editor.commitSlide({ ...editor.slide, title: event.target.value }, "Slide title")} />
           </Field>
           <Properties rows={[
             { label: "Layout", value: layoutById(editor.deck, editor.slide.layoutId).name },
@@ -419,7 +423,7 @@ function ObjectInspector({ editor, context }: { editor: DeckEditor; context: Scr
           />
           <Row gap={2} style={{ marginBlockStart: "var(--space-2)" }}>
             <Field label="Target seconds">
-              <TextInput
+              <TextInput aria-label="Target seconds"
                 inputMode="numeric" align="end"
                 value={String(editor.slide.targetSeconds ?? "")}
                 onChange={(event) => editor.commitSlide({ ...editor.slide, targetSeconds: event.target.value ? Number(event.target.value) : undefined }, "Target time")}
@@ -453,12 +457,12 @@ function ObjectInspector({ editor, context }: { editor: DeckEditor; context: Scr
     <>
       <InspectorSection title={selected.length > 1 ? `${selected.length} objects` : object.name}>
         <Row gap={2} wrap>
-          <Field label="X"><TextInput inputMode="numeric" align="end" value={String(object.x)} onChange={(event) => patch({ x: Number(event.target.value) || 0 }, "Position")} /></Field>
-          <Field label="Y"><TextInput inputMode="numeric" align="end" value={String(object.y)} onChange={(event) => patch({ y: Number(event.target.value) || 0 }, "Position")} /></Field>
+          <Field label="X"><TextInput aria-label="X" inputMode="numeric" align="end" value={String(object.x)} onChange={(event) => patch({ x: Number(event.target.value) || 0 }, "Position")} /></Field>
+          <Field label="Y"><TextInput aria-label="Y" inputMode="numeric" align="end" value={String(object.y)} onChange={(event) => patch({ y: Number(event.target.value) || 0 }, "Position")} /></Field>
         </Row>
         <Row gap={2} wrap>
-          <Field label="Width"><TextInput inputMode="numeric" align="end" value={String(object.w)} onChange={(event) => patch({ w: Math.max(24, Number(event.target.value) || 24) }, "Size")} /></Field>
-          <Field label="Height"><TextInput inputMode="numeric" align="end" value={String(object.h)} onChange={(event) => patch({ h: Math.max(24, Number(event.target.value) || 24) }, "Size")} /></Field>
+          <Field label="Width"><TextInput aria-label="Width" inputMode="numeric" align="end" value={String(object.w)} onChange={(event) => patch({ w: Math.max(24, Number(event.target.value) || 24) }, "Size")} /></Field>
+          <Field label="Height"><TextInput aria-label="Height" inputMode="numeric" align="end" value={String(object.h)} onChange={(event) => patch({ h: Math.max(24, Number(event.target.value) || 24) }, "Size")} /></Field>
         </Row>
         <Field label={`Rotation ${object.rotation}°`}>
           <input
@@ -482,21 +486,21 @@ function ObjectInspector({ editor, context }: { editor: DeckEditor; context: Scr
             onChange={(event) => editor.commitSlide(updateObjects(editor.slide, [object.id], (item) => ({ ...item, text: { ...item.text!, text: event.target.value } })), "Edit text")}
           />
           <Row gap={2} wrap>
-            <Field label="Size"><TextInput inputMode="numeric" align="end" value={String(object.text.size)} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, editor.selectedIds, (item) => ({ ...item, customised: true, text: item.text ? { ...item.text, size: Number(event.target.value) || 16 } : undefined })), "Text size")} /></Field>
+            <Field label="Size"><TextInput aria-label="Size" inputMode="numeric" align="end" value={String(object.text.size)} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, editor.selectedIds, (item) => ({ ...item, customised: true, text: item.text ? { ...item.text, size: Number(event.target.value) || 16 } : undefined })), "Text size")} /></Field>
             <Field label="Weight">
-              <Select value={String(object.text.weight)} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, editor.selectedIds, (item) => ({ ...item, customised: true, text: item.text ? { ...item.text, weight: Number(event.target.value) as 300 | 400 | 500 | 600 | 650 | 700 } : undefined })), "Text weight")}>
+              <Select aria-label="Weight" value={String(object.text.weight)} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, editor.selectedIds, (item) => ({ ...item, customised: true, text: item.text ? { ...item.text, weight: Number(event.target.value) as 300 | 400 | 500 | 600 | 650 | 700 } : undefined })), "Text weight")}>
                 {[300, 400, 500, 600, 650, 700].map((weight) => <option key={weight} value={weight}>{weight}</option>)}
               </Select>
             </Field>
           </Row>
           <Row gap={2} wrap>
             <Field label="Align">
-              <Select value={object.text.align} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, editor.selectedIds, (item) => ({ ...item, customised: true, text: item.text ? { ...item.text, align: event.target.value as "start" | "center" | "end" } : undefined })), "Text align")}>
+              <Select aria-label="Align" value={object.text.align} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, editor.selectedIds, (item) => ({ ...item, customised: true, text: item.text ? { ...item.text, align: event.target.value as "start" | "center" | "end" } : undefined })), "Text align")}>
                 <option value="start">Left</option><option value="center">Centre</option><option value="end">Right</option>
               </Select>
             </Field>
             <Field label="Vertical">
-              <Select value={object.text.valign} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, editor.selectedIds, (item) => ({ ...item, customised: true, text: item.text ? { ...item.text, valign: event.target.value as "start" | "center" | "end" } : undefined })), "Text valign")}>
+              <Select aria-label="Vertical" value={object.text.valign} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, editor.selectedIds, (item) => ({ ...item, customised: true, text: item.text ? { ...item.text, valign: event.target.value as "start" | "center" | "end" } : undefined })), "Text valign")}>
                 <option value="start">Top</option><option value="center">Middle</option><option value="end">Bottom</option>
               </Select>
             </Field>
@@ -522,7 +526,7 @@ function ObjectInspector({ editor, context }: { editor: DeckEditor; context: Scr
       {object.type === "shape" && object.shape && (
         <InspectorSection title="Shape">
           <Field label="Kind">
-            <Select value={object.shape.kind} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, editor.selectedIds, (item) => ({ ...item, customised: true, shape: item.shape ? { ...item.shape, kind: event.target.value as typeof item.shape.kind } : undefined })), "Shape kind")}>
+            <Select aria-label="Kind" value={object.shape.kind} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, editor.selectedIds, (item) => ({ ...item, customised: true, shape: item.shape ? { ...item.shape, kind: event.target.value as typeof item.shape.kind } : undefined })), "Shape kind")}>
               {["rect", "roundRect", "ellipse", "triangle", "line", "arrow"].map((kind) => <option key={kind} value={kind}>{kind}</option>)}
             </Select>
           </Field>
@@ -549,7 +553,7 @@ function ObjectInspector({ editor, context }: { editor: DeckEditor; context: Scr
             />
           </Field>
           <Field label="Corner radius">
-            <TextInput inputMode="numeric" align="end" value={String(object.shape.radius)} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, editor.selectedIds, (item) => ({ ...item, customised: true, shape: item.shape ? { ...item.shape, radius: Number(event.target.value) || 0 } : undefined })), "Radius")} />
+            <TextInput aria-label="Corner radius" inputMode="numeric" align="end" value={String(object.shape.radius)} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, editor.selectedIds, (item) => ({ ...item, customised: true, shape: item.shape ? { ...item.shape, radius: Number(event.target.value) || 0 } : undefined })), "Radius")} />
           </Field>
         </InspectorSection>
       )}
@@ -561,7 +565,7 @@ function ObjectInspector({ editor, context }: { editor: DeckEditor; context: Scr
             { label: "Substituted", value: object.image.substituted ?? "No" },
           ]} />
           <Field label="Alternative text" required hint="Reported in the review when it is empty.">
-            <TextInput value={object.image.alt} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, [object.id], (item) => ({ ...item, image: item.image ? { ...item.image, alt: event.target.value } : undefined })), "Alt text")} />
+            <TextInput aria-label="Alternative text" value={object.image.alt} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, [object.id], (item) => ({ ...item, image: item.image ? { ...item.image, alt: event.target.value } : undefined })), "Alt text")} />
           </Field>
           <Button size="sm" variant="secondary" onClick={() => context.openOverlay("image insert", { objectId: object.id })}>Choose an asset</Button>
         </InspectorSection>
@@ -618,18 +622,22 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
   const [scale, setScale] = useState(0.82);
   const wrapRef = useRef<HTMLDivElement>(null);
 
+  // The record arrives asynchronously and the early return above means the ref
+  // is null on the first pass, so this has to re-run once the canvas exists.
   useEffect(() => {
     const node = wrapRef.current;
     if (!node) return;
-    const observer = new ResizeObserver(() => {
-      const available = node.clientWidth - 48;
+    const measure = () => {
+      const style = window.getComputedStyle(node);
+      const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+      const available = node.clientWidth - padding - 8;
       setScale(Math.max(0.3, Math.min(1, available / SLIDE_W)));
-    });
+    };
+    const observer = new ResizeObserver(measure);
     observer.observe(node);
-    const available = node.clientWidth - 48;
-    setScale(Math.max(0.3, Math.min(1, available / SLIDE_W)));
+    measure();
     return () => observer.disconnect();
-  }, []);
+  }, [record?.id]);
 
   if (!record) {
     return (
@@ -690,8 +698,7 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
           <div className="px-scroll" ref={wrapRef}>
             <ConflictNotice editor={editor} />
             {editor.slide.hidden && <Notice tone="warning" title="This slide is hidden">It stays in the deck and in the notes export, but it is skipped when presenting.</Notice>}
-            <div style={{ width: SLIDE_W * scale, height: SLIDE_H * scale, position: "relative" }}>
-              <SlideCanvas
+            <SlideCanvas
                 deck={editor.deck}
                 slide={editor.slide}
                 selectedIds={editor.selectedIds}
@@ -699,7 +706,12 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
                 onTransform={(updates, committed) => {
                   if (committed) {
                     if (updates.length === 0) { editor.settle("Move object"); return; }
-                    editor.commitSlide(updates.reduce((slide, update) => updateObjects(slide, [update.id], (object) => ({ ...object, ...update.patch })), editor.slide), "Transform object");
+                    // Keyboard nudges arrive committed one key at a time.
+                    editor.commitSlide(
+                      updates.reduce((slide, update) => updateObjects(slide, [update.id], (object) => ({ ...object, ...update.patch })), editor.slide),
+                      "Nudge object",
+                      true,
+                    );
                     return;
                   }
                   editor.preview(updates);
@@ -710,18 +722,17 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
                   table: object.table ? { ...object.table, rows: object.table.rows.map((line, lineIndex) => (lineIndex === row ? line.map((cell, cellIndex) => (cellIndex === col ? value : cell)) : line)) } : undefined,
                 })), "Table cell")}
                 onDelete={(ids) => { editor.commitSlide(removeObjects(editor.slide, ids), "Delete objects"); editor.setSelectedIds([]); }}
-                scale={scale}
-              />
-            </div>
+              scale={scale}
+            />
             <Notice tone="neutral">
               Drag to move, the eight handles to resize, the round handle above to rotate. From the keyboard: Tab cycles objects, arrows move, Alt and arrows resize, square brackets rotate, Enter edits text, Delete removes.
             </Notice>
           </div>
           <div className="px-status">
-            <span>Selection <strong>{editor.selectedIds.length}</strong></span>
-            <span>Objects <strong>{editor.slide.objects.length}</strong></span>
-            <span>Animated <strong>{buildOrder(editor.slide).length}</strong></span>
-            <span>Zoom <strong>{Math.round(scale * 100)}%</strong></span>
+            <span>Selection <strong className="ds-num">{editor.selectedIds.length}</strong></span>
+            <span>Objects <strong className="ds-num">{editor.slide.objects.length}</strong></span>
+            <span>Animated <strong className="ds-num">{buildOrder(editor.slide).length}</strong></span>
+            <span>Zoom <strong className="ds-num">{Math.round(scale * 100)}%</strong></span>
             <span>Last action <strong>{editor.undoLabel ?? "none"}</strong></span>
           </div>
         </div>
@@ -746,7 +757,7 @@ function ThemeScreen({ context, tab }: { context: ScreenContext; tab: "Masters" 
     const usage = (token: ThemeColourToken) => editor.deck.slides.reduce((total, slide) => total + slide.objects.filter((object) => object.text?.colourToken === token || object.shape?.fillToken === token).length, 0);
     return (
       <Grid>
-        <Card span={7} title="Theme colours" subtitle="Every object references a token, never a hex value">
+        <Card span={7} eyebrow="THEME" prov="human" title="Theme colours" subtitle="Every object references a token, never a hex value">
           <Stack gap={3}>
             {tokens.map((token) => (
               <Row key={token} gap={3}>
@@ -766,7 +777,7 @@ function ThemeScreen({ context, tab }: { context: ScreenContext; tab: "Masters" 
           </Stack>
           <Notice tone="info">Because objects store a token, changing a colour here updates every slide at once and no object needs touching.</Notice>
         </Card>
-        <Card span={5} title="Preview" subtitle={editor.deck.slides[0]?.title ?? ""}>
+        <Card span={5} eyebrow="PREVIEW" prov="human" title="Preview" subtitle={editor.deck.slides[0]?.title ?? ""}>
           <div style={{ position: "relative", aspectRatio: "16 / 9", overflow: "hidden", border: "1px solid var(--border-default)", borderRadius: "var(--radius-xs)" }}>
             <MiniSlide deck={editor.deck} slide={editor.slide} width={320} />
           </div>
@@ -779,16 +790,16 @@ function ThemeScreen({ context, tab }: { context: ScreenContext; tab: "Masters" 
     const capability = capabilityById("site.publish");
     return (
       <Grid>
-        <Card span={7} title="Typefaces" subtitle="Only fonts bundled with this workspace can be used">
+        <Card span={7} eyebrow="FONTS" title="Typefaces" subtitle="Only fonts bundled with this workspace can be used">
           <Stack gap={3}>
             <Field label="Heading font">
-              <Select value={editor.deck.theme.headingFont} onChange={(event) => editor.commit({ ...editor.deck, theme: { ...editor.deck.theme, headingFont: event.target.value } }, "Heading font")}>
-                {["Inter", "ui-sans-serif", "ui-serif", "ui-monospace"].map((font) => <option key={font} value={font}>{font}</option>)}
+              <Select aria-label="Heading font" value={editor.deck.theme.headingFont} onChange={(event) => editor.commit({ ...editor.deck, theme: { ...editor.deck.theme, headingFont: event.target.value } }, "Heading font")}>
+                {["IBM Plex Sans Condensed", "Inter", "ui-serif", "IBM Plex Mono"].map((font) => <option key={font} value={font}>{font}</option>)}
               </Select>
             </Field>
             <Field label="Body font">
-              <Select value={editor.deck.theme.bodyFont} onChange={(event) => editor.commit({ ...editor.deck, theme: { ...editor.deck.theme, bodyFont: event.target.value } }, "Body font")}>
-                {["Inter", "ui-sans-serif", "ui-serif", "ui-monospace"].map((font) => <option key={font} value={font}>{font}</option>)}
+              <Select aria-label="Body font" value={editor.deck.theme.bodyFont} onChange={(event) => editor.commit({ ...editor.deck, theme: { ...editor.deck.theme, bodyFont: event.target.value } }, "Body font")}>
+                {["IBM Plex Sans Condensed", "Inter", "ui-serif", "IBM Plex Mono"].map((font) => <option key={font} value={font}>{font}</option>)}
               </Select>
             </Field>
             <Field label={`Heading scale ${editor.deck.theme.headingScale.toFixed(2)}×`}>
@@ -804,7 +815,7 @@ function ThemeScreen({ context, tab }: { context: ScreenContext; tab: "Masters" 
             A brand typeface cannot be fetched here. Where an import asked for one, the substitution is listed rather than quietly rendered in something else.
           </Notice>
         </Card>
-        <Card span={5} title="Substitutions on import" subtitle={`${editor.deck.theme.fontSubstitutions.length} recorded`}>
+        <Card span={5} eyebrow="IMPORT" title="Substitutions on import" subtitle={`${editor.deck.theme.fontSubstitutions.length} recorded`}>
           {editor.deck.theme.fontSubstitutions.length === 0 ? <Empty title="Nothing was substituted" /> : (
             <Properties rows={editor.deck.theme.fontSubstitutions.map((item) => ({ label: item.requested, value: `rendered as ${item.used}` }))} />
           )}
@@ -827,6 +838,7 @@ function ThemeScreen({ context, tab }: { context: ScreenContext; tab: "Masters" 
             <Card
               key={layout.id}
               span={4}
+              eyebrow="MASTER"
               title={layout.name}
               subtitle={`${layout.placeholders.length} placeholders · used by ${used.length} slide${used.length === 1 ? "" : "s"}`}
               footer={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("global apply review", { layoutId: layout.id })}>Apply to this slide</Button>}
@@ -846,7 +858,7 @@ function ThemeScreen({ context, tab }: { context: ScreenContext; tab: "Masters" 
     <Stack gap={4}>
       <Row gap={3} wrap>
         <Field label="Theme">
-          <Select
+          <Select aria-label="Theme"
             value={editor.deck.theme.id}
             onChange={(event) => {
               const next = (editor.deck.themes.find((theme) => theme.id === event.target.value) ?? THEMES[0]);
@@ -864,7 +876,7 @@ function ThemeScreen({ context, tab }: { context: ScreenContext; tab: "Masters" 
         {editor.deck.slides.map((slide, index) => {
           const drifted = customisedObjects(editor.deck, slide);
           return (
-            <Card key={slide.id} span={4} title={`${index + 1}. ${slide.title}`} subtitle={layoutById(editor.deck, slide.layoutId).name}
+            <Card key={slide.id} span={4} eyebrow="SLIDE" prov="human" title={`${index + 1}. ${slide.title}`} subtitle={layoutById(editor.deck, slide.layoutId).name}
               actions={drifted.length > 0 ? <Pill tone="warning">{drifted.length} customised</Pill> : <Pill tone="success">On master</Pill>}
               footer={<Button size="sm" variant="ghost" onClick={() => context.openOverlay("global apply review", { slideId: slide.id })}>Re-apply master</Button>}>
               <div style={{ position: "relative", aspectRatio: "16 / 9", overflow: "hidden", border: "1px solid var(--border-default)", borderRadius: "var(--radius-xs)" }}>
@@ -898,7 +910,7 @@ function DataScreen({ context, tab }: { context: ScreenContext; tab: "Charts" | 
     return (
       <Stack gap={4}>
         {tableObjects.length === 0 ? <Empty title="No tables in this deck" icon={<Table2 size={20} />} /> : tableObjects.map(({ slide, object }) => (
-          <Card key={object.id} title={`${slide.title} — ${object.name}`} subtitle={`${object.table?.rows.length ?? 0} rows × ${object.table?.rows[0]?.length ?? 0} columns`}>
+          <Card key={object.id} eyebrow="TABLE" prov="human" title={`${slide.title} — ${object.name}`} subtitle={`${object.table?.rows.length ?? 0} rows × ${object.table?.rows[0]?.length ?? 0} columns`}>
             <div style={{ overflowX: "auto" }}>
               <table className="ds-table" style={{ borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
                 <tbody>
@@ -955,8 +967,8 @@ function DataScreen({ context, tab }: { context: ScreenContext; tab: "Charts" | 
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Charts" value={String(chartObjects.length)} />
-          <Stat label="Linked" value={String(chartObjects.filter(({ object }) => object.chart?.linked).length)} />
+          <Stat prov="human" label="Charts" value={String(chartObjects.length)} />
+          <Stat prov="human" label="Linked" value={String(chartObjects.filter(({ object }) => object.chart?.linked).length)} />
           <Stat
             label="Stale"
             value={String(chartObjects.filter(({ object }) => {
@@ -972,7 +984,7 @@ function DataScreen({ context, tab }: { context: ScreenContext; tab: "Charts" | 
               const workbook = workbooks.find((item) => item.id === object.chart?.sourceWorkbookId);
               const freshness = chartFreshness(object.chart!, workbook?.updatedAt);
               return (
-                <Card key={object.id} title={`${slide.title} — ${object.chart!.title}`} subtitle={freshness.label}
+                <Card key={object.id} eyebrow="SNAPSHOT" title={`${slide.title} — ${object.chart!.title}`} subtitle={freshness.label}
                   actions={<Pill tone={freshness.state === "stale" ? "warning" : freshness.state === "fresh" ? "success" : "neutral"}>{freshness.state}</Pill>}
                   footer={<>
                     <Button size="sm" variant="secondary" disabled={!workbook} onClick={() => context.openOverlay("Dataset picker", { objectId: object.id })}>Refresh from the workbook</Button>
@@ -1012,7 +1024,7 @@ function DataScreen({ context, tab }: { context: ScreenContext; tab: "Charts" | 
       ) : (
         <Grid>
           {chartObjects.map(({ slide, object }) => (
-            <Card key={object.id} span={6} title={object.chart!.title} subtitle={`On ${slide.title}`}
+            <Card key={object.id} span={6} eyebrow="CHART" prov="human" title={object.chart!.title} subtitle={`On ${slide.title}`}
               footer={<>
                 <Button size="sm" variant="secondary" onClick={() => context.openOverlay("chart inspector", { objectId: object.id })}>Inspect</Button>
                 <Button size="sm" variant="ghost" onClick={() => {
@@ -1188,11 +1200,11 @@ function AnimationScreen({ context, tab }: { context: ScreenContext; tab: "Slide
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Animated objects" value={String(order.length)} />
-          <Stat label="Build length" value={`${(total / 1000).toFixed(2)}s`} meta={total > 2500 ? "Long for one slide" : "Reasonable"} />
-          <Stat label="Clicks needed" value={String(order.filter((object) => object.animation!.trigger === "onClick").length)} />
+          <Stat prov="human" label="Animated objects" value={String(order.length)} />
+          <Stat prov="human" label="Build length" value={`${(total / 1000).toFixed(2)}s`} meta={total > 2500 ? "Long for one slide" : "Reasonable"} />
+          <Stat prov="human" label="Clicks needed" value={String(order.filter((object) => object.animation!.trigger === "onClick").length)} />
         </StatRow>
-        <Card title="Timeline" subtitle={`${editor.slide.title} · each bar is one object's entrance`}>
+        <Card eyebrow="TIMELINE" prov="human" title="Timeline" subtitle={`${editor.slide.title} · each bar is one object's entrance`}>
           {order.length === 0 ? <Empty title="Nothing animates on this slide" /> : (
             <div className="px-timeline">
               {order.map((object) => {
@@ -1212,21 +1224,21 @@ function AnimationScreen({ context, tab }: { context: ScreenContext; tab: "Slide
                     </div>
                     <Row gap={2} wrap style={{ marginBlockStart: 4 }}>
                       <Field label="Delay (ms)">
-                        <TextInput
+                        <TextInput aria-label="Delay (ms)"
                           inputMode="numeric" align="end" style={{ width: 90 }}
                           value={String(object.animation!.delayMs)}
                           onChange={(event) => editor.commitSlide(updateObjects(editor.slide, [object.id], (item) => ({ ...item, animation: item.animation ? { ...item.animation, delayMs: Number(event.target.value) || 0 } : undefined })), "Delay")}
                         />
                       </Field>
                       <Field label="Duration (ms)">
-                        <TextInput
+                        <TextInput aria-label="Duration (ms)"
                           inputMode="numeric" align="end" style={{ width: 90 }}
                           value={String(object.animation!.durationMs)}
                           onChange={(event) => editor.commitSlide(updateObjects(editor.slide, [object.id], (item) => ({ ...item, animation: item.animation ? { ...item.animation, durationMs: Number(event.target.value) || 0 } : undefined })), "Duration")}
                         />
                       </Field>
                       <Field label="Easing">
-                        <Select
+                        <Select aria-label="Easing"
                           value={object.animation!.easing}
                           onChange={(event) => editor.commitSlide(updateObjects(editor.slide, [object.id], (item) => ({ ...item, animation: item.animation ? { ...item.animation, easing: event.target.value as ObjectAnimation["easing"] } : undefined })), "Easing")}
                         >
@@ -1269,7 +1281,7 @@ function AnimationScreen({ context, tab }: { context: ScreenContext; tab: "Slide
         revealed={editor.deck.reduceMotion ? undefined : revealed}
         showGuides={false}
       />
-      <Card title="With motion disabled" subtitle="The same slide, everything shown">
+      <Card eyebrow="REDUCED MOTION" prov="human" title="With motion disabled" subtitle="The same slide, everything shown">
         <SlideCanvas deck={editor.deck} slide={editor.slide} selectedIds={[]} onSelect={() => undefined} onTransform={() => undefined} readOnly scale={0.48} showGuides={false} />
       </Card>
     </Stack>
@@ -1337,8 +1349,8 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
         <div className="px-audience-bar">
           <Button size="sm" variant="secondary" onClick={() => advance(-1)}>Back</Button>
           <Button size="sm" variant="primary" onClick={() => advance(1)}>Advance</Button>
-          <span className="ds-grow" style={{ color: "#fff" }}>Slide {position + 1} of {visible.length} · {clock}</span>
-          <span style={{ color: "#cbd3e2", fontSize: "var(--text-2xs)" }}>Speaker notes are not on this display</span>
+          <span className="ds-grow ds-num" style={{ color: "var(--paper-0)" }}>Slide {position + 1} of {visible.length} · {clock}</span>
+          <span style={{ color: "var(--paper-300)", fontSize: "var(--text-2xs)" }}>Speaker notes are not on this display</span>
           <Button size="sm" variant="ghost" onClick={() => setFullscreen(false)}>End</Button>
         </div>
       </>
@@ -1369,9 +1381,9 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Elapsed" value={clock} meta={running ? "Running" : "Paused"} />
+          <Stat prov="human" label="Elapsed" value={clock} meta={running ? "Running" : "Paused"} />
           <Stat label="Target" value={totalTarget ? `${Math.floor(totalTarget / 60)}:${String(totalTarget % 60).padStart(2, "0")}` : "Unavailable"} unavailable={!totalTarget} meta={totalTarget ? `${visible.length} slides` : "No slide has a target time"} />
-          <Stat label="Slides timed" value={`${Object.keys(laps).length} of ${visible.length}`} />
+          <Stat prov="human" label="Slides timed" value={`${Object.keys(laps).length} of ${visible.length}`} />
           <Stat label="Over or under" value={totalTarget && totalActual ? `${totalActual - totalTarget > 0 ? "+" : ""}${totalActual - totalTarget}s` : "Unavailable"} unavailable={!totalTarget || !totalActual} />
         </StatRow>
         <Row gap={2} wrap>
@@ -1409,7 +1421,7 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
       <div className="px-presenter-main">
         <Row gap={2} wrap>
           <Pill tone="accent">Slide {position + 1} of {visible.length}</Pill>
-          <span className="px-timer">{clock}</span>
+          <span className="px-timer ds-num">{clock}</span>
           <span className="ds-grow" />
           <Button size="sm" variant={running ? "secondary" : "primary"} onClick={() => setRunning(!running)}>{running ? "Pause" : "Start timer"}</Button>
           <Button size="sm" variant="secondary" onClick={() => advance(-1)} disabled={position === 0}>Back</Button>
@@ -1419,18 +1431,18 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
         <SlideCanvas deck={editor.deck} slide={current} selectedIds={[]} onSelect={() => undefined} onTransform={() => undefined} readOnly scale={0.62} showGuides={false} />
       </div>
       <div className="px-presenter-side">
-        <Card title="Speaker notes" subtitle={current.targetSeconds ? `Target ${current.targetSeconds}s` : "No target time set"}>
+        <Card eyebrow="SPEAKER NOTES" prov="human" title="Speaker notes" subtitle={current.targetSeconds ? `Target ${current.targetSeconds}s` : "No target time set"}>
           <div className="px-notes">{current.notes.trim() || "No notes on this slide."}</div>
           <Notice tone="neutral">Private to this view. They are not on the audience display and are not in the HTML export unless you ask for them.</Notice>
         </Card>
-        <Card title="Next slide" subtitle={next ? next.title : "This is the last slide"}>
+        <Card eyebrow="NEXT" prov="human" title="Next slide" subtitle={next ? next.title : "This is the last slide"}>
           {next ? (
             <div style={{ position: "relative", aspectRatio: "16 / 9", overflow: "hidden", border: "1px solid var(--border-default)", borderRadius: "var(--radius-xs)" }}>
               <MiniSlide deck={editor.deck} slide={next} width={300} />
             </div>
           ) : <Empty title="End of the deck" />}
         </Card>
-        <Card title="Remote control" subtitle="Keyboard only">
+        <Card eyebrow="REMOTE" title="Remote control" subtitle="Keyboard only">
           <Properties rows={[
             { label: "Advance", value: "Right arrow, space or Page down" },
             { label: "Back", value: "Left arrow or Page up" },
@@ -1483,7 +1495,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
   if (tab === "Export") {
     return (
       <Grid>
-        <Card span={6} title="Export" subtitle="Deterministic renderers, run in this browser">
+        <Card span={6} eyebrow="EXPORT" title="Export" subtitle="Deterministic renderers, run in this browser">
           <Stack gap={3}>
             <Properties rows={[
               { label: "HTML", value: "One section per visible slide, absolutely positioned, with a table under every chart" },
@@ -1504,7 +1516,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
             </Notice>
           </Stack>
         </Card>
-        <Card span={6} title="Export quality" subtitle="Checked against the object graph">
+        <Card span={6} eyebrow="EXPORT" prov="human" title="Export quality" subtitle="Checked against the object graph">
           {(() => {
             const findings = reviewDeck(editor.deck);
             const bleed = findings.filter((finding) => finding.id.startsWith("bleed-"));
@@ -1538,7 +1550,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
     const active = editor.deck.exports.filter((entry) => entry.scope && !entry.revokedAt);
     return (
       <Grid>
-        <Card span={7} title="Publish" subtitle={`Status: ${record.status.replace("_", " ")}`}>
+        <Card span={7} eyebrow="PUBLISHING" prov="human" title="Publish" subtitle={`Status: ${record.status.replace("_", " ")}`}>
           <Stack gap={3}>
             {editor.deck.comments.filter((comment) => !comment.resolved).length > 0 && (
               <Notice tone="warning" title={`${editor.deck.comments.filter((comment) => !comment.resolved).length} comment${editor.deck.comments.filter((comment) => !comment.resolved).length === 1 ? " is" : "s are"} unresolved`}>
@@ -1567,7 +1579,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
             )}
           </Stack>
         </Card>
-        <Card span={5} title="Approvals" subtitle={`${editor.deck.approvals.length} recorded`}>
+        <Card span={5} eyebrow="APPROVAL" prov="posted" title="Approvals" subtitle={`${editor.deck.approvals.length} recorded`}>
           {editor.deck.approvals.length === 0 ? <Empty title="Not approved yet" /> : (
             <Stack gap={2}>
               {editor.deck.approvals.map((approval) => (
@@ -1588,7 +1600,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
   const findings = reviewDeck(editor.deck);
   return (
     <Grid>
-      <Card span={7} title="Comments" subtitle={`${editor.deck.comments.filter((comment) => !comment.resolved).length} open of ${editor.deck.comments.length}`}>
+      <Card span={7} eyebrow="REVIEW" prov="human" title="Comments" subtitle={`${editor.deck.comments.filter((comment) => !comment.resolved).length} open of ${editor.deck.comments.length}`}>
         <Stack gap={3}>
           {editor.deck.comments.map((comment) => {
             const slide = editor.deck.slides.find((item) => item.id === comment.slideId);
@@ -1622,7 +1634,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
           </Row>
         </Stack>
       </Card>
-      <Card span={5} title="Brand and readability" subtitle={`${findings.length} findings, computed from the object graph`}>
+      <Card span={5} eyebrow="REVIEW" prov="human" title="Brand and readability" subtitle={`${findings.length} findings, computed from the object graph`}>
         {findings.length === 0 ? <Notice tone="success" title="Nothing flagged">Every slide has a title, every image has alternative text and no text is under 14px.</Notice> : (
           <Stack gap={2}>
             {findings.map((finding) => (
@@ -1632,7 +1644,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
         )}
         <Notice tone="neutral" >No model is called. These are rules over the object graph, so the same deck always produces the same findings.</Notice>
       </Card>
-      <Card span={12} title="Reviewers" subtitle="From the workspace roster">
+      <Card span={12} eyebrow="ROSTER" prov="human" title="Reviewers" subtitle="From the workspace roster">
         <Row gap={2} wrap>
           {members.filter((member) => member.fields.kind === "human").slice(0, 6).map((member) => (
             <Pill key={member.id}>{member.title}</Pill>
@@ -1681,17 +1693,17 @@ function NewDeck({ context, close }: { context: ScreenContext; close: () => void
         context.navigate(`/o/${org.slug}/present/decks/${created.id}`);
       }}
     >
-      <Field label="Title" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} invalid={duplicate} required autoFocus /></Field>
+      <Field label="Title" required><TextInput aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} invalid={duplicate} required autoFocus /></Field>
       {duplicate && <Notice tone="danger" title="A deck already has that title" />}
       <Field label="Start from">
-        <Select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
+        <Select aria-label="Start from" value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
           <option value="">One title slide</option>
           {templates.map((record) => <option key={record.id} value={record.id}>{record.title}</option>)}
         </Select>
       </Field>
       {!templateId && (
         <Field label="Theme">
-          <Select value={themeId} onChange={(event) => setThemeId(event.target.value)}>
+          <Select aria-label="Theme" value={themeId} onChange={(event) => setThemeId(event.target.value)}>
             {THEMES.map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}
           </Select>
         </Field>
@@ -1749,12 +1761,12 @@ function ImportDeck({ context, close }: { context: ScreenContext; close: () => v
         context.navigate(`/o/${org.slug}/present/decks/${created.id}`);
       }}
     >
-      <Field label="Deck title" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required autoFocus /></Field>
+      <Field label="Deck title" required><TextInput aria-label="Deck title" value={title} onChange={(event) => setTitle(event.target.value)} required autoFocus /></Field>
       <Field label="Outline" required hint="One slide per blank-line-separated block. The first line of each block becomes the title.">
-        <TextArea rows={8} value={outline} onChange={(event) => setOutline(event.target.value)} placeholder={"Winter collection\nBrushed brass, six weeks\n\nThe Arc Lamp\n£900 ex VAT\nAdjustable drop"} />
+        <TextArea aria-label="Outline" rows={8} value={outline} onChange={(event) => setOutline(event.target.value)} placeholder={"Winter collection\nBrushed brass, six weeks\n\nThe Arc Lamp\n£900 ex VAT\nAdjustable drop"} />
       </Field>
       <Field label="Fonts the original asked for" hint="Comma separated. Each is recorded as substituted rather than silently replaced.">
-        <TextInput value={fonts} onChange={(event) => setFonts(event.target.value)} placeholder="Gill Sans Nova, Caslon Display" />
+        <TextInput aria-label="Fonts the original asked for" value={fonts} onChange={(event) => setFonts(event.target.value)} placeholder="Gill Sans Nova, Caslon Display" />
       </Field>
       <Notice tone="warning" title="An import discloses what it could not reproduce">
         Fonts and media that are not available here are listed on the deck, not quietly swapped.
@@ -1777,7 +1789,7 @@ function TemplatePreview({ context }: { context: ScreenContext }) {
       ]} />
       <Grid>
         {deck.slides.map((slide, index) => (
-          <Card key={slide.id} span={6} title={`${index + 1}. ${slide.title}`} subtitle={layoutById(deck, slide.layoutId).name}>
+          <Card key={slide.id} span={6} eyebrow="SLIDE" prov="human" title={`${index + 1}. ${slide.title}`} subtitle={layoutById(deck, slide.layoutId).name}>
             <div style={{ position: "relative", aspectRatio: "16 / 9", overflow: "hidden", border: "1px solid var(--border-default)", borderRadius: "var(--radius-xs)" }}>
               <MiniSlide deck={deck} slide={slide} width={300} />
             </div>
@@ -1881,16 +1893,16 @@ function ImageInsert({ context, close }: { context: ScreenContext; close: () => 
         The slide stores the asset's record id, so the asset record stays the single source and the deck does not carry a copy.
       </Notice>
       <Field label="Asset" hint={assets.length ? undefined : "No assets are in this workspace yet, so the frame will be empty."}>
-        <Select value={assetId} onChange={(event) => setAssetId(event.target.value)}>
+        <Select aria-label="Asset" value={assetId} onChange={(event) => setAssetId(event.target.value)}>
           <option value="">No asset yet</option>
           {assets.map((asset) => <option key={asset.id} value={asset.id}>{asset.title}</option>)}
         </Select>
       </Field>
       <Field label="Alternative text" required hint="Reported in the review when empty.">
-        <TextInput value={alt} onChange={(event) => setAlt(event.target.value)} required />
+        <TextInput aria-label="Alternative text" value={alt} onChange={(event) => setAlt(event.target.value)} required />
       </Field>
       <Field label="Fit">
-        <Select value={fit} onChange={(event) => setFit(event.target.value as "cover" | "contain")}>
+        <Select aria-label="Fit" value={fit} onChange={(event) => setFit(event.target.value as "cover" | "contain")}>
           <option value="cover">Cover the frame</option><option value="contain">Fit inside the frame</option>
         </Select>
       </Field>
@@ -1926,7 +1938,7 @@ function PropertiesOverlay({ context, close }: { context: ScreenContext; close: 
           { label: "Slide", value: `${editor.deck.index + 1}. ${editor.slide.title}` },
           { label: "Object", value: object?.name ?? "The whole slide" },
         ]} />
-        <Field label="Comment" required><TextArea rows={4} value={body} onChange={(event) => setBody(event.target.value)} required autoFocus /></Field>
+        <Field label="Comment" required><TextArea aria-label="Comment" rows={4} value={body} onChange={(event) => setBody(event.target.value)} required autoFocus /></Field>
       </form>
     );
   }
@@ -1954,7 +1966,7 @@ function PropertiesOverlay({ context, close }: { context: ScreenContext; close: 
         { label: "Z order", value: String(object.z) },
       ]} />
       {object.type === "text" ? (
-        <Field label="Text" required><TextArea rows={5} value={text} onChange={(event) => setText(event.target.value)} autoFocus /></Field>
+        <Field label="Text" required><TextArea aria-label="Text" rows={5} value={text} onChange={(event) => setText(event.target.value)} autoFocus /></Field>
       ) : <Notice tone="neutral">Edit this object's own properties in the inspector on the right.</Notice>}
     </form>
   );
@@ -2162,7 +2174,7 @@ function FontResolver({ context }: { context: ScreenContext }) {
       <Properties rows={[
         { label: "Heading font", value: editor.deck.theme.headingFont },
         { label: "Body font", value: editor.deck.theme.bodyFont },
-        { label: "Available locally", value: "Inter, plus the browser's generic families" },
+        { label: "Available locally", value: "IBM Plex Sans Condensed, IBM Plex Mono and Inter, plus the browser's generic families" },
         { label: "Substitutions recorded", value: String(editor.deck.theme.fontSubstitutions.length) },
       ]} />
       {editor.deck.theme.fontSubstitutions.length > 0 && (
@@ -2271,17 +2283,17 @@ function DatasetPicker({ context, close }: { context: ScreenContext; close: () =
             Linking records where the numbers come from. The numbers themselves are sent across from the workbook, with the time they were captured, so a stale slide shows as stale.
           </Notice>
           <Field label="Workbook">
-            <Select value={workbookId} onChange={(event) => { setWorkbookId(event.target.value); setSheetName(""); }}>
+            <Select aria-label="Workbook" value={workbookId} onChange={(event) => { setWorkbookId(event.target.value); setSheetName(""); }}>
               {workbooks.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
             </Select>
           </Field>
           <Field label="Sheet" required>
-            <Select value={sheetName} onChange={(event) => setSheetName(event.target.value)} required>
+            <Select aria-label="Sheet" value={sheetName} onChange={(event) => setSheetName(event.target.value)} required>
               <option value="">Choose a sheet</option>
               {sheets.map((sheet) => <option key={sheet.name} value={sheet.name}>{sheet.name}</option>)}
             </Select>
           </Field>
-          <Field label="Range" required hint="Include the header row and the label column."><TextInput value={ref} onChange={(event) => setRef(event.target.value)} required /></Field>
+          <Field label="Range" required hint="Include the header row and the label column."><TextInput aria-label="Range" value={ref} onChange={(event) => setRef(event.target.value)} required /></Field>
         </>
       )}
     </form>
@@ -2313,7 +2325,7 @@ function ChartInspector({ context, close }: { context: ScreenContext; close: () 
         close();
       }}
     >
-      <Field label="Title"><TextInput value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
+      <Field label="Title"><TextInput aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Properties rows={[
         { label: "Slide", value: found.slide.title },
         { label: "Source", value: found.object.chart.linked ? `${found.object.chart.sourceSheetName}!${found.object.chart.sourceRef}` : "Held in the slide" },
@@ -2385,7 +2397,7 @@ function MotionInspector({ context, close }: { context: ScreenContext; close: ()
         { label: "Order", value: animation ? String(animation.order) : "—" },
       ]} />
       <Field label="Effect">
-        <Select
+        <Select aria-label="Effect"
           value={animation?.effect ?? "none"}
           onChange={(event) => {
             const effect = event.target.value as ObjectAnimation["effect"];
@@ -2407,10 +2419,10 @@ function MotionInspector({ context, close }: { context: ScreenContext; close: ()
       {animation && (
         <Row gap={2} wrap>
           <Field label="Delay (ms)">
-            <TextInput inputMode="numeric" align="end" value={String(animation.delayMs)} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, [object.id], (item) => ({ ...item, animation: item.animation ? { ...item.animation, delayMs: Number(event.target.value) || 0 } : undefined })), "Delay")} />
+            <TextInput aria-label="Delay (ms)" inputMode="numeric" align="end" value={String(animation.delayMs)} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, [object.id], (item) => ({ ...item, animation: item.animation ? { ...item.animation, delayMs: Number(event.target.value) || 0 } : undefined })), "Delay")} />
           </Field>
           <Field label="Duration (ms)">
-            <TextInput inputMode="numeric" align="end" value={String(animation.durationMs)} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, [object.id], (item) => ({ ...item, animation: item.animation ? { ...item.animation, durationMs: Number(event.target.value) || 0 } : undefined })), "Duration")} />
+            <TextInput aria-label="Duration (ms)" inputMode="numeric" align="end" value={String(animation.durationMs)} onChange={(event) => editor.commitSlide(updateObjects(editor.slide, [object.id], (item) => ({ ...item, animation: item.animation ? { ...item.animation, durationMs: Number(event.target.value) || 0 } : undefined })), "Duration")} />
           </Field>
         </Row>
       )}
@@ -2429,9 +2441,9 @@ function AccessibilityReview({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Motion findings" value={String(warnings.length)} />
-        <Stat label="Click-gated objects" value={String(clickOnly.length)} meta={clickOnly.length ? "Hidden until a click" : "Nothing is click-gated"} />
-        <Stat label="Reduce motion" value={editor.deck.reduceMotion ? "On" : "Off"} />
+        <Stat prov="human" label="Motion findings" value={String(warnings.length)} />
+        <Stat prov="human" label="Click-gated objects" value={String(clickOnly.length)} meta={clickOnly.length ? "Hidden until a click" : "Nothing is click-gated"} />
+        <Stat prov="human" label="Reduce motion" value={editor.deck.reduceMotion ? "On" : "Off"} />
       </StatRow>
       <Notice tone="info" title="The test is simple: turn motion off and read the deck">
         With motion disabled every object is shown at once. If a slide only makes sense in sequence, it is relying on the animation to carry meaning, and that is reported below.
@@ -2440,7 +2452,7 @@ function AccessibilityReview({ context }: { context: ScreenContext }) {
         <Stack gap={2}>{warnings.map((warning) => <Notice key={warning.id} tone="warning">{warning.message}</Notice>)}</Stack>
       )}
       {findings.filter((finding) => finding.id.startsWith("small-") || finding.id.startsWith("alt-")).length > 0 && (
-        <Card title="Also relevant">
+        <Card eyebrow="ACCESSIBILITY" prov="human" title="Also relevant">
           <Stack gap={2}>
             {findings.filter((finding) => finding.id.startsWith("small-") || finding.id.startsWith("alt-")).map((finding) => (
               <Notice key={finding.id} tone="warning">{finding.message}</Notice>
@@ -2525,9 +2537,9 @@ function RehearsalReport({ context }: { context: ScreenContext }) {
       ) : (
         <>
           <StatRow>
-            <Stat label="Slides with a target" value={`${targets.length} of ${editor.deck.slides.length}`} />
-            <Stat label="Total target" value={`${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`} />
-            <Stat label="Longest slide" value={`${Math.max(...targets.map((slide) => slide.targetSeconds ?? 0))}s`} />
+            <Stat prov="human" label="Slides with a target" value={`${targets.length} of ${editor.deck.slides.length}`} />
+            <Stat prov="human" label="Total target" value={`${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`} />
+            <Stat prov="human" label="Longest slide" value={`${Math.max(...targets.map((slide) => slide.targetSeconds ?? 0))}s`} />
           </StatRow>
           <DataGrid
             rows={targets.map((slide, index) => ({ ...slide, id: slide.id, position: index + 1 }))}
@@ -2569,7 +2581,7 @@ function VersionComparison({ context }: { context: ScreenContext }) {
         {stored.slides.map((slide, position) => {
           const now = editor.deck.slides[position];
           return (
-            <Card key={slide.id} span={6} title={`Slide ${position + 1}`} subtitle={now && now.id === slide.id ? "Same slide" : "Changed or reordered"}>
+            <Card key={slide.id} span={6} eyebrow="COMPARE" title={`Slide ${position + 1}`} subtitle={now && now.id === slide.id ? "Same slide" : "Changed or reordered"}>
               <Row gap={2} wrap>
                 <div style={{ flex: 1, minWidth: 140 }}>
                   <span className="ds-subtle" style={{ fontSize: "var(--text-2xs)" }}>Stored</span>
@@ -2674,16 +2686,16 @@ function ApprovalOverlay({ context, close }: { context: ScreenContext; close: ()
         </Notice>
       )}
       <Field label="Reviewer" required>
-        <Select value={reviewer} onChange={(event) => setReviewer(event.target.value)} required>
+        <Select aria-label="Reviewer" value={reviewer} onChange={(event) => setReviewer(event.target.value)} required>
           {members.map((member) => <option key={member.id} value={member.title}>{member.title}</option>)}
         </Select>
       </Field>
       <Field label="Decision">
-        <Select value={decision} onChange={(event) => setDecision(event.target.value as "approved" | "changes")}>
+        <Select aria-label="Decision" value={decision} onChange={(event) => setDecision(event.target.value as "approved" | "changes")}>
           <option value="approved">Approved</option><option value="changes">Changes requested</option>
         </Select>
       </Field>
-      <Field label="Note"><TextArea rows={3} value={note} onChange={(event) => setNote(event.target.value)} /></Field>
+      <Field label="Note"><TextArea aria-label="Note" rows={3} value={note} onChange={(event) => setNote(event.target.value)} /></Field>
     </form>
   );
 }

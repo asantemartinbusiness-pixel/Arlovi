@@ -1,17 +1,19 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Database, Info, Layers, Table2 } from "lucide-react";
 import {
   BarChart, Button, DataGrid, DonutChart, Empty, Field, LineChart, Notice, Pill,
   Properties, Row, Select, Stack, Stat, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
-import { useCollections, useWorkspace } from "@/platform/workspace";
+import { useCollection, useCollections, useWorkspace } from "@/platform/workspace";
 import { freshness } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import {
-  ANALYTICS_COLLECTIONS, DIMENSIONS, FILTER_OPS_BY_TYPE, MEASURES, dimensionById,
-  formatMeasure, lineage, measureById, monthlySeries, runQuery,
-  type FilterOp, type MeasureDef, type QueryContext, type QueryFilter, type QueryResult, type QuerySpec,
+  ANALYTICS_COLLECTIONS, DIMENSIONS, FILTER_OPS_BY_TYPE, allMeasures, buildCustomMeasure,
+  dimensionById, setCustomMeasures,
+  formatMeasure, lineage, measureById, monthlySeries, provenanceFor, runQuery,
+  type FilterOp, type MeasureDef, type Provenance, type QueryContext, type QueryFilter,
+  type QueryResult, type QuerySpec,
 } from "./metrics";
 
 export type Viz = "stat" | "bar" | "line" | "donut" | "table";
@@ -24,15 +26,44 @@ export const VIZ_LABELS: Record<Viz, string> = {
   table: "Table by dimension",
 };
 
+/**
+ * Measures defined by a person in this workspace are merged into the catalogue
+ * before anything is computed, so a custom measure behaves exactly like a
+ * built-in one on every screen.
+ */
+export function useMeasureRegistry(): number {
+  const definitions = useCollection("metricDefinitions");
+  return useMemo(() => {
+    const custom = definitions
+      .filter((record) => record.status !== "retired" && record.fields.collection)
+      .map((record) => buildCustomMeasure({
+        id: String(record.fields.measureId ?? record.id),
+        name: record.title,
+        collection: String(record.fields.collection),
+        agg: (["sum", "count", "avg", "max"].includes(String(record.fields.agg)) ? String(record.fields.agg) : "sum") as "sum" | "count" | "avg" | "max",
+        field: String(record.fields.field ?? "amountMinor"),
+        statusIn: String(record.fields.statusIn ?? "").split(",").map((item) => item.trim()).filter(Boolean),
+        unit: (["money", "count", "percent", "days"].includes(String(record.fields.unit)) ? String(record.fields.unit) : "money") as "money" | "count" | "percent" | "days",
+        owner: record.ownerName,
+        version: Number(record.fields.version ?? 1),
+        description: record.summary,
+      }));
+    setCustomMeasures(custom);
+    return custom.length;
+  }, [definitions]);
+}
+
 /** All the collections the measures can read, each one an indexed query. */
 export function useAnalytics(): { records: Rec[]; context: QueryContext } {
   const data = useCollections(ANALYTICS_COLLECTIONS);
   const { now, org } = useWorkspace();
+  const customCount = useMeasureRegistry();
   return useMemo(() => {
     const records = ANALYTICS_COLLECTIONS.flatMap((name) => data[name] ?? []);
     const byId = new Map(records.map((record) => [record.id, record]));
+    void customCount;
     return { records, context: { records, byId, now, locale: org.locale } };
-  }, [data, now, org.locale]);
+  }, [data, now, org.locale, customCount]);
 }
 
 export function useQuery(spec: QuerySpec): QueryResult {
@@ -54,7 +85,7 @@ export function Figure({
   const unavailable = measure.unavailable !== undefined || value === null;
   return (
     <div>
-      <span className="an-figure" data-unavailable={unavailable ? "true" : undefined}>
+      <span className={`an-figure${unavailable ? "" : " ds-num"}`} data-unavailable={unavailable ? "true" : undefined}>
         {unavailable ? "Unavailable" : formatMeasure(measure, value, context.money)}
       </span>
       {unavailable && (
@@ -218,10 +249,11 @@ export function MeasurePicker({
   label?: string;
   includeUnavailable?: boolean;
 }) {
-  const options = MEASURES.filter((measure) => includeUnavailable || !measure.unavailable);
+  const options = allMeasures().filter((measure) => includeUnavailable || !measure.unavailable);
+  const id = useId();
   return (
-    <Field label={label} hint="Every measure names the collection it is computed from.">
-      <Select value={value} onChange={(event) => onChange(event.target.value)}>
+    <Field label={label} htmlFor={id} hint="Every measure names the collection it is computed from.">
+      <Select id={id} aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>
         {options.map((measure) => (
           <option key={measure.id} value={measure.id}>
             {measure.name} ({measure.collection}){measure.unavailable ? " — unavailable here" : ""}
@@ -233,9 +265,10 @@ export function MeasurePicker({
 }
 
 export function DimensionPicker({ value, onChange, label = "Grouped by", allowNone = true }: { value: string; onChange: (id: string) => void; label?: string; allowNone?: boolean }) {
+  const id = useId();
   return (
-    <Field label={label} hint="A dimension resolves from the record, so a record that cannot answer lands in a named catch-all.">
-      <Select value={value} onChange={(event) => onChange(event.target.value)}>
+    <Field label={label} htmlFor={id} hint="A dimension resolves from the record, so a record that cannot answer lands in a named catch-all.">
+      <Select id={id} aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>
         {allowNone && <option value="">Nothing — a single figure</option>}
         {DIMENSIONS.map((dimension) => <option key={dimension.id} value={dimension.id}>{dimension.name} ({dimension.type})</option>)}
       </Select>
@@ -266,16 +299,14 @@ export function FilterRows({
         return (
           <Row key={filter.id} gap={2} wrap className="ds-panel" style={{ padding: "var(--space-3)" }}>
             <Field label="Field">
-              <Select
-                value={filter.dimensionId}
+              <Select aria-label="Field" value={filter.dimensionId}
                 onChange={(event) => onChange(filters.map((item, position) => (position === index ? { ...item, dimensionId: event.target.value, value: "" } : item)))}
               >
                 {DIMENSIONS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </Select>
             </Field>
             <Field label="Test">
-              <Select
-                value={filter.op}
+              <Select aria-label="Test" value={filter.op}
                 onChange={(event) => onChange(filters.map((item, position) => (position === index ? { ...item, op: event.target.value as FilterOp } : item)))}
               >
                 {ops.map((op) => <option key={op} value={op}>{op}</option>)}
@@ -283,8 +314,7 @@ export function FilterRows({
             </Field>
             <Field label="Value">
               {dimension && dimension.type !== "time" ? (
-                <Select
-                  value={filter.value}
+                <Select aria-label="Value" value={filter.value}
                   onChange={(event) => onChange(filters.map((item, position) => (position === index ? { ...item, value: event.target.value } : item)))}
                 >
                   <option value="">Choose a value</option>
@@ -400,22 +430,26 @@ export function MeasureSummaryGrid({ measureIds, context, onInspect }: { measure
   const result = useMemo(() => runQuery({ measureIds, filters: [] }, queryContext), [measureIds, queryContext]);
   return (
     <>
-      {result.measures.map((measure, index) => (
-        <Stat
-          key={measure.id}
-          label={measure.name}
-          value={measure.unavailable || result.totals[index] === null ? "Unavailable" : formatMeasure(measure, result.totals[index], context.money)}
-          unavailable={Boolean(measure.unavailable) || result.totals[index] === null}
-          meta={measure.unavailable ? "No source in this workspace" : `${measure.collection} · ${result.asOf ? context.relative(result.asOf) : "age unknown"}`}
-          onClick={onInspect ? () => onInspect(measure.id) : undefined}
-        />
-      ))}
+      {result.measures.map((measure, index) => {
+        const prov = provenanceFor(measure, result.totals[index], result.asOf, context.now);
+        return (
+          <Stat
+            key={measure.id}
+            label={measure.name}
+            value={prov === "unknown" ? "Unavailable" : formatMeasure(measure, result.totals[index], context.money)}
+            unavailable={prov === "unknown"}
+            prov={prov}
+            meta={measure.unavailable ? "No source in this workspace" : `${measure.collection} · ${result.asOf ? context.relative(result.asOf) : "age unknown"}`}
+            onClick={onInspect ? () => onInspect(measure.id) : undefined}
+          />
+        );
+      })}
     </>
   );
 }
 
 export function UnavailableList({ context }: { context: ScreenContext }) {
-  const missing = MEASURES.filter((measure) => measure.unavailable);
+  const missing = allMeasures().filter((measure) => measure.unavailable);
   return (
     <Stack gap={2}>
       {missing.map((measure) => (
@@ -432,7 +466,11 @@ export function UnavailableList({ context }: { context: ScreenContext }) {
 }
 
 export function measureOptions(): MeasureDef[] {
-  return MEASURES;
+  return allMeasures();
 }
 
-export { measureById, Info, Table2 };
+export function provOf(result: QueryResult, index: number, now: Date): Provenance {
+  return provenanceFor(result.measures[index], result.totals[index], result.asOf, now);
+}
+
+export { measureById, provenanceFor, Info, Table2 };

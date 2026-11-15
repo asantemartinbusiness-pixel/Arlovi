@@ -289,10 +289,10 @@ export function LogicScreen({ context, lens }: { context: ScreenContext; lens: "
   if (lens === "Preview") {
     return (
       <Grid>
-        <Card span={6} title="Answer it" subtitle="The rules run as you type">
+        <Card span={6} eyebrow="PREVIEW" prov="human" title="Answer it" subtitle="The rules run as you type">
           <FormRuntime model={model} record={record} context={context} mode="preview" />
         </Card>
-        <Card span={6} title="What the rules decide" subtitle="Recomputed from the current answers">
+        <Card span={6} eyebrow="LOGIC" prov="posted" title="What the rules decide" subtitle="Recomputed from the current answers">
           <LogicTrace model={model} answers={answers} />
           <Notice tone="info" title="Two panels, one engine">
             The trace is the same evaluation the form on the left runs, so it cannot drift from what a person actually sees.
@@ -535,9 +535,9 @@ export function SubmissionsScreen({ context, lens }: { context: ScreenContext; l
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Submissions" value={String(children.length)} meta={`${children.filter((row) => row.status === "new").length} not yet reviewed`} />
-        <Stat label="Sensitive answers" value={String(sensitive.length)} meta={sensitive.length ? `${sensitive.join(", ")} redacted by default` : "None flagged"} />
-        <Stat label="Retention" value={`${model.settings.retentionDays} days`} meta={`${overdue.length} past the period`} onClick={() => context.openOverlay("privacy control")} />
+        <Stat prov="posted" label="Submissions" value={String(children.length)} meta={`${children.filter((row) => row.status === "new").length} not yet reviewed`} />
+        <Stat prov="posted" label="Sensitive answers" value={String(sensitive.length)} meta={sensitive.length ? `${sensitive.join(", ")} redacted by default` : "None flagged"} />
+        <Stat prov="posted" label="Retention" value={`${model.settings.retentionDays} days`} meta={`${overdue.length} past the period`} onClick={() => context.openOverlay("privacy control")} />
         <Stat label="Notification" value={model.settings.notifyEnabled ? "Wanted" : "Off"} unavailable={model.settings.notifyEnabled} meta={model.settings.notifyEnabled ? "No mail provider is connected" : "Nothing is attempted"} />
       </StatRow>
 
@@ -741,7 +741,7 @@ export function PublishScreen({ context, lens }: { context: ScreenContext; lens:
     const snippet = embedSnippet(record.id, record.title, model.theme);
     return (
       <Grid>
-        <Card span={6} title="The live form" subtitle={`Version ${model.settings.version} · a submission here writes a record`}>
+        <Card span={6} eyebrow="LIVE FORM" prov="human" title="The live form" subtitle={`Version ${model.settings.version} · a submission here writes a record`}>
           <Stack gap={3}>
             {record.status !== "live" && (
               <Notice tone="warning" title="This form is still a draft">
@@ -751,7 +751,7 @@ export function PublishScreen({ context, lens }: { context: ScreenContext; lens:
             <FormRuntime model={model} record={record} context={context} mode="live" onSubmitted={() => context.toast("Submission recorded", "It is on the submissions screen.")} />
           </Stack>
         </Card>
-        <Card span={6} title="Embed snippet" subtitle="The shape of the embed; it reaches no server"
+        <Card span={6} eyebrow="EMBED" prov="unknown" title="Embed snippet" subtitle="The shape of the embed; it reaches no server"
           footer={<>
             <Button size="sm" variant="secondary" onClick={() => { downloadFile(`${record.id}-embed.html`, snippet, "text/html"); context.toast("Snippet downloaded", "The embed snippet is in a file."); }}>Download</Button>
             <Button size="sm" variant="ghost" onClick={() => context.openOverlay("embed tester")}>Test the embed</Button>
@@ -770,7 +770,7 @@ export function PublishScreen({ context, lens }: { context: ScreenContext; lens:
   if (lens === "Access") {
     return (
       <Grid>
-        <Card span={6} title="Who can answer" subtitle="Shapes the interface; it is not an account security boundary">
+        <Card span={6} eyebrow="ACCESS" prov="human" title="Who can answer" subtitle="Shapes the interface; it is not an account security boundary">
           <Stack gap={3}>
             <Properties rows={[
               { label: "Audience", value: model.settings.access === "link" ? "Anyone with the link" : "People in this workspace" },
@@ -791,7 +791,7 @@ export function PublishScreen({ context, lens }: { context: ScreenContext; lens:
             </Notice>
           </Stack>
         </Card>
-        <Card span={6} title="Version trail" subtitle="So an old answer is readable against the form it answered">
+        <Card span={6} eyebrow="VERSIONS" prov="posted" title="Version trail" subtitle="So an old answer is readable against the form it answered">
           <Stack gap={3}>
             <Properties rows={[
               { label: "Current version", value: String(model.settings.version) },
@@ -925,13 +925,13 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
         <StatRow>
           <Stat label="Views" value="Unavailable" unavailable meta="Nothing counts an impression" onClick={() => context.openOverlay("Metric methods")} />
           <Stat label="Starts" value="Unavailable" unavailable meta="A start needs a view to compare against" />
-          <Stat label="Submissions" value={String(children.length)} meta="Records written in this workspace" />
+          <Stat prov="posted" label="Submissions" value={String(children.length)} meta="Records written in this workspace" />
           <Stat label="Completion rate" value="Unavailable" unavailable meta="A rate needs a denominator" onClick={() => context.openOverlay("Metric methods")} />
         </StatRow>
         <Notice tone="warning" title="A funnel needs a step before the submission">
           Views, starts and abandonment all require a counter on the page a person opens. Nothing is hosted and nothing is counted, so three of the four figures above are blank rather than estimated. The one that is real is the number of submissions.
         </Notice>
-        <Card title="What is measurable" subtitle="From the records themselves">
+        <Card eyebrow="MEASURED" prov="posted" title="What is measurable" subtitle="From the records themselves">
           <Properties rows={[
             { label: "Submissions", value: String(children.length) },
             { label: "Distinct versions answered", value: String(new Set(children.map((row) => String(row.fields.formVersion ?? "?"))).size) },
@@ -954,7 +954,7 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
           <Empty title="No responses yet" icon={<Inbox size={20} />}>Answer the form on its publish screen and the counts appear here.</Empty>
         ) : (
           <>
-            <Card title="Answered per question" subtitle={`Out of ${children.length} submissions`}>
+            <Card eyebrow="RESPONSES" prov="posted" title="Answered per question" subtitle={`Out of ${children.length} submissions`}>
               <BarChart
                 title="Answers per question"
                 height={Math.max(180, perField.length * 28)}
@@ -988,7 +988,7 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
         <Notice tone="warning" title="A source needs a referrer">
           Where a person came from is in the request headers of a hosted page. There is no hosted page, so no source is recorded and none is guessed.
         </Notice>
-        <Card title="What the record does know" subtitle="Everything below is read from the submission itself">
+        <Card eyebrow="MEASURED" prov="posted" title="What the record does know" subtitle="Everything below is read from the submission itself">
           <Properties rows={[
             { label: "Created by", value: children.length ? [...new Set(children.map((row) => row.createdBy))].join(", ") : "No submissions" },
             { label: "Organisation", value: context.org.name },
@@ -1012,7 +1012,7 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
       {days.length === 0 ? (
         <Empty title="Nothing to time yet" icon={<Inbox size={20} />}>Submission timestamps are the only timing signal available here.</Empty>
       ) : (
-        <Card title="Submissions by day" subtitle="From the timestamp on each record">
+        <Card eyebrow="TIMING" prov="posted" title="Submissions by day" subtitle="From the timestamp on each record">
           <BarChart
             title="Submissions by day"
             height={200}

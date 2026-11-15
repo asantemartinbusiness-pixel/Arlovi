@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { BookOpen, Gauge, Headphones, Inbox, MessageSquare, Smile, Timer, Wand2 } from "lucide-react";
+import { BookOpen, Headphones, Inbox, MessageSquare, Smile, Timer, Wand2 } from "lucide-react";
 import {
   Avatar, BarChart, Button, Card, Checkbox, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice,
   Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
@@ -11,6 +11,20 @@ import { SLA_TONE, formatMinutes, slaState, type SlaState } from "./sla";
 
 export function useCareData() {
   return useCollections(["tickets", "messages", "articles", "macros", "slas", "contacts", "employees", "members", "tasks"]);
+}
+
+/** A case reference, falling back to the prefix a title already carries. */
+export function refOf(ticket: Rec): string {
+  const field = String(ticket.fields.ref ?? "").trim();
+  if (field) return field;
+  const first = ticket.title.split(" ")[0];
+  return /^[A-Z]+-\d+$/.test(first) ? first : "";
+}
+
+/** The subject without the reference a title may repeat. */
+export function subjectOf(ticket: Rec): string {
+  const first = ticket.title.split(" ")[0];
+  return /^[A-Z]+-\d+$/.test(first) ? ticket.title.slice(first.length + 1) : ticket.title;
 }
 
 export function policyFor(ticket: Rec, policies: Rec[]): Rec | undefined {
@@ -89,7 +103,7 @@ export function ServiceOverview({ context, lens }: { context: ScreenContext; len
   if (lens === "Quality") {
     return (
       <Grid>
-        <Card span={5} title="Satisfaction" subtitle={`${rated.length} cases rated`}>
+        <Card span={5} eyebrow="CSAT" prov="human" title="Satisfaction" subtitle={`${rated.length} cases rated`}>
           {rated.length === 0 ? <Stat label="CSAT" value="Unavailable" unavailable meta="No ratings recorded" /> : (
             <Stack gap={3}>
               <Stat label="Average CSAT" value={csat.toFixed(1)} meta={`out of 5, from ${rated.length} ratings`} />
@@ -101,7 +115,7 @@ export function ServiceOverview({ context, lens }: { context: ScreenContext; len
             </Stack>
           )}
         </Card>
-        <Card span={7} title="Reopened cases" subtitle="A resolution that did not hold">
+        <Card span={7} eyebrow="QUALITY" prov="human" title="Reopened cases" subtitle="A resolution that did not hold">
           {data.tickets.filter((ticket) => ticket.fields.reopened === true).length === 0 ? (
             <Empty title="Nothing has been reopened" icon={<Smile size={20} />} />
           ) : (
@@ -138,7 +152,7 @@ export function ServiceOverview({ context, lens }: { context: ScreenContext; len
     });
     return (
       <Grid>
-        <Card span={12} title="Opened against resolved" subtitle="Counted from the ticket records">
+        <Card span={12} eyebrow="VOLUME" prov="human" title="Opened against resolved" subtitle="Counted from the ticket records">
           <BarChart
             title="Cases opened and resolved by week"
             height={220}
@@ -150,14 +164,14 @@ export function ServiceOverview({ context, lens }: { context: ScreenContext; len
             footer="A backlog forecast would need more history than this workspace holds, so none is offered."
           />
         </Card>
-        <Card span={6} title="By channel">
+        <Card span={6} eyebrow="CHANNELS" prov="human" title="By channel">
           <DonutChart
             title="Cases by channel"
             size={150}
             points={[...new Set(data.tickets.map((ticket) => String(ticket.fields.channel ?? "other")))].map((channel) => ({ label: channel, value: data.tickets.filter((ticket) => ticket.fields.channel === channel).length }))}
           />
         </Card>
-        <Card span={6} title="Handled with help from an AI employee">
+        <Card span={6} eyebrow="AI WORKFORCE" prov="agent" title="Handled with help from an AI employee">
           <Stack gap={3}>
             <Stat label="Drafted by an agent" value={String(data.tickets.filter((ticket) => ticket.fields.aiDrafted === true).length)} meta="Every one was sent by a person" />
             <Notice tone="info">A draft an agent wrote is marked on the case. Nothing was sent without somebody reading it.</Notice>
@@ -170,15 +184,17 @@ export function ServiceOverview({ context, lens }: { context: ScreenContext; len
   return (
     <Stack gap={5}>
       <StatRow>
-        <Stat label="Open cases" value={String(open.length)} meta={`${data.tickets.filter((ticket) => !ticket.fields.assignee && !["resolved", "closed"].includes(ticket.status)).length} unassigned`} onClick={() => context.navigate(`/o/${org.slug}/care/inbox`)} />
-        <Stat label="Breached" value={String(breached.length)} meta="Past the policy target" onClick={() => context.openOverlay("SLA inspector")} />
-        <Stat label="At risk" value={String(atRisk.length)} meta="Inside a quarter of the target" onClick={() => context.openOverlay("SLA inspector")} />
-        <Stat label="CSAT" value={rated.length ? csat.toFixed(1) : "Unavailable"} unavailable={rated.length === 0} meta={rated.length ? `${rated.length} ratings` : "No ratings yet"} />
+        <Stat label="Open cases" value={String(open.length)} prov="human" meta={`${data.tickets.filter((ticket) => !ticket.fields.assignee && !["resolved", "closed"].includes(ticket.status)).length} unassigned`} onClick={() => context.navigate(`/o/${org.slug}/care/inbox`)} />
+        <Stat label="Breached" value={String(breached.length)} prov="human" meta="Past the policy target" onClick={() => context.openOverlay("SLA inspector")} />
+        <Stat label="At risk" value={String(atRisk.length)} prov="human" meta="Inside a quarter of the target" onClick={() => context.openOverlay("SLA inspector")} />
+        <Stat label="CSAT" value={rated.length ? csat.toFixed(1) : "Unavailable"} prov={rated.length ? "human" : undefined} unavailable={rated.length === 0} meta={rated.length ? `${rated.length} ratings` : "No ratings yet"} />
       </StatRow>
 
       <Grid>
         <Card
           span={7}
+          eyebrow="SLA"
+          prov="human"
           title="Needing attention"
           subtitle={`${breached.length + atRisk.length} cases against the clock`}
           actions={<Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/care/inbox`)}>Open the inbox</Button>}
@@ -190,7 +206,7 @@ export function ServiceOverview({ context, lens }: { context: ScreenContext; len
               {[...breached, ...atRisk].map((ticket) => (
                 <Row key={ticket.id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
                   <div className="ds-grow">
-                    <Row gap={2}><span className="cr-item-ref">{String(ticket.fields.ref ?? "")}</span><strong>{ticket.title.replace(/^\S+\s/, "")}</strong></Row>
+                    <Row gap={2}>{refOf(ticket) && <span className="cr-item-ref">{refOf(ticket)}</span>}<strong>{subjectOf(ticket)}</strong></Row>
                     <p className="ds-subtle">{String(ticket.fields.queue ?? "")} · {String(ticket.fields.assignee || "Unassigned")}</p>
                   </div>
                   <SlaBadge state={states.get(ticket.id)!} />
@@ -201,7 +217,7 @@ export function ServiceOverview({ context, lens }: { context: ScreenContext; len
           )}
         </Card>
 
-        <Card span={5} title="Load by person" subtitle="Open cases assigned">
+        <Card span={5} eyebrow="WORKLOAD" prov="human" title="Load by person" subtitle="Open cases assigned">
           <Stack gap={2}>
             {[...new Set(open.map((ticket) => String(ticket.fields.assignee ?? "")))].filter(Boolean).map((person) => {
               const theirs = open.filter((ticket) => String(ticket.fields.assignee ?? "") === person);
@@ -224,7 +240,7 @@ export function ServiceOverview({ context, lens }: { context: ScreenContext; len
           </Stack>
         </Card>
 
-        <Card span={12} title="Where a handover to a person happened">
+        <Card span={12} eyebrow="AI WORKFORCE" prov="agent" title="Where a handover to a person happened">
           <Notice tone="info" title="Agents draft; people answer">
             {data.tickets.filter((ticket) => ticket.fields.aiDrafted === true).length} cases have a draft written by an AI employee.
             Every reply on every case in this workspace was sent by a named person, and no reply has left the browser.
@@ -254,7 +270,10 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
     return open;
   }, [data.tickets, lens, actor]);
 
-  const active = rows.find((ticket) => ticket.id === activeId) ?? rows[0];
+  /* An explicit choice survives the case leaving this filter, so answering an
+     unassigned case does not throw the reader onto a different conversation. */
+  const active = data.tickets.find((ticket) => ticket.id === activeId) ?? rows[0];
+  const outOfView = Boolean(active && activeId === active.id && !rows.some((ticket) => ticket.id === active.id));
   const conversation = active ? conversationOf(data.messages, active.id) : [];
   const contact = active ? data.contacts.find((row) => row.id === active.fields.contactId) : undefined;
 
@@ -280,6 +299,7 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
       }, { event: `First response recorded on ${String(active.fields.ref ?? "")}` });
     }
     setDraft("");
+    setActiveId(active.id);
     context.toast(internal ? "Note added" : "Reply recorded", internal ? "It is on the case and not visible to the customer." : "It is on the case. No mail provider is connected, so nothing left this browser.");
   }
 
@@ -297,15 +317,15 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
                 className="cr-item"
                 aria-selected={ticket.id === active?.id}
                 aria-current={ticket.id === active?.id ? "true" : undefined}
-                onClick={() => setActiveId(ticket.id)}
+                onClick={() => { setActiveId(ticket.id); context.select(ticket.id); }}
               >
                 <span className="cr-item-top">
-                  <span className="cr-item-ref">{String(ticket.fields.ref ?? "")}</span>
+                  {refOf(ticket) && <span className="cr-item-ref">{refOf(ticket)}</span>}
                   <Pill tone={PRIORITY_TONE[String(ticket.fields.priority ?? "normal")] ?? "neutral"}>{String(ticket.fields.priority ?? "")}</Pill>
                   <span className="ds-grow" />
                   <span className="ds-subtle">{String(ticket.fields.channel ?? "")}</span>
                 </span>
-                <span className="cr-item-subject">{ticket.title.replace(/^\S+\s/, "")}</span>
+                <span className="cr-item-subject">{subjectOf(ticket)}</span>
                 <SlaBadge state={state} />
               </button>
             );
@@ -327,8 +347,15 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
 
             <Row gap={3} wrap>
               <SlaBadge state={slaState(active, policyFor(active, data.slas), now)} />
-              <span className="ds-subtle">{String(active.fields.queue ?? "")} · {String(active.fields.assignee || "Unassigned")} · opened {context.relative(active.at)}</span>
+              <span className="ds-subtle">{[String(active.fields.queue ?? ""), String(active.fields.assignee || "Unassigned"), `opened ${context.relative(active.at)}`].filter(Boolean).join(" · ")}</span>
             </Row>
+
+            {outOfView && (
+              <Notice tone="info" title={`This case is no longer in ${lens}`}>
+                Answering it put it in {String(active.fields.assignee ?? "somebody")}&rsquo;s queue. It stays open here until you
+                choose another case, so the conversation does not disappear mid-sentence.
+              </Notice>
+            )}
 
             <div className="cr-conv">
               {conversation.map((message) => (
@@ -406,8 +433,8 @@ export function TicketList({ context, lens }: { context: ScreenContext; lens: "A
         return state.status === "breached" ? "danger" : state.status === "at_risk" ? "warning" : undefined;
       }}
       columns={[
-        { key: "ref", header: "Case", cell: (row) => <span className="cr-item-ref">{String(row.fields.ref ?? "")}</span>, sortValue: (row) => String(row.fields.ref ?? ""), width: "88px" },
-        { key: "subject", header: "Subject", primary: true, cell: (row) => row.title.replace(/^\S+\s/, ""), sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
+        { key: "ref", header: "Case", cell: (row) => <span className="cr-item-ref">{refOf(row) || "—"}</span>, sortValue: (row) => refOf(row), width: "88px" },
+        { key: "subject", header: "Subject", primary: true, cell: (row) => row.title.replace(/^[A-Z]+-\d+\s/, ""), sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
         { key: "priority", header: "Priority", cell: (row) => <Pill tone={PRIORITY_TONE[String(row.fields.priority ?? "normal")] ?? "neutral"} dot>{String(row.fields.priority ?? "")}</Pill>, sortValue: (row) => String(row.fields.priority ?? "") },
         { key: "channel", header: "Channel", cell: (row) => String(row.fields.channel ?? ""), hideBelow: 1100 },
         { key: "owner", header: "Owner", cell: (row) => String(row.fields.assignee || "Unassigned"), sortValue: (row) => String(row.fields.assignee ?? "~"), hideBelow: 900, filterValue: (row) => String(row.fields.assignee ?? "") },
@@ -525,29 +552,29 @@ export function TicketDetail({ context, lens }: { context: ScreenContext; lens: 
 
   return (
     <Grid>
-      <Card span={7} title={ticket.title} subtitle={`${String(ticket.fields.queue ?? "")} · opened ${context.relative(ticket.at)}`} actions={<Pill tone={PRIORITY_TONE[String(ticket.fields.priority ?? "normal")] ?? "neutral"} dot>{String(ticket.fields.priority ?? "")}</Pill>}>
+      <Card span={7} eyebrow="CASE" prov="human" title={ticket.title} subtitle={[String(ticket.fields.queue ?? ""), `opened ${context.relative(ticket.at)}`].filter(Boolean).join(" · ")} actions={<Pill tone={PRIORITY_TONE[String(ticket.fields.priority ?? "normal")] ?? "neutral"} dot>{String(ticket.fields.priority ?? "")}</Pill>}>
         <Stack gap={3}>
           <p>{ticket.summary}</p>
           <Properties rows={[
             { label: "Owner", value: String(ticket.fields.assignee || "Unassigned") },
-            { label: "Channel", value: String(ticket.fields.channel ?? "") },
+            { label: "Channel", value: String(ticket.fields.channel ?? "") || "Not recorded" },
             { label: "Status", value: ticket.status },
             { label: "Satisfaction", value: Number(ticket.fields.csat ?? 0) > 0 ? `${String(ticket.fields.csat)} of 5` : "Not rated" },
           ]} />
         </Stack>
       </Card>
-      <Card span={5} title="Against the clock" subtitle={policyFor(ticket, data.slas)?.title ?? "No policy matched"}>
+      <Card span={5} eyebrow="SLA" prov="human" title="Against the clock" subtitle={policyFor(ticket, data.slas)?.title ?? "No policy matched"}>
         <Stack gap={3}>
           <SlaBadge state={state} />
           <Properties rows={[
-            { label: "Target", value: state.targetMinutes ? formatMinutes(state.targetMinutes) : "Unavailable" },
-            { label: "Used", value: formatMinutes(state.usedMinutes) },
+            { label: "Target", value: <span className="ds-num">{state.targetMinutes ? formatMinutes(state.targetMinutes) : "Unavailable"}</span> },
+            { label: "Used", value: <span className="ds-num">{formatMinutes(state.usedMinutes)}</span> },
             { label: "Counted in", value: String(policyFor(ticket, data.slas)?.fields.businessHours ?? "business hours") },
             { label: "Paused while waiting", value: policyFor(ticket, data.slas)?.fields.pauseWhileWaiting === true ? "Yes" : "No" },
           ]} />
         </Stack>
       </Card>
-      <Card span={6} title="Customer" subtitle={contact ? String(contact.fields.company ?? "Retail customer") : "No contact linked"}>
+      <Card span={6} eyebrow="CUSTOMER" prov="human" title="Customer" subtitle={contact ? String(contact.fields.company ?? "Retail customer") : "No contact linked"}>
         {contact ? (
           <Stack gap={3}>
             <Row gap={3}><Avatar name={contact.title} size="lg" /><div><strong>{contact.title}</strong><p className="ds-subtle">{String(contact.fields.email ?? "")}</p></div></Row>
@@ -555,7 +582,7 @@ export function TicketDetail({ context, lens }: { context: ScreenContext; lens: 
           </Stack>
         ) : <span className="ds-subtle">No contact record is linked to this case.</span>}
       </Card>
-      <Card span={6} title="Resolution">
+      <Card span={6} eyebrow="RESOLUTION" prov="human" title="Resolution">
         {ticket.fields.resolvedAt ? (
           <Stack gap={3}>
             <Properties rows={[
@@ -605,8 +632,8 @@ export function CustomerContext({ context, lens }: { context: ScreenContext; len
         rowId={(row) => row.id}
         label="Cases"
         columns={[
-          { key: "ref", header: "Case", cell: (row) => String(row.fields.ref ?? ""), width: "88px" },
-          { key: "subject", header: "Subject", primary: true, cell: (row) => row.title.replace(/^\S+\s/, ""), filterValue: (row) => row.title },
+          { key: "ref", header: "Case", cell: (row) => <span className="ds-num">{refOf(row) || "—"}</span>, width: "88px" },
+          { key: "subject", header: "Subject", primary: true, cell: (row) => row.title.replace(/^[A-Z]+-\d+\s/, ""), filterValue: (row) => row.title },
           { key: "status", header: "Status", cell: (row) => <Pill>{row.status}</Pill> },
           { key: "csat", header: "Rating", align: "end", cell: (row) => (Number(row.fields.csat ?? 0) > 0 ? `${String(row.fields.csat)}/5` : "—") },
         ]}
@@ -646,15 +673,15 @@ export function CustomerContext({ context, lens }: { context: ScreenContext; len
 
   return (
     <Grid>
-      <Card span={5} title={<Row gap={3}><Avatar name={contact.title} size="lg" />{contact.title}</Row>} subtitle={String(contact.fields.company ?? "Retail customer")}>
+      <Card span={5} eyebrow="CUSTOMER" prov="human" title={<Row gap={3}><Avatar name={contact.title} size="lg" />{contact.title}</Row>} subtitle={String(contact.fields.company ?? "Retail customer")}>
         <Properties rows={[
           { label: "Email", value: String(contact.fields.email ?? "") },
           { label: "Phone", value: <span className="ds-subtle">{String(contact.fields.phone ?? "Not shared")}</span> },
           { label: "Kind", value: String(contact.fields.kind ?? "") },
-          { label: "Customer since", value: context.date(contact.at) },
+          { label: "Customer since", value: <span className="ds-num">{context.date(contact.at)}</span> },
         ]} />
       </Card>
-      <Card span={7} title="Consent and preferences" subtitle="What the customer agreed to">
+      <Card span={7} eyebrow="CONSENT" prov="human" title="Consent and preferences" subtitle="What the customer agreed to">
         <Stack gap={3}>
           <Properties rows={[
             { label: "Marketing", value: String(contact.fields.consent ?? "Not recorded") },
@@ -668,12 +695,12 @@ export function CustomerContext({ context, lens }: { context: ScreenContext; len
           )}
         </Stack>
       </Card>
-      <Card span={12} title="Case history" subtitle={`${cases.length} cases`}>
+      <Card span={12} eyebrow="HISTORY" prov="posted" title="Case history" subtitle={`${cases.length} cases`}>
         <Stack gap={2}>
           {cases.map((ticket) => (
             <Row key={ticket.id} gap={2}>
               <span className="cr-item-ref">{String(ticket.fields.ref ?? "")}</span>
-              <span className="ds-grow ds-truncate">{ticket.title.replace(/^\S+\s/, "")}</span>
+              <span className="ds-grow ds-truncate">{ticket.title.replace(/^[A-Z]+-\d+\s/, "")}</span>
               <Pill tone={ticket.status === "closed" || ticket.status === "resolved" ? "success" : "neutral"}>{ticket.status}</Pill>
             </Row>
           ))}
@@ -846,8 +873,8 @@ export function Slas({ context, lens }: { context: ScreenContext; lens: "Policie
         label="Breached cases"
         rowTone={() => "danger"}
         columns={[
-          { key: "ref", header: "Case", cell: (row) => String(row.fields.ref ?? ""), width: "88px" },
-          { key: "subject", header: "Subject", primary: true, cell: (row) => row.title.replace(/^\S+\s/, ""), filterValue: (row) => row.title },
+          { key: "ref", header: "Case", cell: (row) => <span className="ds-num">{refOf(row) || "—"}</span>, width: "88px" },
+          { key: "subject", header: "Subject", primary: true, cell: (row) => row.title.replace(/^[A-Z]+-\d+\s/, ""), filterValue: (row) => row.title },
           { key: "owner", header: "Owner", cell: (row) => String(row.fields.assignee || "Unassigned") },
           { key: "over", header: "Over by", align: "end", cell: (row) => <span className="ds-num">{formatMinutes(slaState(row, policyFor(row, data.slas), now).remainingMinutes)}</span> },
         ]}
@@ -881,17 +908,17 @@ export function Slas({ context, lens }: { context: ScreenContext; lens: "Policie
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Resolved cases" value={String(resolved.length)} />
-          <Stat label="Inside target" value={String(met.length)} meta={`${Math.round((met.length / Math.max(1, resolved.length)) * 100)}% of resolved cases`} />
-          <Stat label="Outside target" value={String(resolved.length - met.length)} />
+          <Stat label="Resolved cases" value={String(resolved.length)} prov="human" />
+          <Stat label="Inside target" value={String(met.length)} prov="human" meta={`${Math.round((met.length / Math.max(1, resolved.length)) * 100)}% of resolved cases`} />
+          <Stat label="Outside target" value={String(resolved.length - met.length)} prov="human" />
         </StatRow>
         <DataGrid
           rows={resolved}
           rowId={(row) => row.id}
           label="Resolution history"
           columns={[
-            { key: "ref", header: "Case", cell: (row) => String(row.fields.ref ?? ""), width: "88px" },
-            { key: "subject", header: "Subject", primary: true, cell: (row) => row.title.replace(/^\S+\s/, ""), filterValue: (row) => row.title },
+            { key: "ref", header: "Case", cell: (row) => <span className="ds-num">{refOf(row) || "—"}</span>, width: "88px" },
+            { key: "subject", header: "Subject", primary: true, cell: (row) => row.title.replace(/^[A-Z]+-\d+\s/, ""), filterValue: (row) => row.title },
             { key: "resolved", header: "Resolved", cell: (row) => context.date(String(row.fields.resolvedAt ?? "")), sortValue: (row) => String(row.fields.resolvedAt ?? "") },
             { key: "result", header: "Against target", align: "end", cell: (row) => {
               const state = slaState(row, policyFor(row, data.slas), now);
@@ -922,11 +949,11 @@ export function Slas({ context, lens }: { context: ScreenContext; lens: "Policie
           >
             <Properties rows={[
               { label: "Priority", value: String(policy.fields.priority ?? "") },
-              { label: "First response", value: `${String(policy.fields.firstResponseHours ?? 0)} business hours` },
-              { label: "Resolution", value: `${String(policy.fields.resolutionHours ?? 0)} business hours` },
+              { label: "First response", value: <span className="ds-num">{String(policy.fields.firstResponseHours ?? 0)} business hours</span> },
+              { label: "Resolution", value: <span className="ds-num">{String(policy.fields.resolutionHours ?? 0)} business hours</span> },
               { label: "Counted in", value: String(policy.fields.businessHours ?? "") },
               { label: "Pauses while waiting", value: policy.fields.pauseWhileWaiting === true ? "Yes" : "No" },
-              { label: "Breached now", value: String(breached.length) },
+              { label: "Breached now", value: <span className="ds-num">{String(breached.length)}</span> },
             ]} />
           </Card>
         );
@@ -959,8 +986,8 @@ export function Quality({ context, lens }: { context: ScreenContext; lens: "Surv
           label="Cases sampled for audit"
           filterable={false}
           columns={[
-            { key: "ref", header: "Case", cell: (row) => String(row.fields.ref ?? ""), width: "88px" },
-            { key: "subject", header: "Subject", primary: true, cell: (row) => row.title.replace(/^\S+\s/, "") },
+            { key: "ref", header: "Case", cell: (row) => <span className="ds-num">{refOf(row) || "—"}</span>, width: "88px" },
+            { key: "subject", header: "Subject", primary: true, cell: (row) => row.title.replace(/^[A-Z]+-\d+\s/, "") },
             { key: "owner", header: "Handled by", cell: (row) => String(row.fields.assignee || "Unassigned") },
             { key: "csat", header: "Customer rating", align: "end", cell: (row) => (Number(row.fields.csat ?? 0) > 0 ? `${String(row.fields.csat)}/5` : "Not rated") },
           ]}
@@ -1030,7 +1057,7 @@ export function Quality({ context, lens }: { context: ScreenContext; lens: "Surv
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Responses" value={String(rated.length)} meta={`of ${data.tickets.filter((ticket) => ["resolved", "closed"].includes(ticket.status)).length} closed cases`} />
+        <Stat label="Responses" value={String(rated.length)} prov="human" meta={`of ${data.tickets.filter((ticket) => ["resolved", "closed"].includes(ticket.status)).length} closed cases`} />
         <Stat label="Average" value={rated.length ? (rated.reduce((sum, ticket) => sum + Number(ticket.fields.csat ?? 0), 0) / rated.length).toFixed(1) : "Unavailable"} unavailable={rated.length === 0} meta="out of 5" />
         <Stat label="Survey delivery" value="Not connected" unavailable meta="A request is recorded, not emailed" />
       </StatRow>
@@ -1039,8 +1066,8 @@ export function Quality({ context, lens }: { context: ScreenContext; lens: "Surv
         rowId={(row) => row.id}
         label="Survey responses"
         columns={[
-          { key: "ref", header: "Case", cell: (row) => String(row.fields.ref ?? ""), width: "88px" },
-          { key: "subject", header: "Subject", primary: true, cell: (row) => row.title.replace(/^\S+\s/, ""), filterValue: (row) => row.title },
+          { key: "ref", header: "Case", cell: (row) => <span className="ds-num">{refOf(row) || "—"}</span>, width: "88px" },
+          { key: "subject", header: "Subject", primary: true, cell: (row) => row.title.replace(/^[A-Z]+-\d+\s/, ""), filterValue: (row) => row.title },
           { key: "owner", header: "Handled by", cell: (row) => String(row.fields.assignee || "Unassigned"), hideBelow: 900 },
           { key: "score", header: "Rating", align: "end", cell: (row) => <Pill tone={Number(row.fields.csat) >= 4 ? "success" : Number(row.fields.csat) >= 3 ? "neutral" : "warning"}>{String(row.fields.csat)}/5</Pill>, sortValue: (row) => Number(row.fields.csat ?? 0) },
         ]}
@@ -1169,7 +1196,7 @@ export function CustomerInspector({ context }: { context: ScreenContext }) {
         { label: "Email", value: String(contact.fields.email ?? "") },
         { label: "Phone", value: String(contact.fields.phone ?? "Not shared") },
         { label: "Identity", value: contact.fields.verifiedIdentity === true ? <Pill tone="success">Verified</Pill> : <Pill tone="warning">Not verified</Pill> },
-        { label: "Cases", value: String(cases.length) },
+        { label: "Cases", value: <span className="ds-num">{String(cases.length)}</span> },
         { label: "Consent", value: String(contact.fields.consent ?? "") },
       ]} />
       <Notice tone="info" title="Only what this case needs">
@@ -1327,7 +1354,7 @@ export function SlaInspector({ context }: { context: ScreenContext }) {
         <div key={row.ticket.id} className="ds-panel" style={{ padding: "var(--space-3)" }}>
           <Row gap={2}>
             <span className="cr-item-ref">{String(row.ticket.fields.ref ?? "")}</span>
-            <strong className="ds-grow ds-truncate">{row.ticket.title.replace(/^\S+\s/, "")}</strong>
+            <strong className="ds-grow ds-truncate">{row.ticket.title.replace(/^[A-Z]+-\d+\s/, "")}</strong>
             <SlaBadge state={row.state} />
           </Row>
           <p className="ds-subtle">

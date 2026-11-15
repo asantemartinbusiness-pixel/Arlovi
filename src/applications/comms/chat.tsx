@@ -99,6 +99,10 @@ export function Conversation({
   );
   const repliesOf = (id: string) => messages.filter((message) => message.fields.threadRootId === id).sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
 
+  const declared = Number(channel.fields.memberCount ?? 0);
+  const listed = String(channel.fields.members ?? "").split(",").filter(Boolean).length;
+  const memberCount = declared > 0 ? declared : listed > 0 ? listed : null;
+
   async function toggleReaction(message: Rec, emoji: string) {
     const reactions = parseReactions(message.fields.reactions);
     const names = reactions[emoji] ?? [];
@@ -209,7 +213,11 @@ export function Conversation({
         </strong>
         <Pill tone={channel.fields.visibility === "private" ? "warning" : "neutral"} dot>{String(channel.fields.visibility ?? "public")}</Pill>
         <span className="ds-subtle ds-grow">{channel.summary}</span>
-        <span className="ds-subtle">{String(channel.fields.memberCount ?? 0)} members</span>
+        <span className="ds-subtle">
+          {memberCount === null
+            ? "Membership not recorded"
+            : <><span className="ds-num">{memberCount}</span> {memberCount === 1 ? "member" : "members"}</>}
+        </span>
       </Row>
 
       {channel.fields.visibility === "private" && (

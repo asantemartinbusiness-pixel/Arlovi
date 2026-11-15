@@ -2,8 +2,8 @@ import { CalendarDays, Images, LayoutTemplate, Mail, Megaphone, MousePointerClic
 import { Empty, Notice, Pill, Properties, Row, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useRecord } from "@/platform/workspace";
-import { submitFooter } from "@/applications/growth/kit";
-import "@/applications/growth/growth.css";
+import { submitFooter } from "@/applications/market/kit";
+import "@/applications/market/growth.css";
 import { bodyOf, type CampaignBody } from "./data";
 import {
   Advertising, Attribution, AudienceSegments, CampaignDetail, CampaignLibrary, ContentCalendar,

@@ -238,8 +238,59 @@ export const MEASURES: MeasureDef[] = [
   },
 ];
 
+/**
+ * Measures a person defined in this workspace, merged into the catalogue.
+ * A custom measure is still computed the same way: a collection, an
+ * aggregation, a field and an optional status list, all read from records.
+ */
+let CUSTOM: MeasureDef[] = [];
+
+export function setCustomMeasures(defs: MeasureDef[]): void {
+  CUSTOM = defs;
+}
+
+export function allMeasures(): MeasureDef[] {
+  return [...MEASURES, ...CUSTOM];
+}
+
 export function measureById(id: string): MeasureDef | undefined {
-  return MEASURES.find((measure) => measure.id === id);
+  return allMeasures().find((measure) => measure.id === id);
+}
+
+export interface CustomMeasureInput {
+  id: string;
+  name: string;
+  collection: string;
+  agg: "sum" | "count" | "avg" | "max";
+  field: string;
+  statusIn: string[];
+  unit: Unit;
+  owner: string;
+  version: number;
+  description: string;
+}
+
+export function buildCustomMeasure(input: CustomMeasureInput): MeasureDef {
+  const statuses = input.statusIn.filter(Boolean).map((status) => status.trim().toLowerCase());
+  const formula = `${input.agg}(${input.collection}.${input.field})${statuses.length ? ` where status in (${statuses.join(", ")})` : ""}`;
+  return {
+    id: input.id,
+    name: input.name,
+    unit: input.unit,
+    collection: input.collection,
+    owner: input.owner,
+    version: input.version,
+    formula,
+    description: input.description || `Defined in this workspace: ${formula}.`,
+    agg: input.agg,
+    filter: (record) => record.collection === input.collection && (statuses.length === 0 || statuses.includes(record.status.toLowerCase())),
+    value: (record) => {
+      if (input.field === "count") return 1;
+      if (input.field === "amountMinor") return record.amountMinor ?? 0;
+      const raw = record.fields[input.field];
+      return typeof raw === "number" ? raw : Number(raw ?? 0);
+    },
+  };
 }
 
 /* ------------------------------ dimensions ------------------------------ */
@@ -409,7 +460,9 @@ export function runQuery(spec: QuerySpec, context: QueryContext): QueryResult {
 
   const totals = measures.map((measure) => aggregate(measure, filtered, scopedContext));
   const allContributing = measures.flatMap((measure) => contributing(measure, filtered, scopedContext));
-  const timestamps = allContributing.map((record) => record.updatedAt ?? record.at ?? record.createdAt).filter(Boolean).sort();
+  /* The record's own date, not the moment it was last touched: a figure's age
+     is the age of the newest business event behind it. */
+  const timestamps = allContributing.map((record) => record.at ?? record.updatedAt ?? record.createdAt).filter(Boolean).sort();
   const asOf = timestamps.at(-1);
   const ageDays = asOf ? Math.max(0, Math.floor((context.now.getTime() - new Date(asOf).getTime()) / 86_400_000)) : undefined;
 
@@ -688,4 +741,30 @@ export function joinCheck(fromCollection: string, toCollection: string, key: str
     maxFanOut, fanOut: maxFanOut > 1,
     sumBefore, sumAfter,
   };
+}
+
+/* ------------------------------ provenance ------------------------------ */
+
+export type Provenance = "posted" | "human" | "agent" | "unknown";
+
+const POSTED_COLLECTIONS = ["invoices", "journals", "bills", "expenses", "orders", "payrollRuns"];
+
+/**
+ * Where a figure came from, decided from the records that produced it:
+ * a money record already in the books is posted, anything else a person in the
+ * workspace entered is human, and a figure with no source or one too old to
+ * trust is unknown. Provenance never carries status.
+ */
+export function provenanceFor(
+  measure: MeasureDef | undefined,
+  total: number | null | undefined,
+  asOf: string | undefined,
+  now: Date,
+  staleAfterDays = 45,
+): Provenance {
+  if (!measure || measure.unavailable || total === null || total === undefined) return "unknown";
+  if (!asOf) return "unknown";
+  const age = (now.getTime() - new Date(asOf).getTime()) / 86_400_000;
+  if (!Number.isFinite(age) || age > staleAfterDays) return "unknown";
+  return POSTED_COLLECTIONS.includes(measure.collection) ? "posted" : "human";
 }

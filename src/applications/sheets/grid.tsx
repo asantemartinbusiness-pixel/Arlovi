@@ -251,6 +251,10 @@ export function SheetGrid({
     if (isActive) classes.push("sx-active");
     if (result?.error) classes.push("sx-error");
     if (result?.formula) classes.push("sx-formula");
+    // A figure, a date serial or an error code is data: it takes the mono face.
+    const numeric = typeof result?.value === "number" || Boolean(result?.error)
+      || (typeof result?.value === "string" && result.value.trim() !== "" && !Number.isNaN(Number(result.value)));
+    if (numeric) classes.push("ds-num");
     if (highlighted?.has(address)) classes.push("sx-precedent");
     if (protectedAddresses?.has(address)) classes.push("sx-protected");
     const borders = style?.border ?? [];
@@ -270,7 +274,7 @@ export function SheetGrid({
           top: (row - offsetY / ROW_H) * ROW_H - (offsetY % ROW_H),
           width: columnWidth(sheet, col),
           height: ROW_H,
-          textAlign: style?.align === "end" ? "right" : style?.align === "center" ? "center" : (typeof result?.value === "number" ? "right" : "left"),
+          textAlign: style?.align === "end" ? "right" : style?.align === "center" ? "center" : (numeric && !result?.error ? "right" : "left"),
           fontWeight: style?.bold ? 600 : undefined,
           fontStyle: style?.italic ? "italic" : undefined,
           background: style?.fill,
@@ -428,7 +432,7 @@ export function SheetGrid({
       {editing && (
         <input
           ref={inputRef}
-          className="sx-editor"
+          className="sx-editor ds-num"
           aria-label={`Edit ${cellAddress(editing.col, editing.row)}`}
           value={editing.value}
           style={{ left: editingLeft, top: editingTop, width: columnWidth(sheet, editing.col), height: ROW_H }}

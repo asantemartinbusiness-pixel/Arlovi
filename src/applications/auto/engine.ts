@@ -414,7 +414,11 @@ export function evaluateCondition(
     return { value, left, detail: `${leftText} ${value ? "contains" : "does not contain"} ${right}` };
   }
   if (op === "eq" || op === "neq") {
-    const same = String(left ?? "") === right || toNumber(left) === toNumber(right);
+    const leftNumber = toNumber(left);
+    const rightNumber = toNumber(right);
+    const same = leftNumber !== undefined && rightNumber !== undefined
+      ? leftNumber === rightNumber
+      : String(left ?? "").toLowerCase() === right.toLowerCase();
     const value = op === "eq" ? same : !same;
     return { value, left, detail: `${leftText} ${op === "eq" ? "=" : "≠"} ${right} → ${value}` };
   }

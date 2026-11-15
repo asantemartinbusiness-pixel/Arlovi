@@ -213,6 +213,10 @@ export { downloadFile };
 
 /* ------------------------- Misc ------------------------- */
 
+export function plural(count: number, noun: string, plural?: string): string {
+  return `${count} ${count === 1 ? noun : plural ?? `${noun}s`}`;
+}
+
 export function slugify(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "untitled";
 }

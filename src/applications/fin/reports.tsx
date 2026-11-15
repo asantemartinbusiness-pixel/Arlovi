@@ -50,7 +50,7 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
           options={(Object.keys(STATEMENT_LABEL) as Statement[]).map((key) => ({ value: key, label: STATEMENT_LABEL[key] }))}
         />
         <Field label="Period">
-          <Select value={period} onChange={(event) => setPeriod(event.target.value)}>
+          <Select aria-label="Period" value={period} onChange={(event) => setPeriod(event.target.value)}>
             <option value="all">Since the first posting</option>
             {data.periods.map((item) => <option key={item} value={item}>{periodLabel(item, org.locale)}</option>)}
           </Select>
@@ -75,7 +75,7 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
 
       {statement === "pl" && (
         <Grid>
-          <Card span={7} title="Profit and loss" subtitle={period === "all" ? "Since the first posting" : periodLabel(period, org.locale)}>
+          <Card prov="posted" eyebrow="P&L" span={7} title="Profit and loss" subtitle={period === "all" ? "Since the first posting" : periodLabel(period, org.locale)}>
             <StatementRow
               context={context}
               rows={[
@@ -89,7 +89,7 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
               ]}
             />
           </Card>
-          <Card span={5} title="Revenue and cost by month" subtitle="Six months of posted movement">
+          <Card prov="posted" span={5} title="Revenue and cost by month" subtitle="Six months of posted movement">
             <BarChart
               title="Revenue and expense by month"
               height={240}
@@ -105,7 +105,7 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
 
       {statement === "bs" && (
         <Grid>
-          <Card span={6} title="Balance sheet" subtitle={`At ${context.date(now)}, cumulative`}>
+          <Card prov="posted" eyebrow="BALANCE SHEET" span={6} title="Balance sheet" subtitle={`At ${context.date(now)}, cumulative`}>
             <StatementRow
               context={context}
               rows={[
@@ -120,7 +120,7 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
               ]}
             />
           </Card>
-          <Card span={6} title="Does it tie?" subtitle="Assets against liabilities plus equity plus the result">
+          <Card prov="posted" span={6} title="Does it tie?" subtitle="Assets against liabilities plus equity plus the result">
             <Stack gap={3}>
               <StatementRow
                 context={context}
@@ -141,7 +141,7 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
 
       {statement === "cf" && (
         <Grid>
-          <Card span={6} title="Cash flow" subtitle={period === "all" ? "Since the first posting" : periodLabel(period, org.locale)}>
+          <Card prov="posted" eyebrow="CASH FLOW" span={6} title="Cash flow" subtitle={period === "all" ? "Since the first posting" : periodLabel(period, org.locale)}>
             <StatementRow
               context={context}
               rows={[
@@ -154,7 +154,7 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
               ]}
             />
           </Card>
-          <Card span={6} title="Movements by counterpart" subtitle="Each row is a posted journal's other side" flush>
+          <Card prov="posted" span={6} title="Movements by counterpart" subtitle="Each row is a posted journal's other side" flush>
             <DataGrid
               rows={flow.rows}
               rowId={(row) => `${row.activity}-${row.label}`}
@@ -194,13 +194,13 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
 
       {statement === "aged" && (
         <Grid>
-          <Card span={5} title="Receivables ageing" subtitle={`${open.length} open invoices at ${context.date(now)}`}>
+          <Card prov="posted" span={5} title="Receivables ageing" subtitle={`${open.length} open invoices at ${context.date(now)}`}>
             <StatementRow
               context={context}
               rows={ageBuckets(open, now).map((bucket) => ({ label: bucket.bucket, minor: bucket.amountMinor, note: `${bucket.count} invoice${bucket.count === 1 ? "" : "s"}` }))}
             />
           </Card>
-          <Card span={7} title="Open invoices" flush>
+          <Card prov="posted" span={7} title="Open invoices" flush>
             <DataGrid
               rows={open}
               rowId={(row) => row.id}
@@ -244,10 +244,10 @@ export function ManagementTab({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Months with postings" value={String(withActivity.length)} meta={`of the last ${months.length}`} />
+        <Stat prov="posted" label="Months with postings" value={String(withActivity.length)} meta={`of the last ${months.length}`} />
         <Stat label="Average monthly revenue" value={withActivity.length ? context.money(Math.round(withActivity.reduce((sum, row) => sum + row.revenue, 0) / withActivity.length)) : "Unavailable"} unavailable={withActivity.length === 0} meta="Months with no posting are excluded, not counted as zero" />
         <Stat label="Average gross margin" value={withActivity.some((row) => row.revenue) ? `${Math.round((withActivity.reduce((sum, row) => sum + (row.revenue - row.cost), 0) / Math.max(1, withActivity.reduce((sum, row) => sum + row.revenue, 0))) * 100)}%` : "Unavailable"} unavailable={!withActivity.some((row) => row.revenue)} />
-        <Stat label="Posted journals" value={String(data.postedCount)} />
+        <Stat prov="posted" label="Posted journals" value={String(data.postedCount)} />
       </StatRow>
       <DataGrid
         rows={series}
@@ -283,7 +283,7 @@ export function CustomReportTab({ context }: { context: ScreenContext }) {
 
   return (
     <Stack gap={4}>
-      <Card title="Build a report" subtitle="Choose the account types, the period and a floor">
+      <Card eyebrow="BUILDER" title="Build a report" subtitle="Choose the account types, the period and a floor">
         <Row gap={4} wrap>
           <Stack gap={2}>
             <span className="ds-stat-label">Account types</span>
@@ -299,13 +299,13 @@ export function CustomReportTab({ context }: { context: ScreenContext }) {
             </Row>
           </Stack>
           <Field label="Period">
-            <Select value={period} onChange={(event) => setPeriod(event.target.value)}>
+            <Select aria-label="Period" value={period} onChange={(event) => setPeriod(event.target.value)}>
               <option value="all">Since the first posting</option>
               {data.periods.map((item) => <option key={item} value={item}>{periodLabel(item, org.locale)}</option>)}
             </Select>
           </Field>
           <Field label="Only balances above" hint="In whole units">
-            <TextInput align="end" inputMode="decimal" value={minimum} onChange={(event) => setMinimum(event.target.value.replace(/[^0-9.]/g, ""))} />
+            <TextInput aria-label="Only balances above" align="end" inputMode="decimal" value={minimum} onChange={(event) => setMinimum(event.target.value.replace(/[^0-9.]/g, ""))} />
           </Field>
         </Row>
       </Card>
@@ -372,9 +372,9 @@ export function ReportDesigner({ context, close }: { context: ScreenContext; clo
   const [busy, setBusy] = useState(false);
   return (
     <Stack gap={4}>
-      <Field label="Report name" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
+      <Field label="Report name" required><TextInput aria-label="Report name" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field label="Based on">
-        <Select value={statement} onChange={(event) => setStatement(event.target.value as Statement)}>
+        <Select aria-label="Based on" value={statement} onChange={(event) => setStatement(event.target.value as Statement)}>
           {(Object.keys(STATEMENT_LABEL) as Statement[]).map((key) => <option key={key} value={key}>{STATEMENT_LABEL[key]}</option>)}
         </Select>
       </Field>
@@ -431,7 +431,7 @@ export function SourceNoteOverlay({ context }: { context: ScreenContext }) {
       <Notice tone="info" title="What is never mixed in">
         A draft journal, a forecast assumption and an imported statement line are all excluded from these statements. Only a posted journal moves a reported figure.
       </Notice>
-      <Card title="Journals that would break a statement" subtitle="Posted entries whose lines do not balance">
+      <Card prov="posted" title="Journals that would break a statement" subtitle="Posted entries whose lines do not balance">
         <UnbalancedPosted context={context} />
       </Card>
     </Stack>
@@ -469,11 +469,11 @@ export function ReportSchedule({ context, close }: { context: ScreenContext; clo
       </Notice>
       <Row gap={3} wrap>
         <Field label="Cadence">
-          <Select value={cadence} onChange={(event) => setCadence(event.target.value)}>
+          <Select aria-label="Cadence" value={cadence} onChange={(event) => setCadence(event.target.value)}>
             {["weekly", "monthly", "quarterly"].map((item) => <option key={item}>{item}</option>)}
           </Select>
         </Field>
-        <Field label="For"><TextInput value={recipient} onChange={(event) => setRecipient(event.target.value)} /></Field>
+        <Field label="For"><TextInput aria-label="For" value={recipient} onChange={(event) => setRecipient(event.target.value)} /></Field>
       </Row>
       <Row gap={2}>
         <Button

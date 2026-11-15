@@ -131,6 +131,7 @@ function FormulaBar({ editor, onEdit }: { editor: WorkbookEditor; onEdit: (addre
     <div className="sx-formula-bar">
       <div className="sx-namebox">
         <input
+          className="ds-num"
           aria-label="Name box — type an address or a named range"
           value={name}
           onChange={(event) => setName(event.target.value)}
@@ -151,7 +152,7 @@ function FormulaBar({ editor, onEdit }: { editor: WorkbookEditor; onEdit: (addre
       </div>
       <div className="sx-fx" aria-hidden="true">fx</div>
       <input
-        className="sx-formula-input"
+        className="sx-formula-input ds-num"
         aria-label={`Formula for ${address}`}
         value={draft}
         onFocus={() => setEditing(true)}
@@ -185,16 +186,16 @@ function StatusStrip({ editor }: { editor: WorkbookEditor }) {
   const errors = Object.values(editor.values).filter((cell) => cell.error).length;
   return (
     <div className="sx-status">
-      <span>Selection <strong>{boxLabel(editor.selection.box)}</strong></span>
-      <span>Cells <strong>{addresses.length}</strong></span>
-      <span>Numeric <strong>{numbers.length}</strong></span>
-      <span>Sum <strong>{numbers.length ? editor.format.currency && false ? "" : String(Math.round(sum * 1e6) / 1e6) : "—"}</strong></span>
-      <span>Average <strong>{numbers.length ? String(Math.round((sum / numbers.length) * 1e4) / 1e4) : "—"}</strong></span>
-      <span>Used range <strong>{extent.cols ? `A1:${cellAddress(extent.cols - 1, extent.rows - 1)}` : "empty"}</strong></span>
-      <span>Grid <strong>{columnName(editor.sheet.cols - 1)}{editor.sheet.rows}</strong></span>
-      <span>Formulas <strong>{Object.keys(editor.evaluation.graph).length}</strong></span>
-      <span>Errors <strong style={{ color: errors ? "var(--danger)" : undefined }}>{errors}</strong></span>
-      <span>Recalculated <strong>{editor.recalculatedAt.toLocaleTimeString(editor.format.locale)}</strong></span>
+      <span>Selection <strong className="ds-num">{boxLabel(editor.selection.box)}</strong></span>
+      <span>Cells <strong className="ds-num">{addresses.length}</strong></span>
+      <span>Numeric <strong className="ds-num">{numbers.length}</strong></span>
+      <span>Sum <strong className="ds-num">{numbers.length ? String(Math.round(sum * 1e6) / 1e6) : "—"}</strong></span>
+      <span>Average <strong className="ds-num">{numbers.length ? String(Math.round((sum / numbers.length) * 1e4) / 1e4) : "—"}</strong></span>
+      <span>Used range <strong className="ds-num">{extent.cols ? `A1:${cellAddress(extent.cols - 1, extent.rows - 1)}` : "empty"}</strong></span>
+      <span>Grid <strong className="ds-num">{columnName(editor.sheet.cols - 1)}{editor.sheet.rows}</strong></span>
+      <span>Formulas <strong className="ds-num">{Object.keys(editor.evaluation.graph).length}</strong></span>
+      <span>Errors <strong className="ds-num" style={{ color: errors ? "var(--danger)" : undefined }}>{errors}</strong></span>
+      <span>Recalculated <strong className="ds-num">{editor.recalculatedAt.toLocaleTimeString(editor.format.locale)}</strong></span>
     </div>
   );
 }
@@ -232,7 +233,7 @@ function WorkbookLibrary({ context, tab }: { context: ScreenContext; tab: "Recen
   return (
     <Stack gap={4}>
       <Row gap={3} wrap>
-        <Field label="Search"><TextInput type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles and tags" /></Field>
+        <Field label="Search"><TextInput aria-label="Search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles and tags" /></Field>
       </Row>
       <DataGrid
         rows={rows}
@@ -371,7 +372,7 @@ function FormatRibbon({ editor, context }: { editor: WorkbookEditor; context: Sc
       <Tool label="Align centre" icon={<AlignCenter size={16} />} pressed={first?.align === "center"} onClick={() => apply({ align: "center" }, "Align centre")} />
       <Tool label="Align right" icon={<AlignRight size={16} />} pressed={first?.align === "end"} onClick={() => apply({ align: "end" }, "Align right")} />
       <ToolbarSeparator />
-      <Tool label="Fill the cells" icon={<PaintBucket size={16} />} onClick={() => apply({ fill: first?.fill ? undefined : "#FFF5EE" }, "Fill")} />
+      <Tool label="Fill the cells" icon={<PaintBucket size={16} />} onClick={() => apply({ fill: first?.fill ? undefined : "var(--warning-soft)" }, "Fill")} />
       <Tool label="Rule above the cells" icon={<Palette size={16} />} onClick={() => apply({ border: first?.border?.includes("top") ? [] : ["top"] }, "Border")} />
       <Tool label="Clear the formatting" icon={<Trash2 size={16} />} onClick={() => editor.commitSheet(styleRange(editor.sheet, box, null), "Clear formatting")} />
       <ToolbarSeparator />
@@ -392,20 +393,20 @@ function ViewRibbon({ editor, context }: { editor: WorkbookEditor; context: Scre
       <Tool label="Unfreeze" icon={<ChevronsLeftRight size={16} />} disabled={freeze.rows === 0 && freeze.cols === 0} onClick={() => editor.commitSheet({ ...editor.sheet, freeze: { rows: 0, cols: 0 } }, "Unfreeze")} />
       <Pill tone="neutral">{freeze.rows} row{freeze.rows === 1 ? "" : "s"}, {freeze.cols} column{freeze.cols === 1 ? "" : "s"} frozen</Pill>
       <ToolbarSeparator />
-      <Tool label="Widen the selected columns" icon={<ChevronsLeftRight size={16} />} onClick={() => {
+      <Tool label="Widen the selected columns" onClick={() => {
         const colWidths = { ...editor.sheet.colWidths };
         for (let col = editor.selection.box.fromCol; col <= editor.selection.box.toCol; col += 1) {
           colWidths[String(col)] = Math.min(320, (colWidths[String(col)] ?? 104) + 32);
         }
         editor.commitSheet({ ...editor.sheet, colWidths }, "Column width");
-      }} />
-      <Tool label="Narrow the selected columns" icon={<ChevronsLeftRight size={16} />} onClick={() => {
+      }}>Wider</Tool>
+      <Tool label="Narrow the selected columns" onClick={() => {
         const colWidths = { ...editor.sheet.colWidths };
         for (let col = editor.selection.box.fromCol; col <= editor.selection.box.toCol; col += 1) {
           colWidths[String(col)] = Math.max(56, (colWidths[String(col)] ?? 104) - 32);
         }
         editor.commitSheet({ ...editor.sheet, colWidths }, "Column width");
-      }} />
+      }}>Narrower</Tool>
       <ToolbarSeparator />
       <Tool label="Named ranges" icon={<Table2 size={16} />} onClick={() => context.openOverlay("named range")} />
       <Tool label="Insert a chart from the selection" icon={<BarChart3 size={16} />} onClick={() => context.openOverlay("chart picker")} />
@@ -660,9 +661,9 @@ function FormulaManager({ context, tab }: { context: ScreenContext; tab: "All" |
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Formulas" value={String(formulas.length)} />
-          <Stat label="In error" value={String(errors.length)} meta={errors.length ? "Shown explicitly, never hidden" : "All evaluating"} />
-          <Stat label="In a cycle" value={String(cycles.length)} meta={cycles.length ? "Reported as #CYCLE!" : "No cycle detected"} />
+          <Stat prov="human" label="Formulas" value={String(formulas.length)} />
+          <Stat prov="human" label="In error" value={String(errors.length)} meta={errors.length ? "Shown explicitly, never hidden" : "All evaluating"} />
+          <Stat prov="human" label="In a cycle" value={String(cycles.length)} meta={cycles.length ? "Reported as #CYCLE!" : "No cycle detected"} />
         </StatRow>
         {cycles.length > 0 && (
           <Notice tone="danger" title={`${cycles.length} cell${cycles.length === 1 ? " is" : "s are"} in or downstream of a circular reference`}
@@ -719,7 +720,7 @@ function FormulaManager({ context, tab }: { context: ScreenContext; tab: "All" |
     const order = editor.evaluation.order;
     return (
       <Grid>
-        <Card span={7} title="Recalculation order" subtitle={`${order.length} formulas, computed in this order every time`}>
+        <Card span={7} eyebrow="DEPENDENCIES" prov="human" title="Recalculation order" subtitle={`${order.length} formulas, computed in this order every time`}>
           {order.length === 0 ? <Empty title="No formulas" /> : (
             <ol className="ds-stack ds-gap-1" style={{ paddingInlineStart: "var(--space-6)", fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }}>
               {order.map((key) => <li key={key}>{key} <span className="ds-subtle">reads {(editor.evaluation.graph[key] ?? []).length}</span></li>)}
@@ -727,7 +728,7 @@ function FormulaManager({ context, tab }: { context: ScreenContext; tab: "All" |
           )}
           <Notice tone="neutral">The order comes from a topological sort with a stable tie-break, so the same workbook always recalculates identically.</Notice>
         </Card>
-        <Card span={5} title="Most depended on" subtitle="Cells that many formulas read">
+        <Card span={5} eyebrow="DEPENDENCIES" prov="human" title="Most depended on" subtitle="Cells that many formulas read">
           {(() => {
             const counts = new Map<string, number>();
             for (const [, reads] of graph) for (const read of reads) counts.set(read, (counts.get(read) ?? 0) + 1);
@@ -743,7 +744,7 @@ function FormulaManager({ context, tab }: { context: ScreenContext; tab: "All" |
             );
           })()}
         </Card>
-        <Card span={12} title="Edges" subtitle={`${graph.reduce((total, [, reads]) => total + reads.length, 0)} dependencies`}>
+        <Card span={12} eyebrow="DEPENDENCIES" prov="human" title="Edges" subtitle={`${graph.reduce((total, [, reads]) => total + reads.length, 0)} dependencies`}>
           <DataGrid
             rows={graph.map(([key, reads]) => ({ id: key, key, reads }))}
             rowId={(row) => row.id}
@@ -826,7 +827,7 @@ function FormulaManager({ context, tab }: { context: ScreenContext; tab: "All" |
           }]}
         />
       )}
-      <Card title="Function reference" subtitle="Every function the engine implements">
+      <Card eyebrow="ENGINE" title="Function reference" subtitle="Every function the engine implements">
         <DataGrid
           rows={FUNCTION_HELP.map((item) => ({ ...item, id: item.name }))}
           rowId={(row) => row.id}
@@ -860,7 +861,7 @@ function DataTables({ context, tab }: { context: ScreenContext; tab: "Tables" | 
           Views here are the sheet's own filters and sort, so what you see in the grid and what a formula reads never diverge.
         </Notice>
         {editor.workbook.sheets.map((sheet) => (
-          <Card key={sheet.id} title={sheet.name} subtitle={`${sheet.filters.length} filter${sheet.filters.length === 1 ? "" : "s"}${sheet.sort ? `, sorted on column ${columnName(sheet.sort.column)} ${sheet.sort.direction}` : ", not sorted"}`}>
+          <Card key={sheet.id} eyebrow="VIEW" prov="human" title={sheet.name} subtitle={`${sheet.filters.length} filter${sheet.filters.length === 1 ? "" : "s"}${sheet.sort ? `, sorted on column ${columnName(sheet.sort.column)} ${sheet.sort.direction}` : ", not sorted"}`}>
             {sheet.filters.length === 0 && !sheet.sort ? <Empty title="No view applied" /> : (
               <Properties rows={[
                 ...sheet.filters.map((filter) => ({ label: `Filter on ${columnName(filter.column)}`, value: filter.keep.length ? filter.keep.join(", ") : "Everything" })),
@@ -932,9 +933,9 @@ function DataTables({ context, tab }: { context: ScreenContext; tab: "Tables" | 
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Columns with a rule" value={String(table.columns.filter((column) => column.rule || column.required).length)} />
-          <Stat label="Rows checked" value={box ? String(box.toRow - box.fromRow + (table.headerRow ? 0 : 1)) : "0"} />
-          <Stat label="Breaches" value={String(breaches.length)} meta={breaches.length ? "Reported, not corrected" : "Everything inside its rule"} />
+          <Stat prov="human" label="Columns with a rule" value={String(table.columns.filter((column) => column.rule || column.required).length)} />
+          <Stat prov="human" label="Rows checked" value={box ? String(box.toRow - box.fromRow + (table.headerRow ? 0 : 1)) : "0"} />
+          <Stat prov="human" label="Breaches" value={String(breaches.length)} meta={breaches.length ? "Reported, not corrected" : "Everything inside its rule"} />
         </StatRow>
         {breaches.length === 0 ? <Empty title="Every value is inside its rule" icon={<Database size={20} />} /> : (
           <DataGrid
@@ -965,6 +966,8 @@ function DataTables({ context, tab }: { context: ScreenContext; tab: "Tables" | 
         return (
           <Card
             key={table.id}
+            eyebrow="TABLE"
+            prov="human"
             title={table.name}
             subtitle={`${table.ref} · ${table.columns.length} columns · ${box ? box.toRow - box.fromRow + (table.headerRow ? 0 : 1) : 0} rows`}
             footer={<>
@@ -1020,6 +1023,9 @@ function ChartsScreen({ context, tab }: { context: ScreenContext; tab: "Charts" 
   const record = useWorkbook(context);
   const editor = useWorkbookEditor(context, record);
   const [pivot, setPivot] = useState({ rowCol: 1, valueCol: 4, aggregate: "sum" as "sum" | "count" | "average" });
+  // Every hook runs on every render: the Presentation tab needs the decks, so
+  // the read is hoisted above the branch rather than called inside it.
+  const decks = useCollection("decks");
   if (!record) return <Empty title="No workbook is open" icon={<FileSpreadsheet size={20} />} />;
 
   if (tab === "Pivot") {
@@ -1044,28 +1050,28 @@ function ChartsScreen({ context, tab }: { context: ScreenContext; tab: "Charts" 
       <Stack gap={4}>
         <Row gap={3} wrap>
           <Field label="Group by column">
-            <Select value={String(pivot.rowCol)} onChange={(event) => setPivot((current) => ({ ...current, rowCol: Number(event.target.value) }))}>
+            <Select aria-label="Group by column" value={String(pivot.rowCol)} onChange={(event) => setPivot((current) => ({ ...current, rowCol: Number(event.target.value) }))}>
               {Array.from({ length: Math.max(1, box.toCol + 1) }, (_, col) => (
                 <option key={col} value={col}>{columnName(col)} — {toText(editor.values[cellAddress(col, box.fromRow)]?.value ?? "")}</option>
               ))}
             </Select>
           </Field>
           <Field label="Value column">
-            <Select value={String(pivot.valueCol)} onChange={(event) => setPivot((current) => ({ ...current, valueCol: Number(event.target.value) }))}>
+            <Select aria-label="Value column" value={String(pivot.valueCol)} onChange={(event) => setPivot((current) => ({ ...current, valueCol: Number(event.target.value) }))}>
               {Array.from({ length: Math.max(1, box.toCol + 1) }, (_, col) => (
                 <option key={col} value={col}>{columnName(col)} — {toText(editor.values[cellAddress(col, box.fromRow)]?.value ?? "")}</option>
               ))}
             </Select>
           </Field>
           <Field label="Aggregate">
-            <Select value={pivot.aggregate} onChange={(event) => setPivot((current) => ({ ...current, aggregate: event.target.value as "sum" | "count" | "average" }))}>
+            <Select aria-label="Aggregate" value={pivot.aggregate} onChange={(event) => setPivot((current) => ({ ...current, aggregate: event.target.value as "sum" | "count" | "average" }))}>
               <option value="sum">Sum</option><option value="count">Count</option><option value="average">Average</option>
             </Select>
           </Field>
         </Row>
         {rows.length === 0 ? <Empty title="Nothing to group" icon={<LayoutDashboard size={20} />} /> : (
           <Grid>
-            <Card span={6} title="Pivot" subtitle={`${rows.length} groups from ${sheet.name}`}>
+            <Card span={6} eyebrow="PIVOT" prov="human" title="Pivot" subtitle={`${rows.length} groups from ${sheet.name}`}>
               <DataGrid
                 rows={rows}
                 rowId={(row) => row.id}
@@ -1079,7 +1085,7 @@ function ChartsScreen({ context, tab }: { context: ScreenContext; tab: "Charts" 
                 summary={<span>Total {Math.round(rows.reduce((total, row) => total + row.value, 0) * 100) / 100}</span>}
               />
             </Card>
-            <Card span={6} title="As a chart" subtitle="The same numbers, drawn">
+            <Card span={6} eyebrow="PIVOT" prov="human" title="As a chart" subtitle="The same numbers, drawn">
               <BarChart
                 title={`${pivot.aggregate} by ${columnName(pivot.rowCol)}`}
                 height={240}
@@ -1101,7 +1107,7 @@ function ChartsScreen({ context, tab }: { context: ScreenContext; tab: "Charts" 
         </Notice>
         <Grid>
           {editor.workbook.charts.map((chart) => (
-            <Card key={chart.id} span={6} title={chart.title} subtitle={`${chart.ref} on ${editor.workbook.sheets.find((item) => item.id === chart.sheetId)?.name ?? "?"}`}>
+            <Card key={chart.id} span={6} eyebrow="CHART" prov="human" title={chart.title} subtitle={`${chart.ref} on ${editor.workbook.sheets.find((item) => item.id === chart.sheetId)?.name ?? "?"}`}>
               <ChartView editor={editor} chart={chart} />
             </Card>
           ))}
@@ -1112,7 +1118,6 @@ function ChartsScreen({ context, tab }: { context: ScreenContext; tab: "Charts" 
   }
 
   if (tab === "Presentation") {
-    const decks = useCollection("decks");
     return (
       <Stack gap={4}>
         <Notice tone="warning" title="A chart sent to a deck is a snapshot with a time on it">
@@ -1124,7 +1129,7 @@ function ChartsScreen({ context, tab }: { context: ScreenContext; tab: "Charts" 
               const sheet = editor.workbook.sheets.find((item) => item.id === chart.sheetId) ?? editor.sheet;
               const data = chartData(sheet, chart.ref, chart.seriesInColumns, editor.evaluation.values[sheet.name] ?? {});
               return (
-                <Card key={chart.id} span={6} title={chart.title} subtitle={chart.snapshotAt ? `Last snapshot ${context.relative(chart.snapshotAt)}` : "Never snapshotted"}
+                <Card key={chart.id} span={6} eyebrow="SNAPSHOT" prov="human" title={chart.title} subtitle={chart.snapshotAt ? `Last snapshot ${context.relative(chart.snapshotAt)}` : "Never snapshotted"}
                   footer={<Button size="sm" variant="secondary" disabled={!data || decks.length === 0} onClick={async () => {
                     const deck = decks[0];
                     if (!deck || !data) return;
@@ -1162,6 +1167,8 @@ function ChartsScreen({ context, tab }: { context: ScreenContext; tab: "Charts" 
             <Card
               key={chart.id}
               span={6}
+              eyebrow="CHART"
+              prov="human"
               title={chart.title}
               subtitle={`${chart.kind} from ${chart.ref}`}
               actions={<Segmented
@@ -1201,7 +1208,7 @@ function ImportExport({ context, tab }: { context: ScreenContext; tab: "Imports"
     const rowsEvaluated = sheetToRows(editor.sheet, editor.values, editor.format, true);
     return (
       <Grid>
-        <Card span={6} title="Export this sheet" subtitle={`${editor.sheet.name} · ${rowsRaw.length} rows`}>
+        <Card span={6} eyebrow="EXPORT" title="Export this sheet" subtitle={`${editor.sheet.name} · ${rowsRaw.length} rows`}>
           <Stack gap={3}>
             <Notice tone="warning" title="A CSV cannot carry a formula">
               Two exports are offered and named for what they do: the formulas as typed, or the values as calculated. Neither pretends to be the other.
@@ -1222,7 +1229,7 @@ function ImportExport({ context, tab }: { context: ScreenContext; tab: "Imports"
             </Row>
           </Stack>
         </Card>
-        <Card span={6} title="Preview" subtitle="First rows of the calculated export">
+        <Card span={6} eyebrow="EXPORT" prov="human" title="Preview" subtitle="First rows of the calculated export">
           <TextArea readOnly rows={12} value={toCsv(rowsEvaluated.slice(0, 20))} style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }} aria-label="Export preview" />
         </Card>
       </Grid>
@@ -1277,7 +1284,7 @@ function ImportExport({ context, tab }: { context: ScreenContext; tab: "Imports"
             }]}
           />
         )}
-        <Card title="Record history" subtitle={`${record.history.length} saved versions on the workbook record`}>
+        <Card eyebrow="HISTORY" prov="posted" title="Record history" subtitle={`${record.history.length} saved versions on the workbook record`}>
           {record.history.length === 0 ? <span className="ds-subtle">Autosave suppresses history, so only deliberate saves appear.</span> : (
             <Stack gap={2}>
               {record.history.slice(0, 8).map((snapshot) => (
@@ -1292,7 +1299,7 @@ function ImportExport({ context, tab }: { context: ScreenContext; tab: "Imports"
 
   return (
     <Stack gap={4}>
-      <Card title="Import a CSV" subtitle="Read in this browser; nothing is uploaded">
+      <Card eyebrow="IMPORT" title="Import a CSV" subtitle="Read in this browser; nothing is uploaded">
         <Stack gap={3}>
           <Notice tone="warning" title="A large file is read fully before anything is written">
             The whole file is parsed and planned first, and the plan is shown before a cell changes, so an import cannot half-finish and drop a formula.
@@ -1300,7 +1307,7 @@ function ImportExport({ context, tab }: { context: ScreenContext; tab: "Imports"
           <Button variant="primary" icon={<FileUp size={15} />} onClick={() => context.openOverlay("Import wizard")}>Choose a file</Button>
         </Stack>
       </Card>
-      <Card title="Formula compatibility" subtitle="What this engine implements">
+      <Card eyebrow="ENGINE" title="Formula compatibility" subtitle="What this engine implements">
         <Properties rows={[
           { label: "Implemented functions", value: `${FUNCTION_HELP.length}, listed in the Formula manager` },
           { label: "Unsupported function", value: "Reported as #NAME? in the cell, never approximated" },
@@ -1354,7 +1361,7 @@ function Collaboration({ context, tab }: { context: ScreenContext; tab: "Comment
   if (tab === "Permissions") {
     return (
       <Grid>
-        <Card span={7} title="Protected ranges" subtitle={`${editor.workbook.protection.length} protected`}>
+        <Card span={7} eyebrow="PROTECTION" prov="human" title="Protected ranges" subtitle={`${editor.workbook.protection.length} protected`}>
           {editor.workbook.protection.length === 0 ? (
             <Empty title="Nothing is protected" icon={<Lock size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("protected range")}>Protect a range</Button>}>
               Protecting a range stops an accidental edit in this interface and records why it matters.
@@ -1376,7 +1383,7 @@ function Collaboration({ context, tab }: { context: ScreenContext; tab: "Comment
             A protected range is enforced by this editor in this browser. It is not a server-side permission and does not claim to be one.
           </Notice>
         </Card>
-        <Card span={5} title="Who is in the workspace" subtitle="Presence is not simulated">
+        <Card span={5} eyebrow="PRESENCE" prov="human" title="Who is in the workspace" subtitle="Presence is not simulated">
           <Stack gap={2}>
             {members.slice(0, 6).map((member) => (
               <Row key={member.id} gap={2}><span className="ds-grow ds-truncate">{member.title}</span><Pill tone="neutral">{String(member.fields.role ?? "member")}</Pill></Row>
@@ -1431,7 +1438,7 @@ function Collaboration({ context, tab }: { context: ScreenContext; tab: "Comment
             }]}
           />
         )}
-        <Card title="Two people editing the same cell" subtitle="What this editor does">
+        <Card eyebrow="CONFLICTS" title="Two people editing the same cell" subtitle="What this editor does">
           <Notice tone="warning" title="A conflicting save is refused, never merged silently">
             Autosave carries the revision it was based on. If the stored revision moved on, the write is refused and the grid offers both versions: keep these cells, or take the stored ones. There is no last-write-wins.
           </Notice>
@@ -1444,7 +1451,7 @@ function Collaboration({ context, tab }: { context: ScreenContext; tab: "Comment
   const comments = editor.workbook.comments;
   return (
     <Grid>
-      <Card span={8} title="Cell comments" subtitle={`${comments.filter((comment) => !comment.resolved).length} open of ${comments.length}`}>
+      <Card span={8} eyebrow="REVIEW" prov="human" title="Cell comments" subtitle={`${comments.filter((comment) => !comment.resolved).length} open of ${comments.length}`}>
         {comments.length === 0 ? (
           <Empty title="No comments" icon={<MessageSquare size={20} />} action={<Button variant="secondary" onClick={() => context.navigate(context.path("/o/:org/sheets/workbooks/:id", record.id))}>Open the grid</Button>}>
             Comment on a cell from the Review ribbon in the grid.
@@ -1476,7 +1483,7 @@ function Collaboration({ context, tab }: { context: ScreenContext; tab: "Comment
           </Stack>
         )}
       </Card>
-      <Card span={4} title="Save state" subtitle="How this workbook is being written">
+      <Card span={4} eyebrow="SAVE" prov="posted" title="Save state" subtitle="How this workbook is being written">
         <Properties rows={[
           { label: "State", value: <Pill tone={SAVE_TONE[editor.saveState]}>{SAVE_LABEL[editor.saveState]}</Pill> },
           { label: "Last change", value: context.dateTime(record.updatedAt) },
@@ -1525,17 +1532,17 @@ function NewWorkbook({ context, close }: { context: ScreenContext; close: () => 
         context.navigate(`/o/${org.slug}/sheets/workbooks/${created.id}`);
       }}
     >
-      <Field label="Title" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} invalid={duplicate} required autoFocus /></Field>
+      <Field label="Title" required><TextInput aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} invalid={duplicate} required autoFocus /></Field>
       {duplicate && <Notice tone="danger" title="A workbook already has that title" />}
       <Field label="Start from">
-        <Select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
+        <Select aria-label="Start from" value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
           <option value="">Empty sheets</option>
           {templates.map((record) => <option key={record.id} value={record.id}>{record.title}</option>)}
         </Select>
       </Field>
       {!templateId && (
         <Field label="Sheet names" hint="Comma separated. Each sheet starts at 64 columns by 1000 rows.">
-          <TextInput value={sheetNames} onChange={(event) => setSheetNames(event.target.value)} />
+          <TextInput aria-label="Sheet names" value={sheetNames} onChange={(event) => setSheetNames(event.target.value)} />
         </Field>
       )}
     </form>
@@ -1585,7 +1592,7 @@ function ImportMapper({ context, close }: { context: ScreenContext; close: () =>
       }}
     >
       <Field label="Paste CSV, or choose a file" hint="The file is read in this browser. Nothing is uploaded.">
-        <TextArea rows={6} value={text} onChange={(event) => setText(event.target.value)} placeholder="Deal,Net,Signed&#10;Harrow,1800,2026-11-14" style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }} />
+        <TextArea aria-label="Paste CSV, or choose a file" rows={6} value={text} onChange={(event) => setText(event.target.value)} placeholder="Deal,Net,Signed&#10;Harrow,1800,2026-11-14" style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }} />
       </Field>
       <input
         type="file"
@@ -1599,7 +1606,7 @@ function ImportMapper({ context, close }: { context: ScreenContext; close: () =>
       />
       <Checkbox label="The first row is a header" checked={headerRow} onChange={(event) => setHeaderRow(event.target.checked)} />
       <Field label="Where">
-        <Select value={target} onChange={(event) => setTarget(event.target.value)}>
+        <Select aria-label="Where" value={target} onChange={(event) => setTarget(event.target.value)}>
           <option value="new">A new sheet</option>
           <option value="current">Overwrite {editor.sheet.name} from A1</option>
         </Select>
@@ -1635,7 +1642,9 @@ function ImportMapper({ context, close }: { context: ScreenContext; close: () =>
 }
 
 function ShareWorkbook({ context, close }: { context: ScreenContext; close: () => void }) {
-  const record = useRecord(context.selectedId) ?? useCollection("workbooks")[0];
+  const selected = useRecord(context.selectedId);
+  const workbooks = useCollection("workbooks");
+  const record = selected ?? workbooks[0];
   const members = useCollection("members");
   const [chosen, setChosen] = useState<string[]>([]);
   if (!record) return <Empty title="Select a workbook" />;
@@ -1686,15 +1695,15 @@ function FormatCells({ context, close }: { context: ScreenContext; close: () => 
       <p className="ds-subtle">Applying to {boxLabel(box)} — {boxAddresses(box).length} cells.</p>
       <Row gap={3} wrap>
         <Field label="Number format">
-          <Select value={style.format ?? "general"} onChange={(event) => setStyle((current) => ({ ...current, format: event.target.value as NumberFormat }))}>
+          <Select aria-label="Number format" value={style.format ?? "general"} onChange={(event) => setStyle((current) => ({ ...current, format: event.target.value as NumberFormat }))}>
             {(Object.keys(FORMAT_LABELS) as NumberFormat[]).map((key) => <option key={key} value={key}>{FORMAT_LABELS[key]}</option>)}
           </Select>
         </Field>
         <Field label="Decimals">
-          <TextInput inputMode="numeric" align="end" value={String(style.decimals ?? "")} onChange={(event) => setStyle((current) => ({ ...current, decimals: event.target.value === "" ? undefined : Number(event.target.value) }))} />
+          <TextInput aria-label="Decimals" inputMode="numeric" align="end" value={String(style.decimals ?? "")} onChange={(event) => setStyle((current) => ({ ...current, decimals: event.target.value === "" ? undefined : Number(event.target.value) }))} />
         </Field>
         <Field label="Alignment">
-          <Select value={style.align ?? ""} onChange={(event) => setStyle((current) => ({ ...current, align: (event.target.value || undefined) as CellStyle["align"] }))}>
+          <Select aria-label="Alignment" value={style.align ?? ""} onChange={(event) => setStyle((current) => ({ ...current, align: (event.target.value || undefined) as CellStyle["align"] }))}>
             <option value="">Automatic</option><option value="start">Left</option><option value="center">Centre</option><option value="end">Right</option>
           </Select>
         </Field>
@@ -1705,7 +1714,7 @@ function FormatCells({ context, close }: { context: ScreenContext; close: () => 
       </Row>
       <Field label="Fill">
         <Row gap={2} wrap>
-          {["", "#FFF5EE", "#EFFCFA", "#EEF2FF", "#FDF3E2", "#FDECEA"].map((colour) => (
+          {["", "var(--accent-soft)", "var(--success-soft)", "var(--warning-soft)", "var(--danger-soft)", "var(--bg-sunken)"].map((colour) => (
             <button
               key={colour || "none"}
               type="button"
@@ -1805,7 +1814,7 @@ function ValidationOverlay({ context, close }: { context: ScreenContext; close: 
           { label: "Raw", value: editor.sheet.cells[address] || "(empty)" },
           { label: "Value", value: displayValue(editor.values[address], editor.sheet.styles[address], editor.format) || "(empty)" },
         ]} />
-        <Field label="Comment" required><TextArea rows={4} value={body} onChange={(event) => setBody(event.target.value)} required autoFocus /></Field>
+        <Field label="Comment" required><TextArea aria-label="Comment" rows={4} value={body} onChange={(event) => setBody(event.target.value)} required autoFocus /></Field>
       </form>
     );
   }
@@ -1834,7 +1843,7 @@ function ValidationOverlay({ context, close }: { context: ScreenContext; close: 
     >
       <p className="ds-subtle">Applying to column {columnName(box.fromCol)}.</p>
       <Field label="Allowed values" hint="Comma separated, e.g. won, open, lost. Leave empty for no list.">
-        <TextInput value={rule} onChange={(event) => setRule(event.target.value)} />
+        <TextInput aria-label="Allowed values" value={rule} onChange={(event) => setRule(event.target.value)} />
       </Field>
       <Checkbox label="A value is required in every row" checked={required} onChange={(event) => setRequired(event.target.checked)} />
       <Notice tone="neutral">A rule reports a breach; it does not block typing. Silently rejecting a paste loses data a person meant to keep.</Notice>
@@ -1871,7 +1880,7 @@ function NamedRangeOverlay({ context, close }: { context: ScreenContext; close: 
           close();
         }}
       >
-        <Field label="Sheet name" required><TextInput value={renameTo} onChange={(event) => setRenameTo(event.target.value)} required autoFocus /></Field>
+        <Field label="Sheet name" required><TextInput aria-label="Sheet name" value={renameTo} onChange={(event) => setRenameTo(event.target.value)} required autoFocus /></Field>
         <Notice tone="warning" title="A cross-sheet formula uses the name">
           Renaming does not rewrite <code>Sheet!A1</code> references. Any that break are reported as #REF! rather than quietly pointing somewhere else.
         </Notice>
@@ -1894,18 +1903,18 @@ function NamedRangeOverlay({ context, close }: { context: ScreenContext; close: 
       }}
     >
       <Field label="Name" required hint="Letters, digits and underscores; it cannot start with a digit.">
-        <TextInput value={name} onChange={(event) => setName(event.target.value)} invalid={invalid || taken} required autoFocus />
+        <TextInput aria-label="Name" value={name} onChange={(event) => setName(event.target.value)} invalid={invalid || taken} required autoFocus />
       </Field>
       {taken && <Notice tone="danger" title="That name is already defined" />}
       {invalid && name !== "" && <Notice tone="danger" title="A formula could not parse that name" />}
       <Row gap={3}>
         <Field label="Sheet">
-          <Select value={sheetName} onChange={(event) => setSheetName(event.target.value)}>
+          <Select aria-label="Sheet" value={sheetName} onChange={(event) => setSheetName(event.target.value)}>
             {editor.workbook.sheets.map((sheet) => <option key={sheet.id} value={sheet.name}>{sheet.name}</option>)}
           </Select>
         </Field>
         <Field label="Range" required hint={rangeBox(ref) ? `${expandRange(ref).length} cells` : "Not a valid range"}>
-          <TextInput value={ref} onChange={(event) => setRef(event.target.value)} invalid={!rangeBox(ref)} required />
+          <TextInput aria-label="Range" value={ref} onChange={(event) => setRef(event.target.value)} invalid={!rangeBox(ref)} required />
         </Field>
       </Row>
     </form>
@@ -1945,20 +1954,20 @@ function ChartPicker({ context, close }: { context: ScreenContext; close: () => 
         close();
       }}
     >
-      <Field label="Title"><TextInput value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Net by deal" /></Field>
+      <Field label="Title"><TextInput aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Net by deal" /></Field>
       <Row gap={3} wrap>
         <Field label="Range" required hint={rangeBox(ref) ? "Include the header row and the label column." : "Not a valid range"}>
-          <TextInput value={ref} onChange={(event) => setRef(event.target.value)} invalid={!rangeBox(ref)} required />
+          <TextInput aria-label="Range" value={ref} onChange={(event) => setRef(event.target.value)} invalid={!rangeBox(ref)} required />
         </Field>
         <Field label="Type">
-          <Select value={kind} onChange={(event) => setKind(event.target.value as "bar" | "line" | "donut")}>
+          <Select aria-label="Type" value={kind} onChange={(event) => setKind(event.target.value as "bar" | "line" | "donut")}>
             <option value="bar">Bar</option><option value="line">Line</option><option value="donut">Donut</option>
           </Select>
         </Field>
       </Row>
       <Switch label="Series run down columns" checked={seriesInColumns} onChange={setSeriesInColumns} />
       {preview && preview.series.length > 0 ? (
-        <Card title="Preview" subtitle={`${preview.series.length} series, ${preview.series[0].points.length} points`}>
+        <Card eyebrow="CHART" prov="human" title="Preview" subtitle={`${preview.series.length} series, ${preview.series[0].points.length} points`}>
           <BarChart title={title || "Preview"} height={180} format={(value) => String(Math.round(value))} series={preview.series} />
           {preview.skipped.length > 0 && <Notice tone="warning">{preview.skipped.length} cell{preview.skipped.length === 1 ? " was" : "s were"} not numeric and will be skipped: {preview.skipped.slice(0, 8).join(", ")}.</Notice>}
         </Card>
@@ -1989,7 +1998,7 @@ function FormulaInspector({ context }: { context: ScreenContext }) {
         { label: "Recalculation position", value: position >= 0 ? `${position + 1} of ${editor.evaluation.order.length}` : "Excluded — it is in a cycle" },
         { label: "In a cycle", value: editor.evaluation.cycles.includes(payload.key) ? <Pill tone="danger">Yes</Pill> : <Pill tone="success">No</Pill> },
       ]} />
-      <Card title={`Reads ${reads.length} cell${reads.length === 1 ? "" : "s"}`}>
+      <Card eyebrow="PRECEDENTS" prov="human" title={`Reads ${reads.length} cell${reads.length === 1 ? "" : "s"}`}>
         {reads.length === 0 ? <span className="ds-subtle">This formula reads no cell.</span> : (
           <DataGrid
             rows={reads.map((key) => {
@@ -2008,7 +2017,7 @@ function FormulaInspector({ context }: { context: ScreenContext }) {
           />
         )}
       </Card>
-      <Card title={`Read by ${dependents.length} formula${dependents.length === 1 ? "" : "s"}`}>
+      <Card eyebrow="DEPENDENTS" prov="human" title={`Read by ${dependents.length} formula${dependents.length === 1 ? "" : "s"}`}>
         {dependents.length === 0 ? <span className="ds-subtle">Nothing depends on this cell.</span> : (
           <Row gap={1} wrap>{dependents.map((key) => <Pill key={key}>{key}</Pill>)}</Row>
         )}
@@ -2127,9 +2136,9 @@ function ColumnEditor({ context, close }: { context: ScreenContext; close: () =>
       }}
     >
       <Row gap={3} wrap>
-        <Field label="Table name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} required autoFocus /></Field>
+        <Field label="Table name" required><TextInput aria-label="Table name" value={name} onChange={(event) => setName(event.target.value)} required autoFocus /></Field>
         <Field label="Range" required hint={box ? `${box.toCol - box.fromCol + 1} columns` : "Not a valid range"}>
-          <TextInput value={ref} onChange={(event) => setRef(event.target.value)} invalid={!box} required />
+          <TextInput aria-label="Range" value={ref} onChange={(event) => setRef(event.target.value)} invalid={!box} required />
         </Field>
       </Row>
       <Checkbox label="The first row is a header" checked={headerRow} onChange={(event) => setHeaderRow(event.target.checked)} />
@@ -2243,7 +2252,7 @@ function FormattingInspector({ context, close }: { context: ScreenContext; close
         close();
       }}
     >
-      <Field label="Title"><TextInput value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
+      <Field label="Title"><TextInput aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Properties rows={[
         { label: "Range", value: `${sheet.name}!${chart.ref}` },
         { label: "Series", value: String(data?.series.length ?? 0) },
@@ -2355,13 +2364,13 @@ function ProtectedRangeOverlay({ context, close }: { context: ScreenContext; clo
       }}
     >
       <Row gap={3}>
-        <Field label="Sheet"><TextInput readOnly value={editor.sheet.name} /></Field>
+        <Field label="Sheet"><TextInput aria-label="Sheet" readOnly value={editor.sheet.name} /></Field>
         <Field label="Range" required hint={rangeBox(ref) ? `${expandRange(ref).length} cells` : "Not a valid range"}>
-          <TextInput value={ref} onChange={(event) => setRef(event.target.value)} invalid={!rangeBox(ref)} required />
+          <TextInput aria-label="Range" value={ref} onChange={(event) => setRef(event.target.value)} invalid={!rangeBox(ref)} required />
         </Field>
       </Row>
       <Field label="Why it matters" required hint="Shown when someone tries to edit it.">
-        <TextArea rows={3} value={note} onChange={(event) => setNote(event.target.value)} required />
+        <TextArea aria-label="Why it matters" rows={3} value={note} onChange={(event) => setNote(event.target.value)} required />
       </Field>
       <Notice tone="warning">This is a guard in this interface, not an account permission. Say so to whoever relies on it.</Notice>
     </form>

@@ -35,6 +35,18 @@ function departmentName(departments: Rec[], id: unknown): string {
   return departments.find((department) => department.id === id)?.title ?? "Unassigned";
 }
 
+/** Whose leave this is: the named field, else the linked employee, else the owner. */
+function leavePerson(request: Rec, employees: Rec[]): string {
+  const named = String(request.fields.employeeName ?? "").trim();
+  if (named) return named;
+  const linked = employees.find((employee) => employee.id === request.fields.employeeId);
+  return linked?.title ?? request.ownerName;
+}
+
+function days(count: number): string {
+  return `${count} ${count === 1 ? "day" : "days"}`;
+}
+
 function leaveDays(record: Rec): number {
   if (!record.startAt || !record.endAt) return Number(record.fields.days ?? 1);
   return Math.max(1, daysBetween(new Date(record.startAt), new Date(record.endAt)));
@@ -79,7 +91,7 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
               <Stack gap={3}>
                 <Properties rows={[
                   { label: "Department", value: departmentName(data.departments, employee.fields.departmentId) },
-                  { label: "Leave left", value: `${balance.left} of ${balance.allowance} days` },
+                  { label: "Leave left", value: balance.known ? <span className="ds-num">{balance.left} of {balance.allowance} days</span> : "Not recorded" },
                   { label: "Requests", value: `${booked.length} on record` },
                 ]} />
                 <Meter value={balance.taken} max={Math.max(1, balance.allowance)} label={`${employee.title} leave used`} tone={balance.left <= 2 ? "warning" : undefined} />
@@ -128,7 +140,7 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
     });
     return (
       <Grid>
-        <Card span={7} title="Workforce by department" subtitle="People and AI employees counted separately">
+        <Card span={7} eyebrow="WORKFORCE" prov="human" title="Workforce by department" subtitle="People and AI employees counted separately">
           <BarChart
             title="Workforce by department"
             height={210}
@@ -140,10 +152,10 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
             footer="An AI employee is a local agent contract in this workspace, not a person and not a headcount line."
           />
         </Card>
-        <Card span={5} title="Leave taken" subtitle="Approved days by month">
+        <Card span={5} eyebrow="ABSENCE" prov="human" title="Leave taken" subtitle="Approved days by month">
           <BarChart title="Approved leave days by month" height={210} format={(value) => `${Math.round(value)}d`} series={[{ name: "Days", points: months }]} />
         </Card>
-        <Card span={5} title="Employment mix">
+        <Card span={5} eyebrow="HEADCOUNT" prov="human" title="Employment mix">
           <DonutChart
             title="Employment mix"
             size={150}
@@ -168,15 +180,17 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
   return (
     <Stack gap={5}>
       <StatRow>
-        <Stat label="People employed" value={String(staff.length)} meta={`${data.employees.filter((employee) => employee.fields.employment === "contractor").length} contractors alongside`} onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)} />
-        <Stat label="AI employees" value={String(agents.length)} meta="Local agent contracts" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)} />
-        <Stat label="Leave waiting" value={String(pendingLeave.length)} meta={pendingLeave.length ? `Oldest asked ${context.relative(pendingLeave[0].at)}` : "Nothing to decide"} onClick={() => context.openOverlay("leave approval")} />
-        <Stat label="Open roles" value={String(openRoles.length)} meta={`${data.applicants.filter((applicant) => !["rejected", "withdrawn"].includes(applicant.status)).length} live candidates`} onClick={() => context.navigate(`/o/${org.slug}/hr/recruitment`)} />
+        <Stat label="People employed" value={String(staff.length)} prov="human" meta={`${data.employees.filter((employee) => employee.fields.employment === "contractor").length} contractors alongside`} onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)} />
+        <Stat label="AI employees" value={String(agents.length)} prov="agent" meta="Local agent contracts" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)} />
+        <Stat label="Leave waiting" value={String(pendingLeave.length)} prov="human" meta={pendingLeave.length ? `Oldest asked ${context.relative(pendingLeave[0].at)}` : "Nothing to decide"} onClick={() => context.openOverlay("leave approval")} />
+        <Stat label="Open roles" value={String(openRoles.length)} prov="human" meta={`${data.applicants.filter((applicant) => !["rejected", "withdrawn"].includes(applicant.status)).length} live candidates`} onClick={() => context.navigate(`/o/${org.slug}/hr/recruitment`)} />
       </StatRow>
 
       <Grid>
         <Card
           span={7}
+          eyebrow="DECISIONS"
+          prov="human"
           title="Waiting on a people decision"
           subtitle={`${pendingLeave.length} leave requests`}
           actions={pendingLeave.length > 0 ? <Button size="sm" variant="secondary" onClick={() => context.openOverlay("leave approval")}>Review</Button> : undefined}
@@ -187,10 +201,10 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
             <Stack gap={2}>
               {pendingLeave.map((request) => (
                 <Row key={request.id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-                  <Avatar name={String(request.fields.employeeName ?? request.ownerName)} size="sm" />
+                  <Avatar name={leavePerson(request, data.employees)} size="sm" />
                   <div className="ds-grow">
-                    <strong>{String(request.fields.employeeName ?? request.ownerName)}</strong>
-                    <p className="ds-subtle">{context.date(request.startAt)} – {context.date(request.endAt)} · {leaveDays(request)} days · {String(request.fields.type ?? "annual")}</p>
+                    <strong>{leavePerson(request, data.employees)}</strong>
+                    <p className="ds-subtle"><span className="ds-num">{context.date(request.startAt)} – {context.date(request.endAt)}</span> · {days(leaveDays(request))} · {String(request.fields.type ?? "annual")}</p>
                   </div>
                   <Button size="sm" variant="secondary" onClick={() => { context.select(request.id); context.openOverlay("leave approval", { id: request.id }); }}>Decide</Button>
                 </Row>
@@ -199,11 +213,11 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
           )}
         </Card>
 
-        <Card span={5} title="Coverage risk" subtitle="Computed from the roster and approved leave" actions={<Button size="sm" variant="ghost" onClick={() => context.openOverlay("Staffing alert")}>Inspect</Button>}>
+        <Card span={5} eyebrow="COVERAGE" prov="human" title="Coverage risk" subtitle="Computed from the roster and approved leave" actions={<Button size="sm" variant="ghost" onClick={() => context.openOverlay("Staffing alert")}>Inspect</Button>}>
           <StaffingSummary context={context} />
         </Card>
 
-        <Card span={6} title="Onboarding" subtitle={`${openOnboarding.length} steps outstanding`} footer={<Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/onboarding`)}>Open onboarding</Button>}>
+        <Card span={6} eyebrow="ONBOARDING" prov="human" title="Onboarding" subtitle={`${openOnboarding.length} steps outstanding`} footer={<Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/onboarding`)}>Open onboarding</Button>}>
           {onboarding.length === 0 ? <Empty title="Nobody is onboarding" icon={<UserPlus size={20} />} /> : (
             <Stack gap={3}>
               {[...new Set(onboarding.map((task) => String(task.fields.employeeId)))].map((employeeId) => {
@@ -221,13 +235,13 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
           )}
         </Card>
 
-        <Card span={6} title="Compliance reminders" subtitle="Policies and reviews that need a person">
+        <Card span={6} eyebrow="COMPLIANCE" prov="human" title="Compliance reminders" subtitle="Policies and reviews that need a person">
           <Stack gap={2}>
             {policiesDue.slice(0, 4).map((policy) => (
               <Row key={policy.id} gap={2} className="ds-panel" style={{ padding: "var(--space-3)" }}>
                 <BookOpen size={16} aria-hidden="true" />
                 <span className="ds-grow">{policy.title} <span className="ds-subtle">v{String(policy.fields.version ?? "1.0")}</span></span>
-                <Pill tone={Number(policy.fields.acknowledged ?? 0) >= staff.length ? "success" : "warning"}>{String(policy.fields.acknowledged ?? 0)} of {staff.length} acknowledged</Pill>
+                <Pill tone={Number(policy.fields.acknowledged ?? 0) >= staff.length ? "success" : "warning"}><span className="ds-num">{String(policy.fields.acknowledged ?? 0)} of {staff.length}</span> acknowledged</Pill>
               </Row>
             ))}
             {reviewsDue.slice(0, 3).map((review) => (
@@ -384,7 +398,7 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
   if (lens === "Job") {
     return (
       <Grid>
-        <Card span={6} title="Job details">
+        <Card span={6} eyebrow="JOB" prov="human" title="Job details">
           <Properties rows={[
             { label: "Job title", value: String(employee.fields.title ?? "Not recorded") },
             { label: "Department", value: departmentName(data.departments, employee.fields.departmentId) },
@@ -395,7 +409,7 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
             { label: "Leaving", value: employee.endAt ? context.date(employee.endAt) : "—" },
           ]} />
         </Card>
-        <Card span={6} title="Pay and pension" subtitle="Gated by the payroll role view">
+        <Card span={6} eyebrow="PAY" prov="human" title="Pay and pension" subtitle="Gated by the payroll role view">
           {context.can("view_payroll") ? (
             <Stack gap={3}>
               <Properties rows={[
@@ -451,8 +465,9 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
   if (lens === "Leave") {
     return (
       <Grid>
-        <Card span={5} title="Balance" subtitle={`${balance.left} days left of ${balance.allowance}`}>
+        <Card span={5} eyebrow="BALANCE" prov={balance.known ? "human" : "unknown"} title="Balance" subtitle={balance.known ? `${balance.left} days left of ${balance.allowance}` : "No allowance recorded"}>
           <Stack gap={3}>
+            {!balance.known && <Notice tone="warning" title="No allowance is recorded for this person">A balance is left unavailable rather than shown as zero.</Notice>}
             <Meter value={balance.taken} max={Math.max(1, balance.allowance)} label="Leave used" tone={balance.left <= 2 ? "warning" : "success"} />
             <Properties rows={[
               { label: "Allowance", value: `${balance.allowance} days` },
@@ -561,7 +576,7 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
           {!context.can("view_payroll") && <RoleViewNote what="Date of birth and emergency contact" />}
         </Stack>
       </Card>
-      <Card span={4} title="Leave" subtitle={`${balance.left} of ${balance.allowance} days left`}>
+      <Card span={4} eyebrow="LEAVE" prov={balance.known ? "human" : "unknown"} title="Leave" subtitle={balance.known ? `${balance.left} of ${balance.allowance} days left` : "No allowance recorded"}>
         <Meter value={balance.taken} max={Math.max(1, balance.allowance)} label="Leave used" tone={balance.left <= 2 ? "warning" : "success"} />
         <Button size="sm" variant="ghost" style={{ marginBlockStart: "var(--space-3)" }} onClick={() => context.setTab("Leave")}>See requests</Button>
       </Card>
@@ -992,25 +1007,27 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
       <Stack gap={3}>
         {pending.map((request) => {
           const employee = data.employees.find((row) => row.id === request.fields.employeeId);
-          const balance = employee ? leaveBalance(employee) : { allowance: 0, taken: 0, left: 0 };
-          const days = leaveDays(request);
+          const balance = employee ? leaveBalance(employee) : { allowance: 0, taken: 0, left: 0, known: false };
+          const requested = leaveDays(request);
           const clash = data.leaveRequests.filter((other) => other.id !== request.id && other.status === "approved" && other.startAt && other.endAt && request.startAt && request.endAt && new Date(other.startAt) <= new Date(request.endAt) && new Date(other.endAt) >= new Date(request.startAt));
           return (
             <Card
               key={request.id}
-              title={<Row gap={2}><Avatar name={String(request.fields.employeeName ?? request.ownerName)} size="sm" />{String(request.fields.employeeName ?? request.ownerName)}</Row>}
-              subtitle={`${context.date(request.startAt)} – ${context.date(request.endAt)} · ${days} days · ${String(request.fields.type ?? "annual")}`}
+              eyebrow="LEAVE REQUEST"
+              prov="human"
+              title={<Row gap={2}><Avatar name={leavePerson(request, data.employees)} size="sm" />{leavePerson(request, data.employees)}</Row>}
+              subtitle={`${context.date(request.startAt)} – ${context.date(request.endAt)} · ${days(requested)} · ${String(request.fields.type ?? "annual")}`}
               actions={<Pill tone="warning" dot>Requested {context.relative(request.at)}</Pill>}
               footer={<>
                 <Button
                   size="sm"
                   variant="primary"
                   onClick={async () => {
-                    await context.mutate.patch(request.id, { status: "approved" }, { expectRevision: request.revision, event: `Leave approved for ${String(request.fields.employeeName ?? request.ownerName)}` });
+                    await context.mutate.patch(request.id, { status: "approved" }, { expectRevision: request.revision, event: `Leave approved for ${leavePerson(request, data.employees)}` });
                     if (employee) {
-                      await context.mutate.patch(employee.id, { fields: { ...employee.fields, leaveTaken: Number(employee.fields.leaveTaken ?? 0) + days } }, { event: `Leave balance updated after approval` });
+                      await context.mutate.patch(employee.id, { fields: { ...employee.fields, leaveTaken: Number(employee.fields.leaveTaken ?? 0) + requested } }, { event: "Leave balance updated after approval" });
                     }
-                    context.toast("Leave approved", `${days} days are booked and the balance has moved.`);
+                    context.toast("Leave approved", `${days(requested)} booked${balance.known ? " and the balance has moved" : "; this person has no recorded allowance, so no balance moved"}.`);
                   }}
                 >
                   Approve
@@ -1019,7 +1036,7 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
                   size="sm"
                   variant="outline-danger"
                   onClick={async () => {
-                    await context.mutate.patch(request.id, { status: "declined" }, { expectRevision: request.revision, event: `Leave declined for ${String(request.fields.employeeName ?? request.ownerName)}` });
+                    await context.mutate.patch(request.id, { status: "declined" }, { expectRevision: request.revision, event: `Leave declined for ${leavePerson(request, data.employees)}` });
                     context.toast("Leave declined", "The request is recorded as declined with the decision maker's name.");
                   }}
                 >
@@ -1032,7 +1049,7 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
               <Stack gap={3}>
                 <p>{request.summary}</p>
                 <Properties rows={[
-                  { label: "Balance after approval", value: employee ? `${Math.max(0, balance.left - days)} of ${balance.allowance} days` : "Unavailable — no employee record" },
+                  { label: "Balance after approval", value: employee && balance.known ? <span className="ds-num">{Math.max(0, balance.left - requested)} of {balance.allowance} days</span> : employee ? "Unavailable — no allowance recorded" : "Unavailable — no employee record" },
                   { label: "Overlapping approved leave", value: clash.length ? `${clash.length} other ${clash.length === 1 ? "person" : "people"} away` : "Nobody else is away" },
                 ]} />
                 {clash.length > 0 && <Notice tone="warning" title="Cover is thin on these days">Approving this leaves {clash.length + 1} people away at once. Check the roster before deciding.</Notice>}
@@ -1070,11 +1087,11 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
     );
   }
 
-  const balance = mine ? leaveBalance(mine) : { allowance: 0, taken: 0, left: 0 };
+  const balance = mine ? leaveBalance(mine) : { allowance: 0, taken: 0, left: 0, known: false };
   return (
     <Grid>
-      <Card span={4} title="Your balance" subtitle={mine ? `${balance.left} days left` : "No employee record for this role view"}>
-        {mine ? (
+      <Card span={4} eyebrow="BALANCE" prov={balance.known ? "human" : "unknown"} title="Your balance" subtitle={mine ? (balance.known ? `${balance.left} days left` : "No allowance recorded") : "No employee record for this role view"}>
+        {mine && balance.known ? (
           <Stack gap={3}>
             <Meter value={balance.taken} max={Math.max(1, balance.allowance)} label="Leave used" tone={balance.left <= 2 ? "warning" : "success"} />
             <Properties rows={[
@@ -1086,12 +1103,22 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
           </Stack>
         ) : (
           <Stack gap={3}>
-            <Stat label="Balance" value="Unavailable" unavailable meta={`No employee record matches ${actor}`} />
-            <p className="ds-subtle">The owner and finance role views are not employees in this fixture, so there is no balance to show rather than a made-up number.</p>
+            <Stat
+              label="Balance"
+              value="Unavailable"
+              unavailable
+              meta={mine ? "No allowance on the employee record" : `No employee record matches ${actor}`}
+            />
+            <p className="ds-subtle">
+              {mine
+                ? `${mine.title} has an employee record with no leave allowance on it. A balance is shown as unavailable rather than as zero days, which would read as an entitlement somebody had used up.`
+                : `No employee record matches ${actor}, so there is no balance to show rather than a made-up number.`}
+            </p>
+            <Button variant="primary" onClick={() => context.openOverlay("Leave form")}>Request leave anyway</Button>
           </Stack>
         )}
       </Card>
-      <Card span={8} title="Your requests" subtitle={`${myRequests.length} on record`} flush>
+      <Card span={8} eyebrow="REQUESTS" prov="human" title="Your requests" subtitle={`${myRequests.length} on record`} flush>
         {myRequests.length === 0 ? <div className="ds-card-body"><Empty title="You have not asked for leave" icon={<CalendarDays size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Leave form")}>Request leave</Button>} /></div> : (
           <DataGrid
             rows={myRequests}
@@ -1108,7 +1135,7 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
           />
         )}
       </Card>
-      <Card span={12} title="The next six weeks" subtitle="Your leave in the context of the team">
+      <Card span={12} eyebrow="TEAM CALENDAR" prov="human" title="The next six weeks" subtitle="Your leave in the context of the team">
         <LeaveCalendar context={context} month={month} />
       </Card>
     </Grid>
@@ -1393,9 +1420,9 @@ export function Payroll({ context, lens }: { context: ScreenContext; lens: "Runs
     <Stack gap={4}>
       {banner}
       <StatRow>
-        <Stat label="People in the run" value={String(lines.length)} meta="Contractors invoice separately" />
-        <Stat label="Gross" value={context.money(gross)} meta="Computed from salaries in this browser" />
-        <Stat label="Net" value={context.money(net)} meta="After the illustrative deductions" />
+        <Stat label="People in the run" value={String(lines.length)} prov="human" meta="Contractors invoice separately" />
+        <Stat label="Gross" value={context.money(gross)} prov="human" meta="Computed from salaries in this browser" />
+        <Stat label="Net" value={context.money(net)} prov="human" meta="After the illustrative deductions" />
         <Stat label="Filed" value="Not connected" unavailable meta="No tax authority connection" />
       </StatRow>
       <DataGrid
@@ -1577,9 +1604,9 @@ export function Learning({ context, lens }: { context: ScreenContext; lens: "Cou
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Required courses" value={String(required.length)} meta="Everyone employed must complete these" />
-          <Stat label="Outstanding completions" value={String(rows.reduce((sum, row) => sum + row.outstanding, 0))} meta="Across all required courses" />
-          <Stat label="Policies needing acknowledgement" value={String(policies.filter((policy) => policy.fields.acknowledgementRequired === true).length)} />
+          <Stat label="Required courses" value={String(required.length)} prov="human" meta="Everyone employed must complete these" />
+          <Stat label="Outstanding completions" value={String(rows.reduce((sum, row) => sum + row.outstanding, 0))} prov="human" meta="Across all required courses" />
+          <Stat label="Policies needing acknowledgement" value={String(policies.filter((policy) => policy.fields.acknowledgementRequired === true).length)} prov="human" />
         </StatRow>
         <DataGrid
           rows={rows}

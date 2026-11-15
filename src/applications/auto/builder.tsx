@@ -77,18 +77,16 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
   if (context.tab === "Parameters") {
     return (
       <Grid>
-        <Card span={6} title="Loop and step limits" subtitle="A graph with a cycle is allowed, but it cannot run away">
+        <Card span={6} eyebrow="LIMITS" prov="human" title="Loop and step limits" subtitle="A graph with a cycle is allowed, but it cannot run away">
           <Stack gap={4}>
             <Field label="Maximum steps in a run" hint="The run is failed when it passes this number of executed steps.">
-              <TextInput
-                type="number" min={1} max={200}
+              <TextInput aria-label="Maximum steps in a run" type="number" min={1} max={200}
                 value={String(graph.limits?.maxSteps ?? 40)}
                 onChange={(event) => change({ ...graph, limits: { ...graph.limits, maxSteps: Math.max(1, Number(event.target.value)) } }, "Step limit changed")}
               />
             </Field>
             <Field label="Maximum visits per node" hint="Guards a loop that would otherwise keep re-entering the same node.">
-              <TextInput
-                type="number" min={1} max={20}
+              <TextInput aria-label="Maximum visits per node" type="number" min={1} max={20}
                 value={String(graph.limits?.maxVisits ?? 3)}
                 onChange={(event) => change({ ...graph, limits: { ...graph.limits, maxVisits: Math.max(1, Number(event.target.value)) } }, "Visit limit changed")}
               />
@@ -99,7 +97,7 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
           </Stack>
         </Card>
 
-        <Card span={6} title="Bindings available to a step" subtitle="Computed from the graph, not a fixed list">
+        <Card span={6} eyebrow="BINDINGS" prov="agent" title="Bindings available to a step" subtitle="Computed from the graph, not a fixed list">
           <Stack gap={2}>
             {bindingsOf(graph).map((binding) => (
               <Row key={binding.path} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
@@ -110,7 +108,7 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
           </Stack>
         </Card>
 
-        <Card span={12} title="Dry-run fixture" subtitle="Values merged over the triggered record, for a test only">
+        <Card span={12} eyebrow="FIXTURE" prov="human" title="Dry-run fixture" subtitle="Values merged over the triggered record, for a test only">
           <Stack gap={3}>
             {Object.entries(draft.fixture).length === 0 && <p className="ds-subtle">No fixture values. A dry run uses the real record the trigger matches.</p>}
             {Object.entries(draft.fixture).map(([key, value]) => (
@@ -139,9 +137,9 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
     return (
       <Stack gap={5}>
         <StatRow>
-          <Stat label="Nodes" value={String(graph.nodes.length)} meta={`${graph.edges.length} connections`} />
-          <Stat label="Blocking errors" value={String(errors.length)} meta={errors.length ? "A live run is blocked" : "The graph passes validation"} />
-          <Stat label="Records the trigger can read" value={String(pool.length)} meta={[...new Set(graph.nodes.map((node) => node.config?.collection).filter(Boolean))].join(", ") || "No collection chosen"} />
+          <Stat prov="human" label="Nodes" value={String(graph.nodes.length)} meta={`${graph.edges.length} connections`} />
+          <Stat prov="human" label="Blocking errors" value={String(errors.length)} meta={errors.length ? "A live run is blocked" : "The graph passes validation"} />
+          <Stat prov="posted" label="Records the trigger can read" value={String(pool.length)} meta={[...new Set(graph.nodes.map((node) => node.config?.collection).filter(Boolean))].join(", ") || "No collection chosen"} />
           <Stat
             label="Last simulation"
             value={draft.dryRunAt ? context.relative(draft.dryRunAt) : "Unavailable"}
@@ -151,6 +149,9 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
         </StatRow>
 
         <Card
+          eyebrow="INTERPRETER"
+          prov="agent"
+          machine
           title="Run the interpreter"
           subtitle="A dry run evaluates every step and writes nothing. A live run applies the record changes its steps asked for."
           actions={
@@ -215,7 +216,7 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
 
   if (context.tab === "History") {
     return (
-      <Card title="Runs of this automation" subtitle={`${mine.length} recorded`} flush>
+      <Card eyebrow="RUN HISTORY" prov="agent" title="Runs of this automation" subtitle={`${mine.length} recorded`} flush>
         {mine.length === 0 ? (
           <Empty title="No run yet" icon={<Play size={20} />}>Use the Test tab to run the interpreter. Every run is stored with its step trace.</Empty>
         ) : (
@@ -241,7 +242,7 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
   /* Design */
   return (
     <div className="auto-builder">
-      <Card title="Palette" subtitle="Six node kinds">
+      <Card eyebrow="PALETTE" title="Palette" subtitle="Six node kinds">
         <NodePalette onAdd={(type) => {
           const next = addNode(graph, type);
           change(next, `${type} node added`);
@@ -294,7 +295,7 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
         )}
       </Stack>
 
-      <Card title="Node properties" subtitle={draft.selectedNodeId ? graph.nodes.find((node) => node.id === draft.selectedNodeId)?.label : "Nothing selected"}>
+      <Card eyebrow="NODE" prov="human" title="Node properties" subtitle={draft.selectedNodeId ? graph.nodes.find((node) => node.id === draft.selectedNodeId)?.label : "Nothing selected"}>
         <NodeInspector
           graph={graph}
           nodeId={draft.selectedNodeId}
@@ -303,7 +304,7 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
         />
       </Card>
 
-      <Card title="Validation" subtitle={`${errors.length} error${errors.length === 1 ? "" : "s"}, ${issues.length - errors.length} warning${issues.length - errors.length === 1 ? "" : "s"}`}>
+      <Card eyebrow="VALIDATION" prov="agent" title="Validation" subtitle={`${errors.length} error${errors.length === 1 ? "" : "s"}, ${issues.length - errors.length} warning${issues.length - errors.length === 1 ? "" : "s"}`}>
         <ValidationPanel issues={issues} onSelect={(nodeId) => updateDraft(record.id, { selectedNodeId: nodeId, view: draft.view })} />
       </Card>
     </div>
@@ -323,12 +324,12 @@ export function NodePicker({ context, close }: { context: ScreenContext; close: 
         Adding a node here is the keyboard equivalent of dragging a card from the palette. The node is dropped at the next free slot and selected for you.
       </p>
       <Field label="Node kind">
-        <Select value={type} onChange={(event) => setType(event.target.value as typeof type)}>
+        <Select aria-label="Node kind" value={type} onChange={(event) => setType(event.target.value as typeof type)}>
           {NODE_KINDS.map((kind) => <option key={kind.id} value={kind.id}>{kind.label} — {kind.hint}</option>)}
         </Select>
       </Field>
       <Field label="Label" hint="A short name that says what the step does.">
-        <TextInput value={label} onChange={(event) => setLabel(event.target.value)} placeholder={NODE_KINDS.find((kind) => kind.id === type)?.label} />
+        <TextInput aria-label="Label" value={label} onChange={(event) => setLabel(event.target.value)} placeholder={NODE_KINDS.find((kind) => kind.id === type)?.label} />
       </Field>
       <Button
         variant="primary"
@@ -362,18 +363,18 @@ export function BranchEditor({ context, close }: { context: ScreenContext; close
         Choose the step the path leaves, which port it leaves by, and where it goes. A condition has a true and a false port; an approval has approved and rejected.
       </Notice>
       <Field label="From step">
-        <Select value={from} onChange={(event) => { setFrom(event.target.value); setPort("out"); }}>
+        <Select aria-label="From step" value={from} onChange={(event) => { setFrom(event.target.value); setPort("out"); }}>
           <option value="">Choose a step</option>
           {graph.nodes.map((node) => <option key={node.id} value={node.id}>{node.label} ({node.type})</option>)}
         </Select>
       </Field>
       <Field label="Leaving by">
-        <Select value={port} onChange={(event) => setPort(event.target.value as PortId)} disabled={!fromNode}>
+        <Select aria-label="Leaving by" value={port} onChange={(event) => setPort(event.target.value as PortId)} disabled={!fromNode}>
           {ports.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
         </Select>
       </Field>
       <Field label="To step">
-        <Select value={to} onChange={(event) => setTo(event.target.value)}>
+        <Select aria-label="To step" value={to} onChange={(event) => setTo(event.target.value)}>
           <option value="">Choose a step</option>
           {graph.nodes.filter((node) => node.id !== from).map((node) => <option key={node.id} value={node.id}>{node.label} ({node.type})</option>)}
         </Select>
@@ -461,8 +462,7 @@ export function NodeConfiguration({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <Field label="Step to configure">
-        <Select
-          value={draft.selectedNodeId ?? ""}
+        <Select aria-label="Step to configure" value={draft.selectedNodeId ?? ""}
           onChange={(event) => updateDraft(record.id, { selectedNodeId: event.target.value || undefined })}
         >
           <option value="">Choose a step</option>
@@ -503,14 +503,14 @@ export function FixtureEditor({ context, close }: { context: ScreenContext; clos
         Fixture values are merged over the record the trigger matched, so you can test a branch without editing a real record. A live run ignores the fixture.
       </Notice>
       <Field label="Field">
-        <Select value={key} onChange={(event) => setKey(event.target.value)}>
+        <Select aria-label="Field" value={key} onChange={(event) => setKey(event.target.value)}>
           {bindings.filter((binding) => binding.path.startsWith("record.") || binding.path === "overdueDays").map((binding) => (
             <option key={binding.path} value={binding.path.replace(/^record\./, "")}>{binding.path}</option>
           ))}
         </Select>
       </Field>
       <Field label="Value used in the dry run">
-        <TextInput value={value} onChange={(event) => setValue(event.target.value)} />
+        <TextInput aria-label="Value used in the dry run" value={value} onChange={(event) => setValue(event.target.value)} />
       </Field>
       <Row gap={2}>
         <Button

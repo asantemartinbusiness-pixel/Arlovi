@@ -191,12 +191,14 @@ function ChiefChat({ context }: { context: ScreenContext }) {
 
   return (
     <Grid>
-      <Card span={3} title="Threads" subtitle={`${conversations.length} in ${org.shortName}`}>
+      <Card span={3} eyebrow="THREADS" title="Threads" subtitle={`${conversations.length} in ${org.shortName}`}>
         <ThreadList context={context} conversations={conversations} activeId={conversation.id} />
       </Card>
 
       <Card
         span={6}
+        eyebrow="CHIEF OF STAFF"
+        prov="agent"
         title={conversation.title}
         subtitle={`${turns.length} turns · ${conversation.fields.shared === true ? "shared with the workspace" : "private to you"}`}
         actions={<Pill tone="accent" dot>Chief of Staff</Pill>}
@@ -248,7 +250,7 @@ function ChiefChat({ context }: { context: ScreenContext }) {
         </Stack>
       </Card>
 
-      <Card span={3} title="Artifact" subtitle="Produced in this workspace">
+      <Card span={3} eyebrow="ARTIFACT" prov="agent" title="Artifact" subtitle="Produced in this workspace">
         <ArtifactPreview context={context} conversation={conversation} />
       </Card>
     </Grid>
@@ -653,7 +655,7 @@ function TeamRoom({ context, view }: { context: ScreenContext; view: "Discussion
 
   return (
     <Grid>
-      <Card span={8} title={room.title} subtitle={room.summary}>
+      <Card span={8} eyebrow="TEAM ROOM" title={room.title} subtitle={room.summary}>
         <Stack gap={4}>
           <Notice tone="info" title="A mention is a request, not a grant">
             Mentioning an AI employee records a request against its contract. It cannot give that contract a tool it does not hold: external tools stay governed by the connector policy.
@@ -707,7 +709,7 @@ function TeamRoom({ context, view }: { context: ScreenContext; view: "Discussion
         </Stack>
       </Card>
 
-      <Card span={4} title="Participants" subtitle={`${participants.length} in the room`}>
+      <Card span={4} eyebrow="ROSTER" prov="human" title="Participants" subtitle={`${participants.length} in the room`}>
         <Stack gap={2}>
           {participants.map((person) => (
             <Row key={person.id} gap={2}>
@@ -797,7 +799,7 @@ function MissionRoom({ context, view }: { context: ScreenContext; view: "Discuss
 
   return (
     <Grid>
-      <Card span={8} title={`${mission.title} room`} subtitle="Agent-to-agent requests and the coordinator's decisions">
+      <Card span={8} eyebrow="MISSION ROOM" prov="agent" title={`${mission.title} room`} subtitle="Agent-to-agent requests and the coordinator's decisions">
         <Stack gap={4}>
           {loops.length > 0 && (
             <Notice tone="warning" title="A delegation loop was stopped">
@@ -851,7 +853,7 @@ function MissionRoom({ context, view }: { context: ScreenContext; view: "Discuss
           />
         </Stack>
       </Card>
-      <Card span={4} title="Dependencies" subtitle={`${tasks.length} tasks`}>
+      <Card span={4} eyebrow="DEPENDENCIES" prov="human" title="Dependencies" subtitle={`${tasks.length} tasks`}>
         <Stack gap={2}>
           {tasks.map((task) => {
             const body = task.body as { dependsOn?: string[] } | undefined;
@@ -918,7 +920,7 @@ function VoiceLive({ context }: { context: ScreenContext }) {
 
   return (
     <Grid>
-      <Card span={7} title="Turn state" subtitle={session.title} prov="human">
+      <Card span={7} eyebrow="VOICE" title="Turn state" subtitle={session.title} prov="human">
         <Stack gap={4}>
           <CapabilityLine id="telephony" title="No audio service is connected">
             The microphone is never opened by this screen and no speech is transcribed. Nothing is listening.
@@ -961,7 +963,7 @@ function VoiceLive({ context }: { context: ScreenContext }) {
         </Stack>
       </Card>
 
-      <Card span={5} title="Latest turns" subtitle={`${entries.length} recorded`}>
+      <Card span={5} eyebrow="TRANSCRIPT" prov="human" title="Latest turns" subtitle={`${entries.length} recorded`}>
         {entries.length === 0 ? <Empty title="Nothing typed yet" /> : (
           <Stack gap={2}>
             {entries.slice(-6).reverse().map((entry) => (
@@ -1191,7 +1193,7 @@ function MeetingRoom({ context, view }: { context: ScreenContext; view: "Meeting
 
   return (
     <Grid>
-      <Card span={4} title="Meeting" subtitle={meeting.summary}>
+      <Card span={4} eyebrow="MEETING" prov="human" title="Meeting" subtitle={meeting.summary}>
         <Stack gap={3}>
           <MeetingSwitch context={context} />
           <Properties rows={[
@@ -1204,7 +1206,7 @@ function MeetingRoom({ context, view }: { context: ScreenContext; view: "Meeting
         </Stack>
       </Card>
 
-      <Card span={4} title="Participants and consent" subtitle={`${participants.length} recorded`}>
+      <Card span={4} eyebrow="CONSENT" prov="human" title="Participants and consent" subtitle={`${participants.length} recorded`}>
         {participants.length === 0 ? (
           <Empty title="No participant recorded" action={<Button variant="primary" onClick={() => context.openOverlay("Recording consent")}>Record participants</Button>}>
             Consent cannot be assumed. Until participants are recorded, the transcript stays closed.
@@ -1225,7 +1227,7 @@ function MeetingRoom({ context, view }: { context: ScreenContext; view: "Meeting
         )}
       </Card>
 
-      <Card span={4} title="Agenda" subtitle={`${agenda.reduce((sum, item) => sum + item.minutes, 0)} minutes planned`}>
+      <Card span={4} eyebrow="AGENDA" prov="human" title="Agenda" subtitle={`${agenda.reduce((sum, item) => sum + item.minutes, 0)} minutes planned`}>
         {agenda.length === 0 ? <Empty title="No agenda" /> : (
           <ol className="ds-stack ds-gap-2" style={{ paddingInlineStart: "1.1rem" }}>
             {agenda.map((item) => (
@@ -1376,7 +1378,7 @@ function ResearchWorkspace({ context, view }: { context: ScreenContext; view: "F
 
   return (
     <Grid>
-      <Card span={8} title="Question" subtitle={`${research.status} · ${context.relative(research.at ?? research.updatedAt)}`} prov="human">
+      <Card span={8} eyebrow="RESEARCH" title="Question" subtitle={`${research.status} · ${context.relative(research.at ?? research.updatedAt)}`} prov="human">
         <Stack gap={4}>
           {switcher}
           <p className="ds-prose" style={{ fontSize: "var(--text-lg)" }}>{question}</p>
@@ -1402,7 +1404,7 @@ function ResearchWorkspace({ context, view }: { context: ScreenContext; view: "F
         </Stack>
       </Card>
 
-      <Card span={4} title="Working conclusion" subtitle="Stated with its limits">
+      <Card span={4} eyebrow="CONCLUSION" prov="agent" title="Working conclusion" subtitle="Stated with its limits">
         <Stack gap={3}>
           <Properties rows={[
             { label: "Verified findings", value: String(findings.filter((finding) => finding.confidence === "verified").length) },
@@ -1486,7 +1488,7 @@ function ContextManager({ context, view }: { context: ScreenContext; view: "This
 
   return (
     <Grid>
-      <Card span={7} title="What this chat will read" subtitle={`Organisation: ${org.name}`}>
+      <Card span={7} eyebrow="SCOPE" prov="human" title="What this chat will read" subtitle={`Organisation: ${org.name}`}>
         <Stack gap={4}>
           <Notice tone="info" title="Scope is per thread and per organisation">
             Pinned records are held for the thread you pinned them in. Switching organisation clears every pinned record, so nothing from {org.shortName} can be read inside another entity.
@@ -1510,7 +1512,7 @@ function ContextManager({ context, view }: { context: ScreenContext; view: "This
         </Stack>
       </Card>
 
-      <Card span={5} title="Boundaries" subtitle="What cannot cross">
+      <Card span={5} eyebrow="BOUNDARIES" prov="posted" title="Boundaries" subtitle="What cannot cross">
         <Stack gap={3}>
           <Properties rows={[
             { label: "Organisation", value: org.name },
@@ -1532,7 +1534,7 @@ function ContextManager({ context, view }: { context: ScreenContext; view: "This
 /* ---------------------------- AI-010 ---------------------------- */
 
 interface Version { version: number; at: string; author: string; summary: string }
-interface Comment { id: string; at: string; author: string; text: string }
+interface Comment { id: string; at?: string; author?: string; text: string }
 
 function artifactParts(record: Rec | undefined) {
   const body = record?.body as { text?: string; versions?: Version[]; comments?: Comment[]; sources?: string[] } | undefined;
@@ -1581,7 +1583,11 @@ function ArtifactScreen({ context, view }: { context: ScreenContext; view: "Prev
           <Stack gap={2}>
             {comments.map((item) => (
               <div key={item.id} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-                <Row gap={2}><Avatar name={item.author} size="sm" /><strong>{item.author}</strong><span className="ds-subtle">{context.relative(item.at)}</span></Row>
+                <Row gap={2}>
+                  <Avatar name={item.author ?? "Not recorded"} size="sm" />
+                  <strong>{item.author ?? "Author not recorded"}</strong>
+                  <span className="ds-subtle">{item.at ? context.relative(item.at) : "no date recorded"}</span>
+                </Row>
                 <p className="ds-prose" style={{ marginBlockStart: "var(--space-2)" }}>{item.text}</p>
               </div>
             ))}
@@ -1650,7 +1656,7 @@ function ArtifactScreen({ context, view }: { context: ScreenContext; view: "Prev
           </Row>
         </Stack>
       </Card>
-      <Card span={4} title="Provenance" subtitle="Where this came from">
+      <Card span={4} eyebrow="PROVENANCE" prov="posted" title="Provenance" subtitle="Where this came from">
         <Stack gap={3}>
           <Properties rows={[
             { label: "From conversation", value: records.find((record) => record.id === artifact.fields.conversationId)?.title ?? "Not linked" },
@@ -1895,12 +1901,28 @@ function TaskAuthorization({ context, close }: { context: ScreenContext; close: 
 }
 
 function ThreadPreview({ context }: { context: ScreenContext }) {
-  const payload = context.overlayPayload as { id?: string } | undefined;
+  const payload = context.overlayPayload as { id?: string; rename?: boolean } | undefined;
   const conversation = useRecord(payload?.id ?? context.selectedId);
+  const [name, setName] = useState("");
   if (!conversation) return <Empty title="Choose a thread" />;
   const turns = readTurns(conversation);
   return (
     <Stack gap={3}>
+      <Field label="Thread name" hint="Renaming changes the record; its turns and citations are untouched.">
+        <Row gap={2}>
+          <TextInput value={name || conversation.title} onChange={(event) => setName(event.target.value)} />
+          <Button
+            variant="secondary"
+            disabled={!name.trim() || name.trim() === conversation.title}
+            onClick={async () => {
+              await context.mutate.patch(conversation.id, { title: name.trim() }, { expectRevision: conversation.revision, event: `Conversation renamed to ${name.trim()}` });
+              context.toast("Renamed", "The thread record carries the new name.");
+            }}
+          >
+            Rename
+          </Button>
+        </Row>
+      </Field>
       <Properties rows={[
         { label: "Turns", value: String(turns.length) },
         { label: "Sharing", value: conversation.fields.shared === true ? "Shared with the workspace" : "Only you" },
@@ -2185,14 +2207,16 @@ function TaskHandoffDrawer({ context, close }: { context: ScreenContext; close: 
   const mission = useRecord(context.params.id);
   const tasks = records.filter((record) => record.collection === "missionTasks" && record.parentId === context.params.id);
   const agents = records.filter((record) => record.collection === "agents" && record.status === "active");
-  const [taskId, setTaskId] = useState(tasks[0]?.id ?? "");
-  const [to, setTo] = useState(payload?.agentId ?? agents[0]?.id ?? "");
+  const [pickedTask, setPickedTask] = useState("");
+  const [pickedAgent, setPickedAgent] = useState(payload?.agentId ?? "");
+  const taskId = pickedTask || tasks[0]?.id || "";
+  const to = pickedAgent || agents[0]?.id || "";
   const task = tasks.find((item) => item.id === taskId);
   const target = agents.find((agent) => agent.id === to);
   return (
     <Stack gap={4}>
-      <Field label="Task"><Select value={taskId} onChange={(event) => setTaskId(event.target.value)}>{tasks.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</Select></Field>
-      <Field label="Hand to"><Select value={to} onChange={(event) => setTo(event.target.value)}>{agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.title} — {String(agent.fields.role)}</option>)}</Select></Field>
+      <Field label="Task"><Select value={taskId} onChange={(event) => setPickedTask(event.target.value)}>{tasks.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</Select></Field>
+      <Field label="Hand to"><Select value={to} onChange={(event) => setPickedAgent(event.target.value)}>{agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.title} — {String(agent.fields.role)}</option>)}</Select></Field>
       {task?.fields.approvalRequired === true && (
         <Notice tone="warning" title="This task has an approval gate">
           Handing it over does not pass the gate. It still waits for a person with approval authority.
@@ -2794,7 +2818,7 @@ export const aiApp = registerApp({
         { id: "attach", label: "Attach", placement: "secondary", run: (context) => context.openOverlay("upload review") },
         { id: "mention record", label: "Pin records", placement: "secondary", run: (context) => context.openOverlay("Source selector") },
         { id: "dictate", label: "Dictate", placement: "overflow", guard: () => "No speech service is connected. The voice workspace keeps typed turns instead.", run: (context) => context.navigate(`/o/${context.org.slug}/ai/voice`) },
-        { id: "open artifact", label: "Open artifact", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/ai/artifacts/nl-documents-060`) },
+        { id: "open artifact", label: "Open artifact", placement: "overflow", run: (context) => void openLatestArtifact(context) },
       ],
       overlays: [
         { id: "Source selector", kind: "drawer", title: "Pin records into scope", width: 520, render: ({ ...context }) => <SourceSelector context={context} /> },
@@ -2814,8 +2838,8 @@ export const aiApp = registerApp({
       actions: [
         { id: "Open", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Select a thread first"), run: (context) => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/ai/chat`); } },
         { id: "search transcript", label: "Search transcripts", placement: "secondary", run: () => usePanelFlags.getState().set("ai.library.search", true) },
-        { id: "rename", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a thread first"), run: (context) => context.openOverlay("Thread preview", { id: context.selectedId }) },
-        { id: "archive", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a thread first"), run: async (context) => { context.toast("Use the row selection", "Select threads in the grid and use Archive, so the change is visible on the records.", "info"); } },
+        { id: "rename", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a thread first"), run: (context) => context.openOverlay("Thread preview", { id: context.selectedId, rename: true }) },
+        { id: "archive", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a thread first"), run: (context) => void archiveConversation(context) },
         { id: "delete", placement: "overflow", tone: "danger", capability: "delete_records", guard: (context) => (context.selectedId ? undefined : "Select a thread first"), run: (context) => context.openOverlay("delete confirmation") },
       ],
       overlays: [
@@ -3109,6 +3133,26 @@ async function reviseArtifact(context: ScreenContext): Promise<void> {
     },
   }, { expectRevision: artifact.revision, event: `${artifact.title} revised locally to v${version}` });
   context.toast("Revision composed locally", `v${version} adds the source list. No model is connected, so nothing was written for you.`);
+}
+
+async function openLatestArtifact(context: ScreenContext): Promise<void> {
+  const { db } = await import("@/runtime/db");
+  const documents = await db.records.where("[organizationId+collection]").equals([context.org.id, "documents"]).toArray();
+  const artifact = documents.find((document) => document.fields.artifact === true) ?? documents[0];
+  if (!artifact) { context.toast("No artifact yet", "A thread produces one when it writes a file in this workspace.", "info"); return; }
+  context.navigate(`/o/${context.org.slug}/ai/artifacts/${artifact.id}`);
+}
+
+async function archiveConversation(context: ScreenContext): Promise<void> {
+  const { db } = await import("@/runtime/db");
+  const conversation = context.selectedId ? await db.records.get(context.selectedId) : undefined;
+  if (!conversation || conversation.collection !== "conversations") return;
+  const archived = conversation.fields.archived === true;
+  await context.mutate.patch(conversation.id, {
+    status: archived ? "active" : "archived",
+    fields: { ...conversation.fields, archived: !archived },
+  }, { expectRevision: conversation.revision, event: `${conversation.title} ${archived ? "restored" : "archived"} by ${context.actor}` });
+  context.toast(archived ? "Restored" : "Archived", archived ? "It is back in Recent." : "It is out of the chat surface and still held for the retention schedule.");
 }
 
 export type { Turn };

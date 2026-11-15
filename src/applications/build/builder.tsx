@@ -180,7 +180,7 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
   const logicPane = (
     <div className="t6-pane" data-kind="canvas" style={{ gridColumn: "1 / -1" }} key="logic">
       <Grid>
-        <Card span={7} title="Automations" subtitle={`${model.automations.length} defined`}
+        <Card span={7} eyebrow="LOGIC" prov="human" title="Automations" subtitle={`${model.automations.length} defined`}
           footer={<Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/api`)}>Open API and functions</Button>}>
           {model.automations.length === 0
             ? <Empty title="No automation yet" icon={<FileText size={20} />}>An automation watches an entity and runs steps when a condition matches.</Empty>
@@ -208,7 +208,7 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
               );
             })}</Stack>}
         </Card>
-        <Card span={5} title="What the model says" subtitle={`${issues.filter((issue) => issue.area === "Logic").length} checks`}>
+        <Card span={5} eyebrow="CHECKS" prov="posted" title="What the model says" subtitle={`${issues.filter((issue) => issue.area === "Logic").length} checks`}>
           <Stack gap={2}>
             {issues.filter((issue) => issue.area === "Logic").map((issue) => (
               <div key={issue.id} className="t6-check" data-state={issue.level}>
@@ -401,7 +401,7 @@ export function EntityDesigner({ context, record, model }: { context: ScreenCont
 
   return (
     <Grid>
-      <Card span={4} title="Entities" subtitle={`${model.entities.length} in the model`}
+      <Card span={4} eyebrow="DATA MODEL" prov="human" title="Entities" subtitle={`${model.entities.length} in the model`}
         footer={<Button size="sm" variant="primary" onClick={async () => {
           const created = makeEntity(`Entity ${model.entities.length + 1}`);
           await write({ ...model, entities: [...model.entities, created] }, `Entity ${created.name} created`);
@@ -487,7 +487,7 @@ export function EntityDesigner({ context, record, model }: { context: ScreenCont
         )}
       </Card>
 
-      <Card span={7} title="Validation" subtitle={`${issues.length} ${issues.length === 1 ? "problem" : "problems"} in the data model`}>
+      <Card span={7} eyebrow="VALIDATION" prov="posted" title="Validation" subtitle={`${issues.length} ${issues.length === 1 ? "problem" : "problems"} in the data model`}>
         {issues.length === 0
           ? <Notice tone="success" title="The model is consistent">Every reference resolves, every choice has options and no two fields share a name.</Notice>
           : <Stack gap={2}>{issues.map((issue) => (
@@ -499,7 +499,7 @@ export function EntityDesigner({ context, record, model }: { context: ScreenCont
           ))}</Stack>}
       </Card>
 
-      <Card span={5} title="Generated interface" subtitle="Updates as you change the model"
+      <Card span={5} eyebrow="GENERATED" prov="human" title="Generated interface" subtitle="Updates as you change the model"
         footer={<Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/code`)}>Open the code view</Button>}>
         <pre className="t6-code" style={{ maxHeight: 280 }}>{entity ? generateTypes({ ...model, entities: [entity] }) : "// No entity selected"}</pre>
       </Card>

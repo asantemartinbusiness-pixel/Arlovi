@@ -68,7 +68,6 @@
 .an-h-3 { min-height: 340px; }
 
 .an-figure {
-  font-family: var(--font-mono);
   font-size: var(--text-2xl);
   font-weight: 700;
   letter-spacing: var(--tracking-tighter);
@@ -77,7 +76,6 @@
 .an-figure[data-unavailable="true"] {
   font-size: var(--text-lg);
   color: var(--warning);
-  font-family: var(--font-sans);
   font-weight: 600;
 }
 

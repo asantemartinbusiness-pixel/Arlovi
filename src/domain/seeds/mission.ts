@@ -105,7 +105,7 @@ registerSeed("mission", (ctx) => {
   });
 
   const records: Rec[] = [
-    mission(20, "Second brass supplier", {
+    mission(60, "Second brass supplier", {
       status: "proposed", owner: "Maya Chen", agentId: "nl-agents-061",
       summary: "Qualify one more collar supplier before the winter run, from recorded terms only.",
       budgetMinor: 80_000, committedMinor: 0, spentMinor: 0, dueDays: 21,
@@ -115,7 +115,7 @@ registerSeed("mission", (ctx) => {
         { id: "c2", label: "Risk register updated with the result", verified: false },
       ],
     }),
-    mission(21, "Shade warranty replies", {
+    mission(61, "Shade warranty replies", {
       status: "waiting", owner: "Priya Shah", agentId: "nl-agents-004",
       summary: "Draft replies for every open shade ticket using the approved articles. Waiting on a person to approve the wording.",
       budgetMinor: 30_000, committedMinor: 12_000, spentMinor: 0, dueDays: 4,
@@ -125,7 +125,7 @@ registerSeed("mission", (ctx) => {
         { id: "c2", label: "A person approved each draft before it is used", verified: false },
       ],
     }),
-    mission(22, "Autumn pricing review", {
+    mission(62, "Autumn pricing review", {
       status: "completed", owner: "Maya Chen", agentId: "nl-agents-064",
       summary: "Checked recorded prices against the price list and the paid invoices. Closed with two corrections.",
       budgetMinor: 50_000, committedMinor: 50_000, spentMinor: 0, dueDays: -12,
@@ -135,7 +135,7 @@ registerSeed("mission", (ctx) => {
         { id: "c2", label: "Corrections recorded in the fact registry", verified: true, evidenceId: "nl-facts-071" },
       ],
     }),
-    mission(23, "Showroom hours correction", {
+    mission(63, "Showroom hours correction", {
       status: "running", owner: "Priya Shah", agentId: "nl-agents-001",
       summary: "Settle the Saturday closing time and update every place it appears.",
       budgetMinor: 20_000, committedMinor: 8_000, spentMinor: 0, dueDays: 2,
@@ -145,7 +145,7 @@ registerSeed("mission", (ctx) => {
         { id: "c2", label: "Location record and public page agree", verified: false },
       ],
     }),
-    mission(24, "Spring catalogue groundwork", {
+    mission(64, "Spring catalogue groundwork", {
       status: "archived", owner: "Maya Chen", agentId: "nl-agents-003",
       summary: "Archived before the plan was approved. Kept for audit; it cannot be executed.",
       budgetMinor: 0, committedMinor: 0, spentMinor: 0,
@@ -153,33 +153,33 @@ registerSeed("mission", (ctx) => {
       criteria: [{ id: "c1", label: "Plan approved", verified: false }],
     }),
 
-    task(20, "Read the supply agreement terms", { missionN: 60, stage: "verified", order: 1, summary: "Payment terms and the sole-source clause.", assignee: "Tomas Reiner", kind: "ai", estimateHours: 1, evidence: ["nl-sources-063"] }),
-    task(21, "List candidate suppliers already recorded", { missionN: 60, stage: "ready", order: 2, summary: "Only one supplier record exists, so the gap is reported rather than filled.", assignee: "Tomas Reiner", kind: "ai", estimateHours: 1, dependsOn: [60], risk: "No supplier directory is reachable from this browser." }),
-    task(22, "Enter a second supplier record", { missionN: 60, stage: "todo", order: 3, summary: "A person must add the supplier before terms can be compared.", assignee: "Maya Chen", kind: "human", estimateHours: 2, dependsOn: [61] }),
-    task(23, "Compare terms and write the note", { missionN: 60, stage: "todo", order: 4, summary: "Comparison from recorded terms only.", assignee: "Tomas Reiner", kind: "ai", estimateHours: 2, dependsOn: [62] }),
-    task(24, "Approve the recommendation", { missionN: 60, stage: "todo", order: 5, summary: "Owner decision; the mission stops here until it is given.", assignee: "Maya Chen", kind: "human", estimateHours: 1, dependsOn: [63], approvalRequired: true }),
+    task(60, "Read the supply agreement terms", { missionN: 60, stage: "verified", order: 1, summary: "Payment terms and the sole-source clause.", assignee: "Tomas Reiner", kind: "ai", estimateHours: 1, evidence: ["nl-sources-063"] }),
+    task(61, "List candidate suppliers already recorded", { missionN: 60, stage: "ready", order: 2, summary: "Only one supplier record exists, so the gap is reported rather than filled.", assignee: "Tomas Reiner", kind: "ai", estimateHours: 1, dependsOn: [60], risk: "No supplier directory is reachable from this browser." }),
+    task(62, "Enter a second supplier record", { missionN: 60, stage: "todo", order: 3, summary: "A person must add the supplier before terms can be compared.", assignee: "Maya Chen", kind: "human", estimateHours: 2, dependsOn: [61] }),
+    task(63, "Compare terms and write the note", { missionN: 60, stage: "todo", order: 4, summary: "Comparison from recorded terms only.", assignee: "Tomas Reiner", kind: "ai", estimateHours: 2, dependsOn: [62] }),
+    task(64, "Approve the recommendation", { missionN: 60, stage: "todo", order: 5, summary: "Owner decision; the mission stops here until it is given.", assignee: "Maya Chen", kind: "human", estimateHours: 1, dependsOn: [63], approvalRequired: true }),
 
-    task(30, "Collect open shade tickets", { missionN: 61, stage: "verified", order: 1, summary: "One open ticket found.", assignee: "Remy Alves", kind: "ai", estimateHours: 1, evidence: ["nl-tickets-001"] }),
-    task(31, "Draft each reply from approved articles", { missionN: 61, stage: "review", order: 2, summary: "Draft written with the warranty article cited.", assignee: "Remy Alves", kind: "ai", estimateHours: 1, dependsOn: [70], evidence: ["nl-sources-067"] }),
-    task(32, "Approve the wording", { missionN: 61, stage: "blocked", order: 3, summary: "Waiting on Priya. Nothing can be sent in any case: no mail provider is connected.", assignee: "Priya Shah", kind: "human", estimateHours: 1, dependsOn: [71], approvalRequired: true, risk: "Sending is not possible from this browser." }),
+    task(70, "Collect open shade tickets", { missionN: 61, stage: "verified", order: 1, summary: "One open ticket found.", assignee: "Remy Alves", kind: "ai", estimateHours: 1, evidence: ["nl-tickets-001"] }),
+    task(71, "Draft each reply from approved articles", { missionN: 61, stage: "review", order: 2, summary: "Draft written with the warranty article cited.", assignee: "Remy Alves", kind: "ai", estimateHours: 1, dependsOn: [70], evidence: ["nl-sources-067"] }),
+    task(72, "Approve the wording", { missionN: 61, stage: "blocked", order: 3, summary: "Waiting on Priya. Nothing can be sent in any case: no mail provider is connected.", assignee: "Priya Shah", kind: "human", estimateHours: 1, dependsOn: [71], approvalRequired: true, risk: "Sending is not possible from this browser." }),
 
-    task(40, "Read both hour sources", { missionN: 63, stage: "verified", order: 1, summary: "Board photograph and the location record.", assignee: "Nia Okonkwo", kind: "ai", estimateHours: 1, evidence: ["nl-sources-061"] }),
-    task(41, "Choose the source of truth", { missionN: 63, stage: "running", order: 2, summary: "A person must choose; the conflict is in the knowledge board.", assignee: "Priya Shah", kind: "human", estimateHours: 1, dependsOn: [80], approvalRequired: true }),
-    task(42, "Update the location record", { missionN: 63, stage: "ready", order: 3, summary: "Local record edit once the choice is made.", assignee: "Priya Shah", kind: "human", estimateHours: 1, dependsOn: [81] }),
-    task(43, "Update the public page", { missionN: 63, stage: "blocked", order: 4, summary: "The saved page cannot be republished: no hosting connection exists.", assignee: "Nia Okonkwo", kind: "ai", estimateHours: 1, dependsOn: [82], risk: "Publishing is not connected." }),
+    task(80, "Read both hour sources", { missionN: 63, stage: "verified", order: 1, summary: "Board photograph and the location record.", assignee: "Nia Okonkwo", kind: "ai", estimateHours: 1, evidence: ["nl-sources-061"] }),
+    task(81, "Choose the source of truth", { missionN: 63, stage: "running", order: 2, summary: "A person must choose; the conflict is in the knowledge board.", assignee: "Priya Shah", kind: "human", estimateHours: 1, dependsOn: [80], approvalRequired: true }),
+    task(82, "Update the location record", { missionN: 63, stage: "ready", order: 3, summary: "Local record edit once the choice is made.", assignee: "Priya Shah", kind: "human", estimateHours: 1, dependsOn: [81] }),
+    task(83, "Update the public page", { missionN: 63, stage: "blocked", order: 4, summary: "The saved page cannot be republished: no hosting connection exists.", assignee: "Nia Okonkwo", kind: "ai", estimateHours: 1, dependsOn: [82], risk: "Publishing is not connected." }),
 
-    task(50, "Check every product price against the list", { missionN: 62, stage: "verified", order: 1, summary: "Three products checked.", assignee: "Pilar Sainz", kind: "ai", estimateHours: 2, evidence: ["nl-sources-060"] }),
-    task(51, "Record the two corrections", { missionN: 62, stage: "verified", order: 2, summary: "Collar spare and pendant trio corrected in the registry.", assignee: "Pilar Sainz", kind: "ai", estimateHours: 1, dependsOn: [90], evidence: ["nl-facts-071"] }),
-    task(52, "Owner sign-off", { missionN: 62, stage: "verified", order: 3, summary: "Signed off by Maya.", assignee: "Maya Chen", kind: "human", estimateHours: 1, dependsOn: [91], approvalRequired: true }),
+    task(90, "Check every product price against the list", { missionN: 62, stage: "verified", order: 1, summary: "Three products checked.", assignee: "Pilar Sainz", kind: "ai", estimateHours: 2, evidence: ["nl-sources-060"] }),
+    task(91, "Record the two corrections", { missionN: 62, stage: "verified", order: 2, summary: "Collar spare and pendant trio corrected in the registry.", assignee: "Pilar Sainz", kind: "ai", estimateHours: 1, dependsOn: [90], evidence: ["nl-facts-071"] }),
+    task(92, "Owner sign-off", { missionN: 62, stage: "verified", order: 3, summary: "Signed off by Maya.", assignee: "Maya Chen", kind: "human", estimateHours: 1, dependsOn: [91], approvalRequired: true }),
 
-    step(20, "Read the winter run product records", { missionN: 1, order: 1, kind: "read", state: "done", summary: "Read the products and their recorded prices.", operation: "collect.products", output: "3 product records read, each with a recorded ex-VAT price.", taskId: "nl-missionTasks-001" }),
-    step(21, "Collect the open invoice position", { missionN: 1, order: 2, kind: "read", state: "done", summary: "Open invoices with due dates.", operation: "collect.open_invoices", output: "Open invoices listed with due dates and amounts.", taskId: "nl-missionTasks-001" }),
-    step(22, "Compute the launch budget headroom", { missionN: 1, order: 3, kind: "compute", state: "done", summary: "Budget minus committed.", operation: "compute.budget_headroom", output: "Headroom computed from the mission budget and its commitments." }),
-    step(23, "Draft the campaign copy", { missionN: 1, order: 4, kind: "draft", state: "ready", summary: "Writes a draft document record from the product and decision records.", operation: "draft.campaign_copy" }),
-    step(24, "Owner approves the copy", { missionN: 1, order: 5, kind: "approval", state: "awaiting_approval", summary: "Held for an owner or an approver. Nothing proceeds without it.", operation: "approval.owner" }),
-    step(25, "Email the trade list", { missionN: 1, order: 6, kind: "provider", state: "blocked", capability: "email.send", summary: "Stopped at the provider boundary.", operation: "provider.email_send", reason: "No mail provider is connected. The recipient list and body are kept as a local draft and nothing was sent." }),
-    step(26, "Publish the launch page", { missionN: 1, order: 7, kind: "provider", state: "blocked", capability: "site.publish", summary: "Stopped at the provider boundary.", operation: "provider.site_publish", reason: "No hosting connection exists, so the page model stays in this workspace." }),
-    step(27, "Fetch the supplier price feed", { missionN: 1, order: 8, kind: "provider", state: "unknown_side_effect", capability: "bank.feed", attempts: 2, summary: "An earlier attempt ended without a reply, so the outcome is unknown.", operation: "provider.price_feed", reason: "The attempt was recorded with no response. Retrying could repeat an effect that may already have happened, so it must be reconciled by a person first." }),
+    step(60, "Read the winter run product records", { missionN: 1, order: 1, kind: "read", state: "done", summary: "Read the products and their recorded prices.", operation: "collect.products", output: "3 product records read, each with a recorded ex-VAT price.", taskId: "nl-missionTasks-001" }),
+    step(61, "Collect the open invoice position", { missionN: 1, order: 2, kind: "read", state: "done", summary: "Open invoices with due dates.", operation: "collect.open_invoices", output: "Open invoices listed with due dates and amounts.", taskId: "nl-missionTasks-001" }),
+    step(62, "Compute the launch budget headroom", { missionN: 1, order: 3, kind: "compute", state: "done", summary: "Budget minus committed.", operation: "compute.budget_headroom", output: "Headroom computed from the mission budget and its commitments." }),
+    step(63, "Draft the campaign copy", { missionN: 1, order: 4, kind: "draft", state: "ready", summary: "Writes a draft document record from the product and decision records.", operation: "draft.campaign_copy" }),
+    step(64, "Owner approves the copy", { missionN: 1, order: 5, kind: "approval", state: "awaiting_approval", summary: "Held for an owner or an approver. Nothing proceeds without it.", operation: "approval.owner" }),
+    step(65, "Email the trade list", { missionN: 1, order: 6, kind: "provider", state: "blocked", capability: "email.send", summary: "Stopped at the provider boundary.", operation: "provider.email_send", reason: "No mail provider is connected. The recipient list and body are kept as a local draft and nothing was sent." }),
+    step(66, "Publish the launch page", { missionN: 1, order: 7, kind: "provider", state: "blocked", capability: "site.publish", summary: "Stopped at the provider boundary.", operation: "provider.site_publish", reason: "No hosting connection exists, so the page model stays in this workspace." }),
+    step(67, "Fetch the supplier price feed", { missionN: 1, order: 8, kind: "provider", state: "unknown_side_effect", capability: "bank.feed", attempts: 2, summary: "An earlier attempt ended without a reply, so the outcome is unknown.", operation: "provider.price_feed", reason: "The attempt was recorded with no response. Retrying could repeat an effect that may already have happened, so it must be reconciled by a person first." }),
 
     ctx.rec({
       org: "nl", collection: "missionReceipts", n: 60, title: "Receipt · collect.open_invoices",

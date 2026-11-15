@@ -7,7 +7,7 @@ import {
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import { freshness } from "@/platform/clock";
-import { CalendarToolbar, ProviderBoundary, ScheduleCalendar } from "@/applications/growth/kit";
+import { CalendarToolbar, ProviderBoundary, ScheduleCalendar } from "@/applications/market/kit";
 import { CalendarCheck, Mail, Megaphone, PenLine, Search, Users } from "lucide-react";
 import type { Rec } from "@/domain/types";
 import {

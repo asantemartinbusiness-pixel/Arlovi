@@ -107,6 +107,15 @@ export function writeSelection(root: HTMLElement, model: DocModel, range: DocRan
   if (!anchor || !head) return;
   const selection = root.ownerDocument.getSelection();
   if (!selection) return;
+  // A Range collapses when its end precedes its start, which would destroy
+  // every backward selection (Shift+ArrowLeft). setBaseAndExtent keeps the
+  // direction, so extending leftwards survives the caret restore.
+  try {
+    selection.setBaseAndExtent(anchor.node, anchor.offset, head.node, head.offset);
+    return;
+  } catch {
+    /* fall through to a forward range below */
+  }
   const domRange = root.ownerDocument.createRange();
   try {
     domRange.setStart(anchor.node, anchor.offset);

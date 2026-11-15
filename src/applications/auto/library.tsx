@@ -85,15 +85,15 @@ export function AutomationLibrary({ context, tab }: { context: ScreenContext; ta
     <Stack gap={5}>
       {tab === "All" && (
         <StatRow>
-          <Stat label="Active" value={String(rows.filter((row) => row.record.status === "active").length)} meta={`${rows.length} automations in total`} />
-          <Stat label="Runs recorded" value={String(rows.reduce((total, row) => total + row.runCount, 0))} meta="Every run keeps its own step trace" />
+          <Stat prov="human" label="Active" value={String(rows.filter((row) => row.record.status === "active").length)} meta={`${rows.length} automations in total`} />
+          <Stat prov="agent" label="Runs recorded" value={String(rows.reduce((total, row) => total + row.runCount, 0))} meta="Every run keeps its own step trace" />
           <Stat
             label="Last run"
             value={age.known ? context.relative(lastRunAt) : "Unavailable"}
             unavailable={!age.known}
             meta={age.known ? `${age.days} day${age.days === 1 ? "" : "s"} ago` : "No run has been recorded in this browser"}
           />
-          <Stat label="Blocking errors" value={String(rows.reduce((total, row) => total + row.errors, 0))} meta="A workflow with an error cannot be activated" />
+          <Stat prov="human" label="Blocking errors" value={String(rows.reduce((total, row) => total + row.errors, 0))} meta="A workflow with an error cannot be activated" />
         </StatRow>
       )}
 
@@ -104,6 +104,8 @@ export function AutomationLibrary({ context, tab }: { context: ScreenContext; ta
       )}
 
       <Card
+        eyebrow="AUTOMATIONS"
+        prov="human"
         title={`${tab} automations`}
         subtitle={`${filtered.length} of ${rows.length}`}
         flush
@@ -324,7 +326,7 @@ export function DuplicateWorkflow({ context, close }: { context: ScreenContext; 
   return (
     <Stack gap={4}>
       <Field label="Name of the copy" required>
-        <TextInput value={name} onChange={(event) => setName(event.target.value)} required />
+        <TextInput aria-label="Name of the copy" value={name} onChange={(event) => setName(event.target.value)} required />
       </Field>
       <Notice tone="warning" title="The copy starts without grants or approvals">
         {approvals.length > 0 && `${approvals.length} approval gate${approvals.length === 1 ? "" : "s"} will be copied with the approver cleared, so an old grant cannot carry over. `}
@@ -421,15 +423,15 @@ export function CreateWorkflow({ context, close }: { context: ScreenContext; clo
         close();
       }}
     >
-      <Field label="Name" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required placeholder="Chase overdue invoices" /></Field>
-      <Field label="What it should do"><TextArea rows={2} value={summary} onChange={(event) => setSummary(event.target.value)} /></Field>
+      <Field label="Name" required><TextInput aria-label="Name" value={title} onChange={(event) => setTitle(event.target.value)} required placeholder="Chase overdue invoices" /></Field>
+      <Field label="What it should do"><TextArea aria-label="What it should do" rows={2} value={summary} onChange={(event) => setSummary(event.target.value)} /></Field>
       <Field label="Records it watches">
-        <Select value={collection} onChange={(event) => setCollection(event.target.value)}>
+        <Select aria-label="Records it watches" value={collection} onChange={(event) => setCollection(event.target.value)}>
           {["invoices", "bills", "tasks", "tickets", "deals", "orders", "quotes"].map((name) => <option key={name} value={name}>{name}</option>)}
         </Select>
       </Field>
       <Field label="Starting shape" hint="Every shape is a real graph you can edit; nothing is a placeholder.">
-        <Select value={shape} onChange={(event) => setShape(event.target.value as typeof shape)}>
+        <Select aria-label="Starting shape" value={shape} onChange={(event) => setShape(event.target.value as typeof shape)}>
           <option value="reminder">Trigger → condition → two branches</option>
           <option value="approval">Trigger → variable → approval gate → action</option>
           <option value="blank">Trigger only</option>

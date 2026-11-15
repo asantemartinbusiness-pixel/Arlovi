@@ -66,7 +66,7 @@ registerSeed("docs", (context) => {
   return {
     records: [
       context.rec({
-        org: "nl", collection: "documents", n: 20, title: "Trade pricing and discount policy",
+        org: "nl", collection: "documents", n: 320, title: "Trade pricing and discount policy",
         status: "in_review", owner: "Maya Chen",
         summary: "Governs every quotation raised in the workspace.",
         tags: ["policy", "finance"],
@@ -86,7 +86,7 @@ registerSeed("docs", (context) => {
         }),
       }),
       context.rec({
-        org: "nl", collection: "documents", n: 21, title: "Clerkenwell showroom — lighting proposal",
+        org: "nl", collection: "documents", n: 321, title: "Clerkenwell showroom — lighting proposal",
         status: "draft", owner: "Priya Shah",
         summary: "Twelve Arc Lamps across two phases for the Clerkenwell fit-out.",
         tags: ["proposal", "sales"],
@@ -94,7 +94,7 @@ registerSeed("docs", (context) => {
         body: doc(proposalBlocks),
       }),
       context.rec({
-        org: "nl", collection: "documents", n: 22, title: "Workshop handbook",
+        org: "nl", collection: "documents", n: 322, title: "Workshop handbook",
         status: "published", owner: "Theo Marsh",
         summary: "How the Walthamstow workshop runs, shift by shift.",
         tags: ["handbook", "operations"],
@@ -102,7 +102,7 @@ registerSeed("docs", (context) => {
         body: doc(handbookBlocks),
       }),
       context.rec({
-        org: "nl", collection: "documents", n: 23, title: "Supplier onboarding checklist",
+        org: "nl", collection: "documents", n: 323, title: "Supplier onboarding checklist",
         status: "archived", owner: "Jonah Adeyemi",
         summary: "Superseded by the procurement policy.",
         tags: ["archive"],
@@ -116,7 +116,7 @@ registerSeed("docs", (context) => {
         ]),
       }),
       context.rec({
-        org: "nl", collection: "templates", n: 20, title: "Trade proposal",
+        org: "nl", collection: "templates", n: 320, title: "Trade proposal",
         status: "published", summary: "Scope, commercials and a signature block, with company fields filled from the workspace.",
         tags: ["template", "sales"],
         fields: { kind: "document", scope: "company", tokens: "company.name, company.registration, customer.name, quote.total", usedBy: 6 },
@@ -130,7 +130,7 @@ registerSeed("docs", (context) => {
         ]),
       }),
       context.rec({
-        org: "nl", collection: "templates", n: 21, title: "Policy document",
+        org: "nl", collection: "templates", n: 321, title: "Policy document",
         status: "published", summary: "Numbered sections with a review cycle and an approval block.",
         tags: ["template", "governance"],
         fields: { kind: "document", scope: "company", tokens: "company.name, policy.owner, policy.reviewDate", usedBy: 3 },
@@ -143,7 +143,7 @@ registerSeed("docs", (context) => {
         ]),
       }),
       context.rec({
-        org: "nl", collection: "templates", n: 22, title: "Workshop shift note",
+        org: "nl", collection: "templates", n: 322, title: "Workshop shift note",
         status: "draft", summary: "Short daily note for the workshop board.",
         tags: ["template", "operations"],
         fields: { kind: "document", scope: "department", department: "Workshop", tokens: "shift.date, shift.lead", usedBy: 0 },
@@ -155,7 +155,7 @@ registerSeed("docs", (context) => {
         ]),
       }),
       context.rec({
-        org: "hb", collection: "documents", n: 20, title: "Harbor distribution agreement — draft",
+        org: "hb", collection: "documents", n: 320, title: "Harbor distribution agreement — draft",
         status: "in_review", owner: "Elena Ward",
         summary: "Terms for the US distribution of the Arc range.",
         tags: ["legal", "confidential"],

@@ -67,7 +67,7 @@ function KnowledgeHome({ context, view }: { context: ScreenContext; view: "Overv
     const domains = [...new Set(data.facts.map((fact) => String(fact.fields.domain ?? "unfiled")))];
     return (
       <Grid>
-        <Card span={12} title="Assertions by domain" subtitle="Verified against everything else recorded">
+        <Card span={12} eyebrow="REGISTRY" prov="posted" title="Assertions by domain" subtitle="Verified against everything else recorded">
           <BarChart
             title="Assertions by domain"
             height={220}
@@ -79,7 +79,7 @@ function KnowledgeHome({ context, view }: { context: ScreenContext; view: "Overv
             footer="Counted from the fact registry. A domain with no verified assertion is a gap, not a zero."
           />
         </Card>
-        <Card span={6} title="Assertions with no source" subtitle={`${unsourced.length} of ${data.facts.length}`}>
+        <Card span={6} eyebrow="GAPS" prov="unknown" title="Assertions with no source" subtitle={`${unsourced.length} of ${data.facts.length}`}>
           {unsourced.length === 0 ? <Notice tone="success">Every assertion names a source record.</Notice> : (
             <Stack gap={2}>
               {unsourced.map((fact) => (
@@ -91,7 +91,7 @@ function KnowledgeHome({ context, view }: { context: ScreenContext; view: "Overv
             </Stack>
           )}
         </Card>
-        <Card span={6} title="Stale sources" subtitle="Older than 45 days">
+        <Card span={6} eyebrow="FRESHNESS" prov="unknown" title="Stale sources" subtitle="Older than 45 days">
           {stale.length === 0 ? <Notice tone="success">Every source has been refreshed recently.</Notice> : (
             <Stack gap={2}>
               {stale.map((source) => {
@@ -159,7 +159,7 @@ function KnowledgeHome({ context, view }: { context: ScreenContext; view: "Overv
       </StatRow>
 
       <Grid>
-        <Card span={7} title="Knowledge quality" subtitle="Computed from the registry, not estimated">
+        <Card span={7} eyebrow="QUALITY" prov="posted" title="Knowledge quality" subtitle="Computed from the registry, not estimated">
           <Stack gap={4}>
             <div>
               <Row gap={2}><span className="ds-grow">Assertions with a source</span><strong className="ds-num">{data.facts.length - unsourced.length} / {data.facts.length}</strong></Row>
@@ -179,7 +179,7 @@ function KnowledgeHome({ context, view }: { context: ScreenContext; view: "Overv
           </Stack>
         </Card>
 
-        <Card span={5} title="Recent sources" subtitle={`${data.sources.length} registered`}>
+        <Card span={5} eyebrow="SOURCES" prov="human" title="Recent sources" subtitle={`${data.sources.length} registered`}>
           <Stack gap={2}>
             {data.sources.slice(0, 6).map((source) => {
               const age = freshness(String(source.fields.freshness ?? source.updatedAt), now, 45);
@@ -196,7 +196,7 @@ function KnowledgeHome({ context, view }: { context: ScreenContext; view: "Overv
           </Stack>
         </Card>
 
-        <Card span={12} title="Top entities" subtitle="Subjects the registry knows most about">
+        <Card span={12} eyebrow="ENTITIES" prov="posted" title="Top entities" subtitle="Subjects the registry knows most about">
           <DataGrid
             rows={[...new Set(data.facts.map((fact) => String(fact.fields.subject ?? "unfiled")))].map((subject) => ({
               subject,
@@ -345,7 +345,7 @@ function SourceDetail({ context, view }: { context: ScreenContext; view: "Previe
         <Card title="Lineage" subtitle="What this source came from and what depends on it">
           <Properties rows={[
             { label: "Came from", value: String(source.fields.kind) === "website" ? "A saved copy taken by a person" : "A file a person put into this workspace" },
-            { label: "Feeds", value: `${facts.length} assertions, ${data.conflicts.filter((conflict) => JSON.stringify(conflict.body).includes(source.id)).length} conflicts` },
+            { label: "Feeds", value: `${facts.length} assertions, ${data.conflicts.filter((conflict) => JSON.stringify(conflict.body ?? {}).includes(source.id)).length} conflicts` },
             { label: "Refreshable", value: <Pill tone="warning">No service connected</Pill> },
           ]} />
         </Card>
@@ -401,7 +401,7 @@ function SourceDetail({ context, view }: { context: ScreenContext; view: "Previe
 
   return (
     <Grid>
-      <Card span={7} title={source.title} subtitle={source.summary} prov="human"
+      <Card span={7} eyebrow="SOURCE" title={source.title} subtitle={source.summary} prov="human"
         actions={<Pill tone={source.status === "indexed" ? "success" : "warning"}>{source.status}</Pill>}>
         <Stack gap={3}>
           {source.status === "quarantined" && (
@@ -426,7 +426,7 @@ function SourceDetail({ context, view }: { context: ScreenContext; view: "Previe
           </article>
         </Stack>
       </Card>
-      <Card span={5} title="Metadata" subtitle="Provenance and freshness">
+      <Card span={5} eyebrow="METADATA" prov="human" title="Metadata" subtitle="Provenance and freshness">
         <Properties rows={[
           { label: "Kind", value: String(source.fields.kind ?? "file") },
           { label: "Pages", value: Number(source.fields.pages ?? 0) ? String(source.fields.pages) : "Not recorded" },
@@ -533,7 +533,7 @@ function BusinessGraph({ context, view }: { context: ScreenContext; view: "Entit
       </Row>
 
       {mode === "diagram" ? (
-        <Card title="Entities and their links" subtitle={`${nodes.length} entities drawn · ${links.length} links`}>
+        <Card eyebrow="BUSINESS GRAPH" prov="posted" title="Entities and their links" subtitle={`${nodes.length} entities drawn · ${links.length} links`}>
           <svg viewBox="0 0 600 420" role="img" aria-label={`Business graph with ${nodes.length} entities and ${links.length} relationships. The list view carries the same information.`} style={{ width: "100%", height: 420 }}>
             {data.graphLinks.map((link) => {
               const from = nodes.find((node) => node.id === link.fields.fromId);
@@ -662,7 +662,7 @@ function KnowledgeConflicts({ context, view }: { context: ScreenContext; view: "
       </Notice>
       <Grid>
         {domains.map((domain) => (
-          <Card key={domain} span={6} title={domain} subtitle={`${rows.filter((conflict) => conflict.fields.domain === domain).length} in this domain`}>
+          <Card key={domain} span={6} eyebrow="CONFLICTS" prov="unknown" title={domain} subtitle={`${rows.filter((conflict) => conflict.fields.domain === domain).length} in this domain`}>
             <Stack gap={3}>
               {rows.filter((conflict) => conflict.fields.domain === domain).map((conflict) => {
                 const options = conflictOptions(conflict);
@@ -735,6 +735,7 @@ function DecisionRegister({ context, view }: { context: ScreenContext; view: "Al
             <Card
               key={decision.id}
               span={6}
+              eyebrow="DECISION"
               title={decision.title}
               subtitle={`${decision.status} · ${String(decision.fields.domain ?? "general")}`}
               prov="human"
@@ -895,7 +896,7 @@ function BrandIntelligence({ context, view }: { context: ScreenContext; view: "I
 
   return (
     <Grid>
-      <Card span={7} title={approved.title} subtitle={approved.summary} prov="human">
+      <Card span={7} eyebrow="BRAND" title={approved.title} subtitle={approved.summary} prov="human">
         <Stack gap={3}>
           <Properties rows={[
             { label: "Approved variant", value: approved.title },
@@ -907,7 +908,7 @@ function BrandIntelligence({ context, view }: { context: ScreenContext; view: "I
           </Notice>
         </Stack>
       </Card>
-      <Card span={5} title="Regional variants" subtitle={`${proposals.length} proposed`} prov="agent">
+      <Card span={5} eyebrow="PROPOSED" title="Regional variants" subtitle={`${proposals.length} proposed`} prov="agent">
         {proposals.length === 0 ? <Empty title="No variant proposed" /> : (
           <Stack gap={2}>
             {proposals.map((proposal) => (
@@ -1593,7 +1594,8 @@ function ConflictResolver({ context, close }: { context: ScreenContext; close: (
   const payload = context.overlayPayload as { id?: string } | undefined;
   const conflict = data.conflicts.find((item) => item.id === (payload?.id ?? context.selectedId)) ?? data.conflicts.find((item) => item.status === "open");
   const options = conflictOptions(conflict);
-  const [chosen, setChosen] = useState(options[0]?.id ?? "");
+  const [picked, setPicked] = useState("");
+  const chosen = picked || options[0]?.id || "";
   const [reason, setReason] = useState("");
   if (!conflict) return <Empty title="No conflict to resolve" />;
   const ledger = conflict.fields.requiresLedgerReview === true;
@@ -1609,7 +1611,7 @@ function ConflictResolver({ context, close }: { context: ScreenContext; close: (
           {options.map((option) => (
             <label key={option.id} className="ds-panel" style={{ padding: "var(--space-3)", display: "block", cursor: "pointer" }}>
               <Row gap={2}>
-                <input type="radio" name="truth" value={option.id} checked={chosen === option.id} onChange={() => setChosen(option.id)} />
+                <input type="radio" name="truth" value={option.id} checked={chosen === option.id} onChange={() => setPicked(option.id)} />
                 <strong className="ds-grow">{option.value}</strong>
                 <span className="ds-subtle">{context.date(option.recordedAt)}</span>
               </Row>
@@ -1809,7 +1811,8 @@ function BrandRuleEditor({ context, close }: { context: ScreenContext; close: ()
   const body = proposal?.body as { rules?: BrandRule[] } | undefined;
   const existing = (body?.rules ?? []).find((rule) => rule.id === payload?.id);
   const [rule, setRule] = useState(existing?.rule ?? "");
-  const [source, setSource] = useState(existing?.source ?? sources[0]?.id ?? "");
+  const [pickedSource, setPickedSource] = useState(existing?.source ?? "");
+  const source = pickedSource || sources[0]?.id || "";
   const [status, setStatus] = useState(existing?.status ?? "proposed");
   if (!proposal) return <Empty title="No brand record to edit" />;
   return (
@@ -1829,7 +1832,7 @@ function BrandRuleEditor({ context, close }: { context: ScreenContext; close: ()
     >
       <Field label="Rule" required><TextInput value={rule} onChange={(event) => setRule(event.target.value)} required /></Field>
       <Field label="Evidence" hint="A rule without a source stays proposed.">
-        <Select value={source} onChange={(event) => setSource(event.target.value)}>
+        <Select value={source} onChange={(event) => setPickedSource(event.target.value)}>
           <option value="">No source</option>
           {sources.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
         </Select>
@@ -1902,14 +1905,15 @@ function GrantDialog({ context, close }: { context: ScreenContext; close: () => 
   const payload = context.overlayPayload as { agentId?: string } | undefined;
   const policy = data.policies.find((item) => item.fields.kind === "grants");
   const grants = (policy?.body as { grants?: Grant[] } | undefined)?.grants ?? [];
-  const [agentId, setAgentId] = useState(payload?.agentId ?? grants[0]?.agentId ?? data.agents[0]?.id ?? "");
+  const [pickedAgent, setPickedAgent] = useState(payload?.agentId ?? "");
+  const agentId = pickedAgent || grants[0]?.agentId || data.agents[0]?.id || "";
   const current = grants.find((grant) => grant.agentId === agentId);
   const [groups, setGroups] = useState<string[]>(current?.groups ?? ["public"]);
   if (!policy) return <Empty title="No grant policy recorded" />;
   return (
     <Stack gap={4}>
       <Field label="AI employee">
-        <Select value={agentId} onChange={(event) => { setAgentId(event.target.value); setGroups(grants.find((grant) => grant.agentId === event.target.value)?.groups ?? ["public"]); }}>
+        <Select value={agentId} onChange={(event) => { setPickedAgent(event.target.value); setGroups(grants.find((grant) => grant.agentId === event.target.value)?.groups ?? ["public"]); }}>
           {data.agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.title} — {String(agent.fields.role ?? "")}</option>)}
         </Select>
       </Field>
@@ -1986,12 +1990,13 @@ function RevokeConfirmation({ context, close }: { context: ScreenContext; close:
   const data = useKnowledge();
   const policy = data.policies.find((item) => item.fields.kind === "grants");
   const grants = (policy?.body as { grants?: Grant[] } | undefined)?.grants ?? [];
-  const [agentId, setAgentId] = useState(grants[0]?.agentId ?? "");
+  const [pickedAgent, setPickedAgent] = useState("");
+  const agentId = pickedAgent || grants[0]?.agentId || "";
   if (!policy) return <Empty title="No grant policy" />;
   return (
     <Stack gap={4}>
       <Field label="Revoke the grant of">
-        <Select value={agentId} onChange={(event) => setAgentId(event.target.value)}>
+        <Select value={agentId} onChange={(event) => setPickedAgent(event.target.value)}>
           {grants.map((grant) => <option key={grant.agentId} value={grant.agentId}>{data.agents.find((agent) => agent.id === grant.agentId)?.title ?? grant.agentId}</option>)}
         </Select>
       </Field>

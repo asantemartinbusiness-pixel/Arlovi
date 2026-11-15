@@ -37,7 +37,7 @@ export function BankAccounts({ context }: { context: ScreenContext }) {
           const statement = statements.find((item) => item.bankAccountCode === accountCode(account));
           const recon = reconcile({ accounts: data.accounts, journals: data.journals, lines: data.bankLines, bankAccountCode: accountCode(account) });
           return (
-            <Card
+            <Card prov="human"
               key={account.id}
               span={6}
               title={`${accountCode(account)} ${account.title}`}
@@ -156,9 +156,9 @@ export function ImportJobs({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Import batches" value={String(batches.length)} meta="Each one is a CSV someone uploaded" />
-        <Stat label="Lines imported" value={String(data.bankLines.filter(isStatementLine).length)} />
-        <Stat label="Still unmatched" value={String(data.bankLines.filter((line) => isStatementLine(line) && line.fields.matched !== true).length)} />
+        <Stat prov="human" label="Import batches" value={String(batches.length)} meta="Each one is a CSV someone uploaded" />
+        <Stat prov="human" label="Lines imported" value={String(data.bankLines.filter(isStatementLine).length)} />
+        <Stat prov="human" label="Still unmatched" value={String(data.bankLines.filter((line) => isStatementLine(line) && line.fields.matched !== true).length)} />
         <Stat label="Automatic imports" value="None" unavailable meta="No feed is connected" />
       </StatRow>
       {statements.length === 0 ? <Empty title="No statement has been imported" /> : (
@@ -177,7 +177,7 @@ export function ImportJobs({ context }: { context: ScreenContext }) {
           ]}
         />
       )}
-      <Card title="Batches" subtitle="Lines grouped by the import they arrived in">
+      <Card prov="human" title="Batches" subtitle="Lines grouped by the import they arrived in">
         <Stack gap={2}>
           {batches.map((batch) => (
             <Row key={batch.batch} gap={3}>
@@ -201,7 +201,7 @@ export function FeedHealth({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <Grid>
-        <Card span={6} title="Bank feed" subtitle={bank.provider} actions={<CapabilityPill id="bank.feed" />}>
+        <Card prov="posted" span={6} title="Bank feed" subtitle={bank.provider} actions={<CapabilityPill id="bank.feed" />}>
           <Stack gap={3}>
             <Properties rows={[
               { label: "State", value: CAPABILITY_LABELS[bank.state] },
@@ -214,7 +214,7 @@ export function FeedHealth({ context }: { context: ScreenContext }) {
             </Notice>
           </Stack>
         </Card>
-        <Card span={6} title="Every provider this screen could use" subtitle="Stated, not implied">
+        <Card prov="posted" span={6} title="Every provider this screen could use" subtitle="Stated, not implied">
           <Stack gap={2}>
             {PROVIDER_CAPABILITIES.filter((capability) => ["bank.feed", "payment.capture", "tax.file"].includes(capability.id)).map((capability) => (
               <Row key={capability.id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
@@ -228,7 +228,7 @@ export function FeedHealth({ context }: { context: ScreenContext }) {
           </Stack>
         </Card>
       </Grid>
-      <Card title="Mismatch check" subtitle="Where the ledger and the imported statement disagree">
+      <Card prov="human" title="Mismatch check" subtitle="Where the ledger and the imported statement disagree">
         <MismatchTable context={context} />
       </Card>
     </Stack>
@@ -263,7 +263,7 @@ export function BankConnection({ context, close }: { context: ScreenContext; clo
     <Stack gap={4}>
       <CapabilityNotice id="bank.feed" title="A bank connection cannot be made from this workspace" />
       <Field label="Bank" hint="Recorded so you know which institution the statements come from.">
-        <TextInput value={bank} onChange={(event) => setBank(event.target.value)} placeholder="Clerkenwell Mutual" />
+        <TextInput aria-label="Bank" value={bank} onChange={(event) => setBank(event.target.value)} placeholder="Clerkenwell Mutual" />
       </Field>
       <Properties rows={[
         { label: "What a connection would need", value: "An authorised open-banking grant, held by a server this app does not have." },
@@ -321,21 +321,21 @@ export function CsvMapper({ context, close }: { context: ScreenContext; close: (
         Paste the CSV your bank gave you. Nothing is uploaded; the rows become statement lines in this workspace, all unmatched.
       </Notice>
       <Field label="CSV rows" hint="Comma separated. Amounts in minor units, negative for money out.">
-        <TextArea value={text} rows={6} onChange={(event) => setText(event.target.value)} style={{ fontFamily: "var(--font-mono, monospace)" }} />
+        <TextArea aria-label="CSV rows" value={text} rows={6} onChange={(event) => setText(event.target.value)} style={{ fontFamily: "var(--font-mono, monospace)" }} />
       </Field>
       <Row gap={3} wrap>
         <Field label="Bank account">
-          <Select value={code} onChange={(event) => setCode(event.target.value)}>
+          <Select aria-label="Bank account" value={code} onChange={(event) => setCode(event.target.value)}>
             {cashAccounts(data).map((account) => <option key={account.id} value={accountCode(account)}>{accountCode(account)} {account.title}</option>)}
           </Select>
         </Field>
-        <Field label="First row"><Select value={hasHeader ? "header" : "data"} onChange={(event) => setHasHeader(event.target.value === "header")}>
+        <Field label="First row"><Select aria-label="First row" value={hasHeader ? "header" : "data"} onChange={(event) => setHasHeader(event.target.value === "header")}>
           <option value="header">Is a header</option>
           <option value="data">Is data</option>
         </Select></Field>
-        <Field label="Date column"><TextInput align="end" inputMode="numeric" value={String(dateColumn)} onChange={(event) => setDateColumn(Number(event.target.value.replace(/\D/g, "")) || 0)} /></Field>
-        <Field label="Description column"><TextInput align="end" inputMode="numeric" value={String(descriptionColumn)} onChange={(event) => setDescriptionColumn(Number(event.target.value.replace(/\D/g, "")) || 0)} /></Field>
-        <Field label="Amount column"><TextInput align="end" inputMode="numeric" value={String(amountColumn)} onChange={(event) => setAmountColumn(Number(event.target.value.replace(/\D/g, "")) || 0)} /></Field>
+        <Field label="Date column"><TextInput aria-label="Date column" align="end" inputMode="numeric" value={String(dateColumn)} onChange={(event) => setDateColumn(Number(event.target.value.replace(/\D/g, "")) || 0)} /></Field>
+        <Field label="Description column"><TextInput aria-label="Description column" align="end" inputMode="numeric" value={String(descriptionColumn)} onChange={(event) => setDescriptionColumn(Number(event.target.value.replace(/\D/g, "")) || 0)} /></Field>
+        <Field label="Amount column"><TextInput aria-label="Amount column" align="end" inputMode="numeric" value={String(amountColumn)} onChange={(event) => setAmountColumn(Number(event.target.value.replace(/\D/g, "")) || 0)} /></Field>
       </Row>
 
       {parsed.length > 0 && (
@@ -479,10 +479,10 @@ export function ToReconcile({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Statement closing" value={context.money(recon.statementClosingMinor ?? 0)} meta={`${recon.statement.filename}`} />
-        <Stat label="Ledger balance" value={context.money(recon.ledgerMinor)} meta="Posted journals on 1000" />
-        <Stat label="Difference" value={context.money(recon.differenceMinor ?? 0)} meta={`${open.length} open lines`} />
-        <Stat
+        <Stat prov="posted" label="Statement closing" value={context.money(recon.statementClosingMinor ?? 0)} meta={`${recon.statement.filename}`} />
+        <Stat prov="posted" label="Ledger balance" value={context.money(recon.ledgerMinor)} meta="Posted journals on 1000" />
+        <Stat prov="posted" label="Difference" value={context.money(recon.differenceMinor ?? 0)} meta={`${open.length} open lines`} />
+        <Stat prov="posted"
           label="Unexplained"
           value={context.money(recon.unexplainedMinor ?? 0)}
           meta={recon.unexplainedMinor === 0 ? "Every penny accounted for" : "Investigate before confirming"}
@@ -496,7 +496,7 @@ export function ToReconcile({ context }: { context: ScreenContext }) {
       ) : (
         <Stack gap={3}>
           {open.map(({ line, candidates }) => (
-            <Card
+            <Card prov="posted"
               key={line.id}
               title={line.title}
               subtitle={`${context.date(line.at)} · ${String(line.fields.reference ?? "")}`}
@@ -611,7 +611,7 @@ export function ReconciliationExceptions({ context }: { context: ScreenContext }
   return (
     <Stack gap={4}>
       <Grid>
-        <Card span={6} title="Statement lines with no ledger entry" subtitle={`${recon.needsPosting.length} lines, ${context.money(recon.needsPostingMinor)}`}>
+        <Card prov="human" span={6} title="Statement lines with no ledger entry" subtitle={`${recon.needsPosting.length} lines, ${context.money(recon.needsPostingMinor)}`}>
           {recon.needsPosting.length === 0 ? <span className="ds-subtle">None.</span> : (
             <Stack gap={2}>
               {recon.needsPosting.map((line) => (
@@ -625,7 +625,7 @@ export function ReconciliationExceptions({ context }: { context: ScreenContext }
             </Stack>
           )}
         </Card>
-        <Card span={6} title="Ledger cash entries with no statement line" subtitle={`${stale.length} posted journals`}>
+        <Card prov="human" span={6} title="Ledger cash entries with no statement line" subtitle={`${stale.length} posted journals`}>
           {stale.length === 0 ? <span className="ds-subtle">None.</span> : (
             <Stack gap={2}>
               {stale.map((journal) => (
@@ -671,7 +671,7 @@ export function ReconciliationHistory({ context }: { context: ScreenContext }) {
           ]}
         />
       )}
-      <Card title="Statements on file" subtitle="What has been imported">
+      <Card prov="human" title="Statements on file" subtitle="What has been imported">
         <Stack gap={2}>
           {statements.map((statement) => (
             <Row key={statement.record.id} gap={3}>
@@ -700,7 +700,7 @@ export function MatchCandidatesOverlay({ context, close }: { context: ScreenCont
     <Stack gap={4}>
       <Properties rows={[
         { label: "Line", value: line.title },
-        { label: "Date", value: context.date(line.at) },
+        { label: "Date", value: <span className="ds-num">{context.date(line.at)}</span> },
         { label: "Reference", value: String(line.fields.reference ?? "None") },
         { label: "Amount", value: <Amount minor={line.amountMinor} context={context} bold /> },
       ]} />
@@ -778,7 +778,7 @@ export function AdjustmentReview({ context, close }: { context: ScreenContext; c
       </Notice>
       <Properties rows={[
         { label: "Statement line", value: line.title },
-        { label: "Date", value: context.date(line.at) },
+        { label: "Date", value: <span className="ds-num">{context.date(line.at)}</span> },
         { label: "Amount", value: <Amount minor={amount} context={context} bold /> },
         { label: "Direction", value: amount >= 0 ? "Money in: the bank account is debited" : "Money out: the bank account is credited" },
       ]} />
@@ -908,7 +908,7 @@ export function ReconciliationApproval({ context, close }: { context: ScreenCont
         <Notice tone="danger" title="This reconciliation cannot be confirmed">{recon.blockedReason}</Notice>
       )}
       <Field label="Note" hint="Kept on the reconciliation record.">
-        <TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} />
+        <TextArea aria-label="Note" value={note} rows={3} onChange={(event) => setNote(event.target.value)} />
       </Field>
       <Row gap={2}>
         <Button

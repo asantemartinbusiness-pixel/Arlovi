@@ -70,9 +70,9 @@ export function QualityReport({ context, area }: { context: ScreenContext; area:
   return (
     <Stack gap={5}>
       <StatRow>
-        <Stat label="Failing" value={String(counts.fail)} meta={`${area} checks that must change`} />
-        <Stat label="To review" value={String(counts.warn)} meta="Judgement, not a defect" />
-        <Stat label="Passing" value={String(counts.pass)} meta={`${issues.length} checks computed`} />
+        <Stat prov="posted" label="Failing" value={String(counts.fail)} meta={`${area} checks that must change`} />
+        <Stat prov="posted" label="To review" value={String(counts.warn)} meta="Judgement, not a defect" />
+        <Stat prov="posted" label="Passing" value={String(counts.pass)} meta={`${issues.length} checks computed`} />
         <Stat
           label="Last recorded run"
           value={lastRun ? context.dateTime(lastRun) : "Never recorded"}
@@ -426,7 +426,7 @@ export function PublishReview({ context, close }: { context: ScreenContext; clos
 
       <BoundaryNotice id="site.publish" action="Publishing" />
 
-      <Card title="What you can take away now" subtitle="Complete, standalone files generated in this browser">
+      <Card eyebrow="EXPORT" prov="posted" title="What you can take away now" subtitle="Complete, standalone files generated in this browser">
         <Stack gap={2}>
           {site.pages.map((page) => (
             <Row key={page.id} gap={2}>
@@ -680,13 +680,13 @@ export function AnalyticsPanel({ context, lens }: { context: ScreenContext; lens
         <StatRow>
           <Stat label="Visits" value="Unavailable" unavailable meta="No analytics source connected" onClick={() => context.openOverlay("Metric source", { metric: "visits" })} />
           <Stat label="Unique visitors" value="Unavailable" unavailable meta="Needs a counting service" onClick={() => context.openOverlay("Metric source", { metric: "visits" })} />
-          <Stat label="Consent" value={site.analytics.consent.replace("_", " ")} meta="No banner has been shown" />
-          <Stat label="Measured loss" value="100%" meta="Nothing is counted, so nothing is sampled" onClick={() => context.openOverlay("attribution note")} />
+          <Stat prov="posted" label="Consent" value={site.analytics.consent.replace("_", " ")} meta="No banner has been shown" />
+          <Stat prov="posted" label="Measured loss" value="100%" meta="Nothing is counted, so nothing is sampled" onClick={() => context.openOverlay("attribution note")} />
         </StatRow>
         <Notice tone="warning" title="There is no traffic figure to show">
           Counting a visit needs a request to reach a server. This site is a model and an export in your browser, so no visit has ever been observed. The panel is left blank rather than filled with a plausible number.
         </Notice>
-        <Card title="What a connected source would add" subtitle="Stated so the gap is legible">
+        <Card eyebrow="NOT MEASURED" prov="unknown" title="What a connected source would add" subtitle="Stated so the gap is legible">
           <Properties rows={[
             { label: "Visits and sessions", value: <Pill tone="warning">Needs a counting service</Pill> },
             { label: "Referrer and campaign", value: <Pill tone="warning">Needs request headers</Pill> },
@@ -706,10 +706,10 @@ export function AnalyticsPanel({ context, lens }: { context: ScreenContext; lens
     return (
       <Stack gap={5}>
         <StatRow>
-          <Stat label="Submissions" value={String(siteSubmissions.length)} meta="Records created by a form on this site" />
-          <Stat label="Forms embedded" value={String(boundFormIds.length)} meta={`${site.pages.filter((page) => page.blocks.some((block) => block.type === "form")).length} pages carry one`} />
+          <Stat prov="posted" label="Submissions" value={String(siteSubmissions.length)} meta="Records created by a form on this site" />
+          <Stat prov="posted" label="Forms embedded" value={String(boundFormIds.length)} meta={`${site.pages.filter((page) => page.blocks.some((block) => block.type === "form")).length} pages carry one`} />
           <Stat label="Conversion rate" value="Unavailable" unavailable meta="A rate needs a visit count" onClick={() => context.openOverlay("Metric source", { metric: "rate" })} />
-          <Stat label="Latest" value={siteSubmissions.length ? context.relative([...siteSubmissions].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""))[0].at) : "None"} meta="From the submission records" />
+          <Stat prov="posted" label="Latest" value={siteSubmissions.length ? context.relative([...siteSubmissions].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""))[0].at) : "None"} meta="From the submission records" />
         </StatRow>
         <Row gap={3} wrap>
           <Segmented
@@ -723,7 +723,7 @@ export function AnalyticsPanel({ context, lens }: { context: ScreenContext; lens
             context.toast("Exported", "The monthly submission counts are in a CSV file.");
           }}>Export CSV</Button>
         </Row>
-        <Card title="Submissions by month" subtitle="Counted from submission records in this workspace">
+        <Card eyebrow="CONVERSION" prov="posted" title="Submissions by month" subtitle="Counted from submission records in this workspace">
           <BarChart
             title="Form submissions by month"
             height={220}

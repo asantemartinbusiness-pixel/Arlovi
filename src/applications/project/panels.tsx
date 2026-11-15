@@ -51,7 +51,7 @@ export function Portfolio({ context, lens }: { context: ScreenContext; lens: "Ov
           const projects = data.projects.filter((project) => project.fields.departmentId === department.id);
           const tasks = projects.flatMap((project) => tasksOf(data.tasks, project.id));
           return (
-            <Card key={department.id} span={6} title={department.title} subtitle={`${projects.length} projects · ${tasks.length} tasks`}>
+            <Card key={department.id} span={6} eyebrow="DEPARTMENT" prov="human" title={department.title} subtitle={`${projects.length} projects · ${tasks.length} tasks`}>
               <Stack gap={3}>
                 {projects.map((project) => (
                   <Row key={project.id} gap={3}>
@@ -123,17 +123,17 @@ export function Portfolio({ context, lens }: { context: ScreenContext; lens: "Ov
   return (
     <Stack gap={5}>
       <StatRow>
-        <Stat label="Live projects" value={String(live.length)} meta={`${data.projects.length} including closed`} onClick={() => context.navigate(`/o/${org.slug}/project/projects`)} />
-        <Stat label="Committed budget" value={context.money(budget)} meta="From the project records" />
-        <Stat label="Spent" value={context.money(spent)} meta={`${Math.round((spent / Math.max(1, budget)) * 100)}% of budget`} onClick={() => context.openOverlay("initiative detail")} />
-        <Stat label="Off track" value={String(data.projects.filter((project) => project.fields.health === "off_track").length)} meta="Owner-set health" onClick={() => context.setTab("Risks")} />
+        <Stat label="Live projects" value={String(live.length)} prov="human" meta={`${data.projects.length} including closed`} onClick={() => context.navigate(`/o/${org.slug}/project/projects`)} />
+        <Stat label="Committed budget" value={context.money(budget)} prov="posted" meta="From the project records" />
+        <Stat label="Spent" value={context.money(spent)} prov="posted" meta={`${Math.round((spent / Math.max(1, budget)) * 100)}% of budget`} onClick={() => context.openOverlay("initiative detail")} />
+        <Stat label="Off track" value={String(data.projects.filter((project) => project.fields.health === "off_track").length)} prov="human" meta="Owner-set health" onClick={() => context.setTab("Risks")} />
       </StatRow>
 
       <Grid>
         {[...new Set(data.projects.map((project) => String(project.fields.programme ?? "Unassigned")))].map((programme) => {
           const projects = data.projects.filter((project) => String(project.fields.programme ?? "Unassigned") === programme);
           return (
-            <Card key={programme} span={6} title={programme} subtitle={`${projects.length} projects`} actions={<Pill>{projects.filter((project) => project.status !== "done").length} live</Pill>}>
+            <Card key={programme} span={6} eyebrow="PROGRAMME" prov="human" title={programme} subtitle={`${projects.length} projects`} actions={<Pill>{projects.filter((project) => project.status !== "done").length} live</Pill>}>
               <Stack gap={3}>
                 {projects.map((project) => {
                   const tasks = tasksOf(data.tasks, project.id);
@@ -150,7 +150,7 @@ export function Portfolio({ context, lens }: { context: ScreenContext; lens: "Ov
                       <p className="ds-subtle" style={{ marginBlock: 4 }}>{project.summary}</p>
                       <Meter value={progressOf(tasks)} max={100} label={`${project.title} progress`} tone={project.fields.health === "off_track" ? "danger" : project.fields.health === "at_risk" ? "warning" : "success"} />
                       <Row gap={2} style={{ marginBlockStart: 6 }}>
-                        <span className="ds-subtle ds-grow">{tasks.filter((task) => stageOf(task) === "done").length} of {tasks.length} tasks done</span>
+                        <span className="ds-subtle ds-grow"><span className="ds-num">{tasks.filter((task) => stageOf(task) === "done").length} of {tasks.length}</span> tasks done</span>
                         <span className="ds-subtle ds-num">{context.money(spentOnProject)} / {context.money(budgetOnProject)}</span>
                       </Row>
                     </div>
@@ -160,7 +160,7 @@ export function Portfolio({ context, lens }: { context: ScreenContext; lens: "Ov
             </Card>
           );
         })}
-        <Card span={12} title="Capacity across teams" subtitle="Assigned open tasks per person">
+        <Card span={12} eyebrow="CAPACITY" prov="human" title="Capacity across teams" subtitle="Assigned open tasks per person">
           <BarChart
             title="Open tasks by assignee"
             height={200}
@@ -300,7 +300,7 @@ export function ProjectOverview({ context, lens }: { context: ScreenContext; len
     const logged = tasks.reduce((sum, task) => sum + Number(task.fields.loggedHours ?? 0), 0);
     return (
       <Grid>
-        <Card span={6} title="Hours" subtitle="Estimated against logged">
+        <Card span={6} eyebrow="EFFORT" prov="human" title="Hours" subtitle="Estimated against logged">
           <BarChart
             title="Estimated and logged hours by stage"
             height={200}
@@ -312,10 +312,10 @@ export function ProjectOverview({ context, lens }: { context: ScreenContext; len
             footer={`${logged} of ${estimate} estimated hours logged. Logged hours come from time entries, not from the estimate.`}
           />
         </Card>
-        <Card span={6} title="Work by stage">
+        <Card span={6} eyebrow="WORK" prov="human" title="Work by stage">
           <DonutChart title="Tasks by stage" size={150} points={LANES.map((lane) => ({ label: lane.label, value: tasks.filter((task) => stageOf(task) === lane.id).length })).filter((point) => point.value > 0)} />
         </Card>
-        <Card span={12} title="Budget">
+        <Card span={12} eyebrow="BUDGET" prov="posted" title="Budget">
           <Stack gap={3}>
             <Meter value={Number(project.fields.spentMinor ?? 0)} max={Math.max(1, Number(project.fields.budgetMinor ?? 0))} label="Budget used" tone={Number(project.fields.spentMinor ?? 0) > Number(project.fields.budgetMinor ?? 0) ? "danger" : undefined} />
             <Properties rows={[
@@ -332,12 +332,12 @@ export function ProjectOverview({ context, lens }: { context: ScreenContext; len
   const late = tasks.filter((task) => task.endAt && new Date(task.endAt) < now && stageOf(task) !== "done");
   return (
     <Grid>
-      <Card span={7} title="Summary" subtitle={project.summary} actions={<Pill tone={HEALTH_TONE[String(project.fields.health)] ?? "neutral"} dot>{healthLabel(project.fields.health)}</Pill>}>
+      <Card span={7} eyebrow="PROJECT" prov="human" title="Summary" subtitle={project.summary} actions={<Pill tone={HEALTH_TONE[String(project.fields.health)] ?? "neutral"} dot>{healthLabel(project.fields.health)}</Pill>}>
         <Stack gap={3}>
           <Properties rows={[
             { label: "Owner", value: project.ownerName },
             { label: "Programme", value: String(project.fields.programme ?? "—") },
-            { label: "Runs", value: `${context.date(project.startAt)} – ${context.date(project.endAt)}` },
+            { label: "Runs", value: <span className="ds-num">{context.date(project.startAt)} – {context.date(project.endAt)}</span> },
             { label: "Priority", value: String(project.fields.priority ?? "normal") },
             { label: "Status", value: project.status },
           ]} />
@@ -350,7 +350,7 @@ export function ProjectOverview({ context, lens }: { context: ScreenContext; len
           )}
         </Stack>
       </Card>
-      <Card span={5} title="Milestones" subtitle={`${milestones.length} on the plan`}>
+      <Card span={5} eyebrow="PLAN" prov="human" title="Milestones" subtitle={`${milestones.length} on the plan`}>
         {milestones.length === 0 ? <Empty title="No milestones" icon={<CalendarRange size={20} />} /> : (
           <Stack gap={2}>
             {milestones.map((milestone) => (
@@ -363,7 +363,7 @@ export function ProjectOverview({ context, lens }: { context: ScreenContext; len
         )}
         <Button size="sm" variant="secondary" style={{ marginBlockStart: "var(--space-3)" }} onClick={() => context.openOverlay("Milestone editor")}>Add a milestone</Button>
       </Card>
-      <Card span={4} title="Team" subtitle={`${[...new Set(tasks.map((task) => String(task.fields.assignee ?? task.ownerName)))].length} people with work`}>
+      <Card span={4} eyebrow="PEOPLE" prov="human" title="Team" subtitle={`${[...new Set(tasks.map((task) => String(task.fields.assignee ?? task.ownerName)))].length} people with work`}>
         <Stack gap={2}>
           {[...new Set(tasks.map((task) => String(task.fields.assignee ?? task.ownerName)))].map((person) => (
             <Row key={person} gap={2}>
@@ -374,13 +374,13 @@ export function ProjectOverview({ context, lens }: { context: ScreenContext; len
           ))}
         </Stack>
       </Card>
-      <Card span={4} title="Budget" subtitle={`${Math.round((Number(project.fields.spentMinor ?? 0) / Math.max(1, Number(project.fields.budgetMinor ?? 0))) * 100)}% committed`}>
+      <Card span={4} eyebrow="BUDGET" prov="posted" title="Budget" subtitle={`${Math.round((Number(project.fields.spentMinor ?? 0) / Math.max(1, Number(project.fields.budgetMinor ?? 0))) * 100)}% committed`}>
         <Stack gap={2}>
           <Meter value={Number(project.fields.spentMinor ?? 0)} max={Math.max(1, Number(project.fields.budgetMinor ?? 0))} label="Budget used" tone={Number(project.fields.spentMinor ?? 0) > Number(project.fields.budgetMinor ?? 0) ? "danger" : undefined} />
           <span className="ds-subtle">{context.money(Number(project.fields.spentMinor ?? 0))} of {context.money(Number(project.fields.budgetMinor ?? 0))}</span>
         </Stack>
       </Card>
-      <Card span={4} title="Decisions and blockers" subtitle={`${late.length} past their date`}>
+      <Card span={4} eyebrow="BLOCKERS" prov="human" title="Decisions and blockers" subtitle={`${late.length} past their date`}>
         <Stack gap={2}>
           {tasks.filter((task) => stageOf(task) === "blocked").map((task) => (
             <Row key={task.id} gap={2}><Pill tone="danger">Blocked</Pill><span className="ds-grow ds-truncate">{task.title}</span></Row>
@@ -638,9 +638,9 @@ export function TaskDetail({ context, lens }: { context: ScreenContext; lens: st
             { label: "Owner", value: <Row gap={2}><Avatar name={String(task.fields.assignee ?? task.ownerName)} size="sm" />{String(task.fields.assignee ?? task.ownerName)}</Row> },
             { label: "Priority", value: String(task.fields.priority ?? "normal") },
             { label: "Sprint", value: String(task.fields.sprint ?? "—") },
-            { label: "Dates", value: `${context.date(task.startAt)} – ${context.date(task.endAt)}` },
-            { label: "Estimate", value: `${String(task.fields.estimateHours ?? 0)} hours` },
-            { label: "Logged", value: `${time.reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0)} hours` },
+            { label: "Dates", value: <span className="ds-num">{context.date(task.startAt)} – {context.date(task.endAt)}</span> },
+            { label: "Estimate", value: <span className="ds-num">{String(task.fields.estimateHours ?? 0)} hours</span> },
+            { label: "Logged", value: <span className="ds-num">{time.reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0)} hours</span> },
           ]} />
         </Stack>
       </Card>
@@ -677,9 +677,10 @@ export function TimelineScreen({ context, lens }: { context: ScreenContext; lens
   const record = useRecord(context.params.id);
   const project = record ?? data.projects[0];
   const { org, now } = useWorkspace();
-  if (!project) return <Empty title="No project" />;
-  const tasks = tasksOf(data.tasks, project.id);
+  /* Hooks run before any early return: the project arrives one render late. */
+  const tasks = useMemo(() => (project ? tasksOf(data.tasks, project.id) : []), [data.tasks, project]);
   const path = useMemo(() => criticalPath(tasks), [tasks]);
+  if (!project) return <Empty title="No project" />;
 
   if (lens === "Critical path") {
     const chain = path.map((id) => tasks.find((task) => task.id === id)).filter((task): task is Rec => Boolean(task));
@@ -786,7 +787,7 @@ export function Workload({ context, lens }: { context: ScreenContext; lens: "Peo
           {agents.map((agent) => {
             const delegated = data.tasks.filter((task) => task.fields.delegatedToAgent === true && String(task.fields.assignee ?? "") === agent.title);
             return (
-              <Card key={agent.id} span={4} title={<Row gap={2}><Avatar name={agent.title} kind="ai" size="sm" />{agent.title}</Row>} subtitle={String(agent.fields.title ?? "")}>
+              <Card key={agent.id} span={4} eyebrow="AI EMPLOYEE" prov="agent" machine title={<Row gap={2}><Avatar name={agent.title} kind="ai" size="sm" />{agent.title}</Row>} subtitle={String(agent.fields.title ?? "")}>
                 <Stack gap={3}>
                   <Properties rows={[
                     { label: "Concurrency", value: `${String(agent.fields.concurrency ?? 1)} at once` },
@@ -815,7 +816,7 @@ export function Workload({ context, lens }: { context: ScreenContext; lens: "Peo
             <Card key={department.id} span={4} title={department.title} subtitle={`${tasks.length} open tasks`}>
               <Properties rows={[
                 { label: "Projects", value: String(projects.length) },
-                { label: "Estimated hours outstanding", value: `${hours}h` },
+                { label: "Estimated hours outstanding", value: <span className="ds-num">{hours}h</span> },
                 { label: "People with work", value: String([...new Set(tasks.map((task) => String(task.fields.assignee ?? "")))].filter(Boolean).length) },
               ]} />
             </Card>
@@ -871,7 +872,7 @@ export function Workload({ context, lens }: { context: ScreenContext; lens: "Peo
             >
               <Stack gap={3}>
                 <Meter value={hours} max={capacity} label={`${person} load`} tone={hours > capacity ? "danger" : hours > capacity * 0.85 ? "warning" : "success"} />
-                <span className="ds-subtle">{hours} estimated hours against a {capacity} hour week.</span>
+                <span className="ds-subtle"><span className="ds-num">{hours}</span> estimated hours against a <span className="ds-num">{capacity}</span> hour week.</span>
               </Stack>
             </Card>
           );
@@ -1008,7 +1009,7 @@ export function TimeAndCost({ context, lens }: { context: ScreenContext; lens: "
   if (lens === "Costs") {
     return (
       <Grid>
-        <Card span={12} title="Cost by project" subtitle="Logged hours at the recorded rate, against the project budget">
+        <Card span={12} eyebrow="COST" prov="posted" title="Cost by project" subtitle="Logged hours at the recorded rate, against the project budget">
           <DataGrid
             rows={data.projects}
             rowId={(row) => row.id}
@@ -1063,9 +1064,9 @@ export function TimeAndCost({ context, lens }: { context: ScreenContext; lens: "
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Hours logged" value={String(total)} meta={lens === "My time" ? `By ${actor}` : "Across the team"} />
-        <Stat label="Billable" value={String(rows.filter((entry) => entry.fields.billable === true).reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0))} meta="Marked billable on the entry" />
-        <Stat label="Waiting for approval" value={String(rows.filter((entry) => entry.fields.approved !== true).length)} meta="Entries, not hours" />
+        <Stat label="Hours logged" value={String(total)} prov="human" meta={lens === "My time" ? `By ${actor}` : "Across the team"} />
+        <Stat label="Billable" value={String(rows.filter((entry) => entry.fields.billable === true).reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0))} prov="human" meta="Marked billable on the entry" />
+        <Stat label="Waiting for approval" value={String(rows.filter((entry) => entry.fields.approved !== true).length)} prov="human" meta="Entries, not hours" />
       </StatRow>
       {missing ? (
         <Empty title={`No time logged by ${actor}`} icon={<Timer size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Timer")}>Log time</Button>}>
@@ -1112,7 +1113,7 @@ export function TaskDrawer({ context }: { context: ScreenContext }) {
         { label: "Stage", value: <Pill tone={stageOf(task) === "done" ? "success" : "neutral"}>{stageOf(task)}</Pill> },
         { label: "Owner", value: String(task.fields.assignee ?? task.ownerName) },
         { label: "Priority", value: String(task.fields.priority ?? "normal") },
-        { label: "Dates", value: `${context.date(task.startAt)} – ${context.date(task.endAt)}` },
+        { label: "Dates", value: <span className="ds-num">{context.date(task.startAt)} – {context.date(task.endAt)}</span> },
         { label: "Estimate", value: `${String(task.fields.estimateHours ?? 0)}h, ${String(task.fields.loggedHours ?? 0)}h logged` },
       ]} />
       <Stack gap={2}>

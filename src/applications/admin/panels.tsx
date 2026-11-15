@@ -5,13 +5,13 @@ import {
   Properties, Row, Select, Stack, Stat, StatRow, Switch, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
-import { useCollection, useWorkspace } from "@/platform/workspace";
+import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES } from "@/platform/capability";
 import { can as roleCan, ROLE_LABELS, type Capability } from "@/platform/policy";
 import type { Rec, Role } from "@/domain/types";
 import {
   appsForRole, CAPABILITIES, capabilityLabel, csvList, ofKind, ROLES, RoleReach, StepUp,
-  useAdmin, useOrganisationRecord,
+  useAdmin, useOrganisationRecord, useSeeded, useSeededList,
 } from "./pieces";
 
 /* ====================================================================== *
@@ -28,7 +28,7 @@ export function OrganizationSettings({ context, tab }: { context: ScreenContext;
   if (tab === "Profile") {
     return (
       <Grid>
-        <Card span={7} title="Company identity" subtitle="Held on the organisation record in this browser">
+        <Card eyebrow="IDENTITY" prov="human" span={7} title="Company identity" subtitle="Held on the organisation record in this browser">
           <Properties rows={[
             { label: "Workspace name", value: context.org.name },
             { label: "Legal name", value: String(record?.fields.legalName ?? `${context.org.name} Ltd`) },
@@ -44,7 +44,7 @@ export function OrganizationSettings({ context, tab }: { context: ScreenContext;
             <Button variant="secondary" onClick={() => context.openOverlay("domain verify")}>Verify a domain</Button>
           </Row>
         </Card>
-        <Card span={5} title="Who may change this" subtitle="Legal identity is held to a higher bar">
+        <Card eyebrow="AUTHORITY" prov="human" span={5} title="Who may change this" subtitle="Legal identity is held to a higher bar">
           <Stack gap={3}>
             <Notice tone="warning" title="Legal identity changes need a deliberate confirmation">
               The legal name and company number appear on quotes, invoices and contracts already issued. Changing them asks for a typed
@@ -62,7 +62,7 @@ export function OrganizationSettings({ context, tab }: { context: ScreenContext;
     return (
       <Grid>
         {brands.map((brand) => (
-          <Card key={brand.id} span={6} title={brand.title} subtitle={brand.summary}>
+          <Card key={brand.id} eyebrow="BRAND KIT" prov={brand.fields.proposedBy ? "agent" : "human"} span={6} title={brand.title} subtitle={brand.summary}>
             <Stack gap={3}>
               <Row gap={2} wrap>
                 {["ink", "cobalt", "papaya", "aqua", "paper"].map((token) => {
@@ -84,7 +84,7 @@ export function OrganizationSettings({ context, tab }: { context: ScreenContext;
             </Stack>
           </Card>
         ))}
-        <Card span={12} title="Where branding is edited" subtitle="One source, used by every application">
+        <Card eyebrow="BRANDING" prov="human" span={12} title="Where branding is edited" subtitle="One source, used by every application">
           <Notice tone="info" title="Brand kits live in Assets">
             Administration records which kit is the master and who approved it. The logos, palette, type and rules themselves are
             edited in the asset library so every application draws on the same approved set.
@@ -112,7 +112,7 @@ export function OrganizationSettings({ context, tab }: { context: ScreenContext;
         ) : (
           <Grid>
             {hours.map((policy) => (
-              <Card key={policy.id} span={6} title={policy.title} subtitle={policy.summary}>
+              <Card key={policy.id} eyebrow="HOURS" prov="human" span={6} title={policy.title} subtitle={policy.summary}>
                 <Properties rows={[
                   { label: "Open", value: `${String(policy.fields.open)} – ${String(policy.fields.close)}` },
                   { label: "Days", value: String(policy.fields.days) },
@@ -131,7 +131,7 @@ export function OrganizationSettings({ context, tab }: { context: ScreenContext;
 
   return (
     <Grid>
-      <Card span={6} title="Regional settings" subtitle="Defined by the workspace, used by every calculation">
+      <Card eyebrow="REGION" prov="posted" span={6} title="Regional settings" subtitle="Defined by the workspace, used by every calculation">
         <Properties rows={[
           { label: "Reporting currency", value: context.org.currency },
           { label: "Locale", value: context.org.locale },
@@ -142,7 +142,7 @@ export function OrganizationSettings({ context, tab }: { context: ScreenContext;
           <Button variant="secondary" onClick={() => context.openOverlay("region change impact")}>What a change would affect</Button>
         </Row>
       </Card>
-      <Card span={6} title="Separate companies, separate books" subtitle="Northline and Harbor never consolidate">
+      <Card eyebrow="BOUNDARY" prov="posted" span={6} title="Separate companies, separate books" subtitle="Northline and Harbor never consolidate">
         <Notice tone="warning" title="Tax is never inferred from currency">
           The jurisdiction above drives tax codes. A company billing in pounds is not assumed to be a UK taxpayer, and figures from one
           company are never added to the other's.
@@ -154,9 +154,9 @@ export function OrganizationSettings({ context, tab }: { context: ScreenContext;
 
 export function IdentityForm({ context, close }: { context: ScreenContext; close: () => void }) {
   const record = useOrganisationRecord();
-  const [legalName, setLegalName] = useState(String(record?.fields.legalName ?? ""));
-  const [tradingName, setTradingName] = useState(String(record?.fields.tradingName ?? ""));
-  const [companyNumber, setCompanyNumber] = useState(String(record?.fields.companyNumber ?? ""));
+  const [legalName, setLegalName] = useSeeded(String(record?.fields.legalName ?? ""));
+  const [tradingName, setTradingName] = useSeeded(String(record?.fields.tradingName ?? ""));
+  const [companyNumber, setCompanyNumber] = useSeeded(String(record?.fields.companyNumber ?? ""));
   const [busy, setBusy] = useState(false);
   if (!record) return <Empty title="Organisation record unavailable" />;
 
@@ -239,11 +239,11 @@ export function DomainVerify({ context, close }: { context: ScreenContext; close
       <Field label="Domain to verify" required hint="Used to match invited people to your company.">
         <TextInput value={domain} onChange={(event) => setDomain(event.target.value)} placeholder="northline.example" />
       </Field>
-      <Card title="DNS record to add" subtitle="TXT record at the domain root">
+      <Card eyebrow="DNS" prov="human" title="DNS record to add" subtitle="TXT record at the domain root">
         <Properties rows={[
           { label: "Type", value: "TXT" },
           { label: "Name", value: domain || "your domain" },
-          { label: "Value", value: <code>{token}</code> },
+          { label: "Value", value: <span className="ds-num">{token}</span> },
         ]} />
       </Card>
       <Notice tone="warning" title="Verification cannot complete here">
@@ -333,7 +333,7 @@ export function MembersScreen({ context, tab }: { context: ScreenContext; tab: "
           No mail provider is connected, so each invitation is kept as a record with its role, scope and expiry. Nothing has been
           emailed to anybody.
         </Notice>
-        <Card title={`${data.invitations.length} invitations`} flush>
+        <Card eyebrow="INVITATIONS" prov="human" title={`${data.invitations.length} invitations`} flush>
           <DataGrid
             rows={data.invitations}
             rowId={(row) => row.id}
@@ -344,7 +344,7 @@ export function MembersScreen({ context, tab }: { context: ScreenContext; tab: "
               { key: "email", header: "Email", primary: true, cell: (row) => <div><strong>{row.title}</strong><p className="ds-subtle">{String(row.fields.note ?? "")}</p></div>, filterValue: (row) => row.title },
               { key: "role", header: "Role", cell: (row) => <Pill>{ROLE_LABELS[String(row.fields.role) as Role] ?? String(row.fields.role)}</Pill> },
               { key: "invitedBy", header: "Invited by", hideBelow: 1100, cell: (row) => String(row.fields.invitedBy ?? "") },
-              { key: "expires", header: "Expires", cell: (row) => (row.fields.expiresAt ? context.date(String(row.fields.expiresAt)) : "—"), sortValue: (row) => String(row.fields.expiresAt ?? "") },
+              { key: "expires", header: "Expires", cell: (row) => (row.fields.expiresAt ? <span className="ds-num">{context.date(String(row.fields.expiresAt))}</span> : "—"), sortValue: (row) => String(row.fields.expiresAt ?? "") },
               {
                 key: "state", header: "State", align: "end",
                 cell: (row) => <Pill tone={row.status === "pending" ? "info" : row.status === "expired" ? "warning" : "neutral"}>{row.status}</Pill>,
@@ -375,7 +375,7 @@ export function MembersScreen({ context, tab }: { context: ScreenContext; tab: "
         {data.departments.map((department) => {
           const people = internal.filter((member) => member.fields.departmentId === department.id);
           return (
-            <Card key={department.id} span={6} title={department.title} subtitle={`${people.length} ${people.length === 1 ? "member" : "members"}`}>
+            <Card key={department.id} eyebrow="TEAM" prov="posted" span={6} title={department.title} subtitle={`${people.length} ${people.length === 1 ? "member" : "members"}`}>
               <Stack gap={2}>
                 {people.map((member) => (
                   <Row key={member.id} gap={2}>
@@ -403,7 +403,7 @@ export function MembersScreen({ context, tab }: { context: ScreenContext; tab: "
           exactly what each one can reach.
         </Notice>
       )}
-      <Card title={`${rows.length} ${tab === "External" ? "external collaborators" : "people and agents"}`} flush>
+      <Card eyebrow="MEMBERS" prov="posted" title={`${rows.length} ${tab === "External" ? "external collaborators" : "people and agents"}`} flush>
         <DataGrid
           rows={rows}
           rowId={(row) => row.id}
@@ -429,7 +429,7 @@ export function MembersScreen({ context, tab }: { context: ScreenContext; tab: "
               ? { key: "scope", header: "Scope", hideBelow: 1100, cell: (row: Rec) => String(row.fields.scope ?? "Not stated") }
               : { key: "department", header: "Department", hideBelow: 1100, cell: (row: Rec) => data.departments.find((department) => department.id === row.fields.departmentId)?.title ?? "—" },
             { key: "mfa", header: "Second factor", hideBelow: 1280, cell: (row) => (row.fields.mfa === true ? <Pill tone="success">On</Pill> : <Pill tone="warning">Off</Pill>) },
-            { key: "last", header: "Last seen", align: "end", cell: (row) => (row.fields.lastAccessAt ? context.relative(String(row.fields.lastAccessAt)) : "Never"), sortValue: (row) => String(row.fields.lastAccessAt ?? "") },
+            { key: "last", header: "Last seen", align: "end", cell: (row) => (row.fields.lastAccessAt ? <span className="ds-num">{context.relative(String(row.fields.lastAccessAt))}</span> : "Never"), sortValue: (row) => String(row.fields.lastAccessAt ?? "") },
             { key: "status", header: "Status", align: "end", cell: (row) => <Pill tone={row.status === "active" ? "success" : "warning"}>{row.status}</Pill>, sortValue: (row) => row.status },
           ]}
           bulkActions={[
@@ -556,7 +556,8 @@ export function InviteWizard({ context, close }: { context: ScreenContext; close
 export function RoleImpact({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
   const member = data.members.find((row) => row.id === context.selectedId);
-  const [role, setRole] = useState<Role>((member?.fields.role as Role) ?? "member");
+  const [roleValue, setRole] = useSeeded(String(member?.fields.role ?? "member"));
+  const role = roleValue as Role;
   const [busy, setBusy] = useState(false);
   if (!member) return <Empty title="Select a member" icon={<Users size={20} />}>Choose a person to see what a role change would do.</Empty>;
 
@@ -573,10 +574,10 @@ export function RoleImpact({ context, close }: { context: ScreenContext; close: 
         </Select>
       </Field>
       <Grid>
-        <Card span={6} title="Gains" subtitle={`${gained.length} capabilities`}>
+        <Card eyebrow="GAINS" prov="human" span={6} title="Gains" subtitle={`${gained.length} capabilities`}>
           {gained.length === 0 ? <span className="ds-subtle">Nothing new.</span> : <Row gap={1} wrap>{gained.map((capability) => <Pill key={capability} tone="success">{capabilityLabel(capability)}</Pill>)}</Row>}
         </Card>
-        <Card span={6} title="Loses" subtitle={`${lost.length} capabilities`}>
+        <Card eyebrow="LOSES" prov="human" span={6} title="Loses" subtitle={`${lost.length} capabilities`}>
           {lost.length === 0 ? <span className="ds-subtle">Nothing is removed.</span> : <Row gap={1} wrap>{lost.map((capability) => <Pill key={capability} tone="warning">{capabilityLabel(capability)}</Pill>)}</Row>}
         </Card>
       </Grid>
@@ -681,13 +682,13 @@ export function RolesScreen({ context, tab }: { context: ScreenContext; tab: "Ro
           {ROLES.map((role) => {
             const holders = data.members.filter((member) => member.fields.role === role);
             return (
-              <Card key={role} span={4} title={ROLE_LABELS[role]} subtitle={`${holders.length} ${holders.length === 1 ? "holder" : "holders"} · built in`}>
+              <Card key={role} eyebrow="ROLE VIEW" prov="posted" span={4} title={ROLE_LABELS[role]} subtitle={`${holders.length} ${holders.length === 1 ? "holder" : "holders"} · built in`}>
                 <RoleReach role={role} />
               </Card>
             );
           })}
         </Grid>
-        <Card title={`Custom roles · ${custom.length}`} subtitle="Narrower views defined in this workspace" flush>
+        <Card eyebrow="CUSTOM ROLES" prov="human" title={`Custom roles · ${custom.length}`} subtitle="Narrower views defined in this workspace" flush>
           <DataGrid
             rows={custom}
             rowId={(row) => row.id}
@@ -700,7 +701,7 @@ export function RolesScreen({ context, tab }: { context: ScreenContext; tab: "Ro
               { key: "basedOn", header: "Based on", cell: (row) => ROLE_LABELS[String(row.fields.basedOn) as Role] ?? String(row.fields.basedOn) },
               { key: "caps", header: "Capabilities", cell: (row) => (csvList(row.fields.capabilities).length ? csvList(row.fields.capabilities).map(capabilityLabel).join(", ") : "None") },
               { key: "deny", header: "Explicit deny", hideBelow: 1200, cell: (row) => (csvList(row.fields.deny).length ? csvList(row.fields.deny).map(capabilityLabel).join(", ") : "—") },
-              { key: "holders", header: "Holders", align: "end", cell: (row) => String(row.fields.holders ?? 0) },
+              { key: "holders", header: "Holders", align: "end", cell: (row) => <span className="ds-num">{String(row.fields.holders ?? 0)}</span> },
               { key: "status", header: "State", align: "end", cell: (row) => <Pill tone={row.status === "published" ? "success" : "info"}>{row.status}</Pill>, sortValue: (row) => row.status },
             ]}
             empty={<Empty title="No custom roles" icon={<ShieldCheck size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Policy editor")}>Create a role</Button>}>A custom role narrows a built-in view; it can never widen one.</Empty>}
@@ -713,7 +714,7 @@ export function RolesScreen({ context, tab }: { context: ScreenContext; tab: "Ro
   if (tab === "Policies") {
     const kinds = ["role", "autonomyGrant", "retention", "residency", "consent", "authPolicy", "subscription", "domain", "businessHours"];
     return (
-      <Card title={`${data.policies.length} policy records`} subtitle="Every policy in this workspace, whatever it governs" flush>
+      <Card eyebrow="POLICIES" prov="human" title={`${data.policies.length} policy records`} subtitle="Every policy in this workspace, whatever it governs" flush>
         <DataGrid
           rows={data.policies}
           rowId={(row) => row.id}
@@ -724,7 +725,7 @@ export function RolesScreen({ context, tab }: { context: ScreenContext; tab: "Ro
             { key: "title", header: "Policy", primary: true, cell: (row) => <div><strong>{row.title}</strong><p className="ds-subtle ds-truncate" style={{ maxWidth: "58ch" }}>{row.summary}</p></div>, filterValue: (row) => `${row.title} ${row.summary} ${String(row.fields.kind ?? "")}` },
             { key: "kind", header: "Kind", cell: (row) => <Pill>{String(row.fields.kind ?? "other")}</Pill>, sortValue: (row) => String(row.fields.kind ?? "") },
             { key: "author", header: "Author", hideBelow: 1100, cell: (row) => String(row.fields.author ?? row.ownerName) },
-            { key: "updated", header: "Changed", align: "end", cell: (row) => context.relative(row.updatedAt), sortValue: (row) => row.updatedAt },
+            { key: "updated", header: "Changed", align: "end", cell: (row) => <span className="ds-num">{context.relative(row.updatedAt)}</span>, sortValue: (row) => row.updatedAt },
             { key: "status", header: "State", align: "end", cell: (row) => <Pill tone={row.status === "published" ? "success" : "info"}>{row.status}</Pill> },
           ]}
           toolbar={<span className="ds-subtle">{kinds.filter((kind) => ofKind(data.policies, kind).length > 0).length} kinds in use</span>}
@@ -741,7 +742,7 @@ export function RolesScreen({ context, tab }: { context: ScreenContext; tab: "Ro
           This grid is what the interface offers each role view today. In a product with a server, deny takes precedence over allow and
           the tenant boundary is enforced there, not here. Nothing in this browser is a security boundary.
         </Notice>
-        <Card title="Role against capability" flush>
+        <Card eyebrow="EFFECTIVE ACCESS" prov="posted" title="Role against capability" flush>
           <div className="ds-grid-wrap">
             <div className="ds-grid-scroll">
               <table className="ds-table">
@@ -805,10 +806,11 @@ export function PolicyEditor({ context, close }: { context: ScreenContext; close
   const data = useAdmin();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const existing = ofKind(data.policies, "role").find((row) => row.id === (payload?.id ?? context.selectedId));
-  const [title, setTitle] = useState(existing?.title ?? "");
-  const [basedOn, setBasedOn] = useState<Role>((existing?.fields.basedOn as Role) ?? "member");
-  const [caps, setCaps] = useState<string[]>(csvList(existing?.fields.capabilities));
-  const [deny, setDeny] = useState<string[]>(csvList(existing?.fields.deny));
+  const [title, setTitle] = useSeeded(existing?.title ?? "");
+  const [basedOnValue, setBasedOn] = useSeeded(String(existing?.fields.basedOn ?? "member"));
+  const basedOn = basedOnValue as Role;
+  const [caps, setCaps] = useSeededList(typeof existing?.fields.capabilities === "string" ? existing.fields.capabilities : "");
+  const [deny, setDeny] = useSeededList(typeof existing?.fields.deny === "string" ? existing.fields.deny : "");
   const [error, setError] = useState("");
 
   const widened = caps.filter((capability) => !roleCan(basedOn, capability as Capability));
@@ -887,11 +889,11 @@ export function EffectiveRights({ context }: { context: ScreenContext }) {
         <Field label="With"><Select value={right} onChange={(event) => setRight(event.target.value as Role)}>{ROLES.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}</Select></Field>
       </Row>
       <Grid>
-        <Card span={6} title={`Only ${ROLE_LABELS[left]}`}>
+        <Card eyebrow="EXCLUSIVE" prov="posted" span={6} title={`Only ${ROLE_LABELS[left]}`}>
           <Row gap={1} wrap>{only(left, right).map((capability) => <Pill key={capability} tone="info">{capabilityLabel(capability)}</Pill>)}</Row>
           {only(left, right).length === 0 && <span className="ds-subtle">Nothing exclusive.</span>}
         </Card>
-        <Card span={6} title={`Only ${ROLE_LABELS[right]}`}>
+        <Card eyebrow="EXCLUSIVE" prov="posted" span={6} title={`Only ${ROLE_LABELS[right]}`}>
           <Row gap={1} wrap>{only(right, left).map((capability) => <Pill key={capability} tone="info">{capabilityLabel(capability)}</Pill>)}</Row>
           {only(right, left).length === 0 && <span className="ds-subtle">Nothing exclusive.</span>}
         </Card>
@@ -924,7 +926,7 @@ export function ImpactReview({ context, close }: { context: ScreenContext; close
 
   return (
     <Stack gap={4}>
-      <Card title="Try a decision" subtitle="Reads the policy as it is; changes nothing">
+      <Card eyebrow="SIMULATION" prov="human" title="Try a decision" subtitle="Reads the policy as it is; changes nothing">
         <Stack gap={3}>
           <Row gap={3} wrap>
             <Field label="Role view"><Select value={simulatedRole} onChange={(event) => setSimulatedRole(event.target.value as Role)}>{ROLES.map((entry) => <option key={entry} value={entry}>{ROLE_LABELS[entry]}</option>)}</Select></Field>
@@ -938,7 +940,7 @@ export function ImpactReview({ context, close }: { context: ScreenContext; close
         </Stack>
       </Card>
       {role && (
-        <Card title={`Publishing ${role.title}`} subtitle={role.status === "published" ? "Already published" : "Draft"}>
+        <Card eyebrow="PUBLISH" prov="human" title={`Publishing ${role.title}`} subtitle={role.status === "published" ? "Already published" : "Draft"}>
           <Stack gap={3}>
             <Properties rows={[
               { label: "Based on", value: base ? ROLE_LABELS[base] : "—" },
@@ -980,13 +982,15 @@ export function AutonomyScreen({ context, tab }: { context: ScreenContext; tab: 
   const grants = ofKind(data.policies, "autonomyGrant");
   const organisation = useOrganisationRecord();
   const events = useCollection("timelineEvents");
+  const auditEvents = useEvents(undefined, 200);
 
   if (tab === "Company") {
     const company = grants.find((grant) => grant.fields.scope === "company");
+    const agentWork = auditEvents.filter((event) => event.type.startsWith("ai."));
     const paused = organisation?.fields.executionPaused === true;
     return (
       <Grid>
-        <Card span={7} title={company?.title ?? "Company autonomy"} subtitle={company?.summary ?? "No company grant is recorded"}>
+        <Card eyebrow="COMPANY GRANT" prov="human" span={7} title={company?.title ?? "Company autonomy"} subtitle={company?.summary ?? "No company grant is recorded"}>
           {company ? (
             <Stack gap={3}>
               <Properties rows={[
@@ -1011,7 +1015,7 @@ export function AutonomyScreen({ context, tab }: { context: ScreenContext; tab: 
             </Empty>
           )}
         </Card>
-        <Card span={5} title="Emergency pause" subtitle={paused ? "Automation is paused" : "Automation is running"}>
+        <Card eyebrow="EMERGENCY" prov="human" span={5} title="Emergency pause" subtitle={paused ? "Automation is paused" : "Automation is running"}>
           <Stack gap={3}>
             <Notice tone={paused ? "danger" : "info"} title={paused ? "Every agent and mission step is held" : "Agents may take the steps their grant allows"}>
               {paused
@@ -1022,6 +1026,24 @@ export function AutonomyScreen({ context, tab }: { context: ScreenContext; tab: 
               {paused ? "Resume automation" : "Pause all automation"}
             </Button>
           </Stack>
+        </Card>
+        <Card machine eyebrow="AI WORKFORCE" prov="agent" span={12} title="What the agents have done under this grant" subtitle={`${agentWork.length} recorded steps`}>
+          {agentWork.length === 0 ? (
+            <p className="ds-subtle">No agent has taken a step that was worth recording yet.</p>
+          ) : (
+            <Stack gap={3}>
+              {agentWork.slice(0, 5).map((event) => (
+                <Row key={event.id} gap={3} style={{ alignItems: "flex-start" }}>
+                  <span className="ds-num" style={{ width: 120 }}>{context.relative(event.at)}</span>
+                  <div className="ds-grow">
+                    <strong>{event.actor}</strong>
+                    <p className="ds-subtle">{event.message}</p>
+                  </div>
+                  <span className="ds-num">{event.capability === "blocked" ? "stopped and asked" : "completed"}</span>
+                </Row>
+              ))}
+            </Stack>
+          )}
         </Card>
       </Grid>
     );
@@ -1034,7 +1056,7 @@ export function AutonomyScreen({ context, tab }: { context: ScreenContext; tab: 
         {departmentGrants.map((grant) => {
           const department = data.departments.find((row) => row.id === grant.fields.departmentId);
           return (
-            <Card key={grant.id} span={6} title={department?.title ?? grant.title} subtitle={grant.summary}>
+            <Card key={grant.id} eyebrow="DEPARTMENT GRANT" prov="human" span={6} title={department?.title ?? grant.title} subtitle={grant.summary}>
               <Properties rows={[
                 { label: "Mode", value: <Pill tone="info">{String(grant.fields.mode)}</Pill> },
                 { label: "Spend cap", value: context.money(Number(grant.fields.maxSpendMinor ?? 0)) },
@@ -1053,7 +1075,7 @@ export function AutonomyScreen({ context, tab }: { context: ScreenContext; tab: 
 
   if (tab === "Agents") {
     return (
-      <Card title={`${data.agents.length} agents`} subtitle="What each one may do, and what it must ask for" flush>
+      <Card machine eyebrow="AI WORKFORCE" prov="agent" title={`${data.agents.length} agents`} subtitle="What each one may do, and what it must ask for" flush>
         <DataGrid
           rows={data.agents}
           rowId={(row) => row.id}
@@ -1103,7 +1125,7 @@ export function AutonomyScreen({ context, tab }: { context: ScreenContext; tab: 
           const cap = Number(grant.fields.maxSpendMinor ?? 0);
           const committed = Number(mission?.fields.spentMinor ?? 0);
           return (
-            <Card key={grant.id} span={12} title={mission?.title ?? grant.title} subtitle={grant.summary}>
+            <Card key={grant.id} machine eyebrow="MISSION GRANT" prov="agent" span={12} title={mission?.title ?? grant.title} subtitle={grant.summary}>
               <Stack gap={3}>
                 <Meter value={committed} max={Math.max(1, cap)} label={`${mission?.title ?? grant.title} spend against cap`} tone={committed > cap * 0.9 ? "warning" : "success"} />
                 <Properties rows={[
@@ -1123,13 +1145,13 @@ export function AutonomyScreen({ context, tab }: { context: ScreenContext; tab: 
 
   const policyEvents = events.filter((event) => ["decision", "technology"].includes(String(event.fields.kind ?? "")));
   return (
-    <Card title="Grant history" subtitle="Changes to authority, from the company timeline" flush>
+    <Card eyebrow="HISTORY" prov="posted" title="Grant history" subtitle="Changes to authority, from the company timeline" flush>
       <DataGrid
         rows={policyEvents}
         rowId={(row) => row.id}
         label="Autonomy history"
         columns={[
-          { key: "at", header: "When", width: "160px", cell: (row) => context.date(row.at), sortValue: (row) => row.at ?? "" },
+          { key: "at", header: "When", width: "160px", cell: (row) => <span className="ds-num">{context.date(row.at)}</span>, sortValue: (row) => row.at ?? "" },
           { key: "title", header: "Entry", primary: true, cell: (row) => <div><strong>{row.title}</strong><p className="ds-subtle">{row.summary}</p></div>, filterValue: (row) => `${row.title} ${row.summary}` },
           { key: "kind", header: "Kind", align: "end", cell: (row) => <Pill>{String(row.fields.kind ?? "")}</Pill> },
         ]}
@@ -1145,9 +1167,9 @@ export function GrantEditor({ context, close }: { context: ScreenContext; close:
   const grants = ofKind(data.policies, "autonomyGrant");
   const existing = grants.find((row) => row.id === (payload?.id ?? context.selectedId)) ?? (payload?.agentId ? grants.find((row) => row.fields.agentId === payload.agentId) : undefined);
   const agent = payload?.agentId ? data.agents.find((row) => row.id === payload.agentId) : undefined;
-  const [mode, setMode] = useState(String(existing?.fields.mode ?? "draft"));
-  const [cap, setCap] = useState(Number(existing?.fields.maxSpendMinor ?? 0));
-  const [requires, setRequires] = useState<string[]>(csvList(existing?.fields.requiresApproval ?? "post_journal,approve_payment"));
+  const [mode, setMode] = useSeeded(String(existing?.fields.mode ?? "draft"));
+  const [cap, setCap] = useSeeded(Number(existing?.fields.maxSpendMinor ?? 0));
+  const [requires, setRequires] = useSeededList(typeof existing?.fields.requiresApproval === "string" ? existing.fields.requiresApproval : "post_journal,approve_payment");
   const [busy, setBusy] = useState(false);
 
   const scope = existing ? String(existing.fields.scope) : agent ? "agent" : "company";
@@ -1227,7 +1249,7 @@ export function GrantEditor({ context, close }: { context: ScreenContext; close:
 export function ActionSimulator({ context }: { context: ScreenContext }) {
   const data = useAdmin();
   const grants = ofKind(data.policies, "autonomyGrant");
-  const [agentId, setAgentId] = useState(data.agents[0]?.id ?? "");
+  const [agentId, setAgentId] = useSeeded(data.agents[0]?.id ?? "");
   const [action, setAction] = useState<Capability>("post_journal");
   const [amount, setAmount] = useState(50_000);
 
@@ -1364,14 +1386,14 @@ export function BudgetScreen({ context, tab }: { context: ScreenContext; tab: "A
         <StatRow>
           <Stat label="Model spend this period" value="Unavailable" unavailable meta="No model provider is connected" />
           <Stat label="Tokens used" value="Unavailable" unavailable meta="Nothing is sent to a model, so nothing is counted" />
-          <Stat label="Quota set" value={quota ? context.money(Number(quota.amountMinor ?? 0)) : "None"} meta={quota ? String(quota.fields.period) : "Set one in Limits"} />
-          <Stat label="Agents in draft mode" value={String(data.agents.filter((row) => row.fields.autonomy === "draft").length)} meta={`of ${data.agents.length} agents`} />
+          <Stat prov="human" label="Quota set" value={quota ? context.money(Number(quota.amountMinor ?? 0)) : "None"} meta={quota ? String(quota.fields.period) : "Set one in Limits"} />
+          <Stat prov="agent" label="Agents in draft mode" value={String(data.agents.filter((row) => row.fields.autonomy === "draft").length)} meta={`of ${data.agents.length} agents`} />
         </StatRow>
         <Notice tone="warning" title="There is no model usage to report">
           Agent answers in this workspace are composed from local records, and the records are named. Because nothing is sent to a model
           provider, token counts and model costs do not exist rather than being estimated.
         </Notice>
-        <Card title="What the agents actually did" subtitle="Counted from records, not inferred">
+        <Card machine eyebrow="AI WORKFORCE" prov="agent" title="What the agents actually did" subtitle="Counted from records, not inferred">
           <Properties rows={[
             { label: "Agents active", value: String(data.agents.filter((row) => row.status === "active").length) },
             { label: "Drafts prepared for a person", value: String(data.missions.filter((row) => row.status === "needs_decision").length + data.policies.filter((row) => row.fields.proposedBy === "agent").length) },
@@ -1386,7 +1408,7 @@ export function BudgetScreen({ context, tab }: { context: ScreenContext; tab: "A
     const caps = data.budgets.filter((row) => row.fields.kind === "missionCap");
     return (
       <Stack gap={4}>
-        <Card title="Mission spend against cap" subtitle="Committed locally against local supplier quotes">
+        <Card eyebrow="MISSION SPEND" prov="posted" title="Mission spend against cap" subtitle="Committed locally against local supplier quotes">
           <BarChart
             title="Mission budget and committed spend"
             height={200}
@@ -1404,7 +1426,7 @@ export function BudgetScreen({ context, tab }: { context: ScreenContext; tab: "A
             const reserved = Number(row.fields.reservedMinor ?? 0);
             const total = Number(row.amountMinor ?? 0);
             return (
-              <Card key={row.id} span={6} title={row.title} subtitle={row.summary}>
+              <Card key={row.id} eyebrow="LIMIT" prov="human" span={6} title={row.title} subtitle={row.summary}>
                 <Stack gap={3}>
                   <Meter value={committed + reserved} max={Math.max(1, total)} label={`${row.title} headroom`} tone={committed + reserved > total * 0.9 ? "warning" : "success"} />
                   <Properties rows={[
@@ -1429,7 +1451,7 @@ export function BudgetScreen({ context, tab }: { context: ScreenContext; tab: "A
           Even with a provider connected, charges arrive after the work. A figure here would be at least a day behind, and this console
           would say so rather than presenting it as current.
         </Notice>
-        <Card title="Providers" subtitle={`${PROVIDER_CAPABILITIES.length} capabilities, none connected`} flush>
+        <Card eyebrow="PROVIDERS" prov="unknown" title="Providers" subtitle={`${PROVIDER_CAPABILITIES.length} capabilities, none connected`} flush>
           <DataGrid
             rows={PROVIDER_CAPABILITIES}
             rowId={(row) => row.id}
@@ -1450,7 +1472,7 @@ export function BudgetScreen({ context, tab }: { context: ScreenContext; tab: "A
 
   if (tab === "Limits") {
     return (
-      <Card title={`${data.budgets.length} limits`} subtitle="Quotas and caps, with reservations shown separately" flush>
+      <Card eyebrow="LIMITS" prov="human" title={`${data.budgets.length} limits`} subtitle="Quotas and caps, with reservations shown separately" flush>
         <DataGrid
           rows={data.budgets}
           rowId={(row) => row.id}
@@ -1461,9 +1483,9 @@ export function BudgetScreen({ context, tab }: { context: ScreenContext; tab: "A
           columns={[
             { key: "title", header: "Limit", primary: true, cell: (row) => <div><strong>{row.title}</strong><p className="ds-subtle">{row.summary}</p></div>, filterValue: (row) => `${row.title} ${row.summary}` },
             { key: "kind", header: "Kind", cell: (row) => <Pill>{String(row.fields.kind)}</Pill> },
-            { key: "cap", header: "Cap", align: "end", cell: (row) => context.money(Number(row.amountMinor ?? 0)), sortValue: (row) => row.amountMinor ?? 0 },
+            { key: "cap", header: "Cap", align: "end", cell: (row) => <span className="ds-num">{context.money(Number(row.amountMinor ?? 0))}</span>, sortValue: (row) => row.amountMinor ?? 0 },
             { key: "committed", header: "Committed", align: "end", cell: (row) => (row.fields.usageKnown === false ? <span className="ds-subtle">Unavailable</span> : context.money(Number(row.fields.committedMinor ?? 0))) },
-            { key: "reserved", header: "Reserved", align: "end", hideBelow: 1100, cell: (row) => context.money(Number(row.fields.reservedMinor ?? 0)) },
+            { key: "reserved", header: "Reserved", align: "end", hideBelow: 1100, cell: (row) => <span className="ds-num">{context.money(Number(row.fields.reservedMinor ?? 0))}</span> },
             { key: "period", header: "Period", align: "end", cell: (row) => String(row.fields.period ?? "") },
           ]}
           empty={<Empty title="No limits set" action={<Button variant="primary" onClick={() => context.openOverlay("Spend limit")}>Set a quota</Button>}>Without a limit, a mission may commit whatever its grant allows.</Empty>}
@@ -1474,7 +1496,7 @@ export function BudgetScreen({ context, tab }: { context: ScreenContext; tab: "A
 
   const invoices = data.billingInvoices;
   return (
-    <Card title="Subscription invoices" subtitle={`${invoices.length} records · nothing is charged from this browser`} flush>
+    <Card eyebrow="SUBSCRIPTION" prov="posted" title="Subscription invoices" subtitle={`${invoices.length} records · nothing is charged from this browser`} flush>
       <DataGrid
         rows={invoices}
         rowId={(row) => row.id}
@@ -1482,8 +1504,8 @@ export function BudgetScreen({ context, tab }: { context: ScreenContext; tab: "A
         columns={[
           { key: "title", header: "Invoice", primary: true, cell: (row) => <div><strong>{row.title}</strong><p className="ds-subtle">{row.summary}</p></div>, filterValue: (row) => row.title },
           { key: "period", header: "Period", cell: (row) => String(row.fields.period ?? "") },
-          { key: "amount", header: "Amount", align: "end", cell: (row) => context.money(row.amountMinor), sortValue: (row) => row.amountMinor ?? 0 },
-          { key: "due", header: "Due", align: "end", cell: (row) => (row.fields.dueAt ? context.date(String(row.fields.dueAt)) : "—") },
+          { key: "amount", header: "Amount", align: "end", cell: (row) => <span className="ds-num">{context.money(row.amountMinor)}</span>, sortValue: (row) => row.amountMinor ?? 0 },
+          { key: "due", header: "Due", align: "end", cell: (row) => (row.fields.dueAt ? <span className="ds-num">{context.date(String(row.fields.dueAt))}</span> : "—") },
           {
             key: "status", header: "State", align: "end",
             cell: (row) => <Pill tone={row.status === "paid_locally" ? "success" : new Date(String(row.fields.dueAt ?? now)) < now ? "warning" : "info"}>{row.status.replace(/_/g, " ")}</Pill>,
@@ -1499,7 +1521,7 @@ export function SpendLimit({ context, close }: { context: ScreenContext; close: 
   const data = useAdmin();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const existing = data.budgets.find((row) => row.id === (payload?.id ?? context.selectedId));
-  const [cap, setCap] = useState(Number(existing?.amountMinor ?? 25_000));
+  const [cap, setCap] = useSeeded(Number(existing?.amountMinor ?? 25_000));
   const [busy, setBusy] = useState(false);
   const committed = Number(existing?.fields.committedMinor ?? 0);
   const reserved = Number(existing?.fields.reservedMinor ?? 0);
@@ -1556,7 +1578,7 @@ export function SpendLimit({ context, close }: { context: ScreenContext; close: 
 
 export function CostAllocation({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
-  const [department, setDepartment] = useState(data.departments[0]?.id ?? "");
+  const [department, setDepartment] = useSeeded(data.departments[0]?.id ?? "");
   const [amount, setAmount] = useState(5_000);
   const [busy, setBusy] = useState(false);
   const target = data.budgets.find((row) => row.fields.scope === department);

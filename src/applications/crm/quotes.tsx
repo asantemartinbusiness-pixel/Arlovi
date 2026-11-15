@@ -63,10 +63,10 @@ export function QuotesList({ context, tab }: { context: ScreenContext; tab: stri
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label={`${tab} quotes`} value={String(rows.length)} meta={`${data.quotes.length} in total`} />
-        <Stat label="Value" value={context.money(total)} meta="Net plus resolved tax" />
-        <Stat label="Need a discount approval" value={String(needsApproval.length)} meta={needsApproval.length ? "Above the policy ceiling" : "All within policy"} />
-        <Stat label="Unresolved tax" value={String(unresolved.length)} meta={unresolved.length ? "Held as UNKNOWN" : "Every line resolves"} />
+        <Stat prov="human" label={`${tab} quotes`} value={String(rows.length)} meta={`${data.quotes.length} in total`} />
+        <Stat prov="human" label="Value" value={context.money(total)} meta="Net plus resolved tax" />
+        <Stat prov="human" label="Need a discount approval" value={String(needsApproval.length)} meta={needsApproval.length ? "Above the policy ceiling" : "All within policy"} />
+        <Stat prov="human" label="Unresolved tax" value={String(unresolved.length)} meta={unresolved.length ? "Held as UNKNOWN" : "Every line resolves"} />
       </StatRow>
 
       {unresolved.length > 0 && (
@@ -131,14 +131,14 @@ export function QuotesList({ context, tab }: { context: ScreenContext; tab: stri
       />
 
       <Grid>
-        <Card span={6} title="Pricing policy" subtitle="What needs an approval">
+        <Card prov="human" span={6} title="Pricing policy" subtitle="What needs an approval">
           <Stack gap={2}>
             <Row gap={2}><Pill tone="neutral">Trade discount</Pill><span className="ds-grow">Up to 10% needs no approval</span></Row>
             <Row gap={2}><Pill tone="warning">Above 10%</Pill><span className="ds-grow">Owner approval, recorded on the quote</span></Row>
             <Row gap={2}><Pill tone="danger">Expired</Pill><span className="ds-grow">Cannot be sent as current; duplicate it to re-price</span></Row>
           </Stack>
         </Card>
-        <Card span={6} title="Sending a quote" actions={<CapabilityPill id="email.send" />}>
+        <Card prov="human" span={6} title="Sending a quote" actions={<CapabilityPill id="email.send" />}>
           <CapabilityNotice id="email.send" />
         </Card>
       </Grid>
@@ -177,8 +177,7 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
       setNumber((current) => current || `Q-${Math.max(100, ...numbers) + 1}`);
       setLines((current) => (current.length ? current : [blankLine(0)]));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quote?.id]);
+  }, [quote, data]);
 
   const deal = data.deals.find((item) => item.id === dealId);
   const customer = contactById(data, contactId);
@@ -213,22 +212,22 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
       )}
 
       <Row gap={3} wrap>
-        <Field label="Quote number" required><TextInput value={number} onChange={(event) => { setDirty(true); setNumber(event.target.value); }} disabled={locked} required /></Field>
+        <Field label="Quote number" required><TextInput aria-label="Quote number" value={number} onChange={(event) => { setDirty(true); setNumber(event.target.value); }} disabled={locked} required /></Field>
         <Field label="Deal">
-          <Select value={dealId} onChange={(event) => { setDirty(true); setDealId(event.target.value); }} disabled={locked}>
+          <Select aria-label="Deal" value={dealId} onChange={(event) => { setDirty(true); setDealId(event.target.value); }} disabled={locked}>
             <option value="">Not linked</option>
             {data.deals.map((item) => <option key={item.id} value={item.id}>{item.title} · {stageOf(item).label}</option>)}
           </Select>
         </Field>
         <Field label="Recipient">
-          <Select value={contactId} onChange={(event) => { setDirty(true); setContactId(event.target.value); }} disabled={locked}>
+          <Select aria-label="Recipient" value={contactId} onChange={(event) => { setDirty(true); setContactId(event.target.value); }} disabled={locked}>
             <option value="">Not set</option>
             {data.contacts.map((item) => <option key={item.id} value={item.id}>{item.title}{item.fields.taxStatus ? ` · ${String(item.fields.taxStatus)}` : " · no tax status"}</option>)}
           </Select>
         </Field>
-        <Field label="Expires"><TextInput type="date" value={expires} onChange={(event) => { setDirty(true); setExpires(event.target.value); }} disabled={locked} /></Field>
+        <Field label="Expires"><TextInput aria-label="Expires" type="date" value={expires} onChange={(event) => { setDirty(true); setExpires(event.target.value); }} disabled={locked} /></Field>
         <Field label="Customer tax status" hint="Overrides the contact record for this quote.">
-          <Select value={effectiveStatus} onChange={(event) => { setDirty(true); setStatus(event.target.value as CustomerTaxStatus); }} disabled={locked}>
+          <Select aria-label="Customer tax status" value={effectiveStatus} onChange={(event) => { setDirty(true); setStatus(event.target.value as CustomerTaxStatus); }} disabled={locked}>
             {CUSTOMER_TAX_STATUSES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
           </Select>
         </Field>
@@ -297,7 +296,7 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
         </div>
       </div>
 
-      <Card title="Tax summary by resolved code" subtitle={`${org.jurisdiction} rules · ${CUSTOMER_TAX_STATUSES.find((entry) => entry.value === effectiveStatus)?.label}`}>
+      <Card prov="human" title="Tax summary by resolved code" subtitle={`${org.jurisdiction} rules · ${CUSTOMER_TAX_STATUSES.find((entry) => entry.value === effectiveStatus)?.label}`}>
         <Stack gap={2}>
           {totals.byCode.map((group) => (
             <Row key={group.code.code} gap={3}>
@@ -417,7 +416,7 @@ export function PricingPolicy({ context }: { context: ScreenContext }) {
           {needing.map((quote) => {
             const totals = quoteTotals(data, quote, org.jurisdiction, now);
             return (
-              <Card key={quote.id} title={quote.title} subtitle={String(quote.fields.discountApproval)}
+              <Card prov="human" key={quote.id} title={quote.title} subtitle={String(quote.fields.discountApproval)}
                 actions={<Money minor={quote.amountMinor} context={context} bold />}
                 footer={<>
                   <Button
@@ -478,11 +477,11 @@ export function SendPreview({ context, close }: { context: ScreenContext; close:
         { label: "To", value: to || "No email on the contact record" },
         { label: "Subject", value: `${org.name} · quote ${String(quote.fields.number ?? quote.title)}` },
         { label: "Total", value: <Money minor={totals.grossMinor} context={context} bold /> },
-        { label: "Holds until", value: context.date(quote.dueAt) },
+        { label: "Holds until", value: <span className="ds-num">{context.date(quote.dueAt)}</span> },
         { label: "Consent", value: suppressed ? "Suppressed" : customer?.fields.consent ? String(customer.fields.consent) : "None recorded" },
       ]} />
       {blocked && <Notice tone="danger" title="This quote cannot be sent">{blocked}</Notice>}
-      <Field label="Message"><TextArea value={drafted} rows={10} onChange={(event) => setBody(event.target.value)} /></Field>
+      <Field label="Message"><TextArea aria-label="Message" value={drafted} rows={10} onChange={(event) => setBody(event.target.value)} /></Field>
       <Row gap={2}>
         <Button
           variant="primary"

@@ -69,7 +69,7 @@ registerSeed("team", (ctx) => {
       fields: { lead: "Maya Chen", members: 5 },
     }),
 
-    agent(20, "Wren Halliday", {
+    agent(60, "Wren Halliday", {
       role: "Research", status: "active", owner: "Maya Chen", departmentId: "nl-departments-060", manager: "Nia Okonkwo",
       autonomy: "draft", spendCapMinor: 40_000,
       summary: "Assembles evidence from sources and the fact registry. Reports gaps instead of filling them.",
@@ -81,7 +81,7 @@ registerSeed("team", (ctx) => {
       authority: ["Read internal sources", "Draft research notes", "Cannot verify a fact alone"],
       sources: ["nl-sources-060", "nl-sources-062", "nl-sources-067"],
     }),
-    agent(21, "Tomas Reiner", {
+    agent(61, "Tomas Reiner", {
       role: "Procurement", status: "active", owner: "Maya Chen", departmentId: "nl-departments-001", manager: "Maya Chen",
       autonomy: "draft", spendCapMinor: 60_000,
       summary: "Prepares purchase orders and supplier comparisons from recorded terms.",
@@ -94,7 +94,7 @@ registerSeed("team", (ctx) => {
       authority: ["Draft a purchase order", "Cannot approve or send one"],
       sources: ["nl-sources-063"],
     }),
-    agent(22, "Odile Marchand", {
+    agent(62, "Odile Marchand", {
       role: "Care", status: "paused", owner: "Priya Shah", departmentId: "nl-departments-002", manager: "Priya Shah",
       autonomy: "suggest", spendCapMinor: 20_000, pausedReason: "Replies drifted outside the approved article set during evaluation.",
       summary: "Second care specialist, paused after an evaluation run scored below the required safety line.",
@@ -103,7 +103,7 @@ registerSeed("team", (ctx) => {
       authority: ["Suggest a reply for a person to send"],
       sources: ["nl-sources-067"],
     }),
-    agent(23, "Bela Novak", {
+    agent(63, "Bela Novak", {
       role: "Scheduling", status: "active", owner: "Elena Voss", departmentId: "nl-departments-001", manager: "Elena Voss",
       autonomy: "draft", spendCapMinor: 15_000,
       summary: "Holds the showroom diary shape and flags clashes. Cannot touch an external calendar.",
@@ -115,7 +115,7 @@ registerSeed("team", (ctx) => {
       authority: ["Propose a booking change", "Cannot confirm with a customer"],
       sources: [],
     }),
-    agent(24, "Pilar Sainz", {
+    agent(64, "Pilar Sainz", {
       role: "Analytics", status: "active", owner: "Jonah Adeyemi", departmentId: "nl-departments-002", manager: "Jonah Adeyemi",
       autonomy: "suggest", spendCapMinor: 30_000,
       summary: "Computes figures from posted journals and stock moves, and marks anything without a source as unavailable.",
@@ -124,7 +124,7 @@ registerSeed("team", (ctx) => {
       authority: ["Compute from posted records", "Cannot estimate a figure that has no source"],
       sources: ["nl-sources-066"],
     }),
-    agent(25, "Soren Fisk", {
+    agent(65, "Soren Fisk", {
       role: "Quality", status: "active", owner: "Maya Chen", departmentId: "nl-departments-060", manager: "Nia Okonkwo",
       autonomy: "draft", spendCapMinor: 25_000,
       summary: "Runs evaluation scenarios against other contracts and records the score.",
@@ -133,7 +133,7 @@ registerSeed("team", (ctx) => {
       authority: ["Run a scenario", "Cannot promote a contract"],
       sources: [],
     }),
-    agent(26, "Ines Duarte", {
+    agent(66, "Ines Duarte", {
       role: "Legal review", status: "draft", owner: "Maya Chen", departmentId: "nl-departments-002", manager: "Maya Chen",
       autonomy: "suggest", spendCapMinor: 0,
       summary: "Draft contract: reads contracts and obligations and flags clauses. Not evaluated, so it cannot be activated.",
@@ -142,7 +142,7 @@ registerSeed("team", (ctx) => {
       authority: ["Nothing yet: the contract is incomplete"],
       sources: ["nl-sources-063"],
     }),
-    agent(27, "Kofi Mensah", {
+    agent(67, "Kofi Mensah", {
       role: "Stock", status: "active", owner: "Maya Chen", departmentId: "nl-departments-001", manager: "Maya Chen",
       autonomy: "draft", spendCapMinor: 20_000,
       summary: "Watches stock moves against the winter run and drafts a replenishment note.",
@@ -158,47 +158,47 @@ registerSeed("team", (ctx) => {
     ctx.rec({ org: "nl", collection: "members", n: 63, title: "Pilar Sainz", summary: "Analytics agent. Local contract.", fields: { kind: "ai", role: "agent", departmentId: "nl-departments-002", title: "Analytics agent", agentId: "nl-agents-064" }, tags: ["ai"] }),
     ctx.rec({ org: "nl", collection: "members", n: 64, title: "Soren Fisk", summary: "Quality agent. Local contract.", fields: { kind: "ai", role: "agent", departmentId: "nl-departments-060", title: "Quality agent", agentId: "nl-agents-065" }, tags: ["ai"] }),
 
-    skill(20, "Evidence assembly", {
+    skill(60, "Evidence assembly", {
       origin: "native", version: "2.1", owner: "Maya Chen",
       summary: "Collects the records behind a claim and lists what is missing.",
       tools: ["workspace.read"], inputs: ["A question", "A collection scope"], outputs: ["Finding list with citations", "Gap list"],
     }),
-    skill(21, "Source freshness check", {
+    skill(61, "Source freshness check", {
       origin: "native", version: "1.4", owner: "Maya Chen",
       summary: "Reports the age of each source behind an answer and flags stale ones.",
       tools: ["workspace.read"], inputs: ["Source ids"], outputs: ["Age in days", "Stale flag"],
     }),
-    skill(22, "Supplier comparison", {
+    skill(62, "Supplier comparison", {
       origin: "organization", version: "1.0", owner: "Tomas Reiner",
       summary: "Compares recorded supplier terms. Says plainly when only one supplier exists.",
       tools: ["workspace.read", "workspace.draft"], inputs: ["Product id"], outputs: ["Comparison table", "Risk note"],
     }),
-    skill(23, "Approved-reply drafting", {
+    skill(63, "Approved-reply drafting", {
       origin: "organization", version: "1.2", owner: "Priya Shah",
       summary: "Drafts a customer reply using only approved article text.",
       tools: ["workspace.read"], inputs: ["Ticket id"], outputs: ["Draft reply", "Article citation"],
     }),
-    skill(24, "Diary clash detection", {
+    skill(64, "Diary clash detection", {
       origin: "native", version: "1.1", owner: "Elena Voss",
       summary: "Finds overlapping bookings for one resource.",
       tools: ["workspace.read"], inputs: ["Date range"], outputs: ["Clash list"],
     }),
-    skill(25, "Ledger figure computation", {
+    skill(65, "Ledger figure computation", {
       origin: "native", version: "3.0", owner: "Jonah Adeyemi",
       summary: "Computes totals from posted journals only, and marks unposted drafts as excluded.",
       tools: ["workspace.read"], inputs: ["Period"], outputs: ["Totals", "Excluded drafts"],
     }),
-    skill(26, "Scenario grading", {
+    skill(66, "Scenario grading", {
       origin: "native", version: "1.0", owner: "Maya Chen",
       summary: "Runs a scenario's assertions against the workspace and records pass or fail per assertion.",
       tools: ["workspace.read", "workspace.draft"], inputs: ["Scenario id", "Agent id"], outputs: ["Score", "Assertion results"],
     }),
-    skill(27, "Replenishment note", {
+    skill(67, "Replenishment note", {
       origin: "organization", version: "0.9", owner: "Maya Chen", status: "draft",
       summary: "Drafts a stock note from on-hand quantities. Draft version, not published.",
       tools: ["workspace.read"], inputs: ["Product id"], outputs: ["Draft note"],
     }),
-    skill(28, "Sentiment scoring pack", {
+    skill(68, "Sentiment scoring pack", {
       origin: "purchased", version: "4.2", owner: "Maya Chen", status: "sandboxed", trusted: false,
       summary: "Bought bundle. Held in review: it declares a network call, so it is not runnable here.",
       tools: ["workspace.read", "model.inference"], inputs: ["Message text"], outputs: ["Score"],

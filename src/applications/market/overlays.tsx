@@ -5,7 +5,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
-import { ProviderBoundary } from "@/applications/growth/kit";
+import { ProviderBoundary } from "@/applications/market/kit";
 import { capabilityById } from "@/platform/capability";
 import type { Rec } from "@/domain/types";
 import {

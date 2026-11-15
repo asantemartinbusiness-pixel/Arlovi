@@ -366,6 +366,9 @@ export function SlideCanvas({
 
   return (
     <div className="px-stagewrap">
+      {/* The stage is scaled with a transform, so its layout box stays 960×540.
+          This frame carries the scaled size so the column can lay it out. */}
+      <div className="px-stageframe" style={{ width: SLIDE_W * scale, height: SLIDE_H * scale }}>
       <div
         ref={stageRef}
         className="px-stage"
@@ -452,6 +455,7 @@ export function SlideCanvas({
         ))}
 
         {children}
+      </div>
       </div>
     </div>
   );

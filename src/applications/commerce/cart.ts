@@ -1,5 +1,5 @@
 import type { TaxCategory } from "@/platform/money";
-import { createStore } from "@/applications/growth/kit";
+import { createStore } from "@/applications/market/kit";
 
 export interface CartLine {
   key: string;

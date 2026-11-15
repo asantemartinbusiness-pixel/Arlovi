@@ -22,7 +22,7 @@ export function scaleAt(width: number, base: number): number {
 
 function toneStyle(block: Block, theme: Theme): CSSProperties {
   if (block.props.tone === "accent") return { background: theme.accent, color: "#fff" };
-  if (block.props.tone === "soft") return { background: "rgba(23,34,58,.05)" };
+  if (block.props.tone === "soft") return { background: "color-mix(in srgb, currentColor 7%, transparent)" };
   return {};
 }
 
@@ -91,7 +91,7 @@ export function BlockView({
     inner = <>{heading}<p style={{ maxWidth: props.align === "center" ? "60ch" : undefined, marginInline: props.align === "center" ? "auto" : undefined }}>{editable("body")}</p>{cta}</>;
   } else if (block.type === "columns") {
     inner = <>{heading}<div className="t6-render-cols" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))` }}>
-      {props.items.map((item, index) => <div key={`${item}-${index}`} className="t6-render-tile" style={props.tone === "accent" ? { background: "rgba(255,255,255,.18)" } : undefined}><strong>{item}</strong></div>)}
+      {props.items.map((item, index) => <div key={`${item}-${index}`} className="t6-render-tile" style={props.tone === "accent" ? { background: "color-mix(in srgb, #fff 18%, transparent)" } : undefined}><strong>{item}</strong></div>)}
     </div></>;
   } else if (block.type === "image") {
     inner = <>{heading}<figure style={{ margin: 0 }}><div className="t6-render-img" style={{ borderRadius: theme.radius }} role="img" aria-label={props.alt || "Image with no alternative description"}>{props.alt || "No alternative description"}</div>{props.body && <figcaption style={{ fontSize: base * 0.85, marginTop: 6 }}>{props.body}</figcaption>}</figure></>;
@@ -120,7 +120,7 @@ export function BlockView({
         {(props.items.length ? props.items : ["Name", "Email", "Message"]).map((label, index) => (
           <label key={`${label}-${index}`} style={{ display: "grid", gap: 3, fontSize: base * 0.85, fontWeight: 600 }}>
             {label}
-            <span style={{ height: 34, border: "1px solid rgba(23,34,58,.25)", borderRadius: theme.radius / 2, background: "#fff" }} />
+            <span style={{ height: 34, border: "1px solid color-mix(in srgb, currentColor 28%, transparent)", borderRadius: theme.radius / 2, background: "#fff" }} />
           </label>
         ))}
         <span style={{ marginTop: 4, padding: "9px 14px", borderRadius: theme.radius, background: theme.ink, color: theme.paper, fontWeight: 600, textAlign: "center", fontSize: base * 0.9 }}>{props.ctaLabel || "Send"}</span>
@@ -158,7 +158,7 @@ export function SiteNavView({ site, width }: { site: SiteModel; width: number })
       aria-label="Site menu"
       style={{
         display: "flex", flexDirection: stacked ? "column" : "row", gap: stacked ? 6 : 16,
-        padding: stacked ? 12 : "14px 20px", borderBottom: "1px solid rgba(23,34,58,.1)",
+        padding: stacked ? 12 : "14px 20px", borderBottom: "1px solid color-mix(in srgb, currentColor 12%, transparent)",
         fontSize: (site.theme.scale / 100) * 15, fontWeight: 600,
       }}
     >

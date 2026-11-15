@@ -76,10 +76,10 @@ export function SchedulesAndQueues({ context }: { context: ScreenContext }) {
     return (
       <Stack gap={5}>
         <StatRow>
-          <Stat label="Runs waiting" value={String(waiting.length)} meta="Paused at a gate or stopped at a provider" />
-          <Stat label="Active automations" value={String(active.length)} meta={`${workflows.length} in total`} />
-          <Stat label="Over their concurrency" value={String(pressured.length)} meta="Waiting runs exceed the allowed parallel runs" />
-          <Stat label="Workers" value="1" meta="A single local interpreter, in this tab" />
+          <Stat prov="agent" label="Runs waiting" value={String(waiting.length)} meta="Paused at a gate or stopped at a provider" />
+          <Stat prov="human" label="Active automations" value={String(active.length)} meta={`${workflows.length} in total`} />
+          <Stat prov="agent" label="Over their concurrency" value={String(pressured.length)} meta="Waiting runs exceed the allowed parallel runs" />
+          <Stat prov="agent" label="Workers" value="1" meta="A single local interpreter, in this tab" />
         </StatRow>
 
         {pressured.length > 0 && (
@@ -89,7 +89,7 @@ export function SchedulesAndQueues({ context }: { context: ScreenContext }) {
           </Notice>
         )}
 
-        <Card title="Queue per automation" subtitle="Pending work and the next firing" flush>
+        <Card eyebrow="QUEUES" prov="agent" title="Queue per automation" subtitle="Pending work and the next firing" flush>
           <DataGrid
             rows={perWorkflow}
             rowId={(row) => row.workflow.id}
@@ -107,7 +107,7 @@ export function SchedulesAndQueues({ context }: { context: ScreenContext }) {
         </Card>
 
         {waiting.length > 0 && (
-          <Card title="Pending jobs" subtitle="Each one is a real run with a cursor" flush>
+          <Card eyebrow="PENDING" prov="agent" title="Pending jobs" subtitle="Each one is a real run with a cursor" flush>
             <DataGrid
               rows={waiting}
               rowId={(row) => row.id}
@@ -136,8 +136,7 @@ export function SchedulesAndQueues({ context }: { context: ScreenContext }) {
             <Card key={workflow.id} span={6} title={workflow.title} subtitle={describeSchedule(spec)}>
               <Stack gap={3}>
                 <Field label="Parallel runs allowed" hint="A firing beyond this number queues instead of starting.">
-                  <TextInput
-                    type="number" min={1} max={8} value={String(spec.concurrency)}
+                  <TextInput aria-label="Parallel runs allowed" type="number" min={1} max={8} value={String(spec.concurrency)}
                     onChange={(event) => void context.mutate.patch(workflow.id, { fields: { ...workflow.fields, concurrency: Number(event.target.value) } }, { event: "Concurrency changed" })}
                   />
                 </Field>
@@ -169,7 +168,7 @@ export function SchedulesAndQueues({ context }: { context: ScreenContext }) {
   if (context.tab === "History") {
     const rows = runs.slice().sort((left, right) => String(right.at ?? "").localeCompare(String(left.at ?? "")));
     return (
-      <Card title="Firing history" subtitle={`${rows.length} recorded run${rows.length === 1 ? "" : "s"}`} flush>
+      <Card eyebrow="HISTORY" prov="agent" title="Firing history" subtitle={`${rows.length} recorded run${rows.length === 1 ? "" : "s"}`} flush>
         {rows.length === 0 ? (
           <Empty title="No run has fired" icon={<CalendarClock size={20} />}>No scheduler runs in this browser, so every recorded run was started by hand from a builder or a test screen.</Empty>
         ) : (
@@ -202,10 +201,10 @@ export function SchedulesAndQueues({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Active schedules" value={String(active.length)} meta={`${workflows.length - active.length} not active`} />
-        <Stat label="Firings this month" value={String(firings.filter((firing) => firing.at.getMonth() === monthStart.getMonth()).length)} meta={`Computed in ${context.org.timezone}`} />
-        <Stat label="Clock changes in range" value={String(dstFirings.length)} meta={dstFirings.length ? "The local time holds; the UTC instant moves" : "No offset change in this window"} />
-        <Stat label="Duplicates suppressed" value={String(firings.filter((firing) => firing.duplicate).length)} meta="Two schedules resolving to the same instant" />
+        <Stat prov="human" label="Active schedules" value={String(active.length)} meta={`${workflows.length - active.length} not active`} />
+        <Stat prov="agent" label="Firings this month" value={String(firings.filter((firing) => firing.at.getMonth() === monthStart.getMonth()).length)} meta={`Computed in ${context.org.timezone}`} />
+        <Stat prov="agent" label="Clock changes in range" value={String(dstFirings.length)} meta={dstFirings.length ? "The local time holds; the UTC instant moves" : "No offset change in this window"} />
+        <Stat prov="agent" label="Duplicates suppressed" value={String(firings.filter((firing) => firing.duplicate).length)} meta="Two schedules resolving to the same instant" />
       </StatRow>
 
       <Notice tone="warning" title="These firings are computed, not scheduled">
@@ -244,7 +243,7 @@ export function SchedulesAndQueues({ context }: { context: ScreenContext }) {
         </div>
       </Card>
 
-      <Card title="Next firings in order" subtitle="With the zone offset applied at each instant" flush>
+      <Card eyebrow="SCHEDULE" prov="agent" title="Next firings in order" subtitle="With the zone offset applied at each instant" flush>
         {firings.length === 0 ? (
           <Empty title="No active schedule" icon={<CalendarClock size={20} />}>Activate an automation and set its recurrence to see firings here.</Empty>
         ) : (
@@ -282,21 +281,21 @@ export function ScheduleEditor({ context, close }: { context: ScreenContext; clo
   return (
     <Stack gap={4}>
       <Field label="Automation">
-        <Select value={id} onChange={(event) => { setId(event.target.value); setSpec({}); }}>
+        <Select aria-label="Automation" value={id} onChange={(event) => { setId(event.target.value); setSpec({}); }}>
           {workflows.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
         </Select>
       </Field>
       <Field label="Frequency">
-        <Select value={merged.frequency} onChange={(event) => setSpec({ ...spec, frequency: event.target.value as ScheduleSpec["frequency"] })}>
+        <Select aria-label="Frequency" value={merged.frequency} onChange={(event) => setSpec({ ...spec, frequency: event.target.value as ScheduleSpec["frequency"] })}>
           {["hourly", "daily", "weekly", "monthly"].map((item) => <option key={item} value={item}>{item}</option>)}
         </Select>
       </Field>
       <Row gap={2}>
-        <Field label="Hour"><TextInput type="number" min={0} max={23} value={String(merged.hour)} onChange={(event) => setSpec({ ...spec, hour: Number(event.target.value) })} /></Field>
-        <Field label="Minute"><TextInput type="number" min={0} max={59} value={String(merged.minute)} onChange={(event) => setSpec({ ...spec, minute: Number(event.target.value) })} /></Field>
+        <Field label="Hour"><TextInput aria-label="Hour" type="number" min={0} max={23} value={String(merged.hour)} onChange={(event) => setSpec({ ...spec, hour: Number(event.target.value) })} /></Field>
+        <Field label="Minute"><TextInput aria-label="Minute" type="number" min={0} max={59} value={String(merged.minute)} onChange={(event) => setSpec({ ...spec, minute: Number(event.target.value) })} /></Field>
       </Row>
       <Field label="Time zone">
-        <Select value={merged.timezone} onChange={(event) => setSpec({ ...spec, timezone: event.target.value })}>
+        <Select aria-label="Time zone" value={merged.timezone} onChange={(event) => setSpec({ ...spec, timezone: event.target.value })}>
           {["Europe/London", "America/New_York", "Europe/Paris", "Australia/Sydney", "UTC"].map((zone) => <option key={zone} value={zone}>{zone}</option>)}
         </Select>
       </Field>
@@ -342,12 +341,12 @@ export function QueuePriority({ context, close }: { context: ScreenContext; clos
   return (
     <Stack gap={4}>
       <Field label="Automation">
-        <Select value={id} onChange={(event) => { setId(event.target.value); setConcurrency(null); }}>
+        <Select aria-label="Automation" value={id} onChange={(event) => { setId(event.target.value); setConcurrency(null); }}>
           {workflows.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
         </Select>
       </Field>
       <Field label="Parallel runs allowed" hint="How many runs of this automation a scheduler would allow at once.">
-        <TextInput type="number" min={1} max={8} value={String(value)} onChange={(event) => setConcurrency(Number(event.target.value))} />
+        <TextInput aria-label="Parallel runs allowed" type="number" min={1} max={8} value={String(value)} onChange={(event) => setConcurrency(Number(event.target.value))} />
       </Field>
       <Notice tone="info" title="One worker runs here">
         This browser executes one run at a time, in the tab. The concurrency figure is what a scheduler would honour, and the queue screen measures waiting runs against it.
@@ -434,13 +433,13 @@ export function AutomationExceptions({ context, tab }: { context: ScreenContext;
     return (
       <Stack gap={5}>
         <StatRow>
-          <Stat label="Open exceptions" value={String(exceptions.filter((item) => !["resolved", "closed"].includes(item.status)).length)} meta={`${exceptions.length} recorded in total`} />
-          <Stat label="Runs that stopped" value={String(runs.filter((run) => ["failed", "blocked"].includes(run.status)).length)} meta="Failed or stopped at a provider" />
-          <Stat label="Not yet raised" value={String(unraised.length)} meta="A run that stopped with no exception against it" />
-          <Stat label="Connections unavailable" value={String(PROVIDER_CAPABILITIES.filter((capability) => capability.state !== "verified_external").length)} meta={`of ${PROVIDER_CAPABILITIES.length} capabilities`} />
+          <Stat prov="human" label="Open exceptions" value={String(exceptions.filter((item) => !["resolved", "closed"].includes(item.status)).length)} meta={`${exceptions.length} recorded in total`} />
+          <Stat prov="agent" label="Runs that stopped" value={String(runs.filter((run) => ["failed", "blocked"].includes(run.status)).length)} meta="Failed or stopped at a provider" />
+          <Stat prov="agent" label="Not yet raised" value={String(unraised.length)} meta="A run that stopped with no exception against it" />
+          <Stat prov="unknown" label="Connections unavailable" value={String(PROVIDER_CAPABILITIES.filter((capability) => capability.state !== "verified_external").length)} meta={`of ${PROVIDER_CAPABILITIES.length} capabilities`} />
         </StatRow>
 
-        <Card title="Detected, not yet raised" subtitle={`${unraised.length} run${unraised.length === 1 ? "" : "s"} stopped without an exception`}>
+        <Card eyebrow="DETECTED" prov="agent" title="Detected, not yet raised" subtitle={`${unraised.length} run${unraised.length === 1 ? "" : "s"} stopped without an exception`}>
           {unraised.length === 0 ? (
             <Empty title="Nothing undetected" icon={<ShieldQuestion size={20} />}>Every run that stopped already has an exception against it.</Empty>
           ) : (
@@ -486,7 +485,7 @@ export function AutomationExceptions({ context, tab }: { context: ScreenContext;
           )}
         </Card>
 
-        <Card title="New exceptions" subtitle={`${inTab.length} waiting for triage`} flush>
+        <Card eyebrow="TRIAGE" prov="human" title="New exceptions" subtitle={`${inTab.length} waiting for triage`} flush>
           {inTab.length === 0 ? (
             <Empty title="Nothing new" icon={<AlertOctagon size={20} />}>Raised exceptions appear here until someone takes them.</Empty>
           ) : (
@@ -529,7 +528,7 @@ export function AutomationExceptions({ context, tab }: { context: ScreenContext;
               actions={<Pill tone={exception.fields.cause === "provider" ? "warning" : "danger"} dot>{String(exception.fields.cause)}</Pill>}
             >
               <Grid>
-                <Card span={7} title="Root cause as recorded" subtitle={step ? `${step.label} — ${step.status}` : "No step trace"}>
+                <Card span={7} eyebrow="ROOT CAUSE" prov="agent" title="Root cause as recorded" subtitle={step ? `${step.label} — ${step.status}` : "No step trace"}>
                   {step ? (
                     <Stack gap={2}>
                       <p>{step.message}</p>
@@ -544,7 +543,7 @@ export function AutomationExceptions({ context, tab }: { context: ScreenContext;
                     <Notice tone="warning" title="No step trace for the linked run">The cause cannot be read from the run, so it must be investigated by hand.</Notice>
                   )}
                 </Card>
-                <Card span={5} title="What can be done" subtitle="Only what this browser can genuinely do">
+                <Card span={5} eyebrow="ACTIONS" prov="human" title="What can be done" subtitle="Only what this browser can genuinely do">
                   <Stack gap={2}>
                     {run && <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/auto/runs/${run.id}`)}>Open the run trace</Button>}
                     {workflow && <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/auto/workflows/${workflow.id}`)}>Open the automation</Button>}
@@ -568,7 +567,7 @@ export function AutomationExceptions({ context, tab }: { context: ScreenContext;
           A step that stopped at a provider boundary cannot be fixed by retrying. The connection has to exist and be verified first.
         </Notice>
         <Grid>
-          <Card span={7} title="Waiting on a person" subtitle={`${inTab.length} in this state, ${blockedByProvider.length} caused by a provider`}>
+          <Card span={7} eyebrow="AWAITING" prov="human" title="Waiting on a person" subtitle={`${inTab.length} in this state, ${blockedByProvider.length} caused by a provider`}>
             {inTab.length === 0 && blockedByProvider.length === 0 ? (
               <Empty title="Nothing is waiting on a person" icon={<PlugZap size={20} />}>Exceptions move here when the fix needs a decision or a connection.</Empty>
             ) : (
@@ -586,7 +585,7 @@ export function AutomationExceptions({ context, tab }: { context: ScreenContext;
               </Stack>
             )}
           </Card>
-          <Card span={5} title="Connections in this company" subtitle={`${connectors.length} recorded`}>
+          <Card span={5} eyebrow="CONNECTIONS" prov="unknown" title="Connections in this company" subtitle={`${connectors.length} recorded`}>
             <Stack gap={2}>
               {PROVIDER_CAPABILITIES.map((capability) => (
                 <Row key={capability.id} gap={2}>
@@ -679,7 +678,7 @@ export function ConnectorReconnect({ context, close }: { context: ScreenContext;
   return (
     <Stack gap={4}>
       <Field label="Capability to reconnect">
-        <Select value={capabilityId} onChange={(event) => setCapabilityId(event.target.value)}>
+        <Select aria-label="Capability to reconnect" value={capabilityId} onChange={(event) => setCapabilityId(event.target.value)}>
           {PROVIDER_CAPABILITIES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
         </Select>
       </Field>
@@ -720,7 +719,7 @@ export function ResolutionRecord({ context, close }: { context: ScreenContext; c
   return (
     <Stack gap={4}>
       <Field label="What was done" required>
-        <TextArea rows={4} value={note} onChange={(event) => setNote(event.target.value)} required />
+        <TextArea aria-label="What was done" rows={4} value={note} onChange={(event) => setNote(event.target.value)} required />
       </Field>
       {providerCause && (
         <>
@@ -778,7 +777,7 @@ export function AssignException({ context, close }: { context: ScreenContext; cl
   return (
     <Stack gap={4}>
       <Field label="Assign to">
-        <Select value={owner} onChange={(event) => setOwner(event.target.value)}>
+        <Select aria-label="Assign to" value={owner} onChange={(event) => setOwner(event.target.value)}>
           {[context.actor, ...members.map((member) => member.title)].filter((name, index, all) => all.indexOf(name) === index).map((name) => (
             <option key={name} value={name}>{name}</option>
           ))}

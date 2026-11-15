@@ -47,8 +47,15 @@ export function salaryText(context: ScreenContext, record: Rec): string {
   return `${context.money(minor)} ${String(record.fields.salaryBasis ?? "annual")}`;
 }
 
-export function leaveBalance(record: Rec): { allowance: number; taken: number; left: number } {
+export interface LeaveBalance { allowance: number; taken: number; left: number; known: boolean }
+
+/**
+ * A balance is only a balance when an allowance was recorded. Without one the
+ * screens say so rather than showing a confident zero.
+ */
+export function leaveBalance(record: Rec): LeaveBalance {
+  const known = record.fields.leaveAllowance !== undefined;
   const allowance = Number(record.fields.leaveAllowance ?? 0);
   const taken = Number(record.fields.leaveTaken ?? 0);
-  return { allowance, taken, left: Math.max(0, allowance - taken) };
+  return { allowance, taken, left: Math.max(0, allowance - taken), known };
 }

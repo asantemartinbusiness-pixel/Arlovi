@@ -6,7 +6,7 @@ import {
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
 import { computeInvoice, type CustomerTaxStatus } from "@/platform/money";
-import { ProviderBoundary, TotalsBlock } from "@/applications/growth/kit";
+import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import {
   availableFor, bodyOf, createCartStore, taxCategoryOfProduct,

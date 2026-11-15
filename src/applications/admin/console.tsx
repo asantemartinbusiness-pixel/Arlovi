@@ -9,7 +9,7 @@ import { useEvents, useOrgRecords, useWorkspace } from "@/platform/workspace";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, capabilityById } from "@/platform/capability";
 import { ROLE_LABELS } from "@/platform/policy";
 import type { Audit } from "@/domain/types";
-import { csvList, ofKind, StepUp, useAdmin } from "./pieces";
+import { csvList, ofKind, StepUp, useAdmin, useSeeded } from "./pieces";
 
 /* ====================================================================== *
  * ADMIN console — security, audit, privacy, billing, recovery, developer.
@@ -39,7 +39,7 @@ export function SecurityScreen({ context, tab }: { context: ScreenContext; tab: 
   if (tab === "Authentication") {
     return (
       <Grid>
-        <Card span={7} title="Sign-in" subtitle={policy?.summary ?? "No sign-in policy recorded"}>
+        <Card eyebrow="SIGN-IN" prov="human" span={7} title="Sign-in" subtitle={policy?.summary ?? "No sign-in policy recorded"}>
           <Stack gap={3}>
             <Notice tone="warning" title="There is no identity provider">
               Role views are chosen in this browser from the account menu. Nothing here authenticates anybody, so every setting below
@@ -78,7 +78,7 @@ export function SecurityScreen({ context, tab }: { context: ScreenContext; tab: 
             <Button variant="secondary" onClick={() => context.openOverlay("Provider setup")}>Configure single sign-on</Button>
           </Stack>
         </Card>
-        <Card span={5} title="Second factor by person" subtitle={`${data.members.filter((row) => row.fields.mfa === true).length} of ${data.members.filter((row) => row.fields.kind === "human").length} people`}>
+        <Card eyebrow="SECOND FACTOR" prov="posted" span={5} title="Second factor by person" subtitle={`${data.members.filter((row) => row.fields.mfa === true).length} of ${data.members.filter((row) => row.fields.kind === "human").length} people`}>
           <Stack gap={2}>
             {data.members.filter((row) => row.fields.kind === "human").map((member) => (
               <Row key={member.id} gap={2}>
@@ -96,12 +96,12 @@ export function SecurityScreen({ context, tab }: { context: ScreenContext; tab: 
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Active sessions" value={String(sessions.filter((row) => row.status === "active").length)} meta={`${sessions.length} recorded`} />
-          <Stat label="Without a second factor" value={String(sessions.filter((row) => row.status === "active" && row.fields.mfa !== true).length)} meta="Local records only" />
-          <Stat label="On untrusted devices" value={String(sessions.filter((row) => row.status === "active" && row.fields.trusted !== true).length)} meta="Device first seen recently" />
-          <Stat label="This session" value="1" meta="Marked below as current" />
+          <Stat prov="posted" label="Active sessions" value={String(sessions.filter((row) => row.status === "active").length)} meta={`${sessions.length} recorded`} />
+          <Stat prov="posted" label="Without a second factor" value={String(sessions.filter((row) => row.status === "active" && row.fields.mfa !== true).length)} meta="Local records only" />
+          <Stat prov="posted" label="On untrusted devices" value={String(sessions.filter((row) => row.status === "active" && row.fields.trusted !== true).length)} meta="Device first seen recently" />
+          <Stat prov="posted" label="This session" value="1" meta="Marked below as current" />
         </StatRow>
-        <Card title="Sessions" flush>
+        <Card eyebrow="SESSIONS" prov="posted" title="Sessions" flush>
           <DataGrid
             rows={sessions}
             rowId={(row) => row.id}
@@ -123,7 +123,7 @@ export function SecurityScreen({ context, tab }: { context: ScreenContext; tab: 
               { key: "member", header: "Person", hideBelow: 1100, cell: (row) => String(row.fields.member ?? "") },
               { key: "where", header: "Where", hideBelow: 1200, cell: (row) => `${String(row.fields.location ?? "")} · ${String(row.fields.ip ?? "")}` },
               { key: "mfa", header: "Second factor", cell: (row) => (row.fields.mfa === true ? <Pill tone="success">Yes</Pill> : <Pill tone="warning">No</Pill>) },
-              { key: "seen", header: "Last seen", align: "end", cell: (row) => context.relative(String(row.fields.lastSeenAt ?? row.updatedAt)), sortValue: (row) => String(row.fields.lastSeenAt ?? "") },
+              { key: "seen", header: "Last seen", align: "end", cell: (row) => <span className="ds-num">{context.relative(String(row.fields.lastSeenAt ?? row.updatedAt))}</span>, sortValue: (row) => String(row.fields.lastSeenAt ?? "") },
               { key: "status", header: "State", align: "end", cell: (row) => <Pill tone={row.status === "active" ? "success" : "neutral"}>{row.status}</Pill> },
             ]}
             bulkActions={[
@@ -154,7 +154,7 @@ export function SecurityScreen({ context, tab }: { context: ScreenContext; tab: 
     return (
       <Grid>
         {data.devices.map((device) => (
-          <Card key={device.id} span={4} title={device.title} subtitle={String(device.fields.platform ?? "")}>
+          <Card key={device.id} eyebrow="DEVICE" prov="posted" span={4} title={device.title} subtitle={String(device.fields.platform ?? "")}>
             <Stack gap={3}>
               <Row gap={2} wrap>
                 <Pill tone={device.status === "trusted" ? "success" : device.status === "blocked" ? "danger" : "warning"}>{device.status}</Pill>
@@ -236,8 +236,8 @@ export function ProviderSetup({ context, close }: { context: ScreenContext; clos
       </Field>
       <Field label="Identity provider domain"><TextInput value={domainHint} onChange={(event) => setDomainHint(event.target.value)} placeholder="login.example.com" /></Field>
       <Properties rows={[
-        { label: "Reply URL", value: <code>not available without a server</code> },
-        { label: "Entity id", value: <code>arlovi:{context.org.slug}</code> },
+        { label: "Reply URL", value: <span className="ds-num">not available without a server</span> },
+        { label: "Entity id", value: <span className="ds-num">arlovi:{context.org.slug}</span> },
       ]} />
       <Row gap={2}>
         <Button variant="ghost" onClick={close}>Cancel</Button>
@@ -366,7 +366,7 @@ export function AuditScreen({ context, tab }: { context: ScreenContext; tab: Aud
         The audit log is written as events happen and this console offers no way to edit or remove one. Nothing here can rewrite the
         past; it can only add to it. A tamper-evident chain would need a server to sign each entry.
       </Notice>
-      <Card title={`${rows.length} entries`} subtitle={tab === "All" ? "Everything recorded in this workspace" : `${tab} entries only`} flush>
+      <Card eyebrow="AUDIT TRAIL" prov="posted" title={`${rows.length} entries`} subtitle={tab === "All" ? "Everything recorded in this workspace" : `${tab} entries only`} flush>
         <DataGrid
           rows={rows}
           rowId={(row) => row.id}
@@ -375,7 +375,7 @@ export function AuditScreen({ context, tab }: { context: ScreenContext; tab: Aud
           onSelect={context.select}
           onOpen={(id) => { context.select(id); context.openOverlay("Audit detail", { id }); }}
           columns={[
-            { key: "at", header: "When", width: "170px", cell: (row) => <span title={context.dateTime(row.at)}>{context.relative(row.at)}</span>, sortValue: (row) => row.at },
+            { key: "at", header: "When", width: "170px", cell: (row) => <span className="ds-num" title={context.dateTime(row.at)}>{context.relative(row.at)}</span>, sortValue: (row) => row.at },
             {
               key: "actor", header: "Who", width: "180px",
               cell: (row) => <Row gap={2}><Pill tone={row.actor === "system" ? "accent" : "neutral"}>{row.actor === "system" ? "System" : row.actor}</Pill></Row>,
@@ -384,12 +384,17 @@ export function AuditScreen({ context, tab }: { context: ScreenContext; tab: Aud
             },
             {
               key: "type", header: "Action", primary: true,
-              cell: (row) => <div><strong>{row.type}</strong><p className="ds-subtle ds-truncate" style={{ maxWidth: "62ch" }}>{row.message}</p></div>,
-              filterValue: (row) => `${row.type} ${row.message}`,
+              cell: (row) => (
+                <div>
+                  <strong>{row.type}</strong>
+                  <p className="ds-subtle" style={{ maxWidth: "70ch" }}>{row.message}</p>
+                  <span className="ds-subtle ds-num">{row.screenId ?? "no screen recorded"}</span>
+                </div>
+              ),
+              filterValue: (row) => `${row.type} ${row.message} ${row.screenId ?? ""}`,
               sortValue: (row) => row.type,
             },
-            { key: "target", header: "Target", hideBelow: 1200, cell: (row) => (row.entityId ? <code>{row.entityId}</code> : <span className="ds-subtle">—</span>) },
-            { key: "screen", header: "Source", hideBelow: 1280, cell: (row) => (row.screenId ? row.screenId : <span className="ds-subtle">—</span>) },
+            { key: "target", header: "Target", width: "180px", cell: (row) => (row.entityId ? <span className="ds-num">{row.entityId}</span> : <span className="ds-subtle">—</span>) },
             {
               key: "outcome", header: "Outcome", align: "end",
               cell: (row) => (row.capability ? <Pill tone={CAPABILITY_TONE[row.capability]}>{CAPABILITY_LABELS[row.capability]}</Pill> : <span className="ds-subtle">—</span>),
@@ -412,11 +417,11 @@ export function AuditDetail({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <Properties rows={[
-        { label: "Entry id", value: <code>{event.id}</code> },
+        { label: "Entry id", value: <span className="ds-num">{event.id}</span> },
         { label: "When", value: `${context.dateTime(event.at)} (${context.relative(event.at)})` },
         { label: "Who", value: event.actor === "system" ? "System (no person)" : event.actor },
-        { label: "Action", value: <code>{event.type}</code> },
-        { label: "Target", value: event.entityId ? <code>{event.entityId}</code> : "None" },
+        { label: "Action", value: <span className="ds-num">{event.type}</span> },
+        { label: "Target", value: event.entityId ? <span className="ds-num">{event.entityId}</span> : "None" },
         { label: "Raised from", value: event.screenId ?? "Not recorded" },
         { label: "Outcome", value: event.capability ? <Pill tone={CAPABILITY_TONE[event.capability]}>{CAPABILITY_LABELS[event.capability]}</Pill> : "Not recorded" },
       ]} />
@@ -438,7 +443,7 @@ export function EventChain({ context }: { context: ScreenContext }) {
   if (!entityId || chain.length === 0) return <Empty title="No chain" icon={<FileClock size={20} />}>This entry does not name a record, so there is nothing to follow.</Empty>;
   return (
     <Stack gap={4}>
-      <h3><code>{entityId}</code></h3>
+      <h3><span className="ds-num">{entityId}</span></h3>
       <Stack gap={2}>
         {chain.map((event, index) => (
           <Row key={event.id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)", alignItems: "flex-start" }}>
@@ -551,12 +556,13 @@ type PrivacyTab = "Retention" | "Consent" | "Requests" | "Processing" | "Residen
 export function PrivacyScreen({ context, tab }: { context: ScreenContext; tab: PrivacyTab }) {
   const data = useAdmin();
   const { now } = useWorkspace();
+  const records = useOrgRecords();
 
   if (tab === "Retention") {
     const schedules = ofKind(data.policies, "retention");
     return (
       <Stack gap={4}>
-        <Card title={`${schedules.length} retention schedules`} subtitle="What is kept, for how long, and what prevents deletion" flush>
+        <Card eyebrow="RETENTION" prov="human" title={`${schedules.length} retention schedules`} subtitle="What is kept, for how long, and what prevents deletion" flush>
           <DataGrid
             rows={schedules}
             rowId={(row) => row.id}
@@ -572,7 +578,7 @@ export function PrivacyScreen({ context, tab }: { context: ScreenContext; tab: P
                 key: "hold", header: "Legal hold", align: "end",
                 cell: (row) => (row.fields.legalHold === true ? <Pill tone="danger">Hold</Pill> : <span className="ds-subtle">None</span>),
               },
-              { key: "review", header: "Next review", align: "end", cell: (row) => (row.fields.nextReviewAt ? context.date(String(row.fields.nextReviewAt)) : "—") },
+              { key: "review", header: "Next review", align: "end", cell: (row) => (row.fields.nextReviewAt ? <span className="ds-num">{context.date(String(row.fields.nextReviewAt))}</span> : "—") },
             ]}
             empty={<Empty title="No schedules" icon={<Scale size={20} />}>Without a schedule, nothing says when a record may be removed.</Empty>}
           />
@@ -595,7 +601,7 @@ export function PrivacyScreen({ context, tab }: { context: ScreenContext; tab: P
           const recorded = Number(record.fields.recorded ?? 0);
           const granted = Number(record.fields.granted ?? 0);
           return (
-            <Card key={record.id} span={6} title={record.title} subtitle={record.summary}>
+            <Card key={record.id} eyebrow="CONSENT" prov="human" span={6} title={record.title} subtitle={record.summary}>
               <Stack gap={3}>
                 {recorded > 0 ? (
                   <>
@@ -621,7 +627,7 @@ export function PrivacyScreen({ context, tab }: { context: ScreenContext; tab: P
 
   if (tab === "Requests") {
     return (
-      <Card title={`${data.dataRequests.length} subject requests`} subtitle="Each one with its basis, its deadline and whether a hold applies" flush>
+      <Card eyebrow="SUBJECT REQUESTS" prov="human" title={`${data.dataRequests.length} subject requests`} subtitle="Each one with its basis, its deadline and whether a hold applies" flush>
         <DataGrid
           rows={data.dataRequests}
           rowId={(row) => row.id}
@@ -633,8 +639,8 @@ export function PrivacyScreen({ context, tab }: { context: ScreenContext; tab: P
           columns={[
             { key: "title", header: "Request", primary: true, cell: (row) => <div><strong>{row.title}</strong><p className="ds-subtle">{row.summary}</p></div>, filterValue: (row) => `${row.title} ${row.summary} ${String(row.fields.subject ?? "")}` },
             { key: "type", header: "Kind", cell: (row) => <Pill tone={row.fields.type === "erasure" ? "warning" : "neutral"}>{String(row.fields.type)}</Pill> },
-            { key: "records", header: "Records", align: "end", cell: (row) => String(row.fields.recordCount ?? 0) },
-            { key: "due", header: "Due", align: "end", cell: (row) => (row.dueAt ? context.date(row.dueAt) : "—"), sortValue: (row) => row.dueAt ?? "" },
+            { key: "records", header: "Records", align: "end", cell: (row) => <span className="ds-num">{String(row.fields.recordCount ?? 0)}</span> },
+            { key: "due", header: "Due", align: "end", cell: (row) => (row.dueAt ? <span className="ds-num">{context.date(row.dueAt)}</span> : "—"), sortValue: (row) => row.dueAt ?? "" },
             { key: "hold", header: "Hold", align: "end", cell: (row) => (row.fields.legalHold === true ? <Pill tone="danger">Legal hold</Pill> : <span className="ds-subtle">None</span>) },
             { key: "status", header: "State", align: "end", cell: (row) => <Pill tone={row.status === "completed" ? "success" : "info"}>{row.status}</Pill> },
           ]}
@@ -645,14 +651,13 @@ export function PrivacyScreen({ context, tab }: { context: ScreenContext; tab: P
   }
 
   if (tab === "Processing") {
-    const records = useOrgRecords();
     const byCollection = Object.entries(records.reduce<Record<string, number>>((all, record) => {
       all[record.collection] = (all[record.collection] ?? 0) + 1;
       return all;
     }, {})).sort((a, b) => b[1] - a[1]).slice(0, 12);
     return (
       <Stack gap={4}>
-        <Card title="What this workspace holds" subtitle={`${records.length} records in ${new Set(records.map((record) => record.collection)).size} collections`}>
+        <Card eyebrow="PROCESSING" prov="posted" title="What this workspace holds" subtitle={`${records.length} records in ${new Set(records.map((record) => record.collection)).size} collections`}>
           <BarChart
             title="Records by collection, largest twelve"
             height={220}
@@ -661,7 +666,7 @@ export function PrivacyScreen({ context, tab }: { context: ScreenContext; tab: P
             footer="Counted from this browser's store. Nothing is sampled or estimated."
           />
         </Card>
-        <Card title="Processing register" subtitle="Purpose, basis and who touches it">
+        <Card eyebrow="REGISTER" prov="human" title="Processing register" subtitle="Purpose, basis and who touches it">
           <Properties rows={[
             { label: "Customer records", value: "Fulfilling orders and keeping statutory accounts. Basis: contract and legal obligation." },
             { label: "Employment records", value: "Paying people and meeting employment law. Basis: contract and legal obligation." },
@@ -678,7 +683,7 @@ export function PrivacyScreen({ context, tab }: { context: ScreenContext; tab: P
   const residency = ofKind(data.policies, "residency")[0];
   return (
     <Grid>
-      <Card span={7} title="Where the data is" subtitle={residency?.summary ?? "Not recorded"}>
+      <Card eyebrow="RESIDENCY" prov="posted" span={7} title="Where the data is" subtitle={residency?.summary ?? "Not recorded"}>
         <Stack gap={3}>
           <Properties rows={[
             { label: "Region", value: String(residency?.fields.region ?? "This browser") },
@@ -692,7 +697,7 @@ export function PrivacyScreen({ context, tab }: { context: ScreenContext; tab: P
           </Notice>
         </Stack>
       </Card>
-      <Card span={5} title="Jurisdiction" subtitle={context.org.jurisdiction}>
+      <Card eyebrow="JURISDICTION" prov="posted" span={5} title="Jurisdiction" subtitle={context.org.jurisdiction}>
         <Stack gap={3}>
           <Properties rows={[
             { label: "Workspace jurisdiction", value: context.org.jurisdiction },
@@ -864,13 +869,13 @@ export function BillingScreen({ context, tab }: { context: ScreenContext; tab: "
           are from subscription records kept in this browser.
         </Notice>
         <StatRow>
-          <Stat label="Plan" value={String(subscription?.fields.plan ?? "None")} meta={String(subscription?.fields.term ?? "")} />
-          <Stat label="Seats used" value={`${people.length + agents.length} of ${included}`} meta={`${people.length} people, ${agents.length} agents`} />
-          <Stat label="Renews" value={subscription?.fields.renewsAt ? context.date(String(subscription.fields.renewsAt)) : "Unavailable"} unavailable={!subscription?.fields.renewsAt} meta="From the subscription record" />
-          <Stat label="Balance" value={context.money(Number(subscription?.fields.balanceMinor ?? 0))} meta="Nothing is owed to this browser" />
+          <Stat prov="human" label="Plan" value={String(subscription?.fields.plan ?? "None")} meta={String(subscription?.fields.term ?? "")} />
+          <Stat prov="posted" label="Seats used" value={`${people.length + agents.length} of ${included}`} meta={`${people.length} people, ${agents.length} agents`} />
+          <Stat prov={subscription?.fields.renewsAt ? "human" : undefined} label="Renews" value={subscription?.fields.renewsAt ? context.date(String(subscription.fields.renewsAt)) : "Unavailable"} unavailable={!subscription?.fields.renewsAt} meta="From the subscription record" />
+          <Stat prov="posted" label="Balance" value={context.money(Number(subscription?.fields.balanceMinor ?? 0))} meta="Nothing is owed to this browser" />
         </StatRow>
         <Grid>
-          <Card span={7} title="Seats" subtitle={`${included} included`}>
+          <Card eyebrow="SEATS" prov="posted" span={7} title="Seats" subtitle={`${included} included`}>
             <Stack gap={3}>
               <Meter value={people.length + agents.length} max={Math.max(1, included)} label="Seats used" tone={people.length + agents.length > included ? "danger" : "success"} />
               <Properties rows={[
@@ -882,7 +887,7 @@ export function BillingScreen({ context, tab }: { context: ScreenContext; tab: "
               ]} />
             </Stack>
           </Card>
-          <Card span={5} title="Subscription actions">
+          <Card eyebrow="SUBSCRIPTION" prov="human" span={5} title="Subscription actions">
             <Stack gap={3}>
               <Button variant="primary" onClick={() => context.openOverlay("Checkout")}>Manage subscription</Button>
               <Button variant="secondary" onClick={() => context.openOverlay("billing support")}>Billing question</Button>
@@ -896,7 +901,7 @@ export function BillingScreen({ context, tab }: { context: ScreenContext; tab: "
 
   if (tab === "Invoices") {
     return (
-      <Card title="Invoices" subtitle={`${data.billingInvoices.length} subscription invoices held as records`} flush>
+      <Card eyebrow="INVOICES" prov="posted" title="Invoices" subtitle={`${data.billingInvoices.length} subscription invoices held as records`} flush>
         <DataGrid
           rows={data.billingInvoices}
           rowId={(row) => row.id}
@@ -907,7 +912,7 @@ export function BillingScreen({ context, tab }: { context: ScreenContext; tab: "
             { key: "title", header: "Invoice", primary: true, cell: (row) => <div><strong>{row.title}</strong><p className="ds-subtle">{String(row.fields.lines ?? row.summary)}</p></div>, filterValue: (row) => `${row.title} ${row.summary}` },
             { key: "period", header: "Period", cell: (row) => String(row.fields.period ?? "") },
             { key: "seats", header: "Seats", align: "end", cell: (row) => String(row.fields.seats ?? "") },
-            { key: "amount", header: "Amount", align: "end", cell: (row) => context.money(row.amountMinor), sortValue: (row) => row.amountMinor ?? 0 },
+            { key: "amount", header: "Amount", align: "end", cell: (row) => <span className="ds-num">{context.money(row.amountMinor)}</span>, sortValue: (row) => row.amountMinor ?? 0 },
             { key: "status", header: "State", align: "end", cell: (row) => <Pill tone={row.status === "paid_locally" ? "success" : "warning"}>{row.status.replace(/_/g, " ")}</Pill> },
           ]}
           bulkActions={[
@@ -945,7 +950,7 @@ export function BillingScreen({ context, tab }: { context: ScreenContext; tab: "
     ];
     return (
       <Stack gap={4}>
-        <Card title="Feature usage" subtitle="Counted from records in this workspace">
+        <Card eyebrow="USAGE" prov="posted" title="Feature usage" subtitle="Counted from records in this workspace">
           <BarChart
             title="Records that drive the plan"
             height={200}
@@ -954,7 +959,7 @@ export function BillingScreen({ context, tab }: { context: ScreenContext; tab: "
             footer="These are the counts a plan would be measured against. No usage is reported to anybody."
           />
         </Card>
-        <Card title="What cannot be shown" subtitle="Because no provider is connected">
+        <Card eyebrow="UNAVAILABLE" prov="unknown" title="What cannot be shown" subtitle="Because no provider is connected">
           <Properties rows={[
             { label: "Model spend", value: <Pill tone="warning">Unavailable</Pill> },
             { label: "Storage billed", value: <Pill tone="warning">Unavailable</Pill> },
@@ -967,7 +972,7 @@ export function BillingScreen({ context, tab }: { context: ScreenContext; tab: "
 
   return (
     <Grid>
-      <Card span={7} title="Payment method" subtitle="None, by design">
+      <Card eyebrow="PAYMENT" prov="unknown" span={7} title="Payment method" subtitle="None, by design">
         <Stack gap={3}>
           <Notice tone="warning" title={`${processor?.provider ?? "Payment processor"}: ${CAPABILITY_LABELS.not_connected}`}>
             {processor?.note ?? "No processor is connected."} {processor?.localEquivalent ?? ""}
@@ -980,7 +985,7 @@ export function BillingScreen({ context, tab }: { context: ScreenContext; tab: "
           <Button variant="secondary" onClick={() => context.openOverlay("Checkout")}>What changing the plan would involve</Button>
         </Stack>
       </Card>
-      <Card span={5} title="Billing contact" subtitle="Used on invoices">
+      <Card eyebrow="BILLING CONTACT" prov="human" span={5} title="Billing contact" subtitle="Used on invoices">
         <Properties rows={[
           { label: "Company", value: context.org.name },
           { label: "Registration", value: context.org.registration ?? "Not recorded" },
@@ -995,7 +1000,7 @@ export function BillingScreen({ context, tab }: { context: ScreenContext; tab: "
 export function CheckoutOverlay({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
   const subscription = ofKind(data.policies, "subscription")[0];
-  const [seats, setSeats] = useState(Number(subscription?.fields.seatsIncluded ?? 10));
+  const [seats, setSeats] = useSeeded(Number(subscription?.fields.seatsIncluded ?? 10));
   const perSeat = Number(subscription?.fields.pricePerSeatMinor ?? 2_400);
   const used = data.members.filter((row) => row.fields.external !== true && row.status === "active").length;
 
@@ -1126,9 +1131,9 @@ export function RecoveryScreen({ context, tab }: { context: ScreenContext; tab: 
     <Stack gap={4}>
       {tab === "Backups" && (
         <StatRow>
-          <Stat label="Records held now" value={String(records.length)} meta="Counted from this browser" />
-          <Stat label="Snapshots kept" value={String(data.backups.filter((row) => row.fields.kind === "snapshot" && row.status === "ok").length)} meta="Inside the retention window" />
-          <Stat label="Latest snapshot" value={rows[0] ? context.relative(rows[0].at) : "None"} unavailable={!rows[0]} meta={rows[0] ? `${String(rows[0].fields.records)} records` : "Take one now"} />
+          <Stat prov="posted" label="Records held now" value={String(records.length)} meta="Counted from this browser" />
+          <Stat prov="posted" label="Snapshots kept" value={String(data.backups.filter((row) => row.fields.kind === "snapshot" && row.status === "ok").length)} meta="Inside the retention window" />
+          <Stat prov={rows[0] ? "posted" : undefined} label="Latest snapshot" value={rows[0] ? context.relative(rows[0].at) : "None"} unavailable={!rows[0]} meta={rows[0] ? `${String(rows[0].fields.records)} records` : "Take one now"} />
           <Stat label="Off-device copies" value="None" unavailable meta="A snapshot here never leaves this browser" />
         </StatRow>
       )}
@@ -1139,6 +1144,8 @@ export function RecoveryScreen({ context, tab }: { context: ScreenContext; tab: 
         </Notice>
       )}
       <Card
+        eyebrow="RECOVERY"
+        prov="posted"
         title={tab}
         subtitle={`${rows.length} ${rows.length === 1 ? "record" : "records"}`}
         flush
@@ -1176,8 +1183,8 @@ export function RecoveryScreen({ context, tab }: { context: ScreenContext; tab: 
           rowTone={(row) => (row.status === "failed" ? "danger" : row.status === "blocked" ? "warning" : undefined)}
           columns={[
             { key: "title", header: "Job", primary: true, cell: (row) => <div><strong>{row.title}</strong><p className="ds-subtle">{row.summary}</p></div>, filterValue: (row) => `${row.title} ${row.summary}` },
-            { key: "at", header: "When", cell: (row) => context.relative(row.at), sortValue: (row) => row.at ?? "" },
-            { key: "records", header: "Records", align: "end", cell: (row) => String(row.fields.records ?? 0) },
+            { key: "at", header: "When", cell: (row) => <span className="ds-num">{context.relative(row.at)}</span>, sortValue: (row) => row.at ?? "" },
+            { key: "records", header: "Records", align: "end", cell: (row) => <span className="ds-num">{String(row.fields.records ?? 0)}</span> },
             { key: "bytes", header: "Size", align: "end", hideBelow: 1100, cell: (row) => (Number(row.fields.bytes ?? 0) > 0 ? `${(Number(row.fields.bytes) / 1_000_000).toFixed(2)} MB` : <span className="ds-subtle">—</span>) },
             { key: "where", header: "Destination", hideBelow: 1280, cell: (row) => String(row.fields.destination ?? row.fields.source ?? "—") },
             { key: "status", header: "State", align: "end", cell: (row) => <Pill tone={row.status === "ok" ? "success" : row.status === "failed" ? "danger" : "warning"}>{row.status}</Pill> },
@@ -1265,7 +1272,7 @@ export function RestoreImpact({ context, close }: { context: ScreenContext; clos
   const data = useAdmin();
   const records = useOrgRecords();
   const snapshots = data.backups.filter((row) => row.fields.kind === "snapshot" && row.status === "ok");
-  const [source, setSource] = useState(snapshots[0]?.id ?? "");
+  const [source, setSource] = useSeeded(snapshots[0]?.id ?? "");
   const [planApproved, setPlanApproved] = useState(false);
   const [busy, setBusy] = useState(false);
   const snapshot = snapshots.find((row) => row.id === source);
@@ -1396,7 +1403,7 @@ export function DeveloperScreen({ context, tab }: { context: ScreenContext; tab:
           Keys are records with a prefix and the last four characters. A key's full value is shown once when it is issued and is never
           stored, never shown again, and never placed in anything an agent can read.
         </Notice>
-        <Card title={`${data.apiKeys.length} keys`} flush>
+        <Card eyebrow="API KEYS" prov="human" title={`${data.apiKeys.length} keys`} flush>
           <DataGrid
             rows={data.apiKeys}
             rowId={(row) => row.id}
@@ -1406,10 +1413,10 @@ export function DeveloperScreen({ context, tab }: { context: ScreenContext; tab:
             rowTone={(row) => (row.status === "revoked" ? "warning" : undefined)}
             columns={[
               { key: "title", header: "Key", primary: true, cell: (row) => <div><strong>{row.title}</strong><p className="ds-subtle">{row.summary}</p></div>, filterValue: (row) => `${row.title} ${row.summary}` },
-              { key: "prefix", header: "Value", cell: (row) => <code>{String(row.fields.prefix)}…{String(row.fields.last4)}</code> },
+              { key: "prefix", header: "Value", cell: (row) => <span className="ds-num">{String(row.fields.prefix)}…{String(row.fields.last4)}</span> },
               { key: "scopes", header: "Scopes", hideBelow: 1100, cell: (row) => csvList(row.fields.scopes).join(", ") },
               { key: "env", header: "Environment", cell: (row) => <Pill tone={row.fields.environment === "live" ? "warning" : "neutral"}>{String(row.fields.environment)}</Pill> },
-              { key: "used", header: "Last used", align: "end", hideBelow: 1280, cell: (row) => (row.fields.lastUsedAt ? context.relative(String(row.fields.lastUsedAt)) : "Never") },
+              { key: "used", header: "Last used", align: "end", hideBelow: 1280, cell: (row) => (row.fields.lastUsedAt ? <span className="ds-num">{context.relative(String(row.fields.lastUsedAt))}</span> : "Never") },
               { key: "status", header: "State", align: "end", cell: (row) => <Pill tone={row.status === "active" ? "success" : "neutral"}>{row.status}</Pill> },
             ]}
             bulkActions={[
@@ -1434,7 +1441,7 @@ export function DeveloperScreen({ context, tab }: { context: ScreenContext; tab:
     return (
       <Grid>
         {data.webhooks.map((hook) => (
-          <Card key={hook.id} span={6} title={hook.title} subtitle={hook.summary}>
+          <Card key={hook.id} eyebrow="ENDPOINT" prov="human" span={6} title={hook.title} subtitle={hook.summary}>
             <Stack gap={3}>
               <Properties rows={[
                 { label: "Events", value: csvList(hook.fields.events).join(", ") },
@@ -1467,7 +1474,7 @@ export function DeveloperScreen({ context, tab }: { context: ScreenContext; tab:
   if (tab === "Sandbox") {
     return (
       <Grid>
-        <Card span={7} title="Environments" subtitle="What exists, and what does not">
+        <Card eyebrow="ENVIRONMENTS" prov="posted" span={7} title="Environments" subtitle="What exists, and what does not">
           <Properties rows={[
             { label: "Live", value: "This browser profile. The only environment with records in it." },
             { label: "Sandbox", value: "Not provisioned. There is no second store to copy into." },
@@ -1478,7 +1485,7 @@ export function DeveloperScreen({ context, tab }: { context: ScreenContext; tab:
             not exist, rather than a button that appears to make one.
           </Notice>
         </Card>
-        <Card span={5} title="Seed and reset" subtitle="What the application itself does">
+        <Card eyebrow="SEED" prov="posted" span={5} title="Seed and reset" subtitle="What the application itself does">
           <Properties rows={[
             { label: "Seeded on first load", value: "Base fixtures plus each application's own" },
             { label: "Re-seed", value: "Clearing site data and reloading starts again" },
@@ -1496,13 +1503,13 @@ export function DeveloperScreen({ context, tab }: { context: ScreenContext; tab:
         Nothing has called this workspace, because there is nothing to call. What is shown instead is every entry about keys, exports
         and capability states, which is the closest honest equivalent.
       </Notice>
-      <Card title={`${developerEvents.length} entries`} flush>
+      <Card eyebrow="DEVELOPER LOG" prov="posted" title={`${developerEvents.length} entries`} flush>
         <DataGrid
           rows={developerEvents}
           rowId={(row) => row.id}
           label="Developer log"
           columns={[
-            { key: "at", header: "When", width: "160px", cell: (row) => context.relative(row.at), sortValue: (row) => row.at },
+            { key: "at", header: "When", width: "160px", cell: (row) => <span className="ds-num">{context.relative(row.at)}</span>, sortValue: (row) => row.at },
             { key: "actor", header: "Who", cell: (row) => row.actor },
             { key: "type", header: "Entry", primary: true, cell: (row) => <div><strong>{row.type}</strong><p className="ds-subtle">{row.message}</p></div>, filterValue: (row) => `${row.type} ${row.message}` },
             { key: "outcome", header: "Outcome", align: "end", cell: (row) => (row.capability ? <Pill tone={CAPABILITY_TONE[row.capability]}>{CAPABILITY_LABELS[row.capability]}</Pill> : <span className="ds-subtle">—</span>) },
@@ -1614,11 +1621,11 @@ export function ScopeLimits({ context }: { context: ScreenContext }) {
     <Stack gap={4}>
       <h3>{key.title}</h3>
       <Properties rows={[
-        { label: "Value", value: <code>{String(key.fields.prefix)}…{String(key.fields.last4)}</code> },
+        { label: "Value", value: <span className="ds-num">{String(key.fields.prefix)}…{String(key.fields.last4)}</span> },
         { label: "Environment", value: String(key.fields.environment) },
         { label: "Expires", value: key.fields.expiresAt ? context.date(String(key.fields.expiresAt)) : "No expiry" },
       ]} />
-      <Card title="What each scope allows">
+      <Card eyebrow="SCOPES" prov="human" title="What each scope allows">
         <Properties rows={[
           { label: "records:read", value: scopes.includes("records:read") ? "Read records in this organisation only" : "Not granted" },
           { label: "records:write", value: scopes.includes("records:write") ? "Create and change records; every write is audited" : "Not granted" },
@@ -1650,9 +1657,9 @@ export function CallbackTester({ context, close }: { context: ScreenContext; clo
   return (
     <Stack gap={4}>
       <Properties rows={[
-        { label: "Endpoint", value: <code>{hook.title}</code> },
+        { label: "Endpoint", value: <span className="ds-num">{hook.title}</span> },
         { label: "Events", value: csvList(hook.fields.events).join(", ") },
-        { label: "Signing secret", value: <code>{String(hook.fields.secretPrefix)}…</code> },
+        { label: "Signing secret", value: <span className="ds-num">{String(hook.fields.secretPrefix)}…</span> },
       ]} />
       <Field label="What would be sent">
         <TextArea rows={10} readOnly value={JSON.stringify(example, null, 2)} />

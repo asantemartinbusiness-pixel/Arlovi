@@ -120,13 +120,13 @@ export function JournalForm({ context, close }: { context: ScreenContext; close:
     <Stack gap={4}>
       <Row gap={3} wrap>
         <Field label="Ledger date" required hint={`Posts into ${periodLabel(period, org.locale)}`}>
-          <TextInput type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
+          <TextInput aria-label="Ledger date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
         </Field>
         <Field label="Reference" hint="Optional. Your own numbering or a document id.">
-          <TextInput value={reference} onChange={(event) => setReference(event.target.value)} placeholder="JNL-0094" />
+          <TextInput aria-label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} placeholder="JNL-0094" />
         </Field>
         <Field label="Narrative" required hint="What this entry records. It becomes the journal title.">
-          <TextInput value={memo} onChange={(event) => setMemo(event.target.value)} required />
+          <TextInput aria-label="Narrative" value={memo} onChange={(event) => setMemo(event.target.value)} required />
         </Field>
       </Row>
 
@@ -270,7 +270,7 @@ function PostedJournal({ context, journal, close }: { context: ScreenContext; jo
       </Notice>
       <Properties rows={[
         { label: "Journal", value: journal.title },
-        { label: "Ledger date", value: context.date(journalDate(journal)) },
+        { label: "Ledger date", value: <span className="ds-num">{context.date(journalDate(journal))}</span> },
         { label: "Period", value: periodOf(journalDate(journal)) },
         { label: "Status", value: <Pill tone={journal.status === "reversed" ? "warning" : "success"} dot>{journal.status}</Pill> },
         { label: "Posted by", value: journal.updatedBy },
@@ -343,10 +343,10 @@ export function LedgerEntries({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Lines shown" value={String(rows.length)} meta={`${data.postedCount} posted journals in total`} />
-        <Stat label="Debits" value={context.money(debit)} />
-        <Stat label="Credits" value={context.money(credit)} meta={debit === credit ? "Equal" : `Out by ${context.money(Math.abs(debit - credit))}`} />
-        <Stat label="Drafts excluded" value={String(data.draftJournals.length)} meta="A draft is in no statement" />
+        <Stat prov="posted" label="Lines shown" value={String(rows.length)} meta={`${data.postedCount} posted journals in total`} />
+        <Stat prov="posted" label="Debits" value={context.money(debit)} />
+        <Stat prov="posted" label="Credits" value={context.money(credit)} meta={debit === credit ? "Equal" : `Out by ${context.money(Math.abs(debit - credit))}`} />
+        <Stat prov="human" label="Drafts excluded" value={String(data.draftJournals.length)} meta="A draft is in no statement" />
       </StatRow>
 
       <DataGrid
@@ -558,10 +558,10 @@ export function LedgerAudit({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Recorded events" value={String(financeEvents.length)} meta="Finance-related entries in this browser" />
-        <Stat label="Posted journals" value={String(data.postedCount)} />
-        <Stat label="Reversals" value={String(data.journals.filter((journal) => reversesId(journal)).length)} meta="Each one leaves both entries on the record" />
-        <Stat label="Closed periods" value={String(data.locked.length)} />
+        <Stat prov="posted" label="Recorded events" value={String(financeEvents.length)} meta="Finance-related entries in this browser" />
+        <Stat prov="posted" label="Posted journals" value={String(data.postedCount)} />
+        <Stat prov="posted" label="Reversals" value={String(data.journals.filter((journal) => reversesId(journal)).length)} meta="Each one leaves both entries on the record" />
+        <Stat prov="posted" label="Closed periods" value={String(data.locked.length)} />
       </StatRow>
       {financeEvents.length === 0 ? (
         <Empty title="No finance events recorded yet">Posting a journal, issuing an invoice or closing a period writes an entry here.</Empty>
@@ -602,7 +602,7 @@ export function BalancingValidator({ context }: { context: ScreenContext }) {
       {checks.length === 0 ? <Empty title="No drafts to validate" /> : (
         <Stack gap={3}>
           {checks.map(({ journal, check }) => (
-            <Card key={journal.id} title={journal.title} subtitle={`${context.date(journalDate(journal))} · ${journalLines(journal).length} lines`}
+            <Card prov="posted" key={journal.id} title={journal.title} subtitle={`${context.date(journalDate(journal))} · ${journalLines(journal).length} lines`}
               actions={check.reason ? <Pill tone="danger" dot>Blocked</Pill> : <Pill tone="success" dot>Ready</Pill>}
               footer={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("Journal form", { id: journal.id })}>Open the editor</Button>}
             >
@@ -649,10 +649,10 @@ export function ReverseConfirmation({ context, close }: { context: ScreenContext
       </Notice>
       <Row gap={3} wrap>
         <Field label="Reversal date" required hint={`Posts into ${period}`}>
-          <TextInput type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
+          <TextInput aria-label="Reversal date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
         </Field>
         <Field label="Why" required hint="Recorded on the reversal and in the audit trail.">
-          <TextInput value={reason} onChange={(event) => setReason(event.target.value)} required placeholder="Posted to the wrong account" />
+          <TextInput aria-label="Why" value={reason} onChange={(event) => setReason(event.target.value)} required placeholder="Posted to the wrong account" />
         </Field>
       </Row>
       <div className="ds-grid-wrap">
@@ -727,7 +727,7 @@ export function JournalSearch({ context, close }: { context: ScreenContext; clos
       <Grid>
         <div className="ds-col-8">
           <Field label="Narrative, reference or line memo">
-            <TextInput value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="rent, INV-1055, reversal" />
+            <TextInput aria-label="Narrative, reference or line memo" value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="rent, INV-1055, reversal" />
           </Field>
         </div>
         <div className="ds-col-4">

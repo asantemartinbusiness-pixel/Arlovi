@@ -1141,11 +1141,17 @@ export function toHtml(model: DocModel, title: string): string {
     } else parts.push(`<p>${inlineHtml(block)}</p>`);
   }
   closeList();
-  const style = "body{font-family:Inter,system-ui,sans-serif;max-width:46rem;margin:3rem auto;padding:0 1.5rem;line-height:1.6;color:#1a2339}"
-    + "h1,h2,h3{line-height:1.2}blockquote{border-inline-start:3px solid #cbd3e2;margin:0;padding-inline-start:1rem;color:#4f5c78}"
-    + "table{border-collapse:collapse;width:100%}th,td{border:1px solid #e1e6f0;padding:.5rem;text-align:start}"
-    + "pre{background:#f7f8fc;padding:1rem;border-radius:8px;overflow:auto}.page-break{page-break-after:always;border:0;border-top:1px dashed #cbd3e2}"
-    + ".image-reference{background:#eef1f7;border:1px dashed #cbd3e2;padding:2rem;text-align:center;color:#6b7894;font-family:ui-monospace,monospace}";
+  /* A standalone export opens outside this application, where the workspace's
+   * CSS custom properties do not exist, so the exported stylesheet has to
+   * carry concrete values. They are the warm neutrals of the design system. */
+  const style = "body{font-family:Inter,system-ui,sans-serif;max-width:46rem;margin:3rem auto;padding:0 1.5rem;line-height:1.6;color:#282724}"
+    + "h1,h2,h3{line-height:1.2;font-family:'IBM Plex Sans Condensed',Inter,system-ui,sans-serif}"
+    + "blockquote{border-inline-start:3px solid #cac5ba;margin:0;padding-inline-start:1rem;color:#54514b}"
+    + "table{border-collapse:collapse;width:100%}th,td{border:1px solid #e0dcd4;padding:.5rem;text-align:start}th{background:#f6f4f0}"
+    + "pre{background:#f6f4f0;padding:1rem;border-radius:8px;overflow:auto;font-family:'IBM Plex Mono',ui-monospace,monospace}"
+    + "code{font-family:'IBM Plex Mono',ui-monospace,monospace}a{color:#1c40c4}"
+    + ".page-break{page-break-after:always;border:0;border-top:1px dashed #cac5ba}"
+    + ".image-reference{background:#edeae4;border:1px dashed #cac5ba;padding:2rem;text-align:center;color:#6f6b64;font-family:'IBM Plex Mono',ui-monospace,monospace}";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${style}</style></head><body>${parts.join("\n")}</body></html>`;
 }
 

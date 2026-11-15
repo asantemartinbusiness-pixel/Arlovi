@@ -16,7 +16,8 @@ import { freshness } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import {
   activeQueue, attentionBus, busItem, csv, groupBy, PRIORITIES, PRIORITY_LABEL, PRIORITY_TONE,
-  routeReason, useInboxData, usePublishedItems, writeTriage, type InboxItem,
+  routeReason, useInboxData, usePublishedItems, useSeeded, useSeededList, writeTriage,
+  type InboxItem,
 } from "./engine";
 
 /* ====================================================================== *
@@ -68,14 +69,14 @@ function DeepLink({ item, context }: { item: InboxItem; context: ScreenContext }
   if (!known) {
     return (
       <Notice tone="warning" title="That address is not a workspace screen">
-        <code>{route}</code> is not one of the approved screens, so this item cannot be opened. The item itself is kept.
+        <span className="ds-num">{route}</span> is not one of the approved screens, so this item cannot be opened. The item itself is kept.
       </Notice>
     );
   }
   if (probe === "missing") {
     return (
       <Notice tone="warning" title="Record unavailable">
-        <code>{item.entityId}</code> is no longer in this browser. The screen would open empty, so the link is held back rather than
+        <span className="ds-num">{item.entityId}</span> is no longer in this browser. The screen would open empty, so the link is held back rather than
         sending you to a page with nothing on it. Resolve the item if the record was deleted on purpose.
       </Notice>
     );
@@ -182,8 +183,12 @@ function ForYou({ context }: { context: ScreenContext }) {
   const groups = groupBy(activeQueue(items), (item) => item.group);
 
   return (
-    <Grid>
+    <Stack gap={4}>
+      <InboxStats context={context} />
+      <Grid>
       <Card
+        eyebrow="ATTENTION QUEUE"
+        prov="posted"
         span={8}
         title="Your queue"
         subtitle={`${rows.length} of ${items.length} items routed to the ${ROLE_LABELS[role]} view`}
@@ -195,7 +200,7 @@ function ForYou({ context }: { context: ScreenContext }) {
           label="Attention queue"
           selectedId={context.selectedId}
           onSelect={context.select}
-          onOpen={(id) => context.openOverlay("Notification detail", { itemId: id })}
+          onOpen={(id) => { context.select(id); context.openOverlay("Notification detail", { itemId: id }); }}
           rowTone={(row) => (row.priority === "P0" ? "danger" : row.priority === "P1" ? "warning" : undefined)}
           columns={queueColumns(context)}
           bulkActions={bulkTriageActions(context)}
@@ -223,20 +228,20 @@ function ForYou({ context }: { context: ScreenContext }) {
         />
       </Card>
 
-      <Stack gap={4}>
-        <Card span={4} title="Grouped mission activity" subtitle={`${missionActivity.length} ${missionActivity.length === 1 ? "mission" : "missions"} with open items`}>
+      <Stack gap={4} className="ds-col-4">
+        <Card machine eyebrow="AI WORKFORCE" prov="agent" span={4} title="Grouped mission activity" subtitle={`${missionActivity.length} ${missionActivity.length === 1 ? "mission" : "missions"} with open items`}>
           {missionActivity.length === 0 ? (
             <Empty title="No mission is waiting" icon={<Megaphone size={20} />}>Missions that stop for a decision are grouped here instead of arriving one line at a time.</Empty>
           ) : (
             <Stack gap={3}>
               {missionActivity.map((group) => (
-                <div key={group.label} className="ds-panel" style={{ padding: "var(--space-3)" }}>
+                <div key={group.label}>
                   <Row gap={2}>
                     <strong className="ds-grow ds-truncate">{group.rows[0].title}</strong>
-                    <Pill tone="info">{group.rows.length} {group.rows.length === 1 ? "item" : "items"}</Pill>
+                    <span className="ds-num">{group.rows.length} {group.rows.length === 1 ? "item" : "items"}</span>
                   </Row>
                   <p className="ds-subtle">{group.rows[0].body}</p>
-                  <Row gap={2} style={{ marginBlockStart: "var(--space-2)" }}>
+                  <Row gap={2} style={{ marginBlockStart: "var(--space-3)" }}>
                     <Button size="sm" variant="secondary" onClick={() => openItem(context, group.rows[0])}>Open the mission</Button>
                     <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Notification detail", { itemId: group.rows[0].id })}>Details</Button>
                   </Row>
@@ -246,7 +251,7 @@ function ForYou({ context }: { context: ScreenContext }) {
           )}
         </Card>
 
-        <Card span={4} title="By group" subtitle="Open items only">
+        <Card eyebrow="QUEUE SHAPE" prov="posted" span={4} title="By group" subtitle="Open items only">
           <Stack gap={2}>
             {groups.map((group) => (
               <Row key={group.label} gap={3}>
@@ -259,7 +264,7 @@ function ForYou({ context }: { context: ScreenContext }) {
           </Stack>
         </Card>
 
-        <Card span={4} title="Why you are seeing this" subtitle="Routing, not a feed">
+        <Card eyebrow="ROUTING" prov="human" span={4} title="Why you are seeing this" subtitle="Routing, not a feed">
           <Stack gap={3}>
             <p className="ds-subtle">
               {hiddenByRole === 0
@@ -276,7 +281,8 @@ function ForYou({ context }: { context: ScreenContext }) {
           </Stack>
         </Card>
       </Stack>
-    </Grid>
+      </Grid>
+    </Stack>
   );
 }
 
@@ -295,7 +301,7 @@ function ApprovalsPreview({ context }: { context: ScreenContext }) {
       ) : (
         <Grid>
           {approvals.map((item) => (
-            <Card key={item.id} span={6} title={item.title} subtitle={`${item.sourceLabel} · ${context.relative(item.at)}`}>
+            <Card key={item.id} eyebrow="DECISION" prov={item.sourceLabel === "Approvals" ? "agent" : "human"} span={6} title={item.title} subtitle={`${item.sourceLabel} · ${context.relative(item.at)}`}>
               <Stack gap={3}>
                 <Row gap={2} wrap><PriorityTag priority={item.priority} /><StateTags item={item} /></Row>
                 <p>{item.body}</p>
@@ -369,7 +375,7 @@ function UpdatesPanel({ context }: { context: ScreenContext }) {
       ) : (
         <Grid>
           {groups.map((group) => (
-            <Card key={group.label} span={6} title={group.label} subtitle={`${group.rows.length} ${group.rows.length === 1 ? "update" : "updates"}`}>
+            <Card key={group.label} eyebrow="UPDATES" prov="posted" span={6} title={group.label} subtitle={`${group.rows.length} ${group.rows.length === 1 ? "update" : "updates"}`}>
               <Stack gap={2}>
                 {group.rows.map((item) => (
                   <Row key={item.id} gap={2} style={{ alignItems: "flex-start" }}>
@@ -393,13 +399,13 @@ function UpdatesPanel({ context }: { context: ScreenContext }) {
 function ActivityPanel({ context }: { context: ScreenContext }) {
   const events = useEvents(undefined, 40);
   return (
-    <Card title="What has happened" subtitle={`${events.length} most recent entries from the workspace log`} flush>
+    <Card eyebrow="ACTIVITY" prov="posted" title="What has happened" subtitle={`${events.length} most recent entries from the workspace log`} flush>
       <DataGrid
         rows={events}
         rowId={(row) => row.id}
         label="Workspace activity"
         columns={[
-          { key: "at", header: "When", width: "150px", cell: (row) => context.relative(row.at), sortValue: (row) => row.at },
+          { key: "at", header: "When", width: "150px", cell: (row) => <span className="ds-num">{context.relative(row.at)}</span>, sortValue: (row) => row.at },
           { key: "actor", header: "Who", width: "180px", cell: (row) => <Row gap={2}><Avatar name={row.actor} size="sm" kind={row.actor === "system" ? "ai" : "human"} />{row.actor}</Row>, filterValue: (row) => row.actor },
           { key: "message", header: "Entry", primary: true, cell: (row) => <div><strong>{row.type}</strong><p className="ds-subtle">{row.message}</p></div>, filterValue: (row) => `${row.type} ${row.message}` },
           {
@@ -413,15 +419,35 @@ function ActivityPanel({ context }: { context: ScreenContext }) {
   );
 }
 
-function InboxStrip({ context }: { context: ScreenContext }) {
+/** One compact line for the status strip: context the cards do not carry. */
+function InboxStripLine({ context }: { context: ScreenContext }) {
+  const { items, hiddenByRole, rules } = useInboxData();
+  const { role } = useWorkspace();
+  const live = activeQueue(items);
+  const oldest = [...live].sort((a, b) => a.at.localeCompare(b.at))[0];
+  const active = rules.filter((rule) => rule.fields.enabled === true).length;
+  return (
+    <>
+      <span>Routed to the {ROLE_LABELS[role]} view</span>
+      <span>{hiddenByRole === 0 ? "nothing is held back from it" : `${hiddenByRole} items are routed elsewhere`}</span>
+      <span>oldest open item <strong className="ds-num">{oldest ? context.relative(oldest.at) : "none"}</strong></span>
+      <span><strong className="ds-num">{active}</strong> routing rules are on</span>
+      <span className="ds-grow" />
+      <span>Reading an item never approves it</span>
+    </>
+  );
+}
+
+function InboxStats({ context }: { context: ScreenContext }) {
   const { items } = useInboxData();
   const live = activeQueue(items);
   return (
     <StatRow>
-      <Stat label="Needs attention" value={String(live.length)} meta={`${items.filter((item) => item.snoozed).length} snoozed`} />
-      <Stat label="Unread" value={String(live.filter((item) => !item.read).length)} meta="Reading never approves" />
-      <Stat label="P0–P1" value={String(live.filter((item) => item.priority === "P0" || item.priority === "P1").length)} meta="Critical and urgent" />
+      <Stat prov="posted" label="Needs attention" value={String(live.length)} meta={`${items.filter((item) => item.snoozed).length} snoozed`} />
+      <Stat prov="posted" label="Unread" value={String(live.filter((item) => !item.read).length)} meta="Reading never approves" />
+      <Stat prov="posted" label="P0–P1" value={String(live.filter((item) => item.priority === "P0" || item.priority === "P1").length)} meta="Critical and urgent" />
       <Stat
+        prov="human"
         label="Decisions waiting"
         value={String(live.filter((item) => item.kind === "approval").length)}
         meta="Approve on the record"
@@ -596,7 +622,7 @@ function ActionPreview({ context, close }: { context: ScreenContext; close: () =
           back on the record.
         </Notice>
       )}
-      <Card title="Exactly what changes" flush>
+      <Card eyebrow="PREVIEW" prov="posted" title="Exactly what changes" flush>
         <DataGrid
           rows={willChange}
           rowId={(row) => row.id}
@@ -652,6 +678,8 @@ function ApprovalsScreen({ context, tab }: { context: ScreenContext; tab: Approv
         </Notice>
       )}
       <Card
+        eyebrow="APPROVALS"
+        prov="human"
         title={tab === "History" ? "Decided" : `${rows.length} waiting`}
         subtitle={tab === "Mine" ? `Assigned to ${actor}` : tab === "Delegated" ? "Covered by a backup approver" : tab === "Pending" ? "Every open request in this workspace" : "Decisions already taken"}
         flush
@@ -730,7 +758,7 @@ function ApprovalEvidence({ record, context }: { record: Rec; context: ScreenCon
   return (
     <Stack gap={4}>
       <Properties rows={[
-        { label: "Exact action", value: <code>{String(record.fields.action ?? "")}</code> },
+        { label: "Exact action", value: <span className="ds-num">{String(record.fields.action ?? "")}</span> },
         { label: "Scope", value: String(record.fields.scope ?? "Not stated") },
         { label: "Requested by", value: `${String(record.fields.requester ?? record.ownerName)}${record.fields.requesterKind === "ai" ? " (agent)" : ""}` },
         { label: "Risk", value: <Pill tone={record.fields.risk === "high" ? "danger" : record.fields.risk === "medium" ? "warning" : "neutral"}>{String(record.fields.risk ?? "low")}</Pill> },
@@ -850,7 +878,7 @@ function StepUpAuth({ context, close }: { context: ScreenContext; close: () => v
       </Notice>
       <Properties rows={[
         { label: "Request", value: record.title },
-        { label: "Action", value: <code>{String(record.fields.action ?? "")}</code> },
+        { label: "Action", value: <span className="ds-num">{String(record.fields.action ?? "")}</span> },
         { label: "Amount", value: record.amountMinor === undefined ? "No money moves" : context.money(record.amountMinor) },
         { label: "Bound to", value: `Plan version ${planVersion}` },
         { label: "Approving as", value: `${actor} · ${ROLE_LABELS[context.role]} view` },
@@ -885,15 +913,15 @@ function ScopeDiff({ context }: { context: ScreenContext }) {
 
   return (
     <Stack gap={4}>
-      <Card title="Requested" subtitle="What the request would allow">
+      <Card eyebrow="REQUESTED" prov={isAgent ? "agent" : "human"} title="Requested" subtitle="What the request would allow">
         <Properties rows={[
-          { label: "Action", value: <code>{String(record.fields.action ?? "")}</code> },
+          { label: "Action", value: <span className="ds-num">{String(record.fields.action ?? "")}</span> },
           { label: "Scope", value: String(record.fields.scope ?? "Not stated") },
           { label: "Accounts", value: String(record.fields.accounts ?? "—") },
           { label: "Ceiling", value: record.amountMinor === undefined ? "No money" : context.money(record.amountMinor) },
         ]} />
       </Card>
-      <Card title="Held today" subtitle={`What ${requester} can already do`}>
+      <Card eyebrow="HELD TODAY" prov="posted" title="Held today" subtitle={`What ${requester} can already do`}>
         <Properties rows={[
           { label: "Requester", value: isAgent ? "Agent, draft mode" : "Person" },
           { label: "Capability needed", value: capability || "None recorded" },
@@ -932,7 +960,7 @@ function MessagesScreen({ context, tab }: { context: ScreenContext; tab: Message
 
   return (
     <Grid>
-      <Card span={8} title={`${tab} · ${rows.length}`} subtitle={`${permitted.length} threads in the ${ROLE_LABELS[role]} view`} flush>
+      <Card eyebrow="THREADS" prov="human" span={8} title={`${tab} · ${rows.length}`} subtitle={`${permitted.length} threads in the ${ROLE_LABELS[role]} view`} flush>
         <DataGrid
           rows={rows}
           rowId={(row) => row.id}
@@ -961,7 +989,7 @@ function MessagesScreen({ context, tab }: { context: ScreenContext; tab: Message
             },
             { key: "channel", header: "Channel", hideBelow: 1100, cell: (row) => <Pill tone={csv(row.fields.restrictedTo).length ? "warning" : "neutral"}>{String(row.fields.channel ?? "Direct")}</Pill>, sortValue: (row) => String(row.fields.channel ?? "") },
             { key: "assignee", header: "Owner", hideBelow: 1280, cell: (row) => String(row.fields.assignee ?? "Unassigned") },
-            { key: "at", header: "Last activity", align: "end", cell: (row) => context.relative(row.at), sortValue: (row) => row.at ?? "" },
+            { key: "at", header: "Last activity", align: "end", cell: (row) => <span className="ds-num">{context.relative(row.at)}</span>, sortValue: (row) => row.at ?? "" },
           ]}
           bulkActions={[
             {
@@ -981,8 +1009,8 @@ function MessagesScreen({ context, tab }: { context: ScreenContext; tab: Message
         />
       </Card>
 
-      <Stack gap={4}>
-        <Card span={4} title="Routing" subtitle="What this role view can see">
+      <Stack gap={4} className="ds-col-4">
+        <Card eyebrow="VISIBILITY" prov="human" span={4} title="Routing" subtitle="What this role view can see">
           <Stack gap={3}>
             <Properties rows={[
               { label: "Role view", value: ROLE_LABELS[role] },
@@ -997,7 +1025,7 @@ function MessagesScreen({ context, tab }: { context: ScreenContext; tab: Message
             )}
           </Stack>
         </Card>
-        <Card span={4} title="Unanswered the longest" subtitle="Oldest unread first">
+        <Card eyebrow="WAITING" prov="posted" span={4} title="Unanswered the longest" subtitle="Oldest unread first">
           <Stack gap={2}>
             {[...permitted].filter((row) => row.fields.unread === true).sort((a, b) => (a.at ?? "").localeCompare(b.at ?? "")).slice(0, 4).map((row) => (
               <Row key={row.id} gap={2}>
@@ -1203,7 +1231,7 @@ function NotificationsFeed({ context, tab }: { context: ScreenContext; tab: Feed
 
   return (
     <Grid>
-      <Card span={8} title={`${tab} · ${rows.length}`} subtitle="Company events with their source and time" flush>
+      <Card eyebrow="FEED" prov="posted" span={8} title={`${tab} · ${rows.length}`} subtitle="Company events with their source and time" flush>
         <DataGrid
           rows={rows}
           rowId={(row) => row.id}
@@ -1225,8 +1253,8 @@ function NotificationsFeed({ context, tab }: { context: ScreenContext; tab: Feed
           empty={<Empty title={tab === "Archived" ? "Nothing archived" : "No events"} icon={<Bell size={20} />}>Events are written by the applications in this workspace as records change.</Empty>}
         />
       </Card>
-      <Stack gap={4}>
-        <Card span={4} title="Grouped" subtitle="Related work collapsed into one line">
+      <Stack gap={4} className="ds-col-4">
+        <Card eyebrow="GROUPS" prov="posted" span={4} title="Grouped" subtitle="Related work collapsed into one line">
           <Stack gap={2}>
             {grouped.map((group) => (
               <Row key={group.label} gap={2}>
@@ -1239,7 +1267,7 @@ function NotificationsFeed({ context, tab }: { context: ScreenContext; tab: Feed
             {grouped.length === 0 && <span className="ds-subtle">Nothing to group.</span>}
           </Stack>
         </Card>
-        <Card span={4} title="Sources you follow" subtitle={`${followed.length} followed`}>
+        <Card eyebrow="SOURCES" prov="human" span={4} title="Sources you follow" subtitle={`${followed.length} followed`}>
           <Stack gap={2}>
             {sources.map((entry) => {
               const record = followed.find((row) => String(row.fields.source) === entry);
@@ -1285,7 +1313,7 @@ function EventDetail({ context }: { context: ScreenContext }) {
       <Properties rows={[
         { label: "Source", value: item.sourceLabel },
         { label: "Recorded", value: context.dateTime(item.at) },
-        { label: "Deep link", value: item.route ? <code>{item.route.replace(":org", context.org.slug)}</code> : "None" },
+        { label: "Deep link", value: item.route ? <span className="ds-num">{item.route.replace(":org", context.org.slug)}</span> : "None" },
         { label: "Target record", value: item.entityId ?? "None" },
       ]} />
       <DeepLink item={item} context={context} />
@@ -1367,7 +1395,7 @@ function IncidentBoard({ context, tab }: { context: ScreenContext; tab: Incident
       </Notice>
       <Grid>
         {lanes.map((lane) => (
-          <Card key={lane.label} span={4} title={lane.label} subtitle={`${lane.rows.length} ${lane.rows.length === 1 ? "incident" : "incidents"}`}>
+          <Card key={lane.label} eyebrow="INCIDENTS" prov="human" span={4} title={lane.label} subtitle={`${lane.rows.length} ${lane.rows.length === 1 ? "incident" : "incidents"}`}>
             {lane.rows.length === 0 ? (
               <Empty title="Clear" icon={<ShieldAlert size={18} />}>Nothing at this severity.</Empty>
             ) : (
@@ -1571,7 +1599,7 @@ function ChannelSettings({ context }: { context: ScreenContext }) {
         {channels.map((channel) => {
           const capability = capabilityById(String(channel.fields.capability ?? ""));
           return (
-            <Card key={channel.id} span={6} title={channel.title} subtitle={channel.summary}>
+            <Card key={channel.id} eyebrow="CHANNEL" prov="human" span={6} title={channel.title} subtitle={channel.summary}>
               <Stack gap={3}>
                 <Row gap={3}>
                   <span className="ds-grow">Deliver to this channel</span>
@@ -1623,7 +1651,7 @@ function ChannelSettings({ context }: { context: ScreenContext }) {
 function CategorySettings({ context }: { context: ScreenContext }) {
   const { categories } = useInboxData();
   return (
-    <Card title="Categories" subtitle="What each kind of item is allowed to do" flush>
+    <Card eyebrow="CATEGORIES" prov="human" title="Categories" subtitle="What each kind of item is allowed to do" flush>
       <DataGrid
         rows={categories}
         rowId={(row) => row.id}
@@ -1671,7 +1699,7 @@ function ScheduleSettings({ context }: { context: ScreenContext }) {
   const { quietHours, digests } = useInboxData();
   return (
     <Grid>
-      <Card span={7} title="Quiet hours and focus" subtitle={`${quietHours.length} windows`} actions={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("quiet-hour rules")}>Add a window</Button>}>
+      <Card eyebrow="SCHEDULE" prov="human" span={7} title="Quiet hours and focus" subtitle={`${quietHours.length} windows`} actions={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("quiet-hour rules")}>Add a window</Button>}>
         <Stack gap={3}>
           {quietHours.map((window) => (
             <div key={window.id} className="ds-panel" style={{ padding: "var(--space-3)" }}>
@@ -1702,7 +1730,7 @@ function ScheduleSettings({ context }: { context: ScreenContext }) {
           ))}
         </Stack>
       </Card>
-      <Card span={5} title="Digests" subtitle={`${digests.length} scheduled`}>
+      <Card eyebrow="DIGESTS" prov="human" span={5} title="Digests" subtitle={`${digests.length} scheduled`}>
         <Stack gap={3}>
           {digests.map((digest) => (
             <Row key={digest.id} gap={2} wrap>
@@ -1728,7 +1756,7 @@ function DelegationSettings({ context }: { context: ScreenContext }) {
         Sending a copy to a backup never gives them a decision they do not already hold. Authority lives in Escalations and in
         Administration.
       </Notice>
-      <Card title="Who else sees your items" flush>
+      <Card eyebrow="DELEGATION" prov="human" title="Who else sees your items" flush>
         <DataGrid
           rows={rules}
           rowId={(row) => row.id}
@@ -1904,7 +1932,7 @@ function DigestCentre({ context, tab }: { context: ScreenContext; tab: DigestTab
 
   if (tab === "History") {
     return (
-      <Card title="Built before" subtitle="When each digest was last composed in this browser" flush>
+      <Card eyebrow="HISTORY" prov="posted" title="Built before" subtitle="When each digest was last composed in this browser" flush>
         <DataGrid
           rows={rows}
           rowId={(row) => row.id}
@@ -1913,7 +1941,7 @@ function DigestCentre({ context, tab }: { context: ScreenContext; tab: DigestTab
             { key: "title", header: "Digest", primary: true, cell: (row) => row.title, filterValue: (row) => row.title },
             { key: "cadence", header: "Cadence", cell: (row) => String(row.fields.cadence) },
             { key: "channel", header: "Channel", cell: (row) => <Pill tone={row.fields.channel === "email" ? "warning" : "success"}>{row.fields.channel === "email" ? "Email · not connected" : "Inbox"}</Pill> },
-            { key: "built", header: "Last built", align: "end", cell: (row) => context.dateTime(String(row.fields.lastBuiltAt ?? "")), sortValue: (row) => String(row.fields.lastBuiltAt ?? "") },
+            { key: "built", header: "Last built", align: "end", cell: (row) => <span className="ds-num">{context.dateTime(String(row.fields.lastBuiltAt ?? ""))}</span>, sortValue: (row) => String(row.fields.lastBuiltAt ?? "") },
           ]}
           empty={<Empty title="No digest has been built yet" icon={<CalendarClock size={20} />}>Press Preview on a digest to compose one from the current records.</Empty>}
         />
@@ -1923,7 +1951,7 @@ function DigestCentre({ context, tab }: { context: ScreenContext; tab: DigestTab
 
   return (
     <Grid>
-      <Card span={7} title={`${tab} digests`} subtitle={`${rows.length} configured`} flush>
+      <Card eyebrow="DIGESTS" prov="human" span={7} title={`${tab} digests`} subtitle={`${rows.length} configured`} flush>
         <DataGrid
           rows={rows}
           rowId={(row) => row.id}
@@ -1941,7 +1969,7 @@ function DigestCentre({ context, tab }: { context: ScreenContext; tab: DigestTab
           empty={<Empty title={`No ${tab.toLowerCase()} digest`} icon={<CalendarClock size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Digest editor")}>New digest</Button>}>A digest collects routine items so they arrive once instead of all day.</Empty>}
         />
       </Card>
-      <Card span={5} title="Brief as it stands now" subtitle="Every line names where it came from">
+      <Card eyebrow="BRIEF" prov="posted" span={5} title="Brief as it stands now" subtitle="Every line names where it came from">
         <Stack gap={3}>
           {lines.map((line) => (
             <Row key={line.label} gap={3} style={{ alignItems: "flex-start" }}>
@@ -1966,10 +1994,10 @@ function DigestEditor({ context, close }: { context: ScreenContext; close: () =>
   const { digests } = useInboxData();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const existing = digests.find((row) => row.id === (payload?.id ?? context.selectedId));
-  const [title, setTitle] = useState(existing?.title ?? "");
-  const [cadence, setCadence] = useState(String(existing?.fields.cadence ?? "daily"));
-  const [sendAt, setSendAt] = useState(String(existing?.fields.sendAt ?? "07:30"));
-  const [sections, setSections] = useState<string[]>(csv(existing?.fields.sections) .length ? csv(existing?.fields.sections) : ["approvals", "overdue"]);
+  const [title, setTitle] = useSeeded(existing?.title ?? "");
+  const [cadence, setCadence] = useSeeded(String(existing?.fields.cadence ?? "daily"));
+  const [sendAt, setSendAt] = useSeeded(String(existing?.fields.sendAt ?? "07:30"));
+  const [sections, setSections] = useSeededList(typeof existing?.fields.sections === "string" ? existing.fields.sections : "approvals,overdue");
   const [error, setError] = useState("");
 
   const all = ["approvals", "overdue", "missions", "work", "incidents", "activity", "updates", "ledger"];
@@ -2036,7 +2064,7 @@ function DigestAudience({ context, close }: { context: ScreenContext; close: () 
   const members = useCollection("members");
   const payload = context.overlayPayload as { id?: string } | undefined;
   const digest = digests.find((row) => row.id === (payload?.id ?? context.selectedId)) ?? digests[0];
-  const [chosen, setChosen] = useState<string[]>(csv(digest?.fields.recipients));
+  const [chosen, setChosen] = useSeededList(typeof digest?.fields.recipients === "string" ? digest.fields.recipients : "");
   if (!digest) return <Empty title="No digest selected" />;
   return (
     <Stack gap={4}>
@@ -2077,7 +2105,7 @@ function DigestSchedule({ context, close }: { context: ScreenContext; close: () 
   const { digests } = useInboxData();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const digest = digests.find((row) => row.id === (payload?.id ?? context.selectedId)) ?? digests[0];
-  const [sendAt, setSendAt] = useState(String(digest?.fields.sendAt ?? "07:30"));
+  const [sendAt, setSendAt] = useSeeded(String(digest?.fields.sendAt ?? "07:30"));
   if (!digest) return <Empty title="No digest selected" />;
   return (
     <Stack gap={4}>
@@ -2151,7 +2179,7 @@ function EscalationsScreen({ context, tab }: { context: ScreenContext; tab: Esca
 
   if (tab === "Rules") {
     return (
-      <Card title="Routing rules" subtitle={`${rules.filter((rule) => rule.fields.enabled === true).length} of ${rules.length} enabled`} flush>
+      <Card eyebrow="RULES" prov="human" title="Routing rules" subtitle={`${rules.filter((rule) => rule.fields.enabled === true).length} of ${rules.length} enabled`} flush>
         <DataGrid
           rows={rules}
           rowId={(row) => row.id}
@@ -2161,7 +2189,7 @@ function EscalationsScreen({ context, tab }: { context: ScreenContext; tab: Esca
           onOpen={(id) => { context.select(id); context.openOverlay("Delegation grant", { id }); }}
           columns={[
             { key: "title", header: "Rule", primary: true, cell: (row) => <div><strong>{row.title}</strong><p className="ds-subtle">{row.summary}</p></div>, filterValue: (row) => `${row.title} ${row.summary}` },
-            { key: "condition", header: "Condition", cell: (row) => <code>{String(row.fields.condition)}</code> },
+            { key: "condition", header: "Condition", cell: (row) => <span className="ds-num">{String(row.fields.condition)}</span> },
             { key: "owner", header: "Owner", hideBelow: 1100, cell: (row) => String(row.fields.owner) },
             { key: "backup", header: "Backup", cell: (row) => String(row.fields.backup) },
             { key: "timer", header: "After", align: "end", cell: (row) => `${Number(row.fields.timerMinutes) / 60} h` },
@@ -2193,7 +2221,7 @@ function EscalationsScreen({ context, tab }: { context: ScreenContext; tab: Esca
           const forOwner = rules.filter((rule) => String(rule.fields.owner) === owner);
           const covered = forOwner.filter((rule) => rule.fields.enabled === true);
           return (
-            <Card key={owner} span={6} title={owner} subtitle={`${covered.length} of ${forOwner.length} rules active`}>
+            <Card key={owner} eyebrow="COVERAGE" prov="human" span={6} title={owner} subtitle={`${covered.length} of ${forOwner.length} rules active`}>
               <Stack gap={3}>
                 <Meter value={covered.length} max={Math.max(1, forOwner.length)} label={`${owner} coverage`} tone={covered.length === forOwner.length ? "success" : "warning"} />
                 {forOwner.map((rule) => (
@@ -2214,13 +2242,13 @@ function EscalationsScreen({ context, tab }: { context: ScreenContext; tab: Esca
   if (tab === "History") {
     const relevant = events.filter((event) => event.type.startsWith("approval") || event.type.includes("delegat") || event.type.includes("escalat") || event.type.startsWith("policy"));
     return (
-      <Card title="Delegation and decision history" subtitle={`${relevant.length} entries`} flush>
+      <Card eyebrow="HISTORY" prov="posted" title="Delegation and decision history" subtitle={`${relevant.length} entries`} flush>
         <DataGrid
           rows={relevant}
           rowId={(row) => row.id}
           label="Escalation history"
           columns={[
-            { key: "at", header: "When", width: "150px", cell: (row) => context.relative(row.at), sortValue: (row) => row.at },
+            { key: "at", header: "When", width: "150px", cell: (row) => <span className="ds-num">{context.relative(row.at)}</span>, sortValue: (row) => row.at },
             { key: "actor", header: "Who", cell: (row) => row.actor },
             { key: "message", header: "Entry", primary: true, cell: (row) => <div><strong>{row.type}</strong><p className="ds-subtle">{row.message}</p></div>, filterValue: (row) => row.message },
           ]}
@@ -2288,11 +2316,11 @@ function DelegationGrant({ context, close }: { context: ScreenContext; close: ()
   const members = useCollection("members");
   const payload = context.overlayPayload as { id?: string } | undefined;
   const existing = rules.find((row) => row.id === (payload?.id ?? context.selectedId));
-  const [owner, setOwner] = useState(String(existing?.fields.owner ?? context.actor));
-  const [backup, setBackup] = useState(String(existing?.fields.backup ?? ""));
-  const [condition, setCondition] = useState(String(existing?.fields.condition ?? "capability:approve_payment"));
-  const [timer, setTimer] = useState(String(existing?.fields.timerMinutes ?? 240));
-  const [capMinor, setCapMinor] = useState(Number(existing?.fields.authorityCap ?? 0));
+  const [owner, setOwner] = useSeeded(String(existing?.fields.owner ?? context.actor));
+  const [backup, setBackup] = useSeeded(String(existing?.fields.backup ?? ""));
+  const [condition, setCondition] = useSeeded(String(existing?.fields.condition ?? "capability:approve_payment"));
+  const [timer, setTimer] = useSeeded(String(existing?.fields.timerMinutes ?? 240));
+  const [capMinor, setCapMinor] = useSeeded(Number(existing?.fields.authorityCap ?? 0));
 
   const capability = CAPABILITY_OF_CONDITION[condition];
   const backupRole = backup ? roleOf(members, backup) : "";
@@ -2377,7 +2405,7 @@ function DelegationGrant({ context, close }: { context: ScreenContext; close: ()
 function EscalationSimulation({ context }: { context: ScreenContext }) {
   const { rules, items } = useInboxData();
   const members = useCollection("members");
-  const [away, setAway] = useState(String(rules[0]?.fields.owner ?? context.actor));
+  const [away, setAway] = useSeeded(String(rules[0]?.fields.owner ?? context.actor));
   const affected = rules.filter((rule) => String(rule.fields.owner) === away);
   const waiting = items.filter((item) => item.kind === "approval" && !item.resolved);
 
@@ -2388,7 +2416,7 @@ function EscalationSimulation({ context }: { context: ScreenContext }) {
           {members.filter((member) => member.fields.kind === "human").map((member) => <option key={member.id} value={member.title}>{member.title}</option>)}
         </Select>
       </Field>
-      <Card title="What happens" subtitle={`${affected.length} rules mention ${away}`}>
+      <Card eyebrow="SIMULATION" prov="human" title="What happens" subtitle={`${affected.length} rules mention ${away}`}>
         <Stack gap={3}>
           {affected.length === 0 ? (
             <Notice tone="warning" title="Nothing covers them">
@@ -2540,7 +2568,7 @@ export const inboxApp = registerApp({
     "ARL-INBOX-001": {
       id: "ARL-INBOX-001",
       subtitle: (context) => `Priority, routing and triage for ${context.org.name}, derived from records in this browser.`,
-      statusStrip: (context) => <InboxStrip context={context} />,
+      statusStrip: (context) => <InboxStripLine context={context} />,
       tabs: [
         { id: "For You", render: (context) => <ForYou context={context} /> },
         { id: "Approvals", render: (context) => <ApprovalsPreview context={context} /> },
@@ -2641,6 +2669,7 @@ export const inboxApp = registerApp({
         { id: "Event detail", kind: "drawer", title: "Event", width: 520, render: ({ close: _close, ...context }) => <EventDetail context={context} /> },
         { id: "grouped items", kind: "modal", title: "Grouped items", width: 640, render: ({ close: _close, ...context }) => <GroupedItems context={context} /> },
         { id: "preference quick view", kind: "drawer", title: "Delivery at a glance", width: 460, render: ({ close: _close, ...context }) => <PreferenceQuickView context={context} /> },
+        { id: "action preview", kind: "modal", title: "Preview this triage", width: 720, render: ({ close, ...context }) => <ActionPreview context={context} close={close} /> },
       ],
     },
 

@@ -593,13 +593,13 @@ export function auditSite(site: SiteModel, formTitles: Record<string, string>): 
     level: bytes > 400_000 ? "warn" : "pass",
     title: `The export is ${(bytes / 1024).toFixed(1)} kB of HTML`,
     detail: "Measured by generating every page and counting the encoded bytes.",
-    measured: `${bytes} bytes across ${site.pages.length} pages`,
+    measured: `${bytes} bytes across ${site.pages.length} ${site.pages.length === 1 ? "page" : "pages"}`,
   });
   issues.push({
     id: "perf-blocks",
     area: "Performance",
     level: blocks > 40 ? "warn" : "pass",
-    title: `${blocks} blocks across ${site.pages.length} pages`,
+    title: `${blocks} blocks across ${site.pages.length} ${site.pages.length === 1 ? "page" : "pages"}`,
     detail: "Block count is the structural weight of the document.",
     measured: `${blocks} blocks`,
   });
@@ -628,7 +628,7 @@ export function auditSite(site: SiteModel, formTitles: Record<string, string>): 
     }
   }
   issues.push(site.seo.sitemap
-    ? { id: "seo-sitemap", area: "SEO", level: "pass", title: "A sitemap is generated on export", detail: `${site.pages.filter((page) => !page.seo.noindex).length} pages would be listed.`, measured: "sitemap flag and page index settings" }
+    ? { id: "seo-sitemap", area: "SEO", level: "pass", title: "A sitemap is generated on export", detail: `${site.pages.filter((page) => !page.seo.noindex).length} ${site.pages.filter((page) => !page.seo.noindex).length === 1 ? "page" : "pages"} would be listed.`, measured: "sitemap flag and page index settings" }
     : { id: "seo-sitemap", area: "SEO", level: "warn", title: "No sitemap is generated", detail: "Without one, discovery depends entirely on internal links.", measured: "sitemap flag is off", fix: { label: "Turn the sitemap on", kind: "sitemap" } });
 
   return issues;

@@ -8,7 +8,7 @@ import { Boxes, Package, PackageCheck, RotateCcw, ShoppingBag, Tags, Truck } fro
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { resolveTaxCode } from "@/platform/money";
-import { ProviderBoundary, TotalsBlock } from "@/applications/growth/kit";
+import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import {
   bodyOf, customerStatusOfContact, marginOf, onHandFor, orderTotals, reservedFor, statusTone,

@@ -6,10 +6,10 @@ import type { InvoiceTotals, TaxCategory } from "@/platform/money";
 import type { Rec } from "@/domain/types";
 
 /* ====================================================================== *
- * Team 4 (Commerce & Growth) shared kit.
- *
- * Only pieces genuinely used by more than one of MARKET / COMMERCE / BOOK /
- * PROC / PORTAL live here. Anything specific to one application stays in that
+ * Shared kit for the commerce and growth workstream, kept in MARKET because
+ * the calendar and the provider boundary originate here. COMMERCE, BOOK,
+ * PROC and PORTAL import from this one module rather than each keeping a
+ * copy. Anything specific to a single application stays in that
  * application's folder so each app keeps its own information architecture.
  * ====================================================================== */
 

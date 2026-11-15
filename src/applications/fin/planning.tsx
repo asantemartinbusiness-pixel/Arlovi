@@ -56,7 +56,7 @@ export function BudgetsTab({ context }: { context: ScreenContext }) {
     <Stack gap={4}>
       <Row gap={3} wrap>
         <Field label="Period">
-          <Select value={period} onChange={(event) => setPeriod(event.target.value)}>
+          <Select aria-label="Period" value={period} onChange={(event) => setPeriod(event.target.value)}>
             {periods.map((item) => <option key={item} value={item}>{periodLabel(item, org.locale)}</option>)}
           </Select>
         </Field>
@@ -65,10 +65,10 @@ export function BudgetsTab({ context }: { context: ScreenContext }) {
       </Row>
 
       <StatRow>
-        <Stat label="Budgeted" value={context.money(budgetTotal)} meta={`${rows.length} lines approved`} />
-        <Stat label="Actual" value={context.money(actualTotal)} meta="Posted journals only" />
-        <Stat label="Variance" value={context.money(actualTotal - budgetTotal)} meta={`${adverse.length} adverse lines`} />
-        <Stat label="Unspent budget lines" value={String(rows.filter((row) => !row.hasActual).length)} meta="Nothing posted against them" />
+        <Stat prov="human" label="Budgeted" value={context.money(budgetTotal)} meta={`${rows.length} lines approved`} />
+        <Stat prov="posted" label="Actual" value={context.money(actualTotal)} meta="Posted journals only" />
+        <Stat prov="human" label="Variance" value={context.money(actualTotal - budgetTotal)} meta={`${adverse.length} adverse lines`} />
+        <Stat prov="human" label="Unspent budget lines" value={String(rows.filter((row) => !row.hasActual).length)} meta="Nothing posted against them" />
       </StatRow>
 
       <DataGrid
@@ -95,7 +95,7 @@ export function BudgetsTab({ context }: { context: ScreenContext }) {
         </>}
       />
 
-      <Card title="Variance by line" subtitle="Budget against posted actual">
+      <Card prov="human" title="Variance by line" subtitle="Budget against posted actual">
         <BarChart
           title="Budget against actual by account"
           height={240}
@@ -156,7 +156,7 @@ export function ForecastsTab({ context }: { context: ScreenContext }) {
       </Notice>
       <Row gap={3} wrap>
         <Field label="Model">
-          <Select value={chosen?.id ?? ""} onChange={(event) => setId(event.target.value)}>
+          <Select aria-label="Model" value={chosen?.id ?? ""} onChange={(event) => setId(event.target.value)}>
             {forecasts.map((forecast) => <option key={forecast.id} value={forecast.id}>{forecast.title}</option>)}
           </Select>
         </Field>
@@ -165,7 +165,7 @@ export function ForecastsTab({ context }: { context: ScreenContext }) {
       </Row>
 
       <Grid>
-        <Card span={8} title="Projected cash" subtitle={`Opening ${context.money(opening.amountMinor)} from posted journals, then ${horizon} months of assumptions`}>
+        <Card prov="human" span={8} title="Projected cash" subtitle={`Opening ${context.money(opening.amountMinor)} from posted journals, then ${horizon} months of assumptions`}>
           <LineChart
             title="Projected cash balance"
             height={240}
@@ -174,7 +174,7 @@ export function ForecastsTab({ context }: { context: ScreenContext }) {
             footer={`${chosen?.title}: ${String(chosen?.fields.basis ?? "no basis recorded")}`}
           />
         </Card>
-        <Card span={4} title="Assumptions" subtitle="Each one is a figure you can argue with">
+        <Card prov="human" span={4} title="Assumptions" subtitle="Each one is a figure you can argue with">
           <Stack gap={3}>
             {assumptionsOf(chosen).map((assumption) => (
               <div key={assumption.id}>
@@ -188,7 +188,7 @@ export function ForecastsTab({ context }: { context: ScreenContext }) {
             {assumptionsOf(chosen).length === 0 && <span className="ds-subtle">This model records no assumptions.</span>}
           </Stack>
         </Card>
-        <Card span={12} title="Posted result by month" subtitle="For comparison. These are actuals, not estimates.">
+        <Card prov="posted" span={12} title="Posted result by month" subtitle="For comparison. These are actuals, not estimates.">
           <BarChart
             title="Posted monthly result"
             height={200}
@@ -218,7 +218,7 @@ export function ScenariosTab({ context }: { context: ScreenContext }) {
 
   return (
     <Stack gap={4}>
-      <Card title="Scenarios side by side" subtitle={`Opening cash ${context.money(opening)} is the same in every scenario because it comes from the posted ledger`}>
+      <Card prov="human" title="Scenarios side by side" subtitle={`Opening cash ${context.money(opening)} is the same in every scenario because it comes from the posted ledger`}>
         <LineChart
           title="Projected cash by scenario"
           height={260}
@@ -265,16 +265,16 @@ export function BudgetApprovalTab({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Submitted" value={String(drafts.length)} meta="Waiting on an approval" />
-        <Stat label="Approved" value={String(approved.length)} meta="Used for variance" />
-        <Stat label="Approved value" value={context.money(approved.reduce((sum, budget) => sum + Number(budget.amountMinor ?? 0), 0))} />
+        <Stat prov="human" label="Submitted" value={String(drafts.length)} meta="Waiting on an approval" />
+        <Stat prov="human" label="Approved" value={String(approved.length)} meta="Used for variance" />
+        <Stat prov="human" label="Approved value" value={context.money(approved.reduce((sum, budget) => sum + Number(budget.amountMinor ?? 0), 0))} />
       </StatRow>
       {drafts.length === 0 ? (
         <Empty title="Nothing is waiting for approval">A submitted budget appears here with who submitted it.</Empty>
       ) : (
         <Stack gap={3}>
           {drafts.map((budget) => (
-            <Card
+            <Card prov="human"
               key={budget.id}
               title={budget.title}
               subtitle={budget.summary}
@@ -358,7 +358,7 @@ export function ModelAssumptions({ context, close }: { context: ScreenContext; c
               />
             </Field>
             <Field label="Why">
-              <TextInput value={row.note} onChange={(event) => setRows(rows.map((item) => (item.id === row.id ? { ...item, note: event.target.value } : item)))} />
+              <TextInput aria-label="Why" value={row.note} onChange={(event) => setRows(rows.map((item) => (item.id === row.id ? { ...item, note: event.target.value } : item)))} />
             </Field>
           </Row>
         ))}
@@ -399,7 +399,7 @@ export function BudgetRevisionHistory({ context }: { context: ScreenContext }) {
       ) : (
         <Stack gap={3}>
           {withHistory.map((record) => (
-            <Card key={record.id} title={record.title} subtitle={`Revision ${record.revision}`}>
+            <Card prov="posted" key={record.id} title={record.title} subtitle={`Revision ${record.revision}`}>
               <DataGrid
                 rows={record.history}
                 rowId={(row) => row.at}
@@ -437,20 +437,20 @@ export function BudgetApprovalOverlay({ context, close }: { context: ScreenConte
       </Notice>
       <Row gap={3} wrap>
         <Field label="Account">
-          <Select value={accountCodeValue} onChange={(event) => setAccountCodeValue(event.target.value)}>
+          <Select aria-label="Account" value={accountCodeValue} onChange={(event) => setAccountCodeValue(event.target.value)}>
             {data.accounts.filter((account) => ["expense", "revenue"].includes(String(account.fields.type)) && account.status !== "inactive")
               .map((account) => <option key={account.id} value={accountCode(account)}>{accountCode(account)} {account.title}</option>)}
           </Select>
         </Field>
         <Field label="Period">
-          <Select value={period} onChange={(event) => setPeriod(event.target.value)}>
+          <Select aria-label="Period" value={period} onChange={(event) => setPeriod(event.target.value)}>
             {[...new Set([data.currentPeriod, ...recentPeriods(context.now, 4), ...data.periods])].sort().reverse()
               .map((item) => <option key={item} value={item}>{periodLabel(item, org.locale)}</option>)}
           </Select>
         </Field>
         <Field label="Ceiling"><MoneyInput label="Budget ceiling" currency={org.currency} valueMinor={amount} onChangeMinor={setAmount} /></Field>
       </Row>
-      <Field label="Basis"><TextArea value={note} rows={2} onChange={(event) => setNote(event.target.value)} placeholder="Why this figure" /></Field>
+      <Field label="Basis"><TextArea aria-label="Basis" value={note} rows={2} onChange={(event) => setNote(event.target.value)} placeholder="Why this figure" /></Field>
       {existing && <Notice tone="warning" title={`${accountCodeValue} already has a ${period} budget`}>{existing.title} is {existing.status} at {context.money(existing.amountMinor)}. Submitting another would double the ceiling in the comparison.</Notice>}
       <Row gap={2}>
         <Button

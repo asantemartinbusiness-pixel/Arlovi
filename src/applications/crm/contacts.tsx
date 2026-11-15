@@ -46,7 +46,7 @@ export function ContactsTable({ context, tab }: { context: ScreenContext; tab: s
         ) : (
           <Stack gap={3}>
             {duplicates.map((group) => (
-              <Card key={group.key} title={group.rows[0].title} subtitle={`${group.rows.length} records with this name`}
+              <Card prov="human" key={group.key} title={group.rows[0].title} subtitle={`${group.rows.length} records with this name`}
                 footer={<Button size="sm" variant="primary" onClick={() => { context.select(group.rows[0].id); context.openOverlay("merge preview", { ids: group.rows.map((row) => row.id) }); }}>Review the merge</Button>}>
                 <Stack gap={2}>
                   {group.rows.map((row) => (
@@ -81,7 +81,7 @@ export function ContactsTable({ context, tab }: { context: ScreenContext; tab: s
         </Notice>
         <Grid>
           {segments.map((segment) => (
-            <Card key={segment.id} span={4} title={segment.label} subtitle={segment.why} actions={<Pill tone="neutral">{segment.rows.length}</Pill>}
+            <Card prov="human" key={segment.id} span={4} title={segment.label} subtitle={segment.why} actions={<Pill tone="neutral">{segment.rows.length}</Pill>}
               footer={<Button size="sm" variant="ghost" onClick={() => context.openOverlay("bulk action confirmation", { ids: segment.rows.map((row) => row.id), segment: segment.label })}>Tag this segment</Button>}>
               <Stack gap={1}>
                 {segment.rows.slice(0, 5).map((row) => (
@@ -111,10 +111,10 @@ export function ContactsTable({ context, tab }: { context: ScreenContext; tab: s
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label={tab} value={String(rows.length)} meta={`${data.contacts.length} in total`} />
-        <Stat label="With consent" value={String(rows.filter((contact) => contact.fields.consent && contact.fields.suppressed !== true).length)} meta="Outreach is allowed, once a provider exists" />
-        <Stat label="Suppressed" value={String(rows.filter((contact) => contact.fields.suppressed === true).length)} meta="Never contacted by any automation" />
-        <Stat label="Possible duplicates" value={String(duplicates.reduce((sum, group) => sum + group.rows.length, 0))} meta="Matched on an identical name" />
+        <Stat prov="human" label={tab} value={String(rows.length)} meta={`${data.contacts.length} in total`} />
+        <Stat prov="human" label="With consent" value={String(rows.filter((contact) => contact.fields.consent && contact.fields.suppressed !== true).length)} meta="Outreach is allowed, once a provider exists" />
+        <Stat prov="unknown" label="Suppressed" value={String(rows.filter((contact) => contact.fields.suppressed === true).length)} meta="Never contacted by any automation" />
+        <Stat prov="human" label="Possible duplicates" value={String(duplicates.reduce((sum, group) => sum + group.rows.length, 0))} meta="Matched on an identical name" />
       </StatRow>
       <DataGrid
         rows={rows}
@@ -224,23 +224,23 @@ export function ContactForm({ context, close }: { context: ScreenContext; close:
         close();
       }}
     >
-      <Field label="Full name" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
+      <Field label="Full name" required><TextInput aria-label="Full name" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
       <Row gap={3} wrap>
         <Field label="Email" error={duplicateEmail ? "Another contact already uses this address" : undefined}>
-          <TextInput type="email" value={email} invalid={Boolean(duplicateEmail)} onChange={(event) => setEmail(event.target.value)} />
+          <TextInput aria-label="Email" type="email" value={email} invalid={Boolean(duplicateEmail)} onChange={(event) => setEmail(event.target.value)} />
         </Field>
-        <Field label="Phone"><TextInput value={phone} onChange={(event) => setPhone(event.target.value)} /></Field>
-        <Field label="Role"><TextInput value={role} onChange={(event) => setRole(event.target.value)} /></Field>
+        <Field label="Phone"><TextInput aria-label="Phone" value={phone} onChange={(event) => setPhone(event.target.value)} /></Field>
+        <Field label="Role"><TextInput aria-label="Role" value={role} onChange={(event) => setRole(event.target.value)} /></Field>
       </Row>
       <Row gap={3} wrap>
         <Field label="Account">
-          <Select value={companyId} onChange={(event) => setCompanyId(event.target.value)}>
+          <Select aria-label="Account" value={companyId} onChange={(event) => setCompanyId(event.target.value)}>
             <option value="">None</option>
             {data.companies.map((company) => <option key={company.id} value={company.id}>{company.title}</option>)}
           </Select>
         </Field>
         <Field label="Tax status" hint="Finance needs this to resolve a rate on any invoice.">
-          <Select value={taxStatus} onChange={(event) => setTaxStatus(event.target.value as CustomerTaxStatus)}>
+          <Select aria-label="Tax status" value={taxStatus} onChange={(event) => setTaxStatus(event.target.value as CustomerTaxStatus)}>
             <option value="">Not recorded</option>
             {CUSTOMER_TAX_STATUSES.filter((entry) => entry.value !== "unknown").map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
           </Select>
@@ -249,7 +249,7 @@ export function ContactForm({ context, close }: { context: ScreenContext; close:
       <Checkbox label="Email consent is recorded" checked={consent} disabled={suppressed} onChange={(event) => setConsent(event.target.checked)} />
       <Checkbox label="Suppressed: never contact this person" checked={suppressed} onChange={(event) => { setSuppressed(event.target.checked); if (event.target.checked) setConsent(false); }} />
       {suppressed && <Notice tone="warning" title="Suppression wins over consent">No automation and no bulk action will include this contact, and the flag survives a merge.</Notice>}
-      <Field label="Notes"><TextArea value={summary} rows={3} onChange={(event) => setSummary(event.target.value)} /></Field>
+      <Field label="Notes"><TextArea aria-label="Notes" value={summary} rows={3} onChange={(event) => setSummary(event.target.value)} /></Field>
       <Row gap={2}>
         <Button type="submit" variant="primary" busy={busy} disabled={!title.trim()}>{contact ? "Save the contact" : "Create the contact"}</Button>
         <Button variant="ghost" onClick={close}>Cancel</Button>
@@ -284,7 +284,7 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
             : "Neither record has consent recorded, so the merged record has none."}
       </Notice>
       <Field label="Record to keep">
-        <Select value={keep.id} onChange={(event) => setKeepId(event.target.value)}>
+        <Select aria-label="Record to keep" value={keep.id} onChange={(event) => setKeepId(event.target.value)}>
           {rows.map((row) => <option key={row.id} value={row.id}>{row.title} · {String(row.fields.email ?? "no email")} · created {row.createdAt.slice(0, 10)}</option>)}
         </Select>
       </Field>
@@ -366,12 +366,24 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
 
 export function BulkActionConfirmation({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCrmData();
-  const payload = context.overlayPayload as { ids?: string[]; segment?: string } | undefined;
+  const payload = context.overlayPayload as { ids?: string[]; segment?: string; export?: boolean } | undefined;
   const rows = (payload?.ids ?? []).map((id) => data.contacts.find((contact) => contact.id === id)).filter((contact): contact is Rec => Boolean(contact));
   const [tag, setTag] = useState(payload?.segment ? payload.segment.toLowerCase().replace(/\s+/g, "-") : "trade");
   const [busy, setBusy] = useState(false);
   const suppressed = rows.filter((row) => row.fields.suppressed === true);
   const eligible = rows.filter((row) => row.fields.suppressed !== true);
+
+  if (payload?.export) {
+    return (
+      <Stack gap={4}>
+        <Notice tone="info" title="The file is written in this browser">
+          {data.contacts.length} contacts with their consent and suppression flags. Nothing is uploaded, and a suppressed
+          contact is exported with that flag intact so it cannot be lost in a round trip.
+        </Notice>
+        <Button variant="primary" onClick={() => { exportContacts(context, data, data.contacts); close(); }}>Download the CSV</Button>
+      </Stack>
+    );
+  }
 
   if (rows.length === 0) return <Empty title="Nothing selected">Tick contacts in the list, then choose Tag.</Empty>;
 
@@ -387,7 +399,7 @@ export function BulkActionConfirmation({ context, close }: { context: ScreenCont
           {suppressed.map((row) => row.title).join(", ")} asked not to be contacted, so they are left out of any segment used for outreach.
         </Notice>
       )}
-      <Field label="Tag"><TextInput value={tag} onChange={(event) => setTag(event.target.value)} /></Field>
+      <Field label="Tag"><TextInput aria-label="Tag" value={tag} onChange={(event) => setTag(event.target.value)} /></Field>
       <Row gap={2}>
         <Button
           variant="primary"
@@ -427,7 +439,7 @@ export function ContactHeader({ context }: { context: ScreenContext }) {
   const deals = dealsOfContact(data, contact.id);
   const open = deals.filter((deal) => stageOf(deal).kind === "open");
   return (
-    <Card flush>
+    <Card prov="human" flush>
       <div className="ds-card-body">
         <Row gap={4} wrap>
           <Avatar name={contact.title} size="lg" />
@@ -467,7 +479,7 @@ export function ContactOverview({ context }: { context: ScreenContext }) {
 
   return (
     <Grid>
-      <Card span={4} title="Identity" subtitle="What is recorded, and what is not">
+      <Card prov="human" span={4} title="Identity" subtitle="What is recorded, and what is not">
         <Properties rows={[
           { label: "Name", value: contact.title },
           { label: "Role", value: String(contact.fields.role ?? "Not recorded") },
@@ -481,7 +493,7 @@ export function ContactOverview({ context }: { context: ScreenContext }) {
         ]} />
       </Card>
 
-      <Card span={4} title="Relationship context" subtitle={company ? company.title : "No account linked"}>
+      <Card prov="human" span={4} title="Relationship context" subtitle={company ? company.title : "No account linked"}>
         {company ? (
           <Stack gap={3}>
             <Properties rows={[
@@ -508,7 +520,7 @@ export function ContactOverview({ context }: { context: ScreenContext }) {
         )}
       </Card>
 
-      <Card span={4} title="Commercial position" subtitle="Deals and money, from real records">
+      <Card prov="human" span={4} title="Commercial position" subtitle="Deals and money, from real records">
         <Stack gap={3}>
           <Properties rows={[
             { label: "Deals", value: String(deals.length) },
@@ -534,7 +546,7 @@ export function ContactOverview({ context }: { context: ScreenContext }) {
         </div>
       )}
 
-      <Card span={12} title="Latest touches" subtitle={`${activities.length} activities recorded against this person`} flush>
+      <Card prov="human" span={12} title="Latest touches" subtitle={`${activities.length} activities recorded against this person`} flush>
         {activities.length === 0 ? (
           <div className="ds-card-body"><Empty title="Nothing logged">A call, meeting, email draft or note recorded here becomes the conversation history.</Empty></div>
         ) : (
@@ -632,7 +644,7 @@ export function ContactService({ context }: { context: ScreenContext }) {
   const invoices = invoicesOfContact(data, contact.id);
   return (
     <Grid>
-      <Card span={6} title="Tickets" subtitle={`${tickets.length} recorded`} flush>
+      <Card prov="human" span={6} title="Tickets" subtitle={`${tickets.length} recorded`} flush>
         {tickets.length === 0 ? <div className="ds-card-body"><span className="ds-subtle">No support ticket.</span></div> : (
           <DataGrid
             rows={tickets}
@@ -647,7 +659,7 @@ export function ContactService({ context }: { context: ScreenContext }) {
           />
         )}
       </Card>
-      <Card span={6} title="Invoices" subtitle={`${invoices.length} recorded`} flush>
+      <Card prov="human" span={6} title="Invoices" subtitle={`${invoices.length} recorded`} flush>
         {invoices.length === 0 ? <div className="ds-card-body"><span className="ds-subtle">No invoice.</span></div> : (
           <DataGrid
             rows={invoices}
@@ -674,7 +686,7 @@ export function ContactFiles({ context }: { context: ScreenContext }) {
   const threads = data.threads.filter((thread) => String(thread.fields.to ?? "") === String(contact.fields.email ?? "~"));
   return (
     <Grid>
-      <Card span={6} title="Quotes" subtitle={`${quotes.length} documents`} flush>
+      <Card prov="human" span={6} title="Quotes" subtitle={`${quotes.length} documents`} flush>
         {quotes.length === 0 ? <div className="ds-card-body"><span className="ds-subtle">No quote for this person.</span></div> : (
           <DataGrid
             rows={quotes}
@@ -690,7 +702,7 @@ export function ContactFiles({ context }: { context: ScreenContext }) {
           />
         )}
       </Card>
-      <Card span={6} title="Message drafts" subtitle={`${threads.length} local drafts`}>
+      <Card prov="human" span={6} title="Message drafts" subtitle={`${threads.length} local drafts`}>
         <Stack gap={2}>
           {threads.map((thread) => <Row key={thread.id} gap={2}><span className="ds-grow">{thread.title}</span><Pill tone="warning">Not sent</Pill></Row>)}
           {threads.length === 0 && <span className="ds-subtle">Nothing drafted to this address.</span>}
@@ -723,7 +735,7 @@ export function ComposeMessage({ context, close }: { context: ScreenContext; clo
         { label: "Consent", value: <ConsentPill contact={contact} /> },
       ]} />
       {blocked && <Notice tone="danger" title="This message cannot be drafted">{blocked}</Notice>}
-      <Field label="Message"><TextArea value={body} rows={8} onChange={(event) => setBody(event.target.value)} /></Field>
+      <Field label="Message"><TextArea aria-label="Message" value={body} rows={8} onChange={(event) => setBody(event.target.value)} /></Field>
       <Row gap={2}>
         <Button
           variant="primary"
@@ -806,25 +818,25 @@ export function ActivityComposer({ context, close }: { context: ScreenContext; c
     >
       <Row gap={3} wrap>
         <Field label="Kind">
-          <Select value={kind} onChange={(event) => setKind(event.target.value)}>
+          <Select aria-label="Kind" value={kind} onChange={(event) => setKind(event.target.value)}>
             {["call", "meeting", "email", "task", "note"].map((item) => <option key={item}>{item}</option>)}
           </Select>
         </Field>
-        <Field label="When"><TextInput type="datetime-local" value={when} onChange={(event) => setWhen(event.target.value)} /></Field>
+        <Field label="When"><TextInput aria-label="When" type="datetime-local" value={when} onChange={(event) => setWhen(event.target.value)} /></Field>
         {deals.length > 0 && (
           <Field label="Deal">
-            <Select value={dealId} onChange={(event) => setDealId(event.target.value)}>
+            <Select aria-label="Deal" value={dealId} onChange={(event) => setDealId(event.target.value)}>
               <option value="">Not linked to a deal</option>
               {deals.map((deal) => <option key={deal.id} value={deal.id}>{deal.title}</option>)}
             </Select>
           </Field>
         )}
       </Row>
-      <Field label="What happened" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
+      <Field label="What happened" required><TextInput aria-label="What happened" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
       <Field label="Outcome" hint="What changed as a result. This is what a stage requirement is judged on.">
-        <TextInput value={outcome} onChange={(event) => setOutcome(event.target.value)} />
+        <TextInput aria-label="Outcome" value={outcome} onChange={(event) => setOutcome(event.target.value)} />
       </Field>
-      <Field label="Notes"><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} /></Field>
+      <Field label="Notes"><TextArea aria-label="Notes" value={note} rows={3} onChange={(event) => setNote(event.target.value)} /></Field>
       <Row gap={2}>
         <Button type="submit" variant="primary" busy={busy} disabled={!title.trim()}>Log the activity</Button>
         <Button variant="ghost" onClick={close}>Cancel</Button>

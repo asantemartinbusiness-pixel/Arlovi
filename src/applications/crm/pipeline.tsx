@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, GripVertical, Kanban } from "lucide-react";
 import {
   BarChart, Button, Card, DataGrid, Empty, Field, Grid, Kbd, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
@@ -118,10 +117,10 @@ export function PipelineBoard({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Open pipeline" value={context.money(data.forecast.pipelineMinor)} meta={`${data.forecast.openCount} open deals`} />
-        <Stat label="Weighted forecast" value={context.money(data.forecast.weightedMinor)} meta="Amount × probability, open deals only" />
-        <Stat label="Closed won" value={context.money(data.forecast.wonMinor)} meta="Revenue sits in the ledger, not the forecast" />
-        <Stat label="Closed lost" value={context.money(data.forecast.lostMinor)} meta={`${data.forecast.byStage.find((entry) => entry.stage.kind === "lost")?.count ?? 0} deals`} />
+        <Stat prov="human" label="Open pipeline" value={context.money(data.forecast.pipelineMinor)} meta={`${data.forecast.openCount} open deals`} />
+        <Stat prov="human" label="Weighted forecast" value={context.money(data.forecast.weightedMinor)} meta="Amount × probability, open deals only" />
+        <Stat prov="human" label="Closed won" value={context.money(data.forecast.wonMinor)} meta="Revenue sits in the ledger, not the forecast" />
+        <Stat prov="human" label="Closed lost" value={context.money(data.forecast.lostMinor)} meta={`${data.forecast.byStage.find((entry) => entry.stage.kind === "lost")?.count ?? 0} deals`} />
       </StatRow>
 
       <Notice tone="info" title="Moving a card with the keyboard">
@@ -285,7 +284,7 @@ export function PipelineForecast({ context }: { context: ScreenContext }) {
         Each figure is an open deal's amount multiplied by its stage weighting. Nothing here is in the ledger; recognised revenue lives in Finance and comes from posted journals.
       </Notice>
       <Grid>
-        <Card span={7} title="Weighted value by stage" subtitle="Open stages only">
+        <Card prov="human" span={7} title="Weighted value by stage" subtitle="Open stages only">
           <BarChart
             title="Pipeline and weighted value by stage"
             height={240}
@@ -297,7 +296,7 @@ export function PipelineForecast({ context }: { context: ScreenContext }) {
             footer={`${data.forecast.openCount} open deals. Closed-won and closed-lost deals are excluded.`}
           />
         </Card>
-        <Card span={5} title="Conversion between stages" subtitle="Count of deals that have reached each stage">
+        <Card prov="human" span={5} title="Conversion between stages" subtitle="Count of deals that have reached each stage">
           <Stack gap={3}>
             {data.forecast.byStage.map((entry) => (
               <div key={entry.stage.id}>
@@ -388,33 +387,33 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
           { label: "Owner", value: String(existing.fields.owner ?? existing.ownerName) },
         ]} />
       )}
-      <Field label="Deal" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
+      <Field label="Deal" required><TextInput aria-label="Deal" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
       <Row gap={3} wrap>
         <Field label="Amount" hint="A deal with no amount is excluded from every forecast figure.">
           <MoneyInput label="Deal amount" currency={org.currency} valueMinor={amount} onChangeMinor={setAmount} />
         </Field>
         <Field label="Stage">
-          <Select value={stageId} onChange={(event) => setStageId(event.target.value)}>
+          <Select aria-label="Stage" value={stageId} onChange={(event) => setStageId(event.target.value)}>
             {STAGES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
           </Select>
         </Field>
-        <Field label="Expected close"><TextInput type="date" value={closeDate} onChange={(event) => setCloseDate(event.target.value)} /></Field>
+        <Field label="Expected close"><TextInput aria-label="Expected close" type="date" value={closeDate} onChange={(event) => setCloseDate(event.target.value)} /></Field>
       </Row>
       <Row gap={3} wrap>
         <Field label="Account">
-          <Select value={companyId} onChange={(event) => setCompanyId(event.target.value)}>
+          <Select aria-label="Account" value={companyId} onChange={(event) => setCompanyId(event.target.value)}>
             <option value="">None</option>
             {data.companies.map((company) => <option key={company.id} value={company.id}>{company.title}</option>)}
           </Select>
         </Field>
         <Field label="Contact">
-          <Select value={contactId} onChange={(event) => setContactId(event.target.value)}>
+          <Select aria-label="Contact" value={contactId} onChange={(event) => setContactId(event.target.value)}>
             <option value="">None</option>
             {data.contacts.filter((contact) => !companyId || String(contact.fields.companyId ?? "") === companyId).map((contact) => <option key={contact.id} value={contact.id}>{contact.title}</option>)}
           </Select>
         </Field>
       </Row>
-      <Field label="Notes"><TextArea value={summary} rows={3} onChange={(event) => setSummary(event.target.value)} /></Field>
+      <Field label="Notes"><TextArea aria-label="Notes" value={summary} rows={3} onChange={(event) => setSummary(event.target.value)} /></Field>
       {guard && <Notice tone="warning" title="That stage change will be refused">{guard}</Notice>}
       <Row gap={2}>
         <Button
@@ -488,11 +487,11 @@ export function StageChangeValidation({ context, close }: { context: ScreenConte
         { label: "Amount", value: <Money minor={deal.amountMinor} context={context} bold /> },
       ]} />
       <Field label="Move to">
-        <Select value={target} onChange={(event) => setTarget(event.target.value)}>
+        <Select aria-label="Move to" value={target} onChange={(event) => setTarget(event.target.value)}>
           {STAGES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
         </Select>
       </Field>
-      <Card title={`What ${current.label} requires before a deal advances`} subtitle={requirements.length ? undefined : "Nothing beyond an amount."}>
+      <Card prov="human" title={`What ${current.label} requires before a deal advances`} subtitle={requirements.length ? undefined : "Nothing beyond an amount."}>
         <Stack gap={2}>
           {requirements.map((requirement) => {
             const value = deal.fields[requirement.field];
@@ -546,11 +545,11 @@ export function LostReason({ context, close }: { context: ScreenContext; close: 
         { label: "Current stage", value: stageOf(deal).label },
       ]} />
       <Field label="Reason" required>
-        <Select value={reason} onChange={(event) => setReason(event.target.value)}>
+        <Select aria-label="Reason" value={reason} onChange={(event) => setReason(event.target.value)}>
           {LOST_REASONS.map((item) => <option key={item}>{item}</option>)}
         </Select>
       </Field>
-      <Field label="What happened"><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} /></Field>
+      <Field label="What happened"><TextArea aria-label="What happened" value={note} rows={3} onChange={(event) => setNote(event.target.value)} /></Field>
       <Row gap={2}>
         <Button
           variant="danger"
@@ -592,6 +591,3 @@ export function PipelineStrip({ context }: { context: ScreenContext }) {
   );
 }
 
-export function dealLink(context: ScreenContext, deal: Rec): JSX.Element {
-  return <Link to={`/o/${context.org.slug}/crm/deals/${deal.id}`}>{deal.title}</Link>;
-}

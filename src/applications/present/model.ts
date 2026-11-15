@@ -185,28 +185,28 @@ export const THEMES: Theme[] = [
     id: "northline",
     name: "Northline",
     colours: {
-      ink: "#17223A", muted: "#4F5C78", background: "#F7F8FC", surface: "#FFFFFF",
-      accent: "#234FE8", accentInk: "#FFFFFF", support: "#36C5BA", line: "#CBD3E2",
+      ink: "#1A1917", muted: "#54514B", background: "#F6F4F0", surface: "#FFFFFF",
+      accent: "#234FE8", accentInk: "#FFFFFF", support: "#36C5BA", line: "#CAC5BA",
     },
-    headingFont: "Inter", bodyFont: "Inter", headingScale: 1, fontSubstitutions: [],
+    headingFont: "IBM Plex Sans Condensed", bodyFont: "Inter", headingScale: 1, fontSubstitutions: [],
   },
   {
     id: "harbor",
     name: "Harbor night",
     colours: {
-      ink: "#F2F5FF", muted: "#A7B2CC", background: "#101A3D", surface: "#172A63",
-      accent: "#64DFD6", accentInk: "#101A3D", support: "#FFAE7C", line: "#1A2F7D",
+      ink: "#F7F5F1", muted: "#CAC5BA", background: "#1A1917", surface: "#282724",
+      accent: "#36C5BA", accentInk: "#1A1917", support: "#FFAE7C", line: "#3C3A35",
     },
-    headingFont: "Inter", bodyFont: "Inter", headingScale: 1.05, fontSubstitutions: [],
+    headingFont: "IBM Plex Sans Condensed", bodyFont: "Inter", headingScale: 1.05, fontSubstitutions: [],
   },
   {
     id: "paper",
     name: "Paper",
     colours: {
-      ink: "#26304A", muted: "#6B7894", background: "#FFFDF8", surface: "#F6F1E7",
-      accent: "#B43E18", accentInk: "#FFFDF8", support: "#8A5A00", line: "#E1D9C8",
+      ink: "#282724", muted: "#6F6B64", background: "#FCFBF9", surface: "#EDEAE4",
+      accent: "#D9521A", accentInk: "#FCFBF9", support: "#FFAE7C", line: "#E0DCD4",
     },
-    headingFont: "Inter", bodyFont: "Inter", headingScale: 0.95, fontSubstitutions: [],
+    headingFont: "IBM Plex Sans Condensed", bodyFont: "Inter", headingScale: 0.95, fontSubstitutions: [],
   },
 ];
 
@@ -797,11 +797,13 @@ export function toHtml(deck: Deck, title: string, includeNotes: boolean): string
     return `<section class="slide" aria-label="Slide ${index + 1}: ${escapeHtml(slide.title)}">`
       + `<div class="stage" style="background:${deck.theme.colours[layout.backgroundToken]};">${decoration}${objects}</div>${notes}</section>`;
   }).join("\n");
-  const style = `body{margin:0;background:#1a2339;font-family:Inter,system-ui,sans-serif;padding:32px;}`
+  /* The exported file opens outside this application, so the stylesheet
+   * carries concrete values rather than workspace tokens. */
+  const style = `body{margin:0;background:#1a1917;font-family:Inter,system-ui,sans-serif;padding:32px;}`
     + `.slide{margin:0 auto 40px;max-width:${SLIDE_W}px;}`
     + `.stage{position:relative;width:${SLIDE_W}px;height:${SLIDE_H}px;overflow:hidden;border-radius:10px;box-shadow:0 20px 50px rgb(0 0 0 / 35%);}`
-    + `.notes{max-width:${SLIDE_W}px;color:#cbd3e2;font-size:14px;padding-top:12px;}`
-    + `.notes h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#9aa6bf;}`
+    + `.notes{max-width:${SLIDE_W}px;color:#cac5ba;font-size:14px;padding-top:12px;}`
+    + `.notes h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#9c978c;font-family:'IBM Plex Mono',ui-monospace,monospace;}`
     + `@media (max-width:1000px){.stage{transform-origin:top left;}}`
     + `table{border-collapse:collapse;color:inherit;font-size:12px;}th,td{border:1px solid currentColor;padding:2px 6px;}`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><style>${style}</style></head><body>${body}</body></html>`;

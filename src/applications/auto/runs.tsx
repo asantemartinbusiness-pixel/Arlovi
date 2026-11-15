@@ -61,14 +61,14 @@ export function RunHistory({ context, tab }: { context: ScreenContext; tab: RunT
     <Stack gap={5}>
       {tab === "All" && (
         <StatRow>
-          <Stat label="Runs recorded" value={String(rows.length)} meta={`${workflows.length} automations`} />
-          <Stat label="Completed" value={String(rows.filter((row) => row.run.status === "completed").length)} meta="Every step on the path finished" />
-          <Stat label="Waiting on a person" value={String(rows.filter((row) => row.run.status === "waiting_approval").length)} meta="Paused at an approval gate" />
-          <Stat label="Stopped at a provider" value={String(rows.filter((row) => row.run.status === "blocked" || Number(row.run.fields.blocked ?? 0) > 0).length)} meta="Recorded as not run" />
+          <Stat prov="agent" label="Runs recorded" value={String(rows.length)} meta={`${workflows.length} automations`} />
+          <Stat prov="agent" label="Completed" value={String(rows.filter((row) => row.run.status === "completed").length)} meta="Every step on the path finished" />
+          <Stat prov="human" label="Waiting on a person" value={String(rows.filter((row) => row.run.status === "waiting_approval").length)} meta="Paused at an approval gate" />
+          <Stat prov="unknown" label="Stopped at a provider" value={String(rows.filter((row) => row.run.status === "blocked" || Number(row.run.fields.blocked ?? 0) > 0).length)} meta="Recorded as not run" />
         </StatRow>
       )}
 
-      <Card title={`${tab} runs`} subtitle={`${filtered.length} of ${rows.length}`} flush>
+      <Card eyebrow="RUNS" prov="agent" title={`${tab} runs`} subtitle={`${filtered.length} of ${rows.length}`} flush>
         <DataGrid
           rows={filtered}
           rowId={(row) => row.run.id}
@@ -238,7 +238,7 @@ export function IncidentLink({ context, close }: { context: ScreenContext; close
         </Stack>
       )}
       <Field label="What should be investigated">
-        <TextArea rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder={failing ? failing.message : "Describe what needs attention"} />
+        <TextArea aria-label="What should be investigated" rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder={failing ? failing.message : "Describe what needs attention"} />
       </Field>
       <Button
         variant="primary"
@@ -291,10 +291,10 @@ export function RunDetailHeader({ context }: { context: ScreenContext }) {
       actions={<Pill tone={run.status === "completed" ? "success" : run.status === "failed" ? "danger" : "warning"} dot>{RUN_STATUS_LABELS[run.status as RunStatus] ?? run.status}</Pill>}
     >
       <StatRow>
-        <Stat label="Steps" value={String(stored?.result.steps.length ?? run.fields.steps ?? 0)} meta={`budget ${stored?.result.budget.used ?? "?"} of ${stored?.result.budget.max ?? "?"}`} />
-        <Stat label="Duration" value={`${run.fields.durationMs ?? 0} ms`} meta={context.dateTime(run.at)} />
-        <Stat label="Attempts" value={String(run.fields.attempts ?? 0)} meta="Including retries with backoff" />
-        <Stat label="Record changes" value={String(run.fields.writes ?? 0)} meta={String(run.fields.mode) === "dry" ? "A dry run writes nothing" : "Applied through the normal mutation path"} />
+        <Stat prov="agent" label="Steps" value={String(stored?.result.steps.length ?? run.fields.steps ?? 0)} meta={`budget ${stored?.result.budget.used ?? "?"} of ${stored?.result.budget.max ?? "?"}`} />
+        <Stat prov="agent" label="Duration" value={`${run.fields.durationMs ?? 0} ms`} meta={context.dateTime(run.at)} />
+        <Stat prov="agent" label="Attempts" value={String(run.fields.attempts ?? 0)} meta="Including retries with backoff" />
+        <Stat prov="posted" label="Record changes" value={String(run.fields.writes ?? 0)} meta={String(run.fields.mode) === "dry" ? "A dry run writes nothing" : "Applied through the normal mutation path"} />
       </StatRow>
       {workflow && (
         <Row gap={2} style={{ marginBlockStart: "var(--space-3)" }}>
@@ -334,10 +334,10 @@ export function RunDetail({ context }: { context: ScreenContext }) {
   if (context.tab === "Inputs") {
     return (
       <Stack gap={4}>
-        <Card title="Variables bound during the run" subtitle="What each step could read">
+        <Card eyebrow="BINDINGS" prov="agent" title="Variables bound during the run" subtitle="What each step could read">
           <RunBindings run={result} />
         </Card>
-        <Card title="Input per step" subtitle={`${result.steps.length} steps`}>
+        <Card eyebrow="INPUTS" prov="agent" title="Input per step" subtitle={`${result.steps.length} steps`}>
           <Stack gap={3}>
             {result.steps.map((step) => (
               <div key={`${step.nodeId}-${step.index}`}>
@@ -355,7 +355,7 @@ export function RunDetail({ context }: { context: ScreenContext }) {
 
   if (context.tab === "Outputs") {
     return (
-      <Card title="Output per step" subtitle="What each step produced, and what it asked to write">
+      <Card eyebrow="OUTPUTS" prov="agent" title="Output per step" subtitle="What each step produced, and what it asked to write">
         <Stack gap={3}>
           {result.steps.map((step) => (
             <div key={`${step.nodeId}-${step.index}`}>
@@ -374,7 +374,7 @@ export function RunDetail({ context }: { context: ScreenContext }) {
   if (context.tab === "Logs") {
     return (
       <Grid>
-        <Card span={7} title="Activity written by this run" subtitle={`${events.length} entr${events.length === 1 ? "y" : "ies"} in the audit log`}>
+        <Card span={7} eyebrow="AUDIT" prov="posted" title="Activity written by this run" subtitle={`${events.length} entr${events.length === 1 ? "y" : "ies"} in the audit log`}>
           {events.length === 0 ? (
             <Empty title="No audit entry for this run">A live run writes an entry when it changes a record or stops at a provider.</Empty>
           ) : (
@@ -389,7 +389,7 @@ export function RunDetail({ context }: { context: ScreenContext }) {
             </Stack>
           )}
         </Card>
-        <Card span={5} title="Interpreter messages" subtitle="One line per step, in order">
+        <Card span={5} eyebrow="INTERPRETER" prov="agent" title="Interpreter messages" subtitle="One line per step, in order">
           <Stack gap={2}>
             {result.steps.map((step) => (
               <div key={`${step.nodeId}-${step.index}`} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
@@ -493,7 +493,7 @@ export function RunDetail({ context }: { context: ScreenContext }) {
           {result.steps.filter((step) => step.sensitive).length} step{result.steps.filter((step) => step.sensitive).length === 1 ? " is" : "s are"} marked sensitive. Role views shape what this screen offers; they are not an account security boundary.
         </Notice>
       )}
-      <Card title="Event chain" subtitle={`${result.steps.length} steps, ${result.branchesTaken.length} branch decision${result.branchesTaken.length === 1 ? "" : "s"}`}>
+      <Card eyebrow="TIMELINE" prov="agent" title="Event chain" subtitle={`${result.steps.length} steps, ${result.branchesTaken.length} branch decision${result.branchesTaken.length === 1 ? "" : "s"}`}>
         <RunTimeline
           run={result}
           context={context}
@@ -515,7 +515,7 @@ export function NodeTrace({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <Field label="Step">
-        <Select value={String(index)} onChange={(event) => setIndex(Number(event.target.value))}>
+        <Select aria-label="Step" value={String(index)} onChange={(event) => setIndex(Number(event.target.value))}>
           {stored.result.steps.map((item, position) => <option key={`${item.nodeId}-${position}`} value={position}>{position + 1}. {item.label} — {item.status}</option>)}
         </Select>
       </Field>

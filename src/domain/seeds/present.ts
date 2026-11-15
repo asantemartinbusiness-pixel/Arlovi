@@ -200,7 +200,7 @@ registerSeed("present", (context) => {
   return {
     records: [
       context.rec({
-        org: "nl", collection: "decks", n: 20, title: "Winter trade pitch",
+        org: "nl", collection: "decks", n: 320, title: "Winter trade pitch",
         status: "in_review", owner: "Priya Shah",
         summary: "Five slides for the Clerkenwell and Harrow meetings.",
         tags: ["pitch", "sales"],
@@ -208,7 +208,7 @@ registerSeed("present", (context) => {
         body: deck,
       }),
       context.rec({
-        org: "nl", collection: "decks", n: 21, title: "Northline brand master",
+        org: "nl", collection: "decks", n: 321, title: "Northline brand master",
         status: "published", owner: "Maya Chen",
         summary: "One slide per master layout, for reference.",
         tags: ["template", "brand"],
@@ -216,7 +216,7 @@ registerSeed("present", (context) => {
         body: masterDeck,
       }),
       context.rec({
-        org: "nl", collection: "decks", n: 22, title: "Imported: Harbor distribution",
+        org: "nl", collection: "decks", n: 322, title: "Imported: Harbor distribution",
         status: "draft", owner: "Maya Chen",
         summary: "Imported deck with font and media substitutions disclosed.",
         tags: ["import"],
@@ -224,7 +224,7 @@ registerSeed("present", (context) => {
         body: imported,
       }),
       context.rec({
-        org: "hb", collection: "decks", n: 20, title: "US launch readiness",
+        org: "hb", collection: "decks", n: 320, title: "US launch readiness",
         status: "draft", owner: "Elena Ward",
         summary: "Landed cost, territory and the first three accounts.",
         tags: ["launch"],

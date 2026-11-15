@@ -104,14 +104,14 @@ export function AssetLibrary({ context, tab }: { context: ScreenContext; tab: Li
 
   const toolbar = (
     <Row gap={2} wrap>
-      <TextInput aria-label="Search the library" placeholder="Search name, tag, licensor" value={query} onChange={(event) => setQuery(event.target.value)} style={{ minWidth: 220 }} />
+      <TextInput aria-label="Search the library" placeholder="Search name, tag, licensor" value={query} onChange={(event) => setQuery(event.target.value)} style={{ width: "auto", minWidth: 240, flex: "1 1 240px" }} />
       <Segmented
         label="Layout"
         value={view}
         onChange={setView}
         options={[{ value: "grid", label: "Grid" }, { value: "list", label: "List" }]}
       />
-      <Select aria-label="Group by" value={group} onChange={(event) => setGroup(event.target.value as typeof group)}>
+      <Select aria-label="Group by" value={group} onChange={(event) => setGroup(event.target.value as typeof group)} style={{ width: "auto", minWidth: 170 }}>
         <option value="none">No grouping</option>
         <option value="kind">Group by type</option>
         <option value="licence">Group by licence</option>
@@ -122,6 +122,7 @@ export function AssetLibrary({ context, tab }: { context: ScreenContext; tab: Li
 
   return (
     <Stack gap={4}>
+      <LibraryStats context={context} />
       {expired.length > 0 && (
         <Notice
           tone="warning"
@@ -134,7 +135,7 @@ export function AssetLibrary({ context, tab }: { context: ScreenContext; tab: Li
       )}
 
       {view === "list" ? (
-        <Card title={tab} subtitle={`${rows.length} of ${data.assets.length} assets`} flush>
+        <Card eyebrow="LIBRARY" prov="posted" title={tab} subtitle={`${rows.length} of ${data.assets.length} assets`} flush>
           <DataGrid
             rows={rows}
             rowId={(row) => row.id}
@@ -164,7 +165,7 @@ export function AssetLibrary({ context, tab }: { context: ScreenContext; tab: Li
               { key: "file", header: "File", hideBelow: 1200, cell: (row) => <FileStateTag record={row} /> },
               { key: "licence", header: "Licence", cell: (row) => <Pill tone={licenceTone(licence(row, now).state)}>{licence(row, now).label}</Pill>, sortValue: (row) => String(row.fields.licenceExpiry ?? "~") },
               { key: "uses", header: "Uses", align: "end", cell: (row) => String(usedIn(row).length), sortValue: (row) => usedIn(row).length },
-              { key: "updated", header: "Changed", align: "end", hideBelow: 1280, cell: (row) => context.relative(row.updatedAt), sortValue: (row) => row.updatedAt },
+              { key: "updated", header: "Changed", align: "end", hideBelow: 1280, cell: (row) => <span className="ds-num">{context.relative(row.updatedAt)}</span>, sortValue: (row) => row.updatedAt },
             ]}
             bulkActions={[
               { label: "Inspect", onRun: (selected) => { context.select(selected[0]?.id); context.openOverlay("asset inspector", { id: selected[0]?.id }); }, disabled: (selected) => selected.length !== 1 },
@@ -184,7 +185,7 @@ export function AssetLibrary({ context, tab }: { context: ScreenContext; tab: Li
         </Card>
       ) : (
         <Stack gap={4}>
-          <Card title={tab} subtitle={`${rows.length} of ${data.assets.length} assets`}>{toolbar}</Card>
+          <Card eyebrow="LIBRARY" prov="posted" title={tab} subtitle={`${rows.length} of ${data.assets.length} assets`}>{toolbar}</Card>
           {groups.map((bucket) => (
             <Stack key={bucket.label} gap={3}>
               {group !== "none" && <h3 style={{ textTransform: "capitalize" }}>{bucket.label.replace(/_/g, " ")} · {bucket.rows.length}</h3>}
@@ -194,6 +195,8 @@ export function AssetLibrary({ context, tab }: { context: ScreenContext; tab: Li
                   return (
                     <Card
                       key={row.id}
+                      eyebrow={`${String(row.fields.kind ?? "asset")}`.toUpperCase()}
+                      prov={fileState(row) === "metadata_only" ? "unknown" : row.fields.proposedBy ? "agent" : "human"}
                       span={3}
                       className={context.selectedId === row.id ? "ds-panel" : undefined}
                       title={
@@ -205,7 +208,7 @@ export function AssetLibrary({ context, tab }: { context: ScreenContext; tab: Li
                           {row.title}
                         </button>
                       }
-                      subtitle={`${String(row.fields.kind ?? "")} · ${String(row.fields.format ?? "").toUpperCase()}`}
+                      subtitle={[String(row.fields.kind ?? "asset"), String(row.fields.format ?? "").toUpperCase()].filter(Boolean).join(" · ")}
                     >
                       <Stack gap={3}>
                         <AssetPreview record={row} height={132} fit={String(row.fields.kind) === "template" ? "contain" : "cover"} />
@@ -234,7 +237,7 @@ export function AssetLibrary({ context, tab }: { context: ScreenContext; tab: Li
   );
 }
 
-export function LibraryStrip({ context }: { context: ScreenContext }) {
+export function LibraryStats({ context }: { context: ScreenContext }) {
   const data = useAssets();
   const { now } = useWorkspace();
   const live = data.assets.filter((row) => row.status !== "archived");
@@ -242,11 +245,26 @@ export function LibraryStrip({ context }: { context: ScreenContext }) {
   const noFile = live.filter((row) => fileState(row) === "metadata_only").length;
   return (
     <StatRow>
-      <Stat label="Assets" value={String(live.length)} meta={`${data.assets.length - live.length} archived`} />
-      <Stat label="Licences expiring" value={String(live.filter((row) => ["expiring", "expired"].includes(licence(row, now).state)).length)} meta="Within 30 days or already past" onClick={() => context.navigate(`/o/${context.org.slug}/asset/governance`)} />
-      <Stat label="Bytes actually stored" value={formatBytes(stored)} meta={`${noFile} catalogued without a file`} />
-      <Stat label="Brand kits" value={String(data.brands.length)} meta={`${data.brands.filter((row) => row.fields.master === true).length} master`} onClick={() => context.navigate(`/o/${context.org.slug}/asset/brands`)} />
+      <Stat prov="posted" label="Assets" value={String(live.length)} meta={`${data.assets.length - live.length} archived`} />
+      <Stat prov="posted" label="Licences expiring" value={String(live.filter((row) => ["expiring", "expired"].includes(licence(row, now).state)).length)} meta="Within 30 days or already past" onClick={() => context.navigate(`/o/${context.org.slug}/asset/governance`)} />
+      <Stat prov="posted" label="Bytes actually stored" value={formatBytes(stored)} meta={`${noFile} catalogued without a file`} />
+      <Stat prov="human" label="Brand kits" value={String(data.brands.length)} meta={`${data.brands.filter((row) => row.fields.master === true).length} master`} onClick={() => context.navigate(`/o/${context.org.slug}/asset/brands`)} />
     </StatRow>
+  );
+}
+
+/** One compact line for the status strip: how to read what the library shows. */
+export function LibraryStripLine({ context }: { context: ScreenContext }) {
+  const data = useAssets();
+  const latest = [...data.assets].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  return (
+    <>
+      <span>Previews are drawn in this browser from each record</span>
+      <span>nothing is uploaded anywhere</span>
+      <span>library last changed <strong className="ds-num">{latest ? context.relative(latest.updatedAt) : "never"}</strong></span>
+      <span className="ds-grow" />
+      <span>An expired licence blocks publishing, not browsing</span>
+    </>
   );
 }
 
@@ -423,7 +441,7 @@ export function RightsCheck({ context }: { context: ScreenContext }) {
       {records.map((record) => {
         const state = licence(record, now);
         return (
-          <Card key={record.id} title={record.title} subtitle={String(record.fields.licensor ?? "")}>
+          <Card key={record.id} eyebrow="RIGHTS" prov="human" title={record.title} subtitle={String(record.fields.licensor ?? "")}>
             <Stack gap={3}>
               <Row gap={2} wrap>
                 <Pill tone={licenceTone(state.state)}>{state.label}</Pill>
@@ -472,7 +490,7 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
         <Notice tone="info" title="No asset is open">Choose one from the library to see its detail.</Notice>
         <Grid>
           {data.assets.slice(0, 8).map((row) => (
-            <Card key={row.id} span={3} title={row.title} subtitle={String(row.fields.kind ?? "")}>
+            <Card key={row.id} eyebrow="ASSET" prov="human" span={3} title={row.title} subtitle={String(row.fields.kind ?? "")}>
               <Stack gap={3}>
                 <AssetPreview record={row} height={110} />
                 <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/asset/assets/${row.id}`)}>Open</Button>
@@ -492,7 +510,7 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
   if (tab === "Overview") {
     return (
       <Grid>
-        <Card span={7} title="Preview" subtitle={`${String(record.fields.width ?? "?")} × ${String(record.fields.height ?? "?")} · ${String(record.fields.format ?? "").toUpperCase()}`}>
+        <Card eyebrow="PREVIEW" prov={fileState(record) === "metadata_only" ? "unknown" : "human"} span={7} title="Preview" subtitle={`${String(record.fields.width ?? "?")} × ${String(record.fields.height ?? "?")} · ${String(record.fields.format ?? "").toUpperCase()}`}>
           <Stack gap={3}>
             <AssetPreview record={record} height={340} fit={String(record.fields.kind) === "template" ? "contain" : "cover"} />
             <FileStateTag record={record} />
@@ -509,8 +527,8 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
             )}
           </Stack>
         </Card>
-        <Stack gap={4}>
-          <Card span={5} title="Metadata">
+        <Stack gap={4} className="ds-col-5">
+          <Card eyebrow="METADATA" prov="posted" span={5} title="Metadata">
             <Properties rows={[
               { label: "Type", value: String(record.fields.kind ?? "") },
               { label: "Format", value: String(record.fields.format ?? "").toUpperCase() },
@@ -523,7 +541,7 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
               { label: "Last changed", value: `${context.relative(record.updatedAt)} by ${record.updatedBy}` },
             ]} />
           </Card>
-          <Card span={5} title="Palette in the record">
+          <Card eyebrow="PALETTE" prov="posted" span={5} title="Palette in the record">
             <Row gap={2} wrap>
               {palette(record).map((colour) => (
                 <Row key={colour} gap={1}>
@@ -534,7 +552,7 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
             </Row>
           </Card>
           {parent && (
-            <Card span={5} title="Derived from">
+            <Card eyebrow="LINEAGE" prov="posted" span={5} title="Derived from">
               <Row gap={2}>
                 <span className="ds-grow">{parent.title}</span>
                 <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/asset/assets/${parent.id}`)}>Open</Button>
@@ -558,7 +576,7 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
         ) : (
           <Grid>
             {variants.map((variant) => (
-              <Card key={variant.id} span={4} title={variant.title} subtitle={`${String(variant.fields.width)} × ${String(variant.fields.height)} · ${String(variant.fields.crop ?? "")}`}>
+              <Card key={variant.id} eyebrow="VARIANT" prov="human" span={4} title={variant.title} subtitle={`${String(variant.fields.width)} × ${String(variant.fields.height)} · ${String(variant.fields.crop ?? "")}`}>
                 <Stack gap={3}>
                   <AssetPreview record={variant} height={120} />
                   <Properties rows={[
@@ -579,7 +597,7 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
     const campaigns = data.campaigns.filter((row) => uses.some((use) => row.title.toLowerCase().includes(use.toLowerCase().split(",")[0])));
     return (
       <Grid>
-        <Card span={7} title="Where this asset is used" subtitle={`${uses.length} recorded ${uses.length === 1 ? "use" : "uses"}`}>
+        <Card eyebrow="USAGE" prov="posted" span={7} title="Where this asset is used" subtitle={`${uses.length} recorded ${uses.length === 1 ? "use" : "uses"}`}>
           {uses.length === 0 ? (
             <Empty title="Not used anywhere yet" icon={<Images size={20} />}>Uses are recorded on the asset when a surface references it.</Empty>
           ) : (
@@ -593,15 +611,15 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
             </Stack>
           )}
         </Card>
-        <Stack gap={4}>
-          <Card span={5} title="Replacing this asset">
+        <Stack gap={4} className="ds-col-5">
+          <Card eyebrow="REPLACEMENT" prov="human" span={5} title="Replacing this asset">
             <Stack gap={3}>
               <p className="ds-subtle">Replacing a shared asset changes every surface above at once.</p>
               <Button variant="secondary" onClick={() => context.openOverlay("replacement impact", { id: record.id })}>Preview a replacement</Button>
             </Stack>
           </Card>
           {campaigns.length > 0 && (
-            <Card span={5} title="Matching campaigns">
+            <Card eyebrow="CAMPAIGNS" prov="posted" span={5} title="Matching campaigns">
               <Stack gap={2}>
                 {campaigns.map((campaign) => <Row key={campaign.id} gap={2}><span className="ds-grow ds-truncate">{campaign.title}</span><Pill>{campaign.status}</Pill></Row>)}
               </Stack>
@@ -615,7 +633,7 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
   if (tab === "Rights") {
     return (
       <Grid>
-        <Card span={7} title="Licence" subtitle={state.label}>
+        <Card eyebrow="LICENCE" prov="human" span={7} title="Licence" subtitle={state.label}>
           <Stack gap={3}>
             <Properties rows={[
               { label: "Licence", value: String(record.fields.licence ?? "Not recorded").replace(/_/g, " ") },
@@ -628,7 +646,7 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
             <Button variant="primary" onClick={() => context.openOverlay("rights form", { id: record.id })}>Update the rights</Button>
           </Stack>
         </Card>
-        <Card span={5} title="What the licence allows here">
+        <Card eyebrow="PERMITTED USE" prov="human" span={5} title="What the licence allows here">
           <Stack gap={3}>
             {state.state === "expired" ? (
               <Notice tone="danger" title="Publishing is blocked">The licence has lapsed, so this asset cannot go into anything published, exported for press, or used in a transformation job.</Notice>
@@ -644,7 +662,7 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
   }
 
   return (
-    <Card title="Versions" subtitle={`${record.history.length} earlier ${record.history.length === 1 ? "version" : "versions"} kept with this record`} flush>
+    <Card eyebrow="VERSIONS" prov="posted" title="Versions" subtitle={`${record.history.length} earlier ${record.history.length === 1 ? "version" : "versions"} kept with this record`} flush>
       {record.history.length === 0 ? (
         <Empty title="No earlier versions" icon={<Images size={20} />}>
           This asset has not been changed since it was created on {context.date(record.createdAt)}.
@@ -656,7 +674,7 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
           label="Asset versions"
           filterable={false}
           columns={[
-            { key: "at", header: "When", cell: (row) => context.dateTime(row.at), sortValue: (row) => row.at },
+            { key: "at", header: "When", cell: (row) => <span className="ds-num">{context.dateTime(row.at)}</span>, sortValue: (row) => row.at },
             { key: "title", header: "Title then", primary: true, cell: (row) => row.title },
             { key: "status", header: "Status", cell: (row) => <Pill>{row.status}</Pill> },
             { key: "summary", header: "Summary", hideBelow: 1100, cell: (row) => row.summary },
@@ -673,7 +691,7 @@ export function VariantEditor({ context, close }: { context: ScreenContext; clos
   const payload = context.overlayPayload as { id?: string } | undefined;
   const source = data.assets.find((row) => row.id === (payload?.id ?? context.params.id ?? context.selectedId));
   const presets = data.transforms.filter((row) => row.fields.kind === "preset" && row.status === "published");
-  const [presetId, setPresetId] = useState(presets[0]?.id ?? "");
+  const [presetId, setPresetId] = useSeeded(presets[0]?.id ?? "");
   const [width, setWidth] = useState(1200);
   const [height, setHeight] = useState(630);
   const [crop, setCrop] = useState("centre");
@@ -771,10 +789,10 @@ export function RightsForm({ context, close }: { context: ScreenContext; close: 
   const data = useAssets();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const record = data.assets.find((row) => row.id === (payload?.id ?? context.params.id ?? context.selectedId));
-  const [kind, setKind] = useState(String(record?.fields.licence ?? "owned"));
-  const [licensor, setLicensor] = useState(String(record?.fields.licensor ?? ""));
-  const [reference, setReference] = useState(String(record?.fields.licenceRef ?? ""));
-  const [expiry, setExpiry] = useState(String(record?.fields.licenceExpiry ?? "").slice(0, 10));
+  const [kind, setKind] = useSeeded(String(record?.fields.licence ?? "owned"));
+  const [licensor, setLicensor] = useSeeded(String(record?.fields.licensor ?? ""));
+  const [reference, setReference] = useSeeded(String(record?.fields.licenceRef ?? ""));
+  const [expiry, setExpiry] = useSeeded(String(record?.fields.licenceExpiry ?? "").slice(0, 10));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   if (!record) return <Empty title="No asset" />;
@@ -848,8 +866,8 @@ export function ReplacementImpact({ context, close }: { context: ScreenContext; 
       </Field>
       {replacement && (
         <Grid>
-          <Card span={6} title="Now" subtitle={record.title}><AssetPreview record={record} height={140} /></Card>
-          <Card span={6} title="After" subtitle={replacement.title}><AssetPreview record={replacement} height={140} /></Card>
+          <Card eyebrow="NOW" prov="human" span={6} title="Now" subtitle={record.title}><AssetPreview record={record} height={140} /></Card>
+          <Card eyebrow="AFTER" prov="human" span={6} title="After" subtitle={replacement.title}><AssetPreview record={replacement} height={140} /></Card>
         </Grid>
       )}
       <Notice tone="info" title="The original is kept, not overwritten">
@@ -908,4 +926,19 @@ export function downloadAsset(context: ScreenContext, record: Rec | undefined, n
   link.click();
   void context.mutate.log(`Asset downloaded: ${record.title}.`, { entityId: record.id, type: "asset.download", capability: "ready_local" });
   context.toast("Downloaded", fileState(record) === "uploaded" ? "The file you imported was written back out." : "The stored or drawn SVG was written to a file.");
+}
+
+/* ------------------------------------------------------------------ *
+ * Local primitive: state seeded from a record that loads asynchronously.
+ * Asset overlays mount a render before their record arrives, so a plain
+ * useState would capture an empty value and show a blank form.
+ * ------------------------------------------------------------------ */
+export function useSeeded<T extends string | number | boolean>(seed: T): [T, (next: T) => void] {
+  const [value, setValue] = useState(seed);
+  const [seen, setSeen] = useState(seed);
+  if (seed !== seen) {
+    setSeen(seed);
+    setValue(seed);
+  }
+  return [value, setValue];
 }

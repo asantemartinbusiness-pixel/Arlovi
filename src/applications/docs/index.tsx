@@ -192,7 +192,7 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
         </Notice>
         <Grid>
           {rows.map((record) => (
-            <Card key={record.id} span={4} title={record.title} subtitle={record.summary}
+            <Card key={record.id} span={4} eyebrow="TEMPLATE" prov="human" title={record.title} subtitle={record.summary}
               actions={<Pill tone={record.status === "published" ? "success" : "neutral"}>{record.status}</Pill>}
               footer={<>
                 <Button size="sm" variant="primary" onClick={() => context.openOverlay("New doc", { templateId: record.id })}>Use</Button>
@@ -215,10 +215,10 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
     <Stack gap={4}>
       <Row gap={3} wrap>
         <Field label="Search" hint="Confidential documents match on title and tags only.">
-          <TextInput type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles and text" />
+          <TextInput aria-label="Search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles and text" />
         </Field>
         <Field label="Folder">
-          <Select value={folder} onChange={(event) => setFolder(event.target.value)}>
+          <Select aria-label="Folder" value={folder} onChange={(event) => setFolder(event.target.value)}>
             {folders.map((name) => <option key={name} value={name}>{name}</option>)}
           </Select>
         </Field>
@@ -812,7 +812,7 @@ function OutlineScreen({ context, tab }: { context: ScreenContext; tab: "Heading
   if (tab === "Bookmarks") {
     return (
       <Grid>
-        <Card span={8} title="Bookmarks" subtitle={`${editor.model.bookmarks.length} saved positions`}>
+        <Card span={8} eyebrow="BOOKMARKS" prov="human" title="Bookmarks" subtitle={`${editor.model.bookmarks.length} saved positions`}>
           {editor.model.bookmarks.length === 0 ? (
             <Empty title="No bookmarks" icon={<CornerDownRight size={20} />}>Bookmark a block from the editor inspector to jump straight back to it.</Empty>
           ) : (
@@ -833,7 +833,7 @@ function OutlineScreen({ context, tab }: { context: ScreenContext; tab: "Heading
             </Stack>
           )}
         </Card>
-        <Card span={4} title="Position" subtitle="Where each bookmark sits">
+        <Card span={4} eyebrow="POSITION" prov="human" title="Position" subtitle="Where each bookmark sits">
           <Properties rows={editor.model.bookmarks.map((bookmark) => ({
             label: bookmark.label,
             value: `Block ${blockIndex(editor.model, bookmark.blockId) + 1} of ${editor.model.blocks.length}`,
@@ -882,7 +882,7 @@ function OutlineScreen({ context, tab }: { context: ScreenContext; tab: "Heading
 
   return (
     <Grid>
-      <Card span={7} title="Heading tree" subtitle={`${outline(editor.model).length} headings · reorder with the arrows or the keyboard`}
+      <Card span={7} eyebrow="OUTLINE" prov="human" title="Heading tree" subtitle={`${outline(editor.model).length} headings · reorder with the arrows or the keyboard`}
         actions={<SaveBadge editor={editor} context={context} />}>
         <OutlineTree
           model={editor.model}
@@ -898,7 +898,7 @@ function OutlineScreen({ context, tab }: { context: ScreenContext; tab: "Heading
         />
         <Notice tone="neutral">The arrows move a whole section: the heading and everything under it until the next heading at the same level or above.</Notice>
       </Card>
-      <Card span={5} title="Sections" subtitle="Word count per section">
+      <Card span={5} eyebrow="SECTIONS" prov="human" title="Sections" subtitle="Word count per section">
         <Stack gap={3}>
           {outline(editor.model).map((node) => (
             <div key={node.blockId}>
@@ -909,7 +909,7 @@ function OutlineScreen({ context, tab }: { context: ScreenContext; tab: "Heading
           {outline(editor.model).length === 0 && <span className="ds-subtle">No sections yet.</span>}
         </Stack>
       </Card>
-      <Card span={12} title="Structure" subtitle={`${warnings.length} finding${warnings.length === 1 ? "" : "s"}`}
+      <Card span={12} eyebrow="STRUCTURE" prov="human" title="Structure" subtitle={`${warnings.length} finding${warnings.length === 1 ? "" : "s"}`}
         footer={<Button size="sm" variant="secondary" disabled={warnings.length === 0} onClick={() => context.openOverlay("document structure warning")}>Review findings</Button>}>
         {warnings.length === 0
           ? <Notice tone="success" title="The outline is sound">Headings start at level one and step down one level at a time.</Notice>
@@ -988,7 +988,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
           />
         )}
         {closed.length > 0 && (
-          <Card title="Decided" subtitle={`${closed.length} change${closed.length === 1 ? "" : "s"}`}>
+          <Card eyebrow="TRACKED CHANGES" prov="human" title="Decided" subtitle={`${closed.length} change${closed.length === 1 ? "" : "s"}`}>
             <Stack gap={2}>
               {closed.map((item) => (
                 <Row key={item.id} gap={2}><Pill tone={item.status === "accepted" ? "success" : "neutral"}>{item.status}</Pill><span className="ds-grow">{item.note}</span><span className="ds-subtle">{item.author}</span></Row>
@@ -1005,7 +1005,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
     const approvals = (record.fields.approvals ? String(record.fields.approvals).split("|").filter(Boolean) : []);
     return (
       <Grid>
-        <Card span={7} title="Approval" subtitle={`Document status: ${record.status.replace("_", " ")}`}>
+        <Card span={7} eyebrow="APPROVAL" prov="human" title="Approval" subtitle={`Document status: ${record.status.replace("_", " ")}`}>
           {mandatoryOpen.length > 0 && (
             <Notice tone="danger" title={`${mandatoryOpen.length} mandatory review${mandatoryOpen.length === 1 ? "" : "s"} is still open`}>
               Approval is blocked while a comment marked “must resolve” is open. Approving would otherwise bury a reviewer's objection without a record of it.
@@ -1035,7 +1035,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
             </Row>
           </Stack>
         </Card>
-        <Card span={5} title="Approval history" subtitle={`${approvals.length} recorded`}>
+        <Card span={5} eyebrow="APPROVAL" prov="posted" title="Approval history" subtitle={`${approvals.length} recorded`}>
           {approvals.length === 0 ? <Empty title="Not approved yet" /> : (
             <Stack gap={2}>
               {approvals.map((entry) => {
@@ -1078,7 +1078,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
   const comments = editor.model.comments;
   return (
     <Grid>
-      <Card span={8} title="Comments" subtitle={`${comments.filter((comment) => !comment.resolved).length} open of ${comments.length}`}
+      <Card span={8} eyebrow="REVIEW" prov="human" title="Comments" subtitle={`${comments.filter((comment) => !comment.resolved).length} open of ${comments.length}`}
         actions={<SaveBadge editor={editor} context={context} />}>
         {comments.length === 0 ? (
           <Empty title="No comments" icon={<MessageSquare size={20} />} action={<Button variant="secondary" onClick={() => context.navigate(context.path("/o/:org/docs/documents/:id", record.id))}>Open the editor</Button>}>
@@ -1133,7 +1133,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
           </Stack>
         )}
       </Card>
-      <Card span={4} title="Reviewers" subtitle="From the workspace roster">
+      <Card span={4} eyebrow="ROSTER" prov="human" title="Reviewers" subtitle="From the workspace roster">
         <Stack gap={2}>
           {members.slice(0, 6).map((member) => {
             const count = comments.filter((comment) => comment.author === member.title).length;
@@ -1176,6 +1176,8 @@ function TemplatesScreen({ context, tab }: { context: ScreenContext; tab: "All" 
           <Card
             key={record.id}
             span={4}
+            eyebrow="TEMPLATE"
+            prov="human"
             title={record.title}
             subtitle={record.summary}
             actions={<Pill tone={record.status === "published" ? "success" : record.status === "retired" ? "neutral" : "warning"}>{record.status}</Pill>}
@@ -1223,7 +1225,7 @@ function PublishScreen({ context, tab }: { context: ScreenContext; tab: "Export"
     const active = editor.model.shares.filter((share) => !share.revokedAt);
     return (
       <Grid>
-        <Card span={7} title="Links" subtitle={`${active.length} active`}>
+        <Card span={7} eyebrow="SHARING" prov="human" title="Links" subtitle={`${active.length} active`}>
           {active.length === 0 ? (
             <Empty title="No link is active" icon={<Link2 size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("link permissions")}>Create a link</Button>}>
               A link created here is bounded to this browser's workspace and is revocable at any time.
@@ -1249,7 +1251,7 @@ function PublishScreen({ context, tab }: { context: ScreenContext; tab: "Export"
             Nothing leaves this browser. A link is a record of intent with a scope and a revocation time; there is no public host to serve it from, so no document is reachable outside this workspace.
           </Notice>
         </Card>
-        <Card span={5} title="Revoked" subtitle={`${editor.model.shares.filter((share) => share.revokedAt).length} links`}>
+        <Card span={5} eyebrow="SHARING" prov="posted" title="Revoked" subtitle={`${editor.model.shares.filter((share) => share.revokedAt).length} links`}>
           {editor.model.shares.filter((share) => share.revokedAt).length === 0 ? <span className="ds-subtle">Nothing has been revoked.</span> : (
             <Stack gap={2}>
               {editor.model.shares.filter((share) => share.revokedAt).map((share) => (
@@ -1266,7 +1268,7 @@ function PublishScreen({ context, tab }: { context: ScreenContext; tab: "Export"
     const signature = String(record.fields.signatureStatus ?? "not_requested");
     return (
       <Grid>
-        <Card span={6} title="Publish in the workspace" subtitle={`Current status: ${record.status.replace("_", " ")}`}>
+        <Card span={6} eyebrow="PUBLISHING" prov="human" title="Publish in the workspace" subtitle={`Current status: ${record.status.replace("_", " ")}`}>
           <Stack gap={3}>
             <Properties rows={[
               { label: "Status", value: <Pill tone={record.status === "published" ? "success" : "neutral"}>{record.status.replace("_", " ")}</Pill> },
@@ -1284,7 +1286,7 @@ function PublishScreen({ context, tab }: { context: ScreenContext; tab: "Export"
             </Row>
           </Stack>
         </Card>
-        <Card span={6} title="Signing" subtitle="Electronic signature">
+        <Card span={6} eyebrow="SIGNING" title="Signing" subtitle="Electronic signature">
           <Stack gap={3}>
             <Notice tone="warning" title={`${signing?.provider ?? "Signature provider"} is not connected`}>
               {signing?.localEquivalent ?? "The request is recorded locally with its signatories."} No document has been sent for signature.
@@ -1304,7 +1306,7 @@ function PublishScreen({ context, tab }: { context: ScreenContext; tab: "Export"
     const related = events.filter((item) => item.parentId === record.id);
     return (
       <Stack gap={4}>
-        <Card title="Export and publish history" subtitle="Recorded on the document">
+        <Card eyebrow="HISTORY" prov="posted" title="Export and publish history" subtitle="Recorded on the document">
           {record.history.length === 0 && related.length === 0 ? <Empty title="Nothing recorded yet" /> : (
             <Stack gap={2}>
               {record.history.map((snapshot) => (
@@ -1314,7 +1316,7 @@ function PublishScreen({ context, tab }: { context: ScreenContext; tab: "Export"
           )}
         </Card>
         {related.length > 0 && (
-          <Card title="Recovery versions" subtitle={`${related.length} created from autosave conflicts`}>
+          <Card eyebrow="RECOVERY" prov="human" title="Recovery versions" subtitle={`${related.length} created from autosave conflicts`}>
             <Stack gap={2}>
               {related.map((item) => (
                 <Row key={item.id} gap={2}><span className="ds-grow">{item.title}</span><Button size="sm" variant="ghost" onClick={() => context.navigate(context.path("/o/:org/docs/documents/:id", item.id))}>Open</Button></Row>
@@ -1330,10 +1332,10 @@ function PublishScreen({ context, tab }: { context: ScreenContext; tab: "Export"
   const stats = documentStats(editor.model);
   return (
     <Grid>
-      <Card span={7} title="Preview" subtitle={`${pages.pages.length} page${pages.pages.length === 1 ? "" : "s"} · ${stats.words} words`}>
+      <Card span={7} eyebrow="PAGINATION" prov="human" title="Preview" subtitle={`${pages.pages.length} page${pages.pages.length === 1 ? "" : "s"} · ${stats.words} words`}>
         <PaginationPreview model={editor.model} />
       </Card>
-      <Card span={5} title="Export" subtitle="Deterministic renderers, run in this browser">
+      <Card span={5} eyebrow="EXPORT" title="Export" subtitle="Deterministic renderers, run in this browser">
         <Stack gap={3}>
           <Properties rows={[
             { label: "HTML", value: "Semantic headings, lists, tables and image references" },
@@ -1422,10 +1424,10 @@ function InsightsScreen({ context, tab }: { context: ScreenContext; tab: "Writin
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Words" value={String(stats.words)} meta={`${stats.paragraphs} paragraphs`} />
-          <Stat label="Sentences" value={String(stats.sentences)} meta={stats.averageSentenceWords ? `${stats.averageSentenceWords} words on average` : "No sentence ending found"} />
-          <Stat label="Long paragraphs" value={String(stats.longParagraphs)} meta="Over 90 words" />
-          <Stat label="Reading time" value={`${stats.readingMinutes} min`} meta="At 220 words a minute" />
+          <Stat prov="human" label="Words" value={String(stats.words)} meta={`${stats.paragraphs} paragraphs`} />
+          <Stat prov="human" label="Sentences" value={String(stats.sentences)} meta={stats.averageSentenceWords ? `${stats.averageSentenceWords} words on average` : "No sentence ending found"} />
+          <Stat prov="human" label="Long paragraphs" value={String(stats.longParagraphs)} meta="Over 90 words" />
+          <Stat prov="human" label="Reading time" value={`${stats.readingMinutes} min`} meta="At 220 words a minute" />
         </StatRow>
         <Notice tone="warning" title={`${model?.provider ?? "Model provider"} is not connected`}>
           Every suggestion below is computed from the text in this browser by a deterministic rule. Nothing is generated, and nothing was sent anywhere.
@@ -1458,7 +1460,7 @@ function InsightsScreen({ context, tab }: { context: ScreenContext; tab: "Writin
             }]}
           />
         )}
-        <Card title="Sentence length" subtitle="Per section, from the text in this browser">
+        <Card eyebrow="WRITING" prov="human" title="Sentence length" subtitle="Per section, from the text in this browser">
           <BarChart
             title="Words per section"
             height={200}
@@ -1493,9 +1495,9 @@ function InsightsScreen({ context, tab }: { context: ScreenContext; tab: "Writin
           Each number in the document is matched against workbooks, invoices and products in this workspace. Where nothing matches, the claim is listed as unsupported. No citation is invented and no legal or financial advice is produced.
         </Notice>
         <StatRow>
-          <Stat label="Figures in the text" value={String(claims.length)} />
-          <Stat label="Matched to a record" value={String(claims.length - unsupported.length)} />
-          <Stat label="Unsupported" value={String(unsupported.length)} meta={unsupported.length ? "Needs a source" : "Everything traced"} />
+          <Stat prov="human" label="Figures in the text" value={String(claims.length)} />
+          <Stat prov="human" label="Matched to a record" value={String(claims.length - unsupported.length)} />
+          <Stat prov="human" label="Unsupported" value={String(unsupported.length)} meta={unsupported.length ? "Needs a source" : "Everything traced"} />
         </StatRow>
         {claims.length === 0 ? <Empty title="No figures in the text" icon={<Search size={20} />}>Percentages, money and counted quantities are checked. This document has none.</Empty> : (
           <DataGrid
@@ -1524,7 +1526,7 @@ function InsightsScreen({ context, tab }: { context: ScreenContext; tab: "Writin
     const sentenceCase = editor.model.blocks.filter((block) => headingLevel(block) && visibleText(block).trim().split(/\s+/).filter((word) => /^[A-Z]/.test(word)).length > 2);
     return (
       <Grid>
-        <Card span={6} title="House style" subtitle="Checked against the rules kept in this workspace">
+        <Card span={6} eyebrow="BRAND" prov="human" title="House style" subtitle="Checked against the rules kept in this workspace">
           <Stack gap={3}>
             {hits.length === 0
               ? <Notice tone="success" title="No banned phrase found">The marketing vocabulary list is clean for this document.</Notice>
@@ -1533,7 +1535,7 @@ function InsightsScreen({ context, tab }: { context: ScreenContext; tab: "Writin
             {sentenceCase.length > 0 && <Notice tone="info">{sentenceCase.length} heading{sentenceCase.length === 1 ? " uses" : "s use"} title case. House style is sentence case.</Notice>}
           </Stack>
         </Card>
-        <Card span={6} title="Readability" subtitle="Structural, not a score out of a hat">
+        <Card span={6} eyebrow="READABILITY" prov="human" title="Readability" subtitle="Structural, not a score out of a hat">
           <Properties rows={[
             { label: "Average sentence", value: stats.averageSentenceWords ? `${stats.averageSentenceWords} words` : "Unavailable — no sentence ending found" },
             { label: "Paragraphs over 90 words", value: String(stats.longParagraphs) },
@@ -1615,17 +1617,17 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
       }}
     >
       <Field label="Title" required hint="Shown in the library, the outline and every export.">
-        <TextInput value={title} onChange={(event) => setTitle(event.target.value)} invalid={duplicate} required autoFocus />
+        <TextInput aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} invalid={duplicate} required autoFocus />
       </Field>
       {duplicate && <Notice tone="danger" title="A document already has that title">Two documents with the same title make a search result ambiguous.</Notice>}
       <Field label="Start from" hint="A template fills the sections and leaves the company fields as tokens.">
-        <Select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
+        <Select aria-label="Start from" value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
           <option value="">Blank document</option>
           {templates.map((record) => <option key={record.id} value={record.id}>{record.title}</option>)}
         </Select>
       </Field>
       <Field label="Folder">
-        <Select value={folder} onChange={(event) => setFolder(event.target.value)}>
+        <Select aria-label="Folder" value={folder} onChange={(event) => setFolder(event.target.value)}>
           {["Unfiled", "Policies", "Proposals", "Operations", "Legal", "Procurement"].map((name) => <option key={name} value={name}>{name}</option>)}
         </Select>
       </Field>
@@ -1657,7 +1659,7 @@ function FolderSelector({ context, close }: { context: ScreenContext; close: () 
         <>
           <Properties rows={targets.map((record) => ({ label: record.title, value: String(record.fields.folder ?? "Unfiled") }))} />
           <Field label="Move to">
-            <Select value={folder} onChange={(event) => setFolder(event.target.value)}>
+            <Select aria-label="Move to" value={folder} onChange={(event) => setFolder(event.target.value)}>
               {["Unfiled", "Policies", "Proposals", "Operations", "Legal", "Procurement"].map((name) => <option key={name} value={name}>{name}</option>)}
             </Select>
           </Field>
@@ -1690,13 +1692,13 @@ function SharingOverlay({ context, close }: { context: ScreenContext; close: () 
       }}
     >
       <Field label="Who can open it">
-        <Select value={scope} onChange={(event) => setScope(event.target.value as "workspace" | "link")}>
+        <Select aria-label="Who can open it" value={scope} onChange={(event) => setScope(event.target.value as "workspace" | "link")}>
           <option value="workspace">This workspace only</option>
           <option value="link">Anyone with the link</option>
         </Select>
       </Field>
       <Field label="Why" hint="Recorded with the link so a later reviewer knows what it was for.">
-        <TextInput value={note} onChange={(event) => setNote(event.target.value)} placeholder="Sent to the Clerkenwell project manager" />
+        <TextInput aria-label="Why" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Sent to the Clerkenwell project manager" />
       </Field>
       {scope === "link" && (
         <Notice tone="warning" title="A link here is a local record, not a public URL">
@@ -1735,7 +1737,7 @@ function TrashConfirm({ context, close }: { context: ScreenContext; close: () =>
       <Properties rows={targets.map((record) => ({ label: record.title, value: `${record.history.length} versions` }))} />
       {signed.length > 0 && <Notice tone="warning" title="A signed document is in this selection">Deleting a signed document removes the only copy of what was agreed.</Notice>}
       <Field label="Type delete to confirm" required>
-        <TextInput value={confirm} onChange={(event) => setConfirm(event.target.value)} placeholder="delete" />
+        <TextInput aria-label="Type delete to confirm" value={confirm} onChange={(event) => setConfirm(event.target.value)} placeholder="delete" />
       </Field>
     </form>
   );
@@ -1776,9 +1778,9 @@ function StylesOverlay({ context, close }: { context: ScreenContext; close: () =
             <div key={style.id} className="ds-panel" style={{ padding: "var(--space-3)" }}>
               <Row gap={2}><strong className="ds-grow">{style.name}</strong><Pill tone={used ? "info" : "neutral"}>{used} block{used === 1 ? "" : "s"}</Pill></Row>
               <Row gap={2} wrap style={{ marginBlockStart: "var(--space-2)" }}>
-                <Field label="Size"><TextInput inputMode="numeric" align="end" value={edit.fontSize} onChange={(event) => setEdits((current) => ({ ...current, [style.id]: { ...edit, fontSize: event.target.value } }))} /></Field>
-                <Field label="Weight"><TextInput inputMode="numeric" align="end" value={edit.weight} onChange={(event) => setEdits((current) => ({ ...current, [style.id]: { ...edit, weight: event.target.value } }))} /></Field>
-                <Field label="Space before"><TextInput inputMode="numeric" align="end" value={edit.spaceBefore} onChange={(event) => setEdits((current) => ({ ...current, [style.id]: { ...edit, spaceBefore: event.target.value } }))} /></Field>
+                <Field label="Size"><TextInput aria-label="Size" inputMode="numeric" align="end" value={edit.fontSize} onChange={(event) => setEdits((current) => ({ ...current, [style.id]: { ...edit, fontSize: event.target.value } }))} /></Field>
+                <Field label="Weight"><TextInput aria-label="Weight" inputMode="numeric" align="end" value={edit.weight} onChange={(event) => setEdits((current) => ({ ...current, [style.id]: { ...edit, weight: event.target.value } }))} /></Field>
+                <Field label="Space before"><TextInput aria-label="Space before" inputMode="numeric" align="end" value={edit.spaceBefore} onChange={(event) => setEdits((current) => ({ ...current, [style.id]: { ...edit, spaceBefore: event.target.value } }))} /></Field>
               </Row>
             </div>
           );
@@ -1843,22 +1845,22 @@ function InsertOverlay({ context, close }: { context: ScreenContext; close: () =
             The document stores the asset's record id. Nothing is copied into the document body, so the asset stays the single source.
           </Notice>
           <Field label="Asset" hint={assets.length ? undefined : "No assets are in this workspace yet."}>
-            <Select value={assetId} onChange={(event) => setAssetId(event.target.value)}>
+            <Select aria-label="Asset" value={assetId} onChange={(event) => setAssetId(event.target.value)}>
               <option value="">No asset yet</option>
               {assets.map((asset) => <option key={asset.id} value={asset.id}>{asset.title}</option>)}
             </Select>
           </Field>
           <Field label="Alternative text" required hint="Read out instead of the image. An empty value is reported in Insights.">
-            <TextInput value={alt} onChange={(event) => setAlt(event.target.value)} required />
+            <TextInput aria-label="Alternative text" value={alt} onChange={(event) => setAlt(event.target.value)} required />
           </Field>
-          <Field label="Caption"><TextInput value={caption} onChange={(event) => setCaption(event.target.value)} /></Field>
-          <Field label="Width (%)"><TextInput inputMode="numeric" align="end" value={width} onChange={(event) => setWidth(event.target.value)} /></Field>
+          <Field label="Caption"><TextInput aria-label="Caption" value={caption} onChange={(event) => setCaption(event.target.value)} /></Field>
+          <Field label="Width (%)"><TextInput aria-label="Width (%)" inputMode="numeric" align="end" value={width} onChange={(event) => setWidth(event.target.value)} /></Field>
         </>
       ) : (
         <>
           <Row gap={3}>
-            <Field label="Rows"><TextInput inputMode="numeric" align="end" value={rows} onChange={(event) => setRows(event.target.value)} /></Field>
-            <Field label="Columns"><TextInput inputMode="numeric" align="end" value={cols} onChange={(event) => setCols(event.target.value)} /></Field>
+            <Field label="Rows"><TextInput aria-label="Rows" inputMode="numeric" align="end" value={rows} onChange={(event) => setRows(event.target.value)} /></Field>
+            <Field label="Columns"><TextInput aria-label="Columns" inputMode="numeric" align="end" value={cols} onChange={(event) => setCols(event.target.value)} /></Field>
           </Row>
           <Checkbox label="First row is a header" checked={header} onChange={(event) => setHeader(event.target.checked)} />
           <Notice tone="neutral">Table cells hold plain text. For a calculation, link a workbook range from Sheets instead.</Notice>
@@ -1910,7 +1912,7 @@ function CitationsOverlay({ context, close }: { context: ScreenContext; close: (
       >
         {quote ? <blockquote style={{ margin: 0, paddingInlineStart: "var(--space-3)", borderInlineStart: "2px solid var(--warning-border)", color: "var(--fg-muted)" }}>{quote}</blockquote>
           : <Notice tone="warning" title="No text is selected">Select the words the comment is about in the editor, then comment. The anchor is a block id and an offset range.</Notice>}
-        <Field label="Comment" required><TextArea value={body} onChange={(event) => setBody(event.target.value)} rows={4} required /></Field>
+        <Field label="Comment" required><TextArea aria-label="Comment" value={body} onChange={(event) => setBody(event.target.value)} rows={4} required /></Field>
         <Checkbox label="Mandatory — approval is blocked until this is resolved" checked={mandatory} onChange={(event) => setMandatory(event.target.checked)} />
       </form>
     );
@@ -1932,15 +1934,15 @@ function CitationsOverlay({ context, close }: { context: ScreenContext; close: (
       }}
     >
       <Field label="Reference" required hint="How it should read in the document.">
-        <TextInput value={label} onChange={(event) => setLabel(event.target.value)} required autoFocus />
+        <TextInput aria-label="Reference" value={label} onChange={(event) => setLabel(event.target.value)} required autoFocus />
       </Field>
       <Field label="Record in this workspace" hint="Leave empty to record it honestly as unsourced.">
-        <Select value={recordId} onChange={(event) => setRecordId(event.target.value)}>
+        <Select aria-label="Record in this workspace" value={recordId} onChange={(event) => setRecordId(event.target.value)}>
           <option value="">No source recorded</option>
           {candidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.collection}: {candidate.title}</option>)}
         </Select>
       </Field>
-      <Field label="Note"><TextInput value={note} onChange={(event) => setNote(event.target.value)} placeholder="Figures read from the Pipeline sheet, column B" /></Field>
+      <Field label="Note"><TextInput aria-label="Note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Figures read from the Pipeline sheet, column B" /></Field>
       <Notice tone="warning">No external citation index is connected. A reference without a record stays marked unsourced rather than being filled in.</Notice>
     </form>
   );
@@ -1969,7 +1971,7 @@ function LinkOverlay({ context, close }: { context: ScreenContext; close: () => 
       {expanded ? <p className="ds-subtle">The link is applied to the selected run and nothing else.</p>
         : <Notice tone="warning" title="No text is selected">Select the words to link first. A link is an inline mark on a run, not a separate node.</Notice>}
       <Field label="Address" hint="Leave empty and save to remove an existing link.">
-        <TextInput value={href} onChange={(event) => setHref(event.target.value)} placeholder="https://" autoFocus />
+        <TextInput aria-label="Address" value={href} onChange={(event) => setHref(event.target.value)} placeholder="https://" autoFocus />
       </Field>
     </form>
   );
@@ -2002,7 +2004,7 @@ function ExportOverlay({ context, close }: { context: ScreenContext; close: () =
         options={[{ value: "html", label: "HTML" }, { value: "markdown", label: "Markdown" }, { value: "text", label: "Plain text" }]}
       />
       <Field label="Preview" hint={`${content.length} characters`}>
-        <TextArea readOnly rows={12} value={content.slice(0, 4000)} style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }} />
+        <TextArea aria-label="Preview" readOnly rows={12} value={content.slice(0, 4000)} style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }} />
       </Field>
       <Notice tone="neutral">The renderer is deterministic: the same document always produces the same bytes. Pending tracked deletions are excluded.</Notice>
     </form>
@@ -2038,12 +2040,12 @@ function HeadingProperties({ context, close }: { context: ScreenContext; close: 
         { label: "Comments anchored here", value: String(editor.model.comments.filter((comment) => comment.anchor.blockId === block.id).length) },
       ]} />
       <Field label="Level">
-        <Select value={level} onChange={(event) => setLevel(event.target.value)}>
+        <Select aria-label="Level" value={level} onChange={(event) => setLevel(event.target.value)}>
           <option value="1">Heading 1</option><option value="2">Heading 2</option><option value="3">Heading 3</option>
         </Select>
       </Field>
       <Field label="Named style">
-        <Select value={styleId} onChange={(event) => setStyleId(event.target.value)}>
+        <Select aria-label="Named style" value={styleId} onChange={(event) => setStyleId(event.target.value)}>
           <option value="">No named style</option>
           {editor.model.styles.map((style) => <option key={style.id} value={style.id}>{style.name}</option>)}
         </Select>
@@ -2120,7 +2122,7 @@ function CommentThread({ context, close }: { context: ScreenContext; close: () =
           </Row>
         ))}
       </Stack>
-      <Field label="Reply" required><TextArea value={body} onChange={(event) => setBody(event.target.value)} rows={3} required /></Field>
+      <Field label="Reply" required><TextArea aria-label="Reply" value={body} onChange={(event) => setBody(event.target.value)} rows={3} required /></Field>
     </form>
   );
 }
@@ -2145,14 +2147,14 @@ function DiffOverlay({ context }: { context: ScreenContext }) {
           { label: "Blocks then / now", value: `${before.blocks.length} → ${editor.model.blocks.length}` },
           { label: "Headings then / now", value: `${beforeStats.headings} → ${afterStats.headings}` },
         ]} />
-        <Card title="Blocks only in the stored version">
+        <Card eyebrow="REMOVED" prov="posted" title="Blocks only in the stored version">
           <Stack gap={1}>
             {before.blocks.filter((block) => !editor.model.blocks.some((item) => visibleText(item) === visibleText(block))).slice(0, 8).map((block) => (
               <span key={block.id} className="ds-truncate" style={{ color: "var(--danger)" }}>− {visibleText(block) || `(${block.type})`}</span>
             ))}
           </Stack>
         </Card>
-        <Card title="Blocks only in the current document">
+        <Card eyebrow="ADDED" prov="human" title="Blocks only in the current document">
           <Stack gap={1}>
             {editor.model.blocks.filter((block) => !before.blocks.some((item) => visibleText(item) === visibleText(block))).slice(0, 8).map((block) => (
               <span key={block.id} className="ds-truncate" style={{ color: "var(--success)" }}>+ {visibleText(block) || `(${block.type})`}</span>
@@ -2265,7 +2267,7 @@ function TemplateEditor({ context, close }: { context: ScreenContext; close: () 
         }}
       >
         <Field label="New document title" required>
-          <TextInput value={documentTitle} onChange={(event) => setDocumentTitle(event.target.value)} required autoFocus />
+          <TextInput aria-label="New document title" value={documentTitle} onChange={(event) => setDocumentTitle(event.target.value)} required autoFocus />
         </Field>
         <Notice tone="info" title="Tokens stay as tokens">
           {String(template.fields.tokens ?? "No tokens mapped")}. They are left in the text so a person fills them in deliberately rather than finding a wrong figure already there.
@@ -2302,15 +2304,15 @@ function TemplateEditor({ context, close }: { context: ScreenContext; close: () 
         close();
       }}
     >
-      <Field label="Template name" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
-      <Field label="What it is for"><TextInput value={summary} onChange={(event) => setSummary(event.target.value)} /></Field>
+      <Field label="Template name" required><TextInput aria-label="Template name" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
+      <Field label="What it is for"><TextInput aria-label="What it is for" value={summary} onChange={(event) => setSummary(event.target.value)} /></Field>
       <Field label="Scope">
-        <Select value={scope} onChange={(event) => setScope(event.target.value)}>
+        <Select aria-label="Scope" value={scope} onChange={(event) => setScope(event.target.value)}>
           <option value="company">Company</option><option value="department">Department</option><option value="personal">Mine</option>
         </Select>
       </Field>
       <Field label="Company fields" hint="Comma separated tokens, written as {{token}} in the body.">
-        <TextInput value={tokens} onChange={(event) => setTokens(event.target.value)} placeholder="company.name, customer.name, quote.total" />
+        <TextInput aria-label="Company fields" value={tokens} onChange={(event) => setTokens(event.target.value)} placeholder="company.name, customer.name, quote.total" />
       </Field>
       {template && (
         <Notice tone="warning" title="Documents already created keep their own body">
@@ -2323,7 +2325,9 @@ function TemplateEditor({ context, close }: { context: ScreenContext; close: () 
 
 function TokenMapping({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const template = useRecord(payload?.id) ?? useCollection("templates")[0];
+  const fromRoute = useRecord(payload?.id);
+  const templates = useCollection("templates");
+  const template = fromRoute ?? templates[0];
   const { org } = useWorkspace();
   const [map, setMap] = useState<Record<string, string>>({});
   if (!template) return <Empty title="No template selected" />;
@@ -2373,9 +2377,9 @@ function ChangeImpact({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Documents created" value={String(created.length)} />
-        <Stat label="Published" value={String(published.length)} />
-        <Stat label="Signed" value={String(signed.length)} meta={signed.length ? "Frozen" : "None"} />
+        <Stat prov="human" label="Documents created" value={String(created.length)} />
+        <Stat prov="human" label="Published" value={String(published.length)} />
+        <Stat prov="human" label="Signed" value={String(signed.length)} meta={signed.length ? "Frozen" : "None"} />
       </StatRow>
       <Notice tone="warning" title="Editing this master changes nothing that already exists">
         Each document holds its own body. A template edit only affects documents created after it, which is why a signed document cannot be altered by changing the template it came from.
@@ -2454,12 +2458,12 @@ function LinkPermissions({ context, close }: { context: ScreenContext; close: ()
       }}
     >
       <Field label="Scope">
-        <Select value={scope} onChange={(event) => setScope(event.target.value as "workspace" | "link")}>
+        <Select aria-label="Scope" value={scope} onChange={(event) => setScope(event.target.value as "workspace" | "link")}>
           <option value="workspace">This workspace only</option>
           <option value="link">Anyone with the link</option>
         </Select>
       </Field>
-      <Field label="Note"><TextInput value={note} onChange={(event) => setNote(event.target.value)} /></Field>
+      <Field label="Note"><TextInput aria-label="Note" value={note} onChange={(event) => setNote(event.target.value)} /></Field>
       <Notice tone="warning" title="Bounded and revocable by design">
         Every link carries the time it was created, the scope it was created with, and a revocation time once revoked. Nothing is served outside this browser, so the bound is absolute rather than a promise.
       </Notice>
@@ -2602,10 +2606,10 @@ function StyleSettings({ context, close }: { context: ScreenContext; close: () =
       }}
     >
       <Field label="Banned phrases" hint="Comma separated. The brand check reports any that appear.">
-        <TextArea value={banned} onChange={(event) => setBanned(event.target.value)} rows={3} />
+        <TextArea aria-label="Banned phrases" value={banned} onChange={(event) => setBanned(event.target.value)} rows={3} />
       </Field>
       <Field label="Flag paragraphs over this many words">
-        <TextInput inputMode="numeric" align="end" value={maxWords} onChange={(event) => setMaxWords(event.target.value)} />
+        <TextInput aria-label="Flag paragraphs over this many words" inputMode="numeric" align="end" value={maxWords} onChange={(event) => setMaxWords(event.target.value)} />
       </Field>
       <Notice tone="neutral">These are the rules the deterministic checks use. There is no model behind them, so the result is the same every time.</Notice>
     </form>

@@ -514,7 +514,7 @@ export function GraphList({ graph, onChange, selectedId, onSelect, readOnly }: O
                     </Select>
                   </Field>
                   <Field label="to" htmlFor={`target-${node.id}`}>
-                    <Select id={`target-${node.id}`} value={target[node.id] ?? ""} onChange={(event) => setTarget((current) => ({ ...current, [node.id]: event.target.value }))}>
+                    <Select aria-label="to" id={`target-${node.id}`} value={target[node.id] ?? ""} onChange={(event) => setTarget((current) => ({ ...current, [node.id]: event.target.value }))}>
                       <option value="">Choose a node</option>
                       {graph.nodes.filter((item) => item.id !== node.id).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
                     </Select>
@@ -575,19 +575,19 @@ export function NodeInspector({
   return (
     <Stack gap={4}>
       <Field label="Label" htmlFor={`label-${node.id}`}>
-        <TextInput id={`label-${node.id}`} value={node.label} disabled={readOnly} onChange={(event) => patch({ label: event.target.value }, "Node renamed")} />
+        <TextInput aria-label="Label" id={`label-${node.id}`} value={node.label} disabled={readOnly} onChange={(event) => patch({ label: event.target.value }, "Node renamed")} />
       </Field>
 
       {node.type === "trigger" && (
         <>
           <Field label="Collection watched" hint="The trigger reads records from this company only.">
-            <Select value={config.collection ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ collection: event.target.value }, "Trigger collection changed")}>
+            <Select aria-label="Collection watched" value={config.collection ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ collection: event.target.value }, "Trigger collection changed")}>
               <option value="">Choose a collection</option>
               {collections.map((name) => <option key={name} value={name}>{name}</option>)}
             </Select>
           </Field>
           <Field label="Event">
-            <Select value={config.event ?? "record.matches"} disabled={readOnly} onChange={(event) => patchConfig({ event: event.target.value as typeof config.event }, "Trigger event changed")}>
+            <Select aria-label="Event" value={config.event ?? "record.matches"} disabled={readOnly} onChange={(event) => patchConfig({ event: event.target.value as typeof config.event }, "Trigger event changed")}>
               <option value="record.matches">Any record in the collection</option>
               <option value="record.overdue">Record past its due date and not closed</option>
               <option value="schedule">On a schedule</option>
@@ -595,7 +595,7 @@ export function NodeInspector({
             </Select>
           </Field>
           <Field label="Time zone" hint="Schedules and date tests resolve in this zone.">
-            <Select value={config.timezone ?? "Europe/London"} disabled={readOnly} onChange={(event) => patchConfig({ timezone: event.target.value }, "Trigger time zone changed")}>
+            <Select aria-label="Time zone" value={config.timezone ?? "Europe/London"} disabled={readOnly} onChange={(event) => patchConfig({ timezone: event.target.value }, "Trigger time zone changed")}>
               {["Europe/London", "America/New_York", "Europe/Paris", "UTC"].map((zone) => <option key={zone} value={zone}>{zone}</option>)}
             </Select>
           </Field>
@@ -610,16 +610,16 @@ export function NodeInspector({
       {node.type === "condition" && (
         <>
           <Field label="Field" hint="A binding path, for example record.amountMinor or overdueDays.">
-            <TextInput value={config.left ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ left: event.target.value }, "Condition field changed")} />
+            <TextInput aria-label="Field" value={config.left ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ left: event.target.value }, "Condition field changed")} />
           </Field>
           <Field label="Test">
-            <Select value={config.op ?? "gt"} disabled={readOnly} onChange={(event) => patchConfig({ op: event.target.value as typeof config.op }, "Condition operator changed")}>
+            <Select aria-label="Test" value={config.op ?? "gt"} disabled={readOnly} onChange={(event) => patchConfig({ op: event.target.value as typeof config.op }, "Condition operator changed")}>
               {CONDITION_OPS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
             </Select>
           </Field>
           {op?.needsValue && (
             <Field label="Value">
-              <TextInput value={config.right ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ right: event.target.value }, "Condition value changed")} />
+              <TextInput aria-label="Value" value={config.right ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ right: event.target.value }, "Condition value changed")} />
             </Field>
           )}
           <Notice tone="info" title="Both branches are real">
@@ -631,10 +631,10 @@ export function NodeInspector({
       {node.type === "set" && (
         <>
           <Field label="Variable name">
-            <TextInput value={config.name ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ name: event.target.value }, "Variable renamed")} />
+            <TextInput aria-label="Variable name" value={config.name ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ name: event.target.value }, "Variable renamed")} />
           </Field>
           <Field label="Expression" hint="A number, a binding path, sum/count/avg/max of a path, or a path combined with a number.">
-            <TextInput value={config.expr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ expr: event.target.value }, "Expression changed")} />
+            <TextInput aria-label="Expression" value={config.expr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ expr: event.target.value }, "Expression changed")} />
           </Field>
         </>
       )}
@@ -642,14 +642,14 @@ export function NodeInspector({
       {node.type === "action" && (
         <>
           <Field label="What this step does">
-            <Select value={config.kind ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ kind: event.target.value as typeof config.kind }, "Action kind changed")}>
+            <Select aria-label="What this step does" value={config.kind ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ kind: event.target.value as typeof config.kind }, "Action kind changed")}>
               <option value="">Choose an action</option>
               {ACTION_KINDS.map((kind) => <option key={kind.id} value={kind.id}>{kind.label}</option>)}
             </Select>
           </Field>
           {config.kind === "provider.call" && (
             <Field label="Provider capability">
-              <Select value={config.capability ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ capability: event.target.value }, "Capability changed")}>
+              <Select aria-label="Provider capability" value={config.capability ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ capability: event.target.value }, "Capability changed")}>
                 <option value="">Choose a capability</option>
                 {["email.send", "payment.capture", "bank.feed", "calendar.sync", "telephony", "model.inference", "site.publish", "tax.file"].map((id) => <option key={id} value={id}>{id}</option>)}
               </Select>
@@ -658,42 +658,42 @@ export function NodeInspector({
           {config.kind === "record.create" && (
             <>
               <Field label="Destination collection">
-                <Select value={config.target ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ target: event.target.value }, "Destination changed")}>
+                <Select aria-label="Destination collection" value={config.target ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ target: event.target.value }, "Destination changed")}>
                   <option value="">Choose a collection</option>
                   {collections.map((name) => <option key={name} value={name}>{name}</option>)}
                 </Select>
               </Field>
               <Field label="Title template" hint="Use {record.title} or {overdueDays} to insert a binding.">
-                <TextInput value={config.titleExpr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ titleExpr: event.target.value }, "Title template changed")} />
+                <TextInput aria-label="Title template" value={config.titleExpr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ titleExpr: event.target.value }, "Title template changed")} />
               </Field>
               <Field label="Summary template">
-                <TextInput value={config.summaryExpr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ summaryExpr: event.target.value }, "Summary template changed")} />
+                <TextInput aria-label="Summary template" value={config.summaryExpr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ summaryExpr: event.target.value }, "Summary template changed")} />
               </Field>
             </>
           )}
           {config.kind === "record.tag" && (
             <Field label="Tag applied">
-              <TextInput value={config.tag ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ tag: event.target.value }, "Tag changed")} />
+              <TextInput aria-label="Tag applied" value={config.tag ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ tag: event.target.value }, "Tag changed")} />
             </Field>
           )}
           {config.kind === "log.note" && (
             <Field label="Log line" hint="Bindings in braces are substituted when the step runs.">
-              <TextInput value={config.summaryExpr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ summaryExpr: event.target.value }, "Log line changed")} />
+              <TextInput aria-label="Log line" value={config.summaryExpr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ summaryExpr: event.target.value }, "Log line changed")} />
             </Field>
           )}
           <Field label="Retries" hint="Attempts after the first, with exponential backoff recorded on each attempt.">
-            <Select value={String(config.retries ?? 0)} disabled={readOnly} onChange={(event) => patchConfig({ retries: Number(event.target.value) }, "Retries changed")}>
+            <Select aria-label="Retries" value={String(config.retries ?? 0)} disabled={readOnly} onChange={(event) => patchConfig({ retries: Number(event.target.value) }, "Retries changed")}>
               {[0, 1, 2, 3, 5].map((count) => <option key={count} value={count}>{count}</option>)}
             </Select>
           </Field>
           <Field label="On failure">
-            <Select value={config.onError ?? "halt"} disabled={readOnly} onChange={(event) => patchConfig({ onError: event.target.value as "halt" | "continue" }, "Failure policy changed")}>
+            <Select aria-label="On failure" value={config.onError ?? "halt"} disabled={readOnly} onChange={(event) => patchConfig({ onError: event.target.value as "halt" | "continue" }, "Failure policy changed")}>
               <option value="halt">Stop the run</option>
               <option value="continue">Record the failure and continue</option>
             </Select>
           </Field>
           <Field label="Impact" hint="A high-impact step never runs from a dry run.">
-            <Select value={config.impact ?? "low"} disabled={readOnly} onChange={(event) => patchConfig({ impact: event.target.value as "low" | "high" }, "Impact changed")}>
+            <Select aria-label="Impact" value={config.impact ?? "low"} disabled={readOnly} onChange={(event) => patchConfig({ impact: event.target.value as "low" | "high" }, "Impact changed")}>
               <option value="low">Low — reversible in this workspace</option>
               <option value="high">High — would move money or reach a person</option>
             </Select>
@@ -703,13 +703,13 @@ export function NodeInspector({
 
       {node.type === "approval" && (
         <Field label="Approver" hint="A name or a role. The run stops here until a decision is recorded.">
-          <TextInput value={config.approvers ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ approvers: event.target.value }, "Approver changed")} />
+          <TextInput aria-label="Approver" value={config.approvers ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ approvers: event.target.value }, "Approver changed")} />
         </Field>
       )}
 
       {node.type === "delay" && (
         <Field label="Minutes held">
-          <TextInput type="number" min={0} value={String(config.minutes ?? 0)} disabled={readOnly} onChange={(event) => patchConfig({ minutes: Number(event.target.value) }, "Delay changed")} />
+          <TextInput aria-label="Minutes held" type="number" min={0} value={String(config.minutes ?? 0)} disabled={readOnly} onChange={(event) => patchConfig({ minutes: Number(event.target.value) }, "Delay changed")} />
         </Field>
       )}
 

@@ -889,6 +889,7 @@ export const projectApp = registerApp({
         { id: "Task drawer", kind: "drawer", title: "Task", width: 520, render: ({ ...context }) => <TaskDrawer context={context} /> },
         { id: "stage rule", kind: "modal", title: "This move skips a review", tone: "danger", width: 540, render: ({ close, ...context }) => <StageRule context={context} close={close} /> },
         { id: "batch action review", kind: "modal", title: "Review this batch first", width: 620, render: ({ close, ...context }) => <BatchReview context={context} close={close} /> },
+        { id: "Assignee picker", kind: "modal", title: "Assign this task", width: 520, render: ({ close, ...context }) => <AssigneePicker context={context} close={close} />, footer: submitFooter("pj-assignee", "Assign") },
       ],
     },
 

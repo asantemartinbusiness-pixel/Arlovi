@@ -26,7 +26,7 @@ export function JsonBlock({ value, label }: { value: unknown; label: string }) {
   return (
     <figure style={{ margin: 0 }}>
       <figcaption className="ds-subtle" style={{ fontSize: "var(--text-xs)", marginBlockEnd: 4 }}>{label}</figcaption>
-      <pre className="auto-code">{jsonText(value)}</pre>
+      <pre className="auto-code ds-num">{jsonText(value)}</pre>
     </figure>
   );
 }

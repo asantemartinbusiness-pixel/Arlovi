@@ -15,8 +15,8 @@ export interface DeckEditor {
   canUndo: boolean;
   canRedo: boolean;
   undoLabel?: string;
-  commit: (next: Deck, label: string) => void;
-  commitSlide: (next: Slide, label: string) => void;
+  commit: (next: Deck, label: string, coalesce?: boolean) => void;
+  commitSlide: (next: Slide, label: string, coalesce?: boolean) => void;
   /** High-frequency transform during a drag: no history entry, no autosave. */
   preview: (updates: { id: string; patch: Partial<SlideObject> }[]) => void;
   /** Settle a preview into one undo step and schedule the save. */
@@ -90,8 +90,18 @@ export function useDeckEditor(context: ScreenContext, record: Rec | undefined): 
     timer.current = window.setTimeout(() => { void flush(); }, AUTOSAVE_MS);
   }, [flush]);
 
-  const commit = useCallback((next: Deck, label: string) => {
-    setPast((current) => [...current.slice(-120), { deck, label, at: Date.now() }]);
+  // A run of keyboard nudges inside the coalesce window is one undo step, so
+  // five taps of an arrow key do not cost five undos to reverse.
+  const COALESCE_MS = 900;
+  const commit = useCallback((next: Deck, label: string, coalesce = false) => {
+    setPast((current) => {
+      const last = current[current.length - 1];
+      const at = Date.now();
+      if (coalesce && last && last.label === label && at - last.at < COALESCE_MS) {
+        return [...current.slice(0, -1), { ...last, at }];
+      }
+      return [...current.slice(-120), { deck, label, at }];
+    });
     setFuture([]);
     setDeck(next);
     schedule(next);
@@ -99,8 +109,8 @@ export function useDeckEditor(context: ScreenContext, record: Rec | undefined): 
 
   const slide = useMemo(() => currentSlide(deck), [deck]);
 
-  const commitSlide = useCallback((next: Slide, label: string) => {
-    commit(replaceSlide(deck, next), label);
+  const commitSlide = useCallback((next: Slide, label: string, coalesce = false) => {
+    commit(replaceSlide(deck, next), label, coalesce);
   }, [commit, deck]);
 
   const preview = useCallback((updates: { id: string; patch: Partial<SlideObject> }[]) => {

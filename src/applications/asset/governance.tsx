@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
 import { Copy, HardDrive, Images, Palette, ShieldAlert, Wand2 } from "lucide-react";
 import {
-  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill,
+  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill,
   Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { AssetPreview, fileState, storedBytes } from "./thumbs";
-import { csvList, formatBytes, licence, licenceTone, useAssets, usedIn } from "./panels";
+import { csvList, formatBytes, licence, licenceTone, useAssets, usedIn, useSeeded } from "./panels";
 
 /* ====================================================================== *
  * ASSET — brand kits, transformations, usage and governance.
@@ -31,6 +31,8 @@ export function BrandKits({ context, tab }: { context: ScreenContext; tab: "Bran
           return (
             <Card
               key={brand.id}
+              eyebrow="BRAND KIT"
+              prov={brand.fields.proposedBy ? "agent" : "human"}
               span={4}
               title={brand.title}
               subtitle={brand.summary}
@@ -72,7 +74,7 @@ export function BrandKits({ context, tab }: { context: ScreenContext; tab: "Bran
     if (!active) return <Empty title="No brand kit" icon={<Palette size={20} />}>Create one first.</Empty>;
     return (
       <Grid>
-        <Card span={7} title={`${active.title} tokens`} subtitle="The values every application reads">
+        <Card eyebrow="TOKENS" prov="human" span={7} title={`${active.title} tokens`} subtitle="The values every application reads">
           <Stack gap={3}>
             {TOKENS.map((token) => {
               const value = String(active.fields[token] ?? "");
@@ -80,7 +82,7 @@ export function BrandKits({ context, tab }: { context: ScreenContext; tab: "Bran
                 <Row key={token} gap={3}>
                   <i className="ds-swatch" style={{ background: value || "transparent", width: 28, height: 28, border: "1px solid var(--border-default)" }} aria-hidden="true" />
                   <strong className="ds-grow" style={{ textTransform: "capitalize" }}>{token}</strong>
-                  <code>{value || "not set"}</code>
+                  <span className="ds-num">{value || "not set"}</span>
                 </Row>
               );
             })}
@@ -93,7 +95,7 @@ export function BrandKits({ context, tab }: { context: ScreenContext; tab: "Bran
             <Button variant="primary" onClick={() => context.openOverlay("Token editor", { id: active.id })}>Edit these tokens</Button>
           </Stack>
         </Card>
-        <Card span={5} title="Contrast, checked here" subtitle="Against the paper and ink in this kit">
+        <Card eyebrow="CONTRAST" prov="posted" span={5} title="Contrast, checked here" subtitle="Against the paper and ink in this kit">
           <Stack gap={3}>
             {(["cobalt", "papaya", "aqua"] as const).map((token) => {
               const ratio = contrast(String(active.fields[token] ?? "#000000"), String(active.fields.paper ?? "#ffffff"));
@@ -120,10 +122,10 @@ export function BrandKits({ context, tab }: { context: ScreenContext; tab: "Bran
     const unlinked = data.assets.filter((row) => !ids.includes(row.id) && (row.tags.includes("brand") || row.fields.brandId));
     return (
       <Stack gap={4}>
-        <Card title={`${linked.length} assets in ${active.title}`} subtitle="What a designer may reach for without asking">
+        <Card eyebrow="KIT ASSETS" prov="human" title={`${linked.length} assets in ${active.title}`} subtitle="What a designer may reach for without asking">
           <Grid>
             {linked.map((row) => (
-              <Card key={row.id} span={3} title={row.title} subtitle={String(row.fields.kind ?? "")}>
+              <Card key={row.id} eyebrow="ASSET" prov="human" span={3} title={row.title} subtitle={String(row.fields.kind ?? "")}>
                 <Stack gap={2}>
                   <AssetPreview record={row} height={100} fit="contain" />
                   <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/asset/assets/${row.id}`)}>Open</Button>
@@ -134,7 +136,7 @@ export function BrandKits({ context, tab }: { context: ScreenContext; tab: "Bran
           </Grid>
         </Card>
         {unlinked.length > 0 && (
-          <Card title="Brand-ish assets not in this kit" subtitle={`${unlinked.length} candidates`}>
+          <Card eyebrow="CANDIDATES" prov="posted" title="Brand-ish assets not in this kit" subtitle={`${unlinked.length} candidates`}>
             <Stack gap={2}>
               {unlinked.map((row) => (
                 <Row key={row.id} gap={2}>
@@ -166,7 +168,7 @@ export function BrandKits({ context, tab }: { context: ScreenContext; tab: "Bran
   const voice = (active.body as { voice?: string } | undefined)?.voice;
   return (
     <Grid>
-      <Card span={7} title={`${active.title} rules`} subtitle={`${rules.length} written rules`}>
+      <Card eyebrow="RULES" prov="human" span={7} title={`${active.title} rules`} subtitle={`${rules.length} written rules`}>
         {rules.length === 0 ? (
           <Empty title="No rules written" icon={<Palette size={20} />}>Rules are what make a kit usable by somebody who was not in the room.</Empty>
         ) : (
@@ -180,9 +182,9 @@ export function BrandKits({ context, tab }: { context: ScreenContext; tab: "Bran
           </Stack>
         )}
       </Card>
-      <Stack gap={4}>
-        <Card span={5} title="Voice">{voice ? <p>{voice}</p> : <span className="ds-subtle">Not recorded.</span>}</Card>
-        <Card span={5} title="Replacing the master">
+      <Stack gap={4} className="ds-col-5">
+        <Card eyebrow="VOICE" prov="human" span={5} title="Voice">{voice ? <p>{voice}</p> : <span className="ds-subtle">Not recorded.</span>}</Card>
+        <Card eyebrow="MASTER" prov="human" span={5} title="Replacing the master">
           <Stack gap={3}>
             <Notice tone="warning" title="An unapproved kit cannot become the master">
               {active.status === "draft"
@@ -195,6 +197,12 @@ export function BrandKits({ context, tab }: { context: ScreenContext; tab: "Bran
       </Stack>
     </Grid>
   );
+}
+
+/** Short, still unique: trims the middle rather than the end. */
+function shortLabel(title: string): string {
+  if (title.length <= 18) return title;
+  return `${title.slice(0, 9)}…${title.slice(-7)}`;
 }
 
 function luminance(hex: string): number {
@@ -407,6 +415,8 @@ export function Transformations({ context, tab }: { context: ScreenContext; tab:
         {presets.map((preset) => (
           <Card
             key={preset.id}
+            eyebrow="PRESET"
+            prov="human"
             span={4}
             title={preset.title}
             subtitle={preset.summary}
@@ -458,7 +468,7 @@ export function Transformations({ context, tab }: { context: ScreenContext; tab:
   const rows = tab === "Failed" ? jobs.filter((row) => row.status === "failed") : tab === "History" ? jobs : jobs.filter((row) => row.status !== "failed");
 
   return (
-    <Card title={tab} subtitle={`${rows.length} ${rows.length === 1 ? "job" : "jobs"}`} flush>
+    <Card eyebrow="JOBS" prov="posted" title={tab} subtitle={`${rows.length} ${rows.length === 1 ? "job" : "jobs"}`} flush>
       <DataGrid
         rows={rows}
         rowId={(row) => row.id}
@@ -471,9 +481,9 @@ export function Transformations({ context, tab }: { context: ScreenContext; tab:
           { key: "title", header: "Job", primary: true, cell: (row) => <div><strong>{row.title}</strong><p className="ds-subtle">{row.summary}</p></div>, filterValue: (row) => `${row.title} ${row.summary}` },
           { key: "preset", header: "Preset", cell: (row) => data.transforms.find((entry) => entry.id === row.fields.presetId)?.title ?? "—" },
           { key: "assets", header: "Assets", align: "end", cell: (row) => String(csvList(row.fields.assetIds).length) },
-          { key: "produced", header: "Produced", align: "end", cell: (row) => String(row.fields.produced ?? 0) },
+          { key: "produced", header: "Produced", align: "end", cell: (row) => <span className="ds-num">{String(row.fields.produced ?? 0)}</span> },
           { key: "failed", header: "Failed", align: "end", cell: (row) => (Number(row.fields.failed ?? 0) > 0 ? <Pill tone="danger">{String(row.fields.failed)}</Pill> : "0") },
-          { key: "at", header: "When", align: "end", cell: (row) => context.relative(row.at), sortValue: (row) => row.at ?? "" },
+          { key: "at", header: "When", align: "end", cell: (row) => <span className="ds-num">{context.relative(row.at)}</span>, sortValue: (row) => row.at ?? "" },
           { key: "status", header: "State", align: "end", cell: (row) => <Pill tone={row.status === "done" ? "success" : "danger"}>{row.status}</Pill> },
         ]}
         bulkActions={tab === "Failed" ? [
@@ -498,12 +508,12 @@ export function TransformInspector({ context, close }: { context: ScreenContext;
   const payload = context.overlayPayload as { id?: string } | undefined;
   const record = data.transforms.find((row) => row.id === (payload?.id ?? context.selectedId));
   const isJob = record?.fields.kind === "job";
-  const [title, setTitle] = useState(record && !isJob ? record.title : "");
-  const [width, setWidth] = useState(Number(record?.fields.width ?? 1200));
-  const [height, setHeight] = useState(Number(record?.fields.height ?? 630));
-  const [format, setFormat] = useState(String(record?.fields.format ?? "png"));
-  const [quality, setQuality] = useState(Number(record?.fields.quality ?? 82));
-  const [watermark, setWatermark] = useState(record?.fields.watermark === true);
+  const [title, setTitle] = useSeeded(record && !isJob ? record.title : "");
+  const [width, setWidth] = useSeeded(Number(record?.fields.width ?? 1200));
+  const [height, setHeight] = useSeeded(Number(record?.fields.height ?? 630));
+  const [format, setFormat] = useSeeded(String(record?.fields.format ?? "png"));
+  const [quality, setQuality] = useSeeded(Number(record?.fields.quality ?? 82));
+  const [watermark, setWatermark] = useSeeded(record?.fields.watermark === true);
   const [busy, setBusy] = useState(false);
 
   if (isJob && record) {
@@ -521,7 +531,7 @@ export function TransformInspector({ context, close }: { context: ScreenContext;
         {record.fields.failureReason ? <Notice tone="danger" title="Why it stopped">{String(record.fields.failureReason)}</Notice> : null}
         <Grid>
           {assets.map((row) => (
-            <Card key={row.id} span={6} title={row.title} subtitle={String(row.fields.kind ?? "")}>
+            <Card key={row.id} eyebrow="SOURCE" prov="human" span={6} title={row.title} subtitle={String(row.fields.kind ?? "")}>
               <AssetPreview record={row} height={110} />
             </Card>
           ))}
@@ -738,7 +748,7 @@ export function GovernanceScreen({ context, tab }: { context: ScreenContext; tab
 
   const duplicates = useMemo(() => {
     const map = new Map<string, Rec[]>();
-    for (const row of data.assets) {
+    for (const row of data.assets.filter((asset) => asset.status !== "archived")) {
       const key = String(row.fields.checksum ?? row.id);
       const bucket = map.get(key);
       if (bucket) bucket.push(row);
@@ -753,21 +763,21 @@ export function GovernanceScreen({ context, tab }: { context: ScreenContext; tab
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Assets in use" value={String(live.filter((row) => usedIn(row).length > 0).length)} meta={`of ${live.length} live assets`} />
-          <Stat label="Never used" value={String(unused.length)} meta="Candidates for archiving" />
-          <Stat label="Recorded uses" value={String(live.reduce((sum, row) => sum + usedIn(row).length, 0))} meta="Counted from the asset records" />
-          <Stat label="Variants" value={String(live.filter((row) => row.fields.variantOf).length)} meta="Derived from an original" />
+          <Stat prov="posted" label="Assets in use" value={String(live.filter((row) => usedIn(row).length > 0).length)} meta={`of ${live.length} live assets`} />
+          <Stat prov="posted" label="Never used" value={String(unused.length)} meta="Candidates for archiving" />
+          <Stat prov="posted" label="Recorded uses" value={String(live.reduce((sum, row) => sum + usedIn(row).length, 0))} meta="Counted from the asset records" />
+          <Stat prov="posted" label="Variants" value={String(live.filter((row) => row.fields.variantOf).length)} meta="Derived from an original" />
         </StatRow>
-        <Card title="Most used" subtitle="Where a change would be felt first">
+        <Card eyebrow="USAGE" prov="posted" title="Most used" subtitle="Where a change would be felt first">
           <BarChart
             title="Recorded uses by asset"
             height={210}
             format={(value) => String(Math.round(value))}
-            series={[{ name: "Uses", points: heavy.map((row) => ({ label: row.title.length > 18 ? `${row.title.slice(0, 17)}…` : row.title, value: usedIn(row).length })) }]}
+            series={[{ name: "Uses", points: heavy.map((row) => ({ label: shortLabel(row.title), value: usedIn(row).length })) }]}
             footer="Uses are recorded on each asset as surfaces reference it; nothing is inferred from file names."
           />
         </Card>
-        <Card title="Never used" subtitle={`${unused.length} assets`} flush>
+        <Card eyebrow="UNUSED" prov="posted" title="Never used" subtitle={`${unused.length} assets`} flush>
           <DataGrid
             rows={unused}
             rowId={(row) => row.id}
@@ -777,7 +787,7 @@ export function GovernanceScreen({ context, tab }: { context: ScreenContext; tab
             columns={[
               { key: "title", header: "Asset", primary: true, cell: (row) => row.title, filterValue: (row) => row.title },
               { key: "kind", header: "Type", cell: (row) => String(row.fields.kind ?? "") },
-              { key: "added", header: "Added", align: "end", cell: (row) => context.relative(row.createdAt), sortValue: (row) => row.createdAt },
+              { key: "added", header: "Added", align: "end", cell: (row) => <span className="ds-num">{context.relative(row.createdAt)}</span>, sortValue: (row) => row.createdAt },
               { key: "licence", header: "Licence", align: "end", cell: (row) => <Pill tone={licenceTone(licence(row, now).state)}>{licence(row, now).label}</Pill> },
             ]}
             bulkActions={[
@@ -800,7 +810,7 @@ export function GovernanceScreen({ context, tab }: { context: ScreenContext; tab
         <Notice tone="info" title="Rights expiry is the thing most likely to catch somebody out">
           An expired licence does not stop an asset existing; it stops it being used. This table is ordered by what expires soonest.
         </Notice>
-        <Card title="Licences" subtitle={`${rows.filter((row) => row.fields.licenceExpiry).length} of ${rows.length} assets have an expiry`} flush>
+        <Card eyebrow="LICENCE REGISTER" prov="human" title="Licences" subtitle={`${rows.filter((row) => row.fields.licenceExpiry).length} of ${rows.length} assets have an expiry`} flush>
           <DataGrid
             rows={rows}
             rowId={(row) => row.id}
@@ -816,7 +826,7 @@ export function GovernanceScreen({ context, tab }: { context: ScreenContext; tab
               { key: "title", header: "Asset", primary: true, cell: (row) => <div><strong>{row.title}</strong><p className="ds-subtle">{String(row.fields.licensor ?? "")}</p></div>, filterValue: (row) => `${row.title} ${String(row.fields.licensor ?? "")}` },
               { key: "licence", header: "Licence", cell: (row) => String(row.fields.licence ?? "").replace(/_/g, " ") },
               { key: "ref", header: "Reference", hideBelow: 1200, cell: (row) => String(row.fields.licenceRef ?? "—") },
-              { key: "expiry", header: "Expiry", cell: (row) => (row.fields.licenceExpiry ? context.date(String(row.fields.licenceExpiry)) : "None"), sortValue: (row) => String(row.fields.licenceExpiry ?? "~") },
+              { key: "expiry", header: "Expiry", cell: (row) => (row.fields.licenceExpiry ? <span className="ds-num">{context.date(String(row.fields.licenceExpiry))}</span> : "None"), sortValue: (row) => String(row.fields.licenceExpiry ?? "~") },
               { key: "state", header: "State", cell: (row) => <Pill tone={licenceTone(licence(row, now).state)}>{licence(row, now).label}</Pill> },
               { key: "uses", header: "Live uses", align: "end", cell: (row) => String(usedIn(row).length) },
             ]}
@@ -839,13 +849,15 @@ export function GovernanceScreen({ context, tab }: { context: ScreenContext; tab
           duplicates.map((group) => (
             <Card
               key={group[0].id}
+              eyebrow="DUPLICATES"
+              prov="posted"
               title={`${group.length} copies of the same file`}
               subtitle={`Checksum ${String(group[0].fields.checksum ?? "")}`}
               actions={<Button size="sm" variant="secondary" onClick={() => { context.select(group[0].id); context.openOverlay("merge preview", { ids: group.map((row) => row.id) }); }}>Resolve</Button>}
             >
               <Grid>
                 {group.map((row) => (
-                  <Card key={row.id} span={6} title={row.title} subtitle={`${row.status.replace(/_/g, " ")} · ${usedIn(row).length} uses`}>
+                  <Card key={row.id} eyebrow="COPY" prov="human" span={6} title={row.title} subtitle={`${row.status.replace(/_/g, " ")} · ${usedIn(row).length} ${usedIn(row).length === 1 ? "use" : "uses"}`}>
                     <Stack gap={2}>
                       <AssetPreview record={row} height={110} />
                       <Properties rows={[
@@ -875,12 +887,12 @@ export function GovernanceScreen({ context, tab }: { context: ScreenContext; tab
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Bytes accounted for" value={formatBytes(accounted)} meta={`${live.length - noFile.length} assets with something stored`} />
-        <Stat label="Catalogued without a file" value={String(noFile.length)} meta="Size genuinely unknown" />
-        <Stat label="Archived" value={String(data.assets.length - live.length)} meta="Kept so old documents resolve" />
+        <Stat prov="posted" label="Bytes accounted for" value={formatBytes(accounted)} meta={`${live.length - noFile.length} assets with something stored`} />
+        <Stat prov="posted" label="Catalogued without a file" value={String(noFile.length)} meta="Size genuinely unknown" />
+        <Stat prov="posted" label="Archived" value={String(data.assets.length - live.length)} meta="Kept so old documents resolve" />
         <Stat label="Browser quota" value="Unavailable" unavailable meta="The browser does not report a reliable figure" />
       </StatRow>
-      <Card title="Where the stored bytes are" subtitle="Only what this browser actually holds">
+      <Card eyebrow="STORAGE" prov="posted" title="Where the stored bytes are" subtitle="Only what this browser actually holds">
         <BarChart
           title="Stored bytes by asset type"
           height={200}
@@ -889,7 +901,7 @@ export function GovernanceScreen({ context, tab }: { context: ScreenContext; tab
           footer="Generated previews and metadata-only records contribute nothing, because nothing is stored for them."
         />
       </Card>
-      <Card title="Assets with no stored file" subtitle={`${noFile.length} records`} flush>
+      <Card eyebrow="NO FILE" prov="unknown" title="Assets with no stored file" subtitle={`${noFile.length} records`} flush>
         <DataGrid
           rows={noFile}
           rowId={(row) => row.id}
@@ -944,7 +956,7 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
   const data = useAssets();
   const payload = context.overlayPayload as { ids?: string[] } | undefined;
   const group = data.assets.filter((row) => (payload?.ids ?? []).includes(row.id));
-  const [keepId, setKeepId] = useState(group.find((row) => row.status === "approved")?.id ?? group[0]?.id ?? "");
+  const [keepId, setKeepId] = useSeeded(group.find((row) => row.status === "approved")?.id ?? group[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   if (group.length < 2) return <Empty title="Nothing to merge" icon={<Copy size={20} />}>Choose a duplicate group.</Empty>;
   const keep = group.find((row) => row.id === keepId);
@@ -955,12 +967,12 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
     <Stack gap={4}>
       <Field label="Keep which one">
         <Select value={keepId} onChange={(event) => setKeepId(event.target.value)}>
-          {group.map((row) => <option key={row.id} value={row.id}>{row.title} — {row.status.replace(/_/g, " ")}, {usedIn(row).length} uses</option>)}
+          {group.map((row) => <option key={row.id} value={row.id}>{row.title} — {row.status.replace(/_/g, " ")}, {usedIn(row).length} {usedIn(row).length === 1 ? "use" : "uses"}</option>)}
         </Select>
       </Field>
       <Grid>
         {group.map((row) => (
-          <Card key={row.id} span={6} title={row.title} subtitle={row.id === keepId ? "Kept" : "Archived and pointed at the kept one"}>
+          <Card key={row.id} eyebrow={row.id === keepId ? "KEEP" : "ARCHIVE"} prov="human" span={6} title={row.title} subtitle={row.id === keepId ? "Kept" : "Archived and pointed at the kept one"}>
             <Stack gap={2}>
               <AssetPreview record={row} height={110} />
               <Properties rows={[

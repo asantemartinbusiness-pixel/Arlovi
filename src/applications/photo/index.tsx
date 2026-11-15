@@ -15,8 +15,8 @@ import {
 } from "@/applications/visual/kit";
 import {
   NEUTRAL_ADJUST, addLayer, bakeCrop, compositeImageData, describeAdjust, exportComposite,
-  groupLayers, histogram, isNeutral, layerById, loadImage, makeCanvas, context2d,
-  newAdjustmentLayer, patchLayer, selectionBoundsOf, transformSelection,
+  groupLayers, isNeutral, layerById, loadImage, makeCanvas, context2d,
+  newAdjustmentLayer, patchLayer, selectionBoundsOf,
   type Adjust, type PhotoLayer, type RasterDoc,
 } from "./raster";
 import { PhotoCanvas, useImageBank, LayerThumb, type ImageBank } from "./canvas";
@@ -1170,5 +1170,753 @@ function ExportScreen({ context, lens }: { context: ScreenContext; lens: "Export
         )}
       </Card>
     </Grid>
+  );
+}
+
+/* ====================================================================== *
+ * Overlays
+ * ====================================================================== */
+
+function BulkImport({ context, close }: { context: ScreenContext; close: () => void }) {
+  const [results, setResults] = useState<{ name: string; state: "ok" | "rejected"; note: string }[]>([]);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Stack gap={3}>
+      <Notice tone="info" title="Files are decoded in this browser">
+        Nothing is uploaded. Each image becomes a record with its pixels stored in the workspace database.
+      </Notice>
+      <Field label="Images" hint="PNG, JPEG, WebP, GIF, AVIF and BMP are decoded. Anything else is reported rather than dropped.">
+        <input
+          type="file"
+          multiple
+          accept="image/*"
+          aria-label="Choose images"
+          onChange={async (event) => {
+            const files = Array.from(event.target.files ?? []);
+            setBusy(true);
+            const report: { name: string; state: "ok" | "rejected"; note: string }[] = [];
+            for (const file of files) {
+              const reason = unsupportedReason(file);
+              if (reason) {
+                await context.mutate.create({
+                  collection: "photos", title: file.name, status: "unreadable",
+                  summary: reason, fields: { kind: "image", bytes: file.size, license: "Unknown" },
+                }, `${file.name} could not be imported`);
+                report.push({ name: file.name, state: "rejected", note: reason });
+                continue;
+              }
+              try {
+                const src = await new Promise<string>((resolve, reject) => {
+                  const reader = new FileReader();
+                  reader.onload = () => resolve(String(reader.result));
+                  reader.onerror = () => reject(new Error("The file could not be read."));
+                  reader.readAsDataURL(file);
+                });
+                const image = await loadImage(src);
+                const doc: RasterDoc = {
+                  version: 2,
+                  width: image.naturalWidth, height: image.naturalHeight,
+                  layers: [{
+                    id: "layer-base", name: file.name, kind: "pixel",
+                    visible: true, locked: false, opacity: 1, blend: "normal",
+                    src, naturalWidth: image.naturalWidth, naturalHeight: image.naturalHeight,
+                    x: 0, y: 0, w: image.naturalWidth, h: image.naturalHeight, rotation: 0,
+                  }],
+                  activeLayerId: "layer-base",
+                  presets: [],
+                  profile: "sRGB IEC61966-2.1",
+                  rights: { license: "Unknown", credit: "not recorded" },
+                  origin: `Imported from ${file.name} in this browser.`,
+                  history: [],
+                };
+                await context.mutate.create({
+                  collection: "photos", title: file.name, status: "imported",
+                  summary: `${image.naturalWidth} × ${image.naturalHeight}, ${(file.size / 1024).toFixed(0)} kB.`,
+                  body: doc,
+                  fields: { kind: "image", width: image.naturalWidth, height: image.naturalHeight, bytes: file.size, license: "Unknown", importedAt: new Date().toISOString() },
+                }, `Imported ${file.name}`);
+                report.push({ name: file.name, state: "ok", note: `${image.naturalWidth} × ${image.naturalHeight}` });
+              } catch (error) {
+                await context.mutate.create({
+                  collection: "photos", title: file.name, status: "unreadable",
+                  summary: error instanceof Error ? error.message : "The browser could not decode this file.",
+                  fields: { kind: "image", bytes: file.size, license: "Unknown" },
+                }, `${file.name} could not be decoded`);
+                report.push({ name: file.name, state: "rejected", note: "The browser could not decode it." });
+              }
+            }
+            setResults(report);
+            setBusy(false);
+          }}
+        />
+      </Field>
+      {busy && <p className="ds-subtle">Decoding…</p>}
+      {results.length > 0 && (
+        <Stack gap={2}>
+          {results.map((item) => (
+            <Row key={item.name} gap={2} className="ds-panel" style={{ padding: "var(--space-2)" }}>
+              <span className="ds-grow">{item.name}</span>
+              <Pill tone={item.state === "ok" ? "success" : "danger"}>{item.state === "ok" ? item.note : "rejected"}</Pill>
+            </Row>
+          ))}
+          <Notice tone={results.some((item) => item.state === "rejected") ? "warning" : "success"} title={`${results.filter((item) => item.state === "ok").length} imported, ${results.filter((item) => item.state === "rejected").length} rejected`}>
+            A rejected file is still kept as a record with the reason, so the library never loses track of it. Every import starts with its licence marked Unknown.
+          </Notice>
+          <Button variant="primary" onClick={close}>Done</Button>
+        </Stack>
+      )}
+    </Stack>
+  );
+}
+
+function AssetDetail({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const record = useRecord(payload?.id ?? context.selectedId);
+  if (!record) return <Empty title="Select an image first" />;
+  const doc = parsePhoto(record.body);
+  return (
+    <Stack gap={3}>
+      <PhotoPreview record={record.id} doc={doc} height={200} />
+      <Properties rows={[
+        { label: "Title", value: record.title },
+        { label: "Pixels", value: <span className="ds-num">{doc.width} × {doc.height}</span> },
+        { label: "Layers", value: doc.layers.length },
+        { label: "Adjustment layers", value: doc.layers.filter((layer) => layer.kind === "adjustment").length },
+        { label: "Masks", value: doc.layers.filter((layer) => layer.mask).length },
+        { label: "Profile", value: doc.profile },
+        { label: "Origin", value: doc.origin },
+        { label: "Owner", value: record.ownerName },
+        { label: "Updated", value: context.dateTime(record.updatedAt) },
+      ]} />
+      <Button variant="primary" onClick={() => context.navigate(context.path("/o/:org/photo/photos/:id", record.id))}>Open in the editor</Button>
+    </Stack>
+  );
+}
+
+function LicencePanel({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const record = useRecord(payload?.id ?? context.selectedId);
+  const [credit, setCredit] = useState("");
+  if (!record) return <Empty title="Select an image first" />;
+  const licence = String(record.fields.license ?? "Unknown");
+  return (
+    <Stack gap={3}>
+      {licence === "Unknown" && <Notice tone="danger" title="Do not publish this image">Its licence is unknown. Record where it came from before it is used anywhere.</Notice>}
+      <Field label="Licence">
+        <Select
+          value={licence}
+          onChange={(event) => { void context.mutate.patch(record.id, { fields: { ...record.fields, license: event.target.value } }, { event: `Licence set on ${record.title}` }); }}
+        >
+          {["Unknown", "Company-owned", "Licensed — single use", "Licensed — unlimited", "Creative Commons BY", "Model released", "No model release"].map((option) => <option key={option}>{option}</option>)}
+        </Select>
+      </Field>
+      <Field label="Credit">
+        <Row gap={2}>
+          <TextInput value={credit} placeholder={String(record.fields.credit ?? "not recorded")} onChange={(event) => setCredit(event.target.value)} />
+          <Button size="sm" variant="secondary" disabled={!credit} onClick={() => { void context.mutate.patch(record.id, { fields: { ...record.fields, credit } }, { event: `Credit recorded on ${record.title}` }); setCredit(""); }}>Save</Button>
+        </Row>
+      </Field>
+      <Properties rows={[
+        { label: "Record", value: record.title },
+        { label: "Current credit", value: String(record.fields.credit ?? "not recorded") },
+      ]} />
+    </Stack>
+  );
+}
+
+function ToolOptions({ context }: { context: ScreenContext }) {
+  const ui = useStore(photoUi);
+  return (
+    <Stack gap={3}>
+      <PanelGroup title="Brush">
+        <SliderBoxLocal label="Size" value={ui.brush.size} min={1} max={400} onChange={(value) => photoUi.set((c) => ({ ...c, brush: { ...c.brush, size: value } }))} suffix="px" />
+        <SliderBoxLocal label="Softness" value={Math.round(ui.brush.softness * 100)} min={0} max={100} onChange={(value) => photoUi.set((c) => ({ ...c, brush: { ...c.brush, softness: value / 100 } }))} suffix="%" />
+        <SliderBoxLocal label="Opacity" value={Math.round(ui.brush.opacity * 100)} min={1} max={100} onChange={(value) => photoUi.set((c) => ({ ...c, brush: { ...c.brush, opacity: value / 100 } }))} suffix="%" />
+      </PanelGroup>
+      <ShortcutTable
+        rows={[
+          { keys: "B / E", does: "Brush and eraser" },
+          { keys: "[ and ]", does: "Smaller and larger brush" },
+          { keys: "I", does: "Pick a colour from the canvas" },
+          { keys: "M / N / L", does: "Rectangular, elliptical and lasso selection" },
+          { keys: "C", does: "Crop" },
+          { keys: "Arrows", does: "Move the active layer, Shift for ten pixels" },
+          { keys: "⌘Z / ⇧⌘Z", does: "Undo and redo" },
+          { keys: "⌘D", does: "Deselect" },
+          { keys: "⌘I", does: "Invert the selection" },
+          { keys: "0", does: "Reset the zoom" },
+        ]}
+      />
+      <Notice tone="warning" title="The clone tool is not a clone tool yet">
+        Choosing Clone paints with the brush. Sampling from one place and stamping it in another is not implemented, and the tool does not pretend otherwise.
+      </Notice>
+      <Button variant="ghost" onClick={() => context.closeOverlay()}>Close</Button>
+    </Stack>
+  );
+}
+
+function CanvasSize({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = usePhotoDoc(context);
+  const [width, setWidth] = useState(0);
+  const [height, setHeight] = useState(0);
+  const doc = handle.doc;
+  useEffect(() => { if (doc && width === 0) { setWidth(doc.width); setHeight(doc.height); } }, [doc, width]);
+  if (!record || !doc) return <Empty title="Open an image first" />;
+  return (
+    <Stack gap={3}>
+      <Properties rows={[{ label: "Now", value: <span className="ds-num">{doc.width} × {doc.height}</span> }]} />
+      <Row gap={2}>
+        <Field label="Width"><TextInput type="number" value={width} onChange={(event) => setWidth(Math.max(1, Number(event.target.value)))} /></Field>
+        <Field label="Height"><TextInput type="number" value={height} onChange={(event) => setHeight(Math.max(1, Number(event.target.value)))} /></Field>
+      </Row>
+      <Notice tone="warning" title="This changes the canvas, not the layers">
+        Layers keep their own pixels and position. Making the canvas smaller hides what falls outside it; it does not delete it.
+      </Notice>
+      <Button
+        variant="primary"
+        onClick={() => {
+          handle.edit((current) => ({ ...current, width, height }), "Change the canvas size");
+          context.toast("Canvas resized", `Now ${width} × ${height}. Layer pixels were not touched.`);
+          close();
+        }}
+      >
+        Resize the canvas
+      </Button>
+    </Stack>
+  );
+}
+
+function AdjustmentLayerPicker({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = usePhotoDoc(context);
+  if (!record || !handle.doc) return <Empty title="Open an image first" />;
+  const presets: { name: string; adjust: Partial<Adjust> }[] = [
+    { name: "Exposure", adjust: { exposure: 0.3 } },
+    { name: "Contrast", adjust: { contrast: 18 } },
+    { name: "Saturation", adjust: { saturation: 15 } },
+    { name: "Temperature", adjust: { temperature: 18 } },
+    { name: "Curves", adjust: { curve: [{ x: 0, y: 8 }, { x: 128, y: 138 }, { x: 255, y: 250 }] } },
+    { name: "Black and white", adjust: { saturation: -100, contrast: 12 } },
+  ];
+  return (
+    <Stack gap={3}>
+      <Notice tone="info" title="Non-destructive">An adjustment layer rewrites what is composited below it. The pixels on the layers themselves are never changed.</Notice>
+      <Grid>
+        {presets.map((preset) => (
+          <Card key={preset.name} span={4} pad="tight">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                handle.edit((current) => addLayer(current, newAdjustmentLayer(`adj-${Date.now().toString(36)}`, preset.name, preset.adjust)), `Add a ${preset.name.toLowerCase()} layer`);
+                context.toast("Adjustment added", `${preset.name} sits above the stack and can be turned off at any time.`);
+                close();
+              }}
+            >
+              {preset.name}
+            </Button>
+          </Card>
+        ))}
+      </Grid>
+    </Stack>
+  );
+}
+
+function SelectionOptions({ context }: { context: ScreenContext }) {
+  const { record, handle } = usePhotoDoc(context);
+  if (!record || !handle.doc) return <Empty title="Open an image first" />;
+  const doc = handle.doc;
+  return (
+    <Stack gap={3}>
+      {doc.selection ? (
+        <Properties rows={[
+          { label: "Kind", value: doc.selection.kind },
+          { label: "Feather", value: <span className="ds-num">{doc.selection.feather}px</span> },
+          { label: "Inverted", value: doc.selection.inverted ? "yes" : "no" },
+          { label: "Points", value: doc.selection.points?.length ?? "—" },
+        ]} />
+      ) : <p className="ds-subtle">Nothing is selected.</p>}
+      <Row gap={2} wrap>
+        <Button size="sm" variant="secondary" disabled={!doc.selection} onClick={() => handle.edit((current) => ({ ...current, selection: current.selection ? { ...current.selection, inverted: !current.selection.inverted } : undefined }), "Invert the selection")}>Invert</Button>
+        <Button size="sm" variant="secondary" disabled={!doc.selection} onClick={() => handle.edit((current) => ({ ...current, selection: undefined }), "Clear the selection")}>Deselect</Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => handle.edit((current) => ({ ...current, selection: { kind: "rect", rect: { x: 0, y: 0, w: current.width, h: current.height }, feather: 0, inverted: false } }), "Select everything")}
+        >
+          Select everything
+        </Button>
+      </Row>
+      <Notice tone="info" title="A selection survives a crop">
+        When a crop is baked the selection is carried through the same translation and rotation, so it stays over the same part of the picture.
+      </Notice>
+    </Stack>
+  );
+}
+
+function QuickMask({ context }: { context: ScreenContext }) {
+  const { record, handle, bank } = usePhotoDoc(context);
+  if (!record || !handle.doc) return <Empty title="Open an image first" />;
+  const doc = handle.doc;
+  const layer = layerById(doc, doc.activeLayerId);
+  return (
+    <Stack gap={3}>
+      <Notice tone="info" title="Quick mask">Paint in black to hide, white to show. The mask is a real greyscale image stored on the layer.</Notice>
+      {layer?.mask ? <img src={layer.mask} alt={`Mask on ${layer.name}`} style={{ width: "100%", borderRadius: 6, border: "1px solid var(--border-default)" }} /> : <p className="ds-subtle">{layer?.name ?? "This layer"} has no mask yet.</p>}
+      <Row gap={2} wrap>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={!layer}
+          onClick={() => {
+            const canvas = makeCanvas(doc.width, doc.height);
+            const ctx = context2d(canvas);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, doc.width, doc.height);
+            handle.edit((current) => patchLayer(current, layer!.id, { mask: canvas.toDataURL("image/png"), maskEnabled: true }), "Add a mask");
+            bumpPixels();
+          }}
+        >
+          Add a white mask
+        </Button>
+        <Button size="sm" variant="ghost" disabled={!layer?.mask} onClick={() => handle.edit((current) => patchLayer(current, layer!.id, { maskEnabled: !layer!.maskEnabled }), "Toggle the mask")}>Toggle</Button>
+      </Row>
+      <div style={{ position: "relative", height: 240 }}><PhotoCanvas handle={handle} bank={bank} paintTarget="mask" /></div>
+    </Stack>
+  );
+}
+
+function HistogramOverlay({ context }: { context: ScreenContext }) {
+  const { record, handle, bank } = usePhotoDoc(context);
+  const data = useHistogram(handle.doc, bank);
+  const before = useHistogram(handle.doc, bank, { bypassAdjustments: true });
+  if (!record) return <Empty title="Open an image first" />;
+  return (
+    <Stack gap={3}>
+      <PanelGroup title="After adjustments"><HistogramView data={data} height={110} /></PanelGroup>
+      <PanelGroup title="Before adjustments"><HistogramView data={before} height={110} /></PanelGroup>
+      {data && data.clippedWhite / Math.max(1, data.counted) > 0.02 && (
+        <Notice tone="warning" title="Highlights are clipping">{((data.clippedWhite / data.counted) * 100).toFixed(1)}% of the pixels are at or near pure white. Pull the exposure or the highlights down to recover them.</Notice>
+      )}
+      {data && data.clippedBlack / Math.max(1, data.counted) > 0.02 && (
+        <Notice tone="warning" title="Shadows are clipping">{((data.clippedBlack / data.counted) * 100).toFixed(1)}% of the pixels are at or near pure black.</Notice>
+      )}
+    </Stack>
+  );
+}
+
+function ColourPicker({ context }: { context: ScreenContext }) {
+  const ui = useStore(photoUi);
+  const { record, handle, bank } = usePhotoDoc(context);
+  if (!record) return <Empty title="Open an image first" />;
+  return (
+    <Stack gap={3}>
+      <Notice tone="info" title="Click the image to sample a pixel">The value is read from the composited canvas, so it is the colour you can actually see.</Notice>
+      <Row gap={3}>
+        <div style={{ width: 56, height: 56, borderRadius: 8, background: ui.brush.color, border: "1px solid var(--border-default)" }} />
+        <Properties rows={[{ label: "Brush colour", value: <span className="ds-num">{ui.brush.color}</span> }]} />
+      </Row>
+      <Button size="sm" variant="secondary" onClick={() => setPhotoTool("eyedropper")}>Choose the eyedropper</Button>
+      <div style={{ position: "relative", height: 260 }}><PhotoCanvas handle={handle} bank={bank} showSelectionOverlay={false} /></div>
+    </Stack>
+  );
+}
+
+function ProfileWarning({ context }: { context: ScreenContext }) {
+  const { record, handle } = usePhotoDoc(context);
+  if (!record || !handle.doc) return <Empty title="Open an image first" />;
+  return (
+    <Stack gap={3}>
+      <Notice tone="warning" title="Colour management is not implemented">
+        This editor works in the browser's canvas, which is sRGB. A document can record a different profile so a later converter knows what was intended, but no conversion happens here and every file exported is sRGB.
+      </Notice>
+      <Properties rows={[
+        { label: "Document profile", value: handle.doc.profile },
+        { label: "Working space", value: "sRGB (the browser canvas)" },
+        { label: "Export profile", value: "sRGB, untagged" },
+      ]} />
+      <Field label="Document profile">
+        <Select value={handle.doc.profile} onChange={(event) => handle.edit((current) => ({ ...current, profile: event.target.value }), "Change the colour profile")}>
+          {["sRGB IEC61966-2.1", "Display P3", "Adobe RGB (1998)", "ProPhoto RGB"].map((option) => <option key={option}>{option}</option>)}
+        </Select>
+      </Field>
+    </Stack>
+  );
+}
+
+function BlendPicker({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle, bank } = usePhotoDoc(context);
+  if (!record || !handle.doc) return <Empty title="Open an image first" />;
+  const doc = handle.doc;
+  const layer = layerById(doc, doc.activeLayerId);
+  if (!layer) return <Empty title="Select a layer" />;
+  return (
+    <Stack gap={3}>
+      <p className="ds-prose">Each preview is the real composite with that mode applied to <strong>{layer.name}</strong>.</p>
+      <Grid>
+        {["normal", "multiply", "screen", "overlay", "darken", "lighten", "soft-light", "difference", "luminosity"].map((mode) => (
+          <Card key={mode} span={4} pad="tight">
+            <BlendPreview doc={doc} bank={bank} layerId={layer.id} mode={mode as PhotoLayer["blend"]} />
+            <Button
+              size="sm"
+              variant={layer.blend === mode ? "primary" : "ghost"}
+              onClick={() => { handle.edit((current) => patchLayer(current, layer.id, { blend: mode as PhotoLayer["blend"] }), "Change the blend mode"); close(); }}
+            >
+              {mode}
+            </Button>
+          </Card>
+        ))}
+      </Grid>
+    </Stack>
+  );
+}
+
+function LinkedObject({ context }: { context: ScreenContext }) {
+  const { record, handle } = usePhotoDoc(context);
+  const assets = useCollection("assets");
+  if (!record || !handle.doc) return <Empty title="Open an image first" />;
+  const doc = handle.doc;
+  return (
+    <Stack gap={3}>
+      <Notice tone="info" title="Place an asset as a layer">
+        The asset's pixels are copied into a new layer. There is no live link back to the asset record, and this says so rather than implying one.
+      </Notice>
+      {assets.length === 0 ? <Empty title="No assets in this workspace" /> : (
+        <Stack gap={2}>
+          {assets.slice(0, 8).map((asset) => {
+            const body = asset.body as { src?: string; width?: number; height?: number } | undefined;
+            return (
+              <Row key={asset.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2)" }}>
+                <span className="ds-grow">{asset.title}</span>
+                {body?.width && <span className="ds-num">{body.width} × {body.height}</span>}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!body?.src}
+                  onClick={() => {
+                    handle.edit((current) => addLayer(current, {
+                      id: `layer-${Date.now().toString(36)}`, name: asset.title, kind: "pixel",
+                      visible: true, locked: false, opacity: 1, blend: "normal",
+                      src: body!.src, naturalWidth: body?.width, naturalHeight: body?.height,
+                      x: 0, y: 0, w: body?.width ?? current.width, h: body?.height ?? current.height, rotation: 0,
+                    }), `Place ${asset.title}`);
+                    context.toast("Placed", `${asset.title} is a new layer. Its licence is ${String(asset.fields.license ?? "not recorded")}.`);
+                  }}
+                >
+                  Place
+                </Button>
+              </Row>
+            );
+          })}
+        </Stack>
+      )}
+      <Properties rows={[{ label: "Layers now", value: doc.layers.length }]} />
+    </Stack>
+  );
+}
+
+/* ====================================================================== *
+ * Registration
+ * ====================================================================== */
+
+async function withPhoto(context: ScreenContext, change: (doc: RasterDoc) => RasterDoc, event: string): Promise<void> {
+  const id = context.params.id;
+  if (!id) return;
+  const { db } = await import("@/runtime/db");
+  const record = await db.records.get(id);
+  if (!record) return;
+  await context.mutate.patch(id, { body: change(parsePhoto(record.body)) }, { event });
+}
+
+const EDITOR_ACTIONS: ActionDef[] = [
+  {
+    id: "Crop", label: "Crop", placement: "primary",
+    run: async (context) => {
+      const draft = photoUi.get().cropDraft;
+      if (!draft || draft.rect.w < 4 || draft.rect.h < 4) {
+        setPhotoTool("crop");
+        context.toast("Crop tool chosen", "Drag on the canvas to set the crop, then press Crop again to apply it.", "info");
+        return;
+      }
+      const id = context.params.id;
+      if (!id) return;
+      const { db } = await import("@/runtime/db");
+      const record = await db.records.get(id);
+      if (!record) return;
+      const baked = await bakeCrop(parsePhoto(record.body), draft.rect, draft.angle);
+      await context.mutate.patch(id, { body: baked }, { event: `Cropped ${record.title} to ${Math.round(draft.rect.w)} × ${Math.round(draft.rect.h)}` });
+      photoUi.set((current) => ({ ...current, cropDraft: undefined, tool: "move" }));
+      bumpPixels();
+      context.toast("Cropped", `The pixels were rewritten to ${Math.round(draft.rect.w)} × ${Math.round(draft.rect.h)}. The previous document is in the record's snapshots and in undo.`);
+    },
+  },
+  { id: "brush", label: "Brush", placement: "toolbar", run: () => setPhotoTool("brush") },
+  { id: "clone", label: "Clone", placement: "overflow", run: (context) => { setPhotoTool("clone"); context.toast("Clone is the brush for now", "Sampling from another part of the image is not implemented. The tool paints with the brush.", "info"); } },
+  {
+    id: "transform", label: "Rotate the layer 90°", placement: "overflow",
+    run: (context) => withPhoto(context, (doc) => patchLayer(doc, doc.activeLayerId, { rotation: (layerById(doc, doc.activeLayerId)?.rotation ?? 0) + 90 }), "Rotated a layer by 90 degrees"),
+  },
+  { id: "paint", label: "Eraser", placement: "overflow", run: () => setPhotoTool("eraser") },
+  { id: "undo", label: "Undo", placement: "secondary", run: (context) => { context.toast("Use ⌘Z on the canvas", "The editor's undo stack is on the canvas toolbar and on ⌘Z; it holds every step of this session.", "info"); } },
+];
+
+const MASK_ACTIONS: ActionDef[] = [
+  { id: "Lasso", label: "Lasso", placement: "primary", run: () => setPhotoTool("lasso") },
+  {
+    id: "select subject", label: "Select the subject", placement: "secondary",
+    guard: () => "No model is connected, so a subject cannot be found for you",
+    run: (context) => context.openOverlay("Selection options"),
+  },
+  { id: "refine edge", label: "Refine the edge", placement: "secondary", run: (context) => context.setTab("Refine") },
+  {
+    id: "invert", label: "Invert", placement: "overflow",
+    run: (context) => withPhoto(context, (doc) => ({ ...doc, selection: doc.selection ? { ...doc.selection, inverted: !doc.selection.inverted } : undefined }), "Inverted the selection"),
+  },
+  { id: "mask", label: "Quick mask", placement: "overflow", run: (context) => context.openOverlay("quick mask") },
+];
+
+registerApp({
+  code: "PHOTO",
+  short: "Photo",
+  name: "Photo & Image Editing",
+  purpose: "Raster editing with real layers, masks and adjustments, computed in this browser.",
+  icon: Camera,
+  nav: [
+    { label: "Library", items: [{ label: "Photo library", screenId: "ARL-PHOTO-001", icon: Images }, { label: "Batch processing", screenId: "ARL-PHOTO-006", icon: LayersIcon }] },
+    {
+      label: "The open image",
+      items: [
+        { label: "Raster editor", screenId: "ARL-PHOTO-002", icon: Brush },
+        { label: "Selections and masks", screenId: "ARL-PHOTO-003", icon: Lasso },
+        { label: "Adjustments", screenId: "ARL-PHOTO-004", icon: SlidersHorizontal },
+        { label: "Compositing", screenId: "ARL-PHOTO-005", icon: LayersIcon },
+        { label: "Export", screenId: "ARL-PHOTO-007", icon: Download },
+      ],
+    },
+  ],
+  screens: {
+    "ARL-PHOTO-001": {
+      id: "ARL-PHOTO-001",
+      tabs: (["Recent", "Albums", "Shared", "Imports"] as const).map((lens) => ({
+        id: lens,
+        render: (context: ScreenContext) => <PhotoLibrary context={context} lens={lens} />,
+      })),
+      actions: [
+        { id: "Upload", label: "Upload", placement: "primary", run: (context) => context.openOverlay("Bulk import") },
+        {
+          id: "tag", label: "Tag", placement: "secondary",
+          guard: (context) => (context.selectedId ? undefined : "Select an image first"),
+          run: async (context) => {
+            const { db } = await import("@/runtime/db");
+            const record = await db.records.get(context.selectedId!);
+            if (!record) return;
+            const tag = record.tags.includes("review") ? record.tags.filter((item) => item !== "review") : [...record.tags, "review"];
+            await context.mutate.patch(record.id, { tags: tag }, { event: `Tagged ${record.title}` });
+            context.toast("Tag changed", tag.includes("review") ? "Tagged for review." : "The review tag was removed.");
+          },
+        },
+        { id: "select", label: "Clear the selection", placement: "overflow", run: (context) => context.select(undefined) },
+        {
+          id: "compare", label: "Compare", placement: "secondary",
+          guard: (context) => (context.selectedId ? undefined : "Select an image first"),
+          run: (context) => context.openOverlay("asset detail"),
+        },
+        {
+          id: "open", label: "Open", placement: "overflow",
+          guard: (context) => (context.selectedId ? undefined : "Select an image first"),
+          run: (context) => context.navigate(context.path("/o/:org/photo/photos/:id", context.selectedId)),
+        },
+      ],
+      overlays: [
+        { id: "Bulk import", kind: "modal", title: "Import images", width: 560, render: ({ close, ...context }) => <BulkImport context={context} close={close} /> },
+        { id: "asset detail", kind: "drawer", title: "Image", width: 440, render: ({ ...context }) => <AssetDetail context={context} /> },
+        { id: "license", kind: "drawer", title: "Rights", width: 420, render: ({ ...context }) => <LicencePanel context={context} /> },
+      ],
+    },
+
+    "ARL-PHOTO-002": {
+      id: "ARL-PHOTO-002",
+      chrome: "full",
+      surface: (context) => <RasterEditor context={context} actions={EDITOR_ACTIONS} />,
+      tabs: (["Edit", "Layers", "Adjust", "Review"] as const).map((lens) => ({
+        id: lens,
+        render: (context: ScreenContext) => <RasterEditor context={context} actions={EDITOR_ACTIONS} />,
+      })),
+      actions: EDITOR_ACTIONS,
+      overlays: [
+        { id: "Tool options", kind: "drawer", title: "Tool options", width: 420, render: ({ ...context }) => <ToolOptions context={context} /> },
+        { id: "canvas size", kind: "modal", title: "Canvas size", width: 460, render: ({ close, ...context }) => <CanvasSize context={context} close={close} /> },
+        { id: "adjustment layer", kind: "modal", title: "Add an adjustment layer", width: 560, render: ({ close, ...context }) => <AdjustmentLayerPicker context={context} close={close} /> },
+      ],
+    },
+
+    "ARL-PHOTO-003": {
+      id: "ARL-PHOTO-003",
+      chrome: "full",
+      surface: (context) => <MasksScreen context={context} actions={MASK_ACTIONS} />,
+      tabs: (["Select", "Refine", "Mask", "Compare"] as const).map((lens) => ({
+        id: lens,
+        render: (context: ScreenContext) => <MasksScreen context={context} actions={MASK_ACTIONS} />,
+      })),
+      actions: MASK_ACTIONS,
+      overlays: [
+        { id: "Selection options", kind: "drawer", title: "Selection", width: 420, render: ({ ...context }) => <SelectionOptions context={context} /> },
+        { id: "refinement", kind: "modal", title: "Refine the edge", width: 480, render: ({ ...context }) => <SelectionOptions context={context} /> },
+        { id: "quick mask", kind: "modal", title: "Quick mask", width: 640, render: ({ ...context }) => <QuickMask context={context} /> },
+      ],
+    },
+
+    "ARL-PHOTO-004": {
+      id: "ARL-PHOTO-004",
+      tabs: (["Basic", "Curves", "Colour", "Detail"] as const).map((lens) => ({
+        id: lens,
+        render: (context: ScreenContext) => <AdjustScreen context={context} lens={lens} />,
+      })),
+      actions: [
+        {
+          id: "Adjust slider", label: "Brighten by a third of a stop", placement: "primary",
+          run: (context) => withPhoto(context, (doc) => {
+            const target = doc.layers.filter((layer) => layer.kind === "adjustment").at(-1);
+            if (!target?.adjust) return addLayer(doc, newAdjustmentLayer(`adj-${Date.now().toString(36)}`, "Exposure", { exposure: 0.33 }));
+            return patchLayer(doc, target.id, { adjust: { ...target.adjust, exposure: target.adjust.exposure + 0.33 } });
+          }, "Raised the exposure by a third of a stop"),
+        },
+        {
+          id: "reset", label: "Reset", placement: "secondary",
+          run: (context) => withPhoto(context, (doc) => {
+            const target = doc.layers.filter((layer) => layer.kind === "adjustment").at(-1);
+            return target ? patchLayer(doc, target.id, { adjust: { ...NEUTRAL_ADJUST, curve: [{ x: 0, y: 0 }, { x: 255, y: 255 }] } }) : doc;
+          }, "Reset the adjustment"),
+        },
+        {
+          id: "save preset", label: "Save as a preset", placement: "secondary",
+          run: (context) => withPhoto(context, (doc) => {
+            const target = doc.layers.filter((layer) => layer.kind === "adjustment").at(-1);
+            if (!target?.adjust) return doc;
+            return { ...doc, presets: [...doc.presets, { id: `pr-${Date.now().toString(36)}`, name: `Preset ${doc.presets.length + 1}`, adjust: { ...target.adjust, curve: [...target.adjust.curve] } }] };
+          }, "Saved an adjustment preset"),
+        },
+        { id: "compare", label: "Compare", placement: "overflow", run: () => photoUi.set((current) => ({ ...current, compare: !current.compare })) },
+      ],
+      overlays: [
+        { id: "Histogram", kind: "drawer", title: "Histogram", width: 420, render: ({ ...context }) => <HistogramOverlay context={context} /> },
+        { id: "colour picker", kind: "modal", title: "Pick a colour", width: 620, render: ({ ...context }) => <ColourPicker context={context} /> },
+        { id: "profile warning", kind: "modal", title: "Colour profiles", width: 520, render: ({ ...context }) => <ProfileWarning context={context} /> },
+      ],
+    },
+
+    "ARL-PHOTO-005": {
+      id: "ARL-PHOTO-005",
+      tabs: (["Layers", "Groups", "Effects", "History"] as const).map((lens) => ({
+        id: lens,
+        render: (context: ScreenContext) => <CompositeScreen context={context} lens={lens} />,
+      })),
+      actions: [
+        {
+          id: "Reorder", label: "Raise the layer", placement: "primary",
+          run: (context) => withPhoto(context, (doc) => moveLayerLocal(doc, doc.activeLayerId, 1), "Raised a layer"),
+        },
+        { id: "group", label: "Group", placement: "secondary", run: (context) => context.setTab("Groups") },
+        { id: "blend", label: "Blend mode…", placement: "secondary", run: (context) => context.openOverlay("Blend picker") },
+        {
+          id: "transform", label: "Flip the layer", placement: "overflow",
+          run: (context) => withPhoto(context, (doc) => patchLayer(doc, doc.activeLayerId, { rotation: (layerById(doc, doc.activeLayerId)?.rotation ?? 0) + 180 }), "Flipped a layer"),
+        },
+        { id: "replace", label: "Place an asset", placement: "overflow", run: (context) => context.openOverlay("linked object") },
+      ],
+      overlays: [
+        { id: "Blend picker", kind: "modal", title: "Blend mode", width: 680, render: ({ close, ...context }) => <BlendPicker context={context} close={close} /> },
+        { id: "layer properties", kind: "drawer", title: "Layer", width: 400, render: ({ ...context }) => <LayerPropertiesOverlay context={context} /> },
+        { id: "linked object", kind: "modal", title: "Place an asset", width: 560, render: ({ ...context }) => <LinkedObject context={context} /> },
+      ],
+    },
+
+    "ARL-PHOTO-006": {
+      id: "ARL-PHOTO-006",
+      tabs: (["Queue", "Presets", "Results", "Failed"] as const).map((lens) => ({
+        id: lens,
+        render: (context: ScreenContext) => <BatchScreen context={context} lens={lens} />,
+      })),
+      actions: [
+        { id: "Build batch", label: "Build the batch", placement: "primary", run: (context) => context.setTab("Queue") },
+        { id: "test sample", label: "Test one sample", placement: "secondary", run: (context) => context.setTab("Presets") },
+        { id: "execute", label: "Run the queue", placement: "secondary", run: (context) => context.setTab("Queue") },
+        { id: "download", label: "Results", placement: "overflow", run: (context) => context.setTab("Results") },
+      ],
+      overlays: [
+        { id: "Preset editor", kind: "modal", title: "Batch preset", width: 520, render: () => (
+          <Stack gap={3}>
+            <Notice tone="info" title="Presets live on the screen for now">
+              The format, size and naming on the Presets tab apply to the queue immediately. Storing a named preset on the workspace is not built; this says so instead of pretending to save one.
+            </Notice>
+            <Properties rows={[
+              { label: "What is applied", value: "Format, quality, longest edge and the file-name pattern" },
+              { label: "What is stored", value: "Nothing yet" },
+            ]} />
+          </Stack>
+        ) },
+        { id: "overwrite confirmation", kind: "modal", title: "Name collisions", tone: "danger", width: 480, render: () => (
+          <Stack gap={3}>
+            <Notice tone="warning" title="Nothing is overwritten">
+              Two images that produce the same file name get a counter appended, deterministically and in queue order, so a batch run twice produces the same names in the same order.
+            </Notice>
+            <Properties rows={[
+              { label: "First", value: <span className="ds-num">arc-lamp-1600x1067.jpg</span> },
+              { label: "Second", value: <span className="ds-num">arc-lamp-1600x1067-2.jpg</span> },
+            ]} />
+            <Notice tone="info" title="Where the files go">Each one downloads through the browser. This page cannot see the download folder, so it cannot check what is already there.</Notice>
+          </Stack>
+        ) },
+        { id: "result report", kind: "drawer", title: "Batch report", width: 460, render: ({ ...context }) => (
+          <Stack gap={3}>
+            <Notice tone="info" title="The report is on the Results and Failed tabs">Each row carries the output name, the pixel size and the byte count of the file that was actually encoded.</Notice>
+            <Button variant="secondary" onClick={() => context.setTab("Results")}>Open the results</Button>
+          </Stack>
+        ) },
+      ],
+    },
+
+    "ARL-PHOTO-007": {
+      id: "ARL-PHOTO-007",
+      tabs: (["Export", "Presets", "Publish"] as const).map((lens) => ({
+        id: lens,
+        render: (context: ScreenContext) => <ExportScreen context={context} lens={lens} />,
+      })),
+      actions: [
+        { id: "Set format", label: "Formats", placement: "secondary", run: (context) => context.setTab("Export") },
+        { id: "preview", label: "Preview the real file", placement: "secondary", run: (context) => context.openOverlay("Export preview") },
+        { id: "export", label: "Export", placement: "primary", run: (context) => context.setTab("Export") },
+        { id: "upload to asset library", label: "Add to the asset library", placement: "overflow", run: (context) => context.setTab("Publish") },
+      ],
+      overlays: [
+        { id: "Export preview", kind: "modal", title: "Export preview", width: 680, render: ({ ...context }) => <ExportScreen context={context} lens="Export" /> },
+        { id: "rights", kind: "drawer", title: "Rights", width: 420, render: ({ ...context }) => <RightsOverlay context={context} /> },
+        { id: "profile handling", kind: "modal", title: "Colour profiles", width: 520, render: ({ ...context }) => <ProfileWarning context={context} /> },
+      ],
+    },
+  },
+});
+
+function LayerPropertiesOverlay({ context }: { context: ScreenContext }) {
+  const { record, handle } = usePhotoDoc(context);
+  if (!record || !handle.doc) return <Empty title="Open an image first" />;
+  return <LayerProperties handle={handle} />;
+}
+
+function RightsOverlay({ context }: { context: ScreenContext }) {
+  const { record, handle } = usePhotoDoc(context);
+  if (!record || !handle.doc) return <Empty title="Open an image first" />;
+  const doc = handle.doc;
+  return (
+    <Stack gap={3}>
+      <Field label="Licence">
+        <Select value={doc.rights.license} onChange={(event) => handle.edit((current) => ({ ...current, rights: { ...current.rights, license: event.target.value } }), "Change the licence")}>
+          {["Unknown", "Company-owned", "Licensed — single use", "Licensed — unlimited", "Creative Commons BY", "Model released", "No model release"].map((option) => <option key={option}>{option}</option>)}
+        </Select>
+      </Field>
+      <Field label="Credit">
+        <TextInput value={doc.rights.credit} onChange={(event) => handle.edit((current) => ({ ...current, rights: { ...current.rights, credit: event.target.value } }), "Change the credit")} />
+      </Field>
+      {doc.rights.license === "Unknown" && <Notice tone="danger" title="Do not publish">Resolve the licence before this image leaves the workspace.</Notice>}
+      <Notice tone="info" title="Rights travel with the export">An export copied into the asset library carries this licence and credit onto the new record.</Notice>
+    </Stack>
   );
 }

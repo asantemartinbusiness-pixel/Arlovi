@@ -32,9 +32,9 @@ registerSeed("sheets", (context) => {
   }, {
     freeze: { rows: 1, cols: 1 },
     styles: {
-      A1: { bold: true, fill: "#EEF1F7" }, B1: { bold: true, fill: "#EEF1F7" }, C1: { bold: true, fill: "#EEF1F7" },
-      D1: { bold: true, fill: "#EEF1F7" }, E1: { bold: true, fill: "#EEF1F7" }, F1: { bold: true, fill: "#EEF1F7" },
-      G1: { bold: true, fill: "#EEF1F7" }, H1: { bold: true, fill: "#EEF1F7" },
+      A1: { bold: true, fill: "var(--bg-sunken)" }, B1: { bold: true, fill: "var(--bg-sunken)" }, C1: { bold: true, fill: "var(--bg-sunken)" },
+      D1: { bold: true, fill: "var(--bg-sunken)" }, E1: { bold: true, fill: "var(--bg-sunken)" }, F1: { bold: true, fill: "var(--bg-sunken)" },
+      G1: { bold: true, fill: "var(--bg-sunken)" }, H1: { bold: true, fill: "var(--bg-sunken)" },
       D2: { format: "currency" }, D3: { format: "currency" }, D4: { format: "currency" }, D5: { format: "currency" }, D6: { format: "currency" },
       E2: { format: "currency" }, E3: { format: "currency" }, E4: { format: "currency" }, E5: { format: "currency" }, E6: { format: "currency" },
       H2: { format: "currency" }, H3: { format: "currency" }, H4: { format: "currency" }, H5: { format: "currency" }, H6: { format: "currency" },
@@ -53,7 +53,7 @@ registerSeed("sheets", (context) => {
     A5: "9000", B5: "Project", C5: "0.12",
   }, {
     styles: {
-      A1: { bold: true, fill: "#EEF1F7" }, B1: { bold: true, fill: "#EEF1F7" }, C1: { bold: true, fill: "#EEF1F7" },
+      A1: { bold: true, fill: "var(--bg-sunken)" }, B1: { bold: true, fill: "var(--bg-sunken)" }, C1: { bold: true, fill: "var(--bg-sunken)" },
       A2: { format: "currency" }, A3: { format: "currency" }, A4: { format: "currency" }, A5: { format: "currency" },
       C2: { format: "percent", decimals: 0 }, C3: { format: "percent", decimals: 0 }, C4: { format: "percent", decimals: 0 }, C5: { format: "percent", decimals: 0 },
     },
@@ -71,9 +71,9 @@ registerSeed("sheets", (context) => {
   }, {
     freeze: { rows: 1, cols: 1 },
     styles: {
-      A1: { bold: true, fill: "#EEF1F7" }, B1: { bold: true, fill: "#EEF1F7" }, C1: { bold: true, fill: "#EEF1F7" },
-      D1: { bold: true, fill: "#EEF1F7" }, E1: { bold: true, fill: "#EEF1F7" }, F1: { bold: true, fill: "#EEF1F7" },
-      G1: { bold: true, fill: "#EEF1F7" }, H1: { bold: true, fill: "#EEF1F7" }, I1: { bold: true, fill: "#EEF1F7" },
+      A1: { bold: true, fill: "var(--bg-sunken)" }, B1: { bold: true, fill: "var(--bg-sunken)" }, C1: { bold: true, fill: "var(--bg-sunken)" },
+      D1: { bold: true, fill: "var(--bg-sunken)" }, E1: { bold: true, fill: "var(--bg-sunken)" }, F1: { bold: true, fill: "var(--bg-sunken)" },
+      G1: { bold: true, fill: "var(--bg-sunken)" }, H1: { bold: true, fill: "var(--bg-sunken)" }, I1: { bold: true, fill: "var(--bg-sunken)" },
       I2: { format: "percent", decimals: 1 }, I3: { format: "percent", decimals: 1 }, I4: { format: "percent", decimals: 1 }, I5: { format: "percent", decimals: 1 },
       I7: { format: "percent", decimals: 1, bold: true, border: ["top"] },
       B11: { format: "currency" },
@@ -147,8 +147,8 @@ registerSeed("sheets", (context) => {
     }, {
       freeze: { rows: 1, cols: 1 },
       styles: {
-        A1: { bold: true, fill: "#EEF1F7" }, B1: { bold: true, fill: "#EEF1F7" }, C1: { bold: true, fill: "#EEF1F7" },
-        D1: { bold: true, fill: "#EEF1F7" }, E1: { bold: true, fill: "#EEF1F7" },
+        A1: { bold: true, fill: "var(--bg-sunken)" }, B1: { bold: true, fill: "var(--bg-sunken)" }, C1: { bold: true, fill: "var(--bg-sunken)" },
+        D1: { bold: true, fill: "var(--bg-sunken)" }, E1: { bold: true, fill: "var(--bg-sunken)" },
         B2: { format: "currency" }, B3: { format: "currency" }, B4: { format: "currency" }, B5: { format: "currency" },
         C2: { format: "currency" }, C3: { format: "currency" }, C4: { format: "currency" }, C5: { format: "currency" },
         D2: { format: "currency" }, D3: { format: "currency" }, D4: { format: "currency" }, D5: { format: "currency" },
@@ -168,7 +168,7 @@ registerSeed("sheets", (context) => {
   return {
     records: [
       context.rec({
-        org: "nl", collection: "workbooks", n: 20, title: "Trade model 2026",
+        org: "nl", collection: "workbooks", n: 320, title: "Trade model 2026",
         status: "active", owner: "Jonah Adeyemi",
         summary: "Pipeline, discount bands, margin by line and a summary that reads them.",
         tags: ["model", "finance"],
@@ -176,7 +176,7 @@ registerSeed("sheets", (context) => {
         body: workbook,
       }),
       context.rec({
-        org: "nl", collection: "workbooks", n: 21, title: "Cash view, four months",
+        org: "nl", collection: "workbooks", n: 321, title: "Cash view, four months",
         status: "active", owner: "Jonah Adeyemi",
         summary: "A running cash position built from monthly in and out.",
         tags: ["cash"],
@@ -184,7 +184,7 @@ registerSeed("sheets", (context) => {
         body: cashflow,
       }),
       context.rec({
-        org: "nl", collection: "workbooks", n: 22, title: "Stocktake template",
+        org: "nl", collection: "workbooks", n: 322, title: "Stocktake template",
         status: "template", owner: "Theo Marsh",
         summary: "Count sheet for the Walthamstow shelves.",
         tags: ["template", "operations"],
@@ -195,13 +195,13 @@ registerSeed("sheets", (context) => {
             A2: "ARC-BB", B2: "Arc Lamp brushed brass", C2: "0", D2: "0", E2: "=D2-C2",
             A3: "ARC-BL", B3: "Arc Lamp blackened", C3: "0", D3: "0", E3: "=D3-C3",
             A5: "Total variance", E5: "=SUM(E2:E3)",
-          }, { freeze: { rows: 1, cols: 0 }, styles: { A1: { bold: true, fill: "#EEF1F7" }, B1: { bold: true, fill: "#EEF1F7" }, C1: { bold: true, fill: "#EEF1F7" }, D1: { bold: true, fill: "#EEF1F7" }, E1: { bold: true, fill: "#EEF1F7" } } })],
+          }, { freeze: { rows: 1, cols: 0 }, styles: { A1: { bold: true, fill: "var(--bg-sunken)" }, B1: { bold: true, fill: "var(--bg-sunken)" }, C1: { bold: true, fill: "var(--bg-sunken)" }, D1: { bold: true, fill: "var(--bg-sunken)" }, E1: { bold: true, fill: "var(--bg-sunken)" } } })],
           activeSheetId: "sh-stock",
           namedRanges: [], tables: [], charts: [], comments: [], protection: [], io: [],
         } satisfies Workbook,
       }),
       context.rec({
-        org: "nl", collection: "workbooks", n: 23, title: "Broken import, needs attention",
+        org: "nl", collection: "workbooks", n: 323, title: "Broken import, needs attention",
         status: "active", owner: "Maya Chen",
         summary: "An imported model with a circular reference and an unsupported function.",
         tags: ["import", "errors"],
@@ -221,7 +221,7 @@ registerSeed("sheets", (context) => {
         } satisfies Workbook,
       }),
       context.rec({
-        org: "hb", collection: "workbooks", n: 20, title: "US landed cost",
+        org: "hb", collection: "workbooks", n: 320, title: "US landed cost",
         status: "active", owner: "Elena Ward",
         summary: "Duty, freight and landed cost per unit for the Arc range.",
         tags: ["model"],
@@ -235,8 +235,8 @@ registerSeed("sheets", (context) => {
           }, {
             freeze: { rows: 1, cols: 1 },
             styles: {
-              A1: { bold: true, fill: "#EEF1F7" }, B1: { bold: true, fill: "#EEF1F7" }, C1: { bold: true, fill: "#EEF1F7" },
-              D1: { bold: true, fill: "#EEF1F7" }, E1: { bold: true, fill: "#EEF1F7" }, F1: { bold: true, fill: "#EEF1F7" },
+              A1: { bold: true, fill: "var(--bg-sunken)" }, B1: { bold: true, fill: "var(--bg-sunken)" }, C1: { bold: true, fill: "var(--bg-sunken)" },
+              D1: { bold: true, fill: "var(--bg-sunken)" }, E1: { bold: true, fill: "var(--bg-sunken)" }, F1: { bold: true, fill: "var(--bg-sunken)" },
               B2: { format: "currency" }, B3: { format: "currency" }, C2: { format: "currency" }, C3: { format: "currency" },
               D2: { format: "percent", decimals: 1 }, D3: { format: "percent", decimals: 1 },
               E2: { format: "currency" }, E3: { format: "currency" }, F2: { format: "currency" }, F3: { format: "currency" },

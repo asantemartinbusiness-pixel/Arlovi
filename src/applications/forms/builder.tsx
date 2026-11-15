@@ -165,7 +165,7 @@ export function FormBuilder({ context }: { context: ScreenContext }) {
         <Notice tone="info" title="Rules live on their own screen too">
           This summary is the same model the conditional logic screen edits. A hidden field is never validated, so a required question behind a rule cannot block a submission.
         </Notice>
-        <Card title="Rules" subtitle={`${model.logic.length} on this form`}
+        <Card eyebrow="LOGIC" prov="human" title="Rules" subtitle={`${model.logic.length} on this form`}
           footer={<Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/logic`)}>Open the logic editor</Button>}>
           {model.logic.length === 0
             ? <Empty title="No rules" icon={<ListChecks size={20} />}>Every field is shown to everyone.</Empty>
@@ -331,10 +331,7 @@ export function FormThemeEditor({ model, onChange }: { model: FormModel; onChang
   const theme = model.theme;
   return (
     <Stack gap={4}>
-      <div>
-        <h3 style={{ fontSize: "var(--text-md)" }}>Appearance</h3>
-        <p className="ds-subtle">The preview beside this panel uses the same values the public form does.</p>
-      </div>
+      <p className="ds-subtle">These values drive the preview beside this panel and the live form alike.</p>
       <Row gap={2} wrap>
         <Field label="Accent"><TextInput type="color" value={theme.accent} onChange={(event) => onChange({ ...theme, accent: event.target.value })} style={{ minWidth: 72 }} /></Field>
         <Field label="Ink"><TextInput type="color" value={theme.ink} onChange={(event) => onChange({ ...theme, ink: event.target.value })} style={{ minWidth: 72 }} /></Field>
@@ -364,7 +361,7 @@ export function FormThemeEditor({ model, onChange }: { model: FormModel; onChang
 export function FormSettingsPanel({ context, record, model }: { context: ScreenContext; record: Rec; model: FormModel }) {
   return (
     <Grid>
-      <Card span={7} title="Settings" subtitle="Applied to the public form and every submission">
+      <Card span={7} eyebrow="SETTINGS" prov="human" title="Settings" subtitle="Applied to the public form and every submission">
         <form
           id="form-settings"
           className="ds-stack ds-gap-4"
@@ -410,7 +407,7 @@ export function FormSettingsPanel({ context, record, model }: { context: ScreenC
           <Button type="submit" variant="primary">Save settings</Button>
         </form>
       </Card>
-      <Card span={5} title="Notification" subtitle="Where this stops">
+      <Card span={5} eyebrow="NOTIFICATION" prov="unknown" title="Notification" subtitle="Where this stops">
         <Stack gap={3}>
           <Properties rows={[
             { label: "Mail provider", value: <Pill tone="warning" dot>Not connected</Pill> },

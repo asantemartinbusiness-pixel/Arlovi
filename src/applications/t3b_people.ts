@@ -7,4 +7,6 @@ import "@/domain/seeds/legal";
 import "./hr/index";
 import "./project/index";
 import "./comms/index";
+import "./care/index";
+import "./legal/index";
 export {};

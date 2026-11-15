@@ -32,7 +32,7 @@ export function FinanceOverview({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={5}>
       <StatRow>
-        <Stat
+        <Stat prov="posted"
           label="Cash on the ledger"
           value={context.money(data.cash.amountMinor)}
           meta={age.known ? `Last posting ${context.relative(data.cash.lastPosted)}${age.stale ? " · stale" : ""}` : "No posting recorded"}
@@ -45,20 +45,20 @@ export function FinanceOverview({ context }: { context: ScreenContext }) {
           meta={recon.statement ? `From ${recon.statement.filename}, imported by hand` : "No feed and no statement imported"}
           onClick={() => context.openOverlay("Metric drilldown", { metric: "bank" })}
         />
-        <Stat
+        <Stat prov="posted"
           label="Receivable"
           value={context.money(receivable)}
           meta={`${open.length} open · ${overdue.length} past due`}
           delta={overdue.length ? { dir: "down", text: `${context.money(overdue.reduce((sum, invoice) => sum + outstandingMinor(invoice), 0))} late` } : undefined}
           onClick={() => context.openOverlay("Metric drilldown", { metric: "receivable" })}
         />
-        <Stat
+        <Stat prov="posted"
           label="Payable"
           value={context.money(payableMinor)}
           meta={`${payables.length} bills unpaid`}
           onClick={() => context.openOverlay("Metric drilldown", { metric: "payable" })}
         />
-        <Stat
+        <Stat prov="posted"
           label={`Result · ${periodLabel(data.currentPeriod, org.locale)}`}
           value={context.money(pl.revenue - pl.expense)}
           meta={`${month.journalCount} posted journals this month`}
@@ -74,7 +74,7 @@ export function FinanceOverview({ context }: { context: ScreenContext }) {
       />
 
       <Grid>
-        <Card span={8} title="Revenue and cost by month" subtitle="Posted journals only. Drafts and forecasts are excluded.">
+        <Card prov="posted" eyebrow="LEDGER" span={8} title="Revenue and cost by month" subtitle="Posted journals only. Drafts and forecasts are excluded.">
           <BarChart
             title="Revenue and cost of sales by month"
             height={220}
@@ -87,7 +87,7 @@ export function FinanceOverview({ context }: { context: ScreenContext }) {
           />
         </Card>
 
-        <Card span={4} title="Reconciling" subtitle={recon.statement ? `${recon.statement.filename}` : "Nothing imported"}
+        <Card prov="human" eyebrow="BANK" span={4} title="Reconciling" subtitle={recon.statement ? `${recon.statement.filename}` : "Nothing imported"}
           actions={<CapabilityPill id="bank.feed" />}>
           {recon.statement ? (
             <Stack gap={3}>
@@ -112,7 +112,7 @@ export function FinanceOverview({ context }: { context: ScreenContext }) {
           )}
         </Card>
 
-        <Card span={7} title="Invoices due" subtitle={`${open.length} open, oldest first`} flush>
+        <Card prov="posted" eyebrow="RECEIVABLES" span={7} title="Invoices due" subtitle={`${open.length} open, oldest first`} flush>
           {open.length === 0 ? (
             <Empty title="Nothing outstanding" icon={<ReceiptText size={20} />}>Every issued invoice is settled in this ledger.</Empty>
           ) : (
@@ -135,7 +135,7 @@ export function FinanceOverview({ context }: { context: ScreenContext }) {
           )}
         </Card>
 
-        <Card span={5} title="Receivables ageing" subtitle="By days past the due date">
+        <Card prov="posted" eyebrow="AGEING" span={5} title="Receivables ageing" subtitle="By days past the due date">
           <Stack gap={3}>
             {ageBuckets(open, now).map((bucket) => (
               <Row key={bucket.bucket} gap={3}>
@@ -148,7 +148,7 @@ export function FinanceOverview({ context }: { context: ScreenContext }) {
           </Stack>
         </Card>
 
-        <Card span={12} title="Source status" subtitle="What this workspace can and cannot verify">
+        <Card prov="unknown" eyebrow="SOURCES" span={12} title="Source status" subtitle="What this workspace can and cannot verify">
           <Grid>
             <div className="ds-col-6"><CapabilityNotice id="bank.feed" /></div>
             <div className="ds-col-6"><CapabilityNotice id="tax.file" /></div>
@@ -174,7 +174,7 @@ export function CashflowTab({ context }: { context: ScreenContext }) {
 
   return (
     <Grid>
-      <Card
+      <Card prov="human"
         span={8}
         title="Cash on the ledger"
         subtitle="Closing balance on the cash accounts at the end of each month"
@@ -188,7 +188,7 @@ export function CashflowTab({ context }: { context: ScreenContext }) {
           footer={`Derived from ${data.postedCount} posted journals touching ${flow.cashAccountIds.length} cash accounts. No bank feed confirms these balances.`}
         />
       </Card>
-      <Card span={4} title="Movement by activity" subtitle="Classified by the account on the other side of each entry">
+      <Card prov="posted" eyebrow="CASH FLOW" span={4} title="Movement by activity" subtitle="Classified by the account on the other side of each entry">
         <StatementRow
           context={context}
           rows={[
@@ -201,7 +201,7 @@ export function CashflowTab({ context }: { context: ScreenContext }) {
         />
         <SourceNote>Equity and 27xx loan accounts count as financing, 15xx fixed assets as investing, everything else as operating.</SourceNote>
       </Card>
-      <Card span={12} title="Largest cash movements" subtitle="Every line is a posted journal, not an estimate" flush>
+      <Card prov="posted" eyebrow="CASH FLOW" span={12} title="Largest cash movements" subtitle="Every line is a posted journal, not an estimate" flush>
         <DataGrid
           rows={flow.rows}
           rowId={(row) => `${row.activity}-${row.label}`}
@@ -243,7 +243,7 @@ export function FinanceTasks({ context }: { context: ScreenContext }) {
   return (
     <Grid>
       {tasks.map((task) => (
-        <Card key={task.id} span={6} title={task.title} subtitle={task.body}
+        <Card prov="posted" key={task.id} span={6} title={task.title} subtitle={task.body}
           actions={<Pill tone={task.tone}>{task.count}</Pill>}
           footer={<Button size="sm" variant="secondary" onClick={() => context.navigate(task.to)}>Open</Button>}
         />
@@ -311,7 +311,7 @@ export function FinanceInsights({ context }: { context: ScreenContext }) {
       </Notice>
       <Grid>
         {notes.map((note) => (
-          <Card key={note.id} span={6} title={note.title} subtitle={note.body}
+          <Card prov="posted" key={note.id} span={6} title={note.title} subtitle={note.body}
             footer={<>
               {note.to && <Button size="sm" variant="secondary" onClick={() => context.navigate(note.to!)}>Open the source</Button>}
               <span className="ds-grow" />
@@ -425,7 +425,7 @@ export function PeriodSelector({ context, close }: { context: ScreenContext; clo
   return (
     <Stack gap={4}>
       <Field label="Reporting period" hint="Only months with at least one posted journal are listed.">
-        <Select value={period} onChange={(event) => setPeriod(event.target.value)}>
+        <Select aria-label="Reporting period" value={period} onChange={(event) => setPeriod(event.target.value)}>
           {data.periods.map((item) => <option key={item} value={item}>{periodLabel(item, org.locale)}</option>)}
         </Select>
       </Field>
@@ -474,7 +474,7 @@ export function CorrectionProposal({ context, close }: { context: ScreenContext;
         This records what you think is wrong. Correcting a posted entry needs a reversal, which Finance posts from the General Ledger.
       </Notice>
       <Field label="What looks wrong" required hint={payload?.note ? `About: ${payload.note}` : undefined}>
-        <TextArea value={note} onChange={(event) => setNote(event.target.value)} rows={4} required />
+        <TextArea aria-label="What looks wrong" value={note} onChange={(event) => setNote(event.target.value)} rows={4} required />
       </Field>
       <Row gap={2}>
         <Button type="submit" variant="primary" busy={busy} disabled={!note.trim()}>Record the proposal</Button>

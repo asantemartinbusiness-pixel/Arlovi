@@ -25,10 +25,10 @@ export function EntitiesTab({ context }: { context: ScreenContext }) {
       </Notice>
 
       <StatRow>
-        <Stat label="Entities" value={String(data.entities.length)} meta={`${consolidation.columns.filter((column) => column.debitMinor > 0).length} with postings`} />
-        <Stat label="Tagged journals" value={String(data.journals.filter((journal) => journal.status === "posted" && entityOf(journal)).length)} meta="Posted entries with an entity" />
-        <Stat label="Untagged journals" value={String(consolidation.unassignedJournalIds.length)} meta="Counted in the first entity's column" />
-        <Stat label="Intercompany journals" value={String(consolidation.eliminatedJournalIds.length)} meta="Eliminated once in the group column" />
+        <Stat prov="posted" label="Entities" value={String(data.entities.length)} meta={`${consolidation.columns.filter((column) => column.debitMinor > 0).length} with postings`} />
+        <Stat prov="posted" label="Tagged journals" value={String(data.journals.filter((journal) => journal.status === "posted" && entityOf(journal)).length)} meta="Posted entries with an entity" />
+        <Stat prov="posted" label="Untagged journals" value={String(consolidation.unassignedJournalIds.length)} meta="Counted in the first entity's column" />
+        <Stat prov="posted" label="Intercompany journals" value={String(consolidation.eliminatedJournalIds.length)} meta="Eliminated once in the group column" />
       </StatRow>
 
       <Grid>
@@ -36,7 +36,7 @@ export function EntitiesTab({ context }: { context: ScreenContext }) {
           const column = consolidation.columns.find((item) => item.entityId === entity.id);
           const parent = data.entities.find((item) => item.id === String(entity.fields.parentId ?? ""));
           return (
-            <Card
+            <Card prov="posted"
               key={entity.id}
               span={4}
               title={entity.title}
@@ -95,14 +95,14 @@ export function IntercompanyTab({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Intercompany receivable" value={context.money(receivable)} meta="Account 1900" />
-        <Stat label="Intercompany payable" value={context.money(payable)} meta="Account 2900" />
-        <Stat
+        <Stat prov="posted" label="Intercompany receivable" value={context.money(receivable)} meta="Account 1900" />
+        <Stat prov="posted" label="Intercompany payable" value={context.money(payable)} meta="Account 2900" />
+        <Stat prov="posted"
           label="Mirror difference"
           value={context.money(receivable - payable)}
           meta={receivable === payable ? "The two sides agree" : "The two sides do not agree"}
         />
-        <Stat label="Journals" value={String(intercompany.length)} meta="Tagged as intercompany" />
+        <Stat prov="posted" label="Journals" value={String(intercompany.length)} meta="Tagged as intercompany" />
       </StatRow>
 
       {receivable !== payable && (
@@ -112,7 +112,7 @@ export function IntercompanyTab({ context }: { context: ScreenContext }) {
       )}
 
       <Grid>
-        <Card span={5} title="Control accounts" subtitle="Where intercompany balances sit">
+        <Card prov="posted" span={5} title="Control accounts" subtitle="Where intercompany balances sit">
           <Stack gap={3}>
             {accounts.map((account) => (
               <Row key={account.id} gap={3}>
@@ -123,7 +123,7 @@ export function IntercompanyTab({ context }: { context: ScreenContext }) {
             {accounts.length === 0 && <span className="ds-subtle">No 1900 or 2900 account exists in this chart of accounts.</span>}
           </Stack>
         </Card>
-        <Card span={7} title="Intercompany journals" subtitle="Each appears in one entity's column and is eliminated once in the group" flush>
+        <Card prov="posted" span={7} title="Intercompany journals" subtitle="Each appears in one entity's column and is eliminated once in the group" flush>
           {intercompany.length === 0 ? (
             <div className="ds-card-body"><span className="ds-subtle">No journal is tagged as intercompany.</span></div>
           ) : (
@@ -141,7 +141,7 @@ export function IntercompanyTab({ context }: { context: ScreenContext }) {
             />
           )}
         </Card>
-        <Card span={12} title="By entity" subtitle="Where the intercompany value sits">
+        <Card prov="posted" span={12} title="By entity" subtitle="Where the intercompany value sits">
           <Stack gap={2}>
             {pairs.map((pair) => (
               <Row key={pair.key} gap={3}>
@@ -218,7 +218,7 @@ export function ConsolidationTab({ context }: { context: ScreenContext }) {
       </div>
 
       <Grid>
-        <Card span={6} title="Check against the single-entity trial balance" subtitle="The whole organisation, with nothing eliminated">
+        <Card prov="posted" span={6} title="Check against the single-entity trial balance" subtitle="The whole organisation, with nothing eliminated">
           <StatementRow
             context={context}
             rows={[
@@ -229,7 +229,7 @@ export function ConsolidationTab({ context }: { context: ScreenContext }) {
             ]}
           />
         </Card>
-        <Card span={6} title="What this consolidation does not do" subtitle="Stated rather than implied">
+        <Card prov="posted" span={6} title="What this consolidation does not do" subtitle="Stated rather than implied">
           <Stack gap={2}>
             <SourceNote>It does not translate a different functional currency: no exchange-rate source is connected.</SourceNote>
             <SourceNote>It does not eliminate unrealised profit on intercompany stock, because no stock transfer is tagged as intercompany here.</SourceNote>
@@ -257,8 +257,8 @@ export function FxTab({ context }: { context: ScreenContext }) {
         A rate would have to come from a provider, and none is attached to this workspace. Where an entity reports in another currency, its figures are shown in that currency and never converted with a made-up rate.
       </Notice>
       <StatRow>
-        <Stat label="Reporting currency" value={org.currency} meta={`${org.locale} formatting`} />
-        <Stat label="Entities in another currency" value={String(foreign.length)} />
+        <Stat prov="posted" label="Reporting currency" value={org.currency} meta={`${org.locale} formatting`} />
+        <Stat prov="posted" label="Entities in another currency" value={String(foreign.length)} />
         <Stat label="Rates on file" value={rates.length ? String(rates.length) : "None"} unavailable={rates.length === 0} meta="A rate must be recorded with its date and source" />
         <Stat label="Translated figures" value="None" unavailable meta="Nothing is converted" />
       </StatRow>
@@ -323,25 +323,25 @@ export function EntityConfig({ context, close }: { context: ScreenContext; close
         close();
       }}
     >
-      <Field label="Legal name" required><TextInput value={title} invalid={duplicate} onChange={(event) => setTitle(event.target.value)} required /></Field>
+      <Field label="Legal name" required><TextInput aria-label="Legal name" value={title} invalid={duplicate} onChange={(event) => setTitle(event.target.value)} required /></Field>
       {duplicate && <Notice tone="danger" title="That name is already recorded">Two entities with the same name make a consolidation column ambiguous.</Notice>}
       <Row gap={3} wrap>
-        <Field label="Registration number"><TextInput value={number} onChange={(event) => setNumber(event.target.value)} /></Field>
-        <Field label="Country"><TextInput value={country} onChange={(event) => setCountry(event.target.value)} /></Field>
+        <Field label="Registration number"><TextInput aria-label="Registration number" value={number} onChange={(event) => setNumber(event.target.value)} /></Field>
+        <Field label="Country"><TextInput aria-label="Country" value={country} onChange={(event) => setCountry(event.target.value)} /></Field>
         <Field label="Functional currency" hint="A currency other than the organisation's is never converted here.">
-          <Select value={currency} onChange={(event) => setCurrency(event.target.value)}>
+          <Select aria-label="Functional currency" value={currency} onChange={(event) => setCurrency(event.target.value)}>
             {["GBP", "USD", "EUR"].map((item) => <option key={item}>{item}</option>)}
           </Select>
         </Field>
       </Row>
       <Field label="Parent">
-        <Select value={parentId} onChange={(event) => setParentId(event.target.value)}>
+        <Select aria-label="Parent" value={parentId} onChange={(event) => setParentId(event.target.value)}>
           <option value="">None, it is the top company</option>
           {data.entities.filter((entity) => entity.id !== existing?.id).map((entity) => <option key={entity.id} value={entity.id}>{entity.title}</option>)}
         </Select>
       </Field>
       {cycle && <Notice tone="danger" title="An entity cannot be its own parent" />}
-      <Field label="What it does"><TextArea value={summary} rows={2} onChange={(event) => setSummary(event.target.value)} /></Field>
+      <Field label="What it does"><TextArea aria-label="What it does" value={summary} rows={2} onChange={(event) => setSummary(event.target.value)} /></Field>
       <Row gap={2}>
         <Button type="submit" variant="primary" busy={busy} disabled={!title.trim() || duplicate || cycle}>{existing ? "Save entity" : "Record entity"}</Button>
         <Button variant="ghost" onClick={close}>Cancel</Button>

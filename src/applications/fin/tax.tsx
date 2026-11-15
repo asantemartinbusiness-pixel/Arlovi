@@ -60,7 +60,7 @@ export function TaxCodesTab({ context }: { context: ScreenContext }) {
       )}
 
       <Grid>
-        <Card span={7} title={`Rules for ${org.jurisdiction}`} subtitle={`${TAX_RULES.filter((rule) => rule.jurisdiction === org.jurisdiction).length} approved combinations`} flush>
+        <Card eyebrow="TAX ENGINE" span={7} title={`Rules for ${org.jurisdiction}`} subtitle={`${TAX_RULES.filter((rule) => rule.jurisdiction === org.jurisdiction).length} approved combinations`} flush>
           <DataGrid
             rows={TAX_RULES.filter((rule) => rule.jurisdiction === org.jurisdiction)}
             rowId={(row) => `${row.category}-${row.code.code}-${row.customerStatus.join("")}`}
@@ -76,20 +76,20 @@ export function TaxCodesTab({ context }: { context: ScreenContext }) {
           />
         </Card>
 
-        <Card span={5} title="Resolve a combination" subtitle="The same function the invoice editor calls">
+        <Card eyebrow="RESOLVER" span={5} title="Resolve a combination" subtitle="The same function the invoice editor calls">
           <Stack gap={3}>
             <Field label="Line category">
-              <Select value={category} onChange={(event) => setCategory(event.target.value as TaxCategory)}>
+              <Select aria-label="Line category" value={category} onChange={(event) => setCategory(event.target.value as TaxCategory)}>
                 {TAX_CATEGORIES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
               </Select>
             </Field>
             <Field label="Customer tax status">
-              <Select value={status} onChange={(event) => setStatus(event.target.value as CustomerTaxStatus)}>
+              <Select aria-label="Customer tax status" value={status} onChange={(event) => setStatus(event.target.value as CustomerTaxStatus)}>
                 {CUSTOMER_TAX_STATUSES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
               </Select>
             </Field>
             <Field label="Transaction date" hint="A rule only applies from the date it came into force.">
-              <input className="ds-input" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+              <input aria-label="Transaction date" className="ds-input" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
             </Field>
             <div className="ds-panel" style={{ padding: "var(--space-4)" }}>
               <Row gap={2}>
@@ -110,7 +110,7 @@ export function TaxCodesTab({ context }: { context: ScreenContext }) {
           </Stack>
         </Card>
 
-        <Card span={12} title="Stored code records" subtitle="Reference records in this workspace, checked against the engine" flush>
+        <Card prov="posted" span={12} title="Stored code records" subtitle="Reference records in this workspace, checked against the engine" flush>
           <DataGrid
             rows={drift}
             rowId={(row) => row.record.id}
@@ -159,10 +159,10 @@ export function TaxPeriodsTab({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Periods with activity" value={String(periods.length)} />
-        <Stat label="Output tax to date" value={context.money(rows.reduce((sum, row) => sum + row.boxes.outputTaxMinor, 0))} meta="Across every period" />
-        <Stat label="Input tax to date" value={context.money(rows.reduce((sum, row) => sum + row.boxes.inputTaxMinor, 0))} meta="From recorded bills" />
-        <Stat label="Documents with no rate" value={String(rows.reduce((sum, row) => sum + row.boxes.unknownDocumentIds.length, 0))} meta="Held as UNKNOWN" />
+        <Stat prov="posted" label="Periods with activity" value={String(periods.length)} />
+        <Stat prov="posted" label="Output tax to date" value={context.money(rows.reduce((sum, row) => sum + row.boxes.outputTaxMinor, 0))} meta="Across every period" />
+        <Stat prov="human" label="Input tax to date" value={context.money(rows.reduce((sum, row) => sum + row.boxes.inputTaxMinor, 0))} meta="From recorded bills" />
+        <Stat prov="posted" label="Documents with no rate" value={String(rows.reduce((sum, row) => sum + row.boxes.unknownDocumentIds.length, 0))} meta="Held as UNKNOWN" />
       </StatRow>
       <DataGrid
         rows={rows}
@@ -201,7 +201,7 @@ export function ReturnsTab({ context }: { context: ScreenContext }) {
       <CapabilityNotice id="tax.file" title="This return cannot be filed from here" />
       <Row gap={3} wrap>
         <Field label="Period">
-          <Select value={period} onChange={(event) => setPeriod(event.target.value)}>
+          <Select aria-label="Period" value={period} onChange={(event) => setPeriod(event.target.value)}>
             {periods.map((item) => <option key={item} value={item}>{periodLabel(item, org.locale)}</option>)}
           </Select>
         </Field>
@@ -211,7 +211,7 @@ export function ReturnsTab({ context }: { context: ScreenContext }) {
       </Row>
 
       <Grid>
-        <Card span={6} title={`The return this workspace would file for ${periodLabel(period, org.locale)}`} subtitle={`${org.jurisdiction} rules`}>
+        <Card prov="posted" span={6} title={`The return this workspace would file for ${periodLabel(period, org.locale)}`} subtitle={`${org.jurisdiction} rules`}>
           <StatementRow
             context={context}
             rows={[
@@ -226,7 +226,7 @@ export function ReturnsTab({ context }: { context: ScreenContext }) {
           />
         </Card>
 
-        <Card span={6} title="Resolved codes in the period" subtitle="Grouped by the code the engine produced">
+        <Card prov="posted" span={6} title="Resolved codes in the period" subtitle="Grouped by the code the engine produced">
           {boxes.outputs.length === 0 ? <span className="ds-subtle">Nothing was issued in this period.</span> : (
             <div className="ds-grid-scroll">
               <table className="ds-table">
@@ -275,7 +275,7 @@ export function ReturnsTab({ context }: { context: ScreenContext }) {
           </div>
         )}
 
-        <Card span={12} title="Documents behind the figures" subtitle="Every invoice counted in this period" flush>
+        <Card prov="posted" span={12} title="Documents behind the figures" subtitle="Every invoice counted in this period" flush>
           <DocumentsInPeriod context={context} period={period} />
         </Card>
       </Grid>
@@ -350,9 +350,9 @@ export function TaxAuditTab({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <StatRow>
-        <Stat label="Lines resolved" value={String(perLine.length)} meta="Across every live document" />
-        <Stat label="Distinct codes used" value={String(new Set(perLine.map((row) => row.code)).size)} />
-        <Stat label="Unresolved lines" value={String(unknown.length)} meta={unknown.length ? "Each one is listed below" : "Every line has an approved rate"} />
+        <Stat prov="posted" label="Lines resolved" value={String(perLine.length)} meta="Across every live document" />
+        <Stat prov="posted" label="Distinct codes used" value={String(new Set(perLine.map((row) => row.code)).size)} />
+        <Stat prov="human" label="Unresolved lines" value={String(unknown.length)} meta={unknown.length ? "Each one is listed below" : "Every line has an approved rate"} />
         <Stat label="Filing" value="Not connected" unavailable meta="No tax authority connection exists" />
       </StatRow>
       {unknown.length > 0 && (
@@ -360,7 +360,7 @@ export function TaxAuditTab({ context }: { context: ScreenContext }) {
           {unknown.map((row) => `${row.invoice.title}: ${row.description} (${row.category}, ${row.status})`).join("; ")}
         </Notice>
       )}
-      <Card title="Every line and the code it resolved to" subtitle="The audit a reviewer would ask for" flush>
+      <Card prov="posted" title="Every line and the code it resolved to" subtitle="The audit a reviewer would ask for" flush>
         <DataGrid
           rows={perLine}
           rowId={(row) => row.id}
@@ -382,7 +382,7 @@ export function TaxAuditTab({ context }: { context: ScreenContext }) {
           }}
         />
       </Card>
-      <Card title="Recorded events" subtitle={`${events.length} tax-related entries in this browser`}>
+      <Card prov="posted" title="Recorded events" subtitle={`${events.length} tax-related entries in this browser`}>
         {events.length === 0 ? <span className="ds-subtle">Nothing recorded yet.</span> : (
           <Stack gap={2}>
             {events.slice(0, 12).map((event) => (
@@ -494,7 +494,7 @@ export function ReturnReview({ context }: { context: ScreenContext }) {
       <Properties rows={[
         { label: "Period", value: periodLabel(period, org.locale) },
         { label: "Jurisdiction", value: org.jurisdiction },
-        { label: "Prepared", value: context.dateTime(context.now) },
+        { label: "Prepared", value: <span className="ds-num">{context.dateTime(context.now)}</span> },
         { label: "Filing state", value: <CapabilityPill id="tax.file" /> },
       ]} />
       <StatementRow
@@ -549,7 +549,7 @@ export function FilingAuthorization({ context, close }: { context: ScreenContext
       />
       {blocked && <Notice tone="warning" title="Preparation is blocked">{blocked}</Notice>}
       <Field label="Note for the file" hint="Kept with the prepared return in this workspace.">
-        <TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} />
+        <TextArea aria-label="Note for the file" value={note} rows={3} onChange={(event) => setNote(event.target.value)} />
       </Field>
       <Row gap={2}>
         <Button
