@@ -1,0 +1,80 @@
+[
+ {
+  "id": "ARL-INBOX-001",
+  "title": "Unified Inbox",
+  "route": "/o/northline/inbox/inbox",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "For You",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approvals",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Messages",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Updates",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Activity",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Notification detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "snooze picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "action preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Mark read",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Snooze",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open record",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Bulk triage",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

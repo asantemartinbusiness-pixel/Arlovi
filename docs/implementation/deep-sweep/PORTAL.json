@@ -1,0 +1,523 @@
+[
+ {
+  "id": "ARL-PORTAL-001",
+  "title": "Portal Directory",
+  "route": "/o/northline/portal/portals",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Clients",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Customers",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Suppliers",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Partners",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Portal wizard",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "branding",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "access setup",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Clone selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview as the client",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New portal",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Suspend selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Branding",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Access settings",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PORTAL-002",
+  "title": "Portal Builder",
+  "route": "/o/northline/portal/portals/nl-portals-001/builder",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pages",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Design",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Data",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Access",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Module picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "data grant",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "publish review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test access",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Arrange modules",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Bind permitted data",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview as the client",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish review",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PORTAL-003",
+  "title": "External Dashboard",
+  "route": "/o/northline/portal/portals/nl-portals-001/dashboard",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Work",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Files",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Messages",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Billing",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Shared item inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "client message",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "access request",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request a service",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Comment on selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "View selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Message the studio",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PORTAL-004",
+  "title": "Shared Documents",
+  "route": "/o/northline/portal/portals/nl-portals-001/files",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Shared",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Needs review",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Signed",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archive",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Document preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "permission request",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "signature",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Download selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Comment on selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "View selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Accept and sign",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request access",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PORTAL-005",
+  "title": "External Messaging",
+  "route": "/o/northline/portal/portals/nl-portals-001/messages",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Inbox",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Requests",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Conversation details",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "attachment preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "complaint",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Upload an attachment",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Book a meeting",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reply",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Escalate as a complaint",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Attachments",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PORTAL-006",
+  "title": "Portal Billing & Requests",
+  "route": "/o/northline/portal/portals/nl-portals-001/billing",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Invoices",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Payments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Requests",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Payment provider",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "dispute form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "document receipt",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Download an invoice",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Submit a request",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pay selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Dispute an invoice",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PORTAL-007",
+  "title": "Portal Access & Analytics",
+  "route": "/o/northline/portal/portals/nl-portals-001/admin",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Users",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Access",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Analytics",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Audit",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "External invite",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "scope preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "account recovery",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set expiry",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Revoke access",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Invite someone",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review activity",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "What this portal reaches",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Extend or revoke (30 days)",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

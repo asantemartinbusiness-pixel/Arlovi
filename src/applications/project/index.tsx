@@ -351,7 +351,8 @@ function BatchReview({ context, close }: { context: ScreenContext; close: () => 
 function WorkloadDetail({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { person?: string } | undefined;
   const data = useProjectData();
-  const person = payload?.person ?? String(useRecord(context.selectedId)?.fields.assignee ?? "");
+  const selected = useRecord(context.selectedId);
+  const person = payload?.person ?? String(selected?.fields.assignee ?? "");
   const assigned = data.tasks.filter((task) => String(task.fields.assignee ?? task.ownerName) === person && stageOf(task) !== "done" && task.fields.kind !== "onboarding");
   if (!person) return <Empty title="Choose a person" icon={<Users size={20} />} />;
   return (

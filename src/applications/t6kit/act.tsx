@@ -64,7 +64,8 @@ export interface ActSpec {
   submit: string;
   apply: (input: ActInput & { values: Record<string, string> }) => Promise<string | ActResult | void>;
   /** A hook the body calls so it re-renders when outside state (a store) changes. */
-  watch?: () => unknown;
+  /** Called on every render of the overlay; may call hooks, so it is named as one. */
+  useWatch?: () => unknown;
   /** Close after a successful apply (default true). */
   closeOnDone?: boolean;
 }
@@ -94,7 +95,7 @@ export function targetIds(context: ScreenContext): (string | undefined)[] {
 }
 
 function ActBody({ spec, context, close }: { spec: ActSpec; context: ScreenContext; close: () => void }) {
-  const watched = spec.watch?.();
+  const watched = spec.useWatch?.();
   const all = useCollection(spec.collection ?? "__no_collection__");
   const people = useCollection("members").filter((member) => String(member.fields.kind ?? "human") !== "ai");
   const candidates = spec.collection ? (spec.candidates ? spec.candidates(all, context) : all) : [];

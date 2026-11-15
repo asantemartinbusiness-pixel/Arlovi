@@ -46,7 +46,7 @@ function verifiedSince(record: Rec | undefined): boolean {
   return Boolean(record && ranAt && ranAt > (record.at ?? record.createdAt));
 }
 
-const watchDiagnostics = () => useItUi((state) => `${state.ranAt}|${state.running}`);
+const useWatchDiagnostics = () => useItUi((state) => `${state.ranAt}|${state.running}`);
 
 function IncidentFacts({ record }: ActInput) {
   if (!record) return null;
@@ -179,7 +179,7 @@ export const resolveIncident = actOverlay({
   collection: "incidents",
   noun: "incident",
   candidates: (rows) => rows.filter(isOpenIncident),
-  watch: watchDiagnostics,
+  useWatch: useWatchDiagnostics,
   consequence: () => "The incident is marked resolved with you as the verifier. It can only be resolved after the diagnostics have run since it was opened.",
   Details: DiagnosticsGate,
   blocked: ({ record }) => (verifiedSince(record) ? undefined : "Run the diagnostics after this incident was opened. An incident does not resolve on a belief."),
@@ -417,7 +417,7 @@ export function SavedFilterForm({ context, close }: { context: ScreenContext; cl
 export const bookmarkOverlay = actOverlay({
   id: "bookmark entry",
   title: "Bookmark a log entry",
-  watch: () => useEvents(undefined, 60),
+  useWatch: () => useEvents(undefined, 60),
   consequence: () => "A bookmark is a record that points at one audit entry, with your note. It appears at the top of the Logs tab for everyone in this workspace.",
   blocked: ({ watched }) => ((watched as Audit[] | undefined)?.length ? undefined : "There is no log entry to bookmark yet."),
   fields: ({ context, watched }) => {
@@ -558,7 +558,7 @@ export const runbookEditor = actOverlay({
 export const approveProposal = actOverlay({
     id: "approve proposal",
     title: "Approve a remediation proposal",
-    watch: () => useItUi((state) => state.ranAt),
+    useWatch: () => useItUi((state) => state.ranAt),
     consequence: () => "Approving records the proposal as an approved remediation on the register, with you as the approver. A proposal exists only because a check failed or needs review; approving it does not run it.",
     blocked: () => {
       const failing = useItUi.getState().results.filter((result) => result.state === "fail" || result.state === "warn");
@@ -650,7 +650,7 @@ export const approveRelease = actOverlay({
   collection: "incidents",
   noun: "release",
   width: 620,
-  watch: watchDiagnostics,
+  useWatch: useWatchDiagnostics,
   candidates: (rows) => rows.filter((record) => isRelease(record) && ["planned", "staging"].includes(record.status)),
   consequence: () => "Approving records you as the person who accepted this release. It is refused while any gate is unmet; it does not deploy.",
   Details: ({ record }) => <ReleaseGatesPanel record={record} />,

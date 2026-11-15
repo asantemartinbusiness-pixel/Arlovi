@@ -66,7 +66,7 @@ export const moveField = actOverlay({
   collection: "forms",
   noun: "form",
   candidates: routeForm,
-  watch: () => useFormsUi((state) => state.selectedFieldId),
+  useWatch: () => useFormsUi((state) => state.selectedFieldId),
   consequence: () => "Moves a field to a new position: the keyboard and single-pointer equivalent of dragging its grip. A rule that depends on a later question is flagged afterwards.",
   fields: ({ record }) => {
     const model = form(record);

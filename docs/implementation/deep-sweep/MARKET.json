@@ -1,0 +1,874 @@
+[
+ {
+  "id": "ARL-MARKET-001",
+  "title": "Marketing Overview",
+  "route": "/o/northline/market/home",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Performance",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Calendar",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Opportunities",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Metric source",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "campaign wizard",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "budget inspector",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect a figure",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Ask Marketing",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create campaign",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "View alerts",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MARKET-002",
+  "title": "Campaign Library",
+  "route": "/o/northline/market/campaigns",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Draft",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approval",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Active",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Completed",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Campaign template",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "plan approval",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "duplicate rules",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Duplicate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare campaigns",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New campaign",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Archive selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Start from a template",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve selected plan",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open attribution",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MARKET-003",
+  "title": "Campaign Detail",
+  "route": "/o/northline/market/campaigns/nl-campaigns-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Plan",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Assets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Channels",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Results",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Activity",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Creative preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "launch approval",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "pause consequence",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit draft brief",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pause",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve plan",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Launch locally",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request review",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MARKET-004",
+  "title": "Content Calendar",
+  "route": "/o/northline/market/calendar",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Month",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Week",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "List",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "By channel",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Post editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "asset picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "publish preview",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Preview",
+   "Reschedule selected",
+   "Publish (queue locally)",
+   "Edit caption",
+   "Attach media"
+  ]
+ },
+ {
+  "id": "ARL-MARKET-005",
+  "title": "Social Publishing",
+  "route": "/o/northline/market/social",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Drafts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Schedule",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Published",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Failed",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Account authorization",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "post composer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "delivery receipt",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Connect an account",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New post",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Retry safely",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit in the composer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Delivery receipt",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MARKET-006",
+  "title": "Email Campaigns",
+  "route": "/o/northline/market/email",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Campaigns",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Templates",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Audiences",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Reports",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Audience preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "send review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "suppression check",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve recipients",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test send",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Build an email",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule the send",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set the send window",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Suppression check",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MARKET-007",
+  "title": "Audience Segments",
+  "route": "/o/northline/market/audiences",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Segments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Contacts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exclusions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sources",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Segment builder",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "consent inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "export permission",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview members",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Build a segment",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set exclusions",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MARKET-008",
+  "title": "Advertising",
+  "route": "/o/northline/market/ads",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Accounts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Campaigns",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Creative",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Spend",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exceptions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Ad preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "spend approval",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "campaign diagnostics",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New paid campaign",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Change allocation",
+   "Pause selected",
+   "Reconcile spend",
+   "Diagnose"
+  ]
+ },
+ {
+  "id": "ARL-MARKET-009",
+  "title": "SEO & Content",
+  "route": "/o/northline/market/seo",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Audit",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Content",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Keywords",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Technical",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Audit issue",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "page editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "technical recommendation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign an issue",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit metadata",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Run audit",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish metadata",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open landing pages",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MARKET-010",
+  "title": "Landing Pages",
+  "route": "/o/northline/market/pages",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Library",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Builder",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tests",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Analytics",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Page template",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "publish confirm",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "version compare",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New page",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open the builder",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Edit visually",
+   "Test the page",
+   "Publish (export HTML)",
+   "Revert to a version"
+  ]
+ },
+ {
+  "id": "ARL-MARKET-011",
+  "title": "Attribution & Analytics",
+  "route": "/o/northline/market/analytics",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Channels",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Funnels",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Revenue",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Cohorts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Models",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Attribution model",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "source inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "metric notes",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Filter channels",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare models",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Drill into order sources",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export channel table (CSV)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Metric notes",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Revenue view",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MARKET-012",
+  "title": "Marketing Templates",
+  "route": "/o/northline/market/templates",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Saved",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approved",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archived",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Template editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "approval",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "global update impact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Fork",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish version",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New template",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Impact of a change",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

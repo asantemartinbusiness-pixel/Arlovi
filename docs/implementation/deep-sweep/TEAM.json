@@ -1,0 +1,696 @@
+[
+ {
+  "id": "ARL-TEAM-001",
+  "title": "Workforce Home",
+  "route": "/o/northline/team/home",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Activity",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Costs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Reliability",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Agent creation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "quick profile",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "cost inspector",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "pause agent",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Hire AI employee",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "view department",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "inspect issue"
+  ]
+ },
+ {
+  "id": "ARL-TEAM-002",
+  "title": "AI Employee Directory",
+  "route": "/o/northline/team/agents",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "By department",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Active",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Paused",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Draft",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Agent quick view",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "assignment",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "archive confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Find agent",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "assign work",
+   "open profile",
+   "clone tested contract"
+  ]
+ },
+ {
+  "id": "ARL-TEAM-003",
+  "title": "Agent Profile",
+  "route": "/o/northline/team/agents/nl-agents-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Skills",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Work",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Permissions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Performance",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Role edit",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "permission inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "test panel",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "test",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "open chat",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit role",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reassign open work",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Permissions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "pause",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-TEAM-004",
+  "title": "Agent Builder",
+  "route": "/o/northline/team/agents/new",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Identity",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Skills",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Knowledge",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tools",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Autonomy",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Test",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Skill picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "connector grant",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "simulation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "publish confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Generate contract",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "select templates",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "configure limits",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "test",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "activate"
+  ]
+ },
+ {
+  "id": "ARL-TEAM-005",
+  "title": "Organization Chart",
+  "route": "/o/northline/team/organization",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Hierarchy",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Directory",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Capacity",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Employee inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "transfer approval",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "hierarchy impact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "create department",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reparent agent",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "filter",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "What this line carries",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "assign lead"
+  ]
+ },
+ {
+  "id": "ARL-TEAM-006",
+  "title": "Skills Library",
+  "route": "/o/northline/team/skills",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Native",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Organization",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Purchased",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Draft",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Skill detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "install permission",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "compatibility test",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Search",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "edit",
+   "install",
+   "compare versions",
+   "deprecate"
+  ]
+ },
+ {
+  "id": "ARL-TEAM-007",
+  "title": "Agent Academy",
+  "route": "/o/northline/team/academy",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Training",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Playbooks",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Assessments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Results",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Training asset upload",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "assessment builder",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "publishing review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "demonstrate task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Upload SOP",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "test",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Evaluation lab",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "assign course"
+  ]
+ },
+ {
+  "id": "ARL-TEAM-008",
+  "title": "Evaluation Lab",
+  "route": "/o/northline/team/evaluations",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Scenarios",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Runs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Regression",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Reports",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Scenario editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "detailed trace",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "promotion approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "approve new version",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare models",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Run evaluation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "rollback",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-TEAM-009",
+  "title": "Agent Performance",
+  "route": "/o/northline/team/performance",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Employees",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Departments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Trends",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Quality",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Metric definition",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "incident trace",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "performance note",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "inspect failed task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare agents",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "adjust resource policy",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "coach"
+  ]
+ },
+ {
+  "id": "ARL-TEAM-010",
+  "title": "Model Routing",
+  "route": "/o/northline/team/models",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Providers",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Routing",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Budgets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Experiments",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Provider setup",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "routing simulator",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "policy warning",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "test fallback",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "restrict data",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set role model",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "inspect spend",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

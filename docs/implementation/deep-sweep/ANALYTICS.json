@@ -1,0 +1,669 @@
+[
+ {
+  "id": "ARL-ANALYTICS-001",
+  "title": "Insights Overview",
+  "route": "/o/northline/analytics/home",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Executive",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Financial",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Customers",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Operations",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "AI",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Metric inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "insight detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "data freshness",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect the source of a figure",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Ask a question",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Save this view",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Delegate an investigation",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ANALYTICS-002",
+  "title": "Dashboard Directory",
+  "route": "/o/northline/analytics/dashboards",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Mine",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Shared",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Templates",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Dashboard setup",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "sharing",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "source dependency",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a dashboard",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Source dependencies",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Open",
+   "Share",
+   "Pin",
+   "Archive"
+  ]
+ },
+ {
+  "id": "ARL-ANALYTICS-003",
+  "title": "Dashboard Editor",
+  "route": "/o/northline/analytics/dashboards/nl-datasets-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Layout",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Data",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Style",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Access",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Widget chooser",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "query editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "share",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Resize a tile",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set a filter",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Place a tile",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export the figures",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ANALYTICS-004",
+  "title": "Report Builder",
+  "route": "/o/northline/analytics/reports/nl-datasets-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Content",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Data",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Layout",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Distribution",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Report block",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "schedule",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "source inspection",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a report",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Cite the figures",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a chart",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add another block",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Check the citations",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export the figures",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ANALYTICS-005",
+  "title": "Dataset Catalogue",
+  "route": "/o/northline/analytics/datasets",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Connected",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Native",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Issues",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Dataset details",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "grant review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "quality",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Document",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Browse",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Grant access",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Who has access",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Refresh",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Data quality",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Retire",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ANALYTICS-006",
+  "title": "Metric Definitions",
+  "route": "/o/northline/analytics/metrics",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Metrics",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Dimensions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Versions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Validation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Formula editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "impact review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "metric QA",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test a measure",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve a version",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Define a measure",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare two measures",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Lineage",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export the catalogue",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ANALYTICS-007",
+  "title": "Data Modelling",
+  "route": "/o/northline/analytics/models",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Schema",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Transformations",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tests",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Lineage",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Join properties",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "transform editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "test",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Validate the model",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a relation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Refresh the joins",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Deploy",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Join properties",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Model tests",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ANALYTICS-008",
+  "title": "Forecasts & Scenarios",
+  "route": "/o/northline/analytics/forecasts",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Forecast",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Scenarios",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Inputs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Accuracy",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Assumption inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "scenario editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "confidence note",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare scenarios",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Save a scenario",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Adjust inputs",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request a review",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ANALYTICS-009",
+  "title": "Reports & Distribution",
+  "route": "/o/northline/analytics/distribution",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Schedules",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Audiences",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Deliveries",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Failures",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Recipient preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "delivery method",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "failure detail",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test a delivery",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pause",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Resend safely",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

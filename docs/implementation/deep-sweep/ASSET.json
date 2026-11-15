@@ -1,0 +1,347 @@
+[
+ {
+  "id": "ARL-ASSET-001",
+  "title": "Asset Library",
+  "route": "/o/northline/asset/assets",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Mine",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approved",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Brand",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archived",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Media import",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "asset inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "rights check",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Upload",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Search the library",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Group the library",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Inspect",
+   "Replace",
+   "Check rights"
+  ]
+ },
+ {
+  "id": "ARL-ASSET-002",
+  "title": "Asset Detail",
+  "route": "/o/northline/asset/assets/nl-assets-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Variants",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Usage",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rights",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Variant editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "rights form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "replacement impact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a variant",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Download",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Update rights",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Archive",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Replace across uses",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ASSET-003",
+  "title": "Brand Kits",
+  "route": "/o/northline/asset/brands",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Brands",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tokens",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Assets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rules",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Token editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "brand selection",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "global impact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create brand kit",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Edit tokens",
+   "Apply to a surface",
+   "Publish as master"
+  ]
+ },
+ {
+  "id": "ARL-ASSET-004",
+  "title": "Media Transformations",
+  "route": "/o/northline/asset/transforms",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Presets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Jobs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Failed",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Transform inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "rights",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "overwrite review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Batch export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create preset",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare sources",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Source rights",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Publish preset"
+  ]
+ },
+ {
+  "id": "ARL-ASSET-005",
+  "title": "Asset Usage & Governance",
+  "route": "/o/northline/asset/governance",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Usage",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rights",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Duplicates",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Storage",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Usage inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "merge preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "expiry warning",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Resolve duplicates",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Find use",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set retention",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export the report",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

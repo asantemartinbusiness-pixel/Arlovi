@@ -1301,8 +1301,9 @@ function RetentionDialog({ context, close }: { context: ScreenContext; close: ()
   const source = useRecord(context.selectedId);
   const policies = useCollection("policies");
   const retention = policies.find((policy) => policy.fields.kind === "retention");
+  const allFacts = useCollection("facts");
   if (!source) return <Empty title="Select a source first" />;
-  const facts = useCollection("facts").filter((fact) => fact.fields.sourceId === source.id);
+  const facts = allFacts.filter((fact) => fact.fields.sourceId === source.id);
   return (
     <Stack gap={4}>
       <Notice tone="warning" title="Retiring a source does not delete it">

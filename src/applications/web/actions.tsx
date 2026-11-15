@@ -116,7 +116,7 @@ export const resizeBlock = actOverlay({
   collection: "sites",
   noun: "site",
   candidates: routeSite,
-  watch: () => useWebUi((state) => state.selectedBlockId),
+  useWatch: () => useWebUi((state) => state.selectedBlockId),
   consequence: () => "Changes how much room the selected block takes: its column count and its vertical padding. Columns collapse to one on a phone and two on a tablet, which the responsive canvas shows at real widths.",
   blocked: ({ record }) => (selectedBlock(record) ? undefined : "Select a block on the canvas first."),
   fields: ({ record }) => {
@@ -142,7 +142,7 @@ export const reorderBlock = actOverlay({
   collection: "sites",
   noun: "site",
   candidates: routeSite,
-  watch: () => useWebUi((state) => state.selectedBlockId),
+  useWatch: () => useWebUi((state) => state.selectedBlockId),
   consequence: () => "Moves the selected block to the position you choose on its page. This is the keyboard equivalent of dragging its grip, and it can be undone.",
   blocked: ({ record }) => (selectedBlock(record) ? undefined : "Select a block on the canvas first."),
   fields: ({ record }) => {
@@ -381,7 +381,7 @@ export const publishSiteForm = actOverlay({
   candidates: routeSite,
   consequence: () => "Publishing fixes the form's current fields as a numbered version inside the workspace, so submissions can be traced to what was asked. Putting it on a live page needs a host, which is not connected; the export carries the published version.",
   boundary: { id: "site.publish", action: "Putting the form on a live page" },
-  watch: () => useCollection("forms"),
+  useWatch: () => useCollection("forms"),
   fields: ({ record }) => [{ name: "form", label: "Site form", kind: "select", options: site(record).forms.map((form) => ({ value: form.id, label: `${form.name}${form.publishedVersion ? ` (v${form.publishedVersion} published)` : " (never published)"}` })) }],
   blocked: ({ record, watched, context }) => {
     const app = site(record);

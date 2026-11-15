@@ -1,0 +1,468 @@
+[
+ {
+  "id": "ARL-PRESENT-001",
+  "title": "Presentation Library",
+  "route": "/o/northline/present/decks",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Recent",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Shared",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Templates",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archived",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Import",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "new deck",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "template preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Import",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New deck",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Duplicate",
+   "Present"
+  ]
+ },
+ {
+  "id": "ARL-PRESENT-002",
+  "title": "Slide Editor",
+  "route": "/o/northline/present/decks/nl-decks-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Design",
+    "ok": false,
+    "note": "no tabpanel (selected: Design)"
+   },
+   {
+    "kind": "tab",
+    "name": "Insert",
+    "ok": false,
+    "note": "no tabpanel (selected: Insert)"
+   },
+   {
+    "kind": "tab",
+    "name": "Animate",
+    "ok": false,
+    "note": "no tabpanel (selected: Animate0)"
+   },
+   {
+    "kind": "tab",
+    "name": "Review",
+    "ok": false,
+    "note": "no tabpanel (selected: Review0)"
+   },
+   {
+    "kind": "tab",
+    "name": "View",
+    "ok": false,
+    "note": "no tabpanel (selected: View)"
+   },
+   {
+    "kind": "overlay",
+    "name": "Layout picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "image insert",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "properties",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "AI suggestion",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PRESENT-003",
+  "title": "Master & Theme Editor",
+  "route": "/o/northline/present/decks/nl-decks-001/theme",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Masters",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Colours",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Fonts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Layouts",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Theme editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "global apply review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "font resolver",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a layout…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Change the master theme…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview the impact",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PRESENT-004",
+  "title": "Charts & Data",
+  "route": "/o/northline/present/decks/nl-decks-001/data",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Charts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tables",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sources",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Refresh",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Dataset picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "chart inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "unlink warning",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Link a workbook",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Insert chart",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Update the linked charts",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Show or hide data labels",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Check freshness",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PRESENT-005",
+  "title": "Transitions & Animation",
+  "route": "/o/northline/present/decks/nl-decks-001/animation",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Slides",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Objects",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Timing",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Motion inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "playback",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "accessibility review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test: play the builds",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add animation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Sequence the builds",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reduce motion (on or off)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Accessibility review",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PRESENT-006",
+  "title": "Presenter Mode",
+  "route": "/o/northline/present/decks/nl-decks-001/present",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Audience",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Presenter",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rehearsal",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Display selector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "rehearsal report",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "access confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Advance a slide",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Present",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Annotate the slide…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export notes",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "End the presentation"
+  ]
+ },
+ {
+  "id": "ARL-PRESENT-007",
+  "title": "Review & Publish",
+  "route": "/o/northline/present/decks/nl-decks-001/review",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Comments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Publish",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Version comparison",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "export settings",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Record an approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Resolve comments…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Share…",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

@@ -1,0 +1,698 @@
+[
+ {
+  "id": "ARL-CRM-001",
+  "title": "CRM Overview",
+  "route": "/o/northline/crm/home",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "My pipeline",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Team",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Forecast",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Metric drilldown",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "new lead",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "insight card",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign a follow-up",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect conversion",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open a deal",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Ask Sales",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open the pipeline",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New lead",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Notes worth acting on",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CRM-002",
+  "title": "Contacts",
+  "route": "/o/northline/crm/contacts",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "My contacts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Segments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Duplicates",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Contact form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "merge preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "bulk action confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Merge reviewed duplicates",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a contact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review duplicates",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Tag a selection",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CRM-003",
+  "title": "Contact Profile",
+  "route": "/o/northline/crm/contacts/nl-contacts-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Timeline",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Deals",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Service",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Files",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Compose message",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "activity composer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "customer merge",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Draft a message",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule a meeting",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a note",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Log an activity",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Attach a record",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit the contact",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CRM-004",
+  "title": "Companies",
+  "route": "/o/northline/crm/companies",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Active",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Prospects",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archived",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Account editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "relationship inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "merge preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Linked contacts",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Search accounts",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New account",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Merge two accounts",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Campaign links",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CRM-005",
+  "title": "Leads & Qualification",
+  "route": "/o/northline/crm/leads",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Inbox",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Qualified",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Disqualified",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rules",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Qualification inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "convert dialog",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "routing rules",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Route unassigned leads",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Routing rules",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Convert to a deal",
+   "Assign the lead",
+   "Qualify"
+  ]
+ },
+ {
+  "id": "ARL-CRM-006",
+  "title": "Deals Pipeline",
+  "route": "/o/northline/crm/deals",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Board",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "List",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Forecast",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Team",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Deal drawer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "stage change validation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "lost reason",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Update the amount",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a quote",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Move stage",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign an owner",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New deal",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Close lost",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CRM-007",
+  "title": "Deal Detail",
+  "route": "/o/northline/crm/deals/nl-deals-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Activity",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Products",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Documents",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Team",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Quote builder",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "collaborator picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "closure confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Update the stage",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a proposal",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Close the deal",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pipeline board",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request an approval",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CRM-008",
+  "title": "Quotes & Proposals",
+  "route": "/o/northline/crm/quotes",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Draft",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Review",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sent",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Accepted",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Expired",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Quote editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "pricing policy",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "send preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Send",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a quote",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Duplicate for re-pricing",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pricing policy",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CRM-009",
+  "title": "Activities & Scheduling",
+  "route": "/o/northline/crm/activities",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "My calendar",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All activity",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Follow-ups",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Activity entry",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "calendar conflict",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "meeting composer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule a meeting",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a reminder",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Log a call",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Complete a task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Check for overlaps",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

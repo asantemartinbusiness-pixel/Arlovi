@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 
 export interface TabItem {
   id: string;
@@ -58,9 +58,9 @@ export function Tabs({
   );
 }
 
-export function TabPanel({ id, children }: { id: string; children: ReactNode }) {
+export function TabPanel({ id, children, style }: { id: string; children: ReactNode; style?: CSSProperties }) {
   return (
-    <div role="tabpanel" id={`panel-${id}`} aria-labelledby={`tab-${id}`} tabIndex={0} style={{ outline: "none" }}>
+    <div role="tabpanel" id={`panel-${id}`} aria-labelledby={`tab-${id}`} tabIndex={0} style={{ outline: "none", ...style }}>
       {children}
     </div>
   );

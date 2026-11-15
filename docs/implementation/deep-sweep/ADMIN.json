@@ -1,0 +1,80 @@
+[
+ {
+  "id": "ARL-ADMIN-001",
+  "title": "Organization Settings",
+  "route": "/o/northline/admin/organization",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Profile",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Branding",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Business hours",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Regional",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Identity form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "region change impact",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "domain verify",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Configure a legal entity",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit profile",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Locations in Headquarters",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Verify a domain",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set business hours",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Regional impact",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

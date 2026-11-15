@@ -76,5 +76,637 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-AI-002",
+  "title": "Conversation Library",
+  "route": "/o/northline/ai/conversations",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Recent",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pinned",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Shared",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archived",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Thread preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "delete confirmation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "sharing dialog",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Search transcripts",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "rename",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "archive",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "delete",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-AI-003",
+  "title": "Specialist Chat",
+  "route": "/o/northline/ai/agents/nl-agents-001/chat",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Conversation",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Work",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sources",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Agent profile drawer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "permission explainer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "mission escalation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Attach a record",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "request handoff",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Message specialist",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Specialist profile",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "review tool scope",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-AI-004",
+  "title": "Team Room",
+  "route": "/o/northline/ai/rooms/nl-channels-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Discussion",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Decisions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Files",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tasks",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Participant selector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "decision recorder",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "topic thread",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pin a decision",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Mention participant",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "assign task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "All tasks in Projects",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "host review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Participants",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-AI-005",
+  "title": "Mission Room",
+  "route": "/o/northline/ai/missions/nl-missions-001/room",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Discussion",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Agents",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tasks",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Reviews",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Task handoff drawer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "evidence inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "review dialog",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "assign reviewer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "link evidence",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request status",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "resolve disagreement",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Hand a task over",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-AI-006",
+  "title": "Voice Workspace",
+  "route": "/o/northline/ai/voice",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Live",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Transcript",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Settings",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Mic permission",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "voice settings",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "sensitive-action confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "view transcript",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Start or end a session",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Mute or unmute",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "change voice",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "correct text",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-AI-007",
+  "title": "AI Meeting Room",
+  "route": "/o/northline/ai/meetings/nl-meetings-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Meeting",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Transcript",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Decisions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Actions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Recording consent",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "meeting notes",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "follow-up approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "request specialist report",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "create action",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Invite agent",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "end meeting",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-AI-008",
+  "title": "Research Workspace",
+  "route": "/o/northline/ai/research/nl-facts-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Findings",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sources",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Methods",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Citations",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Source inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "confidence note",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "save report",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "request independent review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "inspect source",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Refine question",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish the report",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-AI-009",
+  "title": "Context Manager",
+  "route": "/o/northline/ai/context",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "This chat",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Team context",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Connected sources",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Context picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "permission explanation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "sensitive data warning",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "switch entity",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "inspect grants",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add or remove context",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "redact selection",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-AI-010",
+  "title": "Conversation Artifacts",
+  "route": "/o/northline/ai/artifacts/nl-documents-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Versions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Comments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sources",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Version comparison",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "share dialog",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "export dialog",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open in native app",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "comment",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compose a revision",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "share",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "export",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]

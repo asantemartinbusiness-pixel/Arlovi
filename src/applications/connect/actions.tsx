@@ -475,7 +475,7 @@ export const retireOperation = actOverlay({
   id: "version impact",
   title: "Retire an operation",
   tone: "danger",
-  watch: () => useCollection("missions"),
+  useWatch: () => useCollection("missions"),
   consequence: ({ watched }) => {
     const missions = (watched as Rec[] | undefined) ?? [];
     return `A retired operation is refused for every mission that names it. ${missions.length} missions exist in this workspace; any that reference the operation must be reviewed. The retirement is recorded on the connector and in the receipts.`;
@@ -746,7 +746,7 @@ export async function exportReceipts(context: ScreenContext): Promise<void> {
 export const reconcileReceipts = actOverlay({
   id: "reconcile receipts",
   title: "Reconcile receipts against provider evidence",
-  watch: () => useEvents(undefined, 400).filter(isReceipt),
+  useWatch: () => useEvents(undefined, 400).filter(isReceipt),
   consequence: ({ watched }) => {
     const rows = (watched as Audit[] | undefined) ?? [];
     return `${rows.length} receipts are compared with provider evidence. A receipt is confirmed only by a provider request id, a response and a later read showing the effect; none exists, so every receipt keeps the state it reached and the reconciliation records that.`;
@@ -783,7 +783,7 @@ export const openMission = actOverlay({
   collection: "missions",
   noun: "mission",
   consequence: () => "Receipts written by a mission step carry the mission. Choose the mission to open its record.",
-  watch: () => useEvents(undefined, 400).filter(isReceipt),
+  useWatch: () => useEvents(undefined, 400).filter(isReceipt),
   Details: ({ record, watched }) => {
     const linked = ((watched as Audit[] | undefined) ?? []).filter((event) => record && event.entityId === record.id).length;
     return record ? <Properties rows={[{ label: "Receipts linked to it", value: <span className="ds-num">{String(linked)}</span> }, { label: "State", value: record.status }]} /> : null;

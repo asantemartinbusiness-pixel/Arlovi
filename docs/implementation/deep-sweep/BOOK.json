@@ -1,0 +1,619 @@
+[
+ {
+  "id": "ARL-BOOK-001",
+  "title": "Bookings Overview",
+  "route": "/o/northline/book/home",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Today",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Week",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Capacity",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Insights",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Quick booking",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "booking inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "capacity alert",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Check in",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reschedule selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New booking",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Ask the receptionist",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Capacity today",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open the calendar",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect a booking",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-BOOK-002",
+  "title": "Booking Calendar",
+  "route": "/o/northline/book/calendar",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Day",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Week",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Month",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Resource",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Staff",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Booking form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "conflict review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "reschedule notice",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New booking",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review conflicts",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Confirm held slot",
+   "Move selected",
+   "Edit time and resource",
+   "Cancel selected",
+   "Reschedule notice"
+  ]
+ },
+ {
+  "id": "ARL-BOOK-003",
+  "title": "Booking Detail",
+  "route": "/o/northline/book/bookings/nl-bookings-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Payments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Messages",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Reschedule",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "refund rule",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "customer message",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reschedule",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Send a reminder",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Confirm",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Take payment (deposit)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Message the customer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Cancellation policy",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-BOOK-004",
+  "title": "Services & Pricing",
+  "route": "/o/northline/book/services",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Services",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Categories",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Packages",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rules",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Service editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "pricing review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "availability test",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit buffers",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New service",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Archive selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pricing review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Availability test",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-BOOK-005",
+  "title": "Staff & Resources",
+  "route": "/o/northline/book/resources",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "People",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rooms",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Equipment",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Availability",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Resource editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "conflict dialog",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "recurrence",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign to a service",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Block a period",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set availability",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New resource",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Conflicts",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-BOOK-006",
+  "title": "Public Booking Page",
+  "route": "/o/northline/book/public/showroom-consult",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Design",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Availability",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Fields",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Form field inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "publish",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "privacy policy",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Arrange fields",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test the page",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish (export)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Privacy notice",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Edit a field"
+  ]
+ },
+ {
+  "id": "ARL-BOOK-007",
+  "title": "Reminders & No-shows",
+  "route": "/o/northline/book/reminders",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rules",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Templates",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Metrics",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Template editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "send preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "suppression",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test send",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule reminders",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New rule",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Who is left out",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-BOOK-008",
+  "title": "Booking Reports",
+  "route": "/o/northline/book/reports",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Utilization",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Revenue",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "No-shows",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Forecast",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Metric calculation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "report design",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "source proof",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare periods",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export CSV",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Filter",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule a report",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "How this is counted",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Seats and slots",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Every source record",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Save a report",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

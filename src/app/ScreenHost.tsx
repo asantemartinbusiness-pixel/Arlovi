@@ -145,8 +145,18 @@ export function ScreenHost() {
 
   /* A tab strip always controls a panel: the tab's aria-controls must resolve,
      including on screens still served by a fallback. */
-  const body = tabIds.length > 1 && def?.chrome !== "full"
-    ? <TabPanel id={activeTab}>{content}</TabPanel>
+  /* Every tab strip controls a panel, full-chrome editors included: their
+     surface changes with the tab, so the surface is the panel. Without the
+     wrapper, an editor's tabs pointed aria-controls at nothing. */
+  const body = tabIds.length > 1
+    ? (
+      <TabPanel
+        id={activeTab}
+        style={def?.chrome === "full" ? { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" } : undefined}
+      >
+        {content}
+      </TabPanel>
+    )
     : content;
 
   const actionBar = (
