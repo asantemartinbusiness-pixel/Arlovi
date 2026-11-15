@@ -82,6 +82,41 @@
    "openItems": [
     "Most dialogs opened clean; principal buttons not all pressed."
    ]
+  },
+  "WEB": {
+   "signedOff": true,
+   "basis": "Platform-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented with edge rules enforced in code; every changed action clicked in a browser.",
+   "openItems": [
+    "WEB-004 import: refused on seeded data (only one site shares a component)."
+   ]
+  },
+  "BUILD": {
+   "signedOff": true,
+   "basis": "Platform-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented with edge rules enforced in code; every changed action clicked in a browser.",
+   "openItems": [
+    "BUILD-001 environment configuration is an explanatory panel."
+   ]
+  },
+  "FORMS": {
+   "signedOff": true,
+   "basis": "Platform-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented with edge rules enforced in code; every changed action clicked in a browser.",
+   "openItems": [
+    "FORMS-003 fix and FORMS-006 compare: refused on seeded data (no computable fix; one version answered)."
+   ]
+  },
+  "CONNECT": {
+   "signedOff": true,
+   "basis": "Platform-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented with edge rules enforced in code; every changed action clicked in a browser.",
+   "openItems": [
+    "CONNECT-008 Health report shows fixed counts that match the checks rather than computing them."
+   ]
+  },
+  "IT": {
+   "signedOff": true,
+   "basis": "Platform-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented with edge rules enforced in code; every changed action clicked in a browser.",
+   "openItems": [
+    "IT-008 revoke disables a connector and clears its scopes; no user sessions exist to revoke."
+   ]
   }
  }
 }

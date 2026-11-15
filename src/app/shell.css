@@ -189,3 +189,14 @@
   .hq-search { padding: 0 var(--space-2); }
   .hq-search kbd { display: none; }
 }
+
+/* Command bar for full-chrome screens (editors, consoles). */
+.pg-cmdbar {
+  display: flex; align-items: center; gap: var(--space-3); min-height: 48px;
+  padding: var(--space-1) var(--space-4); background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-default); position: relative; z-index: 2;
+}
+.pg-cmdbar-title { font-size: var(--text-md); font-weight: 600; letter-spacing: 0; min-width: 0; }
+.pg-cmdbar .pg-actions { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.pg-cmdbar .pg-actions .ds-btn { min-height: var(--control-h-sm); padding: 0 var(--space-3); font-size: var(--text-xs); }
+@media (max-width: 599px) { .pg-cmdbar-title { display: none; } }

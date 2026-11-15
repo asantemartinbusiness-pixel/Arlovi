@@ -345,7 +345,7 @@ function ConfirmAction({ spec, close }: { spec: ConfirmSpec | undefined; close: 
       {spec.blocked
         ? <Notice tone="danger" title="This cannot go ahead">{spec.blocked}</Notice>
         : <Notice tone={spec.tone === "danger" ? "warning" : "info"} title="What this does">{spec.consequence}</Notice>}
-      {spec.facts && spec.facts.length > 0 && <Properties rows={spec.facts} />}
+      {spec.facts && spec.facts.length > 0 && <Properties rows={spec.facts.map((fact, index, all) => (all.findIndex((other) => other.label === fact.label) === index ? fact : { ...fact, label: `${fact.label} (${index + 1})` }))} />}
       {spec.boundary && <ProviderBoundary id={spec.boundary} title={spec.boundaryTitle}>{spec.boundaryNote}</ProviderBoundary>}
       {error && <Notice tone="danger" title="Nothing was saved">{error}</Notice>}
       <Row gap={2}>

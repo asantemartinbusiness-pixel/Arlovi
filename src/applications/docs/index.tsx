@@ -9,7 +9,7 @@ import {
   Meter, Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Switch, Tabs,
   TextArea, TextInput, Tool, Toolbar, ToolbarSeparator,
 } from "@/design-system";
-import { registerApp, type ScreenContext } from "@/platform/registry";
+import { getScreenDef, registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { capabilityById } from "@/platform/capability";
 import { freshness } from "@/platform/clock";
@@ -20,10 +20,13 @@ import {
   headingLevel, insertBlockAfter, isTextBlock, moveSection, nextId, openSuggestions, outline,
   paginate, readDoc, removeBlock, replaceAll, resolveSuggestion, sectionSpan, setBlockType,
   setLink, setStyle, structureWarnings, toHtml, toMarkdown, toPlainText, visibleText,
+  collapsed, insertText, textBlock, toggleMark,
   type Block, type BlockType, type DocModel, type DocRange, type Hit, type MarkType,
 } from "./model";
 import { DocumentCanvas, type EditIntent } from "./canvas";
-import { SAVE_LABEL, SAVE_TONE, useDocEditor, type DocEditor } from "./state";
+import { SAVE_LABEL, SAVE_TONE, activeDocEditor, useDocEditor, type DocEditor } from "./state";
+import { useGuardRefresh } from "@/applications/design/sharedDoc";
+import { createStore, useStore } from "@/applications/visual/kit";
 import "./docs.css";
 
 /* ====================================================================== *
@@ -37,10 +40,27 @@ import "./docs.css";
 /* ----------------------------- Shared pieces ----------------------------- */
 
 function useDocument(context: ScreenContext): Rec | undefined {
+  useGuardRefresh(context);
   const fromRoute = useRecord(context.params.id);
   const all = useCollection("documents");
   return fromRoute ?? all.find((record) => !record.tags.includes("recovered")) ?? all[0];
 }
+
+/** The editor's contract actions, on its own bar (the full-chrome surface has no page header). */
+function DocActions({ context }: { context: ScreenContext }) {
+  const def = getScreenDef(context.screen.applicationCode, context.screen.id);
+  return (
+    <Toolbar label="Document actions">
+      {(def?.actions ?? []).filter((action: ActionDef) => action.id !== "export").map((action: ActionDef) => {
+        const blocked = action.guard?.(context);
+        return <Button key={action.id} size="sm" variant="ghost" disabled={Boolean(blocked)} title={blocked ?? action.shortcut} onClick={() => void action.run(context)}>{action.label ?? action.id}</Button>;
+      })}
+    </Toolbar>
+  );
+}
+
+/** Outline view state shared by the outline tree and the screen's collapse action. */
+const outlineUi = createStore<{ collapseAll: number }>({ collapseAll: 0 });
 
 function SaveBadge({ editor, context }: { editor: DocEditor; context: ScreenContext }) {
   return (
@@ -492,6 +512,16 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
     }
   }, [record]);
 
+  /* A jump requested from the outline lands here: caret on the heading, scrolled into view. */
+  useEffect(() => {
+    const target = pendingJump;
+    if (!target || !editor.model.blocks.some((block) => block.id === target)) return;
+    pendingJump = undefined;
+    editor.moveCaret(collapsed({ blockId: target, offset: 0 }));
+    setFocusBlockId(target);
+    window.requestAnimationFrame(() => document.querySelector(`[data-bid="${target}"]`)?.scrollIntoView({ block: "center" }));
+  }, [editor.model.blocks, editor]);
+
   const payload = context.overlayPayload as { mode?: string } | undefined;
   useEffect(() => {
     if (payload?.mode === "find") setFind((current) => ({ ...current, open: true }));
@@ -549,6 +579,7 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
           <span>{String(record.fields.folder ?? "Unfiled")} · {record.ownerName}</span>
         </div>
         <span className="ds-grow" />
+        <DocActions context={context} />
         <SaveBadge editor={editor} context={context} />
         <Button size="sm" variant="secondary" onClick={() => void editor.saveNow()} disabled={editor.saveState === "clean" || editor.saveState === "saved"}>Save now</Button>
         <Button size="sm" variant="primary" onClick={() => context.openOverlay("export")} icon={<FileDown size={15} />}>Export</Button>
@@ -806,6 +837,14 @@ function OutlineScreen({ context, tab }: { context: ScreenContext; tab: "Heading
   const editor = useDocEditor(context, record);
   const [collapsedIds, setCollapsedIds] = useState<string[]>([]);
   const warnings = useMemo(() => structureWarnings(editor.model), [editor.model]);
+  const collapseRequest = useStore(outlineUi).collapseAll;
+  const seenRequest = useRef(collapseRequest);
+  useEffect(() => {
+    if (seenRequest.current === collapseRequest) return;
+    seenRequest.current = collapseRequest;
+    const parents = outline(editor.model).filter((node, index, all) => all[index + 1] && all[index + 1].level > node.level).map((node) => node.blockId);
+    setCollapsedIds((current) => (current.length > 0 ? [] : parents));
+  }, [collapseRequest, editor.model]);
 
   if (!record) return <Empty title="No document is open" icon={<FileText size={20} />} />;
 
@@ -2620,6 +2659,398 @@ function StyleSettings({ context, close }: { context: ScreenContext; close: () =
  * Registration
  * ====================================================================== */
 
+/* ====================================================================== *
+ * Contract actions that operate on the open document, and their forms.
+ * Each edit goes through the document's one editor: one undo step, saved
+ * with the session, and tracked as a suggestion where suggesting is on.
+ * ====================================================================== */
+
+const docEditorFor = (context: ScreenContext) => activeDocEditor(context.params.id);
+
+/** A heading the editor should put the caret on when it next opens. */
+let pendingJump: string | undefined;
+
+function docFooter(form: string, label: string, danger = false) {
+  return ({ close }: { close: () => void }) => (
+    <>
+      <Button variant="ghost" onClick={close}>Cancel</Button>
+      <Button variant={danger ? "outline-danger" : "primary"} type="submit" form={form}>{label}</Button>
+    </>
+  );
+}
+
+function focusPage(context: ScreenContext): void {
+  const editor = docEditorFor(context);
+  const root = document.querySelector<HTMLElement>(".dx-page [contenteditable='true'], [contenteditable='true'].dx-page, .dx-canvas [contenteditable='true'], [contenteditable='true']");
+  if (!editor || !root) { context.toast("Open the document first", "Typing goes into the open page.", "blocked"); return; }
+  if (!editor.selection) {
+    const last = [...editor.model.blocks].reverse().find((block) => isTextBlock(block));
+    if (last) editor.moveCaret(collapsed({ blockId: last.id, offset: blockText(last).length }));
+  }
+  root.focus();
+}
+
+function SearchDocuments({ context, close }: { context: ScreenContext; close: () => void }) {
+  const documents = useCollection("documents");
+  const [query, setQuery] = useState("");
+  const needle = query.trim().toLowerCase();
+  const matches = needle.length < 2 ? [] : documents.flatMap((record) => {
+    const confidential = record.fields.confidential === true;
+    const why: string[] = [];
+    if (record.title.toLowerCase().includes(needle)) why.push("title");
+    if (record.tags.some((tag) => tag.toLowerCase().includes(needle))) why.push("tag");
+    let excerpt = "";
+    if (!confidential) {
+      if (record.summary.toLowerCase().includes(needle)) why.push("summary");
+      const text = toPlainText(readDoc(record.body, record.ownerName, record.updatedAt));
+      const at = text.toLowerCase().indexOf(needle);
+      if (at >= 0) { why.push("text"); excerpt = `…${text.slice(Math.max(0, at - 40), at + needle.length + 40)}…`; }
+    }
+    return why.length ? [{ record, why, excerpt, confidential }] : [];
+  });
+  return (
+    <Stack gap={3}>
+      <Field label="Search titles, tags and the text of documents that are not confidential"><TextInput value={query} onChange={(event) => setQuery(event.target.value)} autoFocus placeholder="discount" /></Field>
+      {needle.length >= 2 && matches.length === 0 && <Empty title="Nothing matches" />}
+      {matches.map(({ record, why, excerpt, confidential }) => (
+        <Row key={record.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
+          <div className="ds-grow">
+            <Row gap={2}><strong>{record.title}</strong>{confidential && <Pill tone="warning">Confidential</Pill>}</Row>
+            <p className="ds-subtle">{confidential ? "Matched on its title or tags only; the text of a confidential document is never searched or previewed." : excerpt || `Found in ${why.join(", ")}`}</p>
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => { context.select(record.id); close(); }}>Select</Button>
+          <Button size="sm" variant="secondary" onClick={() => { close(); context.navigate(context.path("/o/:org/docs/documents/:id", record.id)); }}>Open</Button>
+        </Row>
+      ))}
+    </Stack>
+  );
+}
+
+const FORMAT_MARKS: { mark: MarkType; label: string }[] = [
+  { mark: "bold", label: "Bold" }, { mark: "italic", label: "Italic" }, { mark: "underline", label: "Underline" }, { mark: "strike", label: "Strikethrough" }, { mark: "code", label: "Code" },
+];
+
+function FormatOverlay({ context, close }: { context: ScreenContext; close: () => void }) {
+  const editor = useDocEditor(context, useDocument(context));
+  const range = editor.selection;
+  if (!range) return <Notice tone="info" title="Put the caret in the text">Select some text, or place the caret in a paragraph, then format it.</Notice>;
+  const block = editor.model.blocks[blockIndex(editor.model, range.head.blockId)];
+  const spans = !collapsedRange(range);
+  return (
+    <Stack gap={3}>
+      <PanelLabel>Text {spans ? `“${rangeText(editor.model, range).slice(0, 40)}”` : "(select text to apply a mark)"}</PanelLabel>
+      <Row gap={2} wrap>
+        {FORMAT_MARKS.map((item) => (
+          <Button key={item.mark} size="sm" variant={editor.marks.includes(item.mark) ? "primary" : "secondary"} disabled={!spans} aria-pressed={editor.marks.includes(item.mark)}
+            onClick={() => { const result = toggleMark(editor.model, range, item.mark); editor.commit(result.model, item.label, result.selection); }}>
+            {item.label}
+          </Button>
+        ))}
+      </Row>
+      <Field label="Paragraph type">
+        <Select value={block?.type ?? "paragraph"} onChange={(event) => { const result = setBlockType(editor.model, range, event.target.value as BlockType); editor.commit(result.model, "Paragraph type", result.selection); }}>
+          {BLOCK_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </Select>
+      </Field>
+      <Row gap={2}><span className="ds-grow" /><Button variant="primary" onClick={close}>Done</Button></Row>
+    </Stack>
+  );
+}
+
+function PanelLabel({ children }: { children: React.ReactNode }) {
+  return <p className="ds-subtle">{children}</p>;
+}
+
+function collapsedRange(range: DocRange): boolean {
+  return range.anchor.blockId === range.head.blockId && range.anchor.offset === range.head.offset;
+}
+
+function rangeText(model: DocModel, range: DocRange): string {
+  if (range.anchor.blockId !== range.head.blockId) return "a selection across paragraphs";
+  const block = model.blocks[blockIndex(model, range.anchor.blockId)];
+  return block ? blockText(block).slice(Math.min(range.anchor.offset, range.head.offset), Math.max(range.anchor.offset, range.head.offset)) : "";
+}
+
+function AcceptChanges({ context, close }: { context: ScreenContext; close: () => void }) {
+  const editor = useDocEditor(context, useDocument(context));
+  const open = openSuggestions(editor.model);
+  const [picked, setPicked] = useState<string[]>(open.map((item) => item.id));
+  if (open.length === 0) return <Notice tone="success" title="No open tracked changes">Nothing waits to be accepted.</Notice>;
+  const decide = (decision: "accepted" | "rejected") => {
+    let next = editor.model;
+    for (const id of picked) next = resolveSuggestion(next, id, decision);
+    editor.commit(next, `${decision === "accepted" ? "Accept" : "Reject"} ${picked.length} changes`);
+    void context.mutate.log(`${picked.length} tracked changes ${decision} by ${context.actor}`, { entityId: context.params.id, type: "update" });
+    close();
+  };
+  return (
+    <Stack gap={2}>
+      {open.map((item) => (
+        <Checkbox key={item.id} label={`${item.kind === "insert" ? "Insert" : "Delete"} · ${item.note} · ${item.author}`} checked={picked.includes(item.id)}
+          onChange={(event) => setPicked((current) => (event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id)))} />
+      ))}
+      <Row gap={2}>
+        <Button variant="ghost" disabled={picked.length === 0} onClick={() => decide("rejected")}>Reject {picked.length}</Button>
+        <span className="ds-grow" />
+        <Button variant="primary" disabled={picked.length === 0} onClick={() => decide("accepted")}>Accept {picked.length}</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+function AddSection({ context, close }: { context: ScreenContext; close: () => void }) {
+  const editor = useDocEditor(context, useDocument(context));
+  const nodes = outline(editor.model);
+  const [after, setAfter] = useState("");
+  const [title, setTitle] = useState("");
+  const [level, setLevel] = useState<BlockType>("heading2");
+  return (
+    <form
+      id="docs-add-section"
+      className="ds-stack ds-gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!title.trim()) return;
+        const anchorIndex = after ? blockIndex(editor.model, after) : -1;
+        const endOfSection = anchorIndex >= 0 ? editor.model.blocks[anchorIndex + sectionSpan(editor.model, anchorIndex) - 1]?.id : undefined;
+        const heading = textBlock(level, title.trim());
+        const result = insertBlockAfter(editor.model, endOfSection, heading);
+        const body = insertBlockAfter(result.model, heading.id, emptyBlock("paragraph"));
+        editor.commit(body.model, `Add the section ${title.trim()}`, collapsed({ blockId: heading.id, offset: title.trim().length }));
+        close();
+      }}
+    >
+      <Field label="Heading" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required autoFocus placeholder="Delivery and returns" /></Field>
+      <Row gap={3} wrap>
+        <Field label="Level">
+          <Select value={level} onChange={(event) => setLevel(event.target.value as BlockType)}>
+            <option value="heading1">Heading 1</option><option value="heading2">Heading 2</option><option value="heading3">Heading 3</option>
+          </Select>
+        </Field>
+        <Field label="Place it after">
+          <Select value={after} onChange={(event) => setAfter(event.target.value)}>
+            <option value="">The end of the document</option>
+            {nodes.map((node) => <option key={node.blockId} value={node.blockId}>{"· ".repeat(node.level - 1)}{node.text} (and its section)</option>)}
+          </Select>
+        </Field>
+      </Row>
+    </form>
+  );
+}
+
+function JumpTo({ context, close }: { context: ScreenContext; close: () => void }) {
+  const record = useDocument(context);
+  const editor = useDocEditor(context, record);
+  const nodes = outline(editor.model);
+  if (!record) return <Empty title="No document is open" />;
+  if (nodes.length === 0) return <Empty title="No headings to jump to" />;
+  return (
+    <Stack gap={1}>
+      {nodes.map((node) => (
+        <Button key={node.blockId} variant="ghost" style={{ justifyContent: "flex-start", paddingInlineStart: `${node.level * 12}px` }} onClick={() => {
+          pendingJump = node.blockId;
+          editor.moveCaret(collapsed({ blockId: node.blockId, offset: 0 }));
+          close();
+          context.navigate(context.path("/o/:org/docs/documents/:id", record.id));
+        }}>{node.text}</Button>
+      ))}
+    </Stack>
+  );
+}
+
+function ReorderHeading({ context, close }: { context: ScreenContext; close: () => void }) {
+  const editor = useDocEditor(context, useDocument(context));
+  const nodes = outline(editor.model);
+  const [blockId, setBlockId] = useState("");
+  const chosen = blockId || nodes[0]?.blockId || "";
+  if (nodes.length === 0) return <Empty title="No headings yet" />;
+  const position = nodes.findIndex((node) => node.blockId === chosen);
+  const move = (direction: -1 | 1) => {
+    const result = moveSection(editor.model, chosen, direction);
+    if (result.model === editor.model) { return; }
+    editor.commit(result.model, direction < 0 ? "Move a section earlier" : "Move a section later", result.selection);
+    void context.mutate.log(`Section ${nodes[position]?.text ?? ""} moved ${direction < 0 ? "earlier" : "later"}; its comments and bookmarks moved with it`, { entityId: context.params.id, type: "update" });
+  };
+  return (
+    <Stack gap={3}>
+      <Field label="Section">
+        <Select value={chosen} onChange={(event) => setBlockId(event.target.value)}>{nodes.map((node) => <option key={node.blockId} value={node.blockId}>{"· ".repeat(node.level - 1)}{node.text}</option>)}</Select>
+      </Field>
+      <Row gap={2}>
+        <Button variant="secondary" onClick={() => move(-1)}>Move earlier</Button>
+        <Button variant="secondary" onClick={() => move(1)}>Move later</Button>
+        <span className="ds-grow" />
+        <Button variant="primary" onClick={close}>Done</Button>
+      </Row>
+      <Notice tone="info" title="The whole section moves">The heading and every block under it move as one, and anchored comments and bookmarks keep pointing at the same text because they hold block ids, not positions.</Notice>
+    </Stack>
+  );
+}
+
+function ApproveDocument({ context, close }: { context: ScreenContext; close: () => void }) {
+  const record = useDocument(context);
+  const editor = useDocEditor(context, record);
+  const [note, setNote] = useState("");
+  if (!record) return <Empty title="No document is open" />;
+  const mandatoryOpen = editor.model.comments.filter((comment) => comment.mandatory && !comment.resolved);
+  const approvals = record.fields.approvals ? String(record.fields.approvals).split("|").filter(Boolean) : [];
+  return (
+    <form
+      id="docs-approve"
+      className="ds-stack ds-gap-3"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (mandatoryOpen.length > 0) return;
+        await editor.saveNow();
+        const fresh = await import("@/platform/repo").then((module) => module.getRecord(record.id));
+        await context.mutate.patch(record.id, {
+          status: "published",
+          fields: { ...(fresh ?? record).fields, approvals: [...approvals, `${context.actor} ${context.now.toISOString()}${note.trim() ? ` ${note.trim()}` : ""}`].join("|") },
+        }, { expectRevision: (fresh ?? record).revision, event: `${record.title} approved by ${context.actor}` });
+        context.toast("Approved", `${record.title} is approved by ${context.actor} and published in this workspace.`);
+        close();
+      }}
+    >
+      {mandatoryOpen.length > 0 ? (
+        <Notice tone="danger" title={`${mandatoryOpen.length} mandatory review${mandatoryOpen.length === 1 ? " is" : "s are"} still open`}>
+          Approval is blocked until each “must resolve” comment is resolved, so a reviewer's objection is never erased by an approval. {mandatoryOpen.map((comment) => `${comment.author}: “${comment.body.slice(0, 60)}”`).join(" · ")}
+        </Notice>
+      ) : (
+        <Notice tone="info" title="Approving publishes the document in this workspace">The approval records who approved and when. Nothing is sent outside this browser.</Notice>
+      )}
+      <Properties rows={[{ label: "Status now", value: record.status.replace("_", " ") }, { label: "Earlier approvals", value: String(approvals.length) }, { label: "Open tracked changes", value: String(openSuggestions(editor.model).length) }]} />
+      <Field label="Note"><TextInput value={note} onChange={(event) => setNote(event.target.value)} disabled={mandatoryOpen.length > 0} placeholder="Approved for the trade launch" /></Field>
+    </form>
+  );
+}
+
+function SuggestEdit({ context, close }: { context: ScreenContext; close: () => void }) {
+  const editor = useDocEditor(context, useDocument(context));
+  const blocks = editor.model.blocks.filter((block) => isTextBlock(block));
+  const [blockId, setBlockId] = useState(editor.selection?.head.blockId ?? "");
+  const [text, setText] = useState("");
+  const chosen = blocks.find((block) => block.id === blockId) ?? blocks[0];
+  if (!chosen) return <Empty title="No text to suggest against" />;
+  return (
+    <form
+      id="docs-suggest"
+      className="ds-stack ds-gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!text.trim()) return;
+        const offset = blockText(chosen).length;
+        const suggesting = { ...editor.model, suggestMode: true };
+        const result = insertText(suggesting, collapsed({ blockId: chosen.id, offset }), `${offset > 0 ? " " : ""}${text.trim()}`, { author: context.actor, at: context.now.toISOString() });
+        editor.commit({ ...result.model, suggestMode: editor.model.suggestMode }, "Suggest an edit", result.selection);
+        void context.mutate.log(`Edit suggested by ${context.actor}`, { entityId: context.params.id, type: "update" });
+        close();
+      }}
+    >
+      <Field label="In the paragraph">
+        <Select value={chosen.id} onChange={(event) => setBlockId(event.target.value)}>{blocks.map((block) => <option key={block.id} value={block.id}>{visibleText(block).slice(0, 70) || "(empty paragraph)"}</option>)}</Select>
+      </Field>
+      <Field label="Add this text" required hint="It goes in as a tracked insertion that an editor accepts or rejects."><TextArea rows={3} value={text} onChange={(event) => setText(event.target.value)} required autoFocus /></Field>
+      <p className="vx-mini">For deletions and edits mid-sentence, turn on suggesting mode in the editor: every keystroke then becomes a tracked change.</p>
+    </form>
+  );
+}
+
+function MentionSomeone({ context, close }: { context: ScreenContext; close: () => void }) {
+  const editor = useDocEditor(context, useDocument(context));
+  const members = useCollection("members");
+  const threads = editor.model.comments.filter((comment) => !comment.resolved);
+  const [threadId, setThreadId] = useState("");
+  const [memberId, setMemberId] = useState("");
+  const [body, setBody] = useState("");
+  const thread = threads.find((comment) => comment.id === threadId) ?? threads[0];
+  const member = members.find((item) => item.id === memberId) ?? members[0];
+  if (!thread) return <Empty title="No open comment to mention someone in">Add a comment first.</Empty>;
+  return (
+    <form
+      id="docs-mention"
+      className="ds-stack ds-gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!member) return;
+        const text = `@${member.title} ${body.trim()}`.trim();
+        editor.commit({ ...editor.model, comments: editor.model.comments.map((comment) => (comment.id === thread.id ? { ...comment, replies: [...comment.replies, { id: nextId("rp"), author: context.actor, at: context.now.toISOString(), body: text }] } : comment)) }, `Mention ${member.title}`);
+        void context.mutate.log(`${member.title} mentioned on a comment; no notification service is connected, so nothing was sent`, { entityId: context.params.id, type: "mention" });
+        context.toast("Mention recorded", `${member.title} is named on the thread. No notification service is connected, so nothing left this browser; they see it when they open the document.`, "info");
+        close();
+      }}
+    >
+      <Field label="Comment thread"><Select value={thread.id} onChange={(event) => setThreadId(event.target.value)}>{threads.map((comment) => <option key={comment.id} value={comment.id}>{comment.author}: {comment.body.slice(0, 60)}</option>)}</Select></Field>
+      <Field label="Mention"><Select value={member?.id ?? ""} onChange={(event) => setMemberId(event.target.value)}>{members.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</Select></Field>
+      <Field label="Message"><TextArea rows={2} value={body} onChange={(event) => setBody(event.target.value)} autoFocus placeholder="can you check the trade discount here?" /></Field>
+    </form>
+  );
+}
+
+function PreviewDocument({ context }: { context: ScreenContext }) {
+  const record = useDocument(context);
+  const editor = useDocEditor(context, record);
+  if (!record) return <Empty title="No document is open" />;
+  const pages = paginate(editor.model).pages.length;
+  return (
+    <Stack gap={3}>
+      <Properties rows={[{ label: "Pages", value: String(pages) }, { label: "Open tracked changes", value: String(openSuggestions(editor.model).length) }, { label: "Comments", value: "not included in the export" }]} />
+      <iframe title={`Export preview of ${record.title}`} srcDoc={toHtml(editor.model, record.title)} style={{ width: "100%", height: 420, border: "1px solid var(--border-default)", borderRadius: 6, background: "#fff" }} sandbox="" />
+      <p className="vx-mini">The same HTML the export writes, rendered in a sandboxed frame. A printer or PDF writer may break pages differently.</p>
+    </Stack>
+  );
+}
+
+function RevokeLinks({ context, close }: { context: ScreenContext; close: () => void }) {
+  const record = useDocument(context);
+  const editor = useDocEditor(context, record);
+  const active = editor.model.shares.filter((share) => !share.revokedAt);
+  if (!record) return <Empty title="No document is open" />;
+  if (active.length === 0) return <Notice tone="success" title="No link is active">Nothing to revoke.</Notice>;
+  const revoke = (ids: string[]) => {
+    editor.commit({ ...editor.model, shares: editor.model.shares.map((item) => (ids.includes(item.id) ? { ...item, revokedAt: context.now.toISOString() } : item)) }, ids.length === 1 ? "Revoke link" : `Revoke ${ids.length} links`);
+    void context.mutate.log(`${ids.length} share link${ids.length === 1 ? "" : "s"} revoked on ${record.title}`, { entityId: record.id, type: "revoke" });
+  };
+  return (
+    <Stack gap={2}>
+      <Notice tone="warning" title="Revoking takes effect at once">A revoked link stops opening the document here. It is kept on the record as revoked, with the time.</Notice>
+      {active.map((share) => (
+        <Row key={share.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
+          <div className="ds-grow"><strong>{share.scope === "link" ? "Anyone with the link" : "Workspace only"}</strong><p className="ds-subtle">{share.note} · created {context.relative(share.at)}</p></div>
+          <Button size="sm" variant="outline-danger" onClick={() => revoke([share.id])}>Revoke</Button>
+        </Row>
+      ))}
+      {active.length > 1 && <Row gap={2}><span className="ds-grow" /><Button variant="outline-danger" onClick={() => { revoke(active.map((share) => share.id)); close(); }}>Revoke all {active.length}</Button></Row>}
+    </Stack>
+  );
+}
+
+function ApplySuggestions({ context, close }: { context: ScreenContext; close: () => void }) {
+  const editor = useDocEditor(context, useDocument(context));
+  const proposals = writingProposals(editor.model).filter((proposal) => proposal.apply);
+  const [picked, setPicked] = useState<string[]>(proposals.map((proposal) => proposal.id));
+  const advisory = writingProposals(editor.model).length - proposals.length;
+  if (proposals.length === 0) return <Notice tone="info" title="Nothing can be applied by rule">{advisory ? `${advisory} findings need a person to rewrite the text; they are on the Writing tab.` : "There are no writing findings."}</Notice>;
+  return (
+    <form
+      id="docs-apply"
+      className="ds-stack ds-gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        let next = editor.model;
+        for (const proposal of proposals.filter((item) => picked.includes(item.id))) next = proposal.apply!(next);
+        editor.commit(next, `Apply ${picked.length} writing suggestions`);
+        close();
+      }}
+    >
+      {proposals.map((proposal) => (
+        <Checkbox key={proposal.id} label={`${proposal.title} — ${proposal.detail}`} checked={picked.includes(proposal.id)}
+          onChange={(event) => setPicked((current) => (event.target.checked ? [...current, proposal.id] : current.filter((id) => id !== proposal.id)))} />
+      ))}
+      <Notice tone="info" title="Only rule-based fixes are applied">Each one changes spacing or punctuation without changing meaning, and undo takes it back. {advisory ? `${advisory} other findings need a person.` : ""} No model is called.</Notice>
+    </form>
+  );
+}
+
 registerApp({
   code: "DOCS",
   short: "Docs",
@@ -2648,11 +3079,12 @@ registerApp({
       actions: [
         { id: "Create", label: "New document", placement: "primary", run: (context) => context.openOverlay("New doc") },
         { id: "upload", label: "Upload", placement: "secondary", icon: <Upload size={15} />, run: (context) => context.openOverlay("New doc", { upload: true }) },
-        { id: "search", label: "Search", placement: "overflow", run: (context) => context.toast("Search is on the page", "The search field above the list reads titles, tags and — for documents that are not confidential — their text.", "info") },
+        { id: "search", label: "Search documents…", placement: "overflow", run: (context) => context.openOverlay("search documents") },
         { id: "move", label: "Move to folder", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a document first"), run: (context) => context.openOverlay("folder selector") },
         { id: "share", label: "Share", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a document first"), run: (context) => context.openOverlay("sharing") },
       ],
       overlays: [
+        { id: "search documents", kind: "modal", title: "Search documents", width: 600, render: (context) => <SearchDocuments context={context} close={context.close} /> },
         { id: "New doc", kind: "modal", title: "New document", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="new-doc">Create</Button></>, render: (context) => <NewDocumentOverlay context={context} close={context.close} /> },
         { id: "folder selector", kind: "modal", title: "Move to folder", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="folder-selector">Move</Button></>, render: (context) => <FolderSelector context={context} close={context.close} /> },
         { id: "sharing", kind: "drawer", title: "Sharing", width: 460, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="sharing">Record link</Button></>, render: (context) => <SharingOverlay context={context} close={context.close} /> },
@@ -2666,14 +3098,16 @@ registerApp({
       surface: (context) => <DocumentEditorScreen context={context} />,
       tabs: ["Write", "Review", "Layout", "References"].map((id) => ({ id, render: () => null })),
       actions: [
-        { id: "Type", label: "Focus the page", placement: "toolbar", run: () => undefined },
-        { id: "format", label: "Formatting", placement: "toolbar", run: () => undefined },
+        { id: "Type", label: "Type on the page", placement: "toolbar", run: (context) => focusPage(context) },
+        { id: "format", label: "Format…", placement: "toolbar", run: (context) => context.openOverlay("format") },
         { id: "insert", label: "Insert", placement: "toolbar", run: (context) => context.openOverlay("insert table") },
         { id: "comment", label: "Comment", placement: "toolbar", run: (context) => context.openOverlay("citations", { mode: "comment" }) },
-        { id: "accept changes", label: "Accept changes", placement: "toolbar", run: (context) => context.setTab("Review") },
+        { id: "accept changes", label: "Accept changes…", placement: "toolbar", run: (context) => context.openOverlay("accept changes") },
         { id: "export", label: "Export", placement: "toolbar", run: (context) => context.openOverlay("export") },
       ],
       overlays: [
+        { id: "format", kind: "modal", title: "Format", width: 480, render: (context) => <FormatOverlay context={context} close={context.close} /> },
+        { id: "accept changes", kind: "modal", title: "Accept or reject changes", width: 600, render: (context) => <AcceptChanges context={context} close={context.close} /> },
         { id: "Styles", kind: "drawer", title: "Styles", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="styles">Save styles</Button></>, render: (context) => <StylesOverlay context={context} close={context.close} /> },
         { id: "insert table", kind: "modal", title: "Insert", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="insert">Insert</Button></>, render: (context) => <InsertOverlay context={context} close={context.close} /> },
         { id: "citations", kind: "modal", title: "Comment or reference", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="citations">Save</Button></>, render: (context) => <CitationsOverlay context={context} close={context.close} /> },
@@ -2687,12 +3121,16 @@ registerApp({
       title: () => "Outline & navigation",
       tabs: (["Headings", "Bookmarks", "Comments"] as const).map((id) => ({ id, render: (context) => <OutlineScreen context={context} tab={id} /> })),
       actions: [
-        { id: "add section", label: "Add section", placement: "primary", run: (context) => context.setTab("Headings") },
-        { id: "jump", label: "Open the editor", placement: "secondary", run: (context) => context.navigate(context.path("/o/:org/docs/documents/:id", context.params.id)) },
-        { id: "Reorder heading", label: "How reordering works", placement: "overflow", run: (context) => context.toast("Reordering moves a whole section", "The heading and every block under it move together, and anchored comments and bookmarks travel with them.", "info") },
-        { id: "collapse", label: "Collapse all", placement: "overflow", run: (context) => context.toast("Use the chevrons", "Each heading has a collapse control in the tree.", "info") },
+        { id: "add section", label: "Add a section…", placement: "primary", run: (context) => context.openOverlay("add section") },
+        { id: "jump", label: "Jump to a heading…", placement: "secondary", run: (context) => context.openOverlay("jump to") },
+        { id: "open editor", label: "Open the editor", placement: "overflow", run: (context) => context.navigate(context.path("/o/:org/docs/documents/:id", context.params.id)) },
+        { id: "Reorder heading", label: "Reorder a heading…", placement: "overflow", run: (context) => context.openOverlay("reorder heading") },
+        { id: "collapse", label: "Collapse or expand every heading", placement: "overflow", run: () => outlineUi.set((current) => ({ collapseAll: current.collapseAll + 1 })) },
       ],
       overlays: [
+        { id: "add section", kind: "modal", title: "Add a section", width: 520, footer: docFooter("docs-add-section", "Add"), render: (context) => <AddSection context={context} close={context.close} /> },
+        { id: "jump to", kind: "modal", title: "Jump to a heading", width: 480, render: (context) => <JumpTo context={context} close={context.close} /> },
+        { id: "reorder heading", kind: "modal", title: "Reorder a heading", width: 480, render: (context) => <ReorderHeading context={context} close={context.close} /> },
         { id: "Heading properties", kind: "modal", title: "Heading properties", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="heading-properties">Save</Button></>, render: (context) => <HeadingProperties context={context} close={context.close} /> },
         { id: "document structure warning", kind: "drawer", title: "Document structure", width: 520, render: (context) => <StructureWarningOverlay context={context} /> },
       ],
@@ -2703,12 +3141,16 @@ registerApp({
       title: () => "Review & comments",
       tabs: (["Comments", "Changes", "Approvals", "Versions"] as const).map((id) => ({ id, render: (context) => <ReviewScreen context={context} tab={id} /> })),
       actions: [
-        { id: "approve", label: "Approve", placement: "primary", capability: "edit_knowledge", run: (context) => context.setTab("Approvals") },
-        { id: "Suggest edit", label: "Suggest an edit", placement: "secondary", run: (context) => { context.setTab("Changes"); context.toast("Turn suggesting on", "With suggesting on, every edit in the editor is recorded as a tracked change instead of being written straight into the text.", "info"); } },
-        { id: "accept/reject", label: "Accept or reject", placement: "overflow", run: (context) => context.setTab("Changes") },
-        { id: "mention", label: "Mention someone", placement: "overflow", run: (context) => { context.setTab("Comments"); context.toast("Mention in a reply", "Type @ and a first name in a reply. The mention is recorded against the document; no notification service is connected.", "info"); } },
+        { id: "approve", label: "Approve…", placement: "primary", capability: "edit_knowledge", run: (context) => context.openOverlay("approve document") },
+        { id: "Suggest edit", label: "Suggest an edit…", placement: "secondary", run: (context) => context.openOverlay("suggest edit") },
+        { id: "accept/reject", label: "Accept or reject…", placement: "overflow", run: (context) => context.openOverlay("accept changes") },
+        { id: "mention", label: "Mention someone…", placement: "overflow", run: (context) => context.openOverlay("mention") },
       ],
       overlays: [
+        { id: "approve document", kind: "modal", title: "Approve the document", width: 540, footer: docFooter("docs-approve", "Approve"), render: (context) => <ApproveDocument context={context} close={context.close} /> },
+        { id: "suggest edit", kind: "modal", title: "Suggest an edit", width: 560, footer: docFooter("docs-suggest", "Suggest"), render: (context) => <SuggestEdit context={context} close={context.close} /> },
+        { id: "accept changes", kind: "modal", title: "Accept or reject changes", width: 600, render: (context) => <AcceptChanges context={context} close={context.close} /> },
+        { id: "mention", kind: "modal", title: "Mention someone", width: 520, footer: docFooter("docs-mention", "Mention"), render: (context) => <MentionSomeone context={context} close={context.close} /> },
         { id: "Comment thread", kind: "drawer", title: "Comment thread", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="comment-thread">Reply</Button></>, render: (context) => <CommentThread context={context} close={context.close} /> },
         { id: "diff", kind: "drawer", title: "Compare", width: 560, render: (context) => <DiffOverlay context={context} /> },
         { id: "reviewer assignment", kind: "modal", title: "Assign reviewers", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="reviewer-assignment">Assign</Button></>, render: (context) => <ReviewerAssignment context={context} close={context.close} /> },
@@ -2720,8 +3162,8 @@ registerApp({
       tabs: (["All", "Company", "Department", "My templates"] as const).map((id) => ({ id, render: (context) => <TemplatesScreen context={context} tab={id} /> })),
       actions: [
         { id: "Create", label: "New template", placement: "primary", run: (context) => context.openOverlay("Template editor") },
-        { id: "use", label: "Use a template", placement: "secondary", run: (context) => context.openOverlay("Template editor", { mode: "use" }) },
-        { id: "edit master", label: "Edit master", placement: "overflow", run: (context) => context.openOverlay("Template editor") },
+        { id: "use", label: "Use the template", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select a template first"), run: (context) => context.openOverlay("Template editor", { mode: "use", id: context.selectedId }) },
+        { id: "edit master", label: "Edit the master", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a template first"), run: (context) => context.openOverlay("Template editor", { id: context.selectedId }) },
         {
           id: "retire", label: "Retire", placement: "overflow", tone: "danger",
           guard: (context) => (context.selectedId ? undefined : "Select a template first"),
@@ -2745,12 +3187,14 @@ registerApp({
       title: () => "Publishing & export",
       tabs: (["Export", "Share", "Publish", "History"] as const).map((id) => ({ id, render: (context) => <PublishScreen context={context} tab={id} /> })),
       actions: [
-        { id: "export", label: "Export", placement: "primary", capability: "export_data", run: (context) => context.setTab("Export") },
-        { id: "Preview", label: "Preview", placement: "secondary", run: (context) => context.setTab("Export") },
+        { id: "export", label: "Export…", placement: "primary", capability: "export_data", run: (context) => context.openOverlay("PDF settings") },
+        { id: "Preview", label: "Preview the export", placement: "secondary", run: (context) => context.openOverlay("preview") },
         { id: "request e-sign", label: "Request signature", placement: "overflow", run: (context) => context.openOverlay("signature request") },
-        { id: "revoke link", label: "Revoke a link", placement: "overflow", tone: "danger", run: (context) => context.setTab("Share") },
+        { id: "revoke link", label: "Revoke a link…", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("revoke links") },
       ],
       overlays: [
+        { id: "preview", kind: "modal", title: "Export preview", width: 760, render: (context) => <PreviewDocument context={context} /> },
+        { id: "revoke links", kind: "modal", title: "Revoke a link", width: 560, tone: "danger", render: (context) => <RevokeLinks context={context} close={context.close} /> },
         { id: "PDF settings", kind: "modal", title: "PDF settings", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="pdf-settings">Write print HTML</Button></>, render: (context) => <PdfSettings context={context} close={context.close} /> },
         { id: "link permissions", kind: "modal", title: "Link permissions", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="link-permissions">Create link</Button></>, render: (context) => <LinkPermissions context={context} close={context.close} /> },
         { id: "signature request", kind: "modal", title: "Signature request", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="signature-request">Record request</Button></>, render: (context) => <SignatureRequest context={context} close={context.close} /> },
@@ -2762,11 +3206,12 @@ registerApp({
       title: () => "Document insights",
       tabs: (["Writing", "Accuracy", "Brand", "Sources"] as const).map((id) => ({ id, render: (context) => <InsightsScreen context={context} tab={id} /> })),
       actions: [
-        { id: "apply selected", label: "Apply selected", placement: "primary", run: (context) => { context.setTab("Writing"); context.toast("Select the suggestions", "Tick the rows you want and use Apply selected in the grid. Only suggestions a rule can apply without changing meaning are applied.", "info"); } },
+        { id: "apply selected", label: "Apply selected…", placement: "primary", run: (context) => context.openOverlay("apply suggestions") },
         { id: "Review suggestion", label: "Review suggestions", placement: "secondary", run: (context) => context.setTab("Writing") },
-        { id: "inspect citations", label: "Inspect citations", placement: "overflow", run: (context) => context.setTab("Sources") },
+        { id: "inspect citations", label: "Inspect citations", placement: "overflow", run: (context) => context.openOverlay("source inspection") },
       ],
       overlays: [
+        { id: "apply suggestions", kind: "modal", title: "Apply writing suggestions", width: 620, footer: docFooter("docs-apply", "Apply the ticked ones"), render: (context) => <ApplySuggestions context={context} close={context.close} /> },
         { id: "Suggestion diff", kind: "modal", title: "Suggestion", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="suggestion-diff">Apply</Button></>, render: (context) => <SuggestionDiff context={context} close={context.close} /> },
         { id: "source inspection", kind: "drawer", title: "Source", width: 520, render: (context) => <SourceInspection context={context} /> },
         { id: "style settings", kind: "modal", title: "Style settings", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="style-settings">Save</Button></>, render: (context) => <StyleSettings context={context} close={context.close} /> },

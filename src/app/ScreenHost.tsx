@@ -149,9 +149,38 @@ export function ScreenHost() {
     ? <TabPanel id={activeTab}>{content}</TabPanel>
     : content;
 
+  const actionBar = (
+    <div className="pg-actions">
+      {secondary.map((action) => <ActionButton key={action.id} action={action} context={context} variant="secondary" />)}
+      {primary.map((action) => <ActionButton key={action.id} action={action} context={context} variant="primary" />)}
+      {overflow.length > 0 && (
+        <Menu
+          label="More actions"
+          trigger={<Button variant="ghost" iconOnly aria-label="More actions"><MoreHorizontal size={18} /></Button>}
+          items={overflow.map((action) => ({
+            label: action.label ?? action.id,
+            group: action.group,
+            tone: action.tone,
+            disabled: Boolean(action.guard?.(context)),
+            onSelect: () => { void action.run(context); },
+          }))}
+        />
+      )}
+    </div>
+  );
+
   if (def?.chrome === "full") {
+    /* Editors and consoles own their canvas, but their contract actions must
+       still be reachable in one consistent place: a slim command bar. Without
+       it, a full-chrome screen showed no actions at all unless its team
+       happened to duplicate them into its own toolbar. */
     return (
       <div className="pg">
+        <div className="pg-cmdbar" role="region" aria-label={`${title} actions`}>
+          <h1 className="pg-cmdbar-title ds-truncate">{title}</h1>
+          <span className="ds-grow" />
+          {actions.length > 0 && actionBar}
+        </div>
         {body}
         <ScreenOverlays context={context} def={def} overlayId={overlay?.id} onClose={() => setOverlay(null)} />
       </div>
@@ -180,23 +209,7 @@ export function ScreenHost() {
                 ? null
                 : <p className="pg-lede">{screen.purpose}</p>}
           </div>
-          <div className="pg-actions">
-            {secondary.map((action) => <ActionButton key={action.id} action={action} context={context} variant="secondary" />)}
-            {primary.map((action) => <ActionButton key={action.id} action={action} context={context} variant="primary" />)}
-            {overflow.length > 0 && (
-              <Menu
-                label="More actions"
-                trigger={<Button variant="ghost" iconOnly aria-label="More actions"><MoreHorizontal size={18} /></Button>}
-                items={overflow.map((action) => ({
-                  label: action.label ?? action.id,
-                  group: action.group,
-                  tone: action.tone,
-                  disabled: Boolean(action.guard?.(context)),
-                  onSelect: () => { void action.run(context); },
-                }))}
-              />
-            )}
-          </div>
+          {actionBar}
         </div>
       </header>
 

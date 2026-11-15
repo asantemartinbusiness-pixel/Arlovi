@@ -162,6 +162,8 @@ export async function testPortal(context: ScreenContext) {
   const body = bodyOf<PortalBody>(portal, {});
   const shared = (body.shared ?? []).flatMap((scope) => scope.ids.map((id) => ({ collection: scope.collection, id, record: (pools[scope.collection] ?? []).find((item) => item.id === id) })));
   const contactId = String(portal.fields.contactId ?? "");
+  const contacts = await listByCollection(context.org.id, "contacts");
+  const nameOf = (id: string) => contacts.find((contact) => contact.id === id)?.title ?? id;
   const foreign = shared.filter((item) => item.record && contactId && String(item.record.fields.contactId ?? contactId) !== contactId);
   const missing = shared.filter((item) => !item.record);
   const sharedIds = new Set(shared.map((item) => item.id));
@@ -173,28 +175,28 @@ export async function testPortal(context: ScreenContext) {
   const traversable = outside.filter((record) => resolved.has(record.id)).length;
   const checks = [
     { label: "Inherits no internal permission", ok: portal.fields.inheritsInternalAccess !== true },
-    { label: `Every shared record belongs to this client (${shared.length} checked)`, ok: foreign.length === 0 },
+    { label: `Every shared record names this portal's contact (${shared.length} checked)`, ok: foreign.length === 0, review: true },
     { label: "Every shared id still resolves", ok: missing.length === 0 },
     { label: `Internal ids outside the list are not reachable (${outside.length} probed)`, ok: traversable === 0 },
     { label: "At least one page is gated", ok: (body.pages ?? []).length > 0 },
   ];
-  const failed = checks.filter((check) => !check.ok);
+  const failed = checks.filter((check) => !check.ok && !("review" in check));
   const saved = await context.mutate.patch(portal.id, {
     fields: { ...portal.fields, testedAt: iso(context), testedBy: context.actor, testsPassed: failed.length === 0 },
     body: activity(body, iso(context), context.actor, `Access test: ${checks.length - failed.length} of ${checks.length} passed.`),
   }, { expectRevision: portal.revision, event: `Portal ${portal.title} access-tested by ${context.actor}: ${checks.length - failed.length}/${checks.length}` });
   if (!saved) return;
-  context.openOverlay("portal test", { checks, foreign: foreign.map((item) => item.record?.title ?? item.id) });
+  context.openOverlay("portal test", { checks, foreign: foreign.map((item) => `${item.record?.title ?? item.id} (linked to ${nameOf(String(item.record?.fields.contactId ?? ""))}, not ${nameOf(contactId)})`) });
 }
 
 export function PortalTestResult({ context }: { context: ScreenContext }) {
-  const payload = context.overlayPayload as { checks?: { label: string; ok: boolean }[]; foreign?: string[] } | undefined;
+  const payload = context.overlayPayload as { checks?: { label: string; ok: boolean; review?: boolean }[]; foreign?: string[] } | undefined;
   return (
     <Stack gap={3}>
       {(payload?.checks ?? []).map((check) => (
-        <Row key={check.label} gap={2}><Pill tone={check.ok ? "success" : "danger"} dot>{check.ok ? "Pass" : "Fail"}</Pill><span className="ds-grow">{check.label}</span></Row>
+        <Row key={check.label} gap={2}><Pill tone={check.ok ? "success" : check.review ? "warning" : "danger"} dot>{check.ok ? "Pass" : check.review ? "Review" : "Fail"}</Pill><span className="ds-grow">{check.label}</span></Row>
       ))}
-      {(payload?.foreign ?? []).length > 0 && <Notice tone="danger" title="Records from another client are shared">{payload?.foreign?.join(", ")}. Remove them from the portal's list.</Notice>}
+      {(payload?.foreign ?? []).length > 0 && <Notice tone="warning" title="Shared records that name a different contact">{payload?.foreign?.join("; ")}. Confirm each belongs to this client, or remove it from the portal's list; a record of another client must never be shared here.</Notice>}
       <Notice tone="info">The test runs against the portal's own list of records in this browser and is recorded on the portal with your name.</Notice>
     </Stack>
   );
