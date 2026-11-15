@@ -71,5 +71,415 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-SHEETS-002",
+  "title": "Grid Editor",
+  "route": "/o/northline/sheets/workbooks/nl-workbooks-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sheet tabs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Data",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Formulas",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Review",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "View",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Format cells",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "data validation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "named range",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "chart picker",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-SHEETS-003",
+  "title": "Formula Manager",
+  "route": "/o/northline/sheets/workbooks/nl-workbooks-001/formulas",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Errors",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Dependencies",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Named ranges",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Formula inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "function help",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "circular reference",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect a formula",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Recalculate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Fix selected errors…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare dependencies…",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-SHEETS-004",
+  "title": "Data Tables",
+  "route": "/o/northline/sheets/workbooks/nl-workbooks-001/tables",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tables",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Views",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Relationships",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Validation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Column editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "import schema",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "relation preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit schema",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create table",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Import into a table…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Connect a source…",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-SHEETS-005",
+  "title": "Charts & Dashboards",
+  "route": "/o/northline/sheets/workbooks/nl-workbooks-001/charts",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Charts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pivot",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Dashboard",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Presentation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Series editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "formatting inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "calculation note",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Change the chart type…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New chart",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Drill down…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish to a deck…",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-SHEETS-006",
+  "title": "Import & Export",
+  "route": "/o/northline/sheets/workbooks/nl-workbooks-001/io",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Imports",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exports",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Errors",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Import wizard",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "compatibility report",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "rollback",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export CSV…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Upload a CSV",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Map columns",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test compatibility",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Roll back an import",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-SHEETS-007",
+  "title": "Collaboration & Versioning",
+  "route": "/o/northline/sheets/workbooks/nl-workbooks-001/collab",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Comments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Permissions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Changes",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Conflict resolver",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "protected range",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "restore confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Comment on a cell…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Protect a range",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Restore a version…",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Merge with the stored version"
+  ]
  }
 ]

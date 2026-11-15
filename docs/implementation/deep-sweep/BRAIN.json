@@ -144,5 +144,325 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-BRAIN-003",
+  "title": "Source Detail",
+  "route": "/o/northline/brain/sources/nl-sources-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Extracted data",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Relationships",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Access",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Correction form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "permission editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "delete request",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "annotate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "restrict",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Correct extraction",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "reindex",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "export",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-BRAIN-004",
+  "title": "Business Graph",
+  "route": "/o/northline/brain/graph",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Entities",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Relationships",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exceptions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Entity inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "merge preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "relationship editor",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "merge candidates",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "filter graph",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "All exceptions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "split record",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Explore node"
+  ]
+ },
+ {
+  "id": "ARL-BRAIN-005",
+  "title": "Fact Registry",
+  "route": "/o/northline/brain/facts",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Verified",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Proposed",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Conflicting",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Expired",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Evidence drawer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "verification dialog",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "conflict resolver",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "reject",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "annotate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "set expiry",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "compare facts",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-BRAIN-006",
+  "title": "Knowledge Conflicts",
+  "route": "/o/northline/brain/conflicts",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Open",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "In review",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Resolved",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Comparison drawer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "resolution dialog",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "escalation",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "defer",
+   "Select source of truth",
+   "request external confirmation"
+  ]
+ },
+ {
+  "id": "ARL-BRAIN-007",
+  "title": "Decision Register",
+  "route": "/o/northline/brain/decisions",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Proposed",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approved",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Superseded",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Decision draft",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "approval detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "impact review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create decision",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "inspect rationale",
+   "link approval",
+   "supersede"
+  ]
  }
 ]
