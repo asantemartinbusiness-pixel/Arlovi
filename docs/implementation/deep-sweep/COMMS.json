@@ -1,0 +1,854 @@
+[
+ {
+  "id": "ARL-COMMS-001",
+  "title": "Communications Home",
+  "route": "/o/northline/comms/home",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Channels",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "DMs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Calls",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Calendar",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Compose",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "quick switcher",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "notification preferences",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Browse and jump to",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reply to a message",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Join a meeting",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Ask for a summary",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compose an email",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Notification settings",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Today's diary",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMS-002",
+  "title": "Channels",
+  "route": "/o/northline/comms/channels",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "My channels",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Departments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archived",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Channel creation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "member management",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "channel archive",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a channel",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Search channels",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Join the channel",
+   "Mute or unmute",
+   "Members",
+   "Archive a channel"
+  ]
+ },
+ {
+  "id": "ARL-COMMS-003",
+  "title": "Channel Conversation",
+  "route": "/o/northline/comms/channels/nl-channels-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Conversation",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Files",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pinned",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tasks",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Thread drawer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "file preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "moderation report",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Threads",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Make a task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pin a message",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reply in the channel",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Mention someone",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Files",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Report a message",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMS-004",
+  "title": "Direct Messages",
+  "route": "/o/northline/comms/messages",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Recent",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Unread",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Groups",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archived",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Conversation info",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "add member",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "message actions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Search messages",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Send a message",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Attach a document",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Audio message",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Call",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New conversation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add someone",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Message actions",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMS-005",
+  "title": "Email Inbox",
+  "route": "/o/northline/comms/email",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Inbox",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sent",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Drafts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archive",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Spam",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Compose window",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "send confirmation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "rule editor",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Archive",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compose",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reply",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Forward",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Label",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Rules",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open a thread",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMS-006",
+  "title": "Email Thread",
+  "route": "/o/northline/comms/email/nl-emailThreads-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Messages",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Related records",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Activity",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Reply editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "contact inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "report phishing",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Make a task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reply",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a CC",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Attach a document",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Block the sender",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Contact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Report phishing",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMS-007",
+  "title": "Calendar",
+  "route": "/o/northline/comms/calendar",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Day",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Week",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Month",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Agenda",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Team",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Event editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "conflict inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "attendee status",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Find a time",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create an event",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Invite someone",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Move a meeting",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reschedule a meeting",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Check for clashes",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Attendee status",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMS-008",
+  "title": "Meeting Room",
+  "route": "/o/northline/comms/meetings/nl-meetings-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Call",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Chat",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Notes",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Participants",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Device permissions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "invite",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "recording consent",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "End the meeting",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Recording and consent",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Mute or unmute",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Share — invite someone",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Raise or lower a hand",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Device permissions",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMS-009",
+  "title": "Calls & Voicemail",
+  "route": "/o/northline/comms/calls",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Recent",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Missed",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Voicemail",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Queues",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Dialer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "recording notice",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "call transcript",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Call",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Attach to a contact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Return a call",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Play voicemail",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open the call record",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Recording rules",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMS-010",
+  "title": "Announcements",
+  "route": "/o/northline/comms/announcements",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Draft",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Scheduled",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Published",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Audience selector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "post preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "publish review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Draft an announcement",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Publish",
+   "Audience",
+   "Preview"
+  ]
+ },
+ {
+  "id": "ARL-COMMS-011",
+  "title": "Communication Preferences",
+  "route": "/o/northline/comms/preferences",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Identity",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Availability",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Notifications",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Privacy",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Signature editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "account setup",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "privacy warning",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Connect a mailbox",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit signature",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set working hours",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

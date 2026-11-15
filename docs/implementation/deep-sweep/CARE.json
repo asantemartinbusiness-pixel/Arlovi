@@ -1,0 +1,656 @@
+[
+ {
+  "id": "ARL-CARE-001",
+  "title": "Service Overview",
+  "route": "/o/northline/care/home",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Queues",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Quality",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Trends",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Queue rules",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "SLA inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "service report",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect the SLA metric",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open a case",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reassign a case",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Manage staffing",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open the inbox",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Queue rules",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Service report",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CARE-002",
+  "title": "Omnichannel Inbox",
+  "route": "/o/northline/care/inbox",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Unassigned",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Mine",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Team",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Waiting",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Closed",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Customer inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "canned reply",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "escalation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Macros",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Route unassigned",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Escalate",
+   "Reply",
+   "Assign",
+   "Tag",
+   "Link a customer or order",
+   "Customer"
+  ]
+ },
+ {
+  "id": "ARL-CARE-003",
+  "title": "Ticket List",
+  "route": "/o/northline/care/tickets",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Open",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pending",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Resolved",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archived",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Ticket create",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "bulk assignment",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "priority change",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Route unassigned",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a case",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Filter cases",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export CSV",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Change priority",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CARE-004",
+  "title": "Ticket Detail",
+  "route": "/o/northline/care/tickets/nl-tickets-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Conversation",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tasks",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Audit",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Response composer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "internal note",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "refund request",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Internal note",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reply",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reopen",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign a specialist",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request a refund",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CARE-005",
+  "title": "Customer Context",
+  "route": "/o/northline/care/customers/nl-contacts-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Cases",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Orders",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Communications",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Customer profile edit",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "consent inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "identity verification",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect consent",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Update permitted fields",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule a follow-up",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Verify identity",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CARE-006",
+  "title": "Knowledge Base",
+  "route": "/o/northline/care/knowledge",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Internal",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Public",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Draft",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Retired",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Rich editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "publish review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "relevance test",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish a draft",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Write an article",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test an answer",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Update an article"
+  ]
+ },
+ {
+  "id": "ARL-CARE-007",
+  "title": "Macros & Automation",
+  "route": "/o/northline/care/automation",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Macros",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rules",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Runs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exceptions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Macro editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "audience preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "escalation rule",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a macro",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Escalation rule",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Simulate",
+   "Activate or deactivate",
+   "Review a macro",
+   "Edit a macro"
+  ]
+ },
+ {
+  "id": "ARL-CARE-008",
+  "title": "Service SLAs",
+  "route": "/o/northline/care/slas",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Policies",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Breaches",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exceptions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "SLA form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "schedule exception",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "policy impact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "SLA report",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reassign a breached case",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Acknowledge a breach",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "When the clock stops",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Edit a policy",
+   "What a change would do"
+  ]
+ },
+ {
+  "id": "ARL-CARE-009",
+  "title": "Quality & Satisfaction",
+  "route": "/o/northline/care/quality",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Surveys",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Audits",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Coaching",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Reports",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "QA scorecard",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "survey builder",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "case replay",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Annotate a case",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Score a case",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign coaching",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export quality data",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Replay a case",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Build a survey",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

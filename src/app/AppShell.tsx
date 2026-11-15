@@ -117,7 +117,7 @@ export function AppShell() {
 
         <span className="ds-grow" />
 
-        <button type="button" className="hq-search" onClick={() => ui.setCommand(true)} aria-label="Search this workspace">
+        <button type="button" className="hq-search" onClick={() => ui.setCommand(true)} aria-label={`Search ${org.shortName}`} aria-keyshortcuts="Control+K Meta+K">
           <Search size={15} />
           <span className="ds-grow" style={{ textAlign: "start" }}>Search {org.shortName}</span>
           <kbd className="ds-kbd">⌘K</kbd>

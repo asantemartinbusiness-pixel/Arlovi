@@ -36,6 +36,7 @@ test("dark appearance keeps contrast", async ({ page }) => {
 
 test("keyboard reaches the main content and the command palette", async ({ page }) => {
   await page.goto("/o/northline/hq/home?clock=2026-11-14T09:30:00Z");
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
   await page.keyboard.press("Control+k");

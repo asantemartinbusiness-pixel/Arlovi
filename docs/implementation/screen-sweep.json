@@ -1,0 +1,2846 @@
+[
+  {
+    "id": "ARL-HQ-001",
+    "route": "/o/northline/hq/home?clock=2026-11-14T09:30:00Z",
+    "app": "HQ",
+    "heading": "Executive Home",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-HQ-002",
+    "route": "/o/northline/hq/my-work?clock=2026-11-14T09:30:00Z",
+    "app": "HQ",
+    "heading": "My Workspace",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-HQ-003",
+    "route": "/o/northline/hq/company?clock=2026-11-14T09:30:00Z",
+    "app": "HQ",
+    "heading": "Company Overview",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-HQ-004",
+    "route": "/o/northline/hq/departments?clock=2026-11-14T09:30:00Z",
+    "app": "HQ",
+    "heading": "Departments Directory",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-HQ-005",
+    "route": "/o/northline/hq/departments/nl-departments-001?clock=2026-11-14T09:30:00Z",
+    "app": "HQ",
+    "heading": "Department workspace",
+    "tabsFound": 6,
+    "tabsRequired": 6,
+    "errors": []
+  },
+  {
+    "id": "ARL-HQ-006",
+    "route": "/o/northline/hq/organization?clock=2026-11-14T09:30:00Z",
+    "app": "HQ",
+    "heading": "Organization Chart",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-HQ-007",
+    "route": "/o/northline/hq/goals?clock=2026-11-14T09:30:00Z",
+    "app": "HQ",
+    "heading": "Company Goals",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-HQ-008",
+    "route": "/o/northline/hq/locations?clock=2026-11-14T09:30:00Z",
+    "app": "HQ",
+    "heading": "Locations & Entities",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-HQ-009",
+    "route": "/o/northline/hq/timeline?clock=2026-11-14T09:30:00Z",
+    "app": "HQ",
+    "heading": "Company Timeline",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-HQ-010",
+    "route": "/o/northline/hq/directory?clock=2026-11-14T09:30:00Z",
+    "app": "HQ",
+    "heading": "Workplace Directory",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-AI-001",
+    "route": "/o/northline/ai/chat?clock=2026-11-14T09:30:00Z",
+    "app": "AI",
+    "heading": "Chief of Staff",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-AI-002",
+    "route": "/o/northline/ai/conversations?clock=2026-11-14T09:30:00Z",
+    "app": "AI",
+    "heading": "Conversation Library",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-AI-003",
+    "route": "/o/northline/ai/agents/nl-agents-001/chat?clock=2026-11-14T09:30:00Z",
+    "app": "AI",
+    "heading": "Specialist chat",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-AI-004",
+    "route": "/o/northline/ai/rooms/nl-channels-001?clock=2026-11-14T09:30:00Z",
+    "app": "AI",
+    "heading": "Team room",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-AI-005",
+    "route": "/o/northline/ai/missions/nl-missions-001/room?clock=2026-11-14T09:30:00Z",
+    "app": "AI",
+    "heading": "Mission room",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-AI-006",
+    "route": "/o/northline/ai/voice?clock=2026-11-14T09:30:00Z",
+    "app": "AI",
+    "heading": "Voice workspace",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-AI-007",
+    "route": "/o/northline/ai/meetings/nl-meetings-001?clock=2026-11-14T09:30:00Z",
+    "app": "AI",
+    "heading": "AI meeting room",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-AI-008",
+    "route": "/o/northline/ai/research/nl-facts-001?clock=2026-11-14T09:30:00Z",
+    "app": "AI",
+    "heading": "Research workspace",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-AI-009",
+    "route": "/o/northline/ai/context?clock=2026-11-14T09:30:00Z",
+    "app": "AI",
+    "heading": "Context manager",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-AI-010",
+    "route": "/o/northline/ai/artifacts/nl-documents-001?clock=2026-11-14T09:30:00Z",
+    "app": "AI",
+    "heading": "Conversation artifact",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BRAIN-001",
+    "route": "/o/northline/brain/home?clock=2026-11-14T09:30:00Z",
+    "app": "BRAIN",
+    "heading": "Knowledge home",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BRAIN-002",
+    "route": "/o/northline/brain/sources?clock=2026-11-14T09:30:00Z",
+    "app": "BRAIN",
+    "heading": "Source library",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BRAIN-003",
+    "route": "/o/northline/brain/sources/nl-sources-001?clock=2026-11-14T09:30:00Z",
+    "app": "BRAIN",
+    "heading": "Source detail",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-BRAIN-004",
+    "route": "/o/northline/brain/graph?clock=2026-11-14T09:30:00Z",
+    "app": "BRAIN",
+    "heading": "Business graph",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-BRAIN-005",
+    "route": "/o/northline/brain/facts?clock=2026-11-14T09:30:00Z",
+    "app": "BRAIN",
+    "heading": "Fact registry",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BRAIN-006",
+    "route": "/o/northline/brain/conflicts?clock=2026-11-14T09:30:00Z",
+    "app": "BRAIN",
+    "heading": "Knowledge conflicts",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-BRAIN-007",
+    "route": "/o/northline/brain/decisions?clock=2026-11-14T09:30:00Z",
+    "app": "BRAIN",
+    "heading": "Decision register",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BRAIN-008",
+    "route": "/o/northline/brain/brand?clock=2026-11-14T09:30:00Z",
+    "app": "BRAIN",
+    "heading": "Brand intelligence",
+    "tabsFound": 6,
+    "tabsRequired": 6,
+    "errors": []
+  },
+  {
+    "id": "ARL-BRAIN-009",
+    "route": "/o/northline/brain/permissions?clock=2026-11-14T09:30:00Z",
+    "app": "BRAIN",
+    "heading": "Knowledge permissions",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BRAIN-010",
+    "route": "/o/northline/brain/intake?clock=2026-11-14T09:30:00Z",
+    "app": "BRAIN",
+    "heading": "Intake centre",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-TEAM-001",
+    "route": "/o/northline/team/home?clock=2026-11-14T09:30:00Z",
+    "app": "TEAM",
+    "heading": "Workforce home",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-TEAM-002",
+    "route": "/o/northline/team/agents?clock=2026-11-14T09:30:00Z",
+    "app": "TEAM",
+    "heading": "AI employee directory",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-TEAM-003",
+    "route": "/o/northline/team/agents/nl-agents-001?clock=2026-11-14T09:30:00Z",
+    "app": "TEAM",
+    "heading": "AI employee",
+    "tabsFound": 6,
+    "tabsRequired": 6,
+    "errors": []
+  },
+  {
+    "id": "ARL-TEAM-004",
+    "route": "/o/northline/team/agents/new?clock=2026-11-14T09:30:00Z",
+    "app": "TEAM",
+    "heading": "Agent builder",
+    "tabsFound": 6,
+    "tabsRequired": 6,
+    "errors": []
+  },
+  {
+    "id": "ARL-TEAM-005",
+    "route": "/o/northline/team/organization?clock=2026-11-14T09:30:00Z",
+    "app": "TEAM",
+    "heading": "Organisation chart",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-TEAM-006",
+    "route": "/o/northline/team/skills?clock=2026-11-14T09:30:00Z",
+    "app": "TEAM",
+    "heading": "Skills library",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-TEAM-007",
+    "route": "/o/northline/team/academy?clock=2026-11-14T09:30:00Z",
+    "app": "TEAM",
+    "heading": "Agent academy",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-TEAM-008",
+    "route": "/o/northline/team/evaluations?clock=2026-11-14T09:30:00Z",
+    "app": "TEAM",
+    "heading": "Evaluation lab",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-TEAM-009",
+    "route": "/o/northline/team/performance?clock=2026-11-14T09:30:00Z",
+    "app": "TEAM",
+    "heading": "Agent performance",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-TEAM-010",
+    "route": "/o/northline/team/models?clock=2026-11-14T09:30:00Z",
+    "app": "TEAM",
+    "heading": "Model routing",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MISSION-001",
+    "route": "/o/northline/mission/missions?clock=2026-11-14T09:30:00Z",
+    "app": "MISSION",
+    "heading": "Mission library",
+    "tabsFound": 6,
+    "tabsRequired": 6,
+    "errors": []
+  },
+  {
+    "id": "ARL-MISSION-002",
+    "route": "/o/northline/mission/missions/new?clock=2026-11-14T09:30:00Z",
+    "app": "MISSION",
+    "heading": "New mission",
+    "tabsFound": 6,
+    "tabsRequired": 6,
+    "errors": []
+  },
+  {
+    "id": "ARL-MISSION-003",
+    "route": "/o/northline/mission/missions/nl-missions-001?clock=2026-11-14T09:30:00Z",
+    "app": "MISSION",
+    "heading": "Mission overview",
+    "tabsFound": 6,
+    "tabsRequired": 6,
+    "errors": []
+  },
+  {
+    "id": "ARL-MISSION-004",
+    "route": "/o/northline/mission/missions/nl-missions-001/plan?clock=2026-11-14T09:30:00Z",
+    "app": "MISSION",
+    "heading": "Plan and dependencies",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MISSION-005",
+    "route": "/o/northline/mission/missions/nl-missions-001/tasks?clock=2026-11-14T09:30:00Z",
+    "app": "MISSION",
+    "heading": "Task board",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-MISSION-006",
+    "route": "/o/northline/mission/missions/nl-missions-001/execution?clock=2026-11-14T09:30:00Z",
+    "app": "MISSION",
+    "heading": "Execution console",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MISSION-007",
+    "route": "/o/northline/mission/missions/nl-missions-001/team?clock=2026-11-14T09:30:00Z",
+    "app": "MISSION",
+    "heading": "Mission team room",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MISSION-008",
+    "route": "/o/northline/mission/missions/nl-missions-001/deliverables?clock=2026-11-14T09:30:00Z",
+    "app": "MISSION",
+    "heading": "Deliverables",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-MISSION-009",
+    "route": "/o/northline/mission/missions/nl-missions-001/budget?clock=2026-11-14T09:30:00Z",
+    "app": "MISSION",
+    "heading": "Mission budget",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MISSION-010",
+    "route": "/o/northline/mission/missions/nl-missions-001/results?clock=2026-11-14T09:30:00Z",
+    "app": "MISSION",
+    "heading": "Mission results",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MISSION-011",
+    "route": "/o/northline/mission/templates?clock=2026-11-14T09:30:00Z",
+    "app": "MISSION",
+    "heading": "Mission templates",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-FIN-001",
+    "route": "/o/northline/fin/home?clock=2026-11-14T09:30:00Z",
+    "app": "FIN",
+    "heading": "Finance Overview",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-FIN-002",
+    "route": "/o/northline/fin/accounts?clock=2026-11-14T09:30:00Z",
+    "app": "FIN",
+    "heading": "Chart of Accounts",
+    "tabsFound": 6,
+    "tabsRequired": 6,
+    "errors": []
+  },
+  {
+    "id": "ARL-FIN-003",
+    "route": "/o/northline/fin/ledger?clock=2026-11-14T09:30:00Z",
+    "app": "FIN",
+    "heading": "General Ledger",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-FIN-004",
+    "route": "/o/northline/fin/invoices?clock=2026-11-14T09:30:00Z",
+    "app": "FIN",
+    "heading": "Invoice List",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-FIN-005",
+    "route": "/o/northline/fin/invoices/nl-invoices-001?clock=2026-11-14T09:30:00Z",
+    "app": "FIN",
+    "heading": "Invoice",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-FIN-006",
+    "route": "/o/northline/fin/bills?clock=2026-11-14T09:30:00Z",
+    "app": "FIN",
+    "heading": "Bills & Payables",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-FIN-007",
+    "route": "/o/northline/fin/expenses?clock=2026-11-14T09:30:00Z",
+    "app": "FIN",
+    "heading": "Expenses",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-FIN-008",
+    "route": "/o/northline/fin/banking?clock=2026-11-14T09:30:00Z",
+    "app": "FIN",
+    "heading": "Banking & Feeds",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-FIN-009",
+    "route": "/o/northline/fin/reconciliation?clock=2026-11-14T09:30:00Z",
+    "app": "FIN",
+    "heading": "Bank Reconciliation",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-FIN-010",
+    "route": "/o/northline/fin/budgets?clock=2026-11-14T09:30:00Z",
+    "app": "FIN",
+    "heading": "Budgets & Forecasts",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-FIN-011",
+    "route": "/o/northline/fin/tax?clock=2026-11-14T09:30:00Z",
+    "app": "FIN",
+    "heading": "Tax & Compliance",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-FIN-012",
+    "route": "/o/northline/fin/reports?clock=2026-11-14T09:30:00Z",
+    "app": "FIN",
+    "heading": "Financial Reports",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-FIN-013",
+    "route": "/o/northline/fin/entities?clock=2026-11-14T09:30:00Z",
+    "app": "FIN",
+    "heading": "Multi-Entity Finance",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CRM-001",
+    "route": "/o/northline/crm/home?clock=2026-11-14T09:30:00Z",
+    "app": "CRM",
+    "heading": "CRM Overview",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CRM-002",
+    "route": "/o/northline/crm/contacts?clock=2026-11-14T09:30:00Z",
+    "app": "CRM",
+    "heading": "Contacts",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CRM-003",
+    "route": "/o/northline/crm/contacts/nl-contacts-001?clock=2026-11-14T09:30:00Z",
+    "app": "CRM",
+    "heading": "Contact",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-CRM-004",
+    "route": "/o/northline/crm/companies?clock=2026-11-14T09:30:00Z",
+    "app": "CRM",
+    "heading": "Companies",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CRM-005",
+    "route": "/o/northline/crm/leads?clock=2026-11-14T09:30:00Z",
+    "app": "CRM",
+    "heading": "Leads & Qualification",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CRM-006",
+    "route": "/o/northline/crm/deals?clock=2026-11-14T09:30:00Z",
+    "app": "CRM",
+    "heading": "Deals Pipeline",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CRM-007",
+    "route": "/o/northline/crm/deals/nl-deals-001?clock=2026-11-14T09:30:00Z",
+    "app": "CRM",
+    "heading": "Deal",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-CRM-008",
+    "route": "/o/northline/crm/quotes?clock=2026-11-14T09:30:00Z",
+    "app": "CRM",
+    "heading": "Quotes & Proposals",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-CRM-009",
+    "route": "/o/northline/crm/activities?clock=2026-11-14T09:30:00Z",
+    "app": "CRM",
+    "heading": "Activities & Scheduling",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CRM-010",
+    "route": "/o/northline/crm/forecasts?clock=2026-11-14T09:30:00Z",
+    "app": "CRM",
+    "heading": "Sales Forecasts",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CRM-011",
+    "route": "/o/northline/crm/automation?clock=2026-11-14T09:30:00Z",
+    "app": "CRM",
+    "heading": "Sales Automation",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-HR-001",
+    "route": "/o/northline/hr/home?clock=2026-11-14T09:30:00Z",
+    "app": "HR",
+    "heading": "People Overview",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-HR-002",
+    "route": "/o/northline/hr/employees?clock=2026-11-14T09:30:00Z",
+    "app": "HR",
+    "heading": "Employee Directory",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-HR-003",
+    "route": "/o/northline/hr/employees/nl-employees-001?clock=2026-11-14T09:30:00Z",
+    "app": "HR",
+    "heading": "Employee profile",
+    "tabsFound": 6,
+    "tabsRequired": 6,
+    "errors": []
+  },
+  {
+    "id": "ARL-HR-004",
+    "route": "/o/northline/hr/recruitment?clock=2026-11-14T09:30:00Z",
+    "app": "HR",
+    "heading": "Recruitment Pipeline",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-HR-005",
+    "route": "/o/northline/hr/candidates/nl-applicants-001?clock=2026-11-14T09:30:00Z",
+    "app": "HR",
+    "heading": "Applicant profile",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-HR-006",
+    "route": "/o/northline/hr/onboarding?clock=2026-11-14T09:30:00Z",
+    "app": "HR",
+    "heading": "Onboarding Centre",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-HR-007",
+    "route": "/o/northline/hr/leave?clock=2026-11-14T09:30:00Z",
+    "app": "HR",
+    "heading": "Leave & Absence",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-HR-008",
+    "route": "/o/northline/hr/scheduling?clock=2026-11-14T09:30:00Z",
+    "app": "HR",
+    "heading": "Scheduling & Time",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-HR-009",
+    "route": "/o/northline/hr/payroll?clock=2026-11-14T09:30:00Z",
+    "app": "HR",
+    "heading": "Payroll",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-HR-010",
+    "route": "/o/northline/hr/performance?clock=2026-11-14T09:30:00Z",
+    "app": "HR",
+    "heading": "Performance Reviews",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-HR-011",
+    "route": "/o/northline/hr/learning?clock=2026-11-14T09:30:00Z",
+    "app": "HR",
+    "heading": "Learning & Policies",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROJECT-001",
+    "route": "/o/northline/project/portfolios?clock=2026-11-14T09:30:00Z",
+    "app": "PROJECT",
+    "heading": "Project Portfolio",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROJECT-002",
+    "route": "/o/northline/project/projects?clock=2026-11-14T09:30:00Z",
+    "app": "PROJECT",
+    "heading": "Project Directory",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROJECT-003",
+    "route": "/o/northline/project/projects/nl-projects-001?clock=2026-11-14T09:30:00Z",
+    "app": "PROJECT",
+    "heading": "Project overview",
+    "tabsFound": 6,
+    "tabsRequired": 6,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROJECT-004",
+    "route": "/o/northline/project/projects/nl-projects-001/board?clock=2026-11-14T09:30:00Z",
+    "app": "PROJECT",
+    "heading": "Task board",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROJECT-005",
+    "route": "/o/northline/project/tasks/nl-tasks-001?clock=2026-11-14T09:30:00Z",
+    "app": "PROJECT",
+    "heading": "Task",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROJECT-006",
+    "route": "/o/northline/project/projects/nl-projects-001/timeline?clock=2026-11-14T09:30:00Z",
+    "app": "PROJECT",
+    "heading": "Timeline",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROJECT-007",
+    "route": "/o/northline/project/workload?clock=2026-11-14T09:30:00Z",
+    "app": "PROJECT",
+    "heading": "Resource Workload",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROJECT-008",
+    "route": "/o/northline/project/templates?clock=2026-11-14T09:30:00Z",
+    "app": "PROJECT",
+    "heading": "Project Templates",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROJECT-009",
+    "route": "/o/northline/project/goals?clock=2026-11-14T09:30:00Z",
+    "app": "PROJECT",
+    "heading": "Goals & OKRs",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROJECT-010",
+    "route": "/o/northline/project/time?clock=2026-11-14T09:30:00Z",
+    "app": "PROJECT",
+    "heading": "Time & Cost",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMS-001",
+    "route": "/o/northline/comms/home?clock=2026-11-14T09:30:00Z",
+    "app": "COMMS",
+    "heading": "Communications Home",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMS-002",
+    "route": "/o/northline/comms/channels?clock=2026-11-14T09:30:00Z",
+    "app": "COMMS",
+    "heading": "Channels",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMS-003",
+    "route": "/o/northline/comms/channels/nl-channels-001?clock=2026-11-14T09:30:00Z",
+    "app": "COMMS",
+    "heading": "Channel",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMS-004",
+    "route": "/o/northline/comms/messages?clock=2026-11-14T09:30:00Z",
+    "app": "COMMS",
+    "heading": "Direct Messages",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMS-005",
+    "route": "/o/northline/comms/email?clock=2026-11-14T09:30:00Z",
+    "app": "COMMS",
+    "heading": "Email Inbox",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMS-006",
+    "route": "/o/northline/comms/email/nl-emailThreads-001?clock=2026-11-14T09:30:00Z",
+    "app": "COMMS",
+    "heading": "Email thread",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMS-007",
+    "route": "/o/northline/comms/calendar?clock=2026-11-14T09:30:00Z",
+    "app": "COMMS",
+    "heading": "Calendar",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMS-008",
+    "route": "/o/northline/comms/meetings/nl-meetings-001?clock=2026-11-14T09:30:00Z",
+    "app": "COMMS",
+    "heading": "Meeting",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMS-009",
+    "route": "/o/northline/comms/calls?clock=2026-11-14T09:30:00Z",
+    "app": "COMMS",
+    "heading": "Calls & Voicemail",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMS-010",
+    "route": "/o/northline/comms/announcements?clock=2026-11-14T09:30:00Z",
+    "app": "COMMS",
+    "heading": "Announcements",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMS-011",
+    "route": "/o/northline/comms/preferences?clock=2026-11-14T09:30:00Z",
+    "app": "COMMS",
+    "heading": "Communication Preferences",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CARE-001",
+    "route": "/o/northline/care/home?clock=2026-11-14T09:30:00Z",
+    "app": "CARE",
+    "heading": "Service Overview",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CARE-002",
+    "route": "/o/northline/care/inbox?clock=2026-11-14T09:30:00Z",
+    "app": "CARE",
+    "heading": "Omnichannel Inbox",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-CARE-003",
+    "route": "/o/northline/care/tickets?clock=2026-11-14T09:30:00Z",
+    "app": "CARE",
+    "heading": "Ticket List",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-CARE-004",
+    "route": "/o/northline/care/tickets/nl-tickets-001?clock=2026-11-14T09:30:00Z",
+    "app": "CARE",
+    "heading": "Case",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-CARE-005",
+    "route": "/o/northline/care/customers/nl-contacts-001?clock=2026-11-14T09:30:00Z",
+    "app": "CARE",
+    "heading": "Customer",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CARE-006",
+    "route": "/o/northline/care/knowledge?clock=2026-11-14T09:30:00Z",
+    "app": "CARE",
+    "heading": "Knowledge Base",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CARE-007",
+    "route": "/o/northline/care/automation?clock=2026-11-14T09:30:00Z",
+    "app": "CARE",
+    "heading": "Macros & Automation",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CARE-008",
+    "route": "/o/northline/care/slas?clock=2026-11-14T09:30:00Z",
+    "app": "CARE",
+    "heading": "Service SLAs",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CARE-009",
+    "route": "/o/northline/care/quality?clock=2026-11-14T09:30:00Z",
+    "app": "CARE",
+    "heading": "Quality & Satisfaction",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MARKET-001",
+    "route": "/o/northline/market/home?clock=2026-11-14T09:30:00Z",
+    "app": "MARKET",
+    "heading": "Marketing Overview",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MARKET-002",
+    "route": "/o/northline/market/campaigns?clock=2026-11-14T09:30:00Z",
+    "app": "MARKET",
+    "heading": "Campaign Library",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-MARKET-003",
+    "route": "/o/northline/market/campaigns/nl-campaigns-001?clock=2026-11-14T09:30:00Z",
+    "app": "MARKET",
+    "heading": "Campaign",
+    "tabsFound": 6,
+    "tabsRequired": 6,
+    "errors": []
+  },
+  {
+    "id": "ARL-MARKET-004",
+    "route": "/o/northline/market/calendar?clock=2026-11-14T09:30:00Z",
+    "app": "MARKET",
+    "heading": "Content Calendar",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MARKET-005",
+    "route": "/o/northline/market/social?clock=2026-11-14T09:30:00Z",
+    "app": "MARKET",
+    "heading": "Social Publishing",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MARKET-006",
+    "route": "/o/northline/market/email?clock=2026-11-14T09:30:00Z",
+    "app": "MARKET",
+    "heading": "Email Campaigns",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MARKET-007",
+    "route": "/o/northline/market/audiences?clock=2026-11-14T09:30:00Z",
+    "app": "MARKET",
+    "heading": "Audience Segments",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MARKET-008",
+    "route": "/o/northline/market/ads?clock=2026-11-14T09:30:00Z",
+    "app": "MARKET",
+    "heading": "Advertising",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-MARKET-009",
+    "route": "/o/northline/market/seo?clock=2026-11-14T09:30:00Z",
+    "app": "MARKET",
+    "heading": "SEO & Content",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MARKET-010",
+    "route": "/o/northline/market/pages?clock=2026-11-14T09:30:00Z",
+    "app": "MARKET",
+    "heading": "Landing Pages",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MARKET-011",
+    "route": "/o/northline/market/analytics?clock=2026-11-14T09:30:00Z",
+    "app": "MARKET",
+    "heading": "Attribution & Analytics",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-MARKET-012",
+    "route": "/o/northline/market/templates?clock=2026-11-14T09:30:00Z",
+    "app": "MARKET",
+    "heading": "Marketing Templates",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMERCE-001",
+    "route": "/o/northline/commerce/home?clock=2026-11-14T09:30:00Z",
+    "app": "COMMERCE",
+    "heading": "Commerce Overview",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMERCE-002",
+    "route": "/o/northline/commerce/products?clock=2026-11-14T09:30:00Z",
+    "app": "COMMERCE",
+    "heading": "Products",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMERCE-003",
+    "route": "/o/northline/commerce/products/nl-products-001?clock=2026-11-14T09:30:00Z",
+    "app": "COMMERCE",
+    "heading": "Product",
+    "tabsFound": 6,
+    "tabsRequired": 6,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMERCE-004",
+    "route": "/o/northline/commerce/inventory?clock=2026-11-14T09:30:00Z",
+    "app": "COMMERCE",
+    "heading": "Inventory",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMERCE-005",
+    "route": "/o/northline/commerce/orders?clock=2026-11-14T09:30:00Z",
+    "app": "COMMERCE",
+    "heading": "Orders",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMERCE-006",
+    "route": "/o/northline/commerce/orders/nl-orders-001?clock=2026-11-14T09:30:00Z",
+    "app": "COMMERCE",
+    "heading": "Order",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMERCE-007",
+    "route": "/o/northline/commerce/storefront?clock=2026-11-14T09:30:00Z",
+    "app": "COMMERCE",
+    "heading": "Storefront Builder",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMERCE-008",
+    "route": "/o/northline/commerce/checkout?clock=2026-11-14T09:30:00Z",
+    "app": "COMMERCE",
+    "heading": "Checkout & Payments",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMERCE-009",
+    "route": "/o/northline/commerce/fulfilment?clock=2026-11-14T09:30:00Z",
+    "app": "COMMERCE",
+    "heading": "Fulfilment & Shipping",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMERCE-010",
+    "route": "/o/northline/commerce/returns?clock=2026-11-14T09:30:00Z",
+    "app": "COMMERCE",
+    "heading": "Returns & Refunds",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMERCE-011",
+    "route": "/o/northline/commerce/promotions?clock=2026-11-14T09:30:00Z",
+    "app": "COMMERCE",
+    "heading": "Promotions & Pricing",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-COMMERCE-012",
+    "route": "/o/northline/commerce/analytics?clock=2026-11-14T09:30:00Z",
+    "app": "COMMERCE",
+    "heading": "Commerce Analytics",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BOOK-001",
+    "route": "/o/northline/book/home?clock=2026-11-14T09:30:00Z",
+    "app": "BOOK",
+    "heading": "Bookings Overview",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BOOK-002",
+    "route": "/o/northline/book/calendar?clock=2026-11-14T09:30:00Z",
+    "app": "BOOK",
+    "heading": "Booking Calendar",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-BOOK-003",
+    "route": "/o/northline/book/bookings/nl-bookings-001?clock=2026-11-14T09:30:00Z",
+    "app": "BOOK",
+    "heading": "Booking",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BOOK-004",
+    "route": "/o/northline/book/services?clock=2026-11-14T09:30:00Z",
+    "app": "BOOK",
+    "heading": "Services & Pricing",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BOOK-005",
+    "route": "/o/northline/book/resources?clock=2026-11-14T09:30:00Z",
+    "app": "BOOK",
+    "heading": "Staff & Resources",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BOOK-006",
+    "route": "/o/northline/book/public/showroom-consult?clock=2026-11-14T09:30:00Z",
+    "app": "BOOK",
+    "heading": "Public booking page",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BOOK-007",
+    "route": "/o/northline/book/reminders?clock=2026-11-14T09:30:00Z",
+    "app": "BOOK",
+    "heading": "Reminders & No-shows",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BOOK-008",
+    "route": "/o/northline/book/reports?clock=2026-11-14T09:30:00Z",
+    "app": "BOOK",
+    "heading": "Booking Reports",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-DOCS-001",
+    "route": "/o/northline/docs/files?clock=2026-11-14T09:30:00Z",
+    "app": "DOCS",
+    "heading": "Document Library",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-DOCS-002",
+    "route": "/o/northline/docs/documents/nl-documents-001?clock=2026-11-14T09:30:00Z",
+    "app": "DOCS",
+    "heading": "Document Editor",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-DOCS-003",
+    "route": "/o/northline/docs/documents/nl-documents-001/outline?clock=2026-11-14T09:30:00Z",
+    "app": "DOCS",
+    "heading": "Outline & navigation",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-DOCS-004",
+    "route": "/o/northline/docs/documents/nl-documents-001/review?clock=2026-11-14T09:30:00Z",
+    "app": "DOCS",
+    "heading": "Review & comments",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-DOCS-005",
+    "route": "/o/northline/docs/templates?clock=2026-11-14T09:30:00Z",
+    "app": "DOCS",
+    "heading": "Templates",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-DOCS-006",
+    "route": "/o/northline/docs/documents/nl-documents-001/publish?clock=2026-11-14T09:30:00Z",
+    "app": "DOCS",
+    "heading": "Publishing & export",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-DOCS-007",
+    "route": "/o/northline/docs/documents/nl-documents-001/insights?clock=2026-11-14T09:30:00Z",
+    "app": "DOCS",
+    "heading": "Document insights",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-SHEETS-001",
+    "route": "/o/northline/sheets/workbooks?clock=2026-11-14T09:30:00Z",
+    "app": "SHEETS",
+    "heading": "Workbook Library",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-SHEETS-002",
+    "route": "/o/northline/sheets/workbooks/nl-workbooks-001?clock=2026-11-14T09:30:00Z",
+    "app": "SHEETS",
+    "heading": "Grid Editor",
+    "tabsFound": 6,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-SHEETS-003",
+    "route": "/o/northline/sheets/workbooks/nl-workbooks-001/formulas?clock=2026-11-14T09:30:00Z",
+    "app": "SHEETS",
+    "heading": "Formula manager",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-SHEETS-004",
+    "route": "/o/northline/sheets/workbooks/nl-workbooks-001/tables?clock=2026-11-14T09:30:00Z",
+    "app": "SHEETS",
+    "heading": "Data tables",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-SHEETS-005",
+    "route": "/o/northline/sheets/workbooks/nl-workbooks-001/charts?clock=2026-11-14T09:30:00Z",
+    "app": "SHEETS",
+    "heading": "Charts & dashboards",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-SHEETS-006",
+    "route": "/o/northline/sheets/workbooks/nl-workbooks-001/io?clock=2026-11-14T09:30:00Z",
+    "app": "SHEETS",
+    "heading": "Import & export",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-SHEETS-007",
+    "route": "/o/northline/sheets/workbooks/nl-workbooks-001/collab?clock=2026-11-14T09:30:00Z",
+    "app": "SHEETS",
+    "heading": "Collaboration & versioning",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PRESENT-001",
+    "route": "/o/northline/present/decks?clock=2026-11-14T09:30:00Z",
+    "app": "PRESENT",
+    "heading": "Presentation Library",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PRESENT-002",
+    "route": "/o/northline/present/decks/nl-decks-001?clock=2026-11-14T09:30:00Z",
+    "app": "PRESENT",
+    "heading": "Slide Editor",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-PRESENT-003",
+    "route": "/o/northline/present/decks/nl-decks-001/theme?clock=2026-11-14T09:30:00Z",
+    "app": "PRESENT",
+    "heading": "Master & theme",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PRESENT-004",
+    "route": "/o/northline/present/decks/nl-decks-001/data?clock=2026-11-14T09:30:00Z",
+    "app": "PRESENT",
+    "heading": "Charts & data",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PRESENT-005",
+    "route": "/o/northline/present/decks/nl-decks-001/animation?clock=2026-11-14T09:30:00Z",
+    "app": "PRESENT",
+    "heading": "Transitions & animation",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PRESENT-006",
+    "route": "/o/northline/present/decks/nl-decks-001/present?clock=2026-11-14T09:30:00Z",
+    "app": "PRESENT",
+    "heading": "Presenter mode",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-PRESENT-007",
+    "route": "/o/northline/present/decks/nl-decks-001/review?clock=2026-11-14T09:30:00Z",
+    "app": "PRESENT",
+    "heading": "Review & publish",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-DESIGN-001",
+    "route": "/o/northline/design/files?clock=2026-11-14T09:30:00Z",
+    "app": "DESIGN",
+    "heading": "Design Files",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-DESIGN-002",
+    "route": "/o/northline/design/files/nl-designs-001?clock=2026-11-14T09:30:00Z",
+    "app": "DESIGN",
+    "heading": "Design Canvas",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-DESIGN-003",
+    "route": "/o/northline/design/files/nl-designs-001/layers?clock=2026-11-14T09:30:00Z",
+    "app": "DESIGN",
+    "heading": "Layers & Pages",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-DESIGN-004",
+    "route": "/o/northline/design/files/nl-designs-001/paths?clock=2026-11-14T09:30:00Z",
+    "app": "DESIGN",
+    "heading": "Vector Path Editor",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-DESIGN-005",
+    "route": "/o/northline/design/files/nl-designs-001/layout?clock=2026-11-14T09:30:00Z",
+    "app": "DESIGN",
+    "heading": "Auto Layout & Responsive",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-DESIGN-006",
+    "route": "/o/northline/design/files/nl-designs-001/components?clock=2026-11-14T09:30:00Z",
+    "app": "DESIGN",
+    "heading": "Components & Variants",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-DESIGN-007",
+    "route": "/o/northline/design/files/nl-designs-001/styles?clock=2026-11-14T09:30:00Z",
+    "app": "DESIGN",
+    "heading": "Typography & Styles",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-DESIGN-008",
+    "route": "/o/northline/design/files/nl-designs-001/prototype?clock=2026-11-14T09:30:00Z",
+    "app": "DESIGN",
+    "heading": "Prototype & Interactions",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-DESIGN-009",
+    "route": "/o/northline/design/files/nl-designs-001/assets?clock=2026-11-14T09:30:00Z",
+    "app": "DESIGN",
+    "heading": "Assets & Export",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-DESIGN-010",
+    "route": "/o/northline/design/files/nl-designs-001/review?clock=2026-11-14T09:30:00Z",
+    "app": "DESIGN",
+    "heading": "Design Review",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PHOTO-001",
+    "route": "/o/northline/photo/photos?clock=2026-11-14T09:30:00Z",
+    "app": "PHOTO",
+    "heading": "Photo Library",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PHOTO-002",
+    "route": "/o/northline/photo/photos/nl-photos-001?clock=2026-11-14T09:30:00Z",
+    "app": "PHOTO",
+    "heading": "Raster Editor",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PHOTO-003",
+    "route": "/o/northline/photo/photos/nl-photos-001/masks?clock=2026-11-14T09:30:00Z",
+    "app": "PHOTO",
+    "heading": "Selections & Masks",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PHOTO-004",
+    "route": "/o/northline/photo/photos/nl-photos-001/adjust?clock=2026-11-14T09:30:00Z",
+    "app": "PHOTO",
+    "heading": "Adjustments & Colour",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PHOTO-005",
+    "route": "/o/northline/photo/photos/nl-photos-001/layers?clock=2026-11-14T09:30:00Z",
+    "app": "PHOTO",
+    "heading": "Compositing & Layers",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PHOTO-006",
+    "route": "/o/northline/photo/batch?clock=2026-11-14T09:30:00Z",
+    "app": "PHOTO",
+    "heading": "Batch Processing",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PHOTO-007",
+    "route": "/o/northline/photo/photos/nl-photos-001/export?clock=2026-11-14T09:30:00Z",
+    "app": "PHOTO",
+    "heading": "Photo Export",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-LAYOUT-001",
+    "route": "/o/northline/layout/publications?clock=2026-11-14T09:30:00Z",
+    "app": "LAYOUT",
+    "heading": "Publication Library",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-LAYOUT-002",
+    "route": "/o/northline/layout/publications/nl-publications-001?clock=2026-11-14T09:30:00Z",
+    "app": "LAYOUT",
+    "heading": "Publication Editor",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-LAYOUT-003",
+    "route": "/o/northline/layout/publications/nl-publications-001/masters?clock=2026-11-14T09:30:00Z",
+    "app": "LAYOUT",
+    "heading": "Master Pages",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-LAYOUT-004",
+    "route": "/o/northline/layout/publications/nl-publications-001/typography?clock=2026-11-14T09:30:00Z",
+    "app": "LAYOUT",
+    "heading": "Typography & Flow",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-LAYOUT-005",
+    "route": "/o/northline/layout/publications/nl-publications-001/preflight?clock=2026-11-14T09:30:00Z",
+    "app": "LAYOUT",
+    "heading": "Print & Preflight",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-VIDEO-001",
+    "route": "/o/northline/video/projects?clock=2026-11-14T09:30:00Z",
+    "app": "VIDEO",
+    "heading": "Video Projects",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-VIDEO-002",
+    "route": "/o/northline/video/projects/nl-videos-001?clock=2026-11-14T09:30:00Z",
+    "app": "VIDEO",
+    "heading": "Video Timeline",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-VIDEO-003",
+    "route": "/o/northline/video/projects/nl-videos-001/media?clock=2026-11-14T09:30:00Z",
+    "app": "VIDEO",
+    "heading": "Media Bin",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-VIDEO-004",
+    "route": "/o/northline/video/projects/nl-videos-001/audio?clock=2026-11-14T09:30:00Z",
+    "app": "VIDEO",
+    "heading": "Audio Mixer",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-VIDEO-005",
+    "route": "/o/northline/video/projects/nl-videos-001/captions?clock=2026-11-14T09:30:00Z",
+    "app": "VIDEO",
+    "heading": "Captions & Transcript",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-VIDEO-006",
+    "route": "/o/northline/video/projects/nl-videos-001/effects?clock=2026-11-14T09:30:00Z",
+    "app": "VIDEO",
+    "heading": "Colour & Effects",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-VIDEO-007",
+    "route": "/o/northline/video/projects/nl-videos-001/export?clock=2026-11-14T09:30:00Z",
+    "app": "VIDEO",
+    "heading": "Video Export & Render",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-VIDEO-008",
+    "route": "/o/northline/video/projects/nl-videos-001/review?clock=2026-11-14T09:30:00Z",
+    "app": "VIDEO",
+    "heading": "Video Review",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MOTION-001",
+    "route": "/o/northline/motion/projects?clock=2026-11-14T09:30:00Z",
+    "app": "MOTION",
+    "heading": "Motion Projects",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MOTION-002",
+    "route": "/o/northline/motion/projects/nl-motions-001?clock=2026-11-14T09:30:00Z",
+    "app": "MOTION",
+    "heading": "Composition Editor",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MOTION-003",
+    "route": "/o/northline/motion/projects/nl-motions-001/easing?clock=2026-11-14T09:30:00Z",
+    "app": "MOTION",
+    "heading": "Easing & Timing",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MOTION-004",
+    "route": "/o/northline/motion/projects/nl-motions-001/interactive?clock=2026-11-14T09:30:00Z",
+    "app": "MOTION",
+    "heading": "Interactive Motion",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-MOTION-005",
+    "route": "/o/northline/motion/projects/nl-motions-001/export?clock=2026-11-14T09:30:00Z",
+    "app": "MOTION",
+    "heading": "Motion Export",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-WEB-001",
+    "route": "/o/northline/web/sites?clock=2026-11-14T09:30:00Z",
+    "app": "WEB",
+    "heading": "Website Directory",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-WEB-002",
+    "route": "/o/northline/web/sites/nl-sites-001?clock=2026-11-14T09:30:00Z",
+    "app": "WEB",
+    "heading": "Site dashboard",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-WEB-003",
+    "route": "/o/northline/web/sites/nl-sites-001/builder?clock=2026-11-14T09:30:00Z",
+    "app": "WEB",
+    "heading": "Visual Page Builder",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-WEB-004",
+    "route": "/o/northline/web/sites/nl-sites-001/components?clock=2026-11-14T09:30:00Z",
+    "app": "WEB",
+    "heading": "Component Library",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-WEB-005",
+    "route": "/o/northline/web/sites/nl-sites-001/cms?clock=2026-11-14T09:30:00Z",
+    "app": "WEB",
+    "heading": "CMS Editor",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-WEB-006",
+    "route": "/o/northline/web/sites/nl-sites-001/navigation?clock=2026-11-14T09:30:00Z",
+    "app": "WEB",
+    "heading": "Site Navigation",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-WEB-007",
+    "route": "/o/northline/web/sites/nl-sites-001/forms?clock=2026-11-14T09:30:00Z",
+    "app": "WEB",
+    "heading": "Forms & Integrations",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-WEB-008",
+    "route": "/o/northline/web/sites/nl-sites-001/quality?clock=2026-11-14T09:30:00Z",
+    "app": "WEB",
+    "heading": "Quality report",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-WEB-009",
+    "route": "/o/northline/web/sites/nl-sites-001/deploy?clock=2026-11-14T09:30:00Z",
+    "app": "WEB",
+    "heading": "Domains & publishing",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-WEB-010",
+    "route": "/o/northline/web/sites/nl-sites-001/analytics?clock=2026-11-14T09:30:00Z",
+    "app": "WEB",
+    "heading": "Web analytics",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BUILD-001",
+    "route": "/o/northline/build/projects?clock=2026-11-14T09:30:00Z",
+    "app": "BUILD",
+    "heading": "App Project Library",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BUILD-002",
+    "route": "/o/northline/build/projects/nl-appProjects-001?clock=2026-11-14T09:30:00Z",
+    "app": "BUILD",
+    "heading": "Application overview",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-BUILD-003",
+    "route": "/o/northline/build/projects/nl-appProjects-001/builder?clock=2026-11-14T09:30:00Z",
+    "app": "BUILD",
+    "heading": "Visual App Builder",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-BUILD-004",
+    "route": "/o/northline/build/projects/nl-appProjects-001/code?clock=2026-11-14T09:30:00Z",
+    "app": "BUILD",
+    "heading": "Code",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BUILD-005",
+    "route": "/o/northline/build/projects/nl-appProjects-001/database?clock=2026-11-14T09:30:00Z",
+    "app": "BUILD",
+    "heading": "Data model",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BUILD-006",
+    "route": "/o/northline/build/projects/nl-appProjects-001/api?clock=2026-11-14T09:30:00Z",
+    "app": "BUILD",
+    "heading": "API & functions",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BUILD-007",
+    "route": "/o/northline/build/projects/nl-appProjects-001/auth?clock=2026-11-14T09:30:00Z",
+    "app": "BUILD",
+    "heading": "Roles & access",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BUILD-008",
+    "route": "/o/northline/build/projects/nl-appProjects-001/tests?clock=2026-11-14T09:30:00Z",
+    "app": "BUILD",
+    "heading": "Checks & QA",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BUILD-009",
+    "route": "/o/northline/build/projects/nl-appProjects-001/deploy?clock=2026-11-14T09:30:00Z",
+    "app": "BUILD",
+    "heading": "Deployments",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BUILD-010",
+    "route": "/o/northline/build/projects/nl-appProjects-001/integrations?clock=2026-11-14T09:30:00Z",
+    "app": "BUILD",
+    "heading": "Integrations & keys",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-BUILD-011",
+    "route": "/o/northline/build/projects/nl-appProjects-001/monitor?clock=2026-11-14T09:30:00Z",
+    "app": "BUILD",
+    "heading": "Monitoring",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-FORMS-001",
+    "route": "/o/northline/forms/forms?clock=2026-11-14T09:30:00Z",
+    "app": "FORMS",
+    "heading": "Forms Directory",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-FORMS-002",
+    "route": "/o/northline/forms/forms/nl-forms-001?clock=2026-11-14T09:30:00Z",
+    "app": "FORMS",
+    "heading": "Visual Form Builder",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-FORMS-003",
+    "route": "/o/northline/forms/forms/nl-forms-001/logic?clock=2026-11-14T09:30:00Z",
+    "app": "FORMS",
+    "heading": "Conditional logic",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-FORMS-004",
+    "route": "/o/northline/forms/forms/nl-forms-001/submissions?clock=2026-11-14T09:30:00Z",
+    "app": "FORMS",
+    "heading": "Submissions",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-FORMS-005",
+    "route": "/o/northline/forms/forms/nl-forms-001/publish?clock=2026-11-14T09:30:00Z",
+    "app": "FORMS",
+    "heading": "Design & publish",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-FORMS-006",
+    "route": "/o/northline/forms/forms/nl-forms-001/analytics?clock=2026-11-14T09:30:00Z",
+    "app": "FORMS",
+    "heading": "Form analytics",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-AUTO-001",
+    "route": "/o/northline/auto/workflows?clock=2026-11-14T09:30:00Z",
+    "app": "AUTO",
+    "heading": "Automation Library",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-AUTO-002",
+    "route": "/o/northline/auto/workflows/nl-workflows-001?clock=2026-11-14T09:30:00Z",
+    "app": "AUTO",
+    "heading": "Visual workflow builder",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-AUTO-003",
+    "route": "/o/northline/auto/workflows/nl-workflows-001/triggers?clock=2026-11-14T09:30:00Z",
+    "app": "AUTO",
+    "heading": "Trigger Configuration",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-AUTO-004",
+    "route": "/o/northline/auto/workflows/nl-workflows-001/actions?clock=2026-11-14T09:30:00Z",
+    "app": "AUTO",
+    "heading": "Action & AI Nodes",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-AUTO-005",
+    "route": "/o/northline/auto/workflows/nl-workflows-001/test?clock=2026-11-14T09:30:00Z",
+    "app": "AUTO",
+    "heading": "Workflow Testing",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-AUTO-006",
+    "route": "/o/northline/auto/runs?clock=2026-11-14T09:30:00Z",
+    "app": "AUTO",
+    "heading": "Run History",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-AUTO-007",
+    "route": "/o/northline/auto/runs/nl-workflowRuns-001?clock=2026-11-14T09:30:00Z",
+    "app": "AUTO",
+    "heading": "Workflow run",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-AUTO-008",
+    "route": "/o/northline/auto/schedules?clock=2026-11-14T09:30:00Z",
+    "app": "AUTO",
+    "heading": "Schedules & Queues",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-AUTO-009",
+    "route": "/o/northline/auto/exceptions?clock=2026-11-14T09:30:00Z",
+    "app": "AUTO",
+    "heading": "Automation Exceptions",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ANALYTICS-001",
+    "route": "/o/northline/analytics/home?clock=2026-11-14T09:30:00Z",
+    "app": "ANALYTICS",
+    "heading": "Insights Overview",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-ANALYTICS-002",
+    "route": "/o/northline/analytics/dashboards?clock=2026-11-14T09:30:00Z",
+    "app": "ANALYTICS",
+    "heading": "Dashboard Directory",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ANALYTICS-003",
+    "route": "/o/northline/analytics/dashboards/nl-datasets-001?clock=2026-11-14T09:30:00Z",
+    "app": "ANALYTICS",
+    "heading": "Dashboard editor",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ANALYTICS-004",
+    "route": "/o/northline/analytics/reports/nl-datasets-001?clock=2026-11-14T09:30:00Z",
+    "app": "ANALYTICS",
+    "heading": "Report builder",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ANALYTICS-005",
+    "route": "/o/northline/analytics/datasets?clock=2026-11-14T09:30:00Z",
+    "app": "ANALYTICS",
+    "heading": "Dataset Catalogue",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ANALYTICS-006",
+    "route": "/o/northline/analytics/metrics?clock=2026-11-14T09:30:00Z",
+    "app": "ANALYTICS",
+    "heading": "Metric Definitions",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ANALYTICS-007",
+    "route": "/o/northline/analytics/models?clock=2026-11-14T09:30:00Z",
+    "app": "ANALYTICS",
+    "heading": "Data Modelling",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ANALYTICS-008",
+    "route": "/o/northline/analytics/forecasts?clock=2026-11-14T09:30:00Z",
+    "app": "ANALYTICS",
+    "heading": "Forecasts & Scenarios",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ANALYTICS-009",
+    "route": "/o/northline/analytics/distribution?clock=2026-11-14T09:30:00Z",
+    "app": "ANALYTICS",
+    "heading": "Reports & Distribution",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROC-001",
+    "route": "/o/northline/proc/home?clock=2026-11-14T09:30:00Z",
+    "app": "PROC",
+    "heading": "Procurement Overview",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROC-002",
+    "route": "/o/northline/proc/suppliers?clock=2026-11-14T09:30:00Z",
+    "app": "PROC",
+    "heading": "Suppliers",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROC-003",
+    "route": "/o/northline/proc/suppliers/nl-suppliers-001?clock=2026-11-14T09:30:00Z",
+    "app": "PROC",
+    "heading": "Supplier",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROC-004",
+    "route": "/o/northline/proc/requisitions?clock=2026-11-14T09:30:00Z",
+    "app": "PROC",
+    "heading": "Purchase Requisitions",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROC-005",
+    "route": "/o/northline/proc/orders?clock=2026-11-14T09:30:00Z",
+    "app": "PROC",
+    "heading": "Purchase Orders",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROC-006",
+    "route": "/o/northline/proc/warehouses?clock=2026-11-14T09:30:00Z",
+    "app": "PROC",
+    "heading": "Warehouse Locations",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROC-007",
+    "route": "/o/northline/proc/receiving?clock=2026-11-14T09:30:00Z",
+    "app": "PROC",
+    "heading": "Receiving & Scanning",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROC-008",
+    "route": "/o/northline/proc/movements?clock=2026-11-14T09:30:00Z",
+    "app": "PROC",
+    "heading": "Stock Movements",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROC-009",
+    "route": "/o/northline/proc/replenishment?clock=2026-11-14T09:30:00Z",
+    "app": "PROC",
+    "heading": "Replenishment",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PROC-010",
+    "route": "/o/northline/proc/reports?clock=2026-11-14T09:30:00Z",
+    "app": "PROC",
+    "heading": "Procurement Analytics",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CONNECT-001",
+    "route": "/o/northline/connect/marketplace?clock=2026-11-14T09:30:00Z",
+    "app": "CONNECT",
+    "heading": "Integration directory",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CONNECT-002",
+    "route": "/o/northline/connect/marketplace/nl-connectors-001?clock=2026-11-14T09:30:00Z",
+    "app": "CONNECT",
+    "heading": "Connector",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-CONNECT-003",
+    "route": "/o/northline/connect/connect/nl-connectors-001?clock=2026-11-14T09:30:00Z",
+    "app": "CONNECT",
+    "heading": "Authorise a connector",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CONNECT-004",
+    "route": "/o/northline/connect/connections?clock=2026-11-14T09:30:00Z",
+    "app": "CONNECT",
+    "heading": "Connections",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CONNECT-005",
+    "route": "/o/northline/connect/connections/nl-connectors-001?clock=2026-11-14T09:30:00Z",
+    "app": "CONNECT",
+    "heading": "Connection",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-CONNECT-006",
+    "route": "/o/northline/connect/capabilities?clock=2026-11-14T09:30:00Z",
+    "app": "CONNECT",
+    "heading": "Capability registry",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CONNECT-007",
+    "route": "/o/northline/connect/sync?clock=2026-11-14T09:30:00Z",
+    "app": "CONNECT",
+    "heading": "Synchronisation",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CONNECT-008",
+    "route": "/o/northline/connect/health?clock=2026-11-14T09:30:00Z",
+    "app": "CONNECT",
+    "heading": "Connector health",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CONNECT-009",
+    "route": "/o/northline/connect/custom?clock=2026-11-14T09:30:00Z",
+    "app": "CONNECT",
+    "heading": "Custom adapters",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-CONNECT-010",
+    "route": "/o/northline/connect/receipts?clock=2026-11-14T09:30:00Z",
+    "app": "CONNECT",
+    "heading": "Action receipts",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-IT-001",
+    "route": "/o/northline/it/home?clock=2026-11-14T09:30:00Z",
+    "app": "IT",
+    "heading": "IT operations",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-IT-002",
+    "route": "/o/northline/it/incidents?clock=2026-11-14T09:30:00Z",
+    "app": "IT",
+    "heading": "Incident queue",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-IT-003",
+    "route": "/o/northline/it/incidents/nl-incidents-001?clock=2026-11-14T09:30:00Z",
+    "app": "IT",
+    "heading": "Incident",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-IT-004",
+    "route": "/o/northline/it/health?clock=2026-11-14T09:30:00Z",
+    "app": "IT",
+    "heading": "System health",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-IT-005",
+    "route": "/o/northline/it/traces?clock=2026-11-14T09:30:00Z",
+    "app": "IT",
+    "heading": "Logs & timings",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-IT-006",
+    "route": "/o/northline/it/remediation?clock=2026-11-14T09:30:00Z",
+    "app": "IT",
+    "heading": "Remediation",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-IT-007",
+    "route": "/o/northline/it/releases?clock=2026-11-14T09:30:00Z",
+    "app": "IT",
+    "heading": "Release management",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-IT-008",
+    "route": "/o/northline/it/security?clock=2026-11-14T09:30:00Z",
+    "app": "IT",
+    "heading": "Security",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-IT-009",
+    "route": "/o/northline/it/reports?clock=2026-11-14T09:30:00Z",
+    "app": "IT",
+    "heading": "Reliability reports",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-INBOX-001",
+    "route": "/o/northline/inbox/inbox?clock=2026-11-14T09:30:00Z",
+    "app": "INBOX",
+    "heading": "Unified Inbox",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-INBOX-002",
+    "route": "/o/northline/inbox/approvals?clock=2026-11-14T09:30:00Z",
+    "app": "INBOX",
+    "heading": "Approvals",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-INBOX-003",
+    "route": "/o/northline/inbox/messages?clock=2026-11-14T09:30:00Z",
+    "app": "INBOX",
+    "heading": "Messages Inbox",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-INBOX-004",
+    "route": "/o/northline/inbox/notifications?clock=2026-11-14T09:30:00Z",
+    "app": "INBOX",
+    "heading": "Notifications Feed",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-INBOX-005",
+    "route": "/o/northline/inbox/incidents?clock=2026-11-14T09:30:00Z",
+    "app": "INBOX",
+    "heading": "Incident Alerts",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-INBOX-006",
+    "route": "/o/northline/inbox/settings?clock=2026-11-14T09:30:00Z",
+    "app": "INBOX",
+    "heading": "Notification Preferences",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-INBOX-007",
+    "route": "/o/northline/inbox/digests?clock=2026-11-14T09:30:00Z",
+    "app": "INBOX",
+    "heading": "Digest Centre",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-INBOX-008",
+    "route": "/o/northline/inbox/escalations?clock=2026-11-14T09:30:00Z",
+    "app": "INBOX",
+    "heading": "Escalations & Delegation",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ADMIN-001",
+    "route": "/o/northline/admin/organization?clock=2026-11-14T09:30:00Z",
+    "app": "ADMIN",
+    "heading": "Organization Settings",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ADMIN-002",
+    "route": "/o/northline/admin/members?clock=2026-11-14T09:30:00Z",
+    "app": "ADMIN",
+    "heading": "Members & Invitations",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ADMIN-003",
+    "route": "/o/northline/admin/roles?clock=2026-11-14T09:30:00Z",
+    "app": "ADMIN",
+    "heading": "Roles & Permissions",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ADMIN-004",
+    "route": "/o/northline/admin/autonomy?clock=2026-11-14T09:30:00Z",
+    "app": "ADMIN",
+    "heading": "Autonomy Centre",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-ADMIN-005",
+    "route": "/o/northline/admin/budgets?clock=2026-11-14T09:30:00Z",
+    "app": "ADMIN",
+    "heading": "Budget & AI Usage",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-ADMIN-006",
+    "route": "/o/northline/admin/security?clock=2026-11-14T09:30:00Z",
+    "app": "ADMIN",
+    "heading": "Security & Sessions",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ADMIN-007",
+    "route": "/o/northline/admin/audit?clock=2026-11-14T09:30:00Z",
+    "app": "ADMIN",
+    "heading": "Audit Trail",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-ADMIN-008",
+    "route": "/o/northline/admin/privacy?clock=2026-11-14T09:30:00Z",
+    "app": "ADMIN",
+    "heading": "Privacy & Data Controls",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-ADMIN-009",
+    "route": "/o/northline/admin/billing?clock=2026-11-14T09:30:00Z",
+    "app": "ADMIN",
+    "heading": "Billing & Subscription",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ADMIN-010",
+    "route": "/o/northline/admin/recovery?clock=2026-11-14T09:30:00Z",
+    "app": "ADMIN",
+    "heading": "Backups & Recovery",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ADMIN-011",
+    "route": "/o/northline/admin/developer?clock=2026-11-14T09:30:00Z",
+    "app": "ADMIN",
+    "heading": "Environment & Developer Access",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-LEGAL-001",
+    "route": "/o/northline/legal/home?clock=2026-11-14T09:30:00Z",
+    "app": "LEGAL",
+    "heading": "Governance Overview",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-LEGAL-002",
+    "route": "/o/northline/legal/contracts?clock=2026-11-14T09:30:00Z",
+    "app": "LEGAL",
+    "heading": "Contract Library",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-LEGAL-003",
+    "route": "/o/northline/legal/contracts/nl-contracts-001?clock=2026-11-14T09:30:00Z",
+    "app": "LEGAL",
+    "heading": "Contract",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-LEGAL-004",
+    "route": "/o/northline/legal/policies?clock=2026-11-14T09:30:00Z",
+    "app": "LEGAL",
+    "heading": "Policy Register",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-LEGAL-005",
+    "route": "/o/northline/legal/obligations?clock=2026-11-14T09:30:00Z",
+    "app": "LEGAL",
+    "heading": "Obligation Calendar",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-LEGAL-006",
+    "route": "/o/northline/legal/risks?clock=2026-11-14T09:30:00Z",
+    "app": "LEGAL",
+    "heading": "Risk Register",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-LEGAL-007",
+    "route": "/o/northline/legal/evidence?clock=2026-11-14T09:30:00Z",
+    "app": "LEGAL",
+    "heading": "Audit & Evidence",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PORTAL-001",
+    "route": "/o/northline/portal/portals?clock=2026-11-14T09:30:00Z",
+    "app": "PORTAL",
+    "heading": "Portal Directory",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PORTAL-002",
+    "route": "/o/northline/portal/portals/nl-portals-001/builder?clock=2026-11-14T09:30:00Z",
+    "app": "PORTAL",
+    "heading": "Portal builder",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-PORTAL-003",
+    "route": "/o/northline/portal/portals/nl-portals-001/dashboard?clock=2026-11-14T09:30:00Z",
+    "app": "PORTAL",
+    "heading": "Client dashboard",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-PORTAL-004",
+    "route": "/o/northline/portal/portals/nl-portals-001/files?clock=2026-11-14T09:30:00Z",
+    "app": "PORTAL",
+    "heading": "Shared documents",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PORTAL-005",
+    "route": "/o/northline/portal/portals/nl-portals-001/messages?clock=2026-11-14T09:30:00Z",
+    "app": "PORTAL",
+    "heading": "Portal messages",
+    "tabsFound": 3,
+    "tabsRequired": 3,
+    "errors": []
+  },
+  {
+    "id": "ARL-PORTAL-006",
+    "route": "/o/northline/portal/portals/nl-portals-001/billing?clock=2026-11-14T09:30:00Z",
+    "app": "PORTAL",
+    "heading": "Billing and requests",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-PORTAL-007",
+    "route": "/o/northline/portal/portals/nl-portals-001/admin?clock=2026-11-14T09:30:00Z",
+    "app": "PORTAL",
+    "heading": "Access and analytics",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ASSET-001",
+    "route": "/o/northline/asset/assets?clock=2026-11-14T09:30:00Z",
+    "app": "ASSET",
+    "heading": "Asset Library",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-ASSET-002",
+    "route": "/o/northline/asset/assets/nl-assets-001?clock=2026-11-14T09:30:00Z",
+    "app": "ASSET",
+    "heading": "Asset",
+    "tabsFound": 5,
+    "tabsRequired": 5,
+    "errors": []
+  },
+  {
+    "id": "ARL-ASSET-003",
+    "route": "/o/northline/asset/brands?clock=2026-11-14T09:30:00Z",
+    "app": "ASSET",
+    "heading": "Brand Kits",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ASSET-004",
+    "route": "/o/northline/asset/transforms?clock=2026-11-14T09:30:00Z",
+    "app": "ASSET",
+    "heading": "Media Transformations",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  },
+  {
+    "id": "ARL-ASSET-005",
+    "route": "/o/northline/asset/governance?clock=2026-11-14T09:30:00Z",
+    "app": "ASSET",
+    "heading": "Asset Usage & Governance",
+    "tabsFound": 4,
+    "tabsRequired": 4,
+    "errors": []
+  }
+]

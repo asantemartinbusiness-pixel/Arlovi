@@ -63,17 +63,26 @@ test.describe("screen contract sweep", () => {
 
 test.describe("organisation scoping", () => {
   test("switching company changes the records every global surface reads", async ({ page }) => {
-    await page.goto(`/o/northline/hq/home?${CLOCK}`);
-    await expect(page.getByRole("heading", { level: 1, name: "Executive Home" })).toBeVisible();
+    // A title that exists only in Northline. Searching for a word is not enough:
+    // Harbor's own records may mention Northline by name.
+    const northlineOnly = "Winter trade launch";
+    const search = async (org: "northline" | "harbor", orgName: RegExp) => {
+      await page.goto(`/o/${org}/hq/home?${CLOCK}`);
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+      await page.keyboard.press("Control+k");
+      const dialog = page.getByRole("dialog", { name: orgName });
+      await expect(dialog).toBeVisible();
+      await dialog.getByRole("combobox").fill(northlineOnly);
+      return dialog;
+    };
 
-    await page.goto(`/o/harbor/hq/home?${CLOCK}`);
-    await expect(page.getByRole("button", { name: /Search Harbor/ })).toBeVisible();
+    const fromNorthline = await search("northline", /Search Northline Atelier/);
+    await expect(fromNorthline.getByRole("option").filter({ hasText: northlineOnly }).first()).toBeVisible();
+    await page.keyboard.press("Escape");
 
-    await page.getByRole("button", { name: /Search Harbor/ }).click();
-    const dialog = page.getByRole("dialog", { name: /Search Harbor Supply/ });
-    await expect(dialog).toBeVisible();
-    await dialog.getByRole("combobox").fill("Northline");
-    await expect(dialog.getByText(/Nothing in Harbor Supply matches/)).toBeVisible();
+    const fromHarbor = await search("harbor", /Search Harbor Supply/);
+    await expect(fromHarbor.getByText(/Nothing in Harbor Supply matches/)).toBeVisible();
+    await expect(fromHarbor.getByRole("option").filter({ hasText: northlineOnly })).toHaveCount(0);
     await page.keyboard.press("Escape");
 
     await page.getByRole("button", { name: /Ask Arlovi/ }).first().click();
@@ -84,14 +93,17 @@ test.describe("organisation scoping", () => {
 test.describe("command palette", () => {
   test("a record hit navigates to the record", async ({ page }) => {
     await page.goto(`/o/northline/hq/home?${CLOCK}`);
+    await expect(page.getByRole("heading", { level: 1, name: "Executive Home" })).toBeVisible();
     await page.keyboard.press("Control+k");
     const dialog = page.getByRole("dialog", { name: /Search Northline/ });
     await expect(dialog).toBeVisible();
-    await dialog.getByRole("combobox").fill("INV");
-    const option = dialog.getByRole("option").first();
-    await expect(option).toBeVisible();
-    await option.click();
-    await expect(page).not.toHaveURL(/hq\/home/);
+    await dialog.getByRole("combobox").fill("INV-");
+    // A record result, not a screen result: its detail line names the collection.
+    const record = dialog.getByRole("option").filter({ hasText: /invoices · / }).first();
+    await expect(record).toBeVisible();
+    await record.click();
+    await expect(page).toHaveURL(/\/fin\/invoices\/[^/?]+/);
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
   });
 });
 

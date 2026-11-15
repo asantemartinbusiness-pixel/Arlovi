@@ -115,7 +115,7 @@ def main():
         "",
         "| Status | Meaning | Screens |",
         "| --- | --- | ---: |",
-        f'| verified | Contract complete, every interaction exercised clean in a browser, and the application\'s actions signed off as doing what they are named for | {tally.get("verified", 0)} |',
+        f'| verified | Contract complete; every tab and every contract overlay exercised, and every action reachable without a specific selection pressed, in a browser with no console error; and the application\'s actions signed off as doing what they are named for | {tally.get("verified", 0)} |',
         f'| exercised | Contract complete and exercised clean, but the semantic action audit is not signed off | {tally.get("exercised", 0)} |',
         f'| implemented | Owned by its application, but part of the contract is missing or an interaction failed in the browser | {tally.get("implemented", 0)} |',
         f'| not-built | Not yet owned by an application module | {tally.get("not-built", 0)} |',
@@ -138,7 +138,36 @@ def main():
         entry = by_app[code]
         signed = "yes" if semantic.get(code, {}).get("signedOff") else "no"
         lines.append(f'| {code} | {entry["total"]} | {entry["verified"]} | {entry["exercised"]} | {entry["implemented"]} | {entry["not-built"]} | {signed} |')
-    lines += ["", "Per-screen detail, including every failing check, is in `SCREEN_LEDGER.csv`.", ""]
+    guarded_total = sum(int(row["actions_guarded"]) for row in rows)
+    exercised_total = sum(int(row["actions_exercised"]) for row in rows)
+    lines += [
+        "",
+        "## What this evidence does not cover",
+        "",
+        f"- **{guarded_total} actions were not pressed by the sweep.** Each needs a specific selection",
+        "  the sweep could not make generically, so it stayed disabled. They were judged in the",
+        "  semantic review and most were driven by hand in the remediation reviews, but this",
+        f"  automated run did not exercise them. The sweep pressed {exercised_total} actions.",
+        "- **Pressing an action is not the same as completing its save path.** The sweep opens what",
+        "  an action opens and checks for errors; it does not fill and submit every form. Save paths",
+        "  were checked selectively during remediation, and the open items below record where they",
+        "  were not.",
+        "- **External services are not connected.** Sending, paying, publishing, filing, calling and",
+        "  model inference stop at a stated provider boundary. Verified means the boundary is",
+        "  honest, not that the remote action happened.",
+        "- **Visual quality is not measured here.** Layout, typography and responsive behaviour were",
+        "  checked by screenshot on sampled screens, not across all 316.",
+        "",
+        "## Open items recorded at sign-off",
+        "",
+    ]
+    for code in sorted(semantic):
+        items = semantic[code].get("openItems", [])
+        if items:
+            lines.append(f"**{code}**")
+            lines += [f"- {item}" for item in items]
+            lines.append("")
+    lines += ["Per-screen detail, including every failing check and guarded count, is in `SCREEN_LEDGER.csv`.", ""]
     (DOCS / "SCREEN_LEDGER.md").write_text("\n".join(lines))
     print(f"ledger written: {tally}")
     return 0
