@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { Button, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
@@ -7,6 +7,8 @@ import type { Rec } from "@/domain/types";
 import { askFirst, Boundary, logBoundary, pickRecord, recordOf, selectedOf } from "@/applications/hr/opsKit";
 import { policyFor, useCareData } from "./panels";
 import { slaState } from "./sla";
+import { caseFilterNow, matchesCase, setCaseFilter, useCaseFilter } from "./caseFilter";
+export { CoachingAssignments, matchesCase, useCaseFilter } from "./caseFilter";
 
 /* ------------------------------------------------------------------ *
  * Contract actions for the Customer Care module that change records.
@@ -190,19 +192,6 @@ export function LinkRecord({ context, close }: { context: ScreenContext; close: 
 
 /* ---------------- ARL-CARE-003 · filter / export ---------------- */
 
-export interface CaseFilterValue { priority: string; queue: string; owner: string }
-let caseFilterValue: CaseFilterValue = { priority: "", queue: "", owner: "" };
-const caseListeners = new Set<() => void>();
-export function setCaseFilter(next: CaseFilterValue): void { caseFilterValue = next; caseListeners.forEach((listener) => listener()); }
-export function useCaseFilter(): CaseFilterValue {
-  return useSyncExternalStore((listener) => { caseListeners.add(listener); return () => caseListeners.delete(listener); }, () => caseFilterValue);
-}
-export function matchesCase(ticket: Rec, filter: CaseFilterValue): boolean {
-  return (!filter.priority || String(ticket.fields.priority ?? "") === filter.priority)
-    && (!filter.queue || String(ticket.fields.queue ?? "") === filter.queue)
-    && (!filter.owner || (filter.owner === "__none" ? !ticket.fields.assignee : String(ticket.fields.assignee ?? "") === filter.owner));
-}
-
 export function CaseFilter({ context: _context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCareData();
   const current = useCaseFilter();
@@ -233,7 +222,7 @@ export function CaseFilterNotice({ total, shown }: { total: number; shown: numbe
 }
 
 export async function exportCases(context: ScreenContext): Promise<void> {
-  const tickets = (await listByCollection(context.org.id, "tickets")).filter((ticket) => matchesCase(ticket, caseFilterValue));
+  const tickets = (await listByCollection(context.org.id, "tickets")).filter((ticket) => matchesCase(ticket, caseFilterNow()));
   download(`${context.org.slug}-cases.csv`, ["ref", "subject", "priority", "queue", "owner", "status", "opened", "resolved", "csat"], tickets.map((ticket) => [
     String(ticket.fields.ref ?? ""), ticket.title, String(ticket.fields.priority ?? ""), String(ticket.fields.queue ?? ""), String(ticket.fields.assignee ?? ""), ticket.status, ticket.at ?? "", String(ticket.fields.resolvedAt ?? ""), String(ticket.fields.csat ?? 0),
   ]));
@@ -569,19 +558,3 @@ export async function exportQuality(context: ScreenContext): Promise<void> {
   context.toast("Quality exported", `${rated.length} ratings and ${reviews.length} reviews downloaded. The file holds cases and reviews, not a ranking of people.`);
 }
 
-/** Coaching tab addition: the coaching actually assigned. */
-export function CoachingAssignments({ context }: { context: ScreenContext }) {
-  const tasks = useCollections(["tasks"]).tasks.filter((task) => task.fields.kind === "coaching");
-  if (tasks.length === 0) return <span className="ds-subtle">No coaching is assigned.</span>;
-  return (
-    <Stack gap={2}>
-      {tasks.map((task) => (
-        <Row key={task.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
-          <span className="ds-grow">{task.title}</span>
-          <span className="ds-subtle">{task.dueAt ? `by ${context.date(task.dueAt)}` : ""}</span>
-          <Pill>{task.status}</Pill>
-        </Row>
-      ))}
-    </Stack>
-  );
-}

@@ -5,6 +5,7 @@ import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { askFirst, Boundary, logBoundary, pickRecord, recordOf, selectedOf } from "@/applications/hr/opsKit";
 import { clausesOf, lifecycleLabel, type Clause } from "./panels";
+export { RecordReview } from "./review";
 
 /* ------------------------------------------------------------------ *
  * Contract actions for the Governance & Legal module that change records.
@@ -41,25 +42,6 @@ export async function reviewItem(context: ScreenContext): Promise<void> {
     empty: "No open obligation",
     onPick: (row) => context.openOverlay("Obligation quick view", { id: row.id }),
   });
-}
-
-export function RecordReview({ context, obligation }: { context: ScreenContext; obligation: Rec }) {
-  const [note, setNote] = useState("");
-  return (
-    <Stack gap={2}>
-      <Field label="Review note" hint={obligation.fields.reviewedBy ? `Last reviewed by ${String(obligation.fields.reviewedBy)} ${context.relative(String(obligation.fields.reviewedAt ?? ""))}` : "Not reviewed yet"}>
-        <TextArea rows={2} value={note} onChange={(event) => setNote(event.target.value)} />
-      </Field>
-      {String(obligation.fields.jurisdiction ?? "") !== "" && String(obligation.fields.jurisdiction) !== context.org.jurisdiction && (
-        <Notice tone="warning" title="Different jurisdiction">This obligation is under {String(obligation.fields.jurisdiction)}, not {context.org.jurisdiction}. Its interpretation needs legal review.</Notice>
-      )}
-      <Button variant="secondary" disabled={!note.trim()} onClick={async () => {
-        await context.mutate.patch(obligation.id, { fields: { ...obligation.fields, reviewedBy: context.actor, reviewedAt: new Date().toISOString(), reviewNote: note.trim() } }, { expectRevision: obligation.revision, event: `${obligation.title} reviewed by ${context.actor}: ${note.trim()}` });
-        setNote("");
-        context.toast("Review recorded", `${obligation.title} is marked reviewed by ${context.actor}. This is not legal advice.`);
-      }}>Record my review</Button>
-    </Stack>
-  );
 }
 
 /* ---------------- assign counsel / owner (001, 005) ---------------- */

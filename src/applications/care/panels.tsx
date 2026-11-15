@@ -8,7 +8,7 @@ import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { SLA_TONE, formatMinutes, slaState, type SlaState } from "./sla";
-import { CoachingAssignments, matchesCase, useCaseFilter } from "./actions";
+import { CoachingAssignments, matchesCase, useCaseFilter } from "./caseFilter";
 
 export function useCareData() {
   return useCollections(["tickets", "messages", "articles", "macros", "slas", "contacts", "employees", "members", "tasks"]);

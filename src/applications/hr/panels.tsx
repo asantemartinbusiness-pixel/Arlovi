@@ -11,7 +11,7 @@ import { useCollection, useCollections, useRecord, useWorkspace } from "@/platfo
 import { addDays, daysBetween, startOfMonth, startOfWeek } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { EmploymentPill, RoleViewNote, leaveBalance, salaryText } from "./kit";
-import { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./actions";
+import { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 
 /* ------------------------------------------------------------------ *
  * Shared reads

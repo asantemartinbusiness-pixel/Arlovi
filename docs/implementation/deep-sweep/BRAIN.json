@@ -1,0 +1,75 @@
+[
+ {
+  "id": "ARL-BRAIN-001",
+  "title": "Knowledge Home",
+  "route": "/o/northline/brain/home",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Recent",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Quality",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Opportunities",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Knowledge inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "suggestion approval",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "upload",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Import a source",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "review proposal",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Search knowledge",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "All opportunities",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "inspect missing source",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

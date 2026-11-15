@@ -1,0 +1,80 @@
+[
+ {
+  "id": "ARL-AI-001",
+  "title": "Chief of Staff Chat",
+  "route": "/o/northline/ai/chat",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Chat",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Attachments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Related missions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Source selector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "upload review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "message action menu",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "task authorization",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Attach",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pin records",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Send text",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Authorise a mission",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Dictate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open artifact",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]
