@@ -9,7 +9,7 @@ import {
 } from "@/design-system";
 import { findScreen } from "@/app/catalog";
 import { registerApp, type ScreenContext } from "@/platform/registry";
-import { useCollection, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
+import { db, useCollection, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import { capabilityById, CAPABILITY_LABELS, CAPABILITY_TONE } from "@/platform/capability";
 import { ROLE_LABELS, can as roleCan, type Capability } from "@/platform/policy";
 import { freshness } from "@/platform/clock";
@@ -19,6 +19,9 @@ import {
   routeReason, useInboxData, usePublishedItems, useSeeded, useSeededList, writeTriage,
   type InboxItem,
 } from "./engine";
+import {
+  AcknowledgeIncident, DelegateApproval, EscalateIncident, FollowSource, RevokeRule, SetDigest, ToggleChannel,
+} from "./actions";
 
 /* ====================================================================== *
  * INBOX — Inbox, Notifications & Attention Engine
@@ -2620,12 +2623,14 @@ export const inboxApp = registerApp({
         { id: "approve", label: "Approve", placement: "secondary", capability: "approve_payment", guard: (context) => (context.selectedId ? undefined : "Select a request"), run: (context) => context.openOverlay("step-up auth", { id: context.selectedId }) },
         { id: "deny", label: "Deny", placement: "overflow", tone: "danger", guard: (context) => (context.selectedId ? undefined : "Select a request"), run: (context) => context.openOverlay("Approval review", { id: context.selectedId, intent: "deny" }) },
         { id: "ask changes", label: "Ask for changes", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a request"), run: (context) => context.openOverlay("Approval review", { id: context.selectedId, intent: "changes" }) },
-        { id: "delegate", label: "Delegate", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/inbox/escalations`) },
+        { id: "delegate", label: "Delegate", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a request"), run: (context) => context.openOverlay("delegate approval") },
+        { id: "escalation rules", label: "Escalation rules", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/inbox/escalations`) },
       ],
       overlays: [
         { id: "Approval review", kind: "drawer", title: "Review the request", width: 560, render: ({ close, ...context }) => <ApprovalReview context={context} close={close} /> },
         { id: "step-up auth", kind: "modal", title: "Confirm this approval", width: 540, blocking: true, render: ({ close, ...context }) => <StepUpAuth context={context} close={close} /> },
         { id: "scope diff", kind: "modal", title: "Requested against held", width: 640, render: ({ close: _close, ...context }) => <ScopeDiff context={context} /> },
+        { id: "delegate approval", kind: "modal", title: "Delegate this request", width: 580, render: ({ close, ...context }) => <DelegateApproval context={context} close={close} /> },
       ],
     },
 
@@ -2638,9 +2643,17 @@ export const inboxApp = registerApp({
       })),
       actions: [
         { id: "Reply", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Select a thread"), run: (context) => context.openOverlay("Message inspector", { id: context.selectedId }) },
-        { id: "open thread", label: "Open thread", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select a thread"), run: (context) => context.navigate(`/o/${context.org.slug}/comms/channels`) },
+        { id: "open thread", label: "Open thread", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select a thread"), run: (context) => context.openOverlay("Message inspector", { id: context.selectedId }) },
+        { id: "open channels", label: "Open Comms channels", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/comms/channels`) },
         { id: "assign", label: "Assign", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a thread"), run: (context) => context.openOverlay("reassignment", { id: context.selectedId }) },
-        { id: "convert to task", label: "Convert to task", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a thread"), run: (context) => context.openOverlay("Message inspector", { id: context.selectedId }) },
+        {
+          id: "convert to task", label: "Convert to task", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a thread"),
+          run: async (context) => {
+            const message = context.selectedId ? await db.records.get(context.selectedId) : undefined;
+            if (message?.fields.taskId) { context.toast("Already a task", `This thread is linked to ${String(message.fields.taskId)}.`, "info"); return; }
+            await convertToTask(context, message);
+          },
+        },
       ],
       overlays: [
         { id: "Message inspector", kind: "drawer", title: "Thread", width: 560, render: ({ close, ...context }) => <MessageInspector context={context} close={close} /> },
@@ -2657,8 +2670,10 @@ export const inboxApp = registerApp({
         render: (context: ScreenContext) => <NotificationsFeed context={context} tab={tab} />,
       })),
       actions: [
-        { id: "Filter", label: "Preferences", placement: "secondary", run: (context) => context.openOverlay("preference quick view") },
-        { id: "follow source", label: "Follow a source", placement: "overflow", run: (context) => context.openOverlay("grouped items") },
+        { id: "Filter", label: "Filter the feed", placement: "secondary", run: () => { document.querySelector<HTMLInputElement>('input[aria-label^="Filter"]')?.focus(); } },
+        { id: "follow source", label: "Follow a source", placement: "overflow", run: (context) => context.openOverlay("follow source") },
+        { id: "preferences", label: "Delivery preferences", placement: "overflow", run: (context) => context.openOverlay("preference quick view") },
+        { id: "grouped", label: "Grouped items", placement: "overflow", run: (context) => context.openOverlay("grouped items") },
         {
           id: "clear read", label: "Clear read items", placement: "secondary",
           run: (context) => context.openOverlay("action preview", { itemIds: attentionBus.items.filter((item) => item.read && !item.resolved).map((item) => item.id), intent: "resolve" }),
@@ -2670,6 +2685,7 @@ export const inboxApp = registerApp({
         { id: "grouped items", kind: "modal", title: "Grouped items", width: 640, render: ({ close: _close, ...context }) => <GroupedItems context={context} /> },
         { id: "preference quick view", kind: "drawer", title: "Delivery at a glance", width: 460, render: ({ close: _close, ...context }) => <PreferenceQuickView context={context} /> },
         { id: "action preview", kind: "modal", title: "Preview this triage", width: 720, render: ({ close, ...context }) => <ActionPreview context={context} close={close} /> },
+        { id: "follow source", kind: "modal", title: "Follow a source", width: 520, render: ({ close, ...context }) => <FollowSource context={context} close={close} /> },
       ],
     },
 
@@ -2684,16 +2700,19 @@ export const inboxApp = registerApp({
         {
           id: "Acknowledge", placement: "primary",
           guard: (context) => (context.selectedId ? undefined : "Select an incident"),
-          run: (context) => context.openOverlay("Incident summary", { id: context.selectedId }),
+          run: (context) => context.openOverlay("acknowledge incident"),
         },
-        { id: "assign", label: "Hand over", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select an incident"), run: (context) => context.openOverlay("owner handoff", { id: context.selectedId }) },
+        { id: "assign", label: "Assign an owner", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select an incident"), run: (context) => context.openOverlay("owner handoff", { id: context.selectedId }) },
         { id: "inspect impact", label: "Inspect impact", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select an incident"), run: (context) => context.openOverlay("Incident summary", { id: context.selectedId }) },
-        { id: "escalate", label: "Emergency pause", placement: "overflow", tone: "danger", capability: "manage_policy", run: (context) => context.openOverlay("emergency pause") },
+        { id: "escalate", label: "Escalate", placement: "overflow", tone: "danger", guard: (context) => (context.selectedId ? undefined : "Select an incident"), run: (context) => context.openOverlay("escalate incident") },
+        { id: "emergency pause", label: "Emergency pause", placement: "overflow", tone: "danger", capability: "manage_policy", run: (context) => context.openOverlay("emergency pause") },
       ],
       overlays: [
         { id: "Incident summary", kind: "drawer", title: "Incident", width: 560, render: ({ close: _close, ...context }) => <IncidentSummary context={context} /> },
         { id: "owner handoff", kind: "modal", title: "Hand over the incident", width: 520, render: ({ close, ...context }) => <OwnerHandoff context={context} close={close} /> },
         { id: "emergency pause", kind: "modal", title: "Emergency pause", tone: "danger", width: 520, blocking: true, render: ({ close, ...context }) => <EmergencyPause context={context} close={close} /> },
+        { id: "acknowledge incident", kind: "modal", title: "Acknowledge an incident", width: 540, render: ({ close, ...context }) => <AcknowledgeIncident context={context} close={close} /> },
+        { id: "escalate incident", kind: "modal", title: "Escalate an incident", width: 580, tone: "danger", render: ({ close, ...context }) => <EscalateIncident context={context} close={close} /> },
       ],
     },
 
@@ -2710,9 +2729,10 @@ export const inboxApp = registerApp({
         ),
       })),
       actions: [
-        { id: "Toggle", label: "Test a channel", placement: "secondary", run: (context) => context.openOverlay("Delivery test") },
-        { id: "test preview", label: "Delivery test", placement: "primary", run: (context) => context.openOverlay("Delivery test") },
-        { id: "set digest", label: "Digests", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/inbox/digests`) },
+        { id: "Toggle", label: "Toggle a channel", placement: "secondary", run: (context) => context.openOverlay("toggle channel") },
+        { id: "test preview", label: "Test a delivery", placement: "primary", run: (context) => context.openOverlay("Delivery test") },
+        { id: "set digest", label: "Set the digest", placement: "overflow", run: (context) => context.openOverlay("set digest") },
+        { id: "digests", label: "Digest centre", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/inbox/digests`) },
         {
           id: "mute mission", label: "Mute mission updates", placement: "overflow",
           run: async (context) => {
@@ -2733,6 +2753,8 @@ export const inboxApp = registerApp({
         { id: "Delivery test", kind: "modal", title: "Delivery test", width: 520, render: ({ close, ...context }) => <DeliveryTest context={context} close={close} /> },
         { id: "quiet-hour rules", kind: "modal", title: "Quiet hours", width: 520, render: ({ close, ...context }) => <QuietHourRules context={context} close={close} />, footer: submitFooter("quiet-hours", "Add window") },
         { id: "exception explanation", kind: "drawer", title: "Exceptions", width: 460, render: ({ close: _close, ...context }) => <ExceptionExplanation context={context} /> },
+        { id: "toggle channel", kind: "modal", title: "Toggle a delivery channel", width: 520, render: ({ close, ...context }) => <ToggleChannel context={context} close={close} /> },
+        { id: "set digest", kind: "modal", title: "Set the digest", width: 520, render: ({ close, ...context }) => <SetDigest context={context} close={close} /> },
       ],
     },
 
@@ -2746,7 +2768,7 @@ export const inboxApp = registerApp({
       actions: [
         { id: "preview", label: "Preview", placement: "primary", run: (context) => context.openOverlay("digest preview") },
         { id: "Schedule", label: "Schedule", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select a digest"), run: (context) => context.openOverlay("schedule", { id: context.selectedId }) },
-        { id: "export", label: "Export", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("digest preview") },
+        { id: "export", label: "Export the brief", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("digest preview") },
         {
           id: "send test", label: "Send a test", placement: "overflow",
           run: async (context) => {
@@ -2774,18 +2796,20 @@ export const inboxApp = registerApp({
       })),
       actions: [
         { id: "Assign backup", placement: "primary", capability: "manage_policy", run: (context) => context.openOverlay("Delegation grant") },
-        { id: "set condition", label: "Edit rule", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select a rule"), run: (context) => context.openOverlay("Delegation grant", { id: context.selectedId }) },
+        { id: "set condition", label: "Set the condition", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select a rule"), run: (context) => context.openOverlay("Delegation grant", { id: context.selectedId }) },
         { id: "simulate", label: "Simulate cover", placement: "secondary", run: (context) => context.openOverlay("simulation") },
         {
           id: "revoke", label: "Revoke", placement: "overflow", tone: "danger", capability: "manage_policy",
           guard: (context) => (context.selectedId ? undefined : "Select a rule"),
-          run: (context) => context.openOverlay("escalation conflict", { id: context.selectedId }),
+          run: (context) => context.openOverlay("revoke rule"),
         },
+        { id: "conflicts", label: "Authority conflicts", placement: "overflow", run: (context) => context.openOverlay("escalation conflict", { id: context.selectedId }) },
       ],
       overlays: [
         { id: "Delegation grant", kind: "modal", title: "Delegation", width: 560, render: ({ close, ...context }) => <DelegationGrant context={context} close={close} />, footer: submitFooter("delegation-grant", "Save delegation") },
         { id: "simulation", kind: "drawer", title: "If someone is away", width: 540, render: ({ close: _close, ...context }) => <EscalationSimulation context={context} /> },
         { id: "escalation conflict", kind: "modal", title: "Authority conflicts", width: 620, render: ({ close: _close, ...context }) => <EscalationConflictOverlay context={context} /> },
+        { id: "revoke rule", kind: "modal", title: "Revoke a delegation", width: 560, tone: "danger", render: ({ close, ...context }) => <RevokeRule context={context} close={close} /> },
       ],
     },
   },

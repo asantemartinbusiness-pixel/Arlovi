@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Keyboard, MonitorSmartphone, MousePointer2, Plus, Trash2 } from "lucide-react";
-import { Button, DataGrid, Empty, Field, Notice, Pill, Row, Segmented, Select, Stack, TextInput } from "@/design-system";
+import { Button, DataGrid, Empty, Notice, Pill, Row, Segmented, Select, Stack, TextInput } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import { ColorBox, EditorFrame, NumberBox, PanelGroup, SaveState, downloadText, slug, useStore, type DocHandle } from "@/applications/visual/kit";
 import { clamp, uid } from "@/applications/visual/geometry";
@@ -12,7 +12,7 @@ import {
 import { motionUi } from "./model";
 import { LayerShape } from "./parts";
 import { PROPERTY_LABEL } from "./editor";
-import { MissingComposition, current, useMotionDoc, usePrefersReducedMotion, useSession } from "./shared";
+import { MissingComposition, current, useMotionDoc, usePrefersReducedMotion, useSession, FormField } from "./shared";
 
 /* ====================================================================== *
  * ARL-MOTION-004 — Interactive Motion
@@ -56,12 +56,15 @@ export function InteractivePreview({ doc, mode = "pointer", height = 300, reduce
   const raf = useRef(0);
   const [log, setLog] = useState<string[]>([]);
 
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const dispatch = (input: InteractionInput, label: string) => {
-    setState((current) => {
-      const next = interact(doc, current, input);
-      if (JSON.stringify(next) !== JSON.stringify(current)) setLog((items) => [`${label} → ${Object.entries(next).map(([id, value]) => `${doc.layers.find((layer) => layer.id === id)?.name ?? id}: ${stateName(doc, value)}`).join(", ")}`, ...items].slice(0, 6));
-      return next;
-    });
+    const before = stateRef.current;
+    const next = interact(doc, before, input);
+    if (JSON.stringify(next) === JSON.stringify(before)) return;
+    stateRef.current = next;
+    setState(next);
+    setLog((items) => [`${label} → ${Object.entries(next).map(([id, value]) => `${doc.layers.find((layer) => layer.id === id)?.name ?? id}: ${stateName(doc, value)}`).join(", ")}`, ...items].slice(0, 6));
   };
 
   useEffect(() => { onState?.(state); }, [state, onState]);
@@ -126,7 +129,8 @@ export function InteractivePreview({ doc, mode = "pointer", height = 300, reduce
     >
       {doc.layers.filter((layer) => layer.visible).map((layer) => {
         const sampled = { ...(shown[layer.id] ?? stateValues(layer, REST, doc)), layer };
-        if (!interactive.has(layer.id)) return <LayerShape key={layer.id} sampled={sampled} />;
+        /* Layers without their own trigger let input through to what is beneath, as a button's label does. */
+        if (!interactive.has(layer.id)) return <g key={layer.id} pointerEvents="none"><LayerShape sampled={sampled} /></g>;
         const name = layer.text || layer.name;
         return (
           <g
@@ -240,9 +244,9 @@ function StatesTab({ handle, doc, context }: { handle: DocHandle<MotionDoc>; doc
       </Row>
       <StaticState doc={shownDoc} state={selected ?? REST} />
       <Row gap={2} wrap style={{ alignItems: "flex-end" }}>
-        <Field label="New state">
+        <FormField label="New state">
           <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="Pressed" />
-        </Field>
+        </FormField>
         <Button size="sm" variant="secondary" icon={<Plus size={14} />} disabled={!name.trim() || doc.states.some((state) => state.name.toLowerCase() === name.trim().toLowerCase())} onClick={() => {
           const id = slug(name.trim());
           handle.edit((current) => ({ ...current, states: [...current.states, { id, name: name.trim(), duration: 0.25, easing: { kind: "bezier", points: [0.2, 0, 0, 1] } }] }), `Add the state ${name.trim()}`);
@@ -388,31 +392,31 @@ export function BindTrigger({ close }: { close: () => void }) {
       close();
     }}>
       <Row gap={3} wrap>
-        <Field label="When">
+        <FormField label="When">
           <Select value={on} onChange={(event) => { const next = event.target.value as TriggerEvent; setOn(next); setKeyboard(next === "hover" ? "Focus" : next === "scroll" ? "Arrow keys" : next === "load" ? "" : "Enter"); }}>
             {(Object.keys(EVENT_LABEL) as TriggerEvent[]).map((event) => <option key={event} value={event}>{EVENT_LABEL[event]}</option>)}
           </Select>
-        </Field>
-        <Field label="Layer">
+        </FormField>
+        <FormField label="Layer">
           <Select value={layerId} onChange={(event) => setLayerId(event.target.value)}>
             {doc.layers.map((layer) => <option key={layer.id} value={layer.id}>{layer.name}</option>)}
           </Select>
-        </Field>
-        <Field label="Goes to state">
+        </FormField>
+        <FormField label="Goes to state">
           <Select value={state} onChange={(event) => setState(event.target.value)}>
             {states.length === 0 && <option value="">No states yet</option>}
             {states.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </Select>
-        </Field>
+        </FormField>
       </Row>
       {on !== "load" && (
         <Row gap={3} wrap style={{ alignItems: "flex-end" }}>
-          <Field label="Keyboard equivalent" hint={on === "hover" ? "Focus reaches the hover state with Tab." : on === "scroll" ? "The scroll region is focusable and the arrow keys scroll it." : "The key that toggles the state when the layer has focus."}>
+          <FormField label="Keyboard equivalent" hint={on === "hover" ? "Focus reaches the hover state with Tab." : on === "scroll" ? "The scroll region is focusable and the arrow keys scroll it." : "The key that toggles the state when the layer has focus."}>
             <Select value={keyboard} onChange={(event) => setKeyboard(event.target.value)}>
               <option value="">None</option>
               {keyboardOptions.map((key) => <option key={key} value={key}>{key}</option>)}
             </Select>
-          </Field>
+          </FormField>
           <label className="ds-check"><input type="checkbox" checked={touch} onChange={(event) => setTouch(event.target.checked)} /><span>{on === "scroll" ? "Swipe scrolls it" : on === "key" ? "An on-screen control for touch" : "A tap toggles it"}</span></label>
           {(on === "hover" || on === "scroll") && <label className="ds-check"><input type="checkbox" checked={returnOnEnd} onChange={(event) => setReturnOnEnd(event.target.checked)} /><span>Return to rest when it ends</span></label>}
         </Row>
@@ -438,13 +442,13 @@ export function StateInspector({ close }: { close: () => void }) {
   return (
     <Stack gap={3}>
       <Row gap={3} wrap>
-        <Field label="Name"><TextInput value={draft.state.name} onChange={(event) => setDraft({ ...draft, state: { ...draft.state, name: event.target.value } })} /></Field>
+        <FormField label="Name"><TextInput value={draft.state.name} onChange={(event) => setDraft({ ...draft, state: { ...draft.state, name: event.target.value } })} /></FormField>
         <NumberBox label="Transition" suffix="s" value={draft.state.duration ?? 0.25} step={0.05} min={0} onChange={(duration) => setDraft({ ...draft, state: { ...draft.state, duration: clamp(duration, 0, 5) } })} />
-        <Field label="Easing">
+        <FormField label="Easing">
           <Select value={EASING_PRESETS.find((preset) => JSON.stringify(preset.easing) === JSON.stringify(draft.state.easing))?.id ?? "emphasis"} onChange={(event) => setDraft({ ...draft, state: { ...draft.state, easing: EASING_PRESETS.find((preset) => preset.id === event.target.value)?.easing } })}>
             {EASING_PRESETS.filter((preset) => preset.easing.kind !== "spring").map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
           </Select>
-        </Field>
+        </FormField>
       </Row>
       {doc.layers.map((layer) => {
         const rest = stateValues(layer, REST, doc);

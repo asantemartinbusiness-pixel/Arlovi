@@ -8,6 +8,7 @@ import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { SLA_TONE, formatMinutes, slaState, type SlaState } from "./sla";
+import { CoachingAssignments, matchesCase, useCaseFilter } from "./actions";
 
 export function useCareData() {
   return useCollections(["tickets", "messages", "articles", "macros", "slas", "contacts", "employees", "members", "tasks"]);
@@ -410,7 +411,8 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
 export function TicketList({ context, lens }: { context: ScreenContext; lens: "All" | "Open" | "Pending" | "Resolved" | "Archived" }) {
   const data = useCareData();
   const { now, org } = useWorkspace();
-  const rows = lens === "All"
+  const caseFilter = useCaseFilter();
+  const lensRows = lens === "All"
     ? data.tickets
     : lens === "Open"
       ? data.tickets.filter((ticket) => ["new", "open"].includes(ticket.status))
@@ -419,6 +421,7 @@ export function TicketList({ context, lens }: { context: ScreenContext; lens: "A
         : lens === "Resolved"
           ? data.tickets.filter((ticket) => ticket.status === "resolved")
           : data.tickets.filter((ticket) => ticket.status === "closed");
+  const rows = lensRows.filter((ticket) => matchesCase(ticket, caseFilter));
 
   return rows.length === 0 ? (
     <Empty title={`No ${lens.toLowerCase()} cases`} icon={<Headphones size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Ticket create")}>Create a case</Button>} />
@@ -447,7 +450,7 @@ export function TicketList({ context, lens }: { context: ScreenContext; lens: "A
         { label: "Route", onRun: () => context.openOverlay("bulk assignment") },
         { label: "Change priority", onRun: () => context.openOverlay("priority change") },
       ]}
-      summary={<span className="ds-subtle">{rows.filter((row) => slaState(row, policyFor(row, data.slas), now).status === "breached").length} breached</span>}
+      summary={<span className="ds-subtle">{rows.filter((row) => slaState(row, policyFor(row, data.slas), now).status === "breached").length} breached{rows.length !== lensRows.length ? ` · filtered, ${rows.length} of ${lensRows.length}` : ""}</span>}
     />
   );
 }
@@ -1020,6 +1023,9 @@ export function Quality({ context, lens }: { context: ScreenContext; lens: "Surv
             </Card>
           );
         })}
+        <Card span={12} eyebrow="COACHING" prov="human" title="Coaching assigned">
+          <CoachingAssignments context={context} />
+        </Card>
         <Card span={12} title="How a low score is used">
           <Notice tone="warning" title="A rating is not an employment decision">
             A low score opens a conversation about a case. It is never used on its own to make a decision about somebody's job,

@@ -30,6 +30,9 @@ export interface AvailabilityGridProps {
   slotMinutes?: number;
   onMove: (move: SlotMove) => void | Promise<void>;
   onOpen?: (bookingId: string) => void;
+  /** Focusing a booking selects it for the screen's actions. */
+  onSelect?: (bookingId: string) => void;
+  selectedId?: string;
   onCreate?: (columnId: string, startAt: string) => void;
   /** Resource a week column belongs to, when columns are days. */
   resourceForColumn: (columnId: string) => string;
@@ -40,7 +43,7 @@ const HOUR_PX = 44;
 
 export function AvailabilityGrid({
   bookings, resources, columns, mode, anchor, now, orgId, slotMinutes = 60,
-  onMove, onOpen, onCreate, resourceForColumn, label,
+  onMove, onOpen, onCreate, resourceForColumn, label, onSelect, selectedId,
 }: AvailabilityGridProps) {
   const [grabbed, setGrabbed] = useState<{ id: string; offsetMinutes: number; columnIndex: number } | null>(null);
   const [message, setMessage] = useState("");
@@ -195,6 +198,8 @@ export function AvailabilityGrid({
                         onDragStart={(event) => event.dataTransfer.setData("text/plain", booking.id)}
                         onKeyDown={(event) => onBookingKey(event, booking, columnIndex)}
                         onClick={() => onOpen?.(booking.id)}
+                        onFocus={() => onSelect?.(booking.id)}
+                        data-selected={selectedId === booking.id ? "true" : undefined}
                         title={`${booking.title} · ${new Date(booking.startAt!).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`}
                       >
                         <strong>{booking.title}</strong>

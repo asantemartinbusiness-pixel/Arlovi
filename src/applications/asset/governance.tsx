@@ -955,10 +955,31 @@ export function UsageInspector({ context }: { context: ScreenContext }) {
 export function MergePreview({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAssets();
   const payload = context.overlayPayload as { ids?: string[] } | undefined;
-  const group = data.assets.filter((row) => (payload?.ids ?? []).includes(row.id));
+  const [picked, setPicked] = useState<string[] | undefined>(payload?.ids);
+  const group = data.assets.filter((row) => (picked ?? []).includes(row.id));
   const [keepId, setKeepId] = useSeeded(group.find((row) => row.status === "approved")?.id ?? group[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
-  if (group.length < 2) return <Empty title="Nothing to merge" icon={<Copy size={20} />}>Choose a duplicate group.</Empty>;
+  if (group.length < 2) {
+    const map = new Map<string, Rec[]>();
+    for (const row of data.assets.filter((asset) => asset.status !== "archived")) {
+      const key = String(row.fields.checksum ?? row.id);
+      map.set(key, [...(map.get(key) ?? []), row]);
+    }
+    const groups = [...map.values()].filter((rows) => rows.length > 1);
+    if (groups.length === 0) return <Empty title="No duplicates" icon={<Copy size={20} />}>No two live assets share a checksum.</Empty>;
+    return (
+      <Stack gap={3}>
+        <p className="ds-subtle">Choose the duplicate group to resolve. Every record and its uses are shown before anything is archived.</p>
+        {groups.map((rows) => (
+          <Row key={rows[0].id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
+            <strong className="ds-grow">{rows.map((row) => row.title).join(" · ")}</strong>
+            <span className="ds-subtle">{rows.length} records</span>
+            <Button size="sm" variant="primary" onClick={() => { setPicked(rows.map((row) => row.id)); setKeepId(rows.find((row) => row.status === "approved")?.id ?? rows[0].id); }}>Review</Button>
+          </Row>
+        ))}
+      </Stack>
+    );
+  }
   const keep = group.find((row) => row.id === keepId);
   const drop = group.filter((row) => row.id !== keepId);
   const movedUses = [...new Set(drop.flatMap((row) => usedIn(row)))];
@@ -1120,6 +1141,52 @@ export function GovernanceExport({ context }: { context: ScreenContext }) {
       <Notice tone="info" title="Stored bytes are blank where nothing is stored">
         The report distinguishes a file held here from a drawn preview and from a metadata-only record, rather than inventing a size.
       </Notice>
+    </Stack>
+  );
+}
+
+/* ---------------------- ASSET-004 compare sources ---------------------- */
+
+/** Compares a preset's output against each source it would read, flagging upscaling and crops. */
+export function CompareSources({ context }: { context: ScreenContext }) {
+  const data = useAssets();
+  const presets = data.transforms.filter((row) => row.fields.kind !== "job");
+  const [presetId, setPresetId] = useState(presets.find((row) => row.id === context.selectedId)?.id ?? presets[0]?.id ?? "");
+  const preset = presets.find((row) => row.id === presetId);
+  const jobs = data.transforms.filter((row) => row.fields.kind === "job" && row.fields.presetId === presetId);
+  const sourceIds = new Set(jobs.flatMap((job) => csvList(job.fields.assetIds)));
+  const sources = data.assets.filter((row) => sourceIds.has(row.id) || (sourceIds.size === 0 && row.status === "approved")).slice(0, 12);
+  if (!preset) return <Empty title="No preset to compare" icon={<Wand2 size={20} />}>Create a preset first.</Empty>;
+  const outW = Number(preset.fields.width ?? 0);
+  const outH = Number(preset.fields.height ?? 0);
+  return (
+    <Stack gap={4}>
+      <Field label="Preset">
+        <Select aria-label="Preset" value={presetId} onChange={(event) => setPresetId(event.target.value)}>
+          {presets.map((row) => <option key={row.id} value={row.id}>{row.title} · {String(row.fields.width)}×{String(row.fields.height)} {String(row.fields.format ?? "").toUpperCase()}</option>)}
+        </Select>
+      </Field>
+      <p className="ds-subtle">{sourceIds.size ? `Sources from ${jobs.length} job${jobs.length === 1 ? "" : "s"} run with this preset.` : "No job has used this preset, so approved assets are compared."}</p>
+      <DataGrid
+        rows={sources}
+        rowId={(row) => row.id}
+        label="Sources against the preset"
+        filterable={false}
+        empty={<Empty title="No source to compare" />}
+        rowTone={(row) => (Number(row.fields.width ?? 0) < outW || Number(row.fields.height ?? 0) < outH ? "warning" : undefined)}
+        columns={[
+          { key: "asset", header: "Source", primary: true, cell: (row) => row.title },
+          { key: "dims", header: "Source size", cell: (row) => (row.fields.width ? `${String(row.fields.width)} × ${String(row.fields.height)}` : "Not recorded") },
+          { key: "out", header: "Output", cell: () => `${outW} × ${outH}` },
+          { key: "fit", header: "Fit", cell: (row) => {
+            const w = Number(row.fields.width ?? 0); const h = Number(row.fields.height ?? 0);
+            if (!w || !h) return <Pill tone="warning">Unknown</Pill>;
+            if (w < outW || h < outH) return <Pill tone="warning">Upscaled</Pill>;
+            return Math.abs(w / h - outW / Math.max(1, outH)) > 0.02 ? <Pill tone="info">Cropped</Pill> : <Pill tone="success">Scales cleanly</Pill>;
+          } },
+          { key: "licence", header: "Licence", cell: (row) => <Pill tone={licenceTone(licence(row, context.now).state)}>{licence(row, context.now).state}</Pill> },
+        ]}
+      />
     </Stack>
   );
 }

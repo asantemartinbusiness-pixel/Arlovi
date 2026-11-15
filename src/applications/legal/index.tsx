@@ -13,6 +13,12 @@ import {
 } from "./panels";
 import { Redline } from "./redline";
 import "./legal.css";
+import { kitOverlays, needsSelection } from "@/applications/hr/opsKit";
+import {
+  AssemblePack, AssignOwnerForm, CommentOnContract, DraftContract, Reminder, RiskReview, SharePack, approveLegalStep, hashPack,
+  publishPolicy, requestAcknowledgment, reviewItem,
+} from "./actions";
+import { getRecord, listByCollection } from "@/platform/repo";
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
   <>
@@ -362,14 +368,23 @@ function PolicyEditor({ context, close }: { context: ScreenContext; close: () =>
         };
         const due = new Date();
         due.setFullYear(due.getFullYear() + 1);
-        if (existing) {
+        if (existing && existing.status === "draft") {
           await context.mutate.patch(existing.id, {
             title: String(form.get("title") ?? existing.title),
             summary: String(form.get("summary") ?? existing.summary),
-            status: "published",
+            fields: { ...existing.fields, acknowledgementRequired: fields.acknowledgementRequired, audience: fields.audience },
+          }, { expectRevision: existing.revision, event: `Draft ${existing.title} v${current} edited by ${context.actor}` });
+        } else if (existing) {
+          await context.mutate.create({
+            collection: "policies",
+            title: String(form.get("title") ?? existing.title),
+            status: "draft",
+            summary: String(form.get("summary") ?? existing.summary),
+            at: new Date().toISOString(),
             dueAt: due.toISOString(),
-            fields: { ...existing.fields, ...fields },
-          }, { expectRevision: existing.revision, event: `${existing.title} published as version ${next}, superseding ${current}` });
+            tags: ["governance"],
+            fields: { ...existing.fields, ...fields, supersedesId: existing.id },
+          }, `Revision v${next} of ${existing.title} drafted by ${context.actor}; v${current} stays published`);
         } else {
           await context.mutate.create({
             collection: "policies",
@@ -382,7 +397,7 @@ function PolicyEditor({ context, close }: { context: ScreenContext; close: () =>
             fields,
           }, `Policy drafted by ${context.actor}`);
         }
-        context.toast("Policy saved", existing ? `Version ${next} is live and version ${current} is kept.` : "It is a draft until somebody publishes it.");
+        context.toast("Policy saved", existing && existing.status !== "draft" ? `Draft v${next} saved. Version ${current} stays live until the draft is published.` : "It is a draft until somebody publishes it.");
         close();
       }}
     >
@@ -394,8 +409,8 @@ function PolicyEditor({ context, close }: { context: ScreenContext; close: () =>
         </Select>
       </Field>
       <Checkbox name="ack" label="Everyone it applies to must acknowledge it" defaultChecked={existing?.fields.acknowledgementRequired === true} />
-      {existing && (
-        <Notice tone="warning" title="Publishing starts the acknowledgements again">
+      {existing && existing.status !== "draft" && (
+        <Notice tone="warning" title="Saving makes a draft revision; publishing starts the acknowledgements again">
           Version {String(existing.fields.version ?? "")} and its {String(existing.fields.acknowledged ?? 0)} acknowledgements are
           kept, so a decision taken under the old wording can still be read against it.
         </Notice>
@@ -458,6 +473,7 @@ function PublicationImpact({ context, close }: { context: ScreenContext; close: 
         <Button variant="ghost" onClick={close}>Close</Button>
         <span className="ds-grow" />
         <Button variant="secondary" onClick={() => { context.select(policy.id); context.openOverlay("Policy editor", { id: policy.id }); }}>Open the editor</Button>
+        {policy.status === "draft" && <Button variant="primary" disabled={!context.can("manage_policy")} onClick={() => publishPolicy(context, policy)}>Publish v{current}</Button>}
       </Row>
     </Stack>
   );
@@ -611,38 +627,6 @@ function ExportPermissions({ context }: { context: ScreenContext }) {
   );
 }
 
-function AssignCounsel({ context, close }: { context: ScreenContext; close: () => void }) {
-  const data = useLegalData();
-  const item = useRecord(context.selectedId) ?? data.obligations[0];
-  if (!item) return <Empty title="Select something to assign" />;
-  return (
-    <form
-      id="lg-counsel"
-      className="ds-stack ds-gap-4"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        const form = new FormData(event.currentTarget);
-        const owner = String(form.get("owner") ?? "");
-        await context.mutate.patch(item.id, {
-          fields: { ...item.fields, owner, assignedBy: context.actor },
-        }, { expectRevision: item.revision, event: `${item.title} assigned to ${owner} by ${context.actor}` });
-        context.toast("Assigned", `${owner} owns ${item.title}.`);
-        close();
-      }}
-    >
-      <Properties rows={[{ label: "Item", value: item.title }, { label: "Owner now", value: String(item.fields.owner ?? item.ownerName) }]} />
-      <Field label="Assign to" required>
-        <Select name="owner" required>
-          {data.employees.filter((employee) => employee.status !== "alumni").map((employee) => <option key={employee.id}>{employee.title}</option>)}
-        </Select>
-      </Field>
-      <Notice tone="warning" title="Nobody here is external counsel">
-        Assigning somebody makes them responsible for getting the work done, not for giving a legal opinion.
-      </Notice>
-    </form>
-  );
-}
-
 function Escalation({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useLegalData();
   const obligation = useRecord(context.selectedId) ?? data.obligations.find((row) => row.status !== "done");
@@ -787,16 +771,19 @@ export const legalApp = registerApp({
         id: lens, render: (context: ScreenContext) => <GovernanceOverview context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Review item", label: "Review an obligation", placement: "primary", capability: "view_legal", run: (context) => context.openOverlay("Obligation quick view") },
-        { id: "report", label: "Risk summary", placement: "secondary", run: (context) => context.openOverlay("risk summary") },
+        { id: "Review item", label: "Review an obligation", placement: "primary", capability: "view_legal", run: (context) => reviewItem(context) },
+        { id: "raise issue", label: "Raise an issue", placement: "overflow", run: (context) => context.openOverlay("issue create") },
+        { id: "report", label: "Risk report", placement: "secondary", run: (context) => context.openOverlay("risk summary") },
         { id: "assign counsel", label: "Assign counsel", placement: "overflow", capability: "view_legal", run: (context) => context.openOverlay("assign counsel") },
         { id: "schedule audit", label: "Schedule an audit", placement: "overflow", capability: "view_legal", run: (context) => context.openOverlay("schedule audit") },
       ],
       overlays: [
+        ...kitOverlays,
         { id: "Obligation quick view", kind: "drawer", title: "Obligation", width: 520, render: ({ ...context }) => <ObligationQuickView context={context} /> },
         { id: "issue create", kind: "modal", title: "Raise an issue", width: 600, render: ({ close, ...context }) => <IssueCreate context={context} close={close} />, footer: submitFooter("lg-issue", "Raise the issue") },
         { id: "risk summary", kind: "drawer", title: "Risk summary", width: 480, render: ({ ...context }) => <RiskSummary context={context} /> },
-        { id: "assign counsel", kind: "modal", title: "Assign counsel", width: 520, render: ({ close, ...context }) => <AssignCounsel context={context} close={close} />, footer: submitFooter("lg-counsel", "Assign") },
+        { id: "evidence upload", kind: "modal", title: "Record evidence", width: 600, render: ({ close, ...context }) => <EvidenceUpload context={context} close={close} />, footer: submitFooter("lg-evidence", "Record the pack") },
+        { id: "assign counsel", kind: "modal", title: "Assign counsel", width: 520, render: ({ close, ...context }) => <AssignOwnerForm context={context} close={close} collections={["obligations", "risks", "contracts"]} label="Item" />, footer: submitFooter("lg-assign", "Assign") },
         { id: "schedule audit", kind: "modal", title: "Schedule an audit", width: 520, render: ({ close, ...context }) => <ScheduleAudit context={context} close={close} />, footer: submitFooter("lg-audit", "Schedule audit") },
       ],
     },
@@ -808,12 +795,13 @@ export const legalApp = registerApp({
         id: lens, render: (context: ScreenContext) => <ContractLibrary context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Upload", label: "Add a contract", placement: "primary", capability: "view_legal", run: (context) => context.openOverlay("Contract upload") },
+        { id: "Upload", label: "Upload — record a contract", placement: "primary", capability: "view_legal", run: (context) => context.openOverlay("Contract upload") },
         { id: "assign review", label: "Send for review", placement: "secondary", capability: "view_legal", guard: (context) => (context.selectedId ? undefined : "Choose a contract first"), run: (context) => context.openOverlay("reviewer picker") },
         { id: "send for signature", label: "Send for signature", placement: "overflow", capability: "view_legal", guard: (context) => (context.selectedId ? undefined : "Choose a contract first"), run: (context) => context.openOverlay("e-sign request") },
-        { id: "draft", label: "Drafts", placement: "overflow", run: (context) => context.setTab("Draft") },
+        { id: "draft", label: "Draft a contract", placement: "overflow", capability: "view_legal", run: (context) => context.openOverlay("draft contract") },
       ],
       overlays: [
+        { id: "draft contract", kind: "modal", title: "Draft a contract", width: 640, render: ({ close, ...context }) => <DraftContract context={context} close={close} />, footer: submitFooter("lg-draft", "Create the draft") },
         { id: "Contract upload", kind: "modal", title: "Add a contract", width: 680, render: ({ close, ...context }) => <ContractUpload context={context} close={close} />, footer: submitFooter("lg-contract", "Add contract") },
         { id: "reviewer picker", kind: "modal", title: "Send for review", width: 560, render: ({ close, ...context }) => <ReviewerPicker context={context} close={close} />, footer: submitFooter("lg-reviewer", "Request review") },
         { id: "e-sign request", kind: "modal", title: "Signature request", tone: "danger", width: 580, render: ({ close, ...context }) => <ESignRequest context={context} close={close} /> },
@@ -829,11 +817,17 @@ export const legalApp = registerApp({
       })),
       actions: [
         { id: "Compare", label: "Compare versions", placement: "primary", run: (context) => context.setTab("Redline") },
-        { id: "request review", label: "Request a review", placement: "secondary", capability: "view_legal", run: (context) => context.openOverlay("Clause inspector") },
-        { id: "approve legal step", label: "Record a signature", placement: "overflow", capability: "view_legal", run: (context) => context.openOverlay("sign authorization") },
-        { id: "comment", label: "Flagged clauses", placement: "overflow", run: (context) => context.openOverlay("Clause inspector") },
+        { id: "request review", label: "Request a review", placement: "secondary", capability: "view_legal", run: (context) => context.openOverlay("request review") },
+        { id: "approve legal step", label: "Approve the legal step", placement: "overflow", capability: "view_legal", run: (context) => approveLegalStep(context) },
+        { id: "comment", label: "Comment", placement: "overflow", run: (context) => context.openOverlay("comment") },
+        { id: "record signature", label: "Record a signature", placement: "overflow", capability: "view_legal", run: (context) => context.openOverlay("sign authorization") },
+        { id: "flagged clauses", label: "Flagged clauses", placement: "overflow", run: (context) => context.openOverlay("Clause inspector") },
+        { id: "what changed", label: "What changed", placement: "overflow", run: (context) => context.openOverlay("redline diff") },
       ],
       overlays: [
+        ...kitOverlays,
+        { id: "request review", kind: "modal", title: "Request a review", width: 560, render: ({ close, ...context }) => <ReviewerPicker context={context} close={close} />, footer: submitFooter("lg-reviewer", "Request review") },
+        { id: "comment", kind: "modal", title: "Comment on the contract", width: 560, render: ({ close, ...context }) => <CommentOnContract context={context} close={close} />, footer: submitFooter("lg-comment", "Add the comment") },
         { id: "Clause inspector", kind: "drawer", title: "Flagged clauses", width: 560, render: ({ ...context }) => <ClauseInspector context={context} /> },
         { id: "redline diff", kind: "drawer", title: "What changed", width: 720, render: ({ ...context }) => <RedlineDiff context={context} /> },
         { id: "sign authorization", kind: "modal", title: "Record a signature", tone: "danger", width: 600, render: ({ close, ...context }) => <SignAuthorization context={context} close={close} /> },
@@ -849,10 +843,23 @@ export const legalApp = registerApp({
       actions: [
         { id: "Create", label: "Create a policy", placement: "primary", capability: "manage_policy", run: (context) => context.openOverlay("Policy editor") },
         { id: "revise", label: "Revise", placement: "secondary", capability: "manage_policy", guard: (context) => (context.selectedId ? undefined : "Choose a policy first"), run: (context) => context.openOverlay("Policy editor") },
-        { id: "publish", label: "What publishing does", placement: "overflow", run: (context) => context.openOverlay("publication impact") },
-        { id: "request acknowledgment", label: "Who it reaches", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a policy first"), run: (context) => context.openOverlay("audience") },
+        { id: "publish", label: "Publish a draft", placement: "overflow", capability: "manage_policy", guard: needsSelection("a draft policy"), run: async (context) => {
+          const policy = await getRecord(context.selectedId ?? "");
+          if (policy?.collection === "policies") await publishPolicy(context, policy);
+          else context.toast("Select a draft policy first", "Nothing was published.", "blocked");
+        } },
+        { id: "request acknowledgment", label: "Request acknowledgement", placement: "overflow", capability: "manage_policy", guard: needsSelection("a policy"), run: async (context) => {
+          const policy = await getRecord(context.selectedId ?? "");
+          const staff = (await listByCollection(context.org.id, "employees")).filter((employee) => employee.status !== "alumni");
+          const audience = String(policy?.fields.audience ?? "All employees");
+          const reach = audience === "All employees" ? staff.length : staff.filter((employee) => `${String(employee.fields.office ?? "")} ${String(employee.fields.title ?? "")}`.toLowerCase().includes(audience.toLowerCase())).length;
+          await requestAcknowledgment(context, reach);
+        } },
+        { id: "publication impact", label: "What publishing does", placement: "overflow", guard: needsSelection("a policy"), run: (context) => context.openOverlay("publication impact") },
+        { id: "who it reaches", label: "Who it reaches", placement: "overflow", guard: needsSelection("a policy"), run: (context) => context.openOverlay("audience") },
       ],
       overlays: [
+        ...kitOverlays,
         { id: "Policy editor", kind: "modal", title: "Policy", width: 640, render: ({ close, ...context }) => <PolicyEditor context={context} close={close} />, footer: submitFooter("lg-policy", "Save policy") },
         { id: "audience", kind: "drawer", title: "Who this reaches", width: 480, render: ({ ...context }) => <PolicyAudience context={context} /> },
         { id: "publication impact", kind: "modal", title: "What publishing does", width: 560, render: ({ close, ...context }) => <PublicationImpact context={context} close={close} /> },
@@ -866,12 +873,16 @@ export const legalApp = registerApp({
         id: lens, render: (context: ScreenContext) => <ObligationCalendar context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Assign", label: "Assign an owner", placement: "primary", capability: "view_legal", guard: (context) => (context.selectedId ? undefined : "Choose an obligation first"), run: (context) => context.openOverlay("escalation") },
+        { id: "Assign", label: "Assign an owner", placement: "primary", capability: "view_legal", run: (context) => context.openOverlay("assign owner") },
         { id: "record evidence", label: "Record evidence", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose an obligation first"), run: (context) => context.openOverlay("evidence upload") },
-        { id: "remind", label: "Add a deadline", placement: "overflow", run: (context) => context.openOverlay("Deadline editor") },
-        { id: "escalate", label: "What is overdue", placement: "overflow", run: (context) => context.setTab("Overdue") },
+        { id: "remind", label: "Set a reminder", placement: "overflow", guard: needsSelection("an obligation"), run: (context) => context.openOverlay("reminder") },
+        { id: "escalate", label: "Escalate", placement: "overflow", capability: "view_legal", guard: needsSelection("an obligation"), run: (context) => context.openOverlay("escalation") },
+        { id: "add deadline", label: "Add a deadline", placement: "overflow", run: (context) => context.openOverlay("Deadline editor") },
+        { id: "overdue", label: "What is overdue", placement: "overflow", run: (context) => context.setTab("Overdue") },
       ],
       overlays: [
+        { id: "assign owner", kind: "modal", title: "Assign an owner", width: 520, render: ({ close, ...context }) => <AssignOwnerForm context={context} close={close} collections={["obligations"]} label="Obligation" />, footer: submitFooter("lg-assign", "Assign") },
+        { id: "reminder", kind: "modal", title: "Set a reminder", width: 520, render: ({ close, ...context }) => <Reminder context={context} close={close} />, footer: submitFooter("lg-reminder", "Set the reminder") },
         { id: "Deadline editor", kind: "modal", title: "Obligation", width: 680, render: ({ close, ...context }) => <DeadlineEditor context={context} close={close} />, footer: submitFooter("lg-deadline", "Save obligation") },
         { id: "evidence upload", kind: "modal", title: "Record evidence", width: 600, render: ({ close, ...context }) => <EvidenceUpload context={context} close={close} />, footer: submitFooter("lg-evidence", "Record the pack") },
         { id: "escalation", kind: "modal", title: "Escalate", width: 560, render: ({ close, ...context }) => <Escalation context={context} close={close} />, footer: submitFooter("lg-escalate", "Escalate") },
@@ -887,10 +898,12 @@ export const legalApp = registerApp({
       actions: [
         { id: "Add", label: "Add a risk", placement: "primary", run: (context) => context.openOverlay("Risk form") },
         { id: "score", label: "Score a risk", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a risk first"), run: (context) => context.openOverlay("score rationale") },
-        { id: "mitigate", label: "Assign a control", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a risk first"), run: (context) => context.openOverlay("control assignment") },
-        { id: "review", label: "High risks", placement: "overflow", run: (context) => context.setTab("High") },
+        { id: "mitigate", label: "Mitigate — assign a control", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a risk first"), run: (context) => context.openOverlay("control assignment") },
+        { id: "review", label: "Review a risk", placement: "overflow", guard: needsSelection("a risk"), run: (context) => context.openOverlay("risk review") },
+        { id: "high risks", label: "High risks", placement: "overflow", run: (context) => context.setTab("High") },
       ],
       overlays: [
+        { id: "risk review", kind: "modal", title: "Review a risk", width: 580, render: ({ close, ...context }) => <RiskReview context={context} close={close} />, footer: submitFooter("lg-risk-review", "Record the review") },
         { id: "Risk form", kind: "modal", title: "Add a risk", width: 600, render: ({ close, ...context }) => <RiskForm context={context} close={close} />, footer: submitFooter("lg-issue", "Add risk") },
         { id: "score rationale", kind: "modal", title: "Score and why", width: 600, render: ({ close, ...context }) => <ScoreRationale context={context} close={close} />, footer: submitFooter("lg-score", "Record the score") },
         { id: "control assignment", kind: "modal", title: "Mitigation and control", width: 600, render: ({ close, ...context }) => <ControlAssignment context={context} close={close} />, footer: submitFooter("lg-control", "Save control") },
@@ -904,12 +917,16 @@ export const legalApp = registerApp({
         id: lens, render: (context: ScreenContext) => <Evidence context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Assemble", label: "Assemble a pack", placement: "primary", capability: "view_legal", run: (context) => context.openOverlay("Evidence detail") },
+        { id: "Assemble", label: "Assemble a pack", placement: "primary", capability: "view_legal", run: (context) => context.openOverlay("assemble pack") },
         { id: "request legal hold", label: "Legal hold", placement: "secondary", capability: "view_legal", guard: (context) => (context.selectedId ? undefined : "Choose a pack first"), run: (context) => context.openOverlay("legal hold") },
-        { id: "share", label: "Export rules", placement: "overflow", run: (context) => context.openOverlay("export permissions") },
-        { id: "hash", label: "Schedule an audit", placement: "overflow", run: (context) => context.openOverlay("Evidence detail") },
+        { id: "share", label: "Share a pack", placement: "overflow", capability: "view_legal", guard: needsSelection("a pack"), run: (context) => context.openOverlay("share pack") },
+        { id: "hash", label: "Hash or verify a pack", placement: "overflow", guard: needsSelection("a pack"), run: (context) => hashPack(context) },
+        { id: "export rules", label: "Export rules", placement: "overflow", run: (context) => context.openOverlay("export permissions") },
+        { id: "open pack", label: "Open a pack", placement: "overflow", guard: needsSelection("a pack"), run: (context) => context.openOverlay("Evidence detail") },
       ],
       overlays: [
+        { id: "assemble pack", kind: "modal", title: "Assemble an evidence pack", width: 620, render: ({ close, ...context }) => <AssemblePack context={context} close={close} />, footer: submitFooter("lg-assemble", "Assemble and hash") },
+        { id: "share pack", kind: "modal", title: "Share a pack", width: 540, render: ({ close, ...context }) => <SharePack context={context} close={close} /> },
         { id: "Evidence detail", kind: "drawer", title: "Evidence pack", width: 540, render: ({ ...context }) => <EvidenceDetail context={context} /> },
         { id: "legal hold", kind: "modal", title: "Legal hold", tone: "danger", width: 560, render: ({ close, ...context }) => <LegalHold context={context} close={close} /> },
         { id: "export permissions", kind: "drawer", title: "Export rules", width: 520, render: ({ ...context }) => <ExportPermissions context={context} /> },

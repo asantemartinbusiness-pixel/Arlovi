@@ -16,6 +16,7 @@ import {
   useBookData, workingHours, type BookingBody, type PublicPageBody, type ServiceBody,
 } from "./data";
 import { AvailabilityGrid } from "./calendar";
+import { applyReportFilter, ReportFilterNote, useReportFilter } from "./actions";
 
 /* ====================================================================== *
  * BOOK panels — capacity, a real availability calendar with conflict
@@ -213,7 +214,7 @@ export function BookingCalendar({ context, lens }: { context: ScreenContext; len
                 <div key={day.toISOString()} role="gridcell" className="t4-cal-cell" data-today={sameDay(day, now) ? "true" : undefined} data-outside={day.getMonth() !== anchor.getMonth() ? "true" : undefined}>
                   <span className="t4-cal-date">{day.getDate()}</span>
                   {here.slice(0, 3).map((booking) => (
-                    <button key={booking.id} type="button" className="t4-cal-item" data-tone={booking.status === "hold" ? "warning" : "success"} onClick={() => context.navigate(`/o/${org.slug}/book/bookings/${booking.id}`)}>
+                    <button key={booking.id} type="button" className="t4-cal-item" data-tone={booking.status === "hold" ? "warning" : "success"} onFocus={() => context.select(booking.id)} onClick={() => context.navigate(`/o/${org.slug}/book/bookings/${booking.id}`)}>
                       <strong>{booking.title}</strong>
                       <span className="ds-num">{new Date(booking.startAt!).toLocaleTimeString(org.locale, { hour: "2-digit", minute: "2-digit" })}</span>
                     </button>
@@ -252,6 +253,8 @@ export function BookingCalendar({ context, lens }: { context: ScreenContext; len
             resourceForColumn={(id) => id}
             onMove={move}
             onOpen={(id) => context.navigate(`/o/${org.slug}/book/bookings/${id}`)}
+            onSelect={(id) => context.select(id)}
+            selectedId={context.selectedId}
             onCreate={(columnId, startAt) => context.openOverlay("Booking form", { resourceId: columnId, startAt })}
           />
         )}
@@ -288,6 +291,8 @@ export function BookingCalendar({ context, lens }: { context: ScreenContext; len
           resourceForColumn={() => active.id}
           onMove={move}
           onOpen={(id) => context.navigate(`/o/${org.slug}/book/bookings/${id}`)}
+          onSelect={(id) => context.select(id)}
+          selectedId={context.selectedId}
           onCreate={(_columnId, startAt) => context.openOverlay("Booking form", { resourceId: active.id, startAt })}
         />
       )}
@@ -839,10 +844,21 @@ export function RemindersAndNoShows({ context, lens }: { context: ScreenContext;
 /* ---------------------------- BOOK-008 ---------------------------- */
 
 export function BookingReports({ context, lens }: { context: ScreenContext; lens: string }) {
+  return (
+    <Stack gap={3}>
+      <ReportFilterNote />
+      <BookingReportsBody context={context} lens={lens} />
+    </Stack>
+  );
+}
+
+function BookingReportsBody({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useBookData();
   const { now, org } = useWorkspace();
   const week = resolveRange("week", now);
-  const live = data.bookings.filter(isLive);
+  const filter = useReportFilter();
+  const bookings = applyReportFilter(data.bookings, filter);
+  const live = bookings.filter(isLive);
 
   if (lens === "Revenue") {
     const byService = data.services.map((service) => {
@@ -870,8 +886,8 @@ export function BookingReports({ context, lens }: { context: ScreenContext; lens
   }
 
   if (lens === "No-shows") {
-    const noShows = data.bookings.filter((booking) => booking.status === "no_show");
-    const cancelled = data.bookings.filter((booking) => booking.status === "cancelled");
+    const noShows = bookings.filter((booking) => booking.status === "no_show");
+    const cancelled = bookings.filter((booking) => booking.status === "cancelled");
     return (
       <Stack gap={4}>
         <Grid>
@@ -880,7 +896,7 @@ export function BookingReports({ context, lens }: { context: ScreenContext; lens
               title="Outcomes"
               format={(value) => String(Math.round(value))}
               points={[
-                { label: "Completed", value: data.bookings.filter((booking) => booking.status === "completed").length },
+                { label: "Completed", value: bookings.filter((booking) => booking.status === "completed").length },
                 { label: "No-show", value: noShows.length },
                 { label: "Cancelled", value: cancelled.length },
               ]}
@@ -916,7 +932,7 @@ export function BookingReports({ context, lens }: { context: ScreenContext; lens
       const end = addDays(start, 7);
       return {
         label: `Week of ${start.toLocaleDateString(org.locale, { day: "numeric", month: "short" })}`,
-        value: data.bookings.filter((booking) => isLive(booking) && booking.startAt && new Date(booking.startAt) >= start && new Date(booking.startAt) < end).length,
+        value: bookings.filter((booking) => isLive(booking) && booking.startAt && new Date(booking.startAt) >= start && new Date(booking.startAt) < end).length,
       };
     });
     return (
@@ -942,11 +958,11 @@ export function BookingReports({ context, lens }: { context: ScreenContext; lens
             const window = workingHours(row);
             return <span className="ds-num">{Math.round(((window.endHour - window.startHour) * window.days.length))}h</span>;
           } },
-          { key: "booked", header: "Booked", align: "end", cell: (row) => <span className="ds-num">{Math.round(bookedMinutes(data.bookings, row.id, week.start, week.end) / 60)}h</span> },
+          { key: "booked", header: "Booked", align: "end", cell: (row) => <span className="ds-num">{Math.round(bookedMinutes(bookings, row.id, week.start, week.end) / 60)}h</span> },
           { key: "util", header: "Utilisation", cell: (row) => {
             const window = workingHours(row);
             const capacity = (window.endHour - window.startHour) * 60 * window.days.length;
-            const booked = bookedMinutes(data.bookings, row.id, week.start, week.end);
+            const booked = bookedMinutes(bookings, row.id, week.start, week.end);
             return <Meter value={booked} max={capacity || 1} label={`${row.title} utilisation`} tone={booked / capacity > 0.8 ? "warning" : undefined} />;
           } },
         ]} />
@@ -955,14 +971,14 @@ export function BookingReports({ context, lens }: { context: ScreenContext; lens
       </Notice>
       <Card eyebrow="SEATS" prov="human" title="Group bookings" subtitle="Where seats and slots differ">
         <Stack gap={2}>
-          {data.bookings.filter((booking) => Number(booking.fields.seats ?? 1) > 1).map((booking) => (
+          {bookings.filter((booking) => Number(booking.fields.seats ?? 1) > 1).map((booking) => (
             <Row key={booking.id} gap={2}>
               <Link to={`/o/${org.slug}/book/bookings/${booking.id}`} className="ds-grow" style={{ color: "inherit" }}>{booking.title}</Link>
               <span className="ds-num">{String(booking.fields.seats)} of {String(serviceOf(data, booking)?.fields.seats ?? "?")} seats</span>
               <span className="ds-num">1 slot</span>
             </Row>
           ))}
-          {data.bookings.filter((booking) => Number(booking.fields.seats ?? 1) > 1).length === 0 && <span className="ds-subtle">No group bookings.</span>}
+          {bookings.filter((booking) => Number(booking.fields.seats ?? 1) > 1).length === 0 && <span className="ds-subtle">No group bookings.</span>}
         </Stack>
       </Card>
     </Stack>

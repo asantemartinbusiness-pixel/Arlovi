@@ -15,6 +15,7 @@ import {
 } from "./model";
 import { NoProject, useAppRecord } from "./builder";
 import { ScreenPreview } from "./preview";
+import { SeedRows } from "./actions";
 import { saveApp, useBuildUi } from "./state";
 
 /* ================================================================ *
@@ -464,6 +465,7 @@ export function DatabaseScreen({ context, lens }: { context: ScreenContext; lens
     if (!entity.collection) {
       return (
         <Stack gap={4}>
+          <SeedRows entityId={entity.id} app={model} />
           <Notice tone="warning" title={`${entity.name} is not bound to a collection`}>
             Bind it on the schema tab and this tab shows the real records it would read. No sample rows are invented to fill the space.
           </Notice>
@@ -477,6 +479,7 @@ export function DatabaseScreen({ context, lens }: { context: ScreenContext; lens
           <Pill tone="success">{entity.name} → {entity.collection}</Pill>
           <span className="ds-subtle">{collections.length} records in {context.org.name}</span>
         </Row>
+        <SeedRows entityId={entity.id} app={model} />
         {collections.length === 0 ? <Empty title={`No ${entity.collection} records in this organisation`} /> : (
           <DataGrid
             rows={collections}
@@ -1069,9 +1072,11 @@ export function ReleaseApproval({ context, close }: { context: ScreenContext; cl
   const issues = validateApp(model);
   const totals = issueTotals(issues);
   const failing = issues.filter((issue) => issue.level === "fail");
+  const paused = Boolean(record.fields.deploysPaused);
 
   return (
     <Stack gap={4}>
+      {paused && <Notice tone="warning" title="Deployments are paused">{`Promotion is refused until they are resumed: ${String(record.fields.pauseReason ?? "")}`}</Notice>}
       <ul className="t6-steps">
         <li className="t6-step" data-state={totals.fail === 0 ? "done" : "blocked"}><span className="t6-step-n">1</span>Model checks · {totals.fail === 0 ? "clear" : `${totals.fail} failing`}</li>
         <li className="t6-step" data-state={model.screens.length ? "done" : "blocked"}><span className="t6-step-n">2</span>{model.screens.length} screens</li>
@@ -1094,7 +1099,7 @@ export function ReleaseApproval({ context, close }: { context: ScreenContext; cl
         <Button
           variant="primary"
           busy={busy}
-          disabled={failing.length > 0}
+          disabled={failing.length > 0 || paused}
           onClick={async () => {
             setBusy(true);
             try {

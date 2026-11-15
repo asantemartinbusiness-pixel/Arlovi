@@ -8,6 +8,7 @@ import { useRecord, useWorkspace } from "@/platform/workspace";
 import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import type { TaxCategory } from "@/platform/money";
+import { applyScenario, approvalLimitFor } from "./actions";
 import {
   approverFor, APPROVAL_LIMITS, billTotals, bodyOf, isPurchaseOrder, MATCH_LABEL, matchTone,
   outstandingFor, poTotals, statusTone, threeWayMatch, useProcData,
@@ -22,10 +23,17 @@ import {
 /* ---------------- PROC-001 / 004 ---------------- */
 
 export function RequisitionForm({ context, close }: { context: ScreenContext; close: () => void }) {
+  const payload = context.overlayPayload as { id?: string; productIds?: string[] } | undefined;
+  const existing = useRecord(payload?.id);
+  const data = useProcData();
+  if ((payload?.id && !existing) || data.suppliers.length === 0 || ((payload?.productIds ?? []).length > 0 && data.products.length === 0)) return <Empty title="Loading" />;
+  return <RequisitionFormBody key={existing?.id ?? (payload?.productIds ?? []).join("|")} context={context} close={close} existing={existing} />;
+}
+
+function RequisitionFormBody({ context, close, existing }: { context: ScreenContext; close: () => void; existing: Rec | undefined }) {
   const data = useProcData();
   const { org, now, actor } = useWorkspace();
   const payload = context.overlayPayload as { id?: string; productIds?: string[] } | undefined;
-  const existing = useRecord(payload?.id);
   const existingBody = bodyOf<PoBody>(existing, {});
   const seeded: PoLine[] = (payload?.productIds ?? []).map((productId, index) => {
     const product = data.products.find((item) => item.id === productId);
@@ -145,7 +153,10 @@ export function RequisitionReview({ context, close }: { context: ScreenContext; 
   if (!requisition) return <Empty title="Nothing to review" />;
   const totals = poTotals(requisition, supplier, org.jurisdiction);
   const needed = approverFor(totals.grossMinor);
-  const canApprove = context.can("approve_payment") || context.role === "owner";
+  const limit = approvalLimitFor(context);
+  const pending = requisition.status === "awaiting_approval";
+  const withinLimit = totals.grossMinor <= limit.limitMinor;
+  const canApprove = (context.can("approve_payment") || context.role === "owner");
 
   return (
     <Stack gap={4}>
@@ -156,7 +167,8 @@ export function RequisitionReview({ context, close }: { context: ScreenContext; 
         { label: "Budget line", value: String(requisition.fields.budgetLine ?? "—") },
         { label: "Reason", value: requisition.summary },
         { label: "Approval needed", value: <Pill tone="warning">{needed}</Pill> },
-        { label: "Your view", value: canApprove ? <Pill tone="success">May approve</Pill> : <Pill tone="danger">May not approve</Pill> },
+        { label: "Your view", value: canApprove ? <Pill tone={withinLimit ? "success" : "danger"}>{limit.role} · up to {context.money(limit.limitMinor)}</Pill> : <Pill tone="danger">May not approve</Pill> },
+        { label: "State", value: <Pill tone={statusTone(requisition.status)}>{requisition.status.replace("_", " ")}</Pill> },
       ]} />
       <DataGrid rows={bodyOf<PoBody>(requisition, {}).lines ?? []} rowId={(row) => row.id} label="Requisition lines" filterable={false}
         columns={[
@@ -172,14 +184,21 @@ export function RequisitionReview({ context, close }: { context: ScreenContext; 
         </Notice>
       ) : (
         <>
+          {!pending && <Notice tone="warning" title={`This is ${requisition.status.replace("_", " ")}`}>Only something awaiting approval can be approved or rejected here.</Notice>}
+          {pending && !withinLimit && (
+            <Notice tone="danger" title={`Above your approval limit`}>
+              {context.money(totals.grossMinor)} needs {needed} approval. The {limit.role.toLowerCase()} limit is {context.money(limit.limitMinor)}, so this cannot be approved from this view; it stays awaiting approval.
+            </Notice>
+          )}
           <Field label="Note for the record"><TextInput value={reason} onChange={(event) => setReason(event.target.value)} /></Field>
           <Row gap={2}>
             <Button
               variant="primary"
+              disabled={!pending || !withinLimit}
               onClick={async () => {
                 await context.mutate.patch(requisition.id, {
                   status: "approved",
-                  fields: { ...requisition.fields, approver: actor, approvedAt: now.toISOString(), approvalNote: reason },
+                  fields: { ...requisition.fields, approver: actor, approverRole: limit.role, approvedAt: now.toISOString(), approvalNote: reason },
                 }, { expectRevision: requisition.revision, event: `${requisition.title} approved by ${actor}` });
                 context.toast("Approved", `${requisition.title} can now be converted into a purchase order with this approval attached.`);
                 close();
@@ -189,7 +208,7 @@ export function RequisitionReview({ context, close }: { context: ScreenContext; 
             </Button>
             <Button
               variant="outline-danger"
-              disabled={!reason.trim()}
+              disabled={!reason.trim() || !pending}
               onClick={async () => {
                 await context.mutate.patch(requisition.id, {
                   status: "rejected",
@@ -232,10 +251,6 @@ export function BudgetCheck({ context }: { context: ScreenContext }) {
       <span className="ds-subtle">Limits are expressed in {org.currency}.</span>
     </Stack>
   );
-}
-
-export function RejectionReason({ context, close }: { context: ScreenContext; close: () => void }) {
-  return <RequisitionReview context={context} close={close} />;
 }
 
 export function CostInspector({ context }: { context: ScreenContext }) {
@@ -463,22 +478,29 @@ export function RiskEscalation({ context, close }: { context: ScreenContext; clo
 /* ---------------- PROC-005 ---------------- */
 
 export function PoEditor({ context, close }: { context: ScreenContext; close: () => void }) {
+  const payload = context.overlayPayload as { id?: string; fromRequisition?: string } | undefined;
+  const existing = useRecord(payload?.id);
+  const preset = useRecord(payload?.fromRequisition);
+  const data = useProcData();
+  if ((payload?.id && !existing) || (payload?.fromRequisition && !preset) || data.suppliers.length === 0) return <Empty title="Loading" />;
+  return <PoEditorForm key={existing?.id ?? preset?.id ?? "new"} context={context} close={close} existing={existing} preset={preset} />;
+}
+
+function PoEditorForm({ context, close, existing, preset }: { context: ScreenContext; close: () => void; existing: Rec | undefined; preset: Rec | undefined }) {
   const data = useProcData();
   const { org, now, actor } = useWorkspace();
-  const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = useRecord(payload?.id);
-  const existingBody = bodyOf<PoBody>(existing, {});
-  const approvedRequisitions = data.purchaseOrders.filter((item) => String(item.fields.kind) === "requisition" && item.status === "approved");
-  const [fromRequisition, setFromRequisition] = useState("");
-  const [supplierId, setSupplierId] = useState(String(existing?.fields.supplierId ?? data.suppliers[0]?.id ?? ""));
+  const existingBody = bodyOf<PoBody>(existing ?? preset, {});
+  const approvedRequisitions = data.purchaseOrders.filter((item) => String(item.fields.kind) === "requisition" && item.status === "approved" && Boolean(item.fields.approver));
+  const [fromRequisition, setFromRequisition] = useState(preset && preset.status === "approved" ? preset.id : "");
+  const [supplierId, setSupplierId] = useState(String((existing ?? preset)?.fields.supplierId ?? data.suppliers[0]?.id ?? ""));
   const [dueAt, setDueAt] = useState((existing?.dueAt ?? new Date(now.getTime() + 14 * 86_400_000).toISOString()).slice(0, 10));
-  const [note, setNote] = useState(existing?.summary ?? "");
+  const [note, setNote] = useState(existing?.summary ?? preset?.summary ?? "");
   const [lines, setLines] = useState<PoLine[]>(existingBody.lines ?? [{ id: "l1", description: "", quantity: 1, unitPriceMinor: 0, taxCategory: "standard", receivedQuantity: 0 }]);
 
   const supplier = data.suppliers.find((item) => item.id === supplierId);
   const draft = { ...(existing ?? ({} as Rec)), at: now.toISOString(), body: { lines } } as Rec;
   const totals = poTotals(draft, supplier, org.jurisdiction);
-  const source = data.purchaseOrders.find((item) => item.id === fromRequisition);
+  const source = approvedRequisitions.find((item) => item.id === fromRequisition);
   const alreadySent = existing?.status === "sent";
   const invalid = lines.length === 0 || lines.some((line) => !line.description.trim() || line.quantity <= 0) || !supplierId;
 
@@ -1185,9 +1207,10 @@ export function Scenario({ context }: { context: ScreenContext }) {
           { key: "short", header: "Would suggest an order", cell: (row) => (row.short ? <Pill tone="warning">Yes</Pill> : <Pill tone="success">No</Pill>) },
         ]} />
       <Notice tone="warning" title="A scenario changes nothing">
-        Nothing here is saved to a product, and no order is created. It is arithmetic on the points someone already set, so a buyer can see the consequence before changing them.
+        Nothing is saved until you apply it, and applying changes reorder points only: no order is created. It is arithmetic on the points someone already set, so a buyer can see the consequence before changing them.
       </Notice>
       <span className="ds-subtle">{rows.filter((row) => row.short).length} of {rows.length} products would be suggested at this level. Values in {context.org.currency} are unaffected.</span>
+      <Button variant="primary" disabled={!(Number(uplift) || 0)} onClick={() => applyScenario(context, Number(uplift) || 0)}>Apply to reorder points…</Button>
     </Stack>
   );
 }

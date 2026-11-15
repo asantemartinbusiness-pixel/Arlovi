@@ -2292,11 +2292,6 @@ async function generateContract(context: ScreenContext): Promise<void> {
   );
 }
 
-async function runEvaluation(context: ScreenContext): Promise<void> {
-  context.setTab("Scenarios");
-  context.openOverlay("detailed trace");
-  context.toast("Pick a contract to run against", "Open the Test panel on an AI employee profile, or choose a run to inspect its trace.", "info");
-}
 
 export const teamApp = registerApp({
   code: "TEAM",
@@ -2386,13 +2381,15 @@ export const teamApp = registerApp({
         { id: "Edit role", placement: "primary", capability: "edit_people", run: (context) => context.openOverlay("Role edit") },
         { id: "test", placement: "secondary", run: (context) => context.openOverlay("test panel", { id: context.params.id }) },
         { id: "open chat", placement: "secondary", run: (context) => context.navigate(`/o/${context.org.slug}/ai/agents/${context.params.id}/chat`) },
-        { id: "reassign", placement: "overflow", run: (context) => { context.select(context.params.id); context.openOverlay("permission inspector"); } },
+        { id: "reassign", label: "Reassign open work", placement: "overflow", capability: "edit_people", run: (context) => context.openOverlay("reassign work") },
+        { id: "permissions", label: "Permissions", placement: "overflow", run: (context) => { context.select(context.params.id); context.openOverlay("permission inspector"); } },
         { id: "pause", placement: "overflow", run: (context) => { context.select(context.params.id); void pauseAgent(context); } },
       ],
       overlays: [
         { id: "Role edit", kind: "modal", title: "Edit the contract", width: 560, render: ({ close, ...context }) => <RoleEdit context={context} close={close} />, footer: submitFooter("role-edit", "Save contract") },
         { id: "permission inspector", kind: "drawer", title: "Permissions", width: 560, render: ({ close, ...context }) => <PermissionInspector context={context} close={close} /> },
         { id: "test panel", kind: "modal", title: "Run an evaluation", width: 680, render: ({ ...context }) => <TestPanel context={context} /> },
+        { id: "reassign work", kind: "modal", title: "Reassign open work", width: 560, render: ({ close, ...context }) => <ReassignWork context={context} close={close} /> },
       ],
     },
 
@@ -2413,14 +2410,16 @@ export const teamApp = registerApp({
         }, run: (context) => context.openOverlay("publish confirmation") },
         { id: "Generate contract", placement: "secondary", run: (context) => void generateContract(context) },
         { id: "select templates", placement: "secondary", run: (context) => context.openOverlay("Skill picker") },
-        { id: "configure limits", placement: "overflow", run: (context) => context.setTab("Autonomy") },
-        { id: "test", placement: "overflow", run: (context) => context.setTab("Test") },
+        { id: "configure limits", placement: "overflow", run: (context) => context.openOverlay("configure limits") },
+        { id: "test", placement: "overflow", run: (context) => context.openOverlay("test draft") },
       ],
       overlays: [
         { id: "Skill picker", kind: "drawer", title: "Skills", width: 560, render: ({ ...context }) => <SkillPicker context={context} /> },
         { id: "connector grant", kind: "modal", title: "Granting an external tool", width: 620, render: ({ ...context }) => <ConnectorGrant context={context} /> },
         { id: "simulation", kind: "modal", title: "Evaluation run", width: 680, render: ({ ...context }) => <SimulationOverlay context={context} /> },
         { id: "publish confirmation", kind: "modal", title: "Activate this contract", width: 560, render: ({ close, ...context }) => <PublishConfirmation context={context} close={close} /> },
+        { id: "configure limits", kind: "modal", title: "Autonomy and spend limits", width: 540, render: ({ close, ...context }) => <ConfigureLimits context={context} close={close} /> },
+        { id: "test draft", kind: "modal", title: "Test the draft contract", width: 680, render: ({ close, ...context }) => <TestDraft context={context} close={close} /> },
       ],
     },
 
@@ -2433,14 +2432,17 @@ export const teamApp = registerApp({
       })),
       actions: [
         { id: "Reparent agent", placement: "primary", capability: "edit_people", guard: (context) => (context.selectedId ? undefined : "Choose a member first"), run: (context) => context.openOverlay("transfer approval") },
-        { id: "assign lead", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a member first"), run: (context) => context.openOverlay("hierarchy impact") },
-        { id: "create department", placement: "secondary", run: (context) => context.navigate(`/o/${context.org.slug}/hq/departments`) },
-        { id: "filter", placement: "overflow", run: (context) => context.setTab("Directory") },
+        { id: "assign lead", placement: "secondary", capability: "edit_people", guard: (context) => (context.selectedId ? undefined : "Choose a member first"), run: (context) => context.openOverlay("assign lead") },
+        { id: "create department", placement: "secondary", capability: "edit_people", run: (context) => context.openOverlay("create department") },
+        { id: "filter", placement: "overflow", run: (context) => { context.setTab("Directory"); window.setTimeout(() => document.querySelector<HTMLInputElement>('input[aria-label^="Filter"]')?.focus(), 50); } },
+        { id: "line impact", label: "What this line carries", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a member first"), run: (context) => context.openOverlay("hierarchy impact") },
       ],
       overlays: [
         { id: "Employee inspector", kind: "drawer", title: "Member", width: 480, render: ({ ...context }) => <EmployeeInspector context={context} /> },
         { id: "transfer approval", kind: "modal", title: "Transfer", width: 560, render: ({ close, ...context }) => <TransferApproval context={context} close={close} /> },
         { id: "hierarchy impact", kind: "modal", title: "What this line carries", width: 560, render: ({ ...context }) => <HierarchyImpact context={context} /> },
+        { id: "assign lead", kind: "modal", title: "Assign a department lead", width: 560, render: ({ close, ...context }) => <AssignLead context={context} close={close} /> },
+        { id: "create department", kind: "modal", title: "Create a department", width: 540, render: ({ close, ...context }) => <CreateDepartment context={context} close={close} /> },
       ],
     },
 
@@ -2476,12 +2478,14 @@ export const teamApp = registerApp({
         { id: "Upload SOP", placement: "primary", run: (context) => context.openOverlay("Training asset upload") },
         { id: "demonstrate task", placement: "secondary", run: (context) => context.openOverlay("Training asset upload", { mode: "demonstration" }) },
         { id: "assign course", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a course first"), run: (context) => context.openOverlay("assessment builder") },
-        { id: "test", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/team/evaluations`) },
+        { id: "test", placement: "overflow", run: (context) => context.openOverlay("academy test") },
+        { id: "evaluation lab", label: "Evaluation lab", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/team/evaluations`) },
       ],
       overlays: [
         { id: "Training asset upload", kind: "modal", title: "Record a procedure", width: 620, render: ({ close, ...context }) => <TrainingAssetUpload context={context} close={close} />, footer: submitFooter("training-upload", "Record") },
         { id: "assessment builder", kind: "modal", title: "Assessment", width: 560, render: ({ close, ...context }) => <AssessmentBuilder context={context} close={close} /> },
         { id: "publishing review", kind: "modal", title: "Publish with a scope", width: 560, render: ({ close, ...context }) => <PublishingReview context={context} close={close} /> },
+        { id: "academy test", kind: "modal", title: "Test an AI employee", width: 700, render: ({ close, ...context }) => <AcademyTest context={context} close={close} /> },
       ],
     },
 
@@ -2497,12 +2501,13 @@ export const teamApp = registerApp({
         { id: "Run evaluation", placement: "primary", run: (context) => context.openOverlay("Scenario editor", { run: true }) },
         { id: "approve new version", placement: "secondary", capability: "edit_people", run: (context) => context.openOverlay("promotion approval") },
         { id: "compare model", placement: "secondary", guard: () => "No model provider is connected, so there is nothing to compare.", run: () => undefined },
-        { id: "rollback", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a run first"), run: (context) => void runEvaluation(context) },
+        { id: "rollback", placement: "overflow", tone: "danger", capability: "edit_people", run: (context) => context.openOverlay("rollback") },
       ],
       overlays: [
         { id: "Scenario editor", kind: "modal", title: "Scenario", width: 620, render: ({ close, ...context }) => <ScenarioEditor context={context} close={close} />, footer: submitFooter("scenario-editor", "Save scenario") },
         { id: "detailed trace", kind: "drawer", title: "Run trace", width: 560, render: ({ ...context }) => <DetailedTrace context={context} /> },
         { id: "promotion approval", kind: "modal", title: "Promote a version", width: 560, render: ({ close, ...context }) => <PromotionApproval context={context} close={close} /> },
+        { id: "rollback", kind: "modal", title: "Roll a contract back", width: 580, tone: "danger", render: ({ close, ...context }) => <RollbackVersion context={context} close={close} /> },
       ],
     },
 
@@ -2514,15 +2519,17 @@ export const teamApp = registerApp({
         render: (context: ScreenContext) => <AgentPerformance context={context} view={view} />,
       })),
       actions: [
-        { id: "Compare agents", placement: "primary", run: (context) => context.setTab("Departments") },
+        { id: "Compare agents", placement: "primary", run: (context) => context.openOverlay("compare agents") },
         { id: "inspect failed task", placement: "secondary", run: (context) => context.setTab("Quality") },
         { id: "coach", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose an AI employee first"), run: (context) => context.openOverlay("performance note") },
-        { id: "adjust resource policy", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/team/models`) },
+        { id: "adjust resource policy", placement: "overflow", capability: "edit_people", run: (context) => context.openOverlay("resource policy") },
       ],
       overlays: [
         { id: "Metric definition", kind: "modal", title: "How each figure is counted", width: 560, render: () => <MetricDefinition /> },
         { id: "incident trace", kind: "drawer", title: "Failed run", width: 560, render: ({ ...context }) => <DetailedTrace context={context} /> },
         { id: "performance note", kind: "modal", title: "Coaching note", width: 560, render: ({ close, ...context }) => <PerformanceNote context={context} close={close} />, footer: submitFooter("performance-note", "Record note") },
+        { id: "compare agents", kind: "drawer", title: "Two AI employees side by side", width: 680, render: ({ ...context }) => <CompareAgents context={context} /> },
+        { id: "resource policy", kind: "modal", title: "Resource policy", width: 560, render: ({ close, ...context }) => <AdjustResourcePolicy context={context} close={close} /> },
       ],
     },
 
@@ -2561,4 +2568,365 @@ async function deprecateSkill(context: ScreenContext): Promise<void> {
   }
   await context.mutate.patch(skill.id, { status: "deprecated", fields: { ...skill.fields, deprecatedBy: context.actor } }, { expectRevision: skill.revision, event: `${skill.title} deprecated by ${context.actor}` });
   context.toast("Deprecated", "It stays in the library marked deprecated and is not offered to a contract.");
+}
+
+/* ====================================================================== *
+ * Contract actions that perform the operation they name.
+ * ====================================================================== */
+
+/** TEAM-003: moves the contract's open work to another active contract and invalidates the stale grants on it. */
+function ReassignWork({ context, close }: { context: ScreenContext; close: () => void }) {
+  const data = useWorkforce();
+  const agent = data.agents.find((item) => item.id === context.params.id);
+  const [to, setTo] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (!agent) return <Empty title="No contract" />;
+  const open = [...data.missionTasks, ...data.tasks].filter((task) => String(task.fields.assignee ?? "") === agent.title && !["verified", "done"].includes(String(task.fields.stage ?? task.status)));
+  const targets = data.agents.filter((item) => item.id !== agent.id && item.status === "active");
+  const target = targets.find((item) => item.id === to);
+  return (
+    <Stack gap={4}>
+      <Notice tone="warning" title="Grants do not travel with the work">
+        Each task moves to the contract you choose and is marked for a grant check, so a step queued under {agent.title}'s permissions cannot run under the new owner without being checked again.
+      </Notice>
+      <Properties rows={[{ label: "Open work", value: `${open.length} task${open.length === 1 ? "" : "s"}` }]} />
+      <Field label="Reassign to">
+        <Select aria-label="Reassign to" value={to} onChange={(event) => setTo(event.target.value)}>
+          <option value="">Choose an active contract</option>
+          {targets.map((item) => <option key={item.id} value={item.id}>{item.title} · {String(item.fields.role ?? "")}</option>)}
+        </Select>
+      </Field>
+      <Row gap={2}>
+        <Button
+          variant="primary"
+          busy={busy}
+          disabled={!target || open.length === 0 || !context.can("edit_people")}
+          onClick={async () => {
+            if (!target) return;
+            setBusy(true);
+            for (const task of open) {
+              await context.mutate.patch(task.id, {
+                fields: { ...task.fields, assignee: target.title, previousAssignee: agent.title, grantCheck: "required", reassignedBy: context.actor },
+              }, { expectRevision: task.revision, event: `${task.title} reassigned from ${agent.title} to ${target.title}; grants must be checked again` });
+            }
+            context.toast("Work reassigned", `${open.length} task${open.length === 1 ? "" : "s"} moved to ${target.title}, each marked for a grant check.`);
+            setBusy(false);
+            close();
+          }}
+        >
+          Reassign {open.length} task{open.length === 1 ? "" : "s"}
+        </Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+/** TEAM-004: sets the autonomy and spend limits on the contract being built. */
+function ConfigureLimits({ context, close }: { context: ScreenContext; close: () => void }) {
+  const draft = useAgentBuilder((state) => state.draft);
+  const set = useAgentBuilder((state) => state.set);
+  const [autonomy, setAutonomy] = useState(draft.autonomy);
+  const [cap, setCap] = useState((draft.spendCapMinor / 100).toFixed(2));
+  const capMinor = Math.round((Number(cap.replace(/[^0-9.]/g, "")) || 0) * 100);
+  const problem = capMinor <= 0 ? "A ceiling above zero is required: an unbounded contract cannot be activated." : capMinor > 100_000 ? "A ceiling over £1,000 needs an owner's approval, which this builder cannot give." : undefined;
+  return (
+    <Stack gap={4}>
+      <Field label="Autonomy">
+        <Select aria-label="Autonomy" value={autonomy} onChange={(event) => setAutonomy(event.target.value as typeof autonomy)}>
+          <option value="suggest">Suggest</option><option value="draft">Draft</option><option value="act_with_approval">Act with approval</option>
+        </Select>
+      </Field>
+      <Field label={`Spend ceiling (${context.org.currency})`} required error={problem}>
+        <TextInput aria-label="Spend ceiling" align="end" inputMode="decimal" value={cap} invalid={Boolean(problem)} onChange={(event) => setCap(event.target.value)} />
+      </Field>
+      <Notice tone="info" title="Limits change the draft, and the evaluation must run again">Nothing is written to the workspace until the contract is activated.</Notice>
+      <Row gap={2}>
+        <Button variant="primary" disabled={Boolean(problem)} onClick={() => {
+          set({ autonomy, spendCapMinor: capMinor, evaluated: false });
+          context.toast("Limits set", `${autonomy.replace(/_/g, " ")}, ceiling ${context.money(capMinor)}. Run the evaluation again before activating.`);
+          close();
+        }}>Save the limits</Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+/** TEAM-004: runs the evaluation on the draft contract right now. */
+function TestDraft({ close }: { context: ScreenContext; close: () => void }) {
+  const data = useWorkforce();
+  const draft = useAgentBuilder((state) => state.draft);
+  const set = useAgentBuilder((state) => state.set);
+  const { now, money, date } = useWorkspace();
+  const scenarios = data.evaluations.filter((item) => item.fields.kind === "scenario");
+  const [scenarioId, setScenarioId] = useState("");
+  const scenario = scenarios.find((item) => item.id === scenarioId) ?? scenarios.find((item) => String(item.fields.domain) === "governance") ?? scenarios[0];
+  const [result, setResult] = useState<RunResult | null>(null);
+  if (!scenario) return <Empty title="No scenario to test against" />;
+  return (
+    <Stack gap={4}>
+      <Field label="Scenario">
+        <Select aria-label="Scenario" value={scenario.id} onChange={(event) => { setScenarioId(event.target.value); setResult(null); }}>
+          {scenarios.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+        </Select>
+      </Field>
+      <Button variant="primary" onClick={() => {
+        const probe: Rec = {
+          ...(data.agents[0] ?? ({} as Rec)),
+          id: "draft-agent", title: draft.name || "Draft contract", status: "draft",
+          fields: { role: draft.role, autonomy: draft.autonomy, spendCapMinor: draft.spendCapMinor, manager: data.departments.find((department) => department.id === draft.departmentId)?.fields.lead ?? "" },
+          body: { skills: draft.skills, tools: draft.tools.map((id) => ({ id, label: id, granted: true })), authority: [draft.brief], sources: draft.sources },
+        };
+        const outcome = runScenario(scenario, probe, [...data.agents, ...data.skills, ...data.sources], now, money, date);
+        set({ evaluated: (outcome.score ?? 0) >= SAFETY_SCORE, evaluationScore: outcome.score, evaluationAt: now.toISOString() });
+        setResult(outcome);
+      }}>Run the test</Button>
+      {result && (
+        <Stack gap={2}>
+          <Notice tone={(result.score ?? 0) >= SAFETY_SCORE ? "success" : "danger"} title={`Scored ${result.score ?? 0} of 100`}>
+            {(result.score ?? 0) >= SAFETY_SCORE ? `At or above the ${SAFETY_SCORE} line.` : `Below the ${SAFETY_SCORE} line, so activation stays blocked.`}
+          </Notice>
+          {result.results.map((item) => (
+            <Row key={item.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2)" }}>
+              <Pill tone={item.pass ? "success" : "danger"}>{item.pass ? "pass" : "fail"}</Pill>
+              <span className="ds-grow">{item.label}</span>
+              <span className="ds-subtle">{item.note}</span>
+            </Row>
+          ))}
+        </Stack>
+      )}
+      <Row gap={2}><span className="ds-grow" /><Button variant="ghost" onClick={close}>Close</Button></Row>
+    </Stack>
+  );
+}
+
+/** TEAM-005: makes the selected member the lead of a department. */
+function AssignLead({ context, close }: { context: ScreenContext; close: () => void }) {
+  const data = useWorkforce();
+  const member = useRecord(context.selectedId);
+  const [departmentId, setDepartmentId] = useState(String(member?.fields.departmentId ?? data.departments[0]?.id ?? ""));
+  const [busy, setBusy] = useState(false);
+  const department = data.departments.find((item) => item.id === departmentId);
+  if (!member) return <Empty title="Choose a member first" />;
+  const isAgent = member.collection === "agents";
+  const reports = data.agents.filter((agent) => agent.fields.departmentId === departmentId);
+  return (
+    <Stack gap={4}>
+      <Field label="Department">
+        <Select aria-label="Department" value={departmentId} onChange={(event) => setDepartmentId(event.target.value)}>
+          {data.departments.map((item) => <option key={item.id} value={item.id}>{item.title} · lead {String(item.fields.lead ?? "none")}</option>)}
+        </Select>
+      </Field>
+      <Properties rows={[
+        { label: "New lead", value: member.title },
+        { label: "Current lead", value: String(department?.fields.lead ?? "None") },
+        { label: "AI employees who will report to them", value: String(reports.length) },
+      ]} />
+      {isAgent && <Notice tone="danger" title="A department is led by a person">An AI employee cannot be accountable for a department.</Notice>}
+      <Notice tone="info" title="A reporting line is not a data grant">Leading a department does not give access to another entity's records.</Notice>
+      <Row gap={2}>
+        <Button
+          variant="primary"
+          busy={busy}
+          disabled={!department || isAgent || String(department.fields.lead ?? "") === member.title || !context.can("edit_people")}
+          onClick={async () => {
+            if (!department) return;
+            setBusy(true);
+            const saved = await context.mutate.patch(department.id, { fields: { ...department.fields, lead: member.title, previousLead: String(department.fields.lead ?? ""), leadSetBy: context.actor } }, { expectRevision: department.revision, event: `${member.title} made lead of ${department.title} by ${context.actor}` });
+            if (saved) context.toast("Lead assigned", `${member.title} leads ${department.title}; ${reports.length} AI employee${reports.length === 1 ? " now reports" : "s now report"} to them.`);
+            setBusy(false);
+            close();
+          }}
+        >
+          Assign as lead
+        </Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+function CreateDepartment({ context, close }: { context: ScreenContext; close: () => void }) {
+  const data = useWorkforce();
+  const people = data.members.filter((member) => String(member.fields.kind ?? "human") === "human");
+  const [title, setTitle] = useState("");
+  const [lead, setLead] = useState("");
+  const [summary, setSummary] = useState("");
+  const [busy, setBusy] = useState(false);
+  const taken = data.departments.some((item) => item.title.toLowerCase() === title.trim().toLowerCase());
+  return (
+    <Stack gap={4}>
+      <Field label="Name" required error={taken ? "A department with this name exists" : undefined}><TextInput aria-label="Name" value={title} invalid={taken} onChange={(event) => setTitle(event.target.value)} /></Field>
+      <Field label="Lead" required hint="A person. AI employees report into a department; they cannot lead one.">
+        <Select aria-label="Lead" value={lead} onChange={(event) => setLead(event.target.value)}>
+          <option value="">Choose a person</option>
+          {people.map((member) => <option key={member.id} value={member.title}>{member.title}</option>)}
+        </Select>
+      </Field>
+      <Field label="What it does"><TextInput aria-label="What it does" value={summary} onChange={(event) => setSummary(event.target.value)} /></Field>
+      <Row gap={2}>
+        <Button variant="primary" busy={busy} disabled={!title.trim() || taken || !lead || !context.can("edit_people")} onClick={async () => {
+          setBusy(true);
+          await context.mutate.create({ collection: "departments", title: title.trim(), status: "active", summary: summary || `${title.trim()} department.`, fields: { lead, members: 0, createdFrom: "TEAM-005" } }, `Department ${title.trim()} created with ${lead} as lead`);
+          context.toast("Department created", `${title.trim()} is led by ${lead}.`);
+          setBusy(false);
+          close();
+        }}>Create the department</Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+/** TEAM-007: tests a chosen AI employee against an evaluation scenario, using the same local runner as the lab. */
+function AcademyTest({ context, close }: { context: ScreenContext; close: () => void }) {
+  const data = useWorkforce();
+  const [agentId, setAgentId] = useState("");
+  const agent = data.agents.find((item) => item.id === agentId);
+  return (
+    <Stack gap={4}>
+      <Field label="AI employee" required>
+        <Select aria-label="AI employee" value={agentId} onChange={(event) => setAgentId(event.target.value)}>
+          <option value="">Choose who to test</option>
+          {data.agents.map((item) => <option key={item.id} value={item.id}>{item.title} · {item.status}</option>)}
+        </Select>
+      </Field>
+      {agent ? <TestPanel context={{ ...context, overlayPayload: { id: agent.id } }} /> : <Empty title="Choose an AI employee to test" />}
+      <Row gap={2}><span className="ds-grow" /><Button variant="ghost" onClick={close}>Close</Button></Row>
+    </Stack>
+  );
+}
+
+/** TEAM-008: rolls a contract back to the version before its last promotion. History is kept. */
+function RollbackVersion({ context, close }: { context: ScreenContext; close: () => void }) {
+  const data = useWorkforce();
+  const promoted = data.agents.filter((agent) => agent.fields.promotedBy && agent.history.length > 0);
+  const [id, setId] = useState(promoted[0]?.id ?? "");
+  const [busy, setBusy] = useState(false);
+  const agent = promoted.find((item) => item.id === id);
+  const previous = agent?.history.find((snapshot) => String(snapshot.fields.promotedVersion ?? "") !== String(agent.fields.promotedVersion ?? "") || !snapshot.fields.promotedBy);
+  if (promoted.length === 0) return <Empty title="No promoted contract to roll back">A rollback needs a contract that was promoted and has an earlier version on record.</Empty>;
+  return (
+    <Stack gap={4}>
+      <Field label="Contract">
+        <Select aria-label="Contract" value={id} onChange={(event) => setId(event.target.value)}>
+          {promoted.map((item) => <option key={item.id} value={item.id}>{item.title} · v{String(item.fields.promotedVersion || "?")}</option>)}
+        </Select>
+      </Field>
+      {agent && <Properties rows={[
+        { label: "Current version", value: String(agent.fields.promotedVersion || "Unversioned") },
+        { label: "Promoted by", value: String(agent.fields.promotedBy) },
+        { label: "Rolls back to", value: previous ? `${String(previous.fields.promotedVersion || "the version before promotion")}, saved ${context.dateTime(previous.at)}` : "No earlier version recorded" },
+      ]} />}
+      <Notice tone="warning" title="A rollback pauses the contract">The earlier fields and body are restored, the contract is paused so it cannot act on the old version unseen, and it must pass the safety line again before reactivation.</Notice>
+      <Row gap={2}>
+        <Button
+          variant="danger"
+          busy={busy}
+          disabled={!agent || !previous || !context.can("edit_people")}
+          onClick={async () => {
+            if (!agent || !previous) return;
+            setBusy(true);
+            const saved = await context.mutate.patch(agent.id, {
+              status: "paused",
+              fields: { ...previous.fields, rolledBackBy: context.actor, rolledBackAt: new Date().toISOString(), rolledBackFrom: String(agent.fields.promotedVersion ?? "") },
+              body: previous.body ?? agent.body,
+            }, { expectRevision: agent.revision, event: `${agent.title} rolled back from v${String(agent.fields.promotedVersion ?? "?")} by ${context.actor} and paused` });
+            if (saved) context.toast("Rolled back", `${agent.title} is on its earlier version and paused until it passes again.`, "blocked");
+            setBusy(false);
+            close();
+          }}
+        >
+          Roll back
+        </Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+/** TEAM-009: two contracts side by side, counted from records. */
+function CompareAgents({ context }: { context: ScreenContext }) {
+  const data = useWorkforce();
+  const [left, setLeft] = useState(data.agents[0]?.id ?? "");
+  const [right, setRight] = useState(data.agents[1]?.id ?? "");
+  const pair = [left, right].map((id) => data.agents.find((agent) => agent.id === id));
+  const stats = (agent: Rec | undefined) => {
+    if (!agent) return undefined;
+    const tasks = data.missionTasks.filter((task) => String(task.fields.assignee) === agent.title);
+    const run = latestRunFor(data.evaluations, agent.id);
+    return {
+      Assigned: String(tasks.length),
+      Verified: String(tasks.filter((task) => String(task.fields.stage) === "verified").length),
+      Blocked: String(tasks.filter((task) => String(task.fields.stage) === "blocked").length),
+      "Latest score": run ? `${String(run.fields.score)} / 100` : "Unavailable",
+      Autonomy: String(agent.fields.autonomy ?? "draft"),
+      "Spend ceiling": context.money(Number(agent.fields.spendCapMinor ?? 0)),
+      Status: agent.status,
+    };
+  };
+  const rows = [stats(pair[0]), stats(pair[1])];
+  return (
+    <Stack gap={4}>
+      <Row gap={3} wrap>
+        <Field label="Left"><Select aria-label="Left" value={left} onChange={(event) => setLeft(event.target.value)}>{data.agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.title}</option>)}</Select></Field>
+        <Field label="Right"><Select aria-label="Right" value={right} onChange={(event) => setRight(event.target.value)}>{data.agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.title}</option>)}</Select></Field>
+      </Row>
+      <div className="ds-grid-wrap"><div className="ds-grid-scroll">
+        <table className="ds-table">
+          <caption className="ds-sr-only">Two AI employees side by side</caption>
+          <thead><tr><th>Measure</th><th>{pair[0]?.title ?? "—"}</th><th>{pair[1]?.title ?? "—"}</th></tr></thead>
+          <tbody>
+            {Object.keys(rows[0] ?? rows[1] ?? {}).map((key) => (
+              <tr key={key}><th scope="row" style={{ textAlign: "start" }}>{key}</th><td>{rows[0]?.[key as keyof typeof rows[0]] ?? "—"}</td><td>{rows[1]?.[key as keyof typeof rows[1]] ?? "—"}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      </div></div>
+      <Notice tone="info" title="Counted, not modelled">No value-of-work or return figure is shown: there is no measured cost or saving to divide.</Notice>
+    </Stack>
+  );
+}
+
+/** TEAM-009: sets one contract's resource policy: its spend ceiling and preferred provider. */
+function AdjustResourcePolicy({ context, close }: { context: ScreenContext; close: () => void }) {
+  const data = useWorkforce();
+  const [id, setId] = useState(data.agents.find((agent) => agent.id === context.selectedId)?.id ?? data.agents[0]?.id ?? "");
+  const agent = data.agents.find((item) => item.id === id);
+  const [cap, setCap] = useState<string>();
+  const [provider, setProvider] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  if (!agent) return <Empty title="No AI employee" />;
+  const capText = cap ?? (Number(agent.fields.spendCapMinor ?? 0) / 100).toFixed(2);
+  const capMinor = Math.round((Number(capText.replace(/[^0-9.]/g, "")) || 0) * 100);
+  const providerId = provider ?? String(agent.fields.provider ?? "");
+  const problem = capMinor <= 0 ? "A ceiling above zero is required." : capMinor > 100_000 && context.role !== "owner" ? "A ceiling over £1,000 needs the Owner view." : undefined;
+  return (
+    <Stack gap={4}>
+      <Field label="AI employee">
+        <Select aria-label="AI employee" value={id} onChange={(event) => { setId(event.target.value); setCap(undefined); setProvider(undefined); }}>
+          {data.agents.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+        </Select>
+      </Field>
+      <Field label={`Spend ceiling (${context.org.currency})`} error={problem}><TextInput aria-label="Spend ceiling" align="end" value={capText} invalid={Boolean(problem)} onChange={(event) => setCap(event.target.value)} /></Field>
+      <Field label="Preferred provider" hint="No provider is connected, so the preference is recorded and cannot be used yet.">
+        <Select aria-label="Preferred provider" value={providerId} onChange={(event) => setProvider(event.target.value)}>
+          <option value="">No provider</option>
+          {data.connectors.filter((connector) => connector.fields.kind === "model").map((connector) => <option key={connector.id} value={connector.id}>{connector.title}</option>)}
+        </Select>
+      </Field>
+      <Row gap={2}>
+        <Button variant="primary" busy={busy} disabled={Boolean(problem) || !context.can("edit_people")} onClick={async () => {
+          setBusy(true);
+          const saved = await context.mutate.patch(agent.id, { fields: { ...agent.fields, spendCapMinor: capMinor, provider: providerId, resourcePolicySetBy: context.actor } }, { expectRevision: agent.revision, event: `Resource policy for ${agent.title} set by ${context.actor}: ceiling ${context.money(capMinor)}` });
+          if (saved) context.toast("Policy saved", `${agent.title} may commit up to ${context.money(capMinor)}.`);
+          setBusy(false);
+          close();
+        }}>Save the policy</Button>
+        <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${context.org.slug}/team/models`); }}>Model routing</Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
 }

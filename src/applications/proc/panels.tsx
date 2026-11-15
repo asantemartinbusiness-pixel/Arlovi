@@ -15,6 +15,7 @@ import {
   statusTone, threeWayMatch, useProcData,
   type ContractBody, type PoBody, type SupplierBody,
 } from "./data";
+import { QuoteRequests } from "./actions";
 
 /* ====================================================================== *
  * PROC panels — suppliers, requisitions with approval, purchase orders,
@@ -305,6 +306,7 @@ export function SupplierDetail({ context, lens }: { context: ScreenContext; lens
             { label: "Notes", value: body.notes || "None" },
           ]} />
         </Card>
+        <QuoteRequests context={context} supplierId={supplier.id} />
       </Stack>
     );
   }
@@ -527,7 +529,8 @@ export function Warehouses({ context, lens }: { context: ScreenContext; lens: st
       {data.warehouses.map((warehouse) => (
         <Card key={warehouse.id} span={4} eyebrow="SITE" prov="human" title={warehouse.title} subtitle={warehouse.summary}
           footer={<>
-            <Button size="sm" variant="secondary" onClick={() => { context.select(warehouse.id); context.openOverlay("Location editor", { id: warehouse.id }); }}>Edit</Button>
+            <Button size="sm" variant={context.selectedId === warehouse.id ? "primary" : "secondary"} aria-pressed={context.selectedId === warehouse.id} onClick={() => context.select(context.selectedId === warehouse.id ? undefined : warehouse.id)}>{context.selectedId === warehouse.id ? "Selected" : "Select"}</Button>
+            <Button size="sm" variant="ghost" onClick={() => { context.select(warehouse.id); context.openOverlay("Location editor", { id: warehouse.id }); }}>Edit</Button>
             <Button size="sm" variant="ghost" onClick={() => { context.select(warehouse.id); context.openOverlay("stock count", { id: warehouse.id }); }}>Count</Button>
           </>}>
           <Properties rows={[
@@ -706,7 +709,7 @@ export function Replenishment({ context, lens }: { context: ScreenContext; lens:
         <Field label="Demand window in days" hint="Used only to describe the suggestion, never to predict demand">
           <TextInput value={horizon} inputMode="numeric" align="end" onChange={(event) => setHorizon(event.target.value)} />
         </Field>
-        <Button variant="secondary" onClick={() => context.openOverlay("reorder policy")}>How a suggestion is made</Button>
+        <Button variant="secondary" onClick={() => context.openOverlay("Reorder policy")}>How a suggestion is made</Button>
       </Row>
       <Notice tone="warning" title="A suggestion is not a forecast and never commits money">
         These rows come from the reorder point, the reorder quantity and the lead time recorded on each product, with units already on order deducted. Nothing extrapolates seasonality, and no purchase order is created without a requisition and an approval.
@@ -742,6 +745,7 @@ export function ProcurementAnalytics({ context, lens }: { context: ScreenContext
     return (
       <Stack gap={4}>
         <DataGrid rows={data.suppliers.filter((supplier) => supplier.status !== "archived")} rowId={(row) => row.id} label="Supplier reliability" filterable={false}
+          selectedId={context.selectedId} onSelect={(id) => context.select(id)}
           columns={[
             { key: "title", header: "Supplier", primary: true, cell: (row) => row.title },
             { key: "ontime", header: "On time", align: "end", cell: (row) => <span className="ds-num">{String(row.fields.onTimeRatePct ?? "—")}%</span>, sortValue: (row) => Number(row.fields.onTimeRatePct ?? 0) },

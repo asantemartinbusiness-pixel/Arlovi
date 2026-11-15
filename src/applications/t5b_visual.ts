@@ -7,3 +7,5 @@ import "@/applications/photo/index";
 import "@/domain/seeds/video";
 import "@/applications/layout/index";
 import "@/applications/video/index";
+import "@/domain/seeds/motion";
+import "@/applications/motion/index";

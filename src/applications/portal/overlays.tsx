@@ -12,6 +12,7 @@ import {
   usePortalData, type PortalBody,
 } from "./data";
 import { InvoiceTotalsCard, usePortal } from "./panels";
+import { ReportPayment } from "./actions";
 
 /* ====================================================================== *
  * PORTAL overlays. Every grant is explicit: nothing is shared by a rule.
@@ -373,7 +374,7 @@ export function ClientMessage({ context, close }: { context: ScreenContext; clos
           at: new Date().toISOString(),
           parentId: portal.id,
           tags: ["portal", "message"],
-          fields: { portalId: portal.id, direction: "in", kind: "message", author: actor, delivery: "not_connected", attachments: 0, internalOnly: false },
+          fields: { portalId: portal.id, direction: context.role === "client" ? "in" : "out", kind: "message", author: actor, delivery: "not_connected", attachments: 0, internalOnly: false },
           body: { text: text.trim() },
         }, `Portal message recorded on ${portal.title}`);
         context.toast("Message recorded", "It is on the portal thread. Nothing was emailed: no mail provider is connected.");
@@ -600,6 +601,7 @@ export function PaymentProvider({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       {invoice && <InvoiceTotalsCard invoice={invoice} context={context} />}
+      {invoice && <ReportPayment context={context} invoice={invoice} />}
       <ProviderBoundary id="payment.capture" title="There is no payment link">
         A card payment must go straight to a processor from a hosted field. This build has no server to hold a key, so no link can be created and no card detail is ever requested from a client.
       </ProviderBoundary>

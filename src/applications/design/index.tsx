@@ -13,7 +13,7 @@ import {
   EditorFrame, PanelGroup, RecoveryNotice, SaveState, ShortcutTable, downloadBlob, downloadText,
   slug, useStore, type DocHandle,
 } from "@/applications/visual/kit";
-import { canUndoShared, editShared, readShared, sharedHandle, undoShared, useSharedDoc } from "./sharedDoc";
+import { canUndoShared, editShared, readShared, sharedHandle, undoShared, useGuardRefresh, useSharedDoc } from "./sharedDoc";
 import { CAPABILITY_LABELS } from "@/platform/capability";
 import { fitRect, rectCenter } from "@/applications/visual/geometry";
 import {
@@ -36,6 +36,8 @@ import { designUi, importSvg, parseDesign, requestFit, setSelection, setTool, st
 function useDesignDoc(context: ScreenContext) {
   const record = useRecord(context.params.id);
   const handle = useSharedDoc<DesignDoc>(record, parseDesign, context.screen.id);
+  useStore(designUi);
+  useGuardRefresh(context);
   return { record, handle };
 }
 
@@ -2099,14 +2101,18 @@ function selectedComponentId(doc: DesignDoc | undefined): string | undefined {
   return node?.kind === "instance" ? node.componentId : undefined;
 }
 
-/** The path the path screen is editing: the chosen one, or the selected path layer. Never the first one found. */
+/**
+ * The path the path screen is editing: the chosen one, then a selected path
+ * layer, then the path the screen itself shows as active (the first on the
+ * page, highlighted in its list), so the actions and the canvas agree.
+ */
 function targetPathId(doc: DesignDoc | undefined): string | undefined {
   if (!doc) return undefined;
   const page = activePage(doc);
   const ui = designUi.get();
   if (ui.pathNodeId && page.nodes[ui.pathNodeId]?.path) return ui.pathNodeId;
   const selected = ui.selected.find((id) => page.nodes[id]?.path);
-  return selected;
+  return selected ?? Object.values(page.nodes).find((node) => node.kind === "path" && node.path)?.id;
 }
 
 const needsPath = (context: ScreenContext) => (targetPathId(openDesign(context)) ? undefined : "Choose a path layer first");
@@ -2325,10 +2331,13 @@ function SwapInstance({ context, close }: { context: ScreenContext; close: () =>
 
 function TokenEditor({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, handle } = useDesignDoc(context);
-  const [tokenId, setTokenId] = useState(handle.doc?.colors[0]?.id ?? "");
+  const [chosenToken, setTokenId] = useState("");
+  const tokenId = chosenToken || handle.doc?.colors[0]?.id || "";
   const token = handle.doc?.colors.find((item) => item.id === tokenId);
-  const [name, setName] = useState(token?.name ?? "");
-  const [value, setValue] = useState(token?.value ?? "#234FE8");
+  const [draftName, setName] = useState<string | null>(null);
+  const [draftValue, setValue] = useState<string | null>(null);
+  const name = draftName ?? token?.name ?? "";
+  const value = draftValue ?? token?.value ?? "#234FE8";
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const doc = handle.doc;
   if (doc.colors.length === 0) return <Empty title="No colour tokens yet">Create one with New colour token.</Empty>;
@@ -2499,15 +2508,17 @@ function PublishPrototype({ context, close }: { context: ScreenContext; close: (
 function CropAsset({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, handle } = useDesignDoc(context);
   const images = handle.doc?.assets.filter((asset) => asset.kind === "image" && asset.src) ?? [];
-  const [assetId, setAssetId] = useState(images[0]?.id ?? "");
+  const [chosenAsset, setAssetId] = useState("");
+  const assetId = chosenAsset || images[0]?.id || "";
   const asset = images.find((item) => item.id === assetId);
-  const [rect, setRect] = useState({ x: 0, y: 0, w: asset?.width ?? 0, h: asset?.height ?? 0 });
+  const [draftRect, setRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const rect = draftRect ?? { x: 0, y: 0, w: asset?.width ?? 0, h: asset?.height ?? 0 };
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   if (images.length === 0) return <Empty title="No image with pixels to crop">Add an image asset first. Icons are vectors and are resized, not cropped.</Empty>;
   const field = (key: "x" | "y" | "w" | "h", label: string) => (
-    <Field label={label}><TextInput type="number" value={rect[key]} onChange={(event) => setRect((current) => ({ ...current, [key]: Math.round(Number(event.target.value)) }))} /></Field>
+    <Field label={label}><TextInput type="number" value={rect[key]} onChange={(event) => setRect({ ...rect, [key]: Math.round(Number(event.target.value)) })} /></Field>
   );
   return (
     <form
@@ -2573,7 +2584,7 @@ async function batchExport(context: ScreenContext): Promise<void> {
     const svg = pageToSvg(page, bounds);
     const name = `${base}-${slug(node.name)}${spec.suffix}`;
     if (spec.format === "svg") downloadText(`${name}.svg`, svg, "image/svg+xml");
-    else downloadBlob(`${name}@${spec.scale}x.png`, await svgToPng(svg, bounds.w, bounds.h, spec.scale));
+    else downloadBlob(`${name}${spec.suffix.includes("@") ? "" : `@${spec.scale}x`}.png`, await svgToPng(svg, bounds.w, bounds.h, spec.scale));
     written += 1;
   }
   await context.mutate.log(`Batch export: ${written} files written${skipped.length ? `, ${skipped.length} skipped` : ""}`, { entityId: id, type: "export" });

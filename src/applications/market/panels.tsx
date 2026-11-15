@@ -743,6 +743,8 @@ export function EmailCampaigns({ context, lens }: { context: ScreenContext; lens
         rows={emailCampaigns}
         rowId={(row) => row.id}
         label="Email campaigns"
+        selectedId={context.selectedId}
+        onSelect={(id) => context.select(id)}
         onOpen={(id) => context.openOverlay("email builder", { id })}
         columns={[
           { key: "title", header: "Campaign", primary: true, cell: (row) => row.title, filterValue: (row) => row.title },
@@ -858,7 +860,8 @@ export function AudienceSegments({ context, lens }: { context: ScreenContext; le
             <Card key={audience.id} span={6} title={audience.title} subtitle={audience.summary}
               actions={<Pill tone={result.members.length === 0 ? "warning" : "success"}>{result.members.length} eligible</Pill>}
               footer={<>
-                <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Segment builder", { id: audience.id })}>Edit rules</Button>
+                <Button size="sm" variant={context.selectedId === audience.id ? "primary" : "secondary"} aria-pressed={context.selectedId === audience.id} onClick={() => context.select(context.selectedId === audience.id ? undefined : audience.id)}>{context.selectedId === audience.id ? "Selected" : "Select"}</Button>
+                <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Segment builder", { id: audience.id })}>Edit rules</Button>
                 <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Audience preview", { id: audience.id })}>Preview members</Button>
                 <span className="ds-grow" />
                 <span className="ds-subtle">Counted {context.relative(audience.updatedAt)}</span>
@@ -999,6 +1002,8 @@ export function Advertising({ context, lens }: { context: ScreenContext; lens: s
       rows={paid}
       rowId={(row) => row.id}
       label="Advertising campaigns"
+      selectedId={context.selectedId}
+      onSelect={(id) => context.select(id)}
       onOpen={(id) => context.navigate(`/o/${org.slug}/market/campaigns/${id}`)}
       columns={[
         { key: "title", header: "Campaign", primary: true, cell: (row) => row.title, filterValue: (row) => row.title },

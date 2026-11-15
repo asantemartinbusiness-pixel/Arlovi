@@ -7,7 +7,7 @@ import {
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
-import { BoundaryNotice, closeFooter, submitFooter } from "@/applications/t6kit/kit";
+import { closeFooter, submitFooter } from "@/applications/t6kit/kit";
 import {
   FIELD_KIND_LABELS, generateTypes, generatedFiles, issueTotals, makeField, validateApp,
 } from "./model";
@@ -18,6 +18,12 @@ import {
   ProjectSetupForm, ReleaseApproval, TestsScreen,
 } from "./panels";
 import { saveApp, useBuildUi } from "./state";
+import {
+  ConfigInspector, EditFileForm, EventInspector, SafeCommandPanel, TraceInspector, addComponent, approveFix, askEngineer,
+  attachIntegration, branchProject, commitChange, configureProvider, createIncident, deployFunctions, editStyles,
+  exportChecks, exportMonitoring, pauseDeployments, revokeIntegration, revokeSessions, rotateSecret, runChecks, seedEntity,
+  testEndpoint, testIntegrations, tuneMonitor, validatePolicy,
+} from "./actions";
 
 /* ====================================================================== *
  * BUILD — App Builder & Development
@@ -81,10 +87,13 @@ function ColumnEditor({ context, close }: { context: ScreenContext; close: () =>
   const payload = context.overlayPayload as { entityId?: string } | undefined;
   const entity = model.entities.find((item) => item.id === (payload?.entityId ?? ui.entityId)) ?? model.entities[0];
   const [fieldId, setFieldId] = useState(entity?.fields[0]?.id ?? "");
+  const [kind, setKind] = useState("");
+  const [error, setError] = useState("");
   if (!record) return <NoProject />;
   if (!entity) return <Empty title="No entity" icon={<Database size={20} />} />;
   const field = entity.fields.find((item) => item.id === fieldId) ?? entity.fields[0];
   if (!field) return <Empty title={`${entity.name} has no fields`} icon={<Database size={20} />} />;
+  const destructive = Boolean(kind) && kind !== field.kind;
 
   return (
     <form
@@ -93,6 +102,10 @@ function ColumnEditor({ context, close }: { context: ScreenContext; close: () =>
       onSubmit={async (event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
+        if (destructive && data.get("authorise") !== "on") {
+          setError("Changing a field's kind can discard values that no longer fit. Export a backup and tick the authorisation first.");
+          return;
+        }
         const next = {
           ...field,
           name: String(data.get("name") ?? field.name),
@@ -105,22 +118,29 @@ function ColumnEditor({ context, close }: { context: ScreenContext; close: () =>
         await saveApp(context, record, {
           ...model,
           entities: model.entities.map((item) => (item.id === entity.id ? { ...item, fields: item.fields.map((entry) => (entry.id === field.id ? next : entry)) } : item)),
-        }, `Field ${next.name} on ${entity.name} changed`);
+        }, `Field ${next.name} on ${entity.name} changed${destructive ? ` from ${field.kind} to ${next.kind}, authorised by ${context.actor} after a backup` : ""}`);
         context.toast("Field saved", `${next.name} is ${next.required ? "required" : "optional"} on ${entity.name}.`);
         close();
       }}
     >
       <Field label="Field">
-        <Select value={field.id} onChange={(event) => setFieldId(event.target.value)}>
+        <Select value={field.id} onChange={(event) => { setFieldId(event.target.value); setKind(""); setError(""); }}>
           {entity.fields.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </Select>
       </Field>
       <Field label="Name" required><TextInput name="name" defaultValue={field.name} required /></Field>
       <Field label="Kind">
-        <Select name="kind" defaultValue={field.kind}>
-          {Object.entries(FIELD_KIND_LABELS).map(([kind, label]) => <option key={kind} value={kind}>{label}</option>)}
+        <Select key={field.id} name="kind" defaultValue={field.kind} onChange={(event) => setKind(event.target.value)}>
+          {Object.entries(FIELD_KIND_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </Select>
       </Field>
+      {destructive && (
+        <Notice tone="danger" title="This is a destructive migration">
+          Existing values of {field.name} may not fit a {FIELD_KIND_LABELS[kind as keyof typeof FIELD_KIND_LABELS]} field. Export a backup from the Migrations tab first.
+          <div style={{ marginBlockStart: 8 }}><Checkbox name="authorise" label="I have exported a backup and I authorise this change" /></div>
+        </Notice>
+      )}
+      {error && <Notice tone="danger" title="Not saved">{error}</Notice>}
       <Field label="Options" hint="Comma separated. Only used by a choice field."><TextInput name="options" defaultValue={field.options.join(", ")} /></Field>
       <Field label="References" hint="Only used by a reference field.">
         <Select name="references" defaultValue={field.references}>
@@ -227,7 +247,7 @@ function CommandAuthorization({ context }: { context: ScreenContext }) {
           { label: "Never from a prompt", value: "Anything touching credentials, the network or the filesystem outside the project" },
         ]} />
       </Card>
-      <Button variant="secondary" onClick={() => { context.closeOverlay(); context.setTab("Problems"); }}>Look at the model problems instead</Button>
+      <SafeCommandPanel context={context} />
     </Stack>
   );
 }
@@ -533,22 +553,6 @@ function TraceViewer({ context }: { context: ScreenContext }) {
   );
 }
 
-function AlertRule({ context }: { context: ScreenContext }) {
-  const { record, model } = useAppRecord(context);
-  if (!record) return <NoProject />;
-  const totals = issueTotals(validateApp(model));
-  return (
-    <Stack gap={3}>
-      <Properties rows={[
-        { label: "Failing checks now", value: <span className="ds-num">{String(totals.fail)}</span> },
-        { label: "Alert when", value: "A check that was passing starts failing" },
-        { label: "Delivery", value: <Pill tone="warning" dot>Not connected</Pill> },
-      ]} />
-      <Checkbox label="Write an attention item when a model check starts failing" defaultChecked />
-      <BoundaryNotice id="email.send" action="Sending an alert" />
-    </Stack>
-  );
-}
 
 export const buildApp = registerApp({
   code: "BUILD",
@@ -636,14 +640,16 @@ export const buildApp = registerApp({
       })),
       actions: [
         { id: "Open builder", label: "Open the builder", placement: "primary", run: (context) => context.navigate(`/o/${context.org.slug}/build/projects/${context.params.id ?? ""}/builder`) },
-        { id: "run tests", label: "Run the checks", placement: "secondary", run: (context) => context.setTab("Tests") },
-        { id: "create issue", label: "Create a task", placement: "overflow", run: (context) => context.openOverlay("task creation") },
-        { id: "ask engineer", label: "Failing checks", placement: "overflow", run: (context) => context.openOverlay("Incident inspector") },
+        { id: "run tests", label: "Run the tests", placement: "secondary", run: async (context) => { await runChecks(context); context.setTab("Tests"); } },
+        { id: "create issue", label: "Create an issue (task)", placement: "overflow", run: (context) => context.openOverlay("task creation") },
+        { id: "ask engineer", label: "Ask an engineer", placement: "overflow", run: (context) => context.openOverlay("ask engineer") },
+        { id: "failing checks", label: "Failing checks", placement: "overflow", run: (context) => context.openOverlay("Incident inspector") },
       ],
       overlays: [
         { id: "Incident inspector", kind: "drawer", title: "Failing checks", width: 520, render: ({ ...context }) => <IncidentInspector context={context} /> },
         { id: "release preview", kind: "modal", title: "Release review", width: 620, render: ({ close, ...context }) => <ReleaseApproval context={context} close={close} /> },
         { id: "task creation", kind: "modal", title: "Create a task", width: 520, render: ({ close, ...context }) => <TaskCreation context={context} close={close} />, footer: submitFooter("task-creation", "Create the task") },
+        askEngineer,
       ],
     },
 
@@ -656,19 +662,25 @@ export const buildApp = registerApp({
         render: (context: ScreenContext) => <AppBuilder context={context} />,
       })),
       actions: [
-        { id: "Add component", label: "Add a component", placement: "primary", run: (context) => { context.setTab("Design"); context.toast("Palette ready", "Press a component to add it after the selection, or drag it onto a position."); } },
+        { id: "Add component", label: "Add a component", placement: "primary", run: (context) => context.openOverlay("add component") },
         {
           id: "bind record", label: "Bind the selection", placement: "secondary",
           guard: () => (useBuildUi.getState().componentId ? undefined : "Select a component first"),
           run: (context) => context.openOverlay("Component inspector"),
         },
-        { id: "edit styles", label: "Widths", placement: "overflow", run: (context) => context.setTab("Responsive") },
-        { id: "simulate", label: "Run the preview", placement: "overflow", run: (context) => context.setTab("Preview") },
+        {
+          id: "edit styles", label: "Edit styles", placement: "overflow",
+          guard: () => (useBuildUi.getState().componentId ? undefined : "Select a component first"),
+          run: (context) => context.openOverlay("edit styles"),
+        },
+        { id: "simulate", label: "Simulate in the preview", placement: "overflow", run: (context) => context.setTab("Preview") },
+        { id: "responsive widths", label: "Responsive widths", placement: "overflow", run: (context) => context.setTab("Responsive") },
       ],
       overlays: [
         { id: "Component inspector", kind: "drawer", title: "Component", width: 460, render: ({ ...context }) => <ComponentInspectorOverlay context={context} /> },
         { id: "expression editor", kind: "modal", title: "Automation", width: 640, render: ({ close, ...context }) => <ExpressionEditor context={context} close={close} />, footer: submitFooter("expression-editor", "Save automation") },
         { id: "binding test", kind: "drawer", title: "Binding test", width: 520, render: ({ ...context }) => <BindingTest context={context} /> },
+        addComponent, editStyles,
       ],
     },
 
@@ -681,16 +693,21 @@ export const buildApp = registerApp({
         render: (context: ScreenContext) => <CodeScreen context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Edit", label: "Edit the model instead", placement: "primary", run: (context) => context.navigate(`/o/${context.org.slug}/build/projects/${context.params.id ?? ""}/builder?tab=Data`) },
+        { id: "Edit", label: "Edit a file", placement: "primary", run: (context) => context.openOverlay("edit file") },
         { id: "search", label: "Search the files", placement: "secondary", run: (context) => context.openOverlay("File search") },
-        { id: "commit", label: "Review the output", placement: "overflow", run: (context) => context.openOverlay("diff review") },
-        { id: "run safe command", label: "Run a command", placement: "overflow", run: (context) => context.openOverlay("command authorization") },
-        { id: "branch", label: "Change history", placement: "overflow", run: (context) => context.setTab("Source control") },
+        { id: "commit", label: "Commit a version", placement: "overflow", run: (context) => context.openOverlay("commit") },
+        { id: "run safe command", label: "Run a safe command", placement: "overflow", run: (context) => context.openOverlay("command authorization") },
+        { id: "branch", label: "Branch", placement: "overflow", run: (context) => context.openOverlay("branch") },
+        { id: "edit model", label: "Edit the model", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/build/projects/${context.params.id ?? ""}/builder?tab=Data`) },
+        { id: "review output", label: "Review the generated output", placement: "overflow", run: (context) => context.openOverlay("diff review") },
+        { id: "change history", label: "Change history", placement: "overflow", run: (context) => context.setTab("Source control") },
       ],
       overlays: [
         { id: "File search", kind: "modal", title: "Search the generated files", width: 620, render: ({ ...context }) => <FileSearch context={context} />, footer: closeFooter() },
         { id: "diff review", kind: "drawer", title: "Generated output", width: 640, render: ({ ...context }) => <DiffReview context={context} /> },
-        { id: "command authorization", kind: "modal", title: "Run a command", tone: "danger", width: 560, render: ({ ...context }) => <CommandAuthorization context={context} />, footer: closeFooter() },
+        { id: "command authorization", kind: "modal", title: "Run a safe command", tone: "danger", width: 600, render: ({ ...context }) => <CommandAuthorization context={context} />, footer: closeFooter() },
+        { id: "edit file", kind: "modal", title: "Edit a file", width: 680, render: ({ close, ...context }) => <EditFileForm context={context} close={close} />, footer: submitFooter("edit-file", "Save the file") },
+        commitChange, branchProject,
       ],
     },
 
@@ -718,9 +735,10 @@ export const buildApp = registerApp({
             context.toast("Entity created", `${created.name} has two starting fields. Rename it and bind a collection.`);
           },
         },
-        { id: "alter schema", label: "Field detail", placement: "secondary", run: (context) => context.openOverlay("Column editor") },
-        { id: "validate policy", label: "Access policy", placement: "overflow", run: (context) => context.setTab("Policies") },
-        { id: "seed", label: "Migration check", placement: "overflow", run: (context) => context.openOverlay("migration diff") },
+        { id: "alter schema", label: "Alter a field", placement: "secondary", run: (context) => context.openOverlay("Column editor") },
+        { id: "validate policy", label: "Validate the access policy", placement: "overflow", run: (context) => context.openOverlay("validate policy") },
+        { id: "seed", label: "Seed an entity", placement: "overflow", run: (context) => context.openOverlay("seed") },
+        { id: "migration check", label: "Migration check", placement: "overflow", run: (context) => context.openOverlay("migration diff") },
       ],
       overlays: [
         { id: "Column editor", kind: "modal", title: "Field", width: 560, render: ({ close, ...context }) => <ColumnEditor context={context} close={close} />, footer: submitFooter("column-editor", "Save field") },
@@ -729,6 +747,7 @@ export const buildApp = registerApp({
           id: "access policy", kind: "drawer", title: "Access policy", width: 520,
           render: ({ ...context }) => <MigrationPanel context={context} />,
         },
+        validatePolicy, seedEntity,
       ],
     },
 
@@ -742,14 +761,18 @@ export const buildApp = registerApp({
       })),
       actions: [
         { id: "Define endpoint", label: "Define an endpoint", placement: "primary", run: (context) => context.openOverlay("Request builder") },
-        { id: "test", label: "Authorisation", placement: "secondary", run: (context) => context.openOverlay("auth inspector") },
-        { id: "deploy", label: "Contracts", placement: "overflow", run: (context) => context.setTab("Contracts") },
-        { id: "inspect trace", label: "Function source", placement: "overflow", run: (context) => context.setTab("Functions") },
+        { id: "test", label: "Test an endpoint", placement: "secondary", run: (context) => context.openOverlay("test endpoint") },
+        { id: "deploy", label: "Deploy", placement: "overflow", run: (context) => context.openOverlay("deploy functions") },
+        { id: "inspect trace", label: "Inspect the trace", placement: "overflow", run: (context) => context.openOverlay("trace inspector") },
+        { id: "authorisation", label: "Authorisation", placement: "overflow", run: (context) => context.openOverlay("auth inspector") },
+        { id: "contracts", label: "Contracts", placement: "overflow", run: (context) => context.setTab("Contracts") },
       ],
       overlays: [
         { id: "Request builder", kind: "modal", title: "Endpoint", width: 580, render: ({ close, ...context }) => <RequestBuilder context={context} close={close} />, footer: submitFooter("request-builder", "Define the endpoint") },
         { id: "auth inspector", kind: "drawer", title: "Authorisation", width: 520, render: ({ ...context }) => <AuthInspector context={context} /> },
         { id: "function diff", kind: "drawer", title: "Generated contracts", width: 640, render: ({ ...context }) => <DiffReview context={context} /> },
+        testEndpoint, deployFunctions,
+        { id: "trace inspector", kind: "drawer", title: "Request path", width: 560, render: ({ ...context }) => <TraceInspector context={context} /> },
       ],
     },
 
@@ -763,13 +786,15 @@ export const buildApp = registerApp({
       })),
       actions: [
         { id: "Create role", label: "New role", placement: "primary", run: (context) => context.openOverlay("Role editor") },
-        { id: "configure provider", label: "Providers", placement: "secondary", run: (context) => context.setTab("Providers") },
-        { id: "revoke session", label: "Sessions", placement: "overflow", run: (context) => context.setTab("Sessions") },
+        { id: "configure provider", label: "Configure a provider", placement: "secondary", run: (context) => context.openOverlay("configure provider") },
+        { id: "revoke session", label: "Revoke sessions", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("revoke session") },
+        { id: "providers", label: "Providers", placement: "overflow", run: (context) => context.setTab("Providers") },
       ],
       overlays: [
         { id: "Role editor", kind: "modal", title: "New role", width: 520, render: ({ close, ...context }) => <RoleEditorForm context={context} close={close} />, footer: submitFooter("role-editor", "Create the role") },
         { id: "policy simulator", kind: "drawer", title: "Policy simulation", width: 580, render: ({ ...context }) => <PolicySimulator context={context} /> },
         { id: "authentication issue", kind: "modal", title: "What this method needs", width: 520, render: ({ ...context }) => <AuthIssuePanel context={context} />, footer: closeFooter() },
+        configureProvider, revokeSessions,
       ],
     },
 
@@ -782,25 +807,15 @@ export const buildApp = registerApp({
         render: (context: ScreenContext) => <TestsScreen context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Run suite", label: "Run the suites", placement: "primary", run: (context) => context.setTab("Suites") },
-        { id: "inspect failure", label: "Open the report", placement: "secondary", run: (context) => context.openOverlay("Test report") },
-        { id: "approve fix", label: "Proposed changes", placement: "overflow", run: (context) => context.openOverlay("AI patch review") },
-        { id: "export", label: "Flaky checks", placement: "overflow", run: (context) => context.openOverlay("flaky test tracker") },
+        { id: "Run suite", label: "Run the suites", placement: "primary", run: async (context) => { await runChecks(context); context.setTab("Runs"); } },
+        { id: "inspect failure", label: "Inspect failures", placement: "secondary", run: (context) => context.openOverlay("Test report") },
+        { id: "approve fix", label: "Approve a fix", placement: "overflow", run: (context) => context.openOverlay("AI patch review") },
+        { id: "export", label: "Export the results", placement: "overflow", capability: "export_data", run: (context) => exportChecks(context) },
+        { id: "flaky checks", label: "Flaky checks", placement: "overflow", run: (context) => context.openOverlay("flaky test tracker") },
       ],
       overlays: [
         { id: "Test report", kind: "drawer", title: "Check report", width: 600, render: ({ ...context }) => <TestReport context={context} /> },
-        {
-          id: "AI patch review", kind: "drawer", title: "Proposed change", width: 560,
-          render: ({ ...context }) => (
-            <Stack gap={3}>
-              <BoundaryNotice id="model.inference" action="Proposing a fix" />
-              <Notice tone="info" title="What a proposal would have to carry">
-                The exact model change, the checks it turns green, the checks it leaves failing, and a way to reject it that leaves the model untouched. Until a model provider is connected, no proposal exists to review.
-              </Notice>
-              <Button variant="secondary" onClick={() => context.setTab("Issues")}>Read the failing checks instead</Button>
-            </Stack>
-          ),
-        },
+        approveFix,
         {
           id: "flaky test tracker", kind: "modal", title: "Flaky checks", width: 520,
           render: () => (
@@ -830,13 +845,17 @@ export const buildApp = registerApp({
       actions: [
         { id: "Promote", label: "Promote", placement: "primary", run: (context) => context.openOverlay("Release approval", { environment: "production" }) },
         { id: "rollback", label: "Roll back", placement: "secondary", run: (context) => context.openOverlay("rollback impact") },
-        { id: "inspect config", label: "Environments", placement: "overflow", run: (context) => context.setTab("Environments") },
-        { id: "pause", label: "Build logs", placement: "overflow", run: (context) => context.setTab("Logs") },
+        { id: "inspect config", label: "Inspect the configuration", placement: "overflow", run: (context) => context.openOverlay("config inspector") },
+        { id: "pause", label: "Pause or resume deployments", placement: "overflow", run: (context) => context.openOverlay("pause deployments") },
+        { id: "environments", label: "Environments", placement: "overflow", run: (context) => context.setTab("Environments") },
+        { id: "build logs", label: "Build logs", placement: "overflow", run: (context) => context.setTab("Logs") },
       ],
       overlays: [
         { id: "Release approval", kind: "modal", title: "Release review", width: 640, render: ({ close, ...context }) => <ReleaseApproval context={context} close={close} /> },
         { id: "diff", kind: "drawer", title: "Generated output", width: 640, render: ({ ...context }) => <DiffReview context={context} /> },
         { id: "rollback impact", kind: "modal", title: "Rollback", width: 540, render: ({ ...context }) => <RollbackImpact context={context} />, footer: closeFooter() },
+        pauseDeployments,
+        { id: "config inspector", kind: "drawer", title: "Configuration", width: 600, render: ({ ...context }) => <ConfigInspector context={context} /> },
       ],
     },
 
@@ -849,10 +868,12 @@ export const buildApp = registerApp({
         render: (context: ScreenContext) => <IntegrationsScreen context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Attach integration", label: "Integration directory", placement: "primary", run: (context) => context.navigate(`/o/${context.org.slug}/connect/marketplace`) },
-        { id: "test", label: "Health", placement: "secondary", run: (context) => context.setTab("Health") },
-        { id: "rotate secret", label: "Keys", placement: "overflow", run: (context) => context.openOverlay("Secret input") },
-        { id: "revoke", label: "Webhooks", placement: "overflow", run: (context) => context.setTab("Webhooks") },
+        { id: "Attach integration", label: "Attach an integration", placement: "primary", run: (context) => context.openOverlay("attach integration") },
+        { id: "test", label: "Test the integrations", placement: "secondary", run: (context) => context.openOverlay("test integrations") },
+        { id: "rotate secret", label: "Rotate a secret", placement: "overflow", run: (context) => context.openOverlay("rotate secret") },
+        { id: "revoke", label: "Revoke an integration", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("revoke integration") },
+        { id: "integration directory", label: "Integration directory", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/connect/marketplace`) },
+        { id: "keys", label: "Keys", placement: "overflow", run: (context) => context.openOverlay("Secret input") },
       ],
       overlays: [
         {
@@ -892,6 +913,7 @@ export const buildApp = registerApp({
           ),
           footer: closeFooter(),
         },
+        attachIntegration, testIntegrations, rotateSecret, revokeIntegration,
       ],
     },
 
@@ -904,14 +926,18 @@ export const buildApp = registerApp({
         render: (context: ScreenContext) => <MonitorScreen context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Inspect event", label: "Read path", placement: "primary", run: (context) => context.openOverlay("Trace viewer") },
-        { id: "create incident", label: "Failing checks", placement: "secondary", run: (context) => context.openOverlay("Incident inspector") },
-        { id: "tune monitor", label: "Alert rule", placement: "overflow", run: (context) => context.openOverlay("alert rule") },
-        { id: "export", label: "Budget", placement: "overflow", run: (context) => context.openOverlay("budget panel") },
+        { id: "Inspect event", label: "Inspect an event", placement: "primary", run: (context) => context.openOverlay("event inspector") },
+        { id: "create incident", label: "Create an incident", placement: "secondary", run: (context) => context.openOverlay("create incident") },
+        { id: "tune monitor", label: "Tune the monitor", placement: "overflow", run: (context) => context.openOverlay("alert rule") },
+        { id: "export", label: "Export", placement: "overflow", capability: "export_data", run: (context) => exportMonitoring(context) },
+        { id: "read path", label: "Read path", placement: "overflow", run: (context) => context.openOverlay("Trace viewer") },
+        { id: "failing checks", label: "Failing checks", placement: "overflow", run: (context) => context.openOverlay("Incident inspector") },
+        { id: "budget", label: "Budget", placement: "overflow", run: (context) => context.openOverlay("budget panel") },
       ],
       overlays: [
         { id: "Trace viewer", kind: "drawer", title: "Read path", width: 580, render: ({ ...context }) => <TraceViewer context={context} /> },
-        { id: "alert rule", kind: "modal", title: "Alert rule", width: 520, render: ({ ...context }) => <AlertRule context={context} />, footer: closeFooter() },
+        tuneMonitor, createIncident,
+        { id: "event inspector", kind: "drawer", title: "Event", width: 560, render: ({ ...context }) => <EventInspector context={context} /> },
         { id: "budget panel", kind: "drawer", title: "Budget", width: 480, render: ({ ...context }) => <BudgetPanel context={context} /> },
         { id: "Incident inspector", kind: "drawer", title: "Failing checks", width: 520, render: ({ ...context }) => <IncidentInspector context={context} /> },
       ],

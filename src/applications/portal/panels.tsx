@@ -78,7 +78,8 @@ export function PortalDirectory({ context, audience }: { context: ScreenContext;
             subtitle={portal.summary}
             actions={<Pill tone={statusTone(portal.status)} dot>{portal.status}</Pill>}
             footer={<>
-              <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/portal/portals/${portal.id}/dashboard`)}>Preview</Button>
+              <Button size="sm" variant={context.selectedId === portal.id ? "primary" : "secondary"} aria-pressed={context.selectedId === portal.id} onClick={() => context.select(context.selectedId === portal.id ? undefined : portal.id)}>{context.selectedId === portal.id ? "Selected" : "Select"}</Button>
+              <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/portal/portals/${portal.id}/dashboard`)}>Preview</Button>
               <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/portal/portals/${portal.id}/builder`)}>Builder</Button>
               <Button size="sm" variant="ghost" onClick={() => { context.select(portal.id); context.openOverlay("access setup", { id: portal.id }); }}>Access</Button>
             </>}
@@ -296,6 +297,7 @@ export function ExternalDashboard({ context, lens }: { context: ScreenContext; l
       : (
         <Stack gap={4}>
           <DataGrid rows={work} rowId={(row) => row.record.id} label="Shared work" filterable={false}
+            selectedId={context.selectedId} onSelect={(id) => context.select(id)}
             columns={[
               { key: "kind", header: "Kind", primary: true, cell: (row) => <Pill>{row.collection === "purchaseOrders" ? "purchase order" : row.collection.replace(/s$/, "")}</Pill> },
               { key: "title", header: "Reference", cell: (row) => <span className="ds-num">{row.record.title}</span> },
@@ -343,7 +345,7 @@ export function ExternalDashboard({ context, lens }: { context: ScreenContext; l
             {documents.filter((document) => document.status === "needs_review").map((document) => (
               <Row key={document.id} gap={2} className="ds-panel" style={{ padding: "var(--space-3)" }}>
                 <div className="ds-grow"><strong>{document.title}</strong><p className="ds-subtle">Awaiting your review</p></div>
-                <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Shared item inspector", { id: document.id })}>Open</Button>
+                <Button size="sm" variant="secondary" onClick={() => { context.select(document.id); context.openOverlay("Shared item inspector", { id: document.id }); }}>Open</Button>
               </Row>
             ))}
             {invoices.filter((invoice) => invoice.status === "awaiting_payment").map((invoice) => (

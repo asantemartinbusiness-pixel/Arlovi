@@ -20,7 +20,7 @@ import {
   type Adjust, type PhotoLayer, type RasterDoc,
 } from "./raster";
 import { addToAssetLibrary, batchUi, buildBatch, downloadResults, exportImage, exportUi, heldBatchFiles, outputSize, runBatch, testSample } from "./jobs";
-import { canUndoShared, editShared, readShared, sharedHandle, undoShared, useSharedDoc } from "@/applications/design/sharedDoc";
+import { canUndoShared, editShared, readShared, sharedHandle, undoShared, useGuardRefresh, useSharedDoc } from "@/applications/design/sharedDoc";
 import { PhotoCanvas, useImageBank, LayerThumb, type ImageBank } from "./canvas";
 import { AdjustControls, CurveEditor, HistogramView, LayerProperties, PhotoLayers, useHistogram } from "./panels";
 import {
@@ -35,6 +35,8 @@ function usePhotoDoc(context: ScreenContext) {
   const record = useRecord(context.params.id);
   const handle = useSharedDoc<RasterDoc>(record, parsePhoto, context.screen.id);
   const bank = useImageBank(handle.doc);
+  useStore(photoUi);
+  useGuardRefresh(context);
   return { record, handle, bank };
 }
 
@@ -773,6 +775,7 @@ function moveLayerLocal(doc: RasterDoc, id: string, delta: number): RasterDoc {
 function BatchScreen({ context, lens }: { context: ScreenContext; lens: "Queue" | "Presets" | "Results" | "Failed" }) {
   const photos = useCollection("photos");
   const batch = useStore(batchUi);
+  useGuardRefresh(context);
   const { jobs, chosen, format, quality, longEdge, pattern, running, done } = batch;
   const set = (patch: Partial<typeof batch>) => batchUi.set((current) => ({ ...current, ...patch }));
   const setFormat = (value: typeof format) => set({ format: value });

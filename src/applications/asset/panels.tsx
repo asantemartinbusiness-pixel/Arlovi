@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Image, Images, ShieldAlert, Wand2 } from "lucide-react";
 import {
   Button, Card, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Segmented,
@@ -14,6 +14,24 @@ import { AssetPreview, FileStateTag, assetPreviewUri, fileState, palette, stored
  * ASSET panels — the media library: browse, inspect, brand kits,
  * transformations and governance.
  * ====================================================================== */
+
+/* A tiny shared store so the contract "group" action and the toolbar control are one setting. */
+export type AssetGrouping = "none" | "kind" | "licence" | "tag";
+let grouping: AssetGrouping = "none";
+const groupingListeners = new Set<() => void>();
+export function setAssetGrouping(next: AssetGrouping): void {
+  grouping = next;
+  for (const listener of groupingListeners) listener();
+}
+function useAssetGrouping(): [AssetGrouping, (next: AssetGrouping) => void] {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const listener = () => bump((value) => value + 1);
+    groupingListeners.add(listener);
+    return () => { groupingListeners.delete(listener); };
+  }, []);
+  return [grouping, setAssetGrouping];
+}
 
 export const ASSET_COLLECTIONS = ["assets", "brands", "transforms", "campaigns", "products", "documents"];
 
@@ -68,7 +86,7 @@ export function AssetLibrary({ context, tab }: { context: ScreenContext; tab: Li
   const data = useAssets();
   const { now, actor } = useWorkspace();
   const [view, setView] = useState<"grid" | "list">("grid");
-  const [group, setGroup] = useState<"none" | "kind" | "licence" | "tag">("none");
+  const [group, setGroup] = useAssetGrouping();
   const [query, setQuery] = useState("");
 
   const base = useMemo(() => {
@@ -941,4 +959,65 @@ export function useSeeded<T extends string | number | boolean>(seed: T): [T, (ne
     setValue(seed);
   }
   return [value, setValue];
+}
+
+/** The contract "group" action: sets the library grouping the toolbar control also shows. */
+export function GroupAssets({ close }: { close: () => void }) {
+  const [group, setGroup] = useAssetGrouping();
+  const [choice, setChoice] = useState<AssetGrouping>(group);
+  return (
+    <Stack gap={4}>
+      <Field label="Group by">
+        <Select aria-label="Group the library by" value={choice} onChange={(event) => setChoice(event.target.value as AssetGrouping)}>
+          <option value="none">No grouping</option>
+          <option value="kind">Type</option>
+          <option value="licence">Licence</option>
+          <option value="tag">First tag</option>
+        </Select>
+      </Field>
+      <Row gap={2}>
+        <Button variant="primary" onClick={() => { setGroup(choice); close(); }}>Apply</Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+/** Archives an asset on its own. Live uses are named first; a retention rule still applies to the archived record. */
+export function ArchiveAsset({ context, close }: { context: ScreenContext; close: () => void }) {
+  const data = useAssets();
+  const record = data.assets.find((row) => row.id === (context.params.id ?? context.selectedId));
+  const [busy, setBusy] = useState(false);
+  if (!record) return <Empty title="No asset" />;
+  const uses = usedIn(record);
+  const archived = record.status === "archived";
+  const brandMaster = data.brands.some((brand) => brand.fields.master === true && csvList(brand.fields.assetIds).includes(record.id));
+  const blocked = archived ? "This asset is already archived." : brandMaster ? "It belongs to the master brand kit. Replace it there first." : undefined;
+  return (
+    <Stack gap={4}>
+      <Notice tone={uses.length ? "warning" : "info"} title={uses.length ? `${uses.length} live ${uses.length === 1 ? "use keeps" : "uses keep"} pointing at it` : "Nothing uses this asset"}>
+        {uses.length ? `${uses.join("; ")}. They keep resolving to the archived file; use Replace to move them to another asset.` : "Archiving removes it from the working library. Nothing is deleted."}
+      </Notice>
+      {record.fields.retentionBasis && <Notice tone="info" title="Retention still applies">{String(record.fields.retentionBasis)}: kept until {context.date(String(record.fields.retentionUntil ?? ""))}. Archiving does not shorten it.</Notice>}
+      {blocked && <Notice tone="danger" title="Cannot archive">{blocked}</Notice>}
+      <Row gap={2}>
+        <Button
+          variant="danger"
+          busy={busy}
+          disabled={Boolean(blocked)}
+          onClick={async () => {
+            setBusy(true);
+            const saved = await context.mutate.patch(record.id, { status: "archived", fields: { ...record.fields, archivedBy: context.actor, archivedAt: new Date().toISOString(), statusBeforeArchive: record.status } }, { expectRevision: record.revision, event: `Asset archived by ${context.actor}: ${record.title}` });
+            if (saved) context.toast("Archived", `${record.title} is archived. ${uses.length} use${uses.length === 1 ? "" : "s"} still resolve to it.`);
+            setBusy(false);
+            close();
+          }}
+        >
+          Archive {record.title}
+        </Button>
+        <Button variant="secondary" onClick={() => context.openOverlay("replacement impact", { id: record.id })}>Replace it instead</Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
 }

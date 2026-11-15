@@ -99,7 +99,9 @@ export async function startRender(context: ScreenContext, title: string, presetN
       width: preset.width, height: preset.height, fps: doc.fps, bitrate: preset.bitrate,
       captions: videoUi.get().showCaptions,
       signal: cancelFlag,
-      onProgress: (value) => renderUi.set((current) => ({ ...current, progress: { frame: value.frame, frames: value.frames } })),
+      /* Every sixth frame is enough for a progress bar, and keeps the
+         panels that show it from re-rendering on every encoded frame. */
+      onProgress: (value) => { if (value.frame % 6 === 0 || value.frame === value.frames - 1) renderUi.set((current) => ({ ...current, progress: { frame: value.frame, frames: value.frames } })); },
     });
     if (cancelFlag.cancelled) {
       await patchJob(context, id, { state: "cancelled", note: "Cancelled before the end. Nothing was written." }, "Cancel a render job");

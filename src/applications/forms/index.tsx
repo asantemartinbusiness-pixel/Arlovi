@@ -12,6 +12,11 @@ import {
   ThemeInspector,
 } from "./panels";
 import { saveForm, useFormsUi } from "./state";
+import { openAct } from "@/applications/t6kit/act";
+import {
+  CompareVersions, ExperimentReport, assignSubmission, connectRule, createExperiment, exportAnalytics, exportSubmissions,
+  fixLogic, insertField, moveField,
+} from "./actions";
 
 /* ====================================================================== *
  * FORMS — Forms & Data Collection
@@ -178,19 +183,20 @@ export const formsApp = registerApp({
         render: (context: ScreenContext) => <FormBuilder context={context} />,
       })),
       actions: [
-        { id: "Insert field", label: "Add a field", placement: "primary", run: (context) => { context.setTab("Build"); context.toast("Palette ready", "Press a field in the palette to add it after the selection, or drag it onto a position."); } },
+        { id: "Insert field", label: "Insert a field", placement: "primary", run: (context) => context.openOverlay("insert field") },
         {
-          id: "change type", label: "Edit the selection", placement: "secondary",
+          id: "change type", label: "Change the field type", placement: "secondary",
           guard: () => (useFormsUi.getState().selectedFieldId ? undefined : "Select a field first"),
           run: (context) => context.openOverlay("Field inspector"),
         },
-        { id: "reorder", label: "Reorder", placement: "overflow", run: (context) => { context.setTab("Build"); context.toast("Reordering", "Drag a grip, or use Move up and Move down on each field."); } },
+        { id: "reorder", label: "Reorder a field", placement: "overflow", run: (context) => context.openOverlay("move field") },
         { id: "publish", label: "Publish", placement: "overflow", run: (context) => context.openOverlay("publish review") },
       ],
       overlays: [
         { id: "Field inspector", kind: "drawer", title: "Field", width: 460, render: ({ ...context }) => <FieldInspectorOverlay context={context} /> },
         { id: "validation", kind: "modal", title: "Validation on this form", width: 620, render: ({ ...context }) => <ValidationOverlay context={context} />, footer: closeFooter() },
         { id: "publish review", kind: "modal", title: "Publish review", width: 600, render: ({ close, ...context }) => <PublishReviewForm context={context} close={close} /> },
+        insertField, moveField,
       ],
     },
 
@@ -203,15 +209,18 @@ export const formsApp = registerApp({
         render: (context: ScreenContext) => <LogicScreen context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Create condition", label: "New rule", placement: "primary", run: (context) => context.openOverlay("Rule editor") },
+        { id: "Create condition", label: "Create a condition", placement: "primary", run: (context) => context.openOverlay("Rule editor") },
         { id: "test", label: "Test a scenario", placement: "secondary", run: (context) => context.setTab("Test") },
-        { id: "connect", label: "Check the branches", placement: "overflow", run: (context) => context.openOverlay("invalid path") },
-        { id: "fix", label: "Scenario tester", placement: "overflow", run: (context) => context.openOverlay("scenario tester") },
+        { id: "connect", label: "Connect a condition", placement: "overflow", run: (context) => context.openOverlay("connect rule") },
+        { id: "fix", label: "Fix a logic problem", placement: "overflow", run: (context) => context.openOverlay("fix logic") },
+        { id: "check branches", label: "Check the branches", placement: "overflow", run: (context) => context.openOverlay("invalid path") },
+        { id: "scenario tester", label: "Scenario tester", placement: "overflow", run: (context) => context.openOverlay("scenario tester") },
       ],
       overlays: [
         { id: "Rule editor", kind: "modal", title: "Rule", width: 600, render: ({ close, ...context }) => <RuleEditorForm context={context} close={close} />, footer: submitFooter("rule-editor", "Save rule") },
         { id: "invalid path", kind: "drawer", title: "Branch check", width: 520, render: ({ ...context }) => <InvalidPathPanel context={context} /> },
         { id: "scenario tester", kind: "drawer", title: "Scenario", width: 480, render: ({ ...context }) => <ScenarioTester context={context} /> },
+        connectRule, fixLogic,
       ],
     },
 
@@ -225,14 +234,16 @@ export const formsApp = registerApp({
       })),
       actions: [
         { id: "Inspect", label: "Inspect", placement: "primary", run: (context) => context.openOverlay("Submission drawer") },
-        { id: "export", label: "Export CSV", placement: "secondary", capability: "export_data", run: (context) => context.toast("Export is in the grid", "Use Export CSV in the table toolbar so the export matches the tab you are looking at.") },
-        { id: "assign", label: "Routing", placement: "overflow", run: (context) => context.openOverlay("route retry") },
-        { id: "delete under policy", label: "Retention", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("privacy control") },
+        { id: "export", label: "Export CSV", placement: "secondary", capability: "export_data", run: (context) => exportSubmissions(context) },
+        { id: "assign", label: "Assign", placement: "overflow", run: openAct("assign submission") },
+        { id: "delete under policy", label: "Delete under the retention policy", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("privacy control") },
+        { id: "routing", label: "Notification routing", placement: "overflow", run: (context) => context.openOverlay("route retry") },
       ],
       overlays: [
         { id: "Submission drawer", kind: "drawer", title: "Submission", width: 520, render: ({ ...context }) => <SubmissionDrawer context={context} /> },
         { id: "privacy control", kind: "modal", title: "Retention and privacy", tone: "danger", width: 560, render: ({ ...context }) => <PrivacyControl context={context} />, footer: closeFooter() },
         { id: "route retry", kind: "modal", title: "Routing", width: 520, render: ({ ...context }) => <RouteRetry context={context} />, footer: closeFooter() },
+        assignSubmission,
       ],
     },
 
@@ -246,9 +257,9 @@ export const formsApp = registerApp({
       })),
       actions: [
         { id: "publish", label: "Publish a version", placement: "primary", run: (context) => context.openOverlay("publish review") },
-        { id: "generate link", label: "Share", placement: "secondary", run: (context) => context.openOverlay("share") },
-        { id: "Style", label: "Appearance", placement: "overflow", run: (context) => context.openOverlay("Theme inspector") },
-        { id: "preview", label: "Test the embed", placement: "overflow", run: (context) => context.openOverlay("embed tester") },
+        { id: "generate link", label: "Generate a link", placement: "secondary", run: (context) => context.openOverlay("share") },
+        { id: "Style", label: "Style the form", placement: "overflow", run: (context) => context.openOverlay("Theme inspector") },
+        { id: "preview", label: "Preview the embed", placement: "overflow", run: (context) => context.openOverlay("embed tester") },
       ],
       overlays: [
         { id: "Theme inspector", kind: "drawer", title: "Appearance", width: 420, render: ({ ...context }) => <ThemeInspector context={context} /> },
@@ -268,13 +279,18 @@ export const formsApp = registerApp({
         render: (context: ScreenContext) => <FormAnalytics context={context} lens={lens} />,
       })),
       actions: [
-        { id: "compare", label: "How each figure is made", placement: "primary", run: (context) => context.openOverlay("Metric methods") },
-        { id: "export", label: "Export", placement: "secondary", capability: "export_data", run: (context) => context.navigate(`/o/${context.org.slug}/forms/forms/${context.params.id ?? ""}/submissions`) },
-        { id: "create experiment", label: "Field insight", placement: "overflow", run: (context) => context.openOverlay("field insight") },
+        { id: "Compare", label: "Compare versions", placement: "primary", run: (context) => context.openOverlay("compare versions") },
+        { id: "export", label: "Export", placement: "secondary", capability: "export_data", run: (context) => exportAnalytics(context) },
+        { id: "create experiment", label: "Create an experiment", placement: "overflow", run: (context) => context.openOverlay("create experiment") },
+        { id: "methods", label: "How each figure is made", placement: "overflow", run: (context) => context.openOverlay("Metric methods") },
+        { id: "test report", label: "Experiment report", placement: "overflow", run: (context) => context.openOverlay("test report") },
+        { id: "field insight", label: "Field insight", placement: "overflow", run: (context) => context.openOverlay("field insight") },
       ],
       overlays: [
         { id: "Metric methods", kind: "modal", title: "How each figure is made", width: 640, render: ({ ...context }) => <MetricMethods context={context} />, footer: closeFooter() },
-        { id: "test report", kind: "drawer", title: "Sample size", width: 480, render: ({ ...context }) => <MetricMethods context={context} /> },
+        { id: "test report", kind: "drawer", title: "Experiment report", width: 520, render: ({ ...context }) => <ExperimentReport context={context} /> },
+        { id: "compare versions", kind: "modal", title: "Compare versions", width: 640, render: ({ ...context }) => <CompareVersions context={context} />, footer: closeFooter() },
+        createExperiment,
         { id: "field insight", kind: "drawer", title: "Field insight", width: 480, render: ({ ...context }) => <FieldInsight context={context} /> },
       ],
     },

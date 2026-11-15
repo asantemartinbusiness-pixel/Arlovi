@@ -8,6 +8,7 @@ import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { addDays, daysBetween, startOfMonth, startOfWeek } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
+import { RecordReview } from "./actions";
 import { Redline, type Version } from "./redline";
 
 export function useLegalData() {
@@ -923,6 +924,7 @@ export function ObligationQuickView({ context }: { context: ScreenContext }) {
         </Button>
         <Button variant="secondary" onClick={() => context.openOverlay("evidence upload", { id: obligation.id })}>Record evidence</Button>
       </Row>
+      <RecordReview context={context} obligation={obligation} />
     </Stack>
   );
 }

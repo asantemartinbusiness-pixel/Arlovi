@@ -1,7 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { useDoc, type DocHandle } from "@/applications/visual/kit";
 import type { Rec } from "@/domain/types";
-import type { ScreenContext } from "@/platform/registry";
+import { getScreenDef, type ScreenContext } from "@/platform/registry";
 
 /* ====================================================================== *
  * One editing session per open record.
@@ -142,4 +142,32 @@ export function undoShared(context: ScreenContext): boolean {
 
 export function canUndoShared(context: ScreenContext): boolean {
   return Boolean(sharedHandle<unknown>(context.params.id)?.canUndo);
+}
+
+/* ====================================================================== *
+ * Keeping the header honest.
+ *
+ * The screen host evaluates each action's guard when it renders, and it
+ * does not re-render when an editor's own state changes (a clip or a layer
+ * is selected, the playhead moves, a document finishes loading). A guard
+ * would then stay disabled after its reason had gone, or enabled after it
+ * had arrived. Each editor component calls this hook: it recomputes every
+ * guard of the screen and, only when one of the answers changes, asks the
+ * host to re-render by re-selecting the current tab.
+ * ====================================================================== */
+
+const LAST_SIGNATURE = new Map<string, string>();
+
+export function useGuardRefresh(context: ScreenContext): void {
+  const def = getScreenDef(context.screen.applicationCode, context.screen.id);
+  const signature = (def?.actions ?? []).map((action) => {
+    try { return action.guard?.(context) ?? ""; } catch { return "!"; }
+  }).join("|");
+  const key = `${context.screen.id}:${context.params.id ?? ""}`;
+  useEffect(() => {
+    const last = LAST_SIGNATURE.get(key);
+    if (last === signature) return;
+    LAST_SIGNATURE.set(key, signature);
+    if (last !== undefined && def?.chrome !== "full") context.setTab(context.tab);
+  });
 }

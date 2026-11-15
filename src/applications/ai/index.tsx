@@ -17,6 +17,7 @@ import {
 } from "@/applications/t2_shared/pieces";
 import { useChatState, usePanelFlags, type LocalAttachment } from "@/applications/t2_shared/store";
 import type { Rec } from "@/domain/types";
+import { AssignReviewer, AssignRoomTask, AttachToSpecialist, CommentOnArtifact, CorrectTranscript } from "./actions";
 
 /* ====================================================================== *
  * AI — Companion & Conversations
@@ -2583,17 +2584,17 @@ function SaveReport({ context, close }: { context: ScreenContext; close: () => v
           const document = await context.mutate.create({
             collection: "documents",
             title: `${research.title} — report`,
-            status: "review",
-            summary: "Research report written from the findings and their sources.",
-            fields: { artifact: true, researchId: research.id, version: 1 },
+            status: "published",
+            summary: "Research report written from the findings and their sources. Published inside this workspace only.",
+            fields: { artifact: true, researchId: research.id, version: 1, publishedBy: context.actor, publishedAt: context.now.toISOString(), externalPublication: "not_connected", gaps: gaps.length },
             body: { text, versions: [{ version: 1, at: context.now.toISOString(), author: context.actor, summary: "Saved from the research workspace." }], sources: findings.map((finding) => finding.sourceId).filter(Boolean) },
-          }, `Research report saved for ${research.title}`);
-          context.toast("Report saved", "It is an artifact in this workspace with its sources attached.");
+          }, `Research report published in the workspace by ${context.actor} for ${research.title}`);
+          context.toast("Report published in this workspace", `It is an artifact with its sources and ${gaps.length} named gap${gaps.length === 1 ? "" : "s"}. Nothing was published outside this browser.`);
           close();
           context.navigate(`/o/${context.org.slug}/ai/artifacts/${document.id}`);
         }}
       >
-        Save the report
+        Publish in this workspace
       </Button>
     </Stack>
   );
@@ -2860,7 +2861,8 @@ export const aiApp = registerApp({
       ],
       actions: [
         { id: "Message specialist", placement: "primary", run: (context) => { useChatState.getState().requestFocus(threadKey(context.screen.id, context.params.id)); context.setTab("Conversation"); } },
-        { id: "attach record", label: "Attach a record", placement: "secondary", run: (context) => context.openOverlay("Agent profile drawer", { id: context.params.id }) },
+        { id: "attach record", label: "Attach a record", placement: "secondary", run: (context) => context.openOverlay("attach record") },
+        { id: "specialist profile", label: "Specialist profile", placement: "overflow", run: (context) => context.openOverlay("Agent profile drawer", { id: context.params.id }) },
         { id: "request handoff", placement: "secondary", run: (context) => context.openOverlay("mission escalation", { id: context.params.id }) },
         { id: "review tool scope", placement: "overflow", run: (context) => context.openOverlay("permission explainer", { id: context.params.id }) },
       ],
@@ -2868,6 +2870,7 @@ export const aiApp = registerApp({
         { id: "Agent profile drawer", kind: "drawer", title: "Specialist", width: 480, render: ({ ...context }) => <AgentProfileDrawer context={context} /> },
         { id: "permission explainer", kind: "drawer", title: "Tool scope", width: 520, render: ({ ...context }) => <PermissionExplainer context={context} /> },
         { id: "mission escalation", kind: "modal", title: "Hand this to the coordinator", width: 560, render: ({ close, ...context }) => <MissionEscalation context={context} close={close} />, footer: submitFooter("mission-escalation", "Record the handoff") },
+        { id: "attach record", kind: "modal", title: "Attach a record", width: 560, render: ({ close, ...context }) => <AttachToSpecialist context={context} close={close} /> },
       ],
     },
 
@@ -2881,13 +2884,15 @@ export const aiApp = registerApp({
       actions: [
         { id: "Mention participant", placement: "primary", run: (context) => { useChatState.getState().setDraft(threadKey(context.screen.id, context.params.id), "@"); useChatState.getState().requestFocus(threadKey(context.screen.id, context.params.id)); context.setTab("Discussion"); } },
         { id: "pin decision", label: "Pin a decision", placement: "secondary", run: (context) => context.openOverlay("decision recorder") },
-        { id: "assign task", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/project/tasks`) },
+        { id: "assign task", placement: "overflow", run: (context) => context.openOverlay("assign task") },
+        { id: "all tasks", label: "All tasks in Projects", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/project/tasks`) },
         { id: "host review", placement: "overflow", run: (context) => context.openOverlay("Participant selector") },
       ],
       overlays: [
         { id: "Participant selector", kind: "modal", title: "Participants", width: 560, render: ({ close, ...context }) => <ParticipantSelector context={context} close={close} /> },
         { id: "decision recorder", kind: "modal", title: "Record a decision", width: 560, render: ({ close, ...context }) => <DecisionRecorder context={context} close={close} />, footer: submitFooter("decision-recorder", "Record decision") },
         { id: "topic thread", kind: "drawer", title: "Topic", width: 520, render: ({ ...context }) => <TopicThread context={context} /> },
+        { id: "assign task", kind: "modal", title: "Assign a task", width: 560, render: ({ close, ...context }) => <AssignRoomTask context={context} close={close} /> },
       ],
     },
 
@@ -2900,7 +2905,7 @@ export const aiApp = registerApp({
       })),
       actions: [
         { id: "Request status", placement: "primary", run: (context) => { const thread = threadKey(context.screen.id, context.params.id); useChatState.getState().setDraft(thread, "Where is this mission and what is blocked?"); useChatState.getState().requestSend(thread); context.setTab("Discussion"); } },
-        { id: "assign reviewer", placement: "secondary", run: (context) => { context.setTab("Reviews"); context.toast("Pick the work to review", "Each gate on the Reviews tab records who decided.", "info"); } },
+        { id: "assign reviewer", placement: "secondary", run: (context) => context.openOverlay("assign reviewer") },
         { id: "link evidence", placement: "secondary", run: (context) => context.openOverlay("evidence inspector") },
         { id: "resolve disagreement", placement: "overflow", run: (context) => context.openOverlay("Task handoff drawer") },
       ],
@@ -2908,6 +2913,7 @@ export const aiApp = registerApp({
         { id: "Task handoff drawer", kind: "drawer", title: "Hand a task over", width: 520, render: ({ close, ...context }) => <TaskHandoffDrawer context={context} close={close} /> },
         { id: "evidence inspector", kind: "drawer", title: "Evidence", width: 520, render: ({ ...context }) => <EvidenceInspector context={context} /> },
         { id: "review dialog", kind: "modal", title: "Record a review", width: 560, render: ({ close, ...context }) => <ReviewDialog context={context} close={close} /> },
+        { id: "assign reviewer", kind: "modal", title: "Assign a reviewer", width: 560, render: ({ close, ...context }) => <AssignReviewer context={context} close={close} /> },
       ],
     },
 
@@ -2925,12 +2931,13 @@ export const aiApp = registerApp({
         { id: "view transcript", placement: "secondary", run: (context) => context.setTab("Transcript") },
         { id: "mute", placement: "overflow", guard: () => "Nothing is being captured, so there is nothing to mute.", run: () => undefined },
         { id: "change voice", placement: "overflow", run: (context) => context.openOverlay("voice settings") },
-        { id: "correct text", placement: "overflow", run: (context) => { context.setTab("Transcript"); context.toast("Correct a line", "Each line has a Correct text button; the original is kept.", "info"); } },
+        { id: "correct text", placement: "overflow", run: (context) => context.openOverlay("correct text") },
       ],
       overlays: [
         { id: "Mic permission", kind: "modal", title: "Microphone", width: 520, render: ({ ...context }) => <MicPermission context={context} /> },
         { id: "voice settings", kind: "modal", title: "Voice settings", width: 520, render: ({ ...context }) => <VoiceSettingsOverlay context={context} /> },
         { id: "sensitive-action confirmation", kind: "modal", title: "Confirm a consequential action", tone: "danger", width: 560, blocking: true, render: ({ close, ...context }) => <SensitiveActionConfirmation context={context} close={close} /> },
+        { id: "correct text", kind: "modal", title: "Correct a transcript line", width: 560, render: ({ close, ...context }) => <CorrectTranscript context={context} close={close} /> },
       ],
     },
 
@@ -2965,7 +2972,7 @@ export const aiApp = registerApp({
         { id: "Refine question", placement: "primary", run: (context) => void refineQuestion(context) },
         { id: "request independent review", placement: "secondary", run: (context) => void requestReview(context) },
         { id: "inspect source", placement: "secondary", run: (context) => context.setTab("Sources") },
-        { id: "publish report", label: "Save report", placement: "overflow", run: (context) => context.openOverlay("save report", { id: context.params.id }) },
+        { id: "publish report", label: "Publish the report", placement: "overflow", run: (context) => context.openOverlay("save report", { id: context.params.id }) },
       ],
       overlays: [
         { id: "Source inspector", kind: "drawer", title: "Source", width: 520, render: ({ ...context }) => <SourceInspector context={context} /> },
@@ -3004,7 +3011,7 @@ export const aiApp = registerApp({
       actions: [
         { id: "revise with AI", label: "Compose a revision", placement: "primary", run: (context) => void reviseArtifact(context) },
         { id: "Open in native app", placement: "secondary", run: (context) => context.navigate(`/o/${context.org.slug}/docs/files/${context.params.id}`) },
-        { id: "comment", placement: "secondary", run: (context) => context.setTab("Comments") },
+        { id: "comment", placement: "secondary", run: (context) => context.openOverlay("comment") },
         { id: "share", placement: "overflow", run: (context) => context.openOverlay("share dialog", { id: context.params.id }) },
         { id: "export", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("export dialog", { id: context.params.id }) },
       ],
@@ -3012,6 +3019,7 @@ export const aiApp = registerApp({
         { id: "Version comparison", kind: "modal", title: "Compare versions", width: 680, render: ({ ...context }) => <VersionComparison context={context} /> },
         { id: "share dialog", kind: "modal", title: "Share", width: 560, render: ({ ...context }) => <ShareDialog context={context} /> },
         { id: "export dialog", kind: "modal", title: "Export", width: 520, render: ({ close, ...context }) => <ExportDialog context={context} close={close} /> },
+        { id: "comment", kind: "modal", title: "Comment on this artifact", width: 540, render: ({ close, ...context }) => <CommentOnArtifact context={context} close={close} /> },
       ],
     },
   },

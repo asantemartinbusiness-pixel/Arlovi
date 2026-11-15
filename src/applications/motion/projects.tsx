@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Clapperboard, FileUp, Link2, Unlink } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, Notice, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, DataGrid, Empty, Grid, Notice, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
@@ -10,7 +10,7 @@ import { uid } from "@/applications/visual/geometry";
 import { keyframeCount, type MotionAsset, type MotionDoc, type MotionLayer } from "./anim";
 import { parseMotion, starterMotion, storyboardFromBrief } from "./model";
 import { Stage } from "./parts";
-import { useAssetLookup } from "./shared";
+import { useAssetLookup, FormField } from "./shared";
 
 /* ====================================================================== *
  * ARL-MOTION-001 — Motion Projects
@@ -219,45 +219,45 @@ export function CompositionSetup({ context, close }: { context: ScreenContext; c
 
   return (
     <form id="motion-setup" className="ds-stack ds-gap-3" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-      <Field label="Name" required error={errors.name}>
+      <FormField label="Name" required error={errors.name}>
         <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="Arc Lamp launch sting" invalid={Boolean(errors.name)} autoFocus />
-      </Field>
-      <Field label="Start from">
+      </FormField>
+      <FormField label="Start from">
         <Select value={start} onChange={(event) => setStart(event.target.value as typeof start)}>
           <option value="starter">The starter: a title, an accent bar and a dot</option>
           <option value="brief">A creative brief, as a storyboard</option>
           <option value="template" disabled={templates.length === 0}>A brand motion template{templates.length === 0 ? " (none published)" : ""}</option>
         </Select>
-      </Field>
+      </FormField>
       {start === "brief" && (
-        <Field label="Creative brief" error={errors.brief} hint="Each sentence becomes one beat: a text layer that fades and rises in on its own slot. This is a rule applied to your words; no model is called, and every keyframe it writes can be edited.">
+        <FormField label="Creative brief" error={errors.brief} hint="Each sentence becomes one beat: a text layer that fades and rises in on its own slot. This is a rule applied to your words; no model is called, and every keyframe it writes can be edited.">
           <TextArea rows={4} value={brief} onChange={(event) => setBrief(event.target.value)} placeholder="Introduce the Arc Lamp. Show the brass finish. End on the showroom address." invalid={Boolean(errors.brief)} />
-        </Field>
+        </FormField>
       )}
       {start === "template" && (
-        <Field label="Template" error={errors.template}>
+        <FormField label="Template" error={errors.template}>
           <Select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
             <option value="">Choose…</option>
             {templates.map((record) => <option key={record.id} value={record.id}>{record.title}</option>)}
           </Select>
-        </Field>
+        </FormField>
       )}
       {start !== "template" && (
         <Row gap={3} wrap>
-          <Field label="Size">
+          <FormField label="Size">
             <Select value={size} onChange={(event) => setSize(event.target.value)}>
               {SIZES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
             </Select>
-          </Field>
-          <Field label="Frame rate">
+          </FormField>
+          <FormField label="Frame rate">
             <Select value={fps} onChange={(event) => setFps(event.target.value)}>
               {["12", "24", "25", "30", "60"].map((rate) => <option key={rate} value={rate}>{rate} fps</option>)}
             </Select>
-          </Field>
+          </FormField>
           {start === "starter" && (
-            <Field label="Duration (s)" error={errors.duration}>
+            <FormField label="Duration (s)" error={errors.duration}>
               <TextInput type="number" step="0.1" value={duration} onChange={(event) => setDuration(event.target.value)} invalid={Boolean(errors.duration)} />
-            </Field>
+            </FormField>
           )}
         </Row>
       )}
@@ -344,9 +344,9 @@ export function ImportComposition({ context, close }: { context: ScreenContext; 
 
   return (
     <Stack gap={3}>
-      <Field label="Composition file" hint="An Arlovi composition (.json, from Motion Export) or a static SVG, whose shapes become layers. The file is read in this browser; nothing is uploaded.">
+      <FormField label="Composition file" hint="An Arlovi composition (.json, from Motion Export) or a static SVG, whose shapes become layers. The file is read in this browser; nothing is uploaded.">
         <input type="file" accept=".json,.svg,application/json,image/svg+xml" aria-label="Composition file" data-testid="motion-import-file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void read(file); }} />
-      </Field>
+      </FormField>
       {error && <Notice tone="danger" title="Not imported">{error}</Notice>}
       {preview && (
         <Card eyebrow="IMPORT PREVIEW" prov="human" title={preview.name} subtitle={preview.note}>
@@ -435,7 +435,8 @@ export function AssetLibrary({ context }: { context: ScreenContext }) {
           </Card>
         );
       })}
-      <Field label="Link another asset">
+      <Stack gap={1}>
+        <span className="ds-field-label">Link another asset</span>
         <Row gap={2}>
           <Select value={relinkFor ? "" : pick} onChange={(event) => { setRelinkFor(null); setPick(event.target.value); }} aria-label="Asset to link">
             <option value="">Choose a record…</option>
@@ -448,7 +449,7 @@ export function AssetLibrary({ context }: { context: ScreenContext }) {
             setPick("");
           }}>Link</Button>
         </Row>
-      </Field>
+      </Stack>
     </Stack>
   );
 }
@@ -469,9 +470,9 @@ export function PublishTemplate({ context, close }: { context: ScreenContext; cl
       </p>
       {doc.reducedMotion.strategy === "none" && <Notice tone="warning" title="No reduced-motion alternative">Every composition made from this template inherits that gap. Choose an alternative in Motion Export first if you can.</Notice>}
       <Notice tone="info" title="Inside this workspace only">Publishing to a public CDN or a brand portal needs a hosting connection, which is not connected. Nothing leaves this browser.</Notice>
-      <Field label="Note for people using the template">
+      <FormField label="Note for people using the template">
         <TextArea rows={2} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Use for product launches; keep the accent bar papaya." />
-      </Field>
+      </FormField>
       <Row gap={2}>
         <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>

@@ -44,7 +44,7 @@ import {
   IntercompanyTab,
 } from "./entities";
 import {
-  ApproveBill, ApproveExpense, AssignCategory, EliminateIntercompany, ExportReturnOverlay, ExportStatements, InspectMismatch,
+  ApproveBill, ApproveExpense, AskFinance, AssignCategory, EliminateIntercompany, ExportReturnOverlay, ExportStatements, InspectMismatch,
   InvoiceExport, IssueReport, MapCategory, ReimburseExpense, ReviewFiling, SchedulePayment, SendInvoice, StatementFilter,
 } from "./actions";
 
@@ -114,13 +114,15 @@ export const finApp = registerApp({
         { id: "start reconciliation", label: "Reconcile", placement: "secondary", run: (context) => context.navigate(`/o/${context.org.slug}/fin/reconciliation`) },
         { id: "issue report", label: "Issue a report", placement: "secondary", capability: "export_data", run: (context) => context.openOverlay("issue report") },
         { id: "choose period", label: "Choose a period", placement: "overflow", run: (context) => context.openOverlay("reporting-period selector") },
-        { id: "ask Finance", label: "Ask Finance", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/ai/chat`) },
+        { id: "ask Finance", label: "Ask Finance", placement: "overflow", run: (context) => context.openOverlay("ask finance") },
+        { id: "chief of staff", label: "Open the Chief of Staff chat", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/ai/chat`) },
       ],
       overlays: [
         { id: "Metric drilldown", kind: "drawer", title: "Where this figure comes from", width: 560, render: ({ ...context }) => <MetricDrilldown context={context} /> },
         { id: "reporting-period selector", kind: "modal", title: "Reporting period", width: 520, render: ({ close, ...context }) => <PeriodSelector context={context} close={close} /> },
         { id: "correction proposal", kind: "modal", title: "Propose a correction", width: 540, render: ({ close, ...context }) => <CorrectionProposal context={context} close={close} /> },
         { id: "issue report", kind: "modal", title: "Issue a management report", width: 600, render: ({ close, ...context }) => <IssueReport context={context} close={close} /> },
+        { id: "ask finance", kind: "drawer", title: "Ask Finance", width: 620, render: ({ close, ...context }) => <AskFinance context={context} close={close} /> },
       ],
     },
 

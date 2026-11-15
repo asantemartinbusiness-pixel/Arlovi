@@ -942,3 +942,45 @@ export function EliminateIntercompany({ context, close }: { context: ScreenConte
   );
 }
 
+
+/* ------------------------------ FIN-001 ask ------------------------------ */
+
+/** A question for the Finance AI employee. No model is called; the question is kept and matched against records. */
+export function AskFinance({ context, close }: { context: ScreenContext; close: () => void }) {
+  const data = useFinData();
+  const [question, setQuestion] = useState("");
+  const [asked, setAsked] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const words = (asked ?? "").toLowerCase().split(/\W+/).filter((word) => word.length > 3);
+  const accounts = asked ? data.trialRows.filter((row) => words.some((word) => row.name.toLowerCase().includes(word))).slice(0, 6) : [];
+  const invoices = asked ? data.invoices.filter((invoice) => words.some((word) => `${invoice.title} ${invoice.summary}`.toLowerCase().includes(word))).slice(0, 6) : [];
+  return (
+    <Stack gap={4}>
+      <CapabilityNotice id="model.inference" title="Finance cannot reason about this yet" />
+      <Field label="Your question for Finance" required>
+        <TextArea aria-label="Your question for Finance" value={question} rows={3} onChange={(event) => setQuestion(event.target.value)} placeholder="How much rent have we posted this quarter?" />
+      </Field>
+      <Row gap={2}>
+        <Button variant="primary" busy={busy} disabled={!question.trim()} onClick={async () => {
+          setBusy(true);
+          await context.mutate.create({
+            collection: "messages", title: `Question for Finance: ${question.trim().slice(0, 60)}`, status: "queued_local", summary: question.trim(),
+            tags: ["finance", "ask-finance"], fields: { to: "Finance", askedBy: context.actor, screenId: context.screen.id, capability: "not_connected" },
+          }, `Question asked of Finance by ${context.actor}`);
+          setAsked(question.trim());
+          context.toast("Question kept", "No model is connected, so the answer below is only the posted figures and documents that match your words.", "info");
+          setBusy(false);
+        }}>Ask Finance</Button>
+        <Button variant="ghost" onClick={close}>Close</Button>
+      </Row>
+      {asked && (
+        <Stack gap={2}>
+          <strong>Posted balances and documents that mention your words</strong>
+          {accounts.map((row) => <Row key={row.accountId} gap={3}><span className="ds-grow">{row.code} {row.name}</span><Amount minor={row.balanceMinor} context={context} /></Row>)}
+          {invoices.map((invoice) => <Row key={invoice.id} gap={3}><span className="ds-grow">{invoice.title} · {invoice.status.replace(/_/g, " ")}</span><Amount minor={invoice.amountMinor} context={context} /></Row>)}
+          {accounts.length + invoices.length === 0 && <span className="ds-subtle">Nothing matches. Nothing is inferred beyond what the records state.</span>}
+        </Stack>
+      )}
+    </Stack>
+  );
+}

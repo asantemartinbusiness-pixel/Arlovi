@@ -13,13 +13,15 @@ import {
   workingHours, type BookingBody, type PublicPageBody, type ResourceBody, type ServiceBody,
 } from "./data";
 import { ConflictNotice, SlotPicker } from "./calendar";
+import { recordTestSend } from "./actions";
+import type { Rec } from "@/domain/types";
 
 /* ====================================================================== *
  * BOOK overlays. Every slot a form offers has been checked for a conflict
  * with findBookingConflict before it is shown as available.
  * ====================================================================== */
 
-function freeSlots(
+export function freeSlots(
   bookings: ReturnType<typeof useBookData>["bookings"],
   resources: ReturnType<typeof useBookData>["resources"],
   orgId: string,
@@ -274,9 +276,15 @@ export function ConflictReview({ context }: { context: ScreenContext }) {
 /* ---------------- BOOK-003 ---------------- */
 
 export function RescheduleBooking({ context, close }: { context: ScreenContext; close: () => void }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const target = useRecord(payload?.id ?? context.params.id ?? context.selectedId);
+  if (!target) return <Empty title="Select a booking" />;
+  return <RescheduleForm key={target.id} context={context} close={close} booking={target} />;
+}
+
+function RescheduleForm({ context, close, booking }: { context: ScreenContext; close: () => void; booking: Rec }) {
   const data = useBookData();
   const { org, now } = useWorkspace();
-  const booking = useRecord(context.params.id) ?? data.bookings[0];
   const service = data.services.find((item) => item.id === String(booking?.fields.serviceId ?? ""));
   const minutes = booking?.startAt && booking?.endAt ? (new Date(booking.endAt).getTime() - new Date(booking.startAt).getTime()) / 60_000 : Number(service?.fields.minutes ?? 45);
   const [startAt, setStartAt] = useState((booking?.startAt ?? now.toISOString()).slice(0, 16));
@@ -329,7 +337,8 @@ export function RescheduleBooking({ context, close }: { context: ScreenContext; 
 export function RefundRule({ context }: { context: ScreenContext }) {
   const data = useBookData();
   const { now } = useWorkspace();
-  const booking = useRecord(context.params.id) ?? data.bookings[0];
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const booking = useRecord(payload?.id ?? context.params.id ?? context.selectedId);
   const service = data.services.find((item) => item.id === String(booking?.fields.serviceId ?? ""));
   if (!booking) return <Empty title="No booking" />;
   const notice = Number(service?.fields.cancellationNoticeHours ?? 24);
@@ -363,7 +372,8 @@ export function RefundRule({ context }: { context: ScreenContext }) {
 export function CustomerMessage({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useBookData();
   const { now } = useWorkspace();
-  const booking = useRecord(context.params.id) ?? data.bookings[0];
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const booking = useRecord(payload?.id ?? context.params.id ?? context.selectedId);
   const contact = data.contacts.find((item) => item.id === String(booking?.fields.contactId ?? ""));
   const [text, setText] = useState("");
   if (!booking) return <Empty title="No booking" />;
@@ -395,9 +405,15 @@ export function CustomerMessage({ context, close }: { context: ScreenContext; cl
 }
 
 export function TakeDeposit({ context, close }: { context: ScreenContext; close: () => void }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const target = useRecord(payload?.id ?? context.params.id ?? context.selectedId);
+  if (!target) return <Empty title="Select a booking" />;
+  return <TakeDepositForm key={target.id} context={context} close={close} booking={target} />;
+}
+
+function TakeDepositForm({ context, close, booking }: { context: ScreenContext; close: () => void; booking: Rec }) {
   const data = useBookData();
   const { org, now } = useWorkspace();
-  const booking = useRecord(context.params.id) ?? data.bookings[0];
   const service = data.services.find((item) => item.id === String(booking?.fields.serviceId ?? ""));
   const [amount, setAmount] = useState(Number(booking?.fields.depositMinor ?? service?.fields.depositMinor ?? 0));
   if (!booking) return <Empty title="No booking" />;
@@ -852,6 +868,8 @@ export function SendPreview({ context }: { context: ScreenContext }) {
         <div className="t4-device-body"><p style={{ whiteSpace: "pre-wrap" }}>{filled}</p></div>
       </div>
       <ProviderBoundary id={String(template.fields.channel) === "sms" ? "telephony" : "email.send"} />
+      {template.fields.lastTestAt ? <span className="ds-subtle">Last test held locally {context.relative(String(template.fields.lastTestAt))} by {String(template.fields.lastTestBy)}.</span> : null}
+      <Button variant="primary" onClick={() => recordTestSend(context, template, context.actor)}>Record a test send to {context.actor}</Button>
     </Stack>
   );
 }

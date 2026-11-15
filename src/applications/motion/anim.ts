@@ -79,6 +79,8 @@ export interface Trigger {
   touch?: boolean;
   /** Hover and scroll return to rest when they end; click and key toggle. */
   returnOnEnd?: boolean;
+  /** Other layers that take the same state with it, such as a button's label. */
+  follow?: string[];
   note: string;
 }
 
@@ -574,7 +576,21 @@ function toggle(current: InteractionState, layerId: string, state: string): Inte
   return { ...current, [layerId]: current[layerId] === state ? REST : state };
 }
 
+/** Apply a trigger's outcome to its layer and to the layers that follow it. */
+function settle(doc: MotionDoc, before: InteractionState, after: InteractionState): InteractionState {
+  let next = after;
+  for (const trigger of doc.triggers) {
+    if (!trigger.follow?.length || before[trigger.layerId] === after[trigger.layerId]) continue;
+    for (const id of trigger.follow) next = { ...next, [id]: after[trigger.layerId] ?? REST };
+  }
+  return next;
+}
+
 export function interact(doc: MotionDoc, current: InteractionState, input: InteractionInput): InteractionState {
+  return settle(doc, current, interactOwn(doc, current, input));
+}
+
+function interactOwn(doc: MotionDoc, current: InteractionState, input: InteractionInput): InteractionState {
   let next = current;
   for (const trigger of doc.triggers) {
     if (input.kind === "load") {
@@ -602,9 +618,14 @@ export function interact(doc: MotionDoc, current: InteractionState, input: Inter
       case "click":
         if (trigger.on === "click") next = toggle(next, trigger.layerId, trigger.state);
         break;
-      case "tap":
-        if (trigger.touch && (trigger.on === "hover" || trigger.on === "click")) next = toggle(next, trigger.layerId, trigger.state);
+      case "tap": {
+        /* On touch, the first tap shows the hover state and the next one presses, as mobile browsers do. */
+        const hoverTouch = doc.triggers.find((item) => item.layerId === input.layerId && item.on === "hover" && item.touch);
+        const showsHover = hoverTouch && (current[input.layerId] ?? REST) === REST;
+        if (trigger.on === "hover" && trigger.touch && (showsHover || !doc.triggers.some((item) => item.layerId === input.layerId && item.on === "click" && item.touch))) next = toggle(next, trigger.layerId, trigger.state);
+        if (trigger.on === "click" && trigger.touch && !showsHover) next = toggle(next, trigger.layerId, trigger.state);
         break;
+      }
       case "key":
         if ((trigger.on === "click" || trigger.on === "key") && trigger.keyboard && trigger.keyboard.toLowerCase() === input.key.toLowerCase()) {
           next = toggle(next, trigger.layerId, trigger.state);
@@ -678,9 +699,9 @@ export function testTriggers(doc: MotionDoc): TriggerCheck[] {
       case "click":
         pointer = reached([{ kind: "click", layerId: id }]);
         keyboard = trigger.keyboard ? reached([{ kind: "key", layerId: id, key: trigger.keyboard }]) : false;
-        touch = reached([{ kind: "tap", layerId: id }]);
+        touch = reached([{ kind: "tap", layerId: id }]) || reached([{ kind: "tap", layerId: id }, { kind: "tap", layerId: id }]);
         if (keyboard) keyboardHow = `${trigger.keyboard} toggles`;
-        if (touch) touchHow = "tap toggles";
+        if (touch) touchHow = reached([{ kind: "tap", layerId: id }]) ? "tap toggles" : "second tap (the first shows hover)";
         break;
       case "key":
         keyboard = trigger.keyboard ? reached([{ kind: "key", layerId: id, key: trigger.keyboard }]) : false;
@@ -954,10 +975,23 @@ ${markup}
   <div class="spacer"></div>
 </div>
 <script>
-const triggers = ${JSON.stringify(doc.triggers.map(({ id, on, state, layerId, keyboard, touch, returnOnEnd }) => ({ id, on, state, layerId, keyboard, touch, returnOnEnd })))};
-const set = (id, state) => { const el = document.querySelector('[data-layer="' + id + '"]'); if (el) el.dataset.state = state; };
+const triggers = ${JSON.stringify(doc.triggers.map(({ id, on, state, layerId, keyboard, touch, returnOnEnd, follow }) => ({ id, on, state, layerId, keyboard, touch, returnOnEnd, follow })))};
+const followers = (id) => triggers.filter((t) => t.layerId === id).flatMap((t) => t.follow || []);
+const set = (id, state) => { for (const target of [id, ...followers(id)]) { const el = document.querySelector('[data-layer="' + target + '"]'); if (el) el.dataset.state = state; } };
 const get = (id) => document.querySelector('[data-layer="' + id + '"]')?.dataset.state;
 const toggle = (id, state) => set(id, get(id) === state ? "rest" : state);
+/* Touch: the first tap shows the hover state, the next presses — the same rule as the editor's reducer. */
+for (const id of new Set(triggers.filter((t) => t.touch && (t.on === "hover" || t.on === "click")).map((t) => t.layerId))) {
+  const el = document.querySelector('[data-layer="' + id + '"]');
+  const hover = triggers.find((t) => t.layerId === id && t.on === "hover" && t.touch);
+  const click = triggers.find((t) => t.layerId === id && t.on === "click" && t.touch);
+  el?.addEventListener("pointerup", (e) => {
+    if (e.pointerType !== "touch") return;
+    if (hover && get(id) === "rest") set(id, hover.state);
+    else if (click) toggle(id, click.state);
+    else if (hover) toggle(id, hover.state);
+  });
+}
 for (const t of triggers) {
   const el = document.querySelector('[data-layer="' + t.layerId + '"]');
   if (!el) continue;
@@ -966,10 +1000,9 @@ for (const t of triggers) {
     el.addEventListener("pointerenter", (e) => { if (e.pointerType !== "touch") set(t.layerId, t.state); });
     el.addEventListener("pointerleave", (e) => { if (e.pointerType !== "touch" && t.returnOnEnd !== false) set(t.layerId, "rest"); });
     if (t.keyboard === "Focus") { el.addEventListener("focus", () => set(t.layerId, t.state)); el.addEventListener("blur", () => { if (t.returnOnEnd !== false) set(t.layerId, "rest"); }); }
-    if (t.touch) el.addEventListener("pointerup", (e) => { if (e.pointerType === "touch") toggle(t.layerId, t.state); });
   }
   if (t.on === "click") {
-    el.addEventListener("click", (e) => { if (e.detail > 0 || !t.keyboard) toggle(t.layerId, t.state); });
+    el.addEventListener("click", (e) => { if (e.detail > 0 && e.pointerType !== "touch") toggle(t.layerId, t.state); });
     if (t.keyboard) el.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === t.keyboard.toLowerCase() || (t.keyboard === "Space" && e.key === " ")) { e.preventDefault(); toggle(t.layerId, t.state); } });
   }
   if (t.on === "key" && t.keyboard) document.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === t.keyboard.toLowerCase()) toggle(t.layerId, t.state); });

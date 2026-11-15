@@ -142,8 +142,9 @@ export function KeyframeTimeline({ handle, height = 230, onOpenKeyframe }: { han
   };
 
   return (
-    <div ref={frameRef} className="vx-tl" style={{ height }}>
-      <div className="vx-tl-gutter" style={{ overflowY: "auto" }}>
+    <div style={{ height, overflowY: "auto" }}>
+    <div ref={frameRef} className="vx-tl">
+      <div className="vx-tl-gutter">
         <div className="vx-tl-ruler"><span className="ds-num" style={{ paddingInlineStart: 6, fontSize: 10, lineHeight: "24px" }}>{ui.time.toFixed(2)}s</span></div>
         {rows.map((row, index) => (
           <div key={`${row.layer.id}-${row.property ?? "head"}-${index}`} className="vx-tl-rowhead" style={{ height: 28, paddingInlineStart: row.property ? 18 : 8 }}>
@@ -256,6 +257,7 @@ export function KeyframeTimeline({ handle, height = 230, onOpenKeyframe }: { han
           <div className="vx-playhead" style={{ insetInlineStart: ui.time * pxPerSecond }} />
         </div>
       </div>
+    </div>
     </div>
   );
 }
@@ -382,6 +384,7 @@ export function useMotionPlayback(doc: MotionDoc | null): { fps: number } {
   const [measured, setMeasured] = useState(0);
   const duration = doc?.duration ?? 0;
   const fps = doc?.fps ?? 30;
+  const loop = doc?.loop ?? false;
 
   useEffect(() => {
     if (!ui.playing || duration <= 0) return;
@@ -391,7 +394,7 @@ export function useMotionPlayback(doc: MotionDoc | null): { fps: number } {
     const tick = (now: number) => {
       let elapsed = (now - origin) / 1000;
       if (elapsed >= duration) {
-        if (motionUi.get().loop) {
+        if (loop) {
           origin = now;
           elapsed = 0;
         } else {
@@ -411,7 +414,7 @@ export function useMotionPlayback(doc: MotionDoc | null): { fps: number } {
     };
     raf.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf.current);
-  }, [ui.playing, duration, fps]);
+  }, [ui.playing, duration, fps, loop]);
 
   return { fps: ui.playing ? measured : 0 };
 }
@@ -428,7 +431,7 @@ export function TransportRow({ doc, fps }: { doc: MotionDoc; fps: number }) {
         data-variant={ui.playing ? "primary" : "secondary"}
         data-size="sm"
         data-testid="motion-play"
-        onClick={() => motionUi.set((current) => ({ ...current, playing: !current.playing }))}
+        onClick={() => motionUi.set((current) => ({ ...current, playing: !current.playing, time: !current.playing && current.time >= doc.duration - 1e-6 ? 0 : current.time }))}
       >
         {ui.playing ? "Pause" : "Play"}
       </button>

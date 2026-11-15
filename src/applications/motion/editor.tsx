@@ -1,7 +1,7 @@
 import { useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { ArrowDown, ArrowUp, Circle, Diamond, Eye, EyeOff, Lock, Square, Trash2, Type, Unlock } from "lucide-react";
 import {
-  Button, Field, Notice, Pill, Row, Select, Stack, TextInput, Tool, Toolbar, ToolbarSeparator,
+  Button, Notice, Pill, Row, Select, Stack, TextInput, Tool, Toolbar, ToolbarSeparator,
 } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import {
@@ -14,7 +14,7 @@ import {
 } from "./anim";
 import { motionUi, setMotionTime } from "./model";
 import { EasingGraph, KeyframeTimeline, Stage, TransportRow } from "./parts";
-import { MissingComposition, SHORTCUTS, useAssetLookup, useMotionDoc, usePrefersReducedMotion, useSession } from "./shared";
+import { MissingComposition, SHORTCUTS, useAssetLookup, useMotionDoc, usePrefersReducedMotion, useSession, FormField } from "./shared";
 
 /* ====================================================================== *
  * ARL-MOTION-002 — Composition Editor
@@ -269,9 +269,8 @@ function LayerList({ handle, doc, missingIds, context }: { handle: DocHandle<Mot
         {ordered.map((layer) => (
           <div key={layer.id} role="listitem" className="mo-layer" data-selected={selected?.id === layer.id}>
             <button type="button" className="mo-layer-name" aria-current={selected?.id === layer.id} onClick={() => motionUi.set((current) => ({ ...current, selectedLayerId: layer.id }))}>
-              {layer.name} <span className="vx-mini">{layer.kind}</span>
+              {layer.name} <span className="vx-mini">{missingIds.includes(layer.id) ? <span style={{ color: "var(--warning)" }}>asset missing</span> : layer.kind}</span>
             </button>
-            {missingIds.includes(layer.id) && <Pill tone="warning">asset missing</Pill>}
             <button type="button" className="vx-node-btn" aria-label={`Move ${layer.name} up`} onClick={() => move(layer.id, 1)}><ArrowUp size={13} /></button>
             <button type="button" className="vx-node-btn" aria-label={`Move ${layer.name} down`} onClick={() => move(layer.id, -1)}><ArrowDown size={13} /></button>
             <button type="button" className="vx-node-btn" aria-label={`${layer.visible ? "Hide" : "Show"} ${layer.name}`} aria-pressed={!layer.visible} onClick={() => handle.edit((current) => ({ ...current, layers: current.layers.map((item) => (item.id === layer.id ? { ...item, visible: !item.visible } : item)) }), layer.visible ? "Hide a layer" : "Show a layer")}>
@@ -358,7 +357,7 @@ function AnimatePanel({ handle, doc, context }: { handle: DocHandle<MotionDoc>; 
         {picked ? (
           <Stack gap={2}>
             <span className="vx-mini">{picked.layer.name} · {PROPERTY_LABEL[picked.property]} · <span className="ds-num">{picked.keyframe.t.toFixed(2)}s</span> → {picked.next ? <span className="ds-num">{picked.next.t.toFixed(2)}s</span> : "end"}</span>
-            <Field label="Easing out of this keyframe">
+            <FormField label="Easing out of this keyframe">
               <Select
                 value={EASING_PRESETS.find((preset) => JSON.stringify(preset.easing) === JSON.stringify(picked.keyframe.easing))?.id ?? "custom"}
                 onChange={(event) => {
@@ -369,7 +368,7 @@ function AnimatePanel({ handle, doc, context }: { handle: DocHandle<MotionDoc>; 
                 {EASING_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
                 <option value="custom" disabled>Custom curve</option>
               </Select>
-            </Field>
+            </FormField>
             {picked.keyframe.easing.kind === "bezier"
               ? <EasingGraph easing={picked.keyframe.easing} size={200} label="Easing of the selected keyframe" onChange={(next) => handle.live((current) => setEasing(current, picked.layer.id, picked.property, picked.keyframe.id, next))} />
               : <p className="vx-mini">A {picked.keyframe.easing.kind} easing has no handles. Choose a bezier preset to drag the curve.</p>}
@@ -389,8 +388,8 @@ function DesignPanel({ handle, doc }: { handle: DocHandle<MotionDoc>; doc: Motio
   return (
     <Stack gap={3}>
       <PanelGroup title="Layer">
-        <Field label="Name"><TextInput value={layer.name} onChange={(event) => patch({ name: event.target.value }, "Rename a layer")} /></Field>
-        {layer.kind === "text" && <Field label="Text"><TextInput value={layer.text ?? ""} onChange={(event) => patch({ text: event.target.value }, "Edit text")} /></Field>}
+        <FormField label="Name"><TextInput value={layer.name} onChange={(event) => patch({ name: event.target.value }, "Rename a layer")} /></FormField>
+        {layer.kind === "text" && <FormField label="Text"><TextInput value={layer.text ?? ""} onChange={(event) => patch({ text: event.target.value }, "Edit text")} /></FormField>}
         <ColorBox label="Base fill" value={layer.fill} onChange={(fill) => patch({ fill }, "Change the fill")} />
       </PanelGroup>
       <PanelGroup title="Geometry (before animation)">
@@ -408,11 +407,11 @@ function DesignPanel({ handle, doc }: { handle: DocHandle<MotionDoc>; doc: Motio
             <NumberBox label="Size" value={layer.textStyle.size} min={6} onChange={(size) => patch({ textStyle: { ...layer.textStyle!, size: Math.max(6, size) } }, "Change the type size")} />
             <NumberBox label="Weight" value={layer.textStyle.weight} step={50} min={100} max={900} onChange={(weight) => patch({ textStyle: { ...layer.textStyle!, weight: clamp(weight, 100, 900) } }, "Change the weight")} />
           </div>
-          <Field label="Align">
+          <FormField label="Align">
             <Select value={layer.textStyle.align} onChange={(event) => patch({ textStyle: { ...layer.textStyle!, align: event.target.value as "start" | "center" | "end" } }, "Align text")}>
               <option value="start">Start</option><option value="center">Centre</option><option value="end">End</option>
             </Select>
-          </Field>
+          </FormField>
         </PanelGroup>
       )}
       <PanelGroup title="Composition">
@@ -465,13 +464,13 @@ function PreviewPanel({ handle, doc, osReduced, showFull, setShowFull }: { handl
           <input type="checkbox" checked={ui.reduceMotionPreview} onChange={(event) => motionUi.set((current) => ({ ...current, reduceMotionPreview: event.target.checked }))} />
           <span>Preview the reduced-motion alternative</span>
         </label>
-        <Field label="Alternative output">
+        <FormField label="Alternative output">
           <Select value={doc.reducedMotion.strategy} onChange={(event) => handle.edit((current) => ({ ...current, reducedMotion: { ...current.reducedMotion, strategy: event.target.value as MotionDoc["reducedMotion"]["strategy"] } }), "Reduced-motion alternative")}>
             <option value="cross-fade">Cross-fade into the final frame</option>
             <option value="static-first-frame">Static first frame</option>
             <option value="none">None (the full motion plays)</option>
           </Select>
-        </Field>
+        </FormField>
         {doc.reducedMotion.strategy === "none" && <Notice tone="danger" title="No alternative">People who set reduced motion will get every movement. Exports say so in the file.</Notice>}
       </PanelGroup>
     </Stack>
@@ -516,7 +515,7 @@ export function KeyframeEditor({ close }: { close: () => void }) {
           ? <ColorBox label="Value" value={String(value)} onChange={setValue} />
           : <NumberBox label="Value" value={Number(value)} step={found.property === "opacity" || found.property === "scale" ? 0.05 : 1} onChange={setValue} />}
       </Row>
-      <Field label="Easing">
+      <FormField label="Easing">
         <Select value={easing.kind === "bezier" ? (EASING_PRESETS.find((preset) => JSON.stringify(preset.easing) === JSON.stringify(easing))?.id ?? "custom") : easing.kind} onChange={(event) => {
           const preset = EASING_PRESETS.find((item) => item.id === event.target.value);
           if (preset) setEasingDraft(preset.easing);
@@ -524,7 +523,7 @@ export function KeyframeEditor({ close }: { close: () => void }) {
           {EASING_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
           <option value="custom">Custom curve</option>
         </Select>
-      </Field>
+      </FormField>
       {easing.kind === "bezier" && (
         <>
           <EasingGraph easing={easing} size={220} onChange={setEasingDraft} label="Keyframe easing" />
@@ -572,8 +571,8 @@ export function LayerInspector({ close }: { close: () => void }) {
   const end = sampleLayer(layer, doc.duration);
   return (
     <Stack gap={3}>
-      <Field label="Name"><TextInput value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></Field>
-      {draft.kind === "text" && <Field label="Text"><TextInput value={draft.text ?? ""} onChange={(event) => setDraft({ ...draft, text: event.target.value })} /></Field>}
+      <FormField label="Name"><TextInput value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></FormField>
+      {draft.kind === "text" && <FormField label="Text"><TextInput value={draft.text ?? ""} onChange={(event) => setDraft({ ...draft, text: event.target.value })} /></FormField>}
       <div className="vx-fieldrow">
         <NumberBox label="X" value={draft.box.x} onChange={(x) => setDraft({ ...draft, box: { ...draft.box, x } })} />
         <NumberBox label="Y" value={draft.box.y} onChange={(y) => setDraft({ ...draft, box: { ...draft.box, y } })} />
@@ -585,12 +584,12 @@ export function LayerInspector({ close }: { close: () => void }) {
         <label className="ds-check"><input type="checkbox" checked={draft.visible} onChange={(event) => setDraft({ ...draft, visible: event.target.checked })} /><span>Visible</span></label>
         <label className="ds-check"><input type="checkbox" checked={draft.locked} onChange={(event) => setDraft({ ...draft, locked: event.target.checked })} /><span>Locked</span></label>
       </Row>
-      <Field label="Linked asset">
+      <FormField label="Linked asset">
         <Select value={draft.assetId ?? ""} onChange={(event) => setDraft({ ...draft, assetId: event.target.value || undefined })}>
           <option value="">None</option>
           {doc.assets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
         </Select>
-      </Field>
+      </FormField>
       <PanelGroup title={`Keyframes (${keyframes.length})`}>
         {keyframes.length === 0 ? <p className="vx-mini">Not animated yet.</p> : (
           <table className="ds-table">

@@ -64,11 +64,10 @@ export async function archiveCampaign(context: ScreenContext) {
 export function CompareCampaigns({ context }: { context: ScreenContext }) {
   const data = useMarketData();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const [chosen, setChosen] = useState<string[]>(() => {
-    const first = payload?.id ?? context.selectedId;
-    const others = data.campaigns.filter((campaign) => campaign.id !== first).slice(0, first ? 1 : 2).map((campaign) => campaign.id);
-    return first ? [first, ...others] : others;
-  });
+  const [picked, setChosen] = useState<string[] | null>(null);
+  const first = payload?.id ?? context.selectedId;
+  const fallback = [...(first ? [first] : []), ...data.campaigns.filter((campaign) => campaign.id !== first).slice(0, first ? 1 : 2).map((campaign) => campaign.id)];
+  const chosen = picked ?? fallback;
   const rows = data.campaigns.filter((campaign) => chosen.includes(campaign.id));
   const metrics = rows.map((campaign) => {
     const channels = bodyOf<CampaignBody>(campaign, {}).channels ?? [];
@@ -103,7 +102,7 @@ export function CompareCampaigns({ context }: { context: ScreenContext }) {
               label={`${campaign.title} · ${campaign.status}`}
               checked={chosen.includes(campaign.id)}
               disabled={!chosen.includes(campaign.id) && chosen.length >= 4}
-              onChange={(event) => setChosen((current) => (event.target.checked ? [...current, campaign.id] : current.filter((id) => id !== campaign.id)))}
+              onChange={(event) => setChosen(event.target.checked ? [...chosen, campaign.id] : chosen.filter((id) => id !== campaign.id))}
             />
           ))}
         </Stack>

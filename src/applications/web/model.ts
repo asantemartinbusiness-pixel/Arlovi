@@ -69,6 +69,8 @@ export interface SiteFormField { id: string; label: string; type: string; requir
 export interface SiteForm {
   id: string; name: string; formRecordId: string; fields: SiteFormField[];
   consent: string; honeypot: boolean; route: "record" | "review"; webhook: string;
+  /** Version a person last published inside the workspace, and when. */
+  publishedVersion?: number; publishedAt?: string; publishedBy?: string;
 }
 
 export interface DnsRecord { type: string; name: string; value: string }
@@ -314,6 +316,7 @@ export function readSite(record: Rec | undefined): SiteModel {
         honeypot: row.honeypot !== false,
         route: str(row.route) === "review" ? "review" : "record",
         webhook: str(row.webhook),
+        ...(typeof row.publishedVersion === "number" ? { publishedVersion: row.publishedVersion, publishedAt: str(row.publishedAt), publishedBy: str(row.publishedBy) } : {}),
       };
     }),
     domains: (Array.isArray(body.domains) ? body.domains : []).map((item, index) => {

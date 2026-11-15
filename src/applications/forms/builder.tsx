@@ -235,6 +235,8 @@ export function FormBuilder({ context }: { context: ScreenContext }) {
         </Toolbar>
         <span className="ds-grow" />
         <Row gap={2}>
+          <Button size="sm" variant="secondary" onClick={() => context.openOverlay("insert field")}>Insert field</Button>
+          <Button size="sm" variant="ghost" onClick={() => context.openOverlay("move field")}>Reorder</Button>
           <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/publish`)}>Design and publish</Button>
           <Button size="sm" variant="primary" onClick={() => context.openOverlay("publish review")}>Publish</Button>
         </Row>

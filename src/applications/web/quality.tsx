@@ -185,6 +185,14 @@ export function CodeDiffPanel({ context }: { context: ScreenContext }) {
         ))}
       </pre>
       <Notice tone="info" title="The diff is the real export">Both sides are produced by the same generator that writes the HTML file, so what is shown is what would ship.</Notice>
+      {applied && (
+        <Button variant="primary" onClick={async () => {
+          await saveSite(context, record, applied.next, applied.label);
+          await context.mutate.patch(record.id, { fields: { ...record.fields, lastFixAt: context.now.toISOString() } }, { event: `Proposed fix applied: ${applied.label}` });
+          context.toast("Fix applied", `${applied.label}. Retest to record the new figures; undo is available in the builder.`);
+          context.closeOverlay();
+        }}>Apply this fix</Button>
+      )}
     </Stack>
   );
 }

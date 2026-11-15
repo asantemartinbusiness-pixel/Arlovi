@@ -11,12 +11,13 @@ import { registerApp, type ActionDef, type ScreenContext } from "@/platform/regi
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import {
   EditorFrame, PanelGroup, RecoveryNotice, SaveState, downloadText, slug,
-  useDoc, useStore, type DocHandle,
+  useStore, type DocHandle,
 } from "@/applications/visual/kit";
+import { canUndoShared, editShared, readShared, sharedHandle, undoShared, useGuardRefresh, useSharedDoc } from "@/applications/design/sharedDoc";
 import {
   PAGE_SIZES, canvasMetrics, composeStory, effectivePpi, masterUsage, mm, overrideMasterFrame,
   preflight, preflightBlocks, threadFrames, threadHeads, toMm,
-  type Composition, type Frame, type ParagraphStyle, type PreflightIssue, type PublicationDoc,
+  type Box, type Composition, type Frame, type ParagraphStyle, type PreflightIssue, type PublicationDoc,
 } from "./flow";
 import { PageView, dragFrame, useCompositions } from "./spread";
 import {
@@ -30,8 +31,10 @@ import {
 
 function usePublication(context: ScreenContext) {
   const record = useRecord(context.params.id);
-  const handle = useDoc<PublicationDoc>(record, parsePublication, context.screen.id);
+  const handle = useSharedDoc<PublicationDoc>(record, parsePublication, context.screen.id);
   const compositions = useCompositions(handle.doc);
+  useStore(layoutUi);
+  useGuardRefresh(context);
   return { record, handle, compositions };
 }
 
@@ -1358,7 +1361,12 @@ function OversetWarning({ context }: { context: ScreenContext }) {
           </blockquote>
         </Notice>
       ))}
-      <Button variant="secondary" onClick={() => context.navigate(`${context.path("/o/:org/layout/publications/:id/typography", context.params.id)}?tab=Flow`)}>Fix the flow</Button>
+      <Row gap={2} wrap>
+        <Button variant="secondary" onClick={() => context.navigate(`${context.path("/o/:org/layout/publications/:id/typography", context.params.id)}?tab=Flow`)}>Fix the flow</Button>
+        {(context.overlayPayload as { exporting?: boolean } | undefined)?.exporting && handle.doc && (
+          <Button variant="outline-danger" onClick={async () => { context.closeOverlay(); await exportHtml(context, handle.doc!); }}>Export anyway, without the overset text</Button>
+        )}
+      </Row>
     </Stack>
   );
 }
@@ -1533,27 +1541,338 @@ function MissingAsset({ context }: { context: ScreenContext }) {
 }
 
 async function withPublication(context: ScreenContext, change: (doc: PublicationDoc) => PublicationDoc, event: string): Promise<void> {
-  const id = context.params.id;
-  if (!id) return;
-  const { db } = await import("@/runtime/db");
-  const record = await db.records.get(id);
-  if (!record) return;
-  await context.mutate.patch(id, { body: change(parsePublication(record.body)) }, { event });
+  await editShared<PublicationDoc>(context, parsePublication, change, event);
 }
+
+function openPublication(context: ScreenContext): PublicationDoc | undefined {
+  return sharedHandle<PublicationDoc>(context.params.id)?.doc ?? undefined;
+}
+
+/** The same composition the editor draws, computed outside a component. */
+function composeAll(doc: PublicationDoc): Map<string, Composition> {
+  const out = new Map<string, Composition>();
+  const metrics = canvasMetrics();
+  const frames = doc.pages.flatMap((page) => page.frames);
+  for (const story of doc.stories) {
+    const head = frames.find((frame) => frame.kind === "text" && frame.storyId === story.id && !frames.some((other) => other.next === frame.id));
+    if (head) out.set(story.id, composeStory(story, threadFrames(doc.pages, head.id), doc.paragraphStyles, metrics, doc.baseline));
+  }
+  return out;
+}
+
+function findFrame(doc: PublicationDoc, id: string | undefined): { frame: Frame; pageIndex: number } | undefined {
+  if (!id) return undefined;
+  for (const [pageIndex, page] of doc.pages.entries()) {
+    const frame = page.frames.find((item) => item.id === id);
+    if (frame) return { frame, pageIndex };
+  }
+  return undefined;
+}
+
+function patchFrame(doc: PublicationDoc, id: string, patch: Partial<Frame>): PublicationDoc {
+  return { ...doc, pages: doc.pages.map((page) => ({ ...page, frames: page.frames.map((frame) => (frame.id === id ? { ...frame, ...patch } : frame)) })) };
+}
+
+/** The live area of a page: inside the margins, mirrored for a left-hand page. */
+function liveArea(doc: PublicationDoc, pageIndex: number): Box {
+  const left = doc.facingPages && pageIndex % 2 === 1 ? doc.margins.outside : doc.margins.inside;
+  const right = doc.facingPages && pageIndex % 2 === 1 ? doc.margins.inside : doc.margins.outside;
+  return { x: left, y: doc.margins.top, w: doc.size.width - left - right, h: doc.size.height - doc.margins.top - doc.margins.bottom };
+}
+
+/** Why a link from one frame to another would break the thread, if it would. */
+function linkProblem(doc: PublicationDoc, fromId: string, toId: string): string | undefined {
+  const from = findFrame(doc, fromId)?.frame;
+  const to = findFrame(doc, toId)?.frame;
+  if (!from || !to) return "Choose two text frames.";
+  if (from.kind !== "text" || to.kind !== "text") return "Only text frames can be threaded.";
+  if (from.id === to.id) return "A frame cannot flow into itself.";
+  if (from.next) return "The first frame already flows into another; unlink it first.";
+  const frames = doc.pages.flatMap((page) => page.frames);
+  if (frames.some((frame) => frame.next === to.id)) return "The second frame already receives text from another frame.";
+  for (let cursor: Frame | undefined = to; cursor; cursor = cursor.next ? frames.find((frame) => frame.id === cursor!.next) : undefined) {
+    if (cursor.id === from.id) return "That link would make the thread loop back on itself.";
+  }
+  const ownStory = to.storyId && to.storyId !== from.storyId ? doc.stories.find((story) => story.id === to.storyId) : undefined;
+  if (ownStory?.text.trim()) return `The second frame holds its own story (${ownStory.name}); linking would hide it.`;
+  return undefined;
+}
+
+function linkFrames(doc: PublicationDoc, fromId: string, toId: string): PublicationDoc {
+  const from = findFrame(doc, fromId)!.frame;
+  return {
+    ...doc,
+    pages: doc.pages.map((page) => ({
+      ...page,
+      frames: page.frames.map((frame) => (frame.id === fromId ? { ...frame, next: toId } : frame.id === toId ? { ...frame, storyId: from.storyId, styleId: frame.styleId ?? from.styleId } : frame)),
+    })),
+  };
+}
+
+const needsPublication = (context: ScreenContext) => (context.params.id ? undefined : "Open a publication first");
 
 const EDITOR_ACTIONS: ActionDef[] = [
   {
     id: "Create page", label: "Add a page", placement: "primary",
+    guard: needsPublication,
     run: (context) => withPublication(context, (doc) => {
       const id = `pg-${Date.now().toString(36)}`;
-      return { ...doc, pages: [...doc.pages, { id, masterId: doc.masters[0]?.id, frames: [], overrides: [] }], activePageId: id };
-    }, "Added a page"),
+      const active = doc.pages.find((page) => page.id === doc.activePageId);
+      return { ...doc, pages: [...doc.pages, { id, masterId: active?.masterId ?? doc.masters[0]?.id, frames: [], overrides: [] }], activePageId: id };
+    }, "Add a page"),
   },
-  { id: "place frame", label: "Place a frame", placement: "toolbar", run: () => setLayoutTool("text") },
-  { id: "flow text", label: "Thread frames", placement: "toolbar", run: () => setLayoutTool("thread") },
-  { id: "snap", label: "Guides", placement: "overflow", run: () => layoutUi.set((current) => ({ ...current, showGuides: !current.showGuides })) },
-  { id: "export", label: "Export", placement: "secondary", run: (context) => context.navigate(`${context.path("/o/:org/layout/publications/:id/preflight", context.params.id)}?tab=Export`) },
+  {
+    id: "place frame", label: "Place a text frame", placement: "toolbar",
+    guard: needsPublication,
+    run: async (context) => {
+      const doc = openPublication(context);
+      if (!doc) return;
+      const pageIndex = Math.max(0, doc.pages.findIndex((page) => page.id === doc.activePageId));
+      const area = liveArea(doc, pageIndex);
+      const storyId = `st-${Date.now().toString(36)}`;
+      const frame = newTextFrame({ x: area.x, y: area.y, w: area.w, h: Math.min(area.h, mm(60)) }, storyId);
+      await withPublication(context, (current) => ({
+        ...current,
+        stories: [...current.stories, { id: storyId, name: `Story ${current.stories.length + 1}`, text: "" }],
+        pages: current.pages.map((page, index) => (index === pageIndex ? { ...page, frames: [...page.frames, frame] } : page)),
+      }), "Place a text frame");
+      selectFrame(frame.id);
+    },
+  },
+  { id: "text tool", label: "Text frame tool (T)", placement: "overflow", run: () => setLayoutTool("text") },
+  {
+    id: "flow text", label: "Flow the overset text onward", placement: "toolbar",
+    guard: () => (layoutUi.get().selectedFrameId ? undefined : "Select a text frame first"),
+    run: async (context) => {
+      const doc = openPublication(context);
+      const found = doc ? findFrame(doc, layoutUi.get().selectedFrameId) : undefined;
+      if (!doc || !found || found.frame.kind !== "text") { context.toast("Select a text frame", "Flowing continues a story from a text frame.", "blocked"); return; }
+      const frames = doc.pages.flatMap((page) => page.frames);
+      let tail = found.frame;
+      let tailPage = found.pageIndex;
+      while (tail.next) {
+        const next = findFrame(doc, tail.next);
+        if (!next) break;
+        tail = next.frame;
+        tailPage = next.pageIndex;
+      }
+      const composition = tail.storyId ? composeAll(doc).get(tail.storyId) : undefined;
+      if (!composition || composition.oversetChars === 0) { context.toast("Nothing is overset", "Every character of this story already fits its frames.", "info"); return; }
+      const pageIndex = tailPage + 1;
+      const area = liveArea(doc, pageIndex);
+      const frame = newTextFrame(area, tail.storyId!);
+      const addPage = pageIndex >= doc.pages.length;
+      await withPublication(context, (current) => {
+        const pages = addPage ? [...current.pages, { id: `pg-${Date.now().toString(36)}`, masterId: current.pages[tailPage]?.masterId, frames: [], overrides: [] }] : current.pages;
+        const withFrame = { ...current, pages: pages.map((page, index) => (index === pageIndex ? { ...page, frames: [...page.frames, { ...frame, styleId: tail.styleId }] } : page)) };
+        return patchFrame(withFrame, tail.id, { next: frame.id });
+      }, `Flow the text onto page ${pageIndex + 1}`);
+      context.toast("Text flowed", `${composition.oversetChars} overset characters continue in a new frame on page ${pageIndex + 1}${addPage ? ", which was added" : ""}.${frames.length ? "" : ""}`);
+    },
+  },
+  { id: "thread tool", label: "Thread tool (link two frames)", placement: "overflow", run: () => setLayoutTool("thread") },
+  {
+    id: "snap", label: "Snap the frame to the guides", placement: "overflow",
+    guard: () => (layoutUi.get().selectedFrameId ? undefined : "Select a frame first"),
+    run: async (context) => {
+      const doc = openPublication(context);
+      const found = doc ? findFrame(doc, layoutUi.get().selectedFrameId) : undefined;
+      if (!doc || !found) return;
+      if (found.frame.locked) { context.toast("The frame is locked", "Unlock it before moving it.", "blocked"); return; }
+      const area = liveArea(doc, found.pageIndex);
+      const columnWidth = (area.w - doc.columns.gutter * (doc.columns.count - 1)) / doc.columns.count;
+      const xs = [area.x, area.x + area.w, ...Array.from({ length: doc.columns.count }, (_, index) => area.x + index * (columnWidth + doc.columns.gutter)), ...Array.from({ length: doc.columns.count }, (_, index) => area.x + index * (columnWidth + doc.columns.gutter) + columnWidth)];
+      const ys = [area.y, area.y + area.h];
+      const nearest = (value: number, guides: number[]) => guides.reduce((best, guide) => (Math.abs(guide - value) < Math.abs(best - value) ? guide : best), guides[0]);
+      const box = found.frame.box;
+      const x = nearest(box.x, xs);
+      const right = nearest(box.x + box.w, xs.filter((guide) => guide > x));
+      const y = nearest(box.y, ys);
+      const next = { x, y, w: Math.max(mm(10), (right ?? box.x + box.w) - x), h: Math.min(box.h, area.y + area.h - y) };
+      await withPublication(context, (current) => patchFrame(current, found.frame.id, { box: next }), "Snap the frame to the guides");
+    },
+  },
+  { id: "guides", label: "Show or hide the guides", placement: "overflow", run: () => layoutUi.set((current) => ({ ...current, showGuides: !current.showGuides })) },
+  {
+    id: "export", label: "Export HTML", placement: "secondary",
+    guard: needsPublication,
+    run: async (context) => {
+      const doc = openPublication(context) ?? await readShared<PublicationDoc>(context, parsePublication);
+      if (!doc) return;
+      const overset = [...composeAll(doc).values()].reduce((sum, composition) => sum + composition.oversetChars, 0);
+      if (overset > 0) { context.openOverlay("overset warning", { exporting: true }); return; }
+      await exportHtml(context, doc);
+    },
+  },
+  { id: "press export", label: "Press export and preflight", placement: "overflow", run: (context) => context.navigate(`${context.path("/o/:org/layout/publications/:id/preflight", context.params.id)}?tab=Export`) },
+  {
+    id: "undo", label: "Undo", placement: "overflow", shortcut: "⌘Z",
+    guard: (context) => (canUndoShared(context) ? undefined : "Nothing to undo yet"),
+    run: (context) => { undoShared(context); },
+  },
 ];
+
+async function exportHtml(context: ScreenContext, doc: PublicationDoc): Promise<void> {
+  const { db } = await import("@/runtime/db");
+  const record = context.params.id ? await db.records.get(context.params.id) : undefined;
+  const name = `${slug(record?.title ?? "publication")}.html`;
+  downloadText(name, publicationToHtml(doc, record?.title ?? "Publication"), "text/html");
+  if (context.params.id) await context.mutate.log(`Exported ${name}`, { entityId: context.params.id, type: "export" });
+  context.toast("HTML written", `${name} downloaded from this browser, with the thread order as the reading order.`);
+}
+
+/** Apply every fix preflight knows how to make; report what is left for a person. */
+async function fixPreflight(context: ScreenContext): Promise<void> {
+  const doc = openPublication(context) ?? await readShared<PublicationDoc>(context, parsePublication);
+  if (!doc) return;
+  const issues = issuesFor(doc, composeAll(doc));
+  const fixable = issues.filter((issue) => issue.fix === "add-bleed" || issue.fix === "add-page");
+  if (fixable.length === 0) {
+    context.toast(issues.length ? "Nothing here can be fixed automatically" : "Preflight is clean", issues.length ? `${issues.length} findings need a person: each one says what to change.` : "There is nothing to fix.", "info");
+    return;
+  }
+  const done: string[] = [];
+  await withPublication(context, (current) => {
+    let next = current;
+    if (fixable.some((issue) => issue.fix === "add-bleed")) { next = { ...next, bleed: mm(3) }; done.push("set a 3mm bleed"); }
+    if (fixable.some((issue) => issue.fix === "add-page")) {
+      const id = `pg-${Date.now().toString(36)}`;
+      next = { ...next, pages: [...next.pages, { id, masterId: next.pages.at(-1)?.masterId, frames: [], overrides: [] }] };
+      done.push("added a page for the overset text to flow onto");
+    }
+    return next;
+  }, "Apply the preflight fixes");
+  const left = issues.length - fixable.length;
+  context.toast("Fixes applied", `${done.join(" and ")}.${left ? ` ${left} findings still need a person.` : ""} Overset text still needs a frame on the new page; use Flow the text in the editor.`);
+}
+
+function openProof(context: ScreenContext, doc: PublicationDoc, title: string, label: string): void {
+  const frame = window.open("", "_blank");
+  if (!frame) { context.toast("The browser blocked the print window", "Allow pop-ups for this page, or use the HTML export instead.", "blocked"); return; }
+  frame.document.write(proofToHtml(doc, title));
+  frame.document.close();
+  frame.focus();
+  context.toast(label, "Use the browser's print dialogue and choose Save as PDF. This page did not write the file itself, and no print service is connected.");
+}
+
+/* --------------------------- action overlays --------------------------- */
+
+function MasterPreview({ context }: { context: ScreenContext }) {
+  const { record, handle, compositions } = usePublication(context);
+  const [masterId, setMasterId] = useState("");
+  if (!record || !handle.doc) return <Empty title="Open a publication first" />;
+  const doc = handle.doc;
+  const master = doc.masters.find((item) => item.id === (masterId || doc.masters[0]?.id));
+  if (!master) return <Empty title="No masters yet" />;
+  const usage = masterUsage(doc, master.id);
+  return (
+    <Stack gap={3}>
+      <Field label="Master">
+        <Select value={master.id} onChange={(event) => setMasterId(event.target.value)}>
+          {doc.masters.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </Select>
+      </Field>
+      <Notice tone={usage.length ? "warning" : "info"} title={`A change to ${master.name} reaches ${usage.length} page${usage.length === 1 ? "" : "s"}`}>
+        {usage.filter((item) => item.overridden > 0).length} of them have overridden frames, which keep their local version.
+      </Notice>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, background: "var(--bg-sunken)", padding: 12, borderRadius: 8 }}>
+        {usage.map((item) => (
+          <div key={item.page.id}>
+            <PageView doc={doc} page={item.page} index={item.index} compositions={compositions} zoom={0.18} showGuides={false} />
+            <p className="vx-mini">Page {item.index + 1}{item.overridden ? ` · ${item.overridden} overridden` : ""}</p>
+          </div>
+        ))}
+      </div>
+    </Stack>
+  );
+}
+
+function LinkFramesForm({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = usePublication(context);
+  const [from, setFrom] = useState(layoutUi.get().selectedFrameId ?? "");
+  const [to, setTo] = useState("");
+  if (!record || !handle.doc) return <Empty title="Open a publication first" />;
+  const doc = handle.doc;
+  const texts = doc.pages.flatMap((page, index) => page.frames.filter((frame) => frame.kind === "text").map((frame) => ({ frame, index })));
+  const story = (frame: Frame) => doc.stories.find((item) => item.id === frame.storyId)?.name ?? "no story";
+  const problem = from && to ? linkProblem(doc, from, to) : undefined;
+  return (
+    <form
+      id="layout-link-frames"
+      className="ds-stack ds-gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!from || !to || problem) return;
+        handle.edit((current) => linkFrames(current, from, to), "Link two text frames");
+        void context.mutate.log("Linked two text frames into one thread", { entityId: record.id, type: "update" });
+        close();
+      }}
+    >
+      <Field label="Flow from" required>
+        <Select value={from} onChange={(event) => setFrom(event.target.value)} required>
+          <option value="">Choose a frame</option>
+          {texts.map(({ frame, index }) => <option key={frame.id} value={frame.id}>Page {index + 1} · {story(frame)}{frame.next ? " (already flows on)" : ""}</option>)}
+        </Select>
+      </Field>
+      <Field label="Into" required>
+        <Select value={to} onChange={(event) => setTo(event.target.value)} required>
+          <option value="">Choose a frame</option>
+          {texts.filter(({ frame }) => frame.id !== from).map(({ frame, index }) => <option key={frame.id} value={frame.id}>Page {index + 1} · {story(frame)}</option>)}
+        </Select>
+      </Field>
+      {problem && <Notice tone="danger" title="Cannot link these">{problem}</Notice>}
+      <Notice tone="info" title="The order stays deterministic">Text runs frame to frame in thread order, whatever the page order, and a link that would loop or hide another story is refused.</Notice>
+    </form>
+  );
+}
+
+function StyleEditor({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, handle } = usePublication(context);
+  const payload = context.overlayPayload as { focus?: "tracking" } | undefined;
+  const [styleId, setStyleId] = useState("");
+  const [draft, setDraft] = useState<Partial<ParagraphStyle>>({});
+  if (!record || !handle.doc) return <Empty title="Open a publication first" />;
+  const doc = handle.doc;
+  const selected = findFrame(doc, layoutUi.get().selectedFrameId)?.frame;
+  const style = doc.paragraphStyles.find((item) => item.id === (styleId || selected?.styleId || doc.paragraphStyles[0]?.id));
+  if (!style) return <Empty title="No paragraph styles" />;
+  const value = { ...style, ...draft };
+  const number = (key: "size" | "leading" | "tracking" | "spaceBefore" | "spaceAfter", label: string, step = 0.5) => (
+    <Field label={label}>
+      <TextInput type="number" step={step} value={value[key]} autoFocus={payload?.focus === key} onChange={(event) => setDraft((current) => ({ ...current, [key]: Number(event.target.value) }))} />
+    </Field>
+  );
+  const uses = doc.pages.flatMap((page) => page.frames).filter((frame) => frame.styleId === style.id).length;
+  const invalid = value.size <= 0 || value.leading < value.size * 0.8;
+  return (
+    <form
+      id="layout-style-editor"
+      className="ds-stack ds-gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (invalid) return;
+        handle.edit((current) => ({ ...current, paragraphStyles: current.paragraphStyles.map((item) => (item.id === style.id ? { ...item, ...draft } : item)) }), `Edit the style ${style.name}`);
+        void context.mutate.log(`Edited the paragraph style ${style.name}`, { entityId: record.id, type: "update" });
+        close();
+      }}
+    >
+      <Field label="Style">
+        <Select value={style.id} onChange={(event) => { setStyleId(event.target.value); setDraft({}); }}>
+          {doc.paragraphStyles.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </Select>
+      </Field>
+      <Row gap={2} wrap>
+        {number("size", "Size (pt)")}
+        {number("leading", "Leading (pt)")}
+        {number("tracking", "Tracking (pt)", 0.05)}
+        {number("spaceBefore", "Space before (pt)")}
+        {number("spaceAfter", "Space after (pt)")}
+      </Row>
+      {invalid && <Notice tone="danger" title="Leading is too tight">Leading below 80% of the size makes lines collide.</Notice>}
+      <Notice tone="info" title={`${uses} frame${uses === 1 ? "" : "s"} use ${style.name} as their default`}>Saving recomposes every story that uses it; the composer reports any overset the change causes.</Notice>
+    </form>
+  );
+}
 
 registerApp({
   code: "LAYOUT",
@@ -1638,15 +1957,16 @@ registerApp({
           run: (context) => withPublication(context, (doc) => ({
             ...doc,
             masters: [...doc.masters, { id: `mp-${Date.now().toString(36)}`, name: `Master ${doc.masters.length + 1}`, side: "both", frames: [] }],
-          }), "Created a master"),
+          }), "Create a master"),
         },
         { id: "apply", label: "Apply to pages", placement: "secondary", run: (context) => context.openOverlay("Master editor") },
         { id: "override", label: "Override a frame", placement: "secondary", run: (context) => context.openOverlay("override confirmation") },
-        { id: "preview", label: "Usage", placement: "overflow", run: (context) => context.setTab("Usage") },
+        { id: "preview", label: "Preview the impact", placement: "overflow", guard: needsPublication, run: (context) => context.openOverlay("master preview") },
       ],
       overlays: [
         { id: "Master editor", kind: "modal", title: "Apply a master", width: 520, render: ({ close, ...context }) => <MasterEditorOverlay context={context} close={close} /> },
         { id: "override confirmation", kind: "modal", title: "Override a master frame", tone: "danger", width: 560, render: ({ close, ...context }) => <OverrideConfirmation context={context} close={close} /> },
+        { id: "master preview", kind: "modal", title: "What a master change reaches", width: 760, render: ({ ...context }) => <MasterPreview context={context} /> },
       ],
     },
 
@@ -1658,26 +1978,28 @@ registerApp({
       })),
       actions: [
         {
-          id: "Edit styles", label: "New paragraph style", placement: "primary",
+          id: "Edit styles", label: "Edit a paragraph style…", placement: "primary",
+          guard: needsPublication,
+          run: (context) => context.openOverlay("style editor"),
+        },
+        {
+          id: "new style", label: "New paragraph style", placement: "overflow",
+          guard: needsPublication,
           run: (context) => withPublication(context, (doc) => ({
             ...doc,
             paragraphStyles: [...doc.paragraphStyles, { ...BASE_STYLES[0], id: `ps-${Date.now().toString(36)}`, name: `Style ${doc.paragraphStyles.length + 1}` }],
-          }), "Created a paragraph style"),
+          }), "Create a paragraph style"),
         },
-        { id: "link frames", label: "Flow", placement: "secondary", run: (context) => context.setTab("Flow") },
-        {
-          id: "adjust tracking", label: "Tighten the tracking", placement: "overflow",
-          run: (context) => withPublication(context, (doc) => ({
-            ...doc,
-            paragraphStyles: doc.paragraphStyles.map((style, index) => (index === 0 ? { ...style, tracking: Math.round((style.tracking - 0.05) * 100) / 100 } : style)),
-          }), "Tightened the tracking on the body style"),
-        },
-        { id: "inspect overset", label: "Overset", placement: "secondary", run: (context) => context.openOverlay("preflight issue") },
+        { id: "link frames", label: "Link frames…", placement: "secondary", guard: needsPublication, run: (context) => context.openOverlay("link frames") },
+        { id: "adjust tracking", label: "Adjust the tracking…", placement: "overflow", guard: needsPublication, run: (context) => context.openOverlay("style editor", { focus: "tracking" }) },
+        { id: "inspect overset", label: "Inspect overset text", placement: "secondary", run: (context) => context.openOverlay("preflight issue") },
       ],
       overlays: [
         { id: "Text style", kind: "modal", title: "Apply a paragraph style", width: 520, render: ({ close, ...context }) => <TextStyleOverlay context={context} close={close} /> },
         { id: "flow options", kind: "drawer", title: "How the flow works", width: 440, render: ({ ...context }) => <FlowOptions context={context} /> },
         { id: "preflight issue", kind: "modal", title: "Overset text", width: 600, render: ({ ...context }) => <OversetWarning context={context} /> },
+        { id: "style editor", kind: "modal", title: "Edit a paragraph style", width: 560, render: ({ close, ...context }) => <StyleEditor context={context} close={close} />, footer: layoutFooter("layout-style-editor", "Save the style") },
+        { id: "link frames", kind: "modal", title: "Link text frames", width: 520, render: ({ close, ...context }) => <LinkFramesForm context={context} close={close} />, footer: layoutFooter("layout-link-frames", "Link") },
       ],
     },
 
@@ -1688,13 +2010,38 @@ registerApp({
         render: (context: ScreenContext) => <PreflightScreen context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Inspect issue", label: "Findings", placement: "secondary", run: (context) => context.openOverlay("Preflight detail") },
+        { id: "Inspect issue", label: "Inspect the findings", placement: "secondary", run: (context) => context.openOverlay("Preflight detail") },
+        { id: "fix", label: "Fix what can be fixed", placement: "secondary", guard: needsPublication, run: (context) => fixPreflight(context) },
         {
-          id: "fix", label: "Set a 3mm bleed", placement: "secondary",
-          run: (context) => withPublication(context, (doc) => ({ ...doc, bleed: mm(3) }), "Set a 3mm bleed"),
+          id: "proof", label: "Open a proof", placement: "primary",
+          guard: needsPublication,
+          run: async (context) => {
+            const doc = openPublication(context) ?? await readShared<PublicationDoc>(context, parsePublication);
+            const { db } = await import("@/runtime/db");
+            const record = context.params.id ? await db.records.get(context.params.id) : undefined;
+            if (!doc || !record) return;
+            context.setTab("Proof");
+            openProof(context, doc, record.title, "Proof opened for checking");
+          },
         },
-        { id: "proof", label: "Proof", placement: "primary", run: (context) => context.setTab("Proof") },
-        { id: "export press PDF", label: "Export", placement: "overflow", run: (context) => context.setTab("Export") },
+        {
+          id: "export press PDF", label: "Export a press PDF", placement: "overflow",
+          guard: needsPublication,
+          run: async (context) => {
+            const doc = openPublication(context) ?? await readShared<PublicationDoc>(context, parsePublication);
+            const { db } = await import("@/runtime/db");
+            const record = context.params.id ? await db.records.get(context.params.id) : undefined;
+            if (!doc || !record) return;
+            const issues = issuesFor(doc, composeAll(doc));
+            if (preflightBlocks(issues)) {
+              context.openOverlay("Preflight detail");
+              context.toast("Blocked by preflight", `${issues.filter((issue) => issue.severity === "error").length} errors must be cleared before a press export. Nothing was written.`, "blocked");
+              return;
+            }
+            await context.mutate.log("Press proof handed to the browser's print dialogue", { entityId: record.id, type: "export" });
+            openProof(context, doc, record.title, "Press proof opened");
+          },
+        },
       ],
       overlays: [
         { id: "Preflight detail", kind: "drawer", title: "Preflight", width: 460, render: ({ ...context }) => <PreflightDetail context={context} /> },
@@ -1704,3 +2051,13 @@ registerApp({
     },
   },
 });
+
+function layoutFooter(form: string, label: string) {
+  return ({ close }: { close: () => void }) => (
+    <>
+      <Button variant="ghost" onClick={close}>Cancel</Button>
+      <span className="ds-grow" />
+      <Button variant="primary" type="submit" form={form}>{label}</Button>
+    </>
+  );
+}

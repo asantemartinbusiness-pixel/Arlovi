@@ -14,6 +14,13 @@ import {
 } from "./panels";
 import { formatMinutes, slaState } from "./sla";
 import "./care.css";
+import { kitOverlays, needsSelection } from "@/applications/hr/opsKit";
+import {
+  Annotate, ArticleRevision, AssignCoaching, AssignSpecialist, CaseFilter, LinkRecord, ReassignCase, ReviewMacro,
+  ScheduleFollowUp, SlaReport, Staffing, TagCase, acknowledgeBreach, activateMacro, exportCases, exportQuality, reopenCase,
+  retireSuperseded,
+} from "./actions";
+import { listByCollection } from "@/platform/repo";
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
   <>
@@ -369,7 +376,8 @@ function ArticleEditor({ context, close }: { context: ScreenContext; close: () =
 
 function ArticlePublishReview({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCareData();
-  const article = useRecord(context.selectedId) ?? data.articles.find((row) => row.status === "draft");
+  const selected = useRecord(context.selectedId);
+  const article = (selected?.collection === "articles" && selected.status === "draft" ? selected : undefined) ?? data.articles.find((row) => row.status === "draft");
   if (!article) return <Empty title="No draft to publish" icon={<BookOpen size={20} />} />;
   const macros = data.macros.filter((macro) => macro.fields.articleId === article.id);
   return (
@@ -378,6 +386,7 @@ function ArticlePublishReview({ context, close }: { context: ScreenContext; clos
         { label: "Article", value: article.title },
         { label: "Audience", value: String(article.fields.audience ?? "") },
         { label: "Version", value: String(article.fields.version ?? "") },
+        { label: "Replaces", value: article.fields.supersedes ? data.articles.find((row) => row.id === article.fields.supersedes)?.title ?? "An earlier version" : "Nothing" },
         { label: "Cited by", value: macros.length ? macros.map((macro) => macro.title).join(", ") : "No macro" },
       ]} />
       {String(article.fields.audience ?? "") === "public" && (
@@ -391,8 +400,9 @@ function ArticlePublishReview({ context, close }: { context: ScreenContext; clos
         <Button
           variant="primary"
           onClick={async () => {
-            await context.mutate.patch(article.id, { status: "published" }, { expectRevision: article.revision, event: `${article.title} published by ${context.actor}` });
-            context.toast("Published", "It is available to the macros that cite it.");
+            await context.mutate.patch(article.id, { status: "published", fields: { ...article.fields, publishedBy: context.actor } }, { expectRevision: article.revision, event: `${article.title} v${String(article.fields.version ?? "")} published by ${context.actor}` });
+            await retireSuperseded(context, article);
+            context.toast("Published", article.fields.supersedes ? "The earlier version is retired, not overwritten, and stays readable." : "It is available to the macros that cite it.");
             close();
           }}
         >
@@ -639,11 +649,15 @@ function QaScorecard({ context, close }: { context: ScreenContext; close: () => 
       onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        await context.mutate.log(
-          `QA review of ${String(ticket.fields.ref ?? "")} by ${context.actor}: tone ${String(form.get("tone"))}, accuracy ${String(form.get("accuracy"))}. ${String(form.get("note") ?? "")}`,
-          { entityId: ticket.id, type: "qa" },
-        );
-        context.toast("Review recorded", "It is in the activity log against the case, attributed to you.");
+        await context.mutate.create({
+          collection: "qaReviews",
+          title: `QA · ${String(ticket.fields.ref ?? "")}`,
+          status: "reviewed",
+          summary: String(form.get("note") ?? ""),
+          parentId: ticket.id,
+          fields: { ref: String(ticket.fields.ref ?? ""), tone: String(form.get("tone")), accuracy: String(form.get("accuracy")), reviewer: context.actor, handledBy: String(ticket.fields.assignee ?? ""), forEmploymentDecision: false },
+        }, `QA review of ${String(ticket.fields.ref ?? "")} by ${context.actor}: tone ${String(form.get("tone"))}, accuracy ${String(form.get("accuracy"))}`);
+        context.toast("Review recorded", "A QA review record is on the case, attributed to you.");
         close();
       }}
     >
@@ -751,12 +765,18 @@ export const careApp = registerApp({
         id: lens, render: (context: ScreenContext) => <ServiceOverview context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Open case", label: "Open the inbox", placement: "primary", run: (context) => context.navigate(`/o/${context.org.slug}/care/inbox`) },
-        { id: "inspect metric", label: "SLA detail", placement: "secondary", run: (context) => context.openOverlay("SLA inspector") },
-        { id: "reassign", label: "Queue rules", placement: "overflow", run: (context) => context.openOverlay("Queue rules") },
-        { id: "manage staffing", label: "Service report", placement: "overflow", run: (context) => context.openOverlay("service report") },
+        { id: "Open case", label: "Open a case", placement: "primary", run: (context) => context.openOverlay("open case") },
+        { id: "inspect metric", label: "Inspect the SLA metric", placement: "secondary", run: (context) => context.openOverlay("SLA inspector") },
+        { id: "reassign", label: "Reassign a case", placement: "overflow", run: (context) => context.openOverlay("reassign case") },
+        { id: "manage staffing", label: "Manage staffing", placement: "overflow", run: (context) => context.openOverlay("staffing") },
+        { id: "open inbox", label: "Open the inbox", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/care/inbox`) },
+        { id: "queue rules", label: "Queue rules", placement: "overflow", run: (context) => context.openOverlay("Queue rules") },
+        { id: "service report", label: "Service report", placement: "overflow", run: (context) => context.openOverlay("service report") },
       ],
       overlays: [
+        { id: "open case", kind: "modal", title: "Open a case", width: 620, render: ({ close, ...context }) => <TicketCreate context={context} close={close} />, footer: submitFooter("cr-create", "Open the case") },
+        { id: "reassign case", kind: "modal", title: "Reassign a case", width: 560, render: ({ close, ...context }) => <ReassignCase context={context} close={close} />, footer: submitFooter("cr-reassign", "Reassign") },
+        { id: "staffing", kind: "drawer", title: "Who covers which queue", width: 580, render: ({ close, ...context }) => <Staffing context={context} close={close} />, footer: submitFooter("cr-staffing", "Save the rota") },
         { id: "Queue rules", kind: "drawer", title: "How a case reaches a queue", width: 520, render: ({ ...context }) => <QueueRules context={context} /> },
         { id: "SLA inspector", kind: "drawer", title: "Against the clock", width: 560, render: ({ ...context }) => <SlaInspector context={context} /> },
         { id: "service report", kind: "modal", title: "Service report", width: 640, render: ({ ...context }) => <ServiceReport context={context} /> },
@@ -772,11 +792,17 @@ export const careApp = registerApp({
       actions: [
         { id: "Respond", label: "Reply", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Choose a case in the list"), run: (context) => context.openOverlay("Response composer") },
         { id: "escalate", label: "Escalate", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a case in the list"), run: (context) => context.openOverlay("escalation") },
-        { id: "assign", label: "Route unassigned", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/care/tickets`) },
-        { id: "tag", label: "Macros", placement: "overflow", run: (context) => context.openOverlay("canned reply") },
-        { id: "link record", label: "Customer", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a case in the list"), run: (context) => context.openOverlay("Customer inspector") },
+        { id: "assign", label: "Assign", placement: "overflow", guard: needsSelection("a case in the list"), run: (context) => context.openOverlay("assign case", { id: context.selectedId }) },
+        { id: "tag", label: "Tag", placement: "overflow", guard: needsSelection("a case in the list"), run: (context) => context.openOverlay("tag case") },
+        { id: "link record", label: "Link a customer or order", placement: "overflow", guard: needsSelection("a case in the list"), run: (context) => context.openOverlay("link record") },
+        { id: "macros", label: "Macros", placement: "overflow", run: (context) => context.openOverlay("canned reply") },
+        { id: "customer", label: "Customer", placement: "overflow", guard: needsSelection("a case in the list"), run: (context) => context.openOverlay("Customer inspector") },
+        { id: "route unassigned", label: "Route unassigned", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/care/tickets`) },
       ],
       overlays: [
+        { id: "assign case", kind: "modal", title: "Assign the case", width: 560, render: ({ close, ...context }) => <ReassignCase context={context} close={close} />, footer: submitFooter("cr-reassign", "Assign") },
+        { id: "tag case", kind: "modal", title: "Tag the case", width: 480, render: ({ close, ...context }) => <TagCase context={context} close={close} />, footer: submitFooter("cr-tag", "Save tags") },
+        { id: "link record", kind: "modal", title: "Link a record", width: 520, render: ({ close, ...context }) => <LinkRecord context={context} close={close} />, footer: submitFooter("cr-link", "Save the link") },
         { id: "Customer inspector", kind: "drawer", title: "Customer", width: 480, render: ({ ...context }) => <CustomerInspector context={context} /> },
         { id: "canned reply", kind: "drawer", title: "Macros", width: 480, render: ({ ...context }) => <CannedReply context={context} /> },
         { id: "escalation", kind: "modal", title: "Escalate this case", width: 560, render: ({ close, ...context }) => <Escalation context={context} close={close} />, footer: submitFooter("cr-escalate", "Escalate") },
@@ -793,10 +819,12 @@ export const careApp = registerApp({
       actions: [
         { id: "Create ticket", label: "Create a case", placement: "primary", run: (context) => context.openOverlay("Ticket create") },
         { id: "bulk route", label: "Route unassigned", placement: "secondary", run: (context) => context.openOverlay("bulk assignment") },
-        { id: "filter", label: "Open cases only", placement: "overflow", run: (context) => context.setTab("Open") },
-        { id: "export", label: "Export", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("priority change") },
+        { id: "filter", label: "Filter cases", placement: "overflow", run: (context) => context.openOverlay("case filter") },
+        { id: "export", label: "Export CSV", placement: "overflow", capability: "export_data", run: (context) => exportCases(context) },
+        { id: "change priority", label: "Change priority", placement: "overflow", guard: needsSelection("a case"), run: (context) => context.openOverlay("priority change") },
       ],
       overlays: [
+        { id: "case filter", kind: "modal", title: "Filter cases", width: 460, render: ({ close, ...context }) => <CaseFilter context={context} close={close} /> },
         { id: "Ticket create", kind: "modal", title: "Create a case", width: 620, render: ({ close, ...context }) => <TicketCreate context={context} close={close} />, footer: submitFooter("cr-create", "Create case") },
         { id: "bulk assignment", kind: "modal", title: "Route unassigned cases", width: 680, render: ({ close, ...context }) => <BulkAssignment context={context} close={close} /> },
         { id: "priority change", kind: "modal", title: "Change priority", width: 560, render: ({ close, ...context }) => <PriorityChange context={context} close={close} />, footer: submitFooter("cr-priority", "Change priority") },
@@ -813,10 +841,13 @@ export const careApp = registerApp({
       actions: [
         { id: "Reply", label: "Reply", placement: "primary", run: (context) => context.openOverlay("Response composer") },
         { id: "add note", label: "Internal note", placement: "secondary", run: (context) => context.openOverlay("internal note") },
-        { id: "reopen", label: "Reopen", placement: "overflow", run: (context) => context.openOverlay("internal note") },
-        { id: "assign specialist", label: "Assign a specialist", placement: "overflow", run: (context) => context.openOverlay("refund request") },
+        { id: "reopen", label: "Reopen", placement: "overflow", run: (context) => reopenCase(context) },
+        { id: "assign specialist", label: "Assign a specialist", placement: "overflow", run: (context) => context.openOverlay("assign specialist") },
+        { id: "request refund", label: "Request a refund", placement: "overflow", run: (context) => context.openOverlay("refund request") },
       ],
       overlays: [
+        ...kitOverlays,
+        { id: "assign specialist", kind: "modal", title: "Assign a specialist", width: 540, render: ({ close, ...context }) => <AssignSpecialist context={context} close={close} />, footer: submitFooter("cr-specialist", "Assign") },
         { id: "Response composer", kind: "modal", title: "Reply", width: 680, render: ({ close, ...context }) => <ResponseComposer context={context} close={close} />, footer: submitFooter("cr-response", "Record the reply") },
         { id: "internal note", kind: "modal", title: "Internal note", width: 560, render: ({ close, ...context }) => <InternalNote context={context} close={close} />, footer: submitFooter("cr-note", "Add the note") },
         { id: "refund request", kind: "modal", title: "Request a refund", tone: "danger", width: 560, render: ({ close, ...context }) => <RefundRequest context={context} close={close} />, footer: submitFooter("cr-refund", "Request from finance") },
@@ -831,11 +862,13 @@ export const careApp = registerApp({
         id: lens, render: (context: ScreenContext) => <CustomerContext context={context} lens={lens} />,
       })),
       actions: [
-        { id: "update permitted field", label: "Edit", placement: "primary", run: (context) => context.openOverlay("Customer profile edit") },
-        { id: "Inspect", label: "Consent", placement: "secondary", run: (context) => context.openOverlay("consent inspector") },
-        { id: "schedule", label: "Verify identity", placement: "overflow", run: (context) => context.openOverlay("identity verification") },
+        { id: "update permitted field", label: "Update permitted fields", placement: "primary", run: (context) => context.openOverlay("Customer profile edit") },
+        { id: "Inspect", label: "Inspect consent", placement: "secondary", run: (context) => context.openOverlay("consent inspector") },
+        { id: "schedule", label: "Schedule a follow-up", placement: "overflow", run: (context) => context.openOverlay("schedule follow-up") },
+        { id: "verify identity", label: "Verify identity", placement: "overflow", run: (context) => context.openOverlay("identity verification") },
       ],
       overlays: [
+        { id: "schedule follow-up", kind: "modal", title: "Schedule a follow-up", width: 520, render: ({ close, ...context }) => <ScheduleFollowUp context={context} close={close} />, footer: submitFooter("cr-schedule", "Schedule") },
         { id: "Customer profile edit", kind: "modal", title: "Edit what care may change", width: 560, render: ({ close, ...context }) => <CustomerProfileEdit context={context} close={close} />, footer: submitFooter("cr-customer", "Save") },
         { id: "consent inspector", kind: "drawer", title: "Consent", width: 460, render: ({ ...context }) => <ConsentInspector context={context} /> },
         { id: "identity verification", kind: "modal", title: "Verify this person", width: 540, render: ({ close, ...context }) => <IdentityVerification context={context} close={close} /> },
@@ -851,10 +884,11 @@ export const careApp = registerApp({
       actions: [
         { id: "Write article", label: "Write an article", placement: "primary", capability: "edit_knowledge", run: (context) => context.openOverlay("Rich editor") },
         { id: "publish", label: "Publish a draft", placement: "secondary", capability: "edit_knowledge", run: (context) => context.openOverlay("publish review") },
-        { id: "update", label: "Edit", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose an article first"), run: (context) => context.openOverlay("Rich editor") },
+        { id: "update", label: "Update an article", placement: "overflow", capability: "edit_knowledge", guard: (context) => (context.selectedId ? undefined : "Choose an article first"), run: (context) => context.openOverlay("article revision") },
         { id: "test answer", label: "Test an answer", placement: "overflow", run: (context) => context.openOverlay("relevance test") },
       ],
       overlays: [
+        { id: "article revision", kind: "modal", title: "Update an article", width: 720, render: ({ close, ...context }) => <ArticleRevision context={context} close={close} />, footer: submitFooter("cr-article-update", "Save") },
         { id: "Rich editor", kind: "modal", title: "Article", width: 720, render: ({ close, ...context }) => <ArticleEditor context={context} close={close} />, footer: submitFooter("cr-article", "Save article") },
         { id: "publish review", kind: "modal", title: "Publish this article", width: 580, render: ({ close, ...context }) => <ArticlePublishReview context={context} close={close} /> },
         { id: "relevance test", kind: "drawer", title: "What would be offered", width: 560, render: ({ ...context }) => <RelevanceTest context={context} /> },
@@ -870,10 +904,14 @@ export const careApp = registerApp({
       actions: [
         { id: "Create macro", label: "Create a macro", placement: "primary", capability: "edit_knowledge", run: (context) => context.openOverlay("Macro editor") },
         { id: "simulate", label: "Simulate", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a macro first"), run: (context) => context.openOverlay("audience preview") },
-        { id: "activate", label: "Edit a macro", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a macro first"), run: (context) => context.openOverlay("Macro editor") },
-        { id: "review", label: "Escalation rule", placement: "overflow", run: (context) => context.openOverlay("escalation rule") },
+        { id: "activate", label: "Activate or deactivate", placement: "overflow", capability: "edit_knowledge", guard: needsSelection("a macro"), run: (context) => activateMacro(context) },
+        { id: "review", label: "Review a macro", placement: "overflow", guard: needsSelection("a macro"), run: (context) => context.openOverlay("review macro") },
+        { id: "edit macro", label: "Edit a macro", placement: "overflow", guard: needsSelection("a macro"), run: (context) => context.openOverlay("Macro editor") },
+        { id: "escalation rule", label: "Escalation rule", placement: "overflow", run: (context) => context.openOverlay("escalation rule") },
       ],
       overlays: [
+        ...kitOverlays,
+        { id: "review macro", kind: "modal", title: "Review a macro", width: 540, render: ({ close, ...context }) => <ReviewMacro context={context} close={close} />, footer: submitFooter("cr-macro-review", "Record the review") },
         { id: "Macro editor", kind: "modal", title: "Macro", width: 640, render: ({ close, ...context }) => <MacroEditor context={context} close={close} />, footer: submitFooter("cr-macro", "Save macro") },
         { id: "audience preview", kind: "drawer", title: "What this macro would do", width: 560, render: ({ ...context }) => <AudiencePreview context={context} /> },
         { id: "escalation rule", kind: "modal", title: "Escalation rule", width: 560, render: ({ ...context }) => <EscalationRule context={context} /> },
@@ -888,11 +926,16 @@ export const careApp = registerApp({
       })),
       actions: [
         { id: "Edit policy", label: "Edit a policy", placement: "primary", capability: "manage_policy", guard: (context) => (context.selectedId ? undefined : "Choose a policy first"), run: (context) => context.openOverlay("SLA form") },
-        { id: "report", label: "Breaches", placement: "secondary", run: (context) => context.setTab("Breaches") },
-        { id: "reassign", label: "What a change would do", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a policy first"), run: (context) => context.openOverlay("policy impact") },
-        { id: "acknowledge", label: "When the clock stops", placement: "overflow", run: (context) => context.openOverlay("schedule exception") },
+        { id: "report", label: "SLA report", placement: "secondary", run: (context) => context.openOverlay("sla report") },
+        { id: "reassign", label: "Reassign a breached case", placement: "overflow", run: (context) => context.openOverlay("reassign case", { breachedOnly: true }) },
+        { id: "acknowledge", label: "Acknowledge a breach", placement: "overflow", run: async (context) => acknowledgeBreach(context, await listByCollection(context.org.id, "tickets"), await listByCollection(context.org.id, "slas")) },
+        { id: "policy impact", label: "What a change would do", placement: "overflow", guard: needsSelection("a policy"), run: (context) => context.openOverlay("policy impact") },
+        { id: "clock rules", label: "When the clock stops", placement: "overflow", run: (context) => context.openOverlay("schedule exception") },
       ],
       overlays: [
+        ...kitOverlays,
+        { id: "sla report", kind: "drawer", title: "SLA report", width: 620, render: ({ ...context }) => <SlaReport context={context} /> },
+        { id: "reassign case", kind: "modal", title: "Reassign a breached case", width: 560, render: ({ close, ...context }) => <ReassignCase context={context} close={close} />, footer: submitFooter("cr-reassign", "Reassign") },
         { id: "SLA form", kind: "modal", title: "Policy", width: 580, render: ({ close, ...context }) => <SlaForm context={context} close={close} />, footer: submitFooter("cr-sla", "Save policy") },
         { id: "schedule exception", kind: "modal", title: "When the clock does not run", width: 560, render: () => <ScheduleException /> },
         { id: "policy impact", kind: "drawer", title: "Impact of a change", width: 520, render: ({ ...context }) => <PolicyImpact context={context} /> },
@@ -907,11 +950,15 @@ export const careApp = registerApp({
       })),
       actions: [
         { id: "Review", label: "Score a case", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Choose a case on the Audits tab"), run: (context) => context.openOverlay("QA scorecard") },
-        { id: "annotate", label: "Replay a case", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a case on the Audits tab"), run: (context) => context.openOverlay("case replay") },
-        { id: "assign coaching", label: "Build a survey", placement: "overflow", run: (context) => context.openOverlay("survey builder") },
-        { id: "export", label: "Report", placement: "overflow", capability: "export_data", run: (context) => context.setTab("Reports") },
+        { id: "annotate", label: "Annotate a case", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a case on the Audits tab"), run: (context) => context.openOverlay("annotate") },
+        { id: "assign coaching", label: "Assign coaching", placement: "overflow", run: (context) => context.openOverlay("assign coaching") },
+        { id: "export", label: "Export quality data", placement: "overflow", capability: "export_data", run: (context) => exportQuality(context) },
+        { id: "replay", label: "Replay a case", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a case on the Audits tab"), run: (context) => context.openOverlay("case replay") },
+        { id: "build survey", label: "Build a survey", placement: "overflow", run: (context) => context.openOverlay("survey builder") },
       ],
       overlays: [
+        { id: "annotate", kind: "drawer", title: "Annotate a case", width: 600, render: ({ ...context }) => <Annotate context={context} /> },
+        { id: "assign coaching", kind: "modal", title: "Assign coaching", width: 540, render: ({ close, ...context }) => <AssignCoaching context={context} close={close} />, footer: submitFooter("cr-coaching", "Assign coaching") },
         { id: "QA scorecard", kind: "modal", title: "Quality review", width: 600, render: ({ close, ...context }) => <QaScorecard context={context} close={close} />, footer: submitFooter("cr-qa", "Record the review") },
         { id: "survey builder", kind: "modal", title: "Survey", width: 560, render: ({ close, ...context }) => <SurveyBuilder context={context} close={close} />, footer: submitFooter("cr-survey", "Save survey") },
         { id: "case replay", kind: "drawer", title: "Case replay", width: 560, render: ({ ...context }) => <CaseReplay context={context} /> },

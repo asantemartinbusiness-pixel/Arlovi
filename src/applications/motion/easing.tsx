@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Field, Notice, Pill, Row, Select, Stack, TextArea } from "@/design-system";
+import { Button, Notice, Pill, Row, Select, Stack, TextArea } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import { EditorFrame, NumberBox, PanelGroup, SaveState, useStore, type DocHandle } from "@/applications/visual/kit";
 import { clamp, springValue } from "@/applications/visual/geometry";
@@ -10,7 +10,7 @@ import {
 import { motionUi } from "./model";
 import { EasingGraph, Stage, TransportRow } from "./parts";
 import { PROPERTY_LABEL, editorKeys, selectedKeyframe } from "./editor";
-import { MissingComposition, useMotionDoc, usePrefersReducedMotion, useSession } from "./shared";
+import { MissingComposition, useMotionDoc, usePrefersReducedMotion, useSession, FormField } from "./shared";
 
 /* ====================================================================== *
  * ARL-MOTION-003 — Easing & Timing
@@ -166,11 +166,11 @@ function TimingTab({ handle, doc }: { handle: DocHandle<MotionDoc>; doc: MotionD
           <NumberBox label="Length" suffix="s" value={length} step={0.1} min={0.2} onChange={setLength} />
           <label className="ds-check"><input type="checkbox" checked={scale} onChange={(event) => setScale(event.target.checked)} /><span>Scale keyframes with it</span></label>
           <Button size="sm" variant="secondary" disabled={Math.abs(length - doc.duration) < 1e-6} onClick={() => handle.edit((current) => retime(current, length, scale), `Retime to ${length}s`)}>Apply</Button>
-          <Field label="Frame rate">
+          <FormField label="Frame rate">
             <Select value={String(doc.fps)} onChange={(event) => handle.edit((current) => ({ ...current, fps: Number(event.target.value) }), "Change the frame rate")}>
               {[12, 15, 24, 25, 30, 60].map((rate) => <option key={rate} value={rate}>{rate} fps</option>)}
             </Select>
-          </Field>
+          </FormField>
         </Row>
       </PanelGroup>
 
@@ -313,9 +313,9 @@ function ReviewPanel({ handle, doc, context }: { handle: DocHandle<MotionDoc>; d
         {doc.review.state === "not_required" && <p className="vx-mini">No review is required. Run Test after changing the motion.</p>}
         {doc.review.state === "required" && (
           <>
-            <Field label="Review note" hint="Say why the motion is acceptable, for example that the flashing area is under the threshold at the size it ships.">
+            <FormField label="Review note" hint="Say why the motion is acceptable, for example that the flashing area is under the threshold at the size it ships.">
               <TextArea rows={3} value={note} onChange={(event) => setNote(event.target.value)} />
-            </Field>
+            </FormField>
             <Button size="sm" variant="secondary" disabled={note.trim().length < 10} onClick={() => handle.edit((current) => ({ ...current, review: { ...current.review, state: "approved", reviewer: context.actor, reviewedAt: new Date().toISOString(), note: note.trim() } }), "Accessibility review recorded")}>
               Record the review
             </Button>

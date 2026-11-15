@@ -17,6 +17,10 @@ import {
   KeyCreation, PrivacyScreen, ProviderSetup, RecoveryScreen, RestoreImpact, RetentionCheck,
   ScopeLimits, SecurityReview, SecurityScreen, WebhookForm,
 } from "./console";
+import {
+  ApproveIncrease, ArchiveOrg, AuditRetention, ConfigureEntity, DownloadInvoices, ExportEverything, MembersExport,
+  PaySubscription, RevokeKey, RotateKey, SessionsExport, SuspendMember, UpdatePaymentMethod,
+} from "./actions";
 
 /* ====================================================================== *
  * ADMIN — Administration, Identity, Policy & Billing
@@ -71,7 +75,8 @@ export const adminApp = registerApp({
       })),
       actions: [
         { id: "Edit profile", placement: "primary", capability: "manage_policy", run: (context) => context.openOverlay("Identity form") },
-        { id: "configure entity", label: "Legal entities", placement: "secondary", run: (context) => context.navigate(`/o/${context.org.slug}/hq/locations`) },
+        { id: "configure entity", label: "Configure a legal entity", placement: "secondary", capability: "manage_policy", run: (context) => context.openOverlay("configure entity") },
+        { id: "locations", label: "Locations in Headquarters", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/hq/locations`) },
         { id: "verify domain", label: "Verify a domain", placement: "overflow", run: (context) => context.openOverlay("domain verify") },
         { id: "business hours", label: "Set business hours", placement: "overflow", run: (context) => context.openOverlay("business hours") },
         { id: "region", label: "Regional impact", placement: "overflow", run: (context) => context.openOverlay("region change impact") },
@@ -81,6 +86,7 @@ export const adminApp = registerApp({
         { id: "region change impact", kind: "drawer", title: "What a regional change touches", width: 500, render: ({ close: _close, ...context }) => <RegionChangeImpact context={context} /> },
         { id: "domain verify", kind: "modal", title: "Verify a domain", width: 560, render: ({ close, ...context }) => <DomainVerify context={context} close={close} /> },
         { id: "business hours", kind: "modal", title: "Business hours", width: 480, render: ({ close, ...context }) => <BusinessHoursForm context={context} close={close} /> },
+        { id: "configure entity", kind: "modal", title: "Legal entity", width: 600, render: ({ close, ...context }) => <ConfigureEntity context={context} close={close} /> },
       ],
     },
 
@@ -94,14 +100,16 @@ export const adminApp = registerApp({
       actions: [
         { id: "Invite", placement: "primary", capability: "edit_people", run: (context) => context.openOverlay("Invite wizard") },
         { id: "role change", label: "Change role view", placement: "secondary", capability: "edit_people", guard: (context) => (context.selectedId ? undefined : "Select a member"), run: (context) => context.openOverlay("role impact", { id: context.selectedId }) },
-        { id: "suspend", label: "Suspend", placement: "overflow", tone: "danger", capability: "edit_people", guard: (context) => (context.selectedId ? undefined : "Select a member"), run: (context) => context.openOverlay("revoke confirmation", { ids: context.selectedId ? [context.selectedId] : [] }) },
-        { id: "revoke", label: "Offboard", placement: "overflow", tone: "danger", capability: "edit_people", guard: (context) => (context.selectedId ? undefined : "Select a member"), run: (context) => context.openOverlay("revoke confirmation", { ids: context.selectedId ? [context.selectedId] : [] }) },
-        { id: "export", label: "Export the member list", placement: "overflow", capability: "export_data", run: (context) => { context.setTab("Members"); context.toast("Select rows to export", "Tick the people to include, then choose Export CSV in the table's bulk actions.", "info"); } },
+        { id: "suspend", label: "Suspend or reinstate", placement: "overflow", tone: "danger", capability: "edit_people", guard: (context) => (context.selectedId ? undefined : "Select a member"), run: (context) => context.openOverlay("suspend member") },
+        { id: "revoke", label: "Revoke access (offboard)", placement: "overflow", tone: "danger", capability: "edit_people", guard: (context) => (context.selectedId ? undefined : "Select a member"), run: (context) => context.openOverlay("revoke confirmation", { ids: context.selectedId ? [context.selectedId] : [] }) },
+        { id: "export", label: "Export the member list", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("export members") },
       ],
       overlays: [
         { id: "Invite wizard", kind: "modal", title: "Invite someone", width: 600, render: ({ close, ...context }) => <InviteWizard context={context} close={close} /> },
         { id: "role impact", kind: "drawer", title: "What a role change does", width: 560, render: ({ close, ...context }) => <RoleImpact context={context} close={close} /> },
         { id: "revoke confirmation", kind: "modal", title: "Offboard", tone: "danger", width: 560, blocking: true, render: ({ close, ...context }) => <RevokeConfirmation context={context} close={close} /> },
+        { id: "suspend member", kind: "modal", title: "Suspend a member", tone: "danger", width: 540, render: ({ close, ...context }) => <SuspendMember context={context} close={close} /> },
+        { id: "export members", kind: "modal", title: "Export the member list", width: 500, render: ({ close, ...context }) => <MembersExport context={context} close={close} /> },
       ],
     },
 
@@ -115,7 +123,7 @@ export const adminApp = registerApp({
       actions: [
         { id: "Create role", placement: "primary", capability: "manage_policy", run: (context) => context.openOverlay("Policy editor") },
         { id: "compare", label: "Compare two views", placement: "secondary", run: (context) => context.openOverlay("effective rights") },
-        { id: "simulate", label: "Try a decision", placement: "secondary", run: (context) => context.openOverlay("impact review") },
+        { id: "simulate", label: "Simulate a role", placement: "secondary", run: (context) => context.openOverlay("impact review") },
         { id: "publish", label: "Publish a draft", placement: "overflow", capability: "manage_policy", guard: (context) => (context.selectedId ? undefined : "Select a draft role"), run: (context) => context.openOverlay("impact review", { id: context.selectedId }) },
       ],
       overlays: [
@@ -136,7 +144,7 @@ export const adminApp = registerApp({
         { id: "Set grant", placement: "primary", capability: "manage_policy", run: (context) => context.openOverlay("Grant editor", { id: context.selectedId }) },
         { id: "test permission", label: "Test a permission", placement: "secondary", run: (context) => context.openOverlay("action simulator") },
         { id: "cap action", label: "Cap an action", placement: "overflow", capability: "manage_policy", guard: (context) => (context.selectedId ? undefined : "Select a grant or an agent"), run: (context) => context.openOverlay("Grant editor", { id: context.selectedId }) },
-        { id: "suspend", label: "Pause automation", placement: "overflow", tone: "danger", capability: "manage_policy", run: (context) => context.openOverlay("revoke confirmation", { intent: "pause" }) },
+        { id: "suspend", label: "Suspend automation", placement: "overflow", tone: "danger", capability: "manage_policy", run: (context) => context.openOverlay("revoke confirmation", { intent: "pause" }) },
       ],
       overlays: [
         { id: "Grant editor", kind: "modal", title: "Autonomy grant", width: 580, render: ({ close, ...context }) => <GrantEditor context={context} close={close} /> },
@@ -156,12 +164,14 @@ export const adminApp = registerApp({
         { id: "Set quota", placement: "primary", capability: "manage_policy", run: (context) => context.openOverlay("Spend limit", { id: context.selectedId }) },
         { id: "inspect", label: "Inspect headroom", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select a limit"), run: (context) => context.openOverlay("budget warning", { id: context.selectedId }) },
         { id: "allocate", label: "Allocate to a department", placement: "overflow", capability: "manage_policy", run: (context) => context.openOverlay("cost allocation") },
-        { id: "approve increase", label: "Request an increase", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a limit"), run: (context) => context.openOverlay("budget warning", { id: context.selectedId }) },
+        { id: "approve increase", label: "Approve an increase", placement: "overflow", capability: "approve_payment", run: (context) => context.openOverlay("approve increase") },
+        { id: "request increase", label: "Request an increase", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a limit"), run: (context) => context.openOverlay("budget warning", { id: context.selectedId }) },
       ],
       overlays: [
         { id: "Spend limit", kind: "modal", title: "Spend limit", width: 520, render: ({ close, ...context }) => <SpendLimit context={context} close={close} /> },
         { id: "cost allocation", kind: "modal", title: "Allocate budget", width: 520, render: ({ close, ...context }) => <CostAllocation context={context} close={close} /> },
         { id: "budget warning", kind: "drawer", title: "Headroom", width: 500, render: ({ close: _close, ...context }) => <BudgetWarning context={context} /> },
+        { id: "approve increase", kind: "modal", title: "Approve a budget increase", width: 580, render: ({ close, ...context }) => <ApproveIncrease context={context} close={close} /> },
       ],
     },
 
@@ -176,15 +186,13 @@ export const adminApp = registerApp({
         { id: "Configure SSO", placement: "primary", capability: "manage_connectors", run: (context) => context.openOverlay("Provider setup") },
         { id: "revoke", label: "Revoke sessions", placement: "secondary", tone: "danger", capability: "manage_policy", run: (context) => context.openOverlay("emergency revoke", { id: context.selectedId }) },
         { id: "require MFA", label: "Require a second factor", placement: "overflow", capability: "manage_policy", run: (context) => context.openOverlay("security review", { setting: "mfaRequired" }) },
-        {
-          id: "export", label: "Export sessions", placement: "overflow", capability: "export_data",
-          run: (context) => { context.setTab("Sessions"); context.openOverlay("security review", { setting: "stepUpForSensitive" }); },
-        },
+        { id: "export", label: "Export sessions", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("export sessions") },
       ],
       overlays: [
         { id: "Provider setup", kind: "modal", title: "Single sign-on", width: 560, render: ({ close, ...context }) => <ProviderSetup context={context} close={close} /> },
         { id: "emergency revoke", kind: "modal", title: "Revoke sessions", tone: "danger", width: 560, blocking: true, render: ({ close, ...context }) => <EmergencyRevoke context={context} close={close} /> },
         { id: "security review", kind: "modal", title: "Confirm a security change", width: 560, render: ({ close, ...context }) => <SecurityReview context={context} close={close} /> },
+        { id: "export sessions", kind: "modal", title: "Export sessions", width: 500, render: ({ close, ...context }) => <SessionsExport context={context} close={close} /> },
       ],
     },
 
@@ -199,13 +207,14 @@ export const adminApp = registerApp({
         { id: "inspect receipt", label: "Inspect the receipt", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Select an entry"), run: (context) => context.openOverlay("Audit detail", { id: context.selectedId }) },
         { id: "Filter", label: "Filter", placement: "secondary", run: (context) => context.openOverlay("audit filter") },
         { id: "export", label: "Export", placement: "secondary", capability: "export_data", run: (context) => context.openOverlay("export authorization") },
-        { id: "retention", label: "Retention", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/admin/privacy`) },
+        { id: "retention", label: "Audit retention", placement: "overflow", run: (context) => context.openOverlay("audit retention") },
       ],
       overlays: [
         { id: "Audit detail", kind: "drawer", title: "Audit entry", width: 520, render: ({ close: _close, ...context }) => <AuditDetail context={context} /> },
         { id: "export authorization", kind: "modal", title: "Authorise an export", width: 560, render: ({ close, ...context }) => <ExportAuthorization context={context} close={close} /> },
         { id: "event chain", kind: "drawer", title: "Everything on this record", width: 560, render: ({ close: _close, ...context }) => <EventChain context={context} /> },
         { id: "audit filter", kind: "drawer", title: "Narrow the trail", width: 440, render: ({ close: _close, ...context }) => <AuditFilter context={context} /> },
+        { id: "audit retention", kind: "modal", title: "Audit retention", width: 540, render: ({ close, ...context }) => <AuditRetention context={context} close={close} /> },
       ],
     },
 
@@ -240,18 +249,21 @@ export const adminApp = registerApp({
       actions: [
         { id: "Manage subscription", placement: "primary", capability: "manage_policy", run: (context) => context.openOverlay("Checkout") },
         {
-          id: "pay", label: "Pay", placement: "secondary",
-          guard: () => "No payment processor is connected, so nothing can be charged",
-          run: (context) => context.openOverlay("billing support"),
+          id: "pay", label: "Pay (held at the processor)", placement: "secondary", capability: "manage_policy",
+          run: (context) => context.openOverlay("pay subscription"),
         },
-        { id: "download invoice", label: "Download invoices", placement: "overflow", run: (context) => { context.setTab("Invoices"); context.toast("Choose invoices", "Tick the invoices to include, then choose Download in the table's bulk actions.", "info"); } },
-        { id: "update method", label: "Payment method", placement: "overflow", run: (context) => context.setTab("Payment") },
+        { id: "download invoice", label: "Download invoices", placement: "overflow", run: (context) => context.openOverlay("download invoices") },
+        { id: "update method", label: "Update the payment method", placement: "overflow", capability: "manage_policy", run: (context) => context.openOverlay("update method") },
+        { id: "billing question", label: "Ask a billing question", placement: "overflow", run: (context) => context.openOverlay("billing support") },
         { id: "cancel", label: "Cancel subscription", placement: "overflow", tone: "danger", capability: "manage_policy", run: (context) => context.openOverlay("cancellation") },
       ],
       overlays: [
         { id: "Checkout", kind: "modal", title: "Subscription", width: 560, render: ({ close, ...context }) => <CheckoutOverlay context={context} close={close} /> },
         { id: "cancellation", kind: "modal", title: "Cancel the subscription", tone: "danger", width: 560, render: ({ close, ...context }) => <CancellationOverlay context={context} close={close} /> },
         { id: "billing support", kind: "modal", title: "Billing question", width: 560, render: ({ close, ...context }) => <BillingSupport context={context} close={close} /> },
+        { id: "pay subscription", kind: "modal", title: "Pay a subscription invoice", width: 560, render: ({ close, ...context }) => <PaySubscription context={context} close={close} /> },
+        { id: "download invoices", kind: "modal", title: "Download invoices", width: 520, render: ({ close, ...context }) => <DownloadInvoices context={context} close={close} /> },
+        { id: "update method", kind: "modal", title: "Payment method", width: 540, render: ({ close, ...context }) => <UpdatePaymentMethod context={context} close={close} /> },
       ],
     },
 
@@ -263,15 +275,18 @@ export const adminApp = registerApp({
         render: (context: ScreenContext) => <RecoveryScreen context={context} tab={tab} />,
       })),
       actions: [
-        { id: "Request backup", label: "Take a snapshot", placement: "primary", run: (context) => context.openOverlay("retention check") },
+        { id: "Request backup", label: "Request a backup", placement: "primary", run: (context) => context.openOverlay("retention check") },
         { id: "restore test", label: "Rehearse a restore", placement: "secondary", run: (context) => context.openOverlay("Restore impact") },
-        { id: "export", label: "Export everything", placement: "secondary", capability: "export_data", run: (context) => { context.setTab("Exports"); context.toast("Export is on this tab", "Use Export everything now to write a JSON file from this browser.", "info"); } },
-        { id: "archive org", label: "Recovery drill", placement: "overflow", run: (context) => context.openOverlay("disaster drill") },
+        { id: "export", label: "Export everything", placement: "secondary", capability: "export_data", run: (context) => context.openOverlay("export everything") },
+        { id: "archive org", label: "Archive the organisation", placement: "overflow", tone: "danger", capability: "manage_policy", run: (context) => context.openOverlay("archive org") },
+        { id: "recovery drill", label: "Recovery drill", placement: "overflow", run: (context) => context.openOverlay("disaster drill") },
       ],
       overlays: [
         { id: "Restore impact", kind: "modal", title: "What a restore would overwrite", width: 620, render: ({ close, ...context }) => <RestoreImpact context={context} close={close} /> },
         { id: "retention check", kind: "modal", title: "Take a snapshot", width: 560, render: ({ close, ...context }) => <RetentionCheck context={context} close={close} /> },
         { id: "disaster drill", kind: "drawer", title: "Recovery readiness", width: 520, render: ({ close: _close, ...context }) => <DisasterDrill context={context} /> },
+        { id: "export everything", kind: "modal", title: "Export everything", width: 520, render: ({ close, ...context }) => <ExportEverything context={context} close={close} /> },
+        { id: "archive org", kind: "modal", title: "Archive the organisation", width: 580, tone: "danger", blocking: true, render: ({ close, ...context }) => <ArchiveOrg context={context} close={close} /> },
       ],
     },
 
@@ -285,8 +300,9 @@ export const adminApp = registerApp({
       actions: [
         { id: "Issue key", placement: "primary", capability: "manage_connectors", run: (context) => context.openOverlay("Key creation") },
         { id: "test webhook", label: "Test an endpoint", placement: "secondary", run: (context) => context.openOverlay("callback tester", { id: context.selectedId }) },
-        { id: "rotate", label: "Rotate a key", placement: "overflow", capability: "manage_connectors", guard: (context) => (context.selectedId ? undefined : "Select a key"), run: (context) => context.openOverlay("scope limits", { id: context.selectedId }) },
-        { id: "revoke", label: "Revoke a key", placement: "overflow", tone: "danger", capability: "manage_connectors", guard: (context) => (context.selectedId ? undefined : "Select a key"), run: (context) => context.openOverlay("scope limits", { id: context.selectedId }) },
+        { id: "rotate", label: "Rotate a key", placement: "overflow", capability: "manage_connectors", guard: (context) => (context.selectedId ? undefined : "Select a key"), run: (context) => context.openOverlay("rotate key") },
+        { id: "revoke", label: "Revoke a key", placement: "overflow", tone: "danger", capability: "manage_connectors", guard: (context) => (context.selectedId ? undefined : "Select a key"), run: (context) => context.openOverlay("revoke key") },
+        { id: "key scope", label: "What a key can reach", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a key"), run: (context) => context.openOverlay("scope limits", { id: context.selectedId }) },
         { id: "add webhook", label: "Add an endpoint", placement: "overflow", capability: "manage_connectors", run: (context) => context.openOverlay("webhook form") },
       ],
       overlays: [
@@ -294,6 +310,8 @@ export const adminApp = registerApp({
         { id: "scope limits", kind: "drawer", title: "What this key can reach", width: 520, render: ({ close: _close, ...context }) => <ScopeLimits context={context} /> },
         { id: "callback tester", kind: "modal", title: "Endpoint test", width: 620, render: ({ close, ...context }) => <CallbackTester context={context} close={close} /> },
         { id: "webhook form", kind: "modal", title: "Add an endpoint", width: 560, render: ({ close, ...context }) => <WebhookForm context={context} close={close} /> },
+        { id: "rotate key", kind: "modal", title: "Rotate an API key", width: 560, render: ({ close, ...context }) => <RotateKey context={context} close={close} /> },
+        { id: "revoke key", kind: "modal", title: "Revoke an API key", width: 560, tone: "danger", blocking: true, render: ({ close, ...context }) => <RevokeKey context={context} close={close} /> },
       ],
     },
   },

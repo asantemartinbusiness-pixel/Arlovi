@@ -60,6 +60,7 @@
 .t4-booking[data-status="hold"] { background: var(--warning-soft); color: var(--warning); border-color: var(--warning-border); border-style: dashed; }
 .t4-booking[data-status="cancelled"] { background: var(--bg-sunken); color: var(--fg-subtle); border-color: var(--border-default); text-decoration: line-through; }
 .t4-booking[data-status="conflict"] { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-border); }
+.t4-booking[data-selected="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
 .t4-booking[data-grabbed="true"] { outline: 2px dashed var(--accent); outline-offset: 1px; }
 .t4-booking strong { display: block; font-weight: 650; }
 

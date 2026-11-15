@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { cloneElement, useEffect, useId, useState, type ReactElement, type ReactNode } from "react";
 import { Clapperboard } from "lucide-react";
-import { Button, Empty } from "@/design-system";
+import { Button, Empty, Field } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord } from "@/platform/workspace";
 import { useDoc, useStore, type DocHandle } from "@/applications/visual/kit";
@@ -31,8 +31,14 @@ export function useMotionDoc(context: ScreenContext) {
   });
   useEffect(() => () => { motionSession.set({}); live.handle = undefined; live.recordId = undefined; }, []);
   useEffect(() => {
-    motionUi.set((current) => ({ ...current, time: 0, playing: false, selectedKeyframeId: undefined, selectedTriggerId: undefined }));
+    motionUi.set((current) => ({ ...current, time: 0, playing: false, selectedKeyframeId: undefined, selectedTriggerId: undefined, selectedLayerId: undefined, selectedStateId: undefined, staggerIds: [] }));
   }, [record?.id]);
+  /* Open on the settled last frame, so the stage shows the composition rather than an empty first frame. */
+  const opened = handle.doc !== null;
+  const duration = handle.doc?.duration;
+  useEffect(() => {
+    if (opened && duration) motionUi.set((current) => ({ ...current, time: duration }));
+  }, [opened, record?.id]);
   const playback = useMotionPlayback(handle.doc);
   return { record, handle, doc: handle.doc, playback };
 }
@@ -120,3 +126,9 @@ export const SHORTCUTS = [
   { keys: "Arrow keys on a curve handle", does: "Move the control point (Shift: larger steps)" },
   { keys: "Ctrl/Cmd + Z, Shift + Z", does: "Undo, redo" },
 ];
+
+/** A design-system Field whose label is tied to its single control by id. */
+export function FormField({ label, hint, error, required, children }: { label: ReactNode; hint?: ReactNode; error?: ReactNode; required?: boolean; children: ReactElement<{ id?: string }> }) {
+  const id = useId();
+  return <Field label={label} hint={hint} error={error} required={required} htmlFor={id}>{cloneElement(children, { id })}</Field>;
+}

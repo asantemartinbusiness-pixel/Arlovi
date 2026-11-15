@@ -5,11 +5,11 @@ import { getRecord } from "@/platform/repo";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { AssetPreview, FileStateTag } from "./thumbs";
 import {
-  AssetDetail, AssetInspector, AssetLibrary, LibraryStripLine, MediaImport, ReplacementImpact,
+  ArchiveAsset, AssetDetail, AssetInspector, AssetLibrary, GroupAssets, LibraryStripLine, MediaImport, ReplacementImpact,
   RightsCheck, RightsForm, VariantEditor, downloadAsset, licence, licenceTone, useAssets,
 } from "./panels";
 import {
-  BrandKits, BrandSelection, ExpiryWarning, GlobalImpact, GovernanceExport, GovernanceScreen,
+  BrandKits, BrandSelection, CompareSources, ExpiryWarning, GlobalImpact, GovernanceExport, GovernanceScreen,
   MergePreview, OverwriteReview, TokenEditor, TransformInspector, TransformRights,
   Transformations, UsageInspector,
 } from "./governance";
@@ -94,10 +94,10 @@ export const assetApp = registerApp({
         render: (context: ScreenContext) => <AssetLibrary context={context} tab={tab} />,
       })),
       actions: [
-        { id: "Upload", label: "Import an image", placement: "primary", run: (context) => context.openOverlay("Media import") },
+        { id: "Upload", label: "Upload", placement: "primary", run: (context) => context.openOverlay("Media import") },
         { id: "inspect", label: "Inspect", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select an asset"), run: (context) => context.openOverlay("asset inspector", { id: context.selectedId }) },
-        { id: "search", label: "Search tips", placement: "overflow", run: (context) => context.toast("Searching the library", "The search box above filters on name, summary, tag, type and licensor. Grouping sits beside it.", "info") },
-        { id: "group", label: "Group by type", placement: "overflow", run: (context) => context.toast("Grouping", "Use the grouping control in the toolbar: by type, by licence or by first tag.", "info") },
+        { id: "search", label: "Search the library", placement: "overflow", run: () => { document.querySelector<HTMLInputElement>('input[aria-label="Search the library"]')?.focus(); } },
+        { id: "group", label: "Group the library", placement: "overflow", run: (context) => context.openOverlay("group assets") },
         {
           id: "replace", label: "Replace", placement: "overflow",
           guard: (context) => (context.selectedId ? undefined : "Select an asset"),
@@ -110,6 +110,7 @@ export const assetApp = registerApp({
         { id: "asset inspector", kind: "drawer", title: "Asset", width: 520, render: ({ close: _close, ...context }) => <AssetInspector context={context} /> },
         { id: "rights check", kind: "modal", title: "Rights check", width: 620, render: ({ close: _close, ...context }) => <RightsCheck context={context} /> },
         { id: "replacement impact", kind: "modal", title: "Replace this asset", width: 680, render: ({ close, ...context }) => <ReplacementImpact context={context} close={close} /> },
+        { id: "group assets", kind: "modal", title: "Group the library", width: 440, render: ({ close }) => <GroupAssets close={close} /> },
       ],
     },
 
@@ -128,13 +129,15 @@ export const assetApp = registerApp({
         { id: "Download", placement: "primary", run: (context) => context.openOverlay("download") },
         { id: "create variant", label: "Create a variant", placement: "secondary", run: (context) => context.openOverlay("Variant editor", { id: context.params.id }) },
         { id: "update rights", label: "Update rights", placement: "overflow", run: (context) => context.openOverlay("rights form", { id: context.params.id }) },
-        { id: "archive", label: "Replace or archive", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("replacement impact", { id: context.params.id }) },
+        { id: "archive", label: "Archive", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("archive asset") },
+        { id: "replace", label: "Replace across uses", placement: "overflow", run: (context) => context.openOverlay("replacement impact", { id: context.params.id }) },
       ],
       overlays: [
         { id: "Variant editor", kind: "modal", title: "New variant", width: 620, render: ({ close, ...context }) => <VariantEditor context={context} close={close} /> },
         { id: "rights form", kind: "modal", title: "Rights", width: 560, render: ({ close, ...context }) => <RightsForm context={context} close={close} /> },
         { id: "replacement impact", kind: "modal", title: "Replace this asset", width: 680, render: ({ close, ...context }) => <ReplacementImpact context={context} close={close} /> },
         { id: "download", kind: "modal", title: "Download", width: 520, render: ({ close, ...context }) => <DownloadOverlay context={context} close={close} /> },
+        { id: "archive asset", kind: "modal", title: "Archive this asset", width: 580, tone: "danger", render: ({ close, ...context }) => <ArchiveAsset context={context} close={close} /> },
       ],
     },
 
@@ -168,7 +171,7 @@ export const assetApp = registerApp({
       actions: [
         { id: "Create preset", placement: "primary", run: (context) => context.openOverlay("Transform inspector") },
         { id: "batch export", label: "Batch export", placement: "secondary", run: (context) => context.openOverlay("overwrite review", { id: context.selectedId }) },
-        { id: "compare", label: "Compare sources", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a preset or a job"), run: (context) => context.openOverlay("Transform inspector", { id: context.selectedId }) },
+        { id: "compare", label: "Compare sources", placement: "overflow", run: (context) => context.openOverlay("compare sources") },
         {
           id: "publish", label: "Publish preset", placement: "overflow",
           guard: (context) => (context.selectedId ? undefined : "Select a draft preset"),
@@ -197,6 +200,7 @@ export const assetApp = registerApp({
         { id: "Transform inspector", kind: "modal", title: "Preset", width: 600, render: ({ close, ...context }) => <TransformInspector context={context} close={close} /> },
         { id: "rights", kind: "drawer", title: "Source rights", width: 520, render: ({ close: _close, ...context }) => <TransformRights context={context} /> },
         { id: "overwrite review", kind: "modal", title: "Batch export", width: 680, render: ({ close, ...context }) => <OverwriteReview context={context} close={close} /> },
+        { id: "compare sources", kind: "drawer", title: "Sources against the preset", width: 760, render: ({ close: _close, ...context }) => <CompareSources context={context} /> },
       ],
     },
 
@@ -209,7 +213,7 @@ export const assetApp = registerApp({
       })),
       actions: [
         { id: "Find use", placement: "primary", run: (context) => context.openOverlay("Usage inspector") },
-        { id: "resolve duplicate", label: "Resolve duplicates", placement: "secondary", run: (context) => { context.setTab("Duplicates"); context.toast("Duplicate groups", "Each group has a Resolve button that shows the merge before it happens.", "info"); } },
+        { id: "resolve duplicate", label: "Resolve duplicates", placement: "secondary", run: (context) => context.openOverlay("merge preview") },
         { id: "set retention", label: "Set retention", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select an asset"), run: (context) => context.openOverlay("expiry warning", { ids: context.selectedId ? [context.selectedId] : [] }) },
         { id: "export", label: "Export the report", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("governance export") },
       ],

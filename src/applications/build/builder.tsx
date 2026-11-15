@@ -296,6 +296,8 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
         <Row gap={2}>
           <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/code`)}>Code</Button>
           <Button size="sm" variant="secondary" onClick={() => context.openOverlay("binding test")}>Test bindings</Button>
+          <Button size="sm" variant="secondary" onClick={() => context.openOverlay("add component")}>Add component</Button>
+          <Button size="sm" variant="ghost" disabled={!ui.componentId} title={ui.componentId ? undefined : "Select a component first"} onClick={() => context.openOverlay("edit styles")}>Edit styles</Button>
           <Button size="sm" variant="primary" onClick={async () => {
             const name = `Screen ${model.screens.length + 1}`;
             await write({

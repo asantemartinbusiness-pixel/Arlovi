@@ -2794,12 +2794,13 @@ export const missionApp = registerApp({
         { id: "open", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a mission first"), run: (context) => context.navigate(`/o/${context.org.slug}/mission/missions/${context.selectedId}`) },
         { id: "filter", placement: "secondary", run: () => { document.querySelector<HTMLInputElement>('input[aria-label^="Filter"]')?.focus(); } },
         { id: "duplicate plan", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a mission first"), run: (context) => void duplicatePlan(context) },
-        { id: "bulk tag", placement: "overflow", run: (context) => { usePanelFlags.getState().set("mission.library.list", true); context.toast("Select rows to tag", "Switch to the list, tick the missions and use Tag as priority.", "info"); } },
+        { id: "bulk tag", placement: "overflow", run: (context) => context.openOverlay("bulk tag") },
       ],
       overlays: [
         { id: "Mission quick view", kind: "drawer", title: "Mission", width: 520, render: ({ ...context }) => <MissionQuickView context={context} /> },
         { id: "create mission", kind: "modal", title: "Create a mission", width: 560, render: ({ ...context }) => <CreateMissionOverlay context={context} /> },
         { id: "archive confirmation", kind: "modal", title: "Archive this mission", tone: "danger", width: 560, render: ({ close, ...context }) => <MissionArchive context={context} close={close} /> },
+        { id: "bulk tag", kind: "modal", title: "Tag missions", width: 560, render: ({ close, ...context }) => <BulkTagMissions context={context} close={close} /> },
       ],
     },
 
@@ -2817,15 +2818,18 @@ export const missionApp = registerApp({
           const problems = WIZARD_STEPS.flatMap((step) => wizardProblems(draft, step));
           return problems.length === 0 ? undefined : `${problems.length} thing${problems.length === 1 ? "" : "s"} outstanding: ${problems[0]}`;
         }, run: (context) => context.openOverlay("approval sheet") },
-        { id: "Describe goal", placement: "secondary", run: (context) => context.setTab("Goal") },
-        { id: "attach records", placement: "secondary", run: (context) => context.setTab("Context") },
-        { id: "revise plan", placement: "overflow", run: (context) => context.setTab("Plan") },
+        { id: "Describe goal", placement: "secondary", run: (context) => context.openOverlay("describe goal") },
+        { id: "attach records", placement: "secondary", run: (context) => context.openOverlay("attach records") },
+        { id: "revise plan", placement: "overflow", run: (context) => context.openOverlay("revise plan") },
       ],
       overlays: [
         { id: "Source picker", kind: "drawer", title: "Context records", width: 520, render: ({ ...context }) => <SourcePicker context={context} /> },
         { id: "team selector", kind: "drawer", title: "Who can do what", width: 560, render: ({ ...context }) => <TeamSelector context={context} /> },
         { id: "risk review", kind: "modal", title: "Risk review", width: 560, render: ({ ...context }) => <RiskReview context={context} /> },
         { id: "approval sheet", kind: "modal", title: "Submit for approval", width: 620, render: ({ close, ...context }) => <ApprovalSheet context={context} close={close} /> },
+        { id: "describe goal", kind: "modal", title: "Describe the goal", width: 580, render: ({ close, ...context }) => <DescribeGoal context={context} close={close} /> },
+        { id: "attach records", kind: "modal", title: "Attach records", width: 580, render: ({ close, ...context }) => <AttachMissionRecords context={context} close={close} /> },
+        { id: "revise plan", kind: "modal", title: "Revise the plan", width: 640, render: ({ close, ...context }) => <RevisePlan context={context} close={close} /> },
       ],
     },
 
@@ -2928,7 +2932,7 @@ export const missionApp = registerApp({
         render: (context: ScreenContext) => <MissionTeamRoom context={context} view={view} />,
       })),
       actions: [
-        { id: "Message", placement: "primary", run: (context) => context.setTab("Discussion") },
+        { id: "Message", placement: "primary", run: (context) => context.openOverlay("post message") },
         { id: "mention", placement: "secondary", run: (context) => context.openOverlay("Agent selector") },
         { id: "request review", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a task on the Reviews tab"), run: (context) => context.openOverlay("handoff view") },
         { id: "accept handoff", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a task first"), run: (context) => void acceptHandoff(context) },
@@ -2937,6 +2941,7 @@ export const missionApp = registerApp({
         { id: "Agent selector", kind: "drawer", title: "AI employees on this mission", width: 520, render: ({ ...context }) => <AgentSelectorOverlay context={context} /> },
         { id: "handoff view", kind: "modal", title: "Request a review", width: 560, render: ({ close, ...context }) => <HandoffView context={context} close={close} /> },
         { id: "decision record", kind: "modal", title: "Record a decision", width: 560, render: ({ close, ...context }) => <MissionDecisionRecord context={context} close={close} />, footer: submitFooter("mission-decision", "Record decision") },
+        { id: "post message", kind: "modal", title: "Message the room", width: 560, render: ({ close, ...context }) => <PostMissionMessage context={context} close={close} /> },
       ],
     },
 
@@ -2972,7 +2977,8 @@ export const missionApp = registerApp({
       actions: [
         { id: "Approve adjustment", placement: "primary", capability: "approve_payment", run: (context) => context.openOverlay("limit increase approval") },
         { id: "inspect cost", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a ledger entry first"), run: (context) => context.openOverlay("cost source") },
-        { id: "set alert", placement: "secondary", run: (context) => context.openOverlay("budget variance") },
+        { id: "set alert", placement: "secondary", run: (context) => context.openOverlay("set alert") },
+        { id: "variance", label: "Variance", placement: "overflow", run: (context) => context.openOverlay("budget variance") },
         { id: "export", placement: "overflow", capability: "export_data", run: (context) => void exportBudget(context) },
       ],
       overlays: [
@@ -2980,6 +2986,7 @@ export const missionApp = registerApp({
         { id: "budget variance", kind: "drawer", title: "Variance", width: 520, render: ({ ...context }) => <BudgetVariance context={context} /> },
         { id: "limit increase approval", kind: "modal", title: "Raise the ceiling", width: 560, render: ({ close, ...context }) => <LimitIncrease context={context} close={close} /> },
         { id: "cost source", kind: "drawer", title: "Where this cost came from", width: 520, render: ({ ...context }) => <CostSource context={context} /> },
+        { id: "set alert", kind: "modal", title: "Set a budget alert", width: 520, render: ({ close, ...context }) => <SetBudgetAlert context={context} close={close} /> },
       ],
     },
 
@@ -3097,4 +3104,178 @@ async function publishTemplate(context: ScreenContext): Promise<void> {
   if (!template || template.collection !== "templates") return;
   await context.mutate.patch(template.id, { status: "published", fields: { ...template.fields, publishedBy: context.actor } }, { expectRevision: template.revision, event: `${template.title} published by ${context.actor}` });
   context.toast("Published", "It is offered to anyone creating a mission here. No credential or approval travels with it.");
+}
+
+/* ====================================================================== *
+ * Contract actions that perform the operation they name.
+ * ====================================================================== */
+
+/** MISSION-001: tags the chosen missions. */
+function BulkTagMissions({ context, close }: { context: ScreenContext; close: () => void }) {
+  const data = useMissionData();
+  const missions = data.missions.filter((mission) => mission.status !== "archived");
+  const [chosen, setChosen] = useState<string[]>(context.selectedId ? [context.selectedId] : []);
+  const [tag, setTag] = useState("priority");
+  const [busy, setBusy] = useState(false);
+  return (
+    <Stack gap={4}>
+      <Field label="Tag" required><TextInput aria-label="Tag" value={tag} onChange={(event) => setTag(event.target.value)} /></Field>
+      <Stack gap={2}>
+        {missions.map((mission) => (
+          <Checkbox key={mission.id} label={`${mission.title} · ${mission.status}${mission.tags.length ? ` · ${mission.tags.join(", ")}` : ""}`} checked={chosen.includes(mission.id)}
+            onChange={(event) => setChosen((list) => (event.target.checked ? [...list, mission.id] : list.filter((id) => id !== mission.id)))} />
+        ))}
+      </Stack>
+      <Row gap={2}>
+        <Button variant="primary" busy={busy} disabled={chosen.length === 0 || !tag.trim()} onClick={async () => {
+          setBusy(true);
+          for (const mission of missions.filter((item) => chosen.includes(item.id))) {
+            await context.mutate.patch(mission.id, { tags: [...new Set([...mission.tags, tag.trim()])] }, { expectRevision: mission.revision, event: `${mission.title} tagged ${tag.trim()}` });
+          }
+          context.toast("Tagged", `${chosen.length} mission${chosen.length === 1 ? "" : "s"} tagged ${tag.trim()}.`);
+          setBusy(false);
+          close();
+        }}>Tag {chosen.length}</Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+/** MISSION-002: writes the goal and the success criteria into the draft. */
+function DescribeGoal({ context, close }: { context: ScreenContext; close: () => void }) {
+  const draft = useMissionWizard((state) => state.draft);
+  const set = useMissionWizard((state) => state.set);
+  const [goal, setGoal] = useState(draft.goal);
+  const [criteria, setCriteria] = useState(draft.successCriteria);
+  const problems = wizardProblems({ ...draft, goal, successCriteria: criteria }, "Goal");
+  return (
+    <Stack gap={4}>
+      <Field label="What the mission must achieve" required><TextArea aria-label="What the mission must achieve" value={goal} rows={3} onChange={(event) => setGoal(event.target.value)} /></Field>
+      <Field label="Success criteria" required hint="Completion is verified against these, not against an agent saying it is done."><TextArea aria-label="Success criteria" value={criteria} rows={3} onChange={(event) => setCriteria(event.target.value)} /></Field>
+      {problems.length > 0 && <Notice tone="warning" title="Not complete yet">{problems.join(" ")}</Notice>}
+      <Row gap={2}>
+        <Button variant="primary" disabled={problems.length > 0} onClick={() => { set({ goal: goal.trim(), successCriteria: criteria.trim() }); context.toast("Goal recorded", "The draft holds the goal and its criteria. Nothing is written until you submit."); close(); }}>Save the goal</Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+/** MISSION-002: attaches the records the mission is about to the draft. */
+function AttachMissionRecords({ context, close }: { context: ScreenContext; close: () => void }) {
+  const data = useMissionData();
+  const draft = useMissionWizard((state) => state.draft);
+  const set = useMissionWizard((state) => state.set);
+  const [chosen, setChosen] = useState<string[]>(draft.contextIds);
+  const pool = [...data.contacts, ...data.companies, ...data.suppliers, ...data.documents, ...data.objectives].slice(0, 60);
+  return (
+    <Stack gap={4}>
+      <Notice tone="info" title="Attached records are the mission's scope">An AI employee on the mission reads these within its grants. Nothing else is in scope.</Notice>
+      <Stack gap={1} style={{ maxHeight: "48vh", overflowY: "auto" }}>
+        {pool.map((record) => (
+          <Checkbox key={record.id} label={`${record.title} · ${record.collection}`} checked={chosen.includes(record.id)}
+            onChange={(event) => setChosen((list) => (event.target.checked ? [...list, record.id] : list.filter((id) => id !== record.id)))} />
+        ))}
+      </Stack>
+      <Row gap={2}>
+        <Button variant="primary" onClick={() => { set({ contextIds: chosen }); context.toast("Records attached", `${chosen.length} record${chosen.length === 1 ? " is" : "s are"} in the mission's scope.`); close(); }}>Attach {chosen.length}</Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+const STEP_KINDS = ["read", "compute", "draft", "approval", "provider"] as const;
+
+/** MISSION-002: edits the typed steps of the draft plan. */
+function RevisePlan({ context, close }: { context: ScreenContext; close: () => void }) {
+  const draft = useMissionWizard((state) => state.draft);
+  const set = useMissionWizard((state) => state.set);
+  const [steps, setSteps] = useState(draft.steps);
+  const providerWithoutApproval = steps.some((step, index) => step.kind === "provider" && !steps.slice(0, index).some((item) => item.kind === "approval"));
+  return (
+    <Stack gap={4}>
+      {steps.map((step, index) => (
+        <Row key={`${index}-${step.kind}`} gap={2} wrap>
+          <TextInput aria-label={`Step ${index + 1}`} value={step.title} onChange={(event) => setSteps(steps.map((item, at) => (at === index ? { ...item, title: event.target.value } : item)))} style={{ flex: "1 1 220px" }} />
+          <Select aria-label={`Kind of step ${index + 1}`} value={step.kind} onChange={(event) => setSteps(steps.map((item, at) => (at === index ? { ...item, kind: event.target.value as typeof item.kind } : item)))} style={{ width: "auto" }}>
+            {STEP_KINDS.map((kind) => <option key={kind} value={kind}>{kind}</option>)}
+          </Select>
+          <Button size="sm" variant="ghost" aria-label={`Remove step ${index + 1}`} onClick={() => setSteps(steps.filter((_, at) => at !== index))}>Remove</Button>
+        </Row>
+      ))}
+      <Button variant="secondary" onClick={() => setSteps([...steps, { title: "", kind: "read" }])}>Add a step</Button>
+      {providerWithoutApproval && <Notice tone="warning" title="A provider step has no approval before it">A step that would reach outside the workspace should follow an approval step. It will stop at the provider boundary either way.</Notice>}
+      <Row gap={2}>
+        <Button variant="primary" disabled={steps.length === 0 || steps.some((step) => !step.title.trim())} onClick={() => { set({ steps: steps.map((step) => ({ ...step, title: step.title.trim() })) }); context.toast("Plan revised", `${steps.length} step${steps.length === 1 ? "" : "s"} in the draft plan.`); close(); }}>Save the plan</Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+/** MISSION-007: posts a message in the mission room. */
+function PostMissionMessage({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { mission } = useMission(context);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (!mission) return <Empty title="No mission" />;
+  return (
+    <Stack gap={4}>
+      <Field label={`Message to the ${mission.title} room`} required><TextArea aria-label="Message" value={text} rows={4} onChange={(event) => setText(event.target.value)} /></Field>
+      <Notice tone="info" title="A message starts nothing">It is recorded in the room with your name. No AI employee acts on it without a task and its grants.</Notice>
+      <Row gap={2}>
+        <Button variant="primary" busy={busy} disabled={!text.trim()} onClick={async () => {
+          setBusy(true);
+          await context.mutate.create({
+            collection: "messages", title: text.trim().slice(0, 60), status: "posted", summary: text.trim(), parentId: mission.id,
+            at: new Date().toISOString(), fields: { author: context.actor, kind: "human", room: "mission" },
+          }, `Message posted in the ${mission.title} room`);
+          context.toast("Posted", "The message is in the Discussion tab.");
+          context.setTab("Discussion");
+          setBusy(false);
+          close();
+        }}>Post the message</Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+/** MISSION-009: sets the spend alert threshold on the mission budget. */
+function SetBudgetAlert({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { mission, costs } = useMission(context);
+  const [percent, setPercent] = useState(String(mission?.fields.alertAtPercent ?? 80));
+  const [busy, setBusy] = useState(false);
+  if (!mission) return <Empty title="No mission" />;
+  const ceiling = Number(mission.fields.budgetMinor ?? 0);
+  const used = costs.reduce((sum, cost) => sum + (cost.amountMinor ?? 0), 0);
+  const value = Math.max(1, Math.min(100, Number(percent) || 0));
+  const crossed = ceiling > 0 && used >= Math.round((ceiling * value) / 100);
+  return (
+    <Stack gap={4}>
+      <Properties rows={[
+        { label: "Ceiling", value: context.money(ceiling) },
+        { label: "Committed and spent", value: context.money(used) },
+      ]} />
+      <Field label="Alert when usage reaches, %" hint={`That is ${context.money(Math.round((ceiling * value) / 100))}.`}>
+        <TextInput aria-label="Alert when usage reaches" type="number" min={1} max={100} value={percent} onChange={(event) => setPercent(event.target.value)} />
+      </Field>
+      {crossed && <Notice tone="warning" title="Already past this threshold">The alert raises in the inbox as soon as it is saved.</Notice>}
+      <Row gap={2}>
+        <Button variant="primary" busy={busy} disabled={ceiling <= 0} onClick={async () => {
+          setBusy(true);
+          const saved = await context.mutate.patch(mission.id, { fields: { ...mission.fields, alertAtPercent: value, alertSetBy: context.actor } }, { expectRevision: mission.revision, event: `Budget alert on ${mission.title} set at ${value}% by ${context.actor}` });
+          if (saved && crossed) {
+            await context.mutate.create({ collection: "notifications", title: `${mission.title} is past ${value}% of its ceiling`, status: "unread", summary: `${context.money(used)} of ${context.money(ceiling)} is committed or spent.`, fields: { kind: "budget", missionId: mission.id, priority: "P1" } }, `Budget alert raised for ${mission.title}`);
+          }
+          if (saved) context.toast("Alert set", `An alert raises at ${value}% of the ceiling.`);
+          setBusy(false);
+          close();
+        }}>Save the alert</Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
 }

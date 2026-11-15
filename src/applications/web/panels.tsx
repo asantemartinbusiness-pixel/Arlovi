@@ -889,7 +889,7 @@ export function SiteForms({ context, lens }: { context: ScreenContext; lens: "Fo
   );
 }
 
-function SiteFormTester({
+export function SiteFormTester({
   context, formRecordId, fields, consent,
 }: { context: ScreenContext; formRecordId: string; fields: { id: string; label: string; type: string; required: boolean }[]; consent: string }) {
   const [values, setValues] = useState<Record<string, string>>({});
@@ -900,6 +900,9 @@ function SiteFormTester({
 
   if (!formRecordId || !target) {
     return <Notice tone="warning" title="No form record is bound">Choose a form on the Forms tab so a submission has a record to be written against.</Notice>;
+  }
+  if (target.organizationId !== context.org.id) {
+    return <Notice tone="danger" title="That form belongs to another organisation">A submission is only ever written against a form record in {context.org.name}. Bind a form from this organisation first.</Notice>;
   }
 
   return (
@@ -919,8 +922,8 @@ function SiteFormTester({
             status: "new",
             summary: `Submitted through the site form on ${target.title}.`,
             parentId: target.id,
-            at: new Date().toISOString(),
-            fields: { ...Object.fromEntries(fields.map((field) => [field.label, values[field.id] ?? ""])), consent: consent },
+            at: context.now.toISOString(),
+            fields: { ...Object.fromEntries(fields.map((field) => [field.label, values[field.id] ?? ""])), consent: consent, test: true },
           }, `Site form submission received for ${target.title}`);
           context.toast("Submission recorded", `A record was created against ${target.title}. Nothing was emailed.`);
           setValues({});

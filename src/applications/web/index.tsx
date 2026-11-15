@@ -8,7 +8,7 @@ import { capabilityById } from "@/platform/capability";
 import { readSite, type SiteModel } from "./model";
 import { PageBuilder } from "./builder";
 import {
-  BreakingChangePreview, BrokenLinkScan, CmsEditor, ComponentLibrary, ComponentPropertyForm,
+  BrokenLinkScan, CmsEditor, ComponentLibrary, ComponentPropertyForm,
   EntryDetailForm, LinkPickerForm, MigrationPreview, NoSite, RedirectForm, SchemaEditorForm,
   SiteDashboard, SiteDirectory, SiteForms, SiteNavigation, SiteStatusStrip, TokenUpdatePanel,
   useSiteRecord,
@@ -19,6 +19,11 @@ import {
   PublishReview, QualityReport, RunAuditAction,
 } from "./quality";
 import { saveSite } from "./state";
+import {
+  ChartBuilder, ComparePeriods, SitePreview, TestSubmissionPanel, bulkPublish, exportAnalytics, importComponents,
+  insertBlock, pickEntry, publishComponent, publishSiteForm, reorderBlock, reorderMenu, resizeBlock, retestAudit,
+  rollbackDeployment, updateEverywhere,
+} from "./actions";
 
 /* ====================================================================== *
  * WEB — Websites, CMS & Hosting
@@ -109,23 +114,6 @@ function require0(site: SiteModel, formNames: Record<string, string>): number {
 import * as ModelModule from "./model";
 const AUDIT = { auditSite: ModelModule.auditSite, issueCounts: ModelModule.issueCounts };
 
-function InsertPanel({ context }: { context: ScreenContext }) {
-  const { record, site } = useSiteRecord(context);
-  if (!record) return <NoSite />;
-  return (
-    <Stack gap={3}>
-      <Notice tone="info" title="Two ways to insert, one result">
-        The palette in the builder inserts a block after the current selection when pressed, and at the drop position when dragged. Both write the same model, and both are undoable.
-      </Notice>
-      <Properties rows={[
-        { label: "Pages", value: String(site.pages.length) },
-        { label: "Blocks", value: String(site.pages.reduce((sum, page) => sum + page.blocks.length, 0)) },
-        { label: "Block kinds available", value: "Hero, Columns, Text, Image, Gallery, Form embed, Pricing, Footer" },
-      ]} />
-      <Button variant="primary" onClick={() => { context.closeOverlay(); context.setTab("Build"); }}>Go to the palette</Button>
-    </Stack>
-  );
-}
 
 function AiEditDiff({ context }: { context: ScreenContext }) {
   const { record } = useSiteRecord(context);
@@ -267,7 +255,7 @@ export const webApp = registerApp({
       })),
       actions: [
         { id: "Open editor", label: "Open the builder", placement: "primary", run: (context) => context.navigate(`/o/${context.org.slug}/web/sites/${context.params.id ?? ""}/builder`) },
-        { id: "preview", label: "Preview", placement: "secondary", run: (context) => { context.setTab("Settings"); context.toast("Preview below", "The Settings tab renders the home page exactly as the export does."); } },
+        { id: "preview", label: "Preview", placement: "secondary", run: (context) => context.openOverlay("site preview") },
         { id: "view logs", label: "View logs", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/web/sites/${context.params.id ?? ""}/deploy?tab=Logs`) },
         { id: "deploy", label: "Deploy", placement: "overflow", run: (context) => context.openOverlay("Publish review", { environment: "production" }) },
       ],
@@ -283,6 +271,7 @@ export const webApp = registerApp({
           id: "Publish review", kind: "modal", title: "Publish review", width: 640,
           render: ({ close, ...context }) => <PublishReview context={context} close={close} />,
         },
+        { id: "site preview", kind: "modal", title: "Preview", width: 1360, render: ({ ...context }) => <SitePreview context={context} />, footer: closeFooter() },
       ],
     },
 
@@ -295,20 +284,29 @@ export const webApp = registerApp({
         render: (context: ScreenContext) => <PageBuilder context={context} />,
       })),
       actions: [
-        { id: "Drag component", label: "Insert a block", placement: "primary", run: (context) => context.openOverlay("insert panel") },
+        { id: "Drag component", label: "Place a component (drag or insert)", placement: "primary", run: (context) => context.openOverlay("insert panel") },
         {
           id: "edit text", label: "Edit the selection", placement: "secondary",
           guard: () => (StateModule.useWebUi.getState().selectedBlockId ? undefined : "Select a block on the canvas first"),
           run: (context) => context.openOverlay("Element inspector"),
         },
         {
-          id: "resize", label: "Next breakpoint", placement: "overflow",
+          id: "resize", label: "Resize the block", placement: "overflow",
+          guard: () => (StateModule.useWebUi.getState().selectedBlockId ? undefined : "Select a block on the canvas first"),
+          run: (context) => context.openOverlay("resize block"),
+        },
+        {
+          id: "next breakpoint", label: "Next breakpoint", placement: "overflow",
           run: (context) => {
             const next = StateModule.useWebUi.getState().cycleBreakpoint();
             context.toast("Breakpoint changed", `The canvas now renders at ${next === "mobile" ? 390 : next === "tablet" ? 768 : 1280}px and the layout is recomputed.`);
           },
         },
-        { id: "reorder", label: "Reorder blocks", placement: "overflow", run: (context) => { context.setTab("Build"); context.toast("Reordering", "Drag a grip, or use the Move up and Move down buttons on each block."); } },
+        {
+          id: "reorder", label: "Move the block", placement: "overflow",
+          guard: () => (StateModule.useWebUi.getState().selectedBlockId ? undefined : "Select a block on the canvas first"),
+          run: (context) => context.openOverlay("reorder blocks"),
+        },
         {
           id: "undo", label: "Undo", placement: "overflow",
           run: async (context) => {
@@ -322,7 +320,7 @@ export const webApp = registerApp({
       ],
       overlays: [
         { id: "Element inspector", kind: "drawer", title: "Element", width: 460, render: ({ ...context }) => <ElementInspectorOverlay context={context} /> },
-        { id: "insert panel", kind: "modal", title: "Insert a block", width: 520, render: ({ ...context }) => <InsertPanel context={context} />, footer: closeFooter() },
+        insertBlock, resizeBlock, reorderBlock,
         { id: "AI edit diff", kind: "drawer", title: "Proposed edit", width: 520, render: ({ ...context }) => <AiEditDiff context={context} /> },
       ],
     },
@@ -337,9 +335,10 @@ export const webApp = registerApp({
       })),
       actions: [
         { id: "Create", label: "Extract a section", placement: "primary", run: (context) => context.openOverlay("Component property") },
-        { id: "import", label: "Import", placement: "secondary", run: (context) => context.openOverlay("token update") },
-        { id: "update", label: "Update everywhere", placement: "overflow", run: (context) => context.openOverlay("breaking change") },
-        { id: "publish", label: "Share with the workspace", placement: "overflow", run: (context) => context.openOverlay("Component property") },
+        { id: "import", label: "Import a component", placement: "secondary", run: (context) => context.openOverlay("import components") },
+        { id: "update", label: "Update everywhere", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("breaking change") },
+        { id: "publish", label: "Publish to the workspace", placement: "overflow", run: (context) => context.openOverlay("publish component") },
+        { id: "design tokens", label: "Design tokens", placement: "overflow", run: (context) => context.openOverlay("token update") },
       ],
       overlays: [
         {
@@ -347,7 +346,7 @@ export const webApp = registerApp({
           render: ({ close, ...context }) => <ComponentPropertyForm context={context} close={close} />,
           footer: submitFooter("component-property", "Save component"),
         },
-        { id: "breaking change", kind: "modal", title: "Before replacing everywhere", tone: "danger", width: 560, render: ({ ...context }) => <BreakingChangePreview context={context} />, footer: closeFooter("Leave it as it is") },
+        updateEverywhere, publishComponent, importComponents,
         { id: "token update", kind: "drawer", title: "Design tokens", width: 420, render: ({ ...context }) => <TokenUpdatePanel context={context} /> },
       ],
     },
@@ -362,9 +361,10 @@ export const webApp = registerApp({
       })),
       actions: [
         { id: "Create collection", label: "New collection", placement: "primary", run: (context) => context.openOverlay("Schema editor") },
-        { id: "edit entry", label: "New entry", placement: "secondary", run: (context) => context.openOverlay("entry detail") },
-        { id: "bulk publish", label: "Publish entries", placement: "overflow", run: (context) => { context.setTab("Entries"); context.toast("Select the entries", "Tick the rows you want, then use Publish selected in the grid toolbar."); } },
+        { id: "edit entry", label: "Edit an entry", placement: "secondary", run: (context) => context.openOverlay("pick entry") },
+        { id: "bulk publish", label: "Publish entries in bulk", placement: "overflow", run: (context) => context.openOverlay("bulk publish") },
         { id: "import", label: "Import CSV", placement: "overflow", run: (context) => context.setTab("Import") },
+        { id: "new entry", label: "New entry", placement: "overflow", run: (context) => context.openOverlay("entry detail") },
       ],
       overlays: [
         {
@@ -378,6 +378,7 @@ export const webApp = registerApp({
           footer: submitFooter("entry-detail", "Save entry"),
         },
         { id: "migration preview", kind: "modal", title: "Migration check", width: 560, render: ({ ...context }) => <MigrationPreview context={context} />, footer: closeFooter() },
+        bulkPublish, pickEntry,
       ],
     },
 
@@ -391,7 +392,7 @@ export const webApp = registerApp({
       })),
       actions: [
         { id: "add route", label: "Add a route", placement: "primary", run: (context) => context.openOverlay("Link picker", { which: context.tab === "Footer" ? "footer" : "header" }) },
-        { id: "Reorder", label: "Reorder", placement: "secondary", run: (context) => context.toast("Reordering", "Drag a grip, or use the Move up and Move down buttons on each link.") },
+        { id: "Reorder", label: "Reorder the menu", placement: "secondary", run: (context) => context.openOverlay("reorder menu") },
         { id: "preview", label: "Preview at 390px", placement: "overflow", run: (context) => context.setTab("Mobile") },
         { id: "publish", label: "Publish review", placement: "overflow", run: (context) => context.openOverlay("Publish review", { environment: "production" }) },
       ],
@@ -408,6 +409,7 @@ export const webApp = registerApp({
         },
         { id: "broken link scan", kind: "drawer", title: "Link scan", width: 520, render: ({ ...context }) => <BrokenLinkScan context={context} /> },
         { id: "Publish review", kind: "modal", title: "Publish review", width: 640, render: ({ close, ...context }) => <PublishReview context={context} close={close} /> },
+        reorderMenu,
       ],
     },
 
@@ -421,9 +423,10 @@ export const webApp = registerApp({
       })),
       actions: [
         { id: "Edit form", label: "Edit fields", placement: "primary", run: (context) => context.setTab("Fields") },
-        { id: "test", label: "Test a submission", placement: "secondary", run: (context) => { context.setTab("Fields"); context.toast("Test form ready", "Submit the form on the right; it writes a real submission record."); } },
+        { id: "test", label: "Test a submission", placement: "secondary", run: (context) => context.openOverlay("test submission") },
         { id: "set webhook", label: "Set a webhook", placement: "overflow", run: (context) => context.openOverlay("submission routing") },
-        { id: "publish", label: "Consent text", placement: "overflow", run: (context) => context.openOverlay("consent inspector") },
+        { id: "publish", label: "Publish a form version", placement: "overflow", run: (context) => context.openOverlay("publish site form") },
+        { id: "consent text", label: "Consent text", placement: "overflow", run: (context) => context.openOverlay("consent inspector") },
       ],
       overlays: [
         {
@@ -437,6 +440,8 @@ export const webApp = registerApp({
           render: ({ close, ...context }) => <RoutingForm context={context} close={close} />,
           footer: submitFooter("site-routing", "Save routing"),
         },
+        { id: "test submission", kind: "drawer", title: "Test a submission", width: 520, render: ({ ...context }) => <TestSubmissionPanel context={context} /> },
+        publishSiteForm,
       ],
     },
 
@@ -461,8 +466,9 @@ export const webApp = registerApp({
           },
         },
         { id: "view issue", label: "Inspect an issue", placement: "secondary", run: (context) => context.openOverlay("Issue detail") },
-        { id: "apply proposed fix", label: "See the diff", placement: "overflow", run: (context) => context.openOverlay("code diff") },
-        { id: "retest", label: "Export the report", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("audit report") },
+        { id: "apply proposed fix", label: "Apply a proposed fix", placement: "overflow", run: (context) => context.openOverlay("code diff") },
+        { id: "retest", label: "Retest", placement: "overflow", run: (context) => retestAudit(context) },
+        { id: "export report", label: "Export the report", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("audit report") },
       ],
       overlays: [
         { id: "Issue detail", kind: "drawer", title: "Check detail", width: 480, render: ({ ...context }) => <IssueDetail context={context} /> },
@@ -483,8 +489,9 @@ export const webApp = registerApp({
       actions: [
         { id: "publish", label: "Publish", placement: "primary", run: (context) => context.openOverlay("Publish review", { environment: "production" }) },
         { id: "Verify domain", label: "Verify a domain", placement: "secondary", run: (context) => context.openOverlay("domain check") },
-        { id: "rollback", label: "Roll back", placement: "overflow", run: (context) => context.openOverlay("deployment issue") },
-        { id: "inspect", label: "DNS records", placement: "overflow", run: (context) => context.openOverlay("DNS instructions") },
+        { id: "rollback", label: "Roll back", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("rollback deployment") },
+        { id: "inspect", label: "Inspect the latest deployment", placement: "overflow", run: (context) => context.openOverlay("deployment issue") },
+        { id: "dns records", label: "DNS records", placement: "overflow", run: (context) => context.openOverlay("DNS instructions") },
       ],
       overlays: [
         { id: "Publish review", kind: "modal", title: "Publish review", width: 660, render: ({ close, ...context }) => <PublishReview context={context} close={close} /> },
@@ -496,6 +503,7 @@ export const webApp = registerApp({
           render: ({ close, ...context }) => <DomainAttachForm context={context} close={close} />,
           footer: submitFooter("domain-attach", "Record the domain"),
         },
+        rollbackDeployment,
       ],
     },
 
@@ -509,15 +517,18 @@ export const webApp = registerApp({
         render: (context: ScreenContext) => <AnalyticsPanel context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Build chart", label: "Choose an event", placement: "primary", run: (context) => context.openOverlay("event setup") },
-        { id: "compare periods", label: "Compare periods", placement: "secondary", run: (context) => { context.setTab("Conversion"); context.toast("Comparison", "Use the Compare halves control on the conversion tab."); } },
-        { id: "export", label: "Export", placement: "overflow", capability: "export_data", run: (context) => context.setTab("Conversion") },
-        { id: "inspect", label: "Where a figure comes from", placement: "overflow", run: (context) => context.openOverlay("Metric source", { metric: "visits" }) },
+        { id: "Build chart", label: "Build a chart", placement: "primary", run: (context) => context.openOverlay("chart builder") },
+        { id: "compare periods", label: "Compare periods", placement: "secondary", run: (context) => context.openOverlay("compare periods") },
+        { id: "export", label: "Export", placement: "overflow", capability: "export_data", run: (context) => exportAnalytics(context) },
+        { id: "inspect", label: "Inspect where a figure comes from", placement: "overflow", run: (context) => context.openOverlay("Metric source", { metric: "visits" }) },
+        { id: "event setup", label: "Event setup", placement: "overflow", run: (context) => context.openOverlay("event setup") },
       ],
       overlays: [
         { id: "Metric source", kind: "drawer", title: "Metric source", width: 520, render: ({ ...context }) => <MetricSource context={context} /> },
         { id: "event setup", kind: "modal", title: "Event setup", width: 560, render: ({ ...context }) => <EventSetup context={context} />, footer: closeFooter() },
         { id: "attribution note", kind: "modal", title: "Attribution", width: 520, render: ({ ...context }) => <AttributionNote context={context} />, footer: closeFooter() },
+        { id: "chart builder", kind: "modal", title: "Build a chart", width: 680, render: ({ ...context }) => <ChartBuilder context={context} />, footer: closeFooter() },
+        { id: "compare periods", kind: "modal", title: "Compare periods", width: 560, render: ({ ...context }) => <ComparePeriods context={context} />, footer: closeFooter() },
       ],
     },
   },

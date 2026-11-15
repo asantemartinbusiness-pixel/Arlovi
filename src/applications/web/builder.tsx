@@ -290,6 +290,8 @@ export function PageBuilder({ context }: { context: ScreenContext }) {
             context.toast(done ? "Undone" : "Nothing to undo", done ? "The previous structure was written back to the record." : "No builder change is on the undo stack for this site.");
           }}>Undo{ui.undoDepth(record.id) > 0 ? ` (${ui.undoDepth(record.id)})` : ""}</Button>
           <Button size="sm" variant="secondary" onClick={() => context.openOverlay("insert panel")}>Insert</Button>
+          <Button size="sm" variant="ghost" disabled={!ui.selectedBlockId} title={ui.selectedBlockId ? undefined : "Select a block first"} onClick={() => context.openOverlay("resize block")}>Resize</Button>
+          <Button size="sm" variant="ghost" disabled={!ui.selectedBlockId} title={ui.selectedBlockId ? undefined : "Select a block first"} onClick={() => context.openOverlay("reorder blocks")}>Move</Button>
           <Button size="sm" variant="secondary" onClick={() => {
             downloadFile(`${context.org.slug}-${page.path === "/" ? "index" : page.path.replace(/\//g, "")}.html`, pageHtml(site, page), "text/html");
             context.toast("Page exported", `${page.name} downloaded as HTML from this browser.`);

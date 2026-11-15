@@ -1147,9 +1147,25 @@ function KnowledgeInspector({ context }: { context: ScreenContext }) {
 function SuggestionApproval({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useKnowledge();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const fact = data.facts.find((item) => item.id === payload?.id);
+  const [picked, setPicked] = useState<string | undefined>(payload?.id);
+  const fact = data.facts.find((item) => item.id === picked);
   const source = fact ? sourceOf(data, fact.fields.sourceId) : undefined;
-  if (!fact) return <Empty title="Choose a suggestion" />;
+  if (!fact) {
+    const proposals = data.facts.filter((item) => item.status === "proposed");
+    if (proposals.length === 0) return <Empty title="No proposal is waiting" icon={<Brain size={20} />}>Every proposed fact has been reviewed.</Empty>;
+    return (
+      <Stack gap={3}>
+        <p className="ds-subtle">Choose a proposal to review. A proposal with no source record cannot be verified.</p>
+        {proposals.map((item) => (
+          <Row key={item.id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
+            <span className="ds-grow">{item.title}</span>
+            <Pill tone={sourceOf(data, item.fields.sourceId) ? "info" : "danger"}>{sourceOf(data, item.fields.sourceId) ? "has evidence" : "no source"}</Pill>
+            <Button size="sm" variant="primary" onClick={() => setPicked(item.id)}>Review</Button>
+          </Row>
+        ))}
+      </Stack>
+    );
+  }
   return (
     <Stack gap={4}>
       <Card title={fact.title} subtitle={fact.summary} prov="agent">
@@ -1460,11 +1476,29 @@ function EntityInspector({ context }: { context: ScreenContext }) {
 
 function MergePreview({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const link = useRecord(payload?.id ?? context.selectedId);
+  const [picked, setPicked] = useState<string | undefined>(payload?.id ?? context.selectedId);
+  const candidateLink = useRecord(picked);
+  const link = candidateLink?.collection === "graphLinks" ? candidateLink : undefined;
+  const allLinks = useCollection("graphLinks");
   const from = useRecord(String(link?.fields.fromId ?? ""));
   const to = useRecord(String(link?.fields.toId ?? ""));
   const [confirmed, setConfirmed] = useState(false);
-  if (!link) return <Empty title="Choose a merge candidate" />;
+  if (!link) {
+    const candidates = allLinks.filter((item) => item.status === "candidate" || (item.status !== "confirmed" && item.status !== "rejected" && item.status !== "split"));
+    if (candidates.length === 0) return <Empty title="No merge candidate" icon={<GitBranch size={20} />}>Every uncertain link has been decided.</Empty>;
+    return (
+      <Stack gap={3}>
+        <p className="ds-subtle">Choose a candidate. Nothing is merged until you have checked both records and confirmed.</p>
+        {candidates.map((item) => (
+          <Row key={item.id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
+            <span className="ds-grow">{item.title}</span>
+            <Pill tone="warning">{String(item.fields.confidence ?? 0)}% match</Pill>
+            <Button size="sm" variant="primary" onClick={() => setPicked(item.id)}>Review</Button>
+          </Row>
+        ))}
+      </Stack>
+    );
+  }
   const confidence = Number(link.fields.confidence ?? 0);
   return (
     <Stack gap={4}>
@@ -1481,7 +1515,7 @@ function MergePreview({ context, close }: { context: ScreenContext; close: () =>
           variant="primary"
           disabled={!confirmed}
           onClick={async () => {
-            await context.mutate.patch(link.id, { status: "confirmed", fields: { ...link.fields, confidence: 100, confirmedBy: context.actor } }, { expectRevision: link.revision, event: `${link.title} confirmed as the same entity by ${context.actor}` });
+            await context.mutate.patch(link.id, { status: "confirmed", fields: { ...link.fields, confidence: 100, confirmedBy: context.actor, confirmedAt: context.now.toISOString(), mergedFromConfidence: Number(link.fields.confidence ?? 0) } }, { expectRevision: link.revision, event: `${link.title} confirmed as the same entity by ${context.actor}` });
             context.toast("Link confirmed", "The two records are recorded as the same entity, with who confirmed it.");
             close();
           }}
@@ -2260,7 +2294,8 @@ export const brainApp = registerApp({
       actions: [
         { id: "Search knowledge", placement: "primary", run: (context) => context.openOverlay("Knowledge inspector") },
         { id: "import", label: "Import a source", placement: "secondary", run: (context) => context.openOverlay("upload") },
-        { id: "review proposal", placement: "secondary", run: (context) => context.setTab("Opportunities") },
+        { id: "review proposal", placement: "secondary", capability: "edit_knowledge", run: (context) => context.openOverlay("suggestion approval") },
+        { id: "opportunities", label: "All opportunities", placement: "overflow", run: (context) => context.setTab("Opportunities") },
         { id: "inspect missing source", placement: "overflow", run: (context) => { context.setTab("Quality"); context.toast("Assertions with no source", "They are listed on the Quality tab and cannot be verified until one is attached.", "info"); } },
       ],
       overlays: [
@@ -2321,13 +2356,15 @@ export const brainApp = registerApp({
       })),
       actions: [
         { id: "Explore node", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Choose an entity in the graph or the list"), run: (context) => context.openOverlay("Entity inspector") },
-        { id: "merge candidates", placement: "secondary", run: (context) => context.setTab("Exceptions") },
+        { id: "merge candidates", placement: "secondary", capability: "edit_knowledge", run: (context) => context.openOverlay("merge preview", { id: "" }) },
+        { id: "exceptions", label: "All exceptions", placement: "overflow", run: (context) => context.setTab("Exceptions") },
         { id: "filter graph", placement: "secondary", run: (context) => { context.setTab("Entities"); usePanelFlags.getState().toggle("brain.graph.filter"); context.toast("Filter", "Choose an entity kind beside the display toggle to narrow the graph and the list together.", "info"); } },
-        { id: "split record", placement: "overflow", guard: () => "No entity in this workspace is a merged record, so there is nothing to split.", run: () => undefined },
+        { id: "split record", placement: "overflow", capability: "edit_knowledge", run: (context) => context.openOverlay("split record") },
       ],
       overlays: [
         { id: "Entity inspector", kind: "drawer", title: "Entity", width: 520, render: ({ ...context }) => <EntityInspector context={context} /> },
         { id: "merge preview", kind: "modal", title: "Review a merge", width: 680, render: ({ close, ...context }) => <MergePreview context={context} close={close} /> },
+        { id: "split record", kind: "modal", title: "Split a merged record", width: 600, render: ({ close, ...context }) => <SplitRecord context={context} close={close} /> },
         { id: "relationship editor", kind: "modal", title: "Relationship", width: 520, render: ({ close, ...context }) => <RelationshipEditor context={context} close={close} />, footer: submitFooter("relationship-editor", "Save relationship") },
       ],
     },
@@ -2403,13 +2440,14 @@ export const brainApp = registerApp({
       actions: [
         { id: "Import guide", placement: "primary", run: (context) => void importBrandGuide(context) },
         { id: "approve variant", placement: "secondary", capability: "edit_knowledge", run: (context) => context.openOverlay("impact preview") },
-        { id: "edit token", placement: "secondary", run: (context) => { context.setTab("Colours"); context.openOverlay("impact preview"); } },
+        { id: "edit token", placement: "secondary", capability: "edit_knowledge", run: (context) => context.openOverlay("edit token") },
         { id: "set usage", placement: "overflow", run: (context) => context.openOverlay("Brand rule editor") },
       ],
       overlays: [
         { id: "Brand rule editor", kind: "modal", title: "Brand rule", width: 560, render: ({ close, ...context }) => <BrandRuleEditor context={context} close={close} />, footer: submitFooter("brand-rule", "Save rule") },
         { id: "asset selector", kind: "drawer", title: "Assets", width: 520, render: ({ ...context }) => <AssetSelector context={context} /> },
         { id: "impact preview", kind: "modal", title: "What approving would change", width: 560, render: ({ close, ...context }) => <BrandImpactPreview context={context} close={close} /> },
+        { id: "edit token", kind: "modal", title: "Edit a design token", width: 560, render: ({ close, ...context }) => <EditToken context={context} close={close} /> },
       ],
     },
 
@@ -2481,4 +2519,102 @@ async function linkApproval(context: ScreenContext): Promise<void> {
     fields: { ...decision.fields, approvers: [...approvers, context.actor].join(","), approvedAt: context.now.toISOString().slice(0, 10) },
   }, { expectRevision: decision.revision, event: `${decision.title} approved by ${context.actor}` });
   context.toast("Approval linked", `${decision.title} now carries your approval and today's date.`);
+}
+
+/** Undoes a confirmed merge: the link is marked split and both records keep their own identity and history. */
+function SplitRecord({ context, close }: { context: ScreenContext; close: () => void }) {
+  const links = useCollection("graphLinks").filter((link) => link.status === "confirmed" && link.fields.confirmedBy);
+  const [id, setId] = useState(links[0]?.id ?? "");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const link = links.find((item) => item.id === id);
+  if (links.length === 0) return <Empty title="No merged record to split" icon={<GitBranch size={20} />}>Only a link someone confirmed as the same entity can be split.</Empty>;
+  return (
+    <Stack gap={4}>
+      <Field label="Merged link">
+        <Select aria-label="Merged link" value={id} onChange={(event) => setId(event.target.value)}>
+          {links.map((item) => <option key={item.id} value={item.id}>{item.title} · confirmed by {String(item.fields.confirmedBy)}</option>)}
+        </Select>
+      </Field>
+      <Notice tone="warning" title="Splitting separates the two records again">The link is kept, marked split with your reason, so the earlier confirmation stays in the history.</Notice>
+      <Field label="Why they are different" required><TextInput aria-label="Why they are different" value={reason} onChange={(event) => setReason(event.target.value)} /></Field>
+      <Row gap={2}>
+        <Button
+          variant="danger"
+          busy={busy}
+          disabled={!link || !reason.trim()}
+          onClick={async () => {
+            if (!link) return;
+            setBusy(true);
+            const saved = await context.mutate.patch(link.id, { status: "split", fields: { ...link.fields, splitBy: context.actor, splitAt: context.now.toISOString(), splitReason: reason.trim(), confidence: Number(link.fields.mergedFromConfidence ?? 0) } }, { expectRevision: link.revision, event: `${link.title} split by ${context.actor}: ${reason.trim()}` });
+            if (saved) context.toast("Split", "The two records are separate again. The earlier confirmation is in the history.");
+            setBusy(false);
+            close();
+          }}
+        >
+          Split the record
+        </Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+/** Edits a colour token. A change to an approved token is held as a proposal; it never overwrites silently. */
+function EditToken({ context, close }: { context: ScreenContext; close: () => void }) {
+  const brands = useCollection("brands");
+  const [brandId, setBrandId] = useState(brands.find((brand) => brand.status === "approved")?.id ?? brands[0]?.id ?? "");
+  const brand = brands.find((item) => item.id === brandId);
+  const colours = ((brand?.body as { colours?: { name: string; value: string; approved: boolean; previousValue?: string }[] } | undefined)?.colours) ?? [];
+  const [name, setName] = useState(colours[0]?.name ?? "");
+  const token = colours.find((colour) => colour.name === name);
+  const [value, setValue] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  if (brands.length === 0) return <Empty title="No brand recorded" />;
+  const next = (value ?? token?.value ?? "").trim();
+  const valid = /^#[0-9a-fA-F]{6}$/.test(next);
+  return (
+    <Stack gap={4}>
+      <Row gap={3} wrap>
+        <Field label="Brand">
+          <Select aria-label="Brand" value={brandId} onChange={(event) => { setBrandId(event.target.value); setName(""); setValue(undefined); }}>
+            {brands.map((item) => <option key={item.id} value={item.id}>{item.title} · {item.status}</option>)}
+          </Select>
+        </Field>
+        <Field label="Token">
+          <Select aria-label="Token" value={name} onChange={(event) => { setName(event.target.value); setValue(undefined); }}>
+            <option value="">Choose a token</option>
+            {colours.map((colour) => <option key={colour.name} value={colour.name}>{colour.name} · {colour.value}{colour.approved ? " · approved" : ""}</option>)}
+          </Select>
+        </Field>
+      </Row>
+      <Field label="New value" hint="Six-digit hex, for example #234FE8" error={next && !valid ? "Use a six-digit hex value" : undefined}>
+        <TextInput aria-label="New value" value={next} onChange={(event) => setValue(event.target.value)} />
+      </Field>
+      {token?.approved && <Notice tone="warning" title="This token is approved">The new value is recorded as a proposal against it. The approved value stays in use until someone approves the change.</Notice>}
+      <Row gap={2}>
+        <Button
+          variant="primary"
+          busy={busy}
+          disabled={!brand || !token || !valid || next.toLowerCase() === token.value.toLowerCase()}
+          onClick={async () => {
+            if (!brand || !token) return;
+            setBusy(true);
+            const updated = colours.map((colour) => (colour.name === token.name
+              ? (colour.approved ? { ...colour, proposedValue: next, proposedBy: context.actor } : { ...colour, value: next, previousValue: colour.value })
+              : colour));
+            const saved = await context.mutate.patch(brand.id, {
+              body: { ...(brand.body as object), colours: updated },
+            }, { expectRevision: brand.revision, event: token.approved ? `Change to approved token ${token.name} proposed by ${context.actor}: ${next}` : `Token ${token.name} set to ${next} by ${context.actor}` });
+            if (saved) context.toast(token.approved ? "Change proposed" : "Token updated", token.approved ? `${token.name} keeps ${token.value} until the proposal to ${next} is approved.` : `${token.name} is now ${next}.`);
+            setBusy(false);
+            close();
+          }}
+        >
+          {token?.approved ? "Propose the change" : "Save the token"}
+        </Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
 }

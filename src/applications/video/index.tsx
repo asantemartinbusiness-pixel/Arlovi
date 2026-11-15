@@ -13,7 +13,7 @@ import {
   EditorFrame, PanelGroup, RecoveryNotice, SaveState, downloadBlob, downloadText,
   slug, useStore, type DocHandle,
 } from "@/applications/visual/kit";
-import { canUndoShared, editShared, readShared, sharedHandle, undoShared, useSharedDoc } from "@/applications/design/sharedDoc";
+import { canUndoShared, editShared, readShared, sharedHandle, undoShared, useGuardRefresh, useSharedDoc } from "@/applications/design/sharedDoc";
 import { CAPABILITY_LABELS } from "@/platform/capability";
 import { RENDER_PRESETS, cancelRender, closeInterrupted, heldFile, isInterrupted, latestHeld, renderUi, startRender } from "./exporter";
 import {
@@ -34,6 +34,8 @@ function useVideoDoc(context: ScreenContext, id?: string) {
   const record = useRecord(id ?? context.params.id);
   const handle = useSharedDoc<VideoDoc>(record, parseVideo, context.screen.id);
   useTransport(handle.doc);
+  useStore(videoUi);
+  useGuardRefresh(context);
   return { record, handle };
 }
 
@@ -660,12 +662,13 @@ function AudioMixer({ context, lens }: { context: ScreenContext; lens: "Tracks" 
   const { record, handle } = useVideoDoc(context);
   const ui = useStore(videoUi);
   const [playing, setPlaying] = useState<{ stop: () => void } | null>(null);
+  const loaded = handle.doc;
+  const loudnessOrNull = useMemo(() => (loaded ? measureLoudness(mixAudio(loaded, 0, Math.min(loaded.duration, 30), 8000)) : null), [loaded]);
   if (!record) return <MissingProject context={context} />;
   const doc = handle.doc;
-  if (!doc) return <Empty title="Opening the project…" />;
+  if (!doc || !loudnessOrNull) return <Empty title="Opening the project…" />;
   const audioTracks = doc.tracks.filter((track) => track.kind === "audio");
-  const mix = useMemo(() => mixAudio(doc, 0, Math.min(doc.duration, 30), 8000), [doc]);
-  const loudness = useMemo(() => measureLoudness(mix), [mix]);
+  const loudness = loudnessOrNull;
 
   if (lens === "Loudness") {
     const over = loudness.approximateLufs > doc.loudnessTarget + 1;
@@ -1048,11 +1051,12 @@ function presetEffects(preset: { effects: { kind: Clip["effects"][number]["kind"
 function EffectsScreen({ context, lens }: { context: ScreenContext; lens: "Colour" | "Effects" | "Presets" | "Compare" }) {
   const { record, handle } = useVideoDoc(context);
   const ui = useStore(videoUi);
+  const loaded = handle.doc;
+  const scopes = useMemo(() => { if (!loaded) return null; try { return frameScopes(loaded, ui.playhead); } catch { return null; } }, [loaded, ui.playhead]);
   if (!record) return <MissingProject context={context} />;
   const doc = handle.doc;
   if (!doc) return <Empty title="Opening the project…" />;
   const clip = doc.clips.find((item) => item.id === ui.selectedClipId) ?? doc.clips.find((item) => doc.tracks.find((track) => track.id === item.trackId)?.kind === "video");
-  const scopes = useMemo(() => { try { return frameScopes(doc, ui.playhead); } catch { return null; } }, [doc, ui.playhead]);
 
   if (lens === "Compare") {
     return (
@@ -1105,7 +1109,7 @@ function EffectsScreen({ context, lens }: { context: ScreenContext; lens: "Colou
 
   return (
     <Grid>
-      <Card span={5} eyebrow="GRADE" prov="human" title={clip ? clip.name : "No clip"}>
+      <Card span={5} eyebrow="GRADE" prov="human" title={clip ? clip.name : "No clip"} actions={<ClipPicker doc={doc} />}>
         {clip ? <ColourPanel handle={handle} context={context} /> : <Empty title="Select a clip on the timeline" />}
       </Card>
       <Card span={7} eyebrow="MONITOR" prov="human" title="Preview" flush>
@@ -1129,6 +1133,18 @@ function EffectsScreen({ context, lens }: { context: ScreenContext; lens: "Colou
         </div>
       </Card>
     </Grid>
+  );
+}
+
+/** Choose the clip the colour actions work on, without going back to the timeline. */
+function ClipPicker({ doc }: { doc: VideoDoc }) {
+  const ui = useStore(videoUi);
+  const picture = doc.clips.filter((item) => doc.tracks.find((track) => track.id === item.trackId)?.kind !== "audio");
+  return (
+    <Select aria-label="Clip to grade" value={ui.selectedClipId ?? ""} onChange={(event) => videoUi.set((current) => ({ ...current, selectedClipId: event.target.value || undefined }))}>
+      <option value="">Choose a clip</option>
+      {picture.map((item) => <option key={item.id} value={item.id}>{item.name} · {timecode(item.start, doc.fps)}</option>)}
+    </Select>
   );
 }
 
@@ -2097,7 +2113,8 @@ function AutomationPoint({ context, close }: { context: ScreenContext; close: ()
   const { record, handle } = useVideoDoc(context);
   const ui = useStore(videoUi);
   const audio = handle.doc?.tracks.filter((track) => track.kind === "audio") ?? [];
-  const [trackId, setTrackId] = useState(ui.selectedTrackId ?? audio[0]?.id ?? "");
+  const [chosenTrack, setTrackId] = useState(ui.selectedTrackId ?? "");
+  const trackId = chosenTrack || audio[0]?.id || "";
   const [time, setTime] = useState(String(ui.playhead.toFixed(2)));
   const [gain, setGain] = useState("-6");
   const [error, setError] = useState<string | null>(null);
