@@ -7,7 +7,7 @@ import { RequisitionForm, ScanOverlay } from "@/applications/proc/overlays";
 import {
   archiveProduct, AssignOrder, BuyerMessage, Categorise, ChangePrice, CheckoutPolicy, createLabel, CustomerSegments,
   deployCheckout, duplicateProduct, exportAnalytics, exportOrders, LayoutEditor, OrderFilter, pauseOffer, PeriodCompare,
-  ProductInspect, publishStorefront, reorderStock, rollbackStorefront, ScanParcel, ScheduleOffer, StorefrontVersions, ThemeInspector,
+  ProductInspect, publishStorefront, reorderStock, rollbackStorefront, ScanParcel, ScheduleOffer, StorefrontVersions, StorePicker, ThemeInspector,
 } from "./actions";
 import "@/applications/market/growth.css";
 import { bodyOf, statusTone, taxCategoryOfProduct, type OrderBody, type ProductBody } from "./data";
@@ -21,7 +21,7 @@ import {
   LabelPreview, MarginCheck, MarginImpact, MediaPicker, OfferBuilder, OfferLaunchApproval,
   OrderQuickView, ProductEditor, ProviderSetup, PublishProduct,
   RefundApproval, RefundAuthorization, RefundConfirmation, ReportSchedule, RestockAssessment,
-  ReturnInspector, ShippingLabel, StockAdjustment, StorePicker, TemplatePicker,
+  ReturnInspector, ShippingLabel, StockAdjustment, TemplatePicker,
   TransferApproval, VariantEditor,
 } from "./overlays";
 
@@ -77,11 +77,12 @@ export const commerceApp = registerApp({
         { id: "inspect product", label: "Inspect a product", placement: "secondary", run: (context) => context.openOverlay("product inspector") },
         { id: "ask Commerce", label: "Ask Commerce", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/ai/chat`) },
         { id: "exceptions", label: "Exceptions", placement: "overflow", run: (context) => context.openOverlay("exception list") },
+        { id: "location", label: "Choose a location", placement: "overflow", run: (context) => context.openOverlay("store picker") },
       ],
       overlays: [
         { id: "KPI explanation", kind: "drawer", title: "How this figure is built", width: 600, render: ({ ...context }) => <KpiExplanation context={context} /> },
         { id: "exception list", kind: "drawer", title: "Exceptions", width: 620, render: ({ ...context }) => <ExceptionList context={context} /> },
-        { id: "store picker", kind: "modal", title: "Stores and locations", width: 560, render: ({ ...context }) => <StorePicker context={context} /> },
+        { id: "store picker", kind: "modal", title: "Choose a location", width: 560, render: ({ close }) => <StorePicker close={close} />, footer: submitFooter("store-picker", "Show this location") },
         { id: "Offer builder", kind: "drawer", title: "Offer", width: 640, render: ({ close, ...context }) => <OfferBuilder context={context} close={close} />, footer: submitFooter("offer-builder", "Save offer") },
         { id: "product inspector", kind: "drawer", title: "Product", width: 600, render: ({ ...context }) => <ProductInspect context={context} /> },
       ],

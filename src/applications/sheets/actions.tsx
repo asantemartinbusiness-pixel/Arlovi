@@ -203,7 +203,9 @@ export function FixErrors({ context, close }: { context: ScreenContext; close: (
   const editor = useWorkbookEditor(context, useWorkbookFor(context));
   const fixable = editor.evaluation.errors.filter((error) => error.code !== "#CYCLE!");
   const cycles = editor.evaluation.errors.length - fixable.length;
-  const [picked, setPicked] = useState<string[]>(fixable.map((error) => error.key));
+  const [excluded, setExcluded] = useState<string[]>([]);
+  const picked = fixable.map((error) => error.key).filter((key) => !excluded.includes(key));
+  const setPicked = (next: (current: string[]) => string[]) => { const kept = next(picked); setExcluded(fixable.map((error) => error.key).filter((key) => !kept.includes(key))); };
   if (editor.evaluation.errors.length === 0) return <Notice tone="success" title="No formula errors">Every formula evaluates.</Notice>;
   return (
     <form

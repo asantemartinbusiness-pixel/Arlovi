@@ -81,21 +81,6 @@ export function ExceptionList({ context }: { context: ScreenContext }) {
   );
 }
 
-export function StorePicker({ context }: { context: ScreenContext }) {
-  const data = useCommerceData();
-  return (
-    <Stack gap={3}>
-      <p className="ds-subtle">One storefront exists in this workspace. Stock is held across {data.warehouses.length} locations and the storefront sells from all of them.</p>
-      <DataGrid rows={data.warehouses} rowId={(row) => row.id} label="Locations" filterable={false}
-        columns={[
-          { key: "title", header: "Location", primary: true, cell: (row) => row.title },
-          { key: "code", header: "Code", cell: (row) => String(row.fields.code ?? "—") },
-          { key: "manager", header: "Manager", cell: (row) => String(row.fields.managerName ?? "Unassigned") },
-        ]} />
-      <Button variant="secondary" onClick={() => { context.navigate(`/o/${context.org.slug}/commerce/storefront?tab=Preview`); context.closeOverlay(); }}>Open the storefront preview</Button>
-    </Stack>
-  );
-}
 
 /* ---------------- COMMERCE-002 / 003 ---------------- */
 

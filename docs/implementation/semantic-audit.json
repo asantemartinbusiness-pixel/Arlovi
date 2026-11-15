@@ -117,6 +117,46 @@
    "openItems": [
     "IT-008 revoke disables a connector and clears its scopes; no user sessions exist to revoke."
    ]
+  },
+  "MARKET": {
+   "signedOff": true,
+   "basis": "Growth-group remediation review, 15 Nov 2026: every contract action, tab and overlay judged; routed actions reimplemented; class-3 actions clicked in a browser.",
+   "openItems": [
+    "MARKET-003 plan approval and MARKET-006 schedule: only the blocked paths were clicked.",
+    "ask Marketing opens the Chief of Staff chat rather than a Marketing-scoped assistant."
+   ]
+  },
+  "COMMERCE": {
+   "signedOff": true,
+   "basis": "Growth-group remediation review, 15 Nov 2026: every contract action, tab and overlay judged; routed actions reimplemented; class-3 actions clicked in a browser.",
+   "openItems": [
+    "ask Commerce opens the Chief of Staff chat rather than a Commerce-scoped assistant.",
+    "COMMERCE-004 receive and reorder: dialogs opened; saves not driven."
+   ]
+  },
+  "PROC": {
+   "signedOff": true,
+   "basis": "Growth-group remediation review, 15 Nov 2026: every contract action, tab and overlay judged; routed actions reimplemented; class-3 actions clicked in a browser.",
+   "openItems": [
+    "PROC-001 and PROC-004 approve: review opened, approve not pressed.",
+    "PROC-008 approve adjustment: success path needs a second person; only the blocked path was clicked."
+   ]
+  },
+  "BOOK": {
+   "signedOff": true,
+   "basis": "Growth-group remediation review, 15 Nov 2026: every contract action, tab and overlay judged; routed actions reimplemented; class-3 actions clicked in a browser.",
+   "openItems": [
+    "BOOK-003 confirm and send reminder: only the blocked paths were clicked.",
+    "BOOK-004 archive: dialog shown, not executed."
+   ]
+  },
+  "PORTAL": {
+   "signedOff": true,
+   "basis": "Growth-group remediation review, 15 Nov 2026: every contract action, tab and overlay judged; routed actions reimplemented; class-3 actions clicked in a browser.",
+   "openItems": [
+    "PORTAL-002 access test flags INV-1041 for review: a genuine seed inconsistency it is designed to catch.",
+    "PORTAL-004 download: the expired-link branch was not exercised."
+   ]
   }
  }
 }

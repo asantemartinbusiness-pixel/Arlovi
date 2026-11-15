@@ -75,6 +75,45 @@ export function ProductInspect({ context }: { context: ScreenContext }) {
   );
 }
 
+/* ---------------- COMMERCE-001 location scope (store picker) ---------------- */
+
+export const locationScope = createStore<string>("");
+
+export function useLocationScope() {
+  return useSyncExternalStore(locationScope.subscribe, locationScope.get, locationScope.get);
+}
+
+export function LocationScopeNote({ context }: { context: ScreenContext }) {
+  const data = useCommerceData();
+  const scope = useLocationScope();
+  const site = data.warehouses.find((item) => item.id === scope);
+  return (
+    <Row gap={2} wrap>
+      <Pill tone={scope ? "info" : "neutral"} dot>{scope ? `Location: ${site?.title ?? "loading"}` : "All locations"}</Pill>
+      <Button size="sm" variant="ghost" onClick={() => context.openOverlay("store picker")}>Change location</Button>
+      {scope && <span className="ds-subtle">Orders and stock below count this location only. Orders without a location are left out, not guessed.</span>}
+    </Row>
+  );
+}
+
+export function StorePicker({ close }: { close: () => void }) {
+  const data = useCommerceData();
+  const current = useLocationScope();
+  const [chosen, setChosen] = useState(current);
+  return (
+    <form id="store-picker" className="ds-stack ds-gap-4" onSubmit={(event) => { event.preventDefault(); locationScope.set(chosen); close(); }}>
+      <p className="ds-subtle">One storefront sells from {data.warehouses.length} locations. Pick one to see the overview for that location alone.</p>
+      <Field label="Location">
+        <Select value={chosen} onChange={(event) => setChosen(event.target.value)}>
+          <option value="">All locations</option>
+          {data.warehouses.map((site) => <option key={site.id} value={site.id}>{site.title} · {String(site.fields.code ?? "")}</option>)}
+        </Select>
+      </Field>
+      <Properties rows={data.warehouses.map((site) => ({ label: site.title, value: `${data.orders.filter((order) => String(order.fields.warehouseId ?? "") === site.id).length} orders · manager ${String(site.fields.managerName ?? "unassigned")}` }))} />
+    </form>
+  );
+}
+
 /* ---------------- COMMERCE-002 categorise, duplicate, archive ---------------- */
 
 export function Categorise({ context, close }: { context: ScreenContext; close: () => void }) {

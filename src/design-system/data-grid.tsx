@@ -83,13 +83,23 @@ export function DataGrid<T>({
   }, [filtered, sort, columns]);
 
   const visible = sorted.slice(0, limit);
+  /* When a grid can both select and open, a click selects and an explicit
+     Open control opens. Otherwise selecting a row would navigate away, and an
+     action that needs a selection could never be used with a pointer. */
+  const bothModes = Boolean(onSelect && onOpen);
   const selectedRows = bulkActions ? sorted.filter((row) => checked.has(rowId(row))) : [];
 
   function onRowKey(event: KeyboardEvent<HTMLTableRowElement>, id: string, index: number) {
-    if (event.key === "Enter" || event.key === " ") {
+    if (event.key === "Enter") {
       event.preventDefault();
       if (onOpen) onOpen(id);
       else onSelect?.(id);
+      return;
+    }
+    if (event.key === " ") {
+      event.preventDefault();
+      if (onSelect) onSelect(id);
+      else onOpen?.(id);
       return;
     }
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
@@ -179,6 +189,7 @@ export function DataGrid<T>({
                       ) : column.header}
                     </th>
                   ))}
+                  {bothModes && <th style={{ width: 72 }}><span className="ds-sr-only">Open</span></th>}
                 </tr>
               </thead>
               <tbody ref={bodyRef}>
@@ -191,7 +202,8 @@ export function DataGrid<T>({
                       tabIndex={0}
                       aria-selected={id === selectedId}
                       data-tone={rowTone?.(row)}
-                      onClick={() => (onOpen ? onOpen(id) : onSelect?.(id))}
+                      onClick={() => (bothModes ? onSelect?.(id) : onOpen ? onOpen(id) : onSelect?.(id))}
+                      onDoubleClick={() => { if (bothModes) onOpen?.(id); }}
                       onFocus={() => onSelect?.(id)}
                       onKeyDown={(event) => onRowKey(event, id, index)}
                       style={{ cursor: onOpen || onSelect ? "pointer" : undefined }}
@@ -215,6 +227,11 @@ export function DataGrid<T>({
                           {column.cell(row)}
                         </td>
                       ))}
+                      {bothModes && (
+                        <td data-align="end" onClick={(event) => event.stopPropagation()}>
+                          <Button size="sm" variant="ghost" aria-label={`Open row ${id}`} onClick={() => onOpen?.(id)}>Open</Button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -226,12 +243,12 @@ export function DataGrid<T>({
             {visible.map((row) => {
               const id = rowId(row);
               return (
+                <div key={id} className="ds-stack ds-gap-1">
                 <button
-                  key={id}
                   type="button"
                   className="ds-record-card"
-                  aria-selected={id === selectedId}
-                  onClick={() => (onOpen ? onOpen(id) : onSelect?.(id))}
+                  aria-pressed={bothModes ? id === selectedId : undefined}
+                  onClick={() => (bothModes ? onSelect?.(id) : onOpen ? onOpen(id) : onSelect?.(id))}
                 >
                   {card ? card(row) : (
                     <>
@@ -242,6 +259,10 @@ export function DataGrid<T>({
                     </>
                   )}
                 </button>
+                {bothModes && id === selectedId && (
+                  <Button size="sm" variant="secondary" onClick={() => onOpen?.(id)}>Open</Button>
+                )}
+                </div>
               );
             })}
           </div>

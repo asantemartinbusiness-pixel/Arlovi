@@ -16,7 +16,7 @@ import {
   type OrderBody, type ProductBody,
 } from "./data";
 import { StorefrontPreview } from "./storefront";
-import { applyOrderFilter, orderFilter, useOrderFilter } from "./actions";
+import { applyOrderFilter, LocationScopeNote, orderFilter, useLocationScope, useOrderFilter } from "./actions";
 
 /* ====================================================================== *
  * COMMERCE panels — catalogue, inventory, orders, fulfilment, returns,
@@ -30,14 +30,25 @@ function warehouseName(warehouses: Rec[], id: string): string {
 /* ---------------------------- COMMERCE-001 ---------------------------- */
 
 export function CommerceOverview({ context, lens }: { context: ScreenContext; lens: string }) {
+  return (
+    <Stack gap={3}>
+      <LocationScopeNote context={context} />
+      <CommerceOverviewBody context={context} lens={lens} />
+    </Stack>
+  );
+}
+
+function CommerceOverviewBody({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useCommerceData();
   const { org, now } = useWorkspace();
-  const live = data.orders.filter((order) => order.status !== "cancelled");
-  const awaiting = data.orders.filter((order) => order.status === "awaiting_payment");
-  const unfulfilled = data.orders.filter((order) => ["unfulfilled", "exception"].includes(order.status));
+  const scope = useLocationScope();
+  const orders = scope ? data.orders.filter((order) => String(order.fields.warehouseId ?? "") === scope) : data.orders;
+  const live = orders.filter((order) => order.status !== "cancelled");
+  const awaiting = orders.filter((order) => order.status === "awaiting_payment");
+  const unfulfilled = orders.filter((order) => ["unfulfilled", "exception"].includes(order.status));
   const grossPaid = live.filter((order) => String(order.fields.payment) === "paid_local").reduce((sum, order) => sum + (order.amountMinor ?? 0), 0);
   const netPaid = live.filter((order) => String(order.fields.payment) === "paid_local").reduce((sum, order) => sum + Number(order.fields.netMinor ?? 0), 0);
-  const lowStock = data.products.filter((product) => product.status === "active" && onHandFor(data.stockMoves, product.id) - reservedFor(data.orders, product.id) <= Number(product.fields.reorderPoint ?? 0));
+  const lowStock = data.products.filter((product) => product.status === "active" && onHandFor(data.stockMoves, product.id, scope || undefined) - reservedFor(orders, product.id) <= Number(product.fields.reorderPoint ?? 0));
 
   if (lens === "Sales") {
     const months = [4, 3, 2, 1, 0].map((back) => {
@@ -95,8 +106,8 @@ export function CommerceOverview({ context, lens }: { context: ScreenContext; le
           {lowStock.length === 0 ? <Empty title="No stock warnings" icon={<Boxes size={20} />} /> : (
             <Stack gap={2}>
               {lowStock.map((product) => {
-                const onHand = onHandFor(data.stockMoves, product.id);
-                const reserved = reservedFor(data.orders, product.id);
+                const onHand = onHandFor(data.stockMoves, product.id, scope || undefined);
+                const reserved = reservedFor(orders, product.id);
                 return (
                   <Row key={product.id} gap={2}>
                     <span className="ds-grow">{product.title}</span>
@@ -130,12 +141,12 @@ export function CommerceOverview({ context, lens }: { context: ScreenContext; le
 
   if (lens === "Insights") {
     const byProduct = data.products.map((product) => {
-      const sold = data.orders.filter((order) => order.status !== "cancelled").flatMap((order) => bodyOf<OrderBody>(order, {}).lines ?? []).filter((line) => line.productId === product.id);
+      const sold = orders.filter((order) => order.status !== "cancelled").flatMap((order) => bodyOf<OrderBody>(order, {}).lines ?? []).filter((line) => line.productId === product.id);
       return { product, units: sold.reduce((sum, line) => sum + line.quantity, 0), value: sold.reduce((sum, line) => sum + line.quantity * line.unitPriceMinor, 0) };
     }).filter((row) => row.units > 0).sort((a, b) => b.value - a.value);
     const findings: { title: string; body: string }[] = [];
     for (const row of byProduct.slice(0, 2)) {
-      const available = onHandFor(data.stockMoves, row.product.id) - reservedFor(data.orders, row.product.id);
+      const available = onHandFor(data.stockMoves, row.product.id, scope || undefined) - reservedFor(orders, row.product.id);
       const lead = Number(row.product.fields.leadTimeDays ?? 0);
       if (available <= Number(row.product.fields.reorderPoint ?? 0)) {
         findings.push({ title: `${row.product.title} is selling and nearly out`, body: `${row.units} units sold and ${available} available with a ${lead} day lead time. A purchase order placed today would arrive after the stock runs out.` });

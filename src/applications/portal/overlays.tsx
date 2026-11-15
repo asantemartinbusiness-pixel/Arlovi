@@ -8,7 +8,7 @@ import { useRecord, useWorkspace } from "@/platform/workspace";
 import { ProviderBoundary } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import {
-  bodyOf, expiryState, GATE_LABELS, MODULE_LABELS, portalDocuments, sharedRecords, statusTone,
+  bodyOf, expiryState, portalDocuments, sharedRecords, statusTone,
   usePortalData, type PortalBody,
 } from "./data";
 import { InvoiceTotalsCard, usePortal } from "./panels";
@@ -173,53 +173,6 @@ export function AccessSetup({ context, close }: { context: ScreenContext; close:
 }
 
 /* ---------------- PORTAL-002 ---------------- */
-
-export function ModulePicker({ context, close }: { context: ScreenContext; close: () => void }) {
-  const { portal } = usePortal(context);
-  const payload = context.overlayPayload as { pageId?: string } | undefined;
-  const body = bodyOf<PortalBody>(portal, {});
-  const page = (body.pages ?? []).find((item) => item.id === payload?.pageId) ?? (body.pages ?? [])[0];
-  const [modules, setModules] = useState<string[]>(page?.modules ?? []);
-  const [gate, setGate] = useState(page?.gate ?? "any_member");
-  if (!portal || !page) return <Empty title="No page selected" />;
-  return (
-    <form
-      id="module-picker"
-      className="ds-stack ds-gap-4"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        await context.mutate.patch(portal.id, {
-          body: { ...body, pages: (body.pages ?? []).map((item) => (item.id === page.id ? { ...item, modules, gate } : item)) },
-        }, { expectRevision: portal.revision, event: `Modules changed on ${portal.title} · ${page.name}` });
-        context.toast("Page saved", `${page.name} shows ${modules.length} module${modules.length === 1 ? "" : "s"} to ${GATE_LABELS[gate] ?? gate}.`);
-        close();
-      }}
-    >
-      <Properties rows={[{ label: "Page", value: page.name }, { label: "Portal", value: portal.title }]} />
-      <fieldset className="ds-fieldset">
-        <legend>Modules</legend>
-        <Stack gap={2}>
-          {Object.entries(MODULE_LABELS).map(([key, label]) => (
-            <Checkbox
-              key={key}
-              label={label}
-              checked={modules.includes(key)}
-              onChange={(event) => setModules((current) => (event.target.checked ? [...current, key] : current.filter((item) => item !== key)))}
-            />
-          ))}
-        </Stack>
-      </fieldset>
-      <Field label="Who can open this page">
-        <Select value={gate} onChange={(event) => setGate(event.target.value)}>
-          {Object.entries(GATE_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-        </Select>
-      </Field>
-      <Notice tone="info" title="A module shows only what is granted">
-        Adding the orders module does not share an order. It renders the orders this portal has been granted, which may be none.
-      </Notice>
-    </form>
-  );
-}
 
 export function DataGrant({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = usePortalData();

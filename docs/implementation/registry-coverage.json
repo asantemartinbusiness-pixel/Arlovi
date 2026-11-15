@@ -2071,7 +2071,7 @@
       "tabsRequired": 4,
       "tabsDeclared": 4,
       "actionsRequired": 4,
-      "actionsDeclared": 5,
+      "actionsDeclared": 6,
       "overlaysRequired": 3,
       "overlaysDeclared": 5,
       "missingTabs": [],
@@ -2393,7 +2393,7 @@
       "actionsRequired": 5,
       "actionsDeclared": 5,
       "overlaysRequired": 4,
-      "overlaysDeclared": 4,
+      "overlaysDeclared": 5,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -2409,7 +2409,7 @@
       "actionsRequired": 6,
       "actionsDeclared": 6,
       "overlaysRequired": 5,
-      "overlaysDeclared": 5,
+      "overlaysDeclared": 7,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -2423,9 +2423,9 @@
       "tabsRequired": 3,
       "tabsDeclared": 3,
       "actionsRequired": 4,
-      "actionsDeclared": 4,
+      "actionsDeclared": 5,
       "overlaysRequired": 2,
-      "overlaysDeclared": 2,
+      "overlaysDeclared": 5,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -2441,7 +2441,7 @@
       "actionsRequired": 4,
       "actionsDeclared": 4,
       "overlaysRequired": 3,
-      "overlaysDeclared": 3,
+      "overlaysDeclared": 7,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -2473,7 +2473,7 @@
       "actionsRequired": 4,
       "actionsDeclared": 4,
       "overlaysRequired": 3,
-      "overlaysDeclared": 3,
+      "overlaysDeclared": 5,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -2489,7 +2489,7 @@
       "actionsRequired": 3,
       "actionsDeclared": 3,
       "overlaysRequired": 3,
-      "overlaysDeclared": 3,
+      "overlaysDeclared": 4,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []

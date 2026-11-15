@@ -341,11 +341,21 @@ export function PutAway({ context, close }: { context: ScreenContext; close: () 
   if (!receipt || receipt.collection !== "receipts") return <Empty title="Select a received delivery">Put-away moves goods from the receiving dock of a completed receipt into a site.</Empty>;
   const order = data.purchaseOrders.find((item) => item.id === String(receipt.fields.purchaseOrderId));
   const orderLines = bodyOf<PoBody>(order, {}).lines ?? [];
-  const lines = (bodyOf<ReceiptBody>(receipt, {}).lines ?? []).map((line) => ({ line, productId: orderLines.find((item) => item.id === line.lineId)?.productId }));
   const dock = String(receipt.fields.warehouseId ?? order?.fields.warehouseId ?? "");
+  // Receipt lines carry the cumulative quantity received on the order line, so this receipt's own quantity is the
+  // difference from the previous receipt against the same line, capped at what is actually on hand at the dock.
+  const earlier = data.receipts
+    .filter((item) => item.id !== receipt.id && String(item.fields.purchaseOrderId) === String(receipt.fields.purchaseOrderId) && (item.at ?? "") < (receipt.at ?? ""))
+    .sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
+  const lines = (bodyOf<ReceiptBody>(receipt, {}).lines ?? []).map((line) => {
+    const productId = orderLines.find((item) => item.id === line.lineId)?.productId;
+    const before = earlier.map((item) => (bodyOf<ReceiptBody>(item, {}).lines ?? []).find((other) => other.lineId === line.lineId)?.received).find((value) => value !== undefined) ?? 0;
+    const onDock = productId ? data.stockMoves.filter((move) => String(move.fields.productId) === productId && String(move.fields.warehouseId) === dock).reduce((sum, move) => sum + Number(move.fields.quantity ?? 0), 0) : 0;
+    return { line, productId, quantity: Math.max(0, Math.min(line.received - before, onDock)) };
+  });
   const destination = target || data.warehouses.find((item) => item.id !== dock)?.id || "";
   const done = receipt.fields.putAway === true;
-  const blocked = receipt.status === "expected" ? "Nothing has been received on this receipt yet." : done ? `Already put away by ${String(receipt.fields.putAwayBy)}.` : destination === dock ? "Choose a site other than the receiving site." : lines.every((row) => !row.productId) ? "None of the lines is linked to a product, so there is no stock to move." : undefined;
+  const blocked = receipt.status === "expected" ? "Nothing has been received on this receipt yet." : done ? `Already put away by ${String(receipt.fields.putAwayBy)}.` : destination === dock ? "Choose a site other than the receiving site." : lines.every((row) => !row.productId) ? "None of the lines is linked to a product, so there is no stock to move." : lines.every((row) => row.quantity === 0) ? "Nothing from this receipt is still on hand at the receiving site." : undefined;
   return (
     <form
       id="put-away"
@@ -355,8 +365,8 @@ export function PutAway({ context, close }: { context: ScreenContext; close: () 
         if (blocked) return;
         const reference = `PUT-${receipt.title}`;
         const site = data.warehouses.find((item) => item.id === destination);
-        for (const row of lines.filter((item) => item.productId)) {
-          const quantity = row.line.received;
+        for (const row of lines.filter((item) => item.productId && item.quantity > 0)) {
+          const quantity = row.quantity;
           await context.mutate.create({ collection: "stockMoves", title: `put away out · ${row.line.description}`, status: "posted", at: iso(context), summary: `From receiving to ${site?.title}.`, fields: { productId: row.productId!, warehouseId: dock, quantity: -quantity, kind: "put_away_out", reference } }, `Put away ${quantity} × ${row.line.description} from receiving`);
           await context.mutate.create({ collection: "stockMoves", title: `put away in · ${row.line.description}`, status: "posted", at: iso(context), summary: `From ${receipt.title}.`, fields: { productId: row.productId!, warehouseId: destination, quantity, kind: "put_away_in", reference } }, `Put away ${quantity} × ${row.line.description} into ${site?.title}`);
         }
@@ -369,7 +379,7 @@ export function PutAway({ context, close }: { context: ScreenContext; close: () 
       <Properties rows={[
         { label: "Receipt", value: <span className="ds-num">{receipt.title}</span> },
         { label: "Received at", value: data.warehouses.find((item) => item.id === dock)?.title ?? "—" },
-        { label: "Lines", value: lines.map((row) => `${row.line.received} × ${row.line.description}`).join(", ") || "None" },
+        { label: "Moves", value: lines.map((row) => `${row.quantity} × ${row.line.description}${row.productId ? "" : " (not a catalogue item)"}`).join(", ") || "None" },
       ]} />
       <Field label="Put away into">
         <Select value={destination} onChange={(event) => setTarget(event.target.value)}>

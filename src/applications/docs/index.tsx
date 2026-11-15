@@ -2774,7 +2774,9 @@ function rangeText(model: DocModel, range: DocRange): string {
 function AcceptChanges({ context, close }: { context: ScreenContext; close: () => void }) {
   const editor = useDocEditor(context, useDocument(context));
   const open = openSuggestions(editor.model);
-  const [picked, setPicked] = useState<string[]>(open.map((item) => item.id));
+  const [excluded, setExcluded] = useState<string[]>([]);
+  const picked = open.map((item) => item.id).filter((id) => !excluded.includes(id));
+  const setPicked = (next: (current: string[]) => string[]) => { const kept = next(picked); setExcluded(open.map((item) => item.id).filter((id) => !kept.includes(id))); };
   if (open.length === 0) return <Notice tone="success" title="No open tracked changes">Nothing waits to be accepted.</Notice>;
   const decide = (decision: "accepted" | "rejected") => {
     let next = editor.model;
@@ -3027,7 +3029,9 @@ function RevokeLinks({ context, close }: { context: ScreenContext; close: () => 
 function ApplySuggestions({ context, close }: { context: ScreenContext; close: () => void }) {
   const editor = useDocEditor(context, useDocument(context));
   const proposals = writingProposals(editor.model).filter((proposal) => proposal.apply);
-  const [picked, setPicked] = useState<string[]>(proposals.map((proposal) => proposal.id));
+  const [excluded, setExcluded] = useState<string[]>([]);
+  const picked = proposals.map((proposal) => proposal.id).filter((id) => !excluded.includes(id));
+  const setPicked = (next: (current: string[]) => string[]) => { const kept = next(picked); setExcluded(proposals.map((proposal) => proposal.id).filter((id) => !kept.includes(id))); };
   const advisory = writingProposals(editor.model).length - proposals.length;
   if (proposals.length === 0) return <Notice tone="info" title="Nothing can be applied by rule">{advisory ? `${advisory} findings need a person to rewrite the text; they are on the Writing tab.` : "There are no writing findings."}</Notice>;
   return (
@@ -3208,7 +3212,7 @@ registerApp({
       actions: [
         { id: "apply selected", label: "Apply selected…", placement: "primary", run: (context) => context.openOverlay("apply suggestions") },
         { id: "Review suggestion", label: "Review suggestions", placement: "secondary", run: (context) => context.setTab("Writing") },
-        { id: "inspect citations", label: "Inspect citations", placement: "overflow", run: (context) => context.openOverlay("source inspection") },
+        { id: "inspect citations", label: "Inspect citations", placement: "overflow", run: (context) => context.setTab("Sources") },
       ],
       overlays: [
         { id: "apply suggestions", kind: "modal", title: "Apply writing suggestions", width: 620, footer: docFooter("docs-apply", "Apply the ticked ones"), render: (context) => <ApplySuggestions context={context} close={context.close} /> },
