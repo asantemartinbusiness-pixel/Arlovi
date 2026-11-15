@@ -542,5 +542,146 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-BRAIN-009",
+  "title": "Knowledge Permissions",
+  "route": "/o/northline/brain/permissions",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Roles",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Source grants",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Retention",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Activity",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Grant dialog",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "simulation report",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "revoke confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "simulate retrieval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "revoke grant",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Adjust access",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "inspect usage",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-BRAIN-010",
+  "title": "Intake Centre",
+  "route": "/o/northline/brain/intake",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Incoming",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Processing",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Review",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Completed",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Failed",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "File chooser",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "import review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "unsupported format error",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "approve extraction",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "route document",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Upload",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "retry safe step",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]

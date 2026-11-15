@@ -538,5 +538,161 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-CRM-008",
+  "title": "Quotes & Proposals",
+  "route": "/o/northline/crm/quotes",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Draft",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Review",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sent",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Accepted",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Expired",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Quote editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "pricing policy",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "send preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Send",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a quote",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Duplicate for re-pricing",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pricing policy",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CRM-009",
+  "title": "Activities & Scheduling",
+  "route": "/o/northline/crm/activities",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "My calendar",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All activity",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Follow-ups",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Activity entry",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "calendar conflict",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "meeting composer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule a meeting",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a reminder",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Log a call",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Complete a task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Check for overlaps",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]

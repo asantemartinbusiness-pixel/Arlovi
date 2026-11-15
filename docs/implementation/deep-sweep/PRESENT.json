@@ -59,5 +59,199 @@
    "Duplicate",
    "Present"
   ]
+ },
+ {
+  "id": "ARL-PRESENT-002",
+  "title": "Slide Editor",
+  "route": "/o/northline/present/decks/nl-decks-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Design",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Insert",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Animate",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Review",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "View",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Layout picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "image insert",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "properties",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "AI suggestion",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PRESENT-003",
+  "title": "Master & Theme Editor",
+  "route": "/o/northline/present/decks/nl-decks-001/theme",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Masters",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Colours",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Fonts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Layouts",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Theme editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "global apply review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "font resolver",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a layout…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Change the master theme…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview the impact",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PRESENT-004",
+  "title": "Charts & Data",
+  "route": "/o/northline/present/decks/nl-decks-001/data",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Charts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tables",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sources",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Refresh",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Dataset picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "chart inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "unlink warning",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Link a workbook",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Insert chart",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Update the linked charts",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Show or hide data labels",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Check freshness",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]
