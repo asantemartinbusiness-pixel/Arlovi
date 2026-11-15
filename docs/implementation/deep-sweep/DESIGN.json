@@ -268,5 +268,68 @@
    "Subtract the second selected path",
    "Simplify"
   ]
+ },
+ {
+  "id": "ARL-DESIGN-005",
+  "title": "Auto Layout & Responsive",
+  "route": "/o/northline/design/files/nl-designs-001/layout",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Layout",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Constraints",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Responsive",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Grid",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Layout inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "constraint conflict",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "breakpoint preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview at each breakpoint",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Apply the layout rules",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Wrap or unwrap the frame",
+   "Set the frame size…",
+   "Reorder: move the child later",
+   "Reverse the frame's children"
+  ]
  }
 ]

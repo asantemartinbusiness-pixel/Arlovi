@@ -129,5 +129,135 @@
    "Clone stamp…",
    "Paint the selection with the brush colour"
   ]
+ },
+ {
+  "id": "ARL-PHOTO-003",
+  "title": "Selections & Masks",
+  "route": "/o/northline/photo/photos/nl-photos-001/masks",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Select",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Refine",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Mask",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Compare",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Selection options",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "refinement",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "quick mask",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Lasso (L)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Quick mask",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Select the subject",
+   "Refine the edge…",
+   "Invert"
+  ]
+ },
+ {
+  "id": "ARL-PHOTO-004",
+  "title": "Adjustments & Colour",
+  "route": "/o/northline/photo/photos/nl-photos-001/adjust",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Basic",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Curves",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Colour",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Histogram",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "colour picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "profile warning",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reset the adjustment",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Save as a preset",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Adjust: exposure +⅓ stop",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]

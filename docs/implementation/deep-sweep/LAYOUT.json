@@ -59,5 +59,144 @@
    "Duplicate",
    "Open"
   ]
+ },
+ {
+  "id": "ARL-LAYOUT-002",
+  "title": "Publication Editor",
+  "route": "/o/northline/layout/publications/nl-publications-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pages",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Layout",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Type",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Frame editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "page settings",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "overset warning",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export HTML",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a page",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Text frame tool (T)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Thread tool (link two frames)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Show or hide the guides",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Press export and preflight",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Snap the frame to the guides",
+   "Undo"
+  ]
+ },
+ {
+  "id": "ARL-LAYOUT-003",
+  "title": "Master Pages",
+  "route": "/o/northline/layout/publications/nl-publications-001/masters",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Masters",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Variables",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Usage",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Master editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "override confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Apply to pages",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Override a frame",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a master",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview the impact",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]

@@ -326,5 +326,138 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-PRESENT-006",
+  "title": "Presenter Mode",
+  "route": "/o/northline/present/decks/nl-decks-001/present",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Audience",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Presenter",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rehearsal",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Display selector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "rehearsal report",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "access confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Advance a slide",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Present",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Annotate the slide…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export notes",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "End the presentation"
+  ]
+ },
+ {
+  "id": "ARL-PRESENT-007",
+  "title": "Review & Publish",
+  "route": "/o/northline/present/decks/nl-decks-001/review",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Comments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Publish",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Version comparison",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "export settings",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Record an approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Resolve comments…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Share…",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]
