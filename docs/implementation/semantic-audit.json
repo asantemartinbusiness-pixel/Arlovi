@@ -157,6 +157,65 @@
     "PORTAL-002 access test flags INV-1041 for review: a genuine seed inconsistency it is designed to catch.",
     "PORTAL-004 download: the expired-link branch was not exercised."
    ]
+  },
+  "VIDEO": {
+   "signedOff": true,
+   "basis": "Studio remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented through one shared editing session per record, so actions are undoable and no longer collide with autosave; changed actions run in a browser.",
+   "openItems": [
+    "VIDEO-007 cancel: not confirmed in a browser; headless WebM rendering saturated the CPU.",
+    "Tabs were audited exhaustively on VIDEO only.",
+    "New forms were not checked at 390px."
+   ]
+  },
+  "DESIGN": {
+   "signedOff": true,
+   "basis": "Studio remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented through one shared editing session per record, so actions are undoable and no longer collide with autosave; changed actions run in a browser.",
+   "openItems": [
+    "Tabs were audited exhaustively on VIDEO only.",
+    "New forms were not checked at 390px."
+   ]
+  },
+  "PRESENT": {
+   "signedOff": true,
+   "basis": "Studio remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented through one shared editing session per record, so actions are undoable and no longer collide with autosave; changed actions run in a browser.",
+   "openItems": [
+    "Tabs were audited exhaustively on VIDEO only.",
+    "New forms were not checked at 390px."
+   ]
+  },
+  "PHOTO": {
+   "signedOff": true,
+   "basis": "Studio remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented through one shared editing session per record, so actions are undoable and no longer collide with autosave; changed actions run in a browser.",
+   "openItems": [
+    "PHOTO-003 select subject: guarded honestly because no model is connected.",
+    "Tabs were audited exhaustively on VIDEO only.",
+    "New forms were not checked at 390px."
+   ]
+  },
+  "LAYOUT": {
+   "signedOff": true,
+   "basis": "Studio remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented through one shared editing session per record, so actions are undoable and no longer collide with autosave; changed actions run in a browser.",
+   "openItems": [
+    "Tabs were audited exhaustively on VIDEO only.",
+    "New forms were not checked at 390px."
+   ]
+  },
+  "SHEETS": {
+   "signedOff": true,
+   "basis": "Studio remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented through one shared editing session per record, so actions are undoable and no longer collide with autosave; changed actions run in a browser.",
+   "openItems": [
+    "Tabs were audited exhaustively on VIDEO only.",
+    "New forms were not checked at 390px."
+   ]
+  },
+  "DOCS": {
+   "signedOff": true,
+   "basis": "Studio remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented through one shared editing session per record, so actions are undoable and no longer collide with autosave; changed actions run in a browser.",
+   "openItems": [
+    "DOCS-006 request e-sign: left as it was and not re-examined.",
+    "Tabs were audited exhaustively on VIDEO only.",
+    "New forms were not checked at 390px."
+   ]
   }
  }
 }

@@ -2966,7 +2966,7 @@ registerApp({
         render: (context: ScreenContext) => <AssetsScreen context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Replace asset", label: "Add or replace an asset", placement: "primary", run: (context) => context.openOverlay("Asset picker") },
+        { id: "Replace asset", label: "Replace or add an asset…", placement: "primary", run: (context) => context.openOverlay("Asset picker") },
         {
           id: "crop", label: "Crop an asset…", placement: "overflow",
           guard: (context) => (openDesign(context)?.assets.some((asset) => asset.kind === "image" && asset.src) ? undefined : "No image asset with pixels to crop"),
@@ -3595,9 +3595,17 @@ function AssetPicker({ context, close }: { context: ScreenContext; close: () => 
   const [license, setLicense] = useState("Company-owned");
   const [credit, setCredit] = useState("");
   const [image, setImage] = useState<{ src: string; width: number; height: number } | null>(null);
+  const [replaceId, setReplaceId] = useState("");
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
+  const replacing = handle.doc.assets.find((asset) => asset.id === replaceId);
   return (
     <Stack gap={3}>
+      <Field label="What to do" hint="Replacing keeps the asset's id, so every place that uses it shows the new image.">
+        <Select value={replaceId} onChange={(event) => { setReplaceId(event.target.value); const target = handle.doc?.assets.find((asset) => asset.id === event.target.value); if (target) { setLicense(target.license); setCredit(target.credit); } }}>
+          <option value="">Add a new asset</option>
+          {handle.doc.assets.map((asset) => <option key={asset.id} value={asset.id}>Replace {asset.name}</option>)}
+        </Select>
+      </Field>
       <Field label="Image file" hint="Read in this browser and stored as a data URL on the record.">
         <input
           type="file"
@@ -3628,8 +3636,17 @@ function AssetPicker({ context, close }: { context: ScreenContext; close: () => 
       <Field label="Credit"><TextInput value={credit} onChange={(event) => setCredit(event.target.value)} placeholder="Photographer or source" /></Field>
       <Button
         variant="primary"
-        disabled={!name}
+        disabled={!name || (Boolean(replacing) && !image)}
         onClick={() => {
+          if (replacing && image) {
+            handle.edit((current) => ({
+              ...current,
+              assets: current.assets.map((asset) => (asset.id === replacing.id ? { ...asset, name, src: image.src, width: image.width, height: image.height, license, credit: credit || "not recorded", kind: "image" } : asset)),
+            }), `Replace ${replacing.name}`);
+            void context.mutate.log(`Asset ${replacing.name} replaced by ${name}; licence ${license}`, { entityId: record.id, type: "update" });
+            close();
+            return;
+          }
           handle.edit((current) => ({
             ...current,
             assets: [...current.assets, {
@@ -3642,7 +3659,7 @@ function AssetPicker({ context, close }: { context: ScreenContext; close: () => 
           close();
         }}
       >
-        Add the asset
+        {replacing ? `Replace ${replacing.name}` : "Add the asset"}
       </Button>
     </Stack>
   );
