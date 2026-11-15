@@ -17,6 +17,11 @@ A screen is VERIFIED only when all three kinds of evidence agree:
                 (docs/implementation/semantic-audit.json, one sign-off per
                 application, recorded from the remediation reviews)
 
+and no defect found by the cross-application journeys is still open against
+it (docs/implementation/defects.json; journey results in
+docs/implementation/workflow-results.json, written from e2e/workflows.spec.ts).
+A screen with an open defect is reported as "defect-open", whatever else passed.
+
 Nothing in the output is written by hand.
 """
 import csv
@@ -48,6 +53,13 @@ def main():
                 sweep[result["id"]] = result
 
     semantic = load(DOCS / "semantic-audit.json", {"applications": {}})["applications"]
+    defects = load(DOCS / "defects.json", {"defects": []})["defects"]
+    workflows = load(DOCS / "workflow-results.json", {"tests": []})["tests"]
+    open_by_screen = {}
+    for defect in defects:
+        if defect["status"] != "fixed":
+            for screen_id in defect["screens"]:
+                open_by_screen.setdefault(screen_id, []).append(defect["id"])
 
     rows = []
     for row in coverage["rows"]:
@@ -66,7 +78,10 @@ def main():
             failing, exercised_ok, counts, guarded = [], False, {"tab": 0, "overlay": 0, "action": 0}, 0
         signed = semantic.get(row["app"], {}).get("signedOff", False)
 
-        if contract_ok and exercised_ok and signed:
+        open_defects = open_by_screen.get(row["id"], [])
+        if open_defects:
+            status = "defect-open"
+        elif contract_ok and exercised_ok and signed:
             status = "verified"
         elif contract_ok and exercised_ok:
             status = "exercised"
@@ -88,6 +103,7 @@ def main():
             "actions_exercised": counts["action"],
             "actions_guarded": guarded,
             "semantic_signoff": "yes" if signed else "no",
+            "open_defects": " ".join(open_defects),
             "failing": "; ".join(f'{c["kind"]} {c["name"]}: {c.get("note") or "failed"}' for c in failing)[:400],
             "missing": "; ".join(row["missingTabs"] + row["missingActions"] + row["missingOverlays"])[:300],
         })
@@ -102,7 +118,7 @@ def main():
         tally[row["status"]] = tally.get(row["status"], 0) + 1
     by_app = {}
     for row in rows:
-        entry = by_app.setdefault(row["application"], {"total": 0, "verified": 0, "exercised": 0, "implemented": 0, "not-built": 0})
+        entry = by_app.setdefault(row["application"], {"total": 0, "verified": 0, "defect-open": 0, "exercised": 0, "implemented": 0, "not-built": 0})
         entry["total"] += 1
         entry[row["status"]] += 1
 
@@ -116,6 +132,7 @@ def main():
         "| Status | Meaning | Screens |",
         "| --- | --- | ---: |",
         f'| verified | Contract complete; every tab and every contract overlay exercised, and every action reachable without a specific selection pressed, in a browser with no console error; and the application\'s actions signed off as doing what they are named for | {tally.get("verified", 0)} |',
+        f'| defect-open | A cross-application journey found a defect on this screen that is not yet fixed | {tally.get("defect-open", 0)} |',
         f'| exercised | Contract complete and exercised clean, but the semantic action audit is not signed off | {tally.get("exercised", 0)} |',
         f'| implemented | Owned by its application, but part of the contract is missing or an interaction failed in the browser | {tally.get("implemented", 0)} |',
         f'| not-built | Not yet owned by an application module | {tally.get("not-built", 0)} |',
@@ -131,15 +148,37 @@ def main():
         "",
         "## By application",
         "",
-        "| Application | Screens | Verified | Exercised | Implemented | Not built | Semantic sign-off |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | --- |",
+        "| Application | Screens | Verified | Defect open | Exercised | Implemented | Not built | Semantic sign-off |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
     ]
     for code in sorted(by_app):
         entry = by_app[code]
         signed = "yes" if semantic.get(code, {}).get("signedOff") else "no"
-        lines.append(f'| {code} | {entry["total"]} | {entry["verified"]} | {entry["exercised"]} | {entry["implemented"]} | {entry["not-built"]} | {signed} |')
+        lines.append(f'| {code} | {entry["total"]} | {entry["verified"]} | {entry["defect-open"]} | {entry["exercised"]} | {entry["implemented"]} | {entry["not-built"]} | {signed} |')
     guarded_total = sum(int(row["actions_guarded"]) for row in rows)
     exercised_total = sum(int(row["actions_exercised"]) for row in rows)
+    passed = [test for test in workflows if test["status"] == "passed"]
+    lines += [
+        "",
+        "## Cross-application journeys",
+        "",
+        f"`e2e/workflows.spec.ts`: {len(passed)} of {len(workflows)} journeys pass in the last recorded run.",
+        "",
+        "| Journey | Result |",
+        "| --- | --- |",
+    ]
+    lines += [f'| {test["title"]} | {test["status"]} |' for test in workflows]
+    fixed = [d for d in defects if d["status"] == "fixed"]
+    still_open = [d for d in defects if d["status"] != "fixed"]
+    lines += [
+        "",
+        f"Defects found by the journeys: {len(defects)}; fixed and retested: {len(fixed)}; open: {len(still_open)}.",
+        "",
+    ]
+    if still_open:
+        lines += ["| Defect | Journey | Screens | Finding |", "| --- | --- | --- | --- |"]
+        lines += [f'| {d["id"]} | {d["workflow"]} | {", ".join(d["screens"])} | {d["summary"]} |' for d in still_open]
+        lines.append("")
     lines += [
         "",
         "## What this evidence does not cover",

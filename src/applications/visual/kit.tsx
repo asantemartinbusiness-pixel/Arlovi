@@ -55,7 +55,8 @@ export function EditorFrame({
         />
         <div className="vx-titlerow">
           <div>
-            <h1>{title ?? context.screen.title}</h1>
+            {/* The page shell owns the level-1 heading; this names the workspace beneath it. */}
+            <h2 className="vx-title">{title ?? context.screen.title}</h2>
             {subtitle && <div className="vx-sub">{subtitle}</div>}
           </div>
           <div className="vx-headactions">
