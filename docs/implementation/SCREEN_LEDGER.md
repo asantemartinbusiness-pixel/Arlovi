@@ -91,11 +91,7 @@ Nothing in this file is written by hand.
 | Journeys › an invoice can be created, issued, and found in the ledger after reload | passed |
 | Journeys › moving a task with the keyboard updates the project board after reload | passed |
 
-Defects found by the journeys: 38; fixed and retested: 37; open: 1.
-
-| Defect | Journey | Screens | Finding |
-| --- | --- | --- | --- |
-| DEF-36 | observed, not asserted |  | Records created under a frozen clock are stamped with wall time in places |
+Defects found by the journeys: 38; fixed and retested: 38; open: 0.
 
 
 ## What this evidence does not cover

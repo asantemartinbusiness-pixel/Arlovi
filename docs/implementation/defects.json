@@ -51,7 +51,7 @@
    ],
    "summary": "A Qualified deal requires a confirmed budget but no screen records one",
    "match": "no screen can record one",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-06",
@@ -61,7 +61,7 @@
    ],
    "summary": "Approving a quote removed it from the library's Open value while still open",
    "match": "removes its",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-07",
@@ -91,7 +91,7 @@
    ],
    "summary": "Revenue recognised summed gross paid invoices instead of posted net revenue",
    "match": "/analytics/forecasts \"Revenue recognised",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-10",
@@ -242,7 +242,7 @@
    ],
    "summary": "The monthly report's revenue disagreed with the posted ledger",
    "match": "/analytics/reports/nl-reports-020 states revenue",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-25",
@@ -253,7 +253,7 @@
    ],
    "summary": "HQ and Finance showed different receivables for the same date",
    "match": "/hq/home shows receivable",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-26",
@@ -364,10 +364,10 @@
    "id": "DEF-36",
    "workflow": "observed, not asserted",
    "screens": [],
-   "summary": "Records created under a frozen clock are stamped with wall time in places",
+   "summary": "Records and audit entries were stamped with wall time when the workspace clock was frozen",
    "match": null,
-   "status": "open",
-   "note": "Only the ?clock= test mode is affected: outside it the workspace clock is the wall clock. About 330 direct Date reads in application code should move to context.now; left open as test-determinism debt."
+   "status": "fixed",
+   "evidence": "e2e/findings.spec.ts DEF-36 (a write under a frozen clock is stamped with the frozen time; red on the previous build, green on this one); tests/unit/clock-seam.test.ts; lint rule bans bare clock reads in src"
   },
   {
    "id": "DEF-37",

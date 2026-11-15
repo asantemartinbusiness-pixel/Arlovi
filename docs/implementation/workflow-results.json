@@ -3,10 +3,8 @@
  "tests": [
   {
    "title": "WF-05 Sales-to-cash: lead, quote approval, won deal, posted invoice, receipt, reconciliation",
-   "status": "failed",
-   "errors": [
-    "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoMatch\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m"
-   ]
+   "status": "passed",
+   "errors": []
   },
   {
    "title": "WF-01 Company onboarding: identity, domain claim, connector boundary, brain approval, authority, first mission",
@@ -20,10 +18,8 @@
   },
   {
    "title": "WF-03 Revenue decline investigation: question, reconciled actuals, drivers, fact versus hypothesis",
-   "status": "failed",
-   "errors": [
-    "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoMatch\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m"
-   ]
+   "status": "passed",
+   "errors": []
   },
   {
    "title": "WF-04 Customer request to resolution: verified contact, approved answer, refund request, no double refund",
@@ -82,10 +78,8 @@
   },
   {
    "title": "WF-15 Monthly executive reporting: cited figures, reconciled to the ledger, reviewed, distributed only to the boundary",
-   "status": "failed",
-   "errors": [
-    "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoMatch\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m"
-   ]
+   "status": "passed",
+   "errors": []
   },
   {
    "title": "WF-16 External client collaboration: scoped portal, invitation at the boundary, no cross-client leakage",
