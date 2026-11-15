@@ -9,7 +9,6 @@ import { can as roleCan, canOpen, ROLE_LABELS } from "@/platform/policy";
 import { useMutations, useToast, useWorkspace } from "@/platform/workspace";
 import { getRecord, knownRecord } from "@/platform/repo";
 import { useLiveQuery } from "dexie-react-hooks";
-import { ScreenRoute as LegacyScreen } from "@/app/screen";
 import { applicationLoadFailures } from "@/applications";
 
 export function ScreenHost() {
@@ -147,7 +146,7 @@ export function ScreenHost() {
         </div>
       );
     }
-    return <LegacyScreen />;
+    return <NotBuilt title={screen.title} application={screen.applicationName} />;
   }
 
   const actions = (def?.actions ?? []).filter((action) => !action.capability || roleCan(workspace.role, action.capability));
@@ -165,7 +164,7 @@ export function ScreenHost() {
       ? activeDefTab.render(context)
       : app.fallback
         ? app.fallback(context)
-        : <LegacyScreen />;
+        : <NotBuilt title={screen.title} application={screen.applicationName} />;
 
   /* A tab strip always controls a panel: the tab's aria-controls must resolve,
      including on screens still served by a fallback. */
@@ -292,6 +291,24 @@ export function ScreenHost() {
  * dialog and discard whatever a person had typed into it — including on the
  * workspace clock's minute tick.
  */
+/**
+ * A screen in the approved contract that its application has not implemented.
+ * The contract test keeps this unreachable; if it ever shows, it says so
+ * plainly rather than falling back to a generic page.
+ */
+function NotBuilt({ title, application }: { title: string; application: string }) {
+  return (
+    <div className="pg">
+      <div className="pg-head"><h1>{title}</h1></div>
+      <div className="pg-body">
+        <Notice tone="warning" title="This screen is not built yet">
+          {title} is in the approved contract for {application} but has no implementation. It is recorded as outstanding in the implementation ledger.
+        </Notice>
+      </div>
+    </div>
+  );
+}
+
 function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { context: ScreenContext; def?: ScreenDef; overlayId?: string; onClose: () => void }) {
   const found = screenDef?.overlays?.find((item) => item.id === overlayId);
   if (!overlayId) return null;

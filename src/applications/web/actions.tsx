@@ -51,7 +51,7 @@ export function SitePreview({ context }: { context: ScreenContext }) {
         </Field>
         <Segmented label="Width" value={width} onChange={setWidth} options={(Object.keys(BREAKPOINTS) as Breakpoint[]).map((key) => ({ value: key, label: `${BREAKPOINTS[key].label} ${BREAKPOINTS[key].width}px` }))} />
       </Row>
-      <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: "var(--radius-md, 8px)" }}>
+      <div style={{ overflowX: "auto", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md, 8px)" }}>
         <iframe
           title={`Preview of ${page.name} at ${BREAKPOINTS[width].width} pixels`}
           srcDoc={html}

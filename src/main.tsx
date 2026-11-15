@@ -7,7 +7,6 @@ import { WorkspaceProvider } from "@/platform/workspace";
 import { ensureSeed } from "@/runtime/db";
 import { useUi } from "@/runtime/ui";
 import "@/design-system";
-import "@/styles.css";
 import { loadApplications } from "@/applications";
 
 function Boot() {
