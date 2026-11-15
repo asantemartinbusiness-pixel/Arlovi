@@ -11,11 +11,22 @@ import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import { freshness } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
-import { describeSchedule, nextOccurrences, readSchedule } from "@/applications/auto/schedule";
+import { describeSchedule, nextOccurrences, readSchedule as readAutoSchedule } from "@/applications/auto/schedule";
 import { dimensionById, formatMeasure, measureById, runQuery, type QueryFilter } from "./metrics";
 import {
   DimensionPicker, FilterRows, MeasurePicker, MeasureView, useAnalytics, VIZ_LABELS, type Viz,
 } from "./panels";
+
+/**
+ * A report's recurrence. A report that records only its period ("monthly",
+ * "weekly") recurs at that period, never at the scheduler's daily default.
+ */
+function readSchedule(fields: Rec["fields"], fallbackZone: string): ReturnType<typeof readAutoSchedule> {
+  if (fields.scheduleFrequency) return readAutoSchedule(fields, fallbackZone);
+  const period = String(fields.period ?? "");
+  const frequency = ["daily", "weekly", "monthly"].includes(period) ? period : "monthly";
+  return readAutoSchedule({ ...fields, scheduleFrequency: frequency }, fallbackZone);
+}
 
 export type BlockKind = "heading" | "commentary" | "metric" | "chart" | "table";
 
@@ -744,7 +755,11 @@ export function RecipientPreview({ context, close }: { context: ScreenContext; c
   const members = useCollection("members");
   const deliveries = useDeliveries();
   const { context: queryContext } = useAnalytics();
-  const [reportId, setReportId] = useState(context.selectedId && reports.some((item) => item.id === context.selectedId) ? context.selectedId : reports[0]?.id ?? "");
+  /* The choice follows the loaded reports until a person picks one, so it is
+     never fixed from the empty first read. */
+  const [pickedReport, setReportId] = useState<string>();
+  const reportId = pickedReport
+    ?? (context.selectedId && reports.some((item) => item.id === context.selectedId) ? context.selectedId : reports[0]?.id ?? "");
   const [recipient, setRecipient] = useState("");
   const report = reports.find((item) => item.id === reportId);
   const people = recipientsOf(contacts, members);

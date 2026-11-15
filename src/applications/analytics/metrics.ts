@@ -1,4 +1,6 @@
 import type { Rec } from "@/domain/types";
+import { journalDate, periodOf, profitAndLoss, trialForRange } from "@/domain/fin-ledger";
+import { openInvoices, outstandingMinor } from "@/applications/fin/data";
 
 /* ====================================================================== *
  * ANALYTICS — measures, dimensions and the query that recomputes them.
@@ -11,7 +13,7 @@ import type { Rec } from "@/domain/types";
 
 export const ANALYTICS_COLLECTIONS = [
   "invoices", "bills", "expenses", "deals", "leads", "quotes", "orders", "products",
-  "contacts", "companies", "tasks", "tickets", "projects", "campaigns", "bookings", "journals",
+  "contacts", "companies", "tasks", "tickets", "projects", "campaigns", "bookings", "journals", "accounts",
 ];
 
 export type Unit = "money" | "count" | "percent" | "days";
@@ -44,16 +46,53 @@ export interface MeasureDef {
   compute?: (records: Rec[], context: QueryContext) => number | null;
 }
 
-const openInvoice = (record: Rec) => !["paid", "void", "draft"].includes(record.status);
+/* Open means what Finance means: awaiting payment or part paid, at what is still outstanding. */
+const openInvoice = (record: Rec) => openInvoices([record]).length === 1;
 const openDeal = (record: Rec) => !["won", "lost"].includes(record.status);
 const amount = (record: Rec) => record.amountMinor ?? 0;
 
+/**
+ * Net revenue from the posted journals among `records`, computed with the
+ * Finance ledger's own trial balance and profit and loss.
+ */
+function postedRevenue(records: Rec[], context: QueryContext): number {
+  const journals = records.filter((record) => record.collection === "journals" && record.status === "posted");
+  if (journals.length === 0) return 0;
+  const orgId = journals[0].organizationId;
+  const accounts = [...context.byId.values()].filter((record) => record.collection === "accounts");
+  return profitAndLoss(trialForRange(accounts, journals, orgId).rows).revenueMinor;
+}
+
+/** The business date of a record: a journal's ledger date, else its own date. */
+export function recordDate(record: Rec): string {
+  return record.collection === "journals" ? journalDate(record) : (record.at ?? record.createdAt);
+}
+
+/** The month a record belongs to, as `2026-11`. Ledger dates are read as written, not shifted by time zone. */
+function recordPeriod(record: Rec): string | undefined {
+  if (record.collection === "journals") return periodOf(journalDate(record));
+  const date = new Date(record.at ?? record.createdAt);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export const MEASURES: MeasureDef[] = [
   {
-    id: "revenue.paid", name: "Revenue recognised", unit: "money", collection: "invoices",
+    /* Revenue recognised is the ledger's revenue: net of tax, from posted
+       journals, by ledger date. It is the same computation as Finance's profit
+       and loss (trialForRange + profitAndLoss), so the two can never disagree. */
+    id: "revenue.paid", name: "Revenue recognised", unit: "money", collection: "journals",
+    owner: "Jonah Adeyemi", version: 2,
+    formula: "sum(revenue account credits − debits) over posted journals, by ledger date",
+    description: "Net revenue posted to the ledger, exactly as Finance's profit and loss shows it. Drafts, tax and forecasts are excluded.",
+    filter: (record) => record.collection === "journals" && record.status === "posted",
+    compute: (records, context) => postedRevenue(records, context),
+  },
+  {
+    id: "invoices.paid", name: "Paid invoices, gross", unit: "money", collection: "invoices",
     owner: "Jonah Adeyemi", version: 1,
     formula: "sum(invoices.amountMinor) where status = paid",
-    description: "Gross invoice value for invoices marked paid in this workspace. There is no bank feed, so this is what the ledger says, not what a bank confirmed.",
+    description: "Gross invoice value, VAT included, for invoices marked paid in this workspace. This is cash collected by invoice date, not revenue recognised. There is no bank feed, so it is what the ledger says, not what a bank confirmed.",
     filter: (record) => record.collection === "invoices" && record.status === "paid",
     value: amount, agg: "sum",
   },
@@ -68,18 +107,18 @@ export const MEASURES: MeasureDef[] = [
   {
     id: "receivable.open", name: "Receivable", unit: "money", collection: "invoices",
     owner: "Jonah Adeyemi", version: 1,
-    formula: "sum(invoices.amountMinor) where status not in (paid, void, draft)",
-    description: "Invoice value issued and not yet settled in the local ledger.",
+    formula: "sum(invoices.amountMinor − invoices.fields.paidMinor) where status in (awaiting_payment, part_paid)",
+    description: "What is still outstanding on issued invoices, as Finance states it.",
     filter: (record) => record.collection === "invoices" && openInvoice(record),
-    value: amount, agg: "sum",
+    value: outstandingMinor, agg: "sum",
   },
   {
     id: "receivable.overdue", name: "Overdue receivable", unit: "money", collection: "invoices",
     owner: "Jonah Adeyemi", version: 2,
-    formula: "sum(invoices.amountMinor) where dueAt < now and status ≠ paid",
-    description: "Open invoice value past its due date, measured against the workspace clock.",
+    formula: "sum(invoices.amountMinor − invoices.fields.paidMinor) where dueAt < now and status in (awaiting_payment, part_paid)",
+    description: "What is still outstanding on open invoices past their due date, measured against the workspace clock.",
     filter: (record, context) => record.collection === "invoices" && openInvoice(record) && Boolean(record.dueAt) && new Date(record.dueAt!) < context.now,
-    value: amount, agg: "sum",
+    value: outstandingMinor, agg: "sum",
   },
   {
     id: "invoice.count", name: "Invoices issued", unit: "count", collection: "invoices",
@@ -312,10 +351,9 @@ export const DIMENSIONS: DimensionDef[] = [
   {
     id: "month", name: "Month", type: "time", description: "Calendar month of the record's own date, or its creation date if it has none.",
     of: (record) => {
-      const raw = record.at ?? record.createdAt;
-      const date = new Date(raw);
-      if (Number.isNaN(date.getTime())) return "Unknown";
-      return `${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+      const period = recordPeriod(record);
+      if (!period) return "Unknown";
+      return `${MONTHS[Number(period.slice(5, 7)) - 1]} ${period.slice(0, 4)}`;
     },
   },
   {
@@ -375,8 +413,8 @@ export function applyFilter(record: Rec, filter: QueryFilter, context: QueryCont
     case "contains": return actual.toLowerCase().includes(expected.toLowerCase());
     case "greater than": return Number(actual) > Number(expected);
     case "less than": return Number(actual) < Number(expected);
-    case "before": return new Date(record.at ?? record.createdAt) < new Date(expected);
-    case "after": return new Date(record.at ?? record.createdAt) > new Date(expected);
+    case "before": return new Date(recordDate(record)) < new Date(expected);
+    case "after": return new Date(recordDate(record)) > new Date(expected);
     default: return true;
   }
 }
@@ -427,7 +465,7 @@ function aggregate(measure: MeasureDef, records: Rec[], context: QueryContext): 
 
 function contributing(measure: MeasureDef, records: Rec[], context: QueryContext): Rec[] {
   if (measure.unavailable) return [];
-  if (measure.compute) return records.filter((record) => record.collection === measure.collection);
+  if (measure.compute && !measure.filter) return records.filter((record) => record.collection === measure.collection);
   return records.filter((record) => (measure.filter ? measure.filter(record, context) : record.collection === measure.collection));
 }
 
@@ -462,7 +500,7 @@ export function runQuery(spec: QuerySpec, context: QueryContext): QueryResult {
   const allContributing = measures.flatMap((measure) => contributing(measure, filtered, scopedContext));
   /* The record's own date, not the moment it was last touched: a figure's age
      is the age of the newest business event behind it. */
-  const timestamps = allContributing.map((record) => record.at ?? record.updatedAt ?? record.createdAt).filter(Boolean).sort();
+  const timestamps = allContributing.map((record) => (record.collection === "journals" ? recordDate(record) : record.at ?? record.updatedAt ?? record.createdAt)).filter(Boolean).sort();
   const asOf = timestamps.at(-1);
   const ageDays = asOf ? Math.max(0, Math.floor((context.now.getTime() - new Date(asOf).getTime()) / 86_400_000)) : undefined;
 
@@ -534,15 +572,11 @@ export function monthlySeries(measureId: string, months: number, context: QueryC
   const out: SeriesPoint[] = [];
   for (let back = months - 1; back >= 0; back -= 1) {
     const start = new Date(context.now.getFullYear(), context.now.getMonth() - back, 1);
-    const end = new Date(context.now.getFullYear(), context.now.getMonth() - back + 1, 1);
-    const inMonth = context.records.filter((record) => {
-      const raw = record.at ?? record.createdAt;
-      const date = new Date(raw);
-      return !Number.isNaN(date.getTime()) && date >= start && date < end;
-    });
+    const key = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
+    const inMonth = context.records.filter((record) => recordPeriod(record) === key);
     const value = aggregate(measure, inMonth, { ...context, records: inMonth });
     out.push({
-      key: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`,
+      key,
       label: `${MONTHS[start.getMonth()]}`,
       value: value ?? 0,
     });

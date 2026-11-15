@@ -15,9 +15,9 @@ import { ROLE_LABELS, can as roleCan, type Capability } from "@/platform/policy"
 import { freshness } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import {
-  activeQueue, attentionBus, busItem, csv, groupBy, PRIORITIES, PRIORITY_LABEL, PRIORITY_TONE,
-  routeReason, useInboxData, usePublishedItems, useSeeded, useSeededList, writeTriage,
-  type InboxItem,
+  activeQueue, approvalRows, attentionBus, busItem, csv, groupBy, PRIORITIES, PRIORITY_LABEL, PRIORITY_TONE,
+  routeReason, targetDrift, useInboxData, usePublishedItems, useSeeded, useSeededList, writeTriage,
+  type ApprovalTab, type InboxItem,
 } from "./engine";
 import {
   AcknowledgeIncident, DelegateApproval, EscalateIncident, FollowSource, RevokeRule, SetDigest, ToggleChannel,
@@ -655,17 +655,6 @@ function ActionPreview({ context, close }: { context: ScreenContext; close: () =
 
 /* ---------------------------- INBOX-002 ---------------------------- */
 
-type ApprovalTab = "Mine" | "Delegated" | "Pending" | "History";
-
-const DECIDED = new Set(["approved", "denied", "changes_requested"]);
-
-function approvalRows(approvals: Rec[], tab: ApprovalTab, actor: string): Rec[] {
-  if (tab === "History") return approvals.filter((row) => DECIDED.has(row.status));
-  const open = approvals.filter((row) => !DECIDED.has(row.status));
-  if (tab === "Mine") return open.filter((row) => String(row.fields.assignee ?? "") === actor);
-  if (tab === "Delegated") return open.filter((row) => Boolean(row.fields.delegatedTo));
-  return open;
-}
 
 function ApprovalsScreen({ context, tab }: { context: ScreenContext; tab: ApprovalTab }) {
   const approvals = useCollection("approvals");
@@ -756,7 +745,7 @@ function ApprovalEvidence({ record, context }: { record: Rec; context: ScreenCon
   const target = useRecord(String(record.fields.targetId ?? ""));
   const planVersion = String(record.fields.planVersion ?? "1");
   const currentVersion = target ? String(target.revision) : undefined;
-  const drifted = Boolean(currentVersion && currentVersion !== planVersion);
+  const { checked, drifted, boundRevision } = targetDrift(record, target);
 
   return (
     <Stack gap={4}>
@@ -769,6 +758,7 @@ function ApprovalEvidence({ record, context }: { record: Rec; context: ScreenCon
         { label: "Affected accounts", value: String(record.fields.accounts ?? "—") },
         { label: "Target record", value: target ? `${target.title} (revision ${target.revision})` : `${String(record.fields.targetTitle ?? "Unknown")} — not in this browser` },
         { label: "Plan version approved", value: planVersion },
+        { label: "Target revision when requested", value: boundRevision ?? "Not recorded" },
         { label: "Expires", value: record.dueAt ? context.date(record.dueAt) : "No expiry" },
       ]} />
       <Notice tone="info" title="Evidence as recorded">
@@ -776,8 +766,13 @@ function ApprovalEvidence({ record, context }: { record: Rec; context: ScreenCon
       </Notice>
       {drifted && (
         <Notice tone="warning" title="The target changed after this request was made">
-          The approval was bound to plan version {planVersion}; the record is now at revision {currentVersion}. Approving would apply a
+          The request was raised against revision {boundRevision} of the target; the record is now at revision {currentVersion}. Approving would apply a
           decision to something the requester did not describe, so it is blocked until the request is re-submitted.
+        </Notice>
+      )}
+      {target && !checked && (
+        <Notice tone="neutral" title="The target's revision was not recorded">
+          This request did not record which revision of {target.title} it describes, so a change since it was raised cannot be detected here.
         </Notice>
       )}
       {record.fields.decisionNote ? <Notice tone="neutral" title="Decision note">{String(record.fields.decisionNote)}</Notice> : null}
@@ -850,7 +845,7 @@ function StepUpAuth({ context, close }: { context: ScreenContext; close: () => v
 
   if (!record) return <Empty title="Select a request" />;
   const planVersion = String(record.fields.planVersion ?? "1");
-  const drifted = Boolean(target && String(target.revision) !== planVersion);
+  const { drifted, boundRevision } = targetDrift(record, target);
   const expected = "APPROVE";
 
   async function approve() {
@@ -888,7 +883,7 @@ function StepUpAuth({ context, close }: { context: ScreenContext; close: () => v
       ]} />
       {drifted ? (
         <Notice tone="danger" title="Blocked: the plan changed">
-          The target record is now at revision {target?.revision}, not the version this request was raised against. Ask the requester to
+          The target record is now at revision {target?.revision}, not revision {boundRevision}, which this request was raised against. Ask the requester to
           re-submit so the decision matches what will actually happen.
         </Notice>
       ) : (

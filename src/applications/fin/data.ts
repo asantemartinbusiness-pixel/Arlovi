@@ -99,3 +99,26 @@ export function openInvoices(invoices: Rec[]): Rec[] {
 export function outstandingMinor(invoice: Rec): number {
   return Number(invoice.amountMinor ?? 0) - Number(invoice.fields.paidMinor ?? 0);
 }
+
+export interface ReceivablePosition {
+  open: Rec[];
+  receivableMinor: number;
+  overdue: Rec[];
+  overdueMinor: number;
+}
+
+/**
+ * The receivable and overdue position: open invoices (awaiting payment or part
+ * paid) at what is still outstanding on each, and those past their due date.
+ * Finance and the executive home both read this, so they state one figure.
+ */
+export function receivablePosition(invoices: Rec[], now: Date): ReceivablePosition {
+  const open = openInvoices(invoices);
+  const overdue = open.filter((invoice) => invoice.dueAt && new Date(invoice.dueAt) < now);
+  return {
+    open,
+    receivableMinor: open.reduce((sum, invoice) => sum + outstandingMinor(invoice), 0),
+    overdue,
+    overdueMinor: overdue.reduce((sum, invoice) => sum + outstandingMinor(invoice), 0),
+  };
+}

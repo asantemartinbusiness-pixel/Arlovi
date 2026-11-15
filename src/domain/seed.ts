@@ -101,6 +101,7 @@ export function buildSeed(): { records: Rec[]; events: Audit[] } {
     rent: `${NORTH.prefix}-accounts-010`,
     software: `${NORTH.prefix}-accounts-011`,
     wages: `${NORTH.prefix}-accounts-012`,
+    accruedWages: `${NORTH.prefix}-accounts-013`,
   };
 
   records.push(
@@ -116,6 +117,7 @@ export function buildSeed(): { records: Rec[]; events: Audit[] } {
     account(NORTH, 10, "6100", "Rent", "expense"),
     account(NORTH, 11, "6200", "Software", "expense"),
     account(NORTH, 12, "6300", "Wages", "expense"),
+    account(NORTH, 13, "2200", "Accrued wages", "liability"),
     journal(NORTH, 1, "Opening balances", [
       { accountId: A.bank, debitMinor: 8_500_000, creditMinor: 0 },
       { accountId: A.inventory, debitMinor: 2_400_000, creditMinor: 0 },
@@ -149,7 +151,7 @@ export function buildSeed(): { records: Rec[]; events: Audit[] } {
     ]),
     journal(NORTH, 8, "Wage accrual draft", [
       { accountId: A.wages, debitMinor: 100_000, creditMinor: 0 },
-      { accountId: A.bank, debitMinor: 0, creditMinor: 100_000 },
+      { accountId: A.accruedWages, debitMinor: 0, creditMinor: 100_000 },
     ], "draft", "Balanced draft waiting for Finance approval."),
   );
 

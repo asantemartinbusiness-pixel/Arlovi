@@ -14,6 +14,39 @@ import { useCollections, useWorkspace, type Mutations } from "@/platform/workspa
  * the only evidence that something was read, snoozed or resolved.
  * ====================================================================== */
 
+/* ------------------------------ approvals ------------------------------ */
+
+export type ApprovalTab = "Mine" | "Delegated" | "Pending" | "History";
+
+export const DECIDED = new Set(["approved", "denied", "changes_requested"]);
+
+/**
+ * The approval requests a tab lists. Every surface that counts decisions
+ * waiting on a person (the Inbox, the executive home) reads this, so they
+ * cannot disagree.
+ */
+export function approvalRows(approvals: Rec[], tab: ApprovalTab, actor: string): Rec[] {
+  if (tab === "History") return approvals.filter((row) => DECIDED.has(row.status));
+  const open = approvals.filter((row) => !DECIDED.has(row.status));
+  if (tab === "Mine") return open.filter((row) => String(row.fields.assignee ?? "") === actor);
+  if (tab === "Delegated") return open.filter((row) => Boolean(row.fields.delegatedTo));
+  return open;
+}
+
+/**
+ * Whether an approval's target has changed since the request was raised. The
+ * request records the target's revision at that moment (`targetRevision`);
+ * a plan version is a different number and is never compared with a record
+ * revision. A request that recorded no revision cannot be checked, which is
+ * reported rather than guessed.
+ */
+export function targetDrift(request: Rec, target: Rec | undefined): { checked: boolean; drifted: boolean; boundRevision?: string } {
+  const raw = request.fields.targetRevision;
+  const boundRevision = raw === undefined || raw === "" ? undefined : String(raw);
+  if (!target || boundRevision === undefined) return { checked: false, drifted: false, boundRevision };
+  return { checked: true, drifted: String(target.revision) !== boundRevision, boundRevision };
+}
+
 export const PRIORITIES: Priority[] = ["P0", "P1", "P2", "P3", "P4", "P5"];
 export { PRIORITY_LABEL, PRIORITY_TONE };
 

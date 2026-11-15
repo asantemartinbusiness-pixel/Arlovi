@@ -10,7 +10,7 @@ import { freshness } from "@/platform/clock";
 import {
   ageBuckets, cashFlow, monthlyMovement, periodLabel, recentPeriods, reconcile, trialForRange,
 } from "@/domain/fin-ledger";
-import { contactOf, openInvoices, outstandingMinor, useFinData } from "./data";
+import { contactOf, openInvoices, outstandingMinor, receivablePosition, useFinData } from "./data";
 import { Amount, CapabilityNotice, CapabilityPill, LedgerHealth, OverdueBadge, SourceNote, StatementRow, StatusPill } from "./parts";
 
 /* ---------------------------- FIN-001 ---------------------------- */
@@ -18,9 +18,7 @@ import { Amount, CapabilityNotice, CapabilityPill, LedgerHealth, OverdueBadge, S
 export function FinanceOverview({ context }: { context: ScreenContext }) {
   const data = useFinData();
   const { org, now } = useWorkspace();
-  const open = openInvoices(data.invoices);
-  const receivable = open.reduce((sum, invoice) => sum + outstandingMinor(invoice), 0);
-  const overdue = open.filter((invoice) => invoice.dueAt && new Date(invoice.dueAt) < now);
+  const { open, receivableMinor: receivable, overdue } = receivablePosition(data.invoices, now);
   const payables = data.bills.filter((bill) => !["paid", "void"].includes(bill.status));
   const payableMinor = payables.reduce((sum, bill) => sum + Number(bill.amountMinor ?? 0), 0);
   const recon = reconcile({ accounts: data.accounts, journals: data.journals, lines: data.bankLines, bankAccountCode: "1000" });

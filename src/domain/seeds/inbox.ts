@@ -95,12 +95,20 @@ registerSeed("inbox", (ctx) => {
     hoursAgo: number,
     dueAt?: string,
     org: "nl" | "hb" = "nl",
-  ) => records.push(ctx.rec({ org, collection: "approvals", n, title, status, summary, amountMinor, at: at(hoursAgo), dueAt, fields, tags: [String(fields.risk ?? "low")] }));
+  ) => records.push(ctx.rec({
+    org, collection: "approvals", n, title, status, summary, amountMinor, at: at(hoursAgo), dueAt,
+    /* targetRevision is the target record's revision when the request was
+       raised; planVersion is the plan's own version and is not compared with it. */
+    fields: { targetRevision: 1, ...fields },
+    tags: [String(fields.risk ?? "low")],
+  }));
 
-  approval(20, "Post the October wage accrual", "Posts JRN-0008 to Wages and Accruals. The journal is balanced at the amount shown.", 1_842_000, {
-    requester: "Idris Cole", requesterKind: "ai", action: "finance.post_journal", targetId: "nl-journals-008", targetTitle: "JRN-0008 Wage accrual",
-    risk: "high", accounts: "6300 Wages, 2100 Accruals", planVersion: "1", scope: "Post one journal in the current period",
-    assignee: "Maya Chen", capability: "post_journal", evidence: "Debits 18,420.00 equal credits 18,420.00 across two lines.",
+  /* The amount and evidence are the target journal's own: nl-journals-008,
+     "Wage accrual draft", £1,000.00 dated 1 November in the base seed. */
+  approval(20, "Post the October wage accrual", "Posts JRN-0008, the wage accrual draft dated 1 November. The journal is balanced at the amount shown.", 100_000, {
+    requester: "Idris Cole", requesterKind: "ai", action: "finance.post_journal", targetId: "nl-journals-008", targetTitle: "Wage accrual draft",
+    risk: "high", accounts: "6300 Wages, 2200 Accrued wages", planVersion: "1", scope: "Post one journal in the current period",
+    assignee: "Maya Chen", capability: "post_journal", evidence: "Debits 1,000.00 equal credits 1,000.00 across two lines.",
   }, "awaiting_approval", 2, inDays(2));
   approval(21, "Pay Hollis Metalwork bill BILL-220", "Marks the payable as paid locally. No payment leaves this browser.", 486_500, {
     requester: "Jonah Adeyemi", requesterKind: "human", action: "finance.mark_bill_paid", targetId: "nl-bills-001", targetTitle: "BILL-220 Hollis Metalwork",

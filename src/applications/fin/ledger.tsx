@@ -78,15 +78,17 @@ export function JournalForm({ context, close }: { context: ScreenContext; close:
       if (reference) fields.reference = reference;
       if (post) { fields.postedBy = context.actor; fields.postedAt = new Date().toISOString(); }
       if (existing) {
+        /* A journal keeps its title when it is saved or posted: the narrative
+           is its memo, and approvals and links name the journal by title. */
         const saved = await context.mutate.patch(existing.id, {
-          title: memo || existing.title,
+          title: existing.title,
           status: post ? "posted" : "draft",
           summary: memo || existing.summary,
           amountMinor: amount,
           at: `${date}T09:00:00.000Z`,
           body,
           fields: { ...existing.fields, ...fields },
-        }, { expectRevision: existing.revision, event: post ? `Posted journal ${memo || existing.title}` : `Draft journal ${memo || existing.title} saved` });
+        }, { expectRevision: existing.revision, event: post ? `Posted journal ${existing.title}` : `Draft journal ${existing.title} saved` });
         if (!saved) { setBusy(undefined); return; }
       } else {
         await context.mutate.create({
@@ -128,7 +130,7 @@ export function JournalForm({ context, close }: { context: ScreenContext; close:
         <Field label="Reference" hint="Optional. Your own numbering or a document id.">
           <TextInput aria-label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} placeholder="JNL-0094" />
         </Field>
-        <Field label="Narrative" required hint="What this entry records. It becomes the journal title.">
+        <Field label="Narrative" required hint={existing ? `What this entry records. The journal keeps its title, ${existing.title}.` : "What this entry records. It becomes the journal title."}>
           <TextInput aria-label="Narrative" value={memo} onChange={(event) => setMemo(event.target.value)} required />
         </Field>
       </Row>

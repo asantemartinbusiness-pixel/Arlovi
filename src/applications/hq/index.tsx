@@ -1,4 +1,5 @@
 import { useMemo, useState, type JSX } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Building2, CalendarDays, Clock, Compass, Flag, Landmark, Network, Target, Users,
@@ -9,8 +10,11 @@ import {
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
+import * as repo from "@/platform/repo";
 import { freshness, resolveRange, addDays, sameDay } from "@/platform/clock";
 import { Building } from "@/applications/hq/pieces";
+import { outstandingMinor, receivablePosition } from "@/applications/fin/data";
+import { approvalRows } from "@/applications/inbox/engine";
 import {
   AddResource, ArrangeCards, AssignLeader, AssignTaskTo, AssignWork, ChooseScope, FindColleague, HOME_CARDS,
   LinkMission, MessageTeam, OpenDepartment, RecommendationsManager, ReorderDepartments, RequestHelp, ReviewGoal,
@@ -26,8 +30,24 @@ import type { Rec } from "@/domain/types";
  * handler and every overlay is its own component.
  * ====================================================================== */
 
+const HQ_COLLECTIONS = ["objectives", "departments", "members", "locations", "timelineEvents", "tasks", "missions", "invoices", "journals", "documents", "legalEntities", "brands", "risks", "approvals"];
+const HQ_EMPTY: Record<string, Rec[]> = Object.fromEntries(HQ_COLLECTIONS.map((name) => [name, [] as Rec[]]));
+
+/**
+ * One read of every collection HQ shows. `loaded` is false until the read has
+ * returned, so a figure is never stated as zero while it is still loading.
+ */
+function useHqRead(): { data: Record<string, Rec[]>; loaded: boolean } {
+  const { org } = useWorkspace();
+  const rows = useLiveQuery(async () => {
+    const entries = await Promise.all(HQ_COLLECTIONS.map(async (name) => [name, await repo.listByCollection(org.id, name)] as const));
+    return Object.fromEntries(entries) as Record<string, Rec[]>;
+  }, [org.id]);
+  return { data: rows ?? HQ_EMPTY, loaded: rows !== undefined };
+}
+
 function useHqData() {
-  return useCollections(["objectives", "departments", "members", "locations", "timelineEvents", "tasks", "missions", "invoices", "journals", "documents", "legalEntities", "brands", "risks"]);
+  return useHqRead().data;
 }
 
 /* ---------------------------- HQ-001 ---------------------------- */
@@ -41,9 +61,10 @@ function useHqData() {
  * read for trust before it is read for meaning.
  */
 function StateOfPlay({
-  context, approvals, missions, overdue, ledgerDays, ledgerStale,
+  context, loaded = true, approvals, missions, overdue, ledgerDays, ledgerStale,
 }: {
   context: ScreenContext;
+  loaded?: boolean;
   approvals: number;
   missions: number;
   overdue: number;
@@ -53,19 +74,20 @@ function StateOfPlay({
   const { now, org } = useWorkspace();
   const clauses: string[] = [];
 
-  clauses.push(approvals > 0
+  if (!loaded) clauses.push("Reading the state of the company");
+  else clauses.push(approvals > 0
     ? `${approvals} ${approvals === 1 ? "decision is" : "decisions are"} waiting on you`
     : "Nothing is waiting on a decision");
 
-  clauses.push(missions > 0
+  if (loaded) clauses.push(missions > 0
     ? `${missions} ${missions === 1 ? "mission is" : "missions are"} running`
     : "no mission is running");
 
-  if (overdue > 0) {
+  if (loaded && overdue > 0) {
     clauses.push(`${overdue} ${overdue === 1 ? "invoice is" : "invoices are"} past due`);
   }
 
-  clauses.push(ledgerDays === null
+  if (loaded) clauses.push(ledgerDays === null
     ? "the ledger has no recorded posting"
     : ledgerDays === 0
       ? "the ledger was posted today"
@@ -98,7 +120,7 @@ export function useHomeInsights(): Insight[] {
   const data = useHqData();
   const { now, org } = useWorkspace();
   return useMemo(() => {
-    const overdue = data.invoices.filter((invoice) => invoice.dueAt && new Date(invoice.dueAt) < now && invoice.status !== "paid");
+    const { overdue } = receivablePosition(data.invoices, now);
     const latestPost = data.journals.filter((journal) => journal.status === "posted").map((journal) => journal.at ?? journal.updatedAt).sort().at(-1);
     const ledgerAge = freshness(latestPost, now, 3);
     const list: Insight[] = [];
@@ -116,8 +138,8 @@ export function useHomeInsights(): Insight[] {
 }
 
 function ExecutiveHome({ context, range }: { context: ScreenContext; range: "today" | "week" }) {
-  const data = useHqData();
-  const { now, org } = useWorkspace();
+  const { data, loaded } = useHqRead();
+  const { now, org, actor } = useWorkspace();
   const window = resolveRange(range === "today" ? "today" : "week", now);
   const allInsights = useHomeInsights();
   const cardsPref = usePref("homeCards");
@@ -128,14 +150,14 @@ function ExecutiveHome({ context, range }: { context: ScreenContext; range: "tod
   const dismissed = listField(dismissPref, "ids");
   const insights = allInsights.filter((insight) => !dismissed.includes(insight.id));
 
-  const receivable = data.invoices
-    .filter((invoice) => !["paid", "void", "draft"].includes(invoice.status))
-    .reduce((sum, invoice) => sum + (invoice.amountMinor ?? 0), 0);
-  const overdue = data.invoices.filter((invoice) => invoice.dueAt && new Date(invoice.dueAt) < now && invoice.status !== "paid");
+  /* The Finance computation, so this home and /fin/home state one figure. */
+  const position = receivablePosition(data.invoices, now);
+  const overdue = position.overdue;
   const posted = data.journals.filter((journal) => journal.status === "posted");
   const latestPost = posted.map((journal) => journal.at ?? journal.updatedAt).sort().at(-1);
   const ledgerAge = freshness(latestPost, now, 3);
-  const approvals = [...data.invoices, ...data.missions].filter((record) => ["awaiting_approval", "needs_decision"].includes(record.status));
+  /* The requests the Inbox lists as assigned to this person, read the same way. */
+  const approvals = approvalRows(data.approvals, "Mine", actor);
   const active = data.missions.filter((mission) => ["running", "executing", "dispatched"].includes(mission.status));
   const dueInWindow = data.tasks.filter((task) => task.dueAt && new Date(task.dueAt) >= window.start && new Date(task.dueAt) < window.end);
 
@@ -150,16 +172,18 @@ function ExecutiveHome({ context, range }: { context: ScreenContext; range: "tod
         <StatRow>
           <Stat
             label="Receivable"
-            value={context.money(receivable)}
-            prov="posted"
-            meta={`${data.invoices.filter((i) => !["paid", "void", "draft"].includes(i.status)).length} open invoices`}
+            value={loaded ? context.money(position.receivableMinor) : "Reading…"}
+            unavailable={!loaded}
+            prov={loaded ? "posted" : "unknown"}
+            meta={loaded ? `${position.open.length} open invoices` : "Reading the ledger"}
             onClick={() => context.openOverlay("metric inspector", { metric: "receivable" })}
           />
           <Stat
             label="Overdue"
-            value={context.money(overdue.reduce((sum, i) => sum + (i.amountMinor ?? 0), 0))}
-            prov="posted"
-            meta={`${overdue.length} past due`}
+            value={loaded ? context.money(position.overdueMinor) : "Reading…"}
+            unavailable={!loaded}
+            prov={loaded ? "posted" : "unknown"}
+            meta={loaded ? `${overdue.length} past due` : "Reading the ledger"}
             onClick={() => context.openOverlay("metric inspector", { metric: "overdue" })}
           />
           <Stat
@@ -175,8 +199,10 @@ function ExecutiveHome({ context, range }: { context: ScreenContext; range: "tod
       </div>
     ),
     waiting: (
-      <Card key="waiting" span={7} title="Waiting on you" eyebrow="Decisions" prov="human" subtitle={`${window.label} · ${approvals.length} items`}>
-        {approvals.length === 0 ? (
+      <Card key="waiting" span={7} title="Waiting on you" eyebrow="Decisions" prov="human" subtitle={loaded ? `${window.label} · ${approvals.length} items` : `${window.label} · reading`}>
+        {!loaded ? (
+          <p className="ds-subtle">Reading the approval requests in this workspace…</p>
+        ) : approvals.length === 0 ? (
           <Empty title="Nothing to approve" icon={<Flag size={20} />}>Approvals appear here when a record is submitted for a decision.</Empty>
         ) : (
           <Stack gap={2}>
@@ -187,7 +213,7 @@ function ExecutiveHome({ context, range }: { context: ScreenContext; range: "tod
                   <p className="ds-subtle">{record.summary}</p>
                 </div>
                 {record.amountMinor !== undefined && <strong className="ds-num">{context.money(record.amountMinor)}</strong>}
-                <Button size="sm" variant="secondary" onClick={() => context.navigate(record.collection === "missions" ? `/o/${org.slug}/mission/missions/${record.id}` : `/o/${org.slug}/fin/invoices/${record.id}`)}>Review</Button>
+                <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/inbox/approvals`)}>Review</Button>
               </Row>
             ))}
           </Stack>
@@ -273,6 +299,7 @@ function ExecutiveHome({ context, range }: { context: ScreenContext; range: "tod
     <Stack gap={5}>
       <StateOfPlay
         context={context}
+        loaded={loaded}
         approvals={approvals.length}
         missions={active.length}
         overdue={overdue.length}
@@ -1002,16 +1029,15 @@ function MetricInspector({ context }: { context: ScreenContext }) {
       </Stack>
     );
   }
-  const rows = metric === "overdue"
-    ? data.invoices.filter((invoice) => invoice.dueAt && new Date(invoice.dueAt) < now && invoice.status !== "paid")
-    : data.invoices.filter((invoice) => !["paid", "void", "draft"].includes(invoice.status));
+  const position = receivablePosition(data.invoices, now);
+  const rows = metric === "overdue" ? position.overdue : position.open;
   return (
     <Stack gap={3}>
       <p className="ds-subtle">Computed from {rows.length} invoice records. Each row is the source of the figure.</p>
       <DataGrid rows={rows} rowId={(row) => row.id} label="Metric sources" filterable={false} columns={[
         { key: "title", header: "Invoice", primary: true, cell: (row) => row.title },
         { key: "due", header: "Due", cell: (row) => context.date(row.dueAt) },
-        { key: "amount", header: "Amount", align: "end", cell: (row) => context.money(row.amountMinor) },
+        { key: "amount", header: "Outstanding", align: "end", cell: (row) => context.money(outstandingMinor(row)) },
       ]} />
     </Stack>
   );

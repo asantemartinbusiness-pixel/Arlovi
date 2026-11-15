@@ -827,8 +827,11 @@ export function issueLines(data: FinData, totals: DocumentTotals, invoice: Rec):
 export function NewInvoice({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useFinData();
   const { org, now } = useWorkspace();
-  const [contactId, setContactId] = useState(data.contacts[0]?.id ?? "");
-  const [number, setNumber] = useState("");
+  /* Until a person types or chooses, the number and customer follow the
+     loaded records, so neither is fixed from an empty first read. */
+  const [chosenContact, setContactId] = useState<string>();
+  const contactId = chosenContact ?? data.contacts[0]?.id ?? "";
+  const [typedNumber, setNumber] = useState<string>();
   const [dueDays, setDueDays] = useState(21);
   const [description, setDescription] = useState("");
   const [unit, setUnit] = useState(0);
@@ -843,7 +846,7 @@ export function NewInvoice({ context, close }: { context: ScreenContext; close: 
     return `INV-${(Math.max(1000, ...numbers) + 1)}`;
   }, [data.invoices]);
 
-  useEffect(() => { setNumber((current) => current || suggested); }, [suggested]);
+  const number = typedNumber ?? suggested;
 
   const customer = data.contacts.find((contact) => contact.id === contactId);
   const status = statusFor(undefined, customer);
