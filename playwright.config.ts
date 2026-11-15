@@ -16,8 +16,11 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"]],
   use: {
-    baseURL: "http://127.0.0.1:5173",
+    /* BASE_URL points the suite at a production preview instead of the dev server. */
+    baseURL: process.env.BASE_URL ?? "http://127.0.0.1:5173",
     trace: "off",
+    actionTimeout: 10_000,
+    navigationTimeout: 30_000,
     launchOptions,
   },
   webServer: {

@@ -1,0 +1,711 @@
+[
+ {
+  "id": "ARL-HQ-001",
+  "title": "Executive Home",
+  "route": "/o/northline/hq/home",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Today",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Week",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Saved views",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Widget picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "metric inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "save view dialog",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Arrange cards",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Ask Arlovi",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect a metric",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Dismiss a recommendation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Save this view",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-HQ-002",
+  "title": "My Workspace",
+  "route": "/o/northline/hq/my-work",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Today",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Upcoming",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Saved",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Quick task",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "work item inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "personal preferences",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Quick task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open latest draft",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Prioritise",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request help",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pin item",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preferences",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-HQ-003",
+  "title": "Company Overview",
+  "route": "/o/northline/hq/company",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Business",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Performance",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Operations",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Compliance",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "KPI builder",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "executive note",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "data freshness inspector",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Departments",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New objective",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Data freshness",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-HQ-004",
+  "title": "Departments Directory",
+  "route": "/o/northline/hq/departments",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "My departments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pinned",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Create department",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "organizational impact preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign a leader",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New department",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open a department",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reorder the directory",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Impact preview",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-HQ-005",
+  "title": "Department Workspace",
+  "route": "/o/northline/hq/departments/nl-departments-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "People",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Work",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Discussions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Files",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Performance",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Department settings",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "invite member",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "permission inspector",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Message team",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign work",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a resource",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open the department's app",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Department settings",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Invite a member",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-HQ-006",
+  "title": "Organization Chart",
+  "route": "/o/northline/hq/organization",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "People",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Departments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "AI employees",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Member inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "change manager",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "impact confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Switch chart / list",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Change reporting line",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Zoom in",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Zoom out",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Inspect member"
+  ]
+ },
+ {
+  "id": "ARL-HQ-007",
+  "title": "Company Goals",
+  "route": "/o/northline/hq/goals",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Active",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Proposed",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Achieved",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archived",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Goal editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "target change review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "related work inspector",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Link a mission",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New objective",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Update the measure",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review a goal",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Related work",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-HQ-008",
+  "title": "Locations & Entities",
+  "route": "/o/northline/hq/locations",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Locations",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Legal entities",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Brands",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Operating calendars",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Location form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "scope preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "duplicate checker",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set primary office",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add location",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Choose scope",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit local details",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Duplicate check",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-HQ-009",
+  "title": "Company Timeline",
+  "route": "/o/northline/hq/timeline",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Decisions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Financial",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "People",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Technology",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Event inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "add annotation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "export selection",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export history",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Filter",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add milestone",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Inspect source"
+  ]
+ },
+ {
+  "id": "ARL-HQ-010",
+  "title": "Workplace Directory",
+  "route": "/o/northline/hq/directory",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Humans",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "AI",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Departments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Skills",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Profile quick view",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "presence settings",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign a task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Find a colleague",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Start a conversation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "View profile",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Presence settings",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

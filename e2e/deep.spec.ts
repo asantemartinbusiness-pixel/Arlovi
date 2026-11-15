@@ -85,6 +85,20 @@ async function load(page: Page, url: string) {
   await settle(page, 120);
 }
 
+/** Selects a record the way a person would: a grid row, or a card's Select control. */
+async function selectSomething(page: Page): Promise<boolean> {
+  const row = page.locator("main tbody tr[data-row]").first();
+  if (await row.count()) {
+    await row.click({ position: { x: 8, y: 8 } }).catch(() => undefined);
+    return true;
+  }
+  const card = page.locator("main button[aria-pressed]", { hasText: /^Select$/ }).first();
+  if (await card.count()) { await card.click().catch(() => undefined); return true; }
+  const recordCard = page.locator("main .ds-record-card").first();
+  if (await recordCard.count()) { await recordCard.click().catch(() => undefined); return true; }
+  return false;
+}
+
 async function sweepScreen(page: Page, screen: Contract, errors: ReturnType<typeof watch>): Promise<ScreenResult> {
   const base = pathFor(screen);
   const checks: Check[] = [];
@@ -138,12 +152,26 @@ async function sweepScreen(page: Page, screen: Contract, errors: ReturnType<type
     if (inMenu) {
       await page.locator(".pg-actions").getByRole("button", { name: "More actions" }).click();
       await page.waitForTimeout(100);
-      const item = page.getByRole("menuitem", { name: label, exact: true }).first();
-      if (await item.getAttribute("data-disabled") !== null) { guarded.push(label); await page.keyboard.press("Escape"); return; }
+      let item = page.getByRole("menuitem", { name: label, exact: true }).first();
+      if (await item.getAttribute("data-disabled") !== null) {
+        await page.keyboard.press("Escape");
+        if (await selectSomething(page)) await page.waitForTimeout(150);
+        const reopen = page.locator(".pg-actions").getByRole("button", { name: "More actions" });
+        if ((await reopen.count()) === 0) { guarded.push(label); return; }
+        await reopen.click({ timeout: 3000 });
+        await page.waitForTimeout(100);
+        item = page.getByRole("menuitem", { name: label, exact: true }).first();
+        if (await item.getAttribute("data-disabled") !== null) { guarded.push(label); await page.keyboard.press("Escape"); return; }
+      }
       await item.click();
     } else {
       const button = page.locator(".pg-actions").getByRole("button", { name: label, exact: true }).first();
-      if (await button.isDisabled()) { guarded.push(label); return; }
+      if (await button.isDisabled()) {
+        // Selection-gated: select a record the way a person would, then retry.
+        if (await selectSomething(page)) await page.waitForTimeout(150);
+        // Selecting may have navigated (a grid that only opens); never wait on a vanished button.
+        if ((await button.count()) === 0 || (await button.isDisabled({ timeout: 2000 }).catch(() => true))) { guarded.push(label); return; }
+      }
       await button.click();
     }
     await page.waitForTimeout(200);
