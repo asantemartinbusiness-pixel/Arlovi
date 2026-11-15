@@ -584,12 +584,12 @@ export function MatchedLines({ context }: { context: ScreenContext }) {
             const journalId = String(row.fields.journalId ?? "");
             const fields: Record<string, string | number | boolean> = { ...row.fields, matched: false };
             delete fields.journalId;
-            await context.mutate.patch(row.id, { status: "unmatched", fields }, { event: `Statement line ${row.title} unmatched` });
+            await context.mutate.patch(row.id, { status: "unmatched", fields }, { replaceFields: true, event: `Statement line ${row.title} unmatched` });
             const journal = data.journals.find((item) => item.id === journalId);
             if (journal) {
               const journalFields: Record<string, string | number | boolean> = { ...journal.fields };
               delete journalFields.bankLineId;
-              await context.mutate.patch(journal.id, { fields: journalFields }, { event: `${journal.title} unlinked from a statement line` });
+              await context.mutate.patch(journal.id, { fields: journalFields }, { replaceFields: true, event: `${journal.title} unlinked from a statement line` });
             }
             context.toast("Unmatched", "The link is removed. No ledger entry was changed.");
           }}>Unmatch</Button>

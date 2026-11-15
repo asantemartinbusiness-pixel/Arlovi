@@ -97,6 +97,8 @@ export function useCollections(collections: string[]): Record<string, Rec[]> {
  */
 export function useRecord(id: string | undefined): Rec | undefined {
   const { org } = useWorkspace();
+  const cached = repo.knownRecord(id);
+  const initial = cached && cached.organizationId === org.id ? cached : undefined;
   return useLiveQuery(
     async () => {
       if (!id) return undefined;
@@ -104,6 +106,7 @@ export function useRecord(id: string | undefined): Rec | undefined {
       return record && record.organizationId === org.id ? record : undefined;
     },
     [id, org.id],
+    initial,
   );
 }
 

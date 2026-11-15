@@ -848,6 +848,20 @@ function TaskBoard({ context, view }: { context: ScreenContext; view: string }) 
 /* ---------------------------- MISSION-006 ---------------------------- */
 
 async function executeStep(context: ScreenContext, step: Rec, mission: Rec, pool: Rec[], money: (minor: number | undefined) => string, date: (value: string | Date | undefined) => string, now: Date): Promise<StepResult> {
+  // Every entry point runs through here, so the stop control is enforced once,
+  // against the stored mission rather than whatever copy the caller holds.
+  const { getRecord } = await import("@/platform/repo");
+  const current = (await getRecord(mission.id)) ?? mission;
+  const organisation = await getRecord(context.org.id);
+  if (organisation?.fields.executionPaused === true) {
+    context.toast("Dispatch is paused", `Automation is paused for ${context.org.shortName}. No step runs until an owner resumes it.`, "blocked");
+    return { state: step.status as StepResult["state"], output: "", reason: "Organisation paused", read: [] };
+  }
+  if (current.status === "paused" || current.fields.executionPaused === true || ["cancelled", "completed"].includes(current.status)) {
+    const reason = current.status === "paused" || current.fields.executionPaused === true ? "stopped" : current.status;
+    context.toast("Step not started", `${current.title} is ${reason}. No step runs until it is resumed.`, "blocked");
+    return { state: step.status as StepResult["state"], output: "", reason: `Mission ${reason}`, read: [] };
+  }
   const result = runStep(step, { records: pool, mission, money, date, now });
   const attempts = Number(step.fields.attempts ?? 0) + 1;
   await context.mutate.patch(step.id, {
@@ -2692,6 +2706,14 @@ async function runNextStep(context: ScreenContext): Promise<void> {
   const { db } = await import("@/runtime/db");
   const mission = await missionRecord(context, context.params.id);
   if (!mission) return;
+  if (mission.status === "paused" || mission.fields.executionPaused === true) {
+    context.toast("Mission is stopped", `${mission.title} is stopped. Resume it before running the next step.`, "blocked");
+    return;
+  }
+  if (["cancelled", "completed"].includes(mission.status)) {
+    context.toast("Mission has ended", `${mission.title} is ${mission.status}. No further step will run.`, "blocked");
+    return;
+  }
   const children = await db.records.where("parentId").equals(mission.id).toArray();
   const steps = children.filter((row) => row.collection === "missionSteps").sort((a, b) => Number(a.fields.order ?? 0) - Number(b.fields.order ?? 0));
   const next = steps.find((step) => ["ready", "todo"].includes(step.status));

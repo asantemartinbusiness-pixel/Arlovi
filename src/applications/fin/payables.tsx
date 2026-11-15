@@ -314,7 +314,7 @@ export function MatchInspector({ context, close }: { context: ScreenContext; clo
             await context.mutate.patch(bill.id, {
               status: fields.exception ? bill.status : "inbox",
               fields,
-            }, { expectRevision: bill.revision, event: `Bill ${bill.title} matched to a supplier` });
+            }, { replaceFields: true, expectRevision: bill.revision, event: `Bill ${bill.title} matched to a supplier` });
             context.toast("Supplier matched", `${bill.title} now belongs to ${data.suppliers.find((item) => item.id === supplierId)?.title}.`);
             setBusy(false);
             close();

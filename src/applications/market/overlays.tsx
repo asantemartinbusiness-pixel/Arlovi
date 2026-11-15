@@ -710,13 +710,21 @@ export function DeliveryReceipt({ context }: { context: ScreenContext }) {
 /* ---------------- MARKET-006 ---------------- */
 
 export function EmailBuilder({ context, close }: { context: ScreenContext; close: () => void }) {
-  const data = useMarketData();
-  const { now } = useWorkspace();
   const payload = context.overlayPayload as { id?: string; templateId?: string } | undefined;
   const campaign = useRecord(payload?.id);
-  const template = useRecord(payload?.templateId) ?? data.templates.find((item) => String(item.fields.kind) === "email" && item.status === "approved");
+  /* The form seeds its state once. Editing an existing campaign must wait for
+     the record, or the defaults (first audience, template subject) would be
+     saved over the campaign's own audience and subject. */
+  if (payload?.id && !campaign) return <Empty title="Loading the campaign" />;
+  return <EmailBuilderForm key={campaign?.id ?? "new"} context={context} close={close} campaign={campaign} templateId={payload?.templateId} />;
+}
+
+function EmailBuilderForm({ context, close, campaign, templateId }: { context: ScreenContext; close: () => void; campaign: Rec | undefined; templateId?: string }) {
+  const data = useMarketData();
+  const { now } = useWorkspace();
+  const template = useRecord(templateId) ?? data.templates.find((item) => String(item.fields.kind) === "email" && item.status === "approved");
   const templateBody = bodyOf<{ subject?: string; preheader?: string; blocks?: string[] }>(template, {});
-  const [subject, setSubject] = useState(templateBody.subject ?? "");
+  const [subject, setSubject] = useState(String(campaign?.fields.emailSubject ?? templateBody.subject ?? ""));
   const [preheader, setPreheader] = useState(templateBody.preheader ?? "");
   const [audienceId, setAudienceId] = useState(String(campaign?.fields.audienceId ?? data.audiences[0]?.id ?? ""));
   const [bodyText, setBodyText] = useState(campaign ? `${campaign.summary}` : "");

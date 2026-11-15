@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MoreHorizontal } from "lucide-react";
 import { Breadcrumbs, Button, Drawer, Menu, Modal, Notice, Tabs, TabPanel } from "@/design-system";
@@ -7,7 +7,7 @@ import { APP_ENTRIES } from "@/app/nav";
 import { getApp, type ActionDef, type ScreenContext, type ScreenDef } from "@/platform/registry";
 import { can as roleCan, canOpen, ROLE_LABELS } from "@/platform/policy";
 import { useMutations, useToast, useWorkspace } from "@/platform/workspace";
-import { getRecord } from "@/platform/repo";
+import { getRecord, knownRecord } from "@/platform/repo";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ScreenRoute as LegacyScreen } from "@/app/screen";
 import { applicationLoadFailures } from "@/applications";
@@ -305,11 +305,14 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
     );
   }
   const overlayContext = { ...ctx, close: onClose };
+  const payloadId = (ctx.overlayPayload as { id?: unknown } | undefined)?.id;
+  const ids = [typeof payloadId === "string" ? payloadId : undefined, ctx.selectedId, ctx.params.id].filter((id): id is string => Boolean(id));
+  const body = <PrimedOverlayBody ids={ids} render={() => found.render(overlayContext)} />;
   const overlayTitle = typeof found.title === "function" ? found.title(ctx) : found.title ?? found.id;
   if (found.kind === "drawer") {
     return (
       <Drawer open onOpenChange={(next) => { if (!next) onClose(); }} title={overlayTitle} subtitle={found.description} width={found.width ?? 440} footer={found.footer?.(overlayContext)}>
-        {found.render(overlayContext)}
+        {body}
       </Drawer>
     );
   }
@@ -324,9 +327,29 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
       blocking={found.blocking}
       footer={found.footer?.(overlayContext)}
     >
-      {found.render(overlayContext)}
+      {body}
     </Modal>
   );
+}
+
+/**
+ * Mounts an overlay's body only once the records it is about have been read,
+ * so a form that seeds its fields from a record sees the record on its first
+ * render. Most opens are already primed by the list they came from; a deep
+ * link waits for one indexed read.
+ */
+function PrimedOverlayBody({ ids, render }: { ids: string[]; render: () => ReactNode }) {
+  const key = ids.join("|");
+  const ready = useLiveQuery(async () => {
+    await Promise.all(ids.map((id) => getRecord(id)));
+    return true;
+  }, [key], ids.every((id) => knownRecord(id) !== undefined) || ids.length === 0);
+  if (!ready) return <div className="ds-muted" role="status">Loading…</div>;
+  return <OverlayBody render={render} />;
+}
+
+function OverlayBody({ render }: { render: () => ReactNode }) {
+  return <>{render()}</>;
 }
 
 

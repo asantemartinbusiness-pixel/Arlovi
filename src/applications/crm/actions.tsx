@@ -480,7 +480,7 @@ export function ApproveQuote({ context, close }: { context: ScreenContext; close
               ...quote.fields, approvedBy: context.actor, approvedAt: new Date().toISOString(), approvedVersion: Number(quote.fields.version ?? 1), approvedGrossMinor: totals.grossMinor,
             };
             delete fields.discountApproval;
-            const saved = await context.mutate.patch(quote.id, { status: "approved", fields }, { expectRevision: quote.revision, event: `Quote ${quote.title} approved by ${context.actor}` });
+            const saved = await context.mutate.patch(quote.id, { status: "approved", fields }, { replaceFields: true, expectRevision: quote.revision, event: `Quote ${quote.title} approved by ${context.actor}` });
             if (saved) context.toast("Quote approved", `${quote.title} is approved by ${context.actor} and can be sent.`);
             setBusy(false);
             close();

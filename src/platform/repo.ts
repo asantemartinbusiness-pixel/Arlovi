@@ -18,16 +18,40 @@ export class ConflictError extends Error {
   }
 }
 
+/* Last-read copy of every record this tab has seen. Forms seed their state
+   once, on first render; reading the record asynchronously meant that render
+   saw nothing and the form saved its defaults over the real values. Hooks use
+   this copy as the first-render value; the live query then keeps it current. */
+const known = new Map<string, Rec>();
+
+function prime<T extends Rec | undefined>(record: T): T {
+  if (record) known.set(record.id, record);
+  return record;
+}
+
+function primeAll(rows: Rec[]): Rec[] {
+  for (const row of rows) known.set(row.id, row);
+  return rows;
+}
+
+/** The last-read copy of a record, if this tab has read it. */
+export function knownRecord(id: string | undefined): Rec | undefined {
+  return id ? known.get(id) : undefined;
+}
+
 export function listByCollection(orgId: string, collection: string): Promise<Rec[]> {
-  return db.records.where("[organizationId+collection]").equals([orgId, collection]).toArray();
+  return db.records.where("[organizationId+collection]").equals([orgId, collection]).toArray().then(primeAll);
 }
 
 export function listByOrg(orgId: string): Promise<Rec[]> {
-  return db.records.where("organizationId").equals(orgId).toArray();
+  return db.records.where("organizationId").equals(orgId).toArray().then(primeAll);
 }
 
 export function getRecord(id: string): Promise<Rec | undefined> {
-  return db.records.get(id);
+  return db.records.get(id).then((record) => {
+    if (!record) known.delete(id);
+    return prime(record);
+  });
 }
 
 /** A record by id only if it belongs to the given organisation. */
@@ -38,7 +62,7 @@ export async function getRecordInOrg(orgId: string, id: string): Promise<Rec | u
 
 export async function listChildren(orgId: string, parentId: string): Promise<Rec[]> {
   const rows = await db.records.where("parentId").equals(parentId).toArray();
-  return rows.filter((row) => row.organizationId === orgId);
+  return primeAll(rows.filter((row) => row.organizationId === orgId));
 }
 
 export function listEvents(orgId: string, limit = 200): Promise<Audit[]> {
@@ -68,6 +92,8 @@ export interface PatchOptions {
   expectRevision?: number;
   /** Suppress history snapshot for high-frequency editor saves. */
   skipHistory?: boolean;
+  /** Replace the whole fields map instead of merging. Only for deliberate removals. */
+  replaceFields?: boolean;
   event?: Omit<Audit, "id" | "at" | "actor" | "organizationId">;
 }
 
@@ -81,6 +107,8 @@ export async function patchRecord(id: string, patch: Partial<Rec>, context: Writ
     const next: Rec = {
       ...current,
       ...patch,
+      // A patch names the fields it changes; it never silently wipes the others.
+      fields: patch.fields ? (options.replaceFields ? { ...patch.fields } : { ...current.fields, ...patch.fields }) : current.fields,
       id: current.id,
       organizationId: current.organizationId,
       collection: current.collection,
@@ -90,6 +118,7 @@ export async function patchRecord(id: string, patch: Partial<Rec>, context: Writ
       updatedBy: context.actor,
     };
     await db.records.put(next);
+    prime(next);
     if (options.event) {
       await db.events.add({
         ...options.event,

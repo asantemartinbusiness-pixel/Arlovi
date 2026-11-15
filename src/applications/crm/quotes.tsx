@@ -426,7 +426,7 @@ export function PricingPolicy({ context }: { context: ScreenContext }) {
                     onClick={async () => {
                       const fields: Record<string, string | number | boolean> = { ...quote.fields, approvedBy: context.actor };
                       delete fields.discountApproval;
-                      await context.mutate.patch(quote.id, { status: "review", fields }, { expectRevision: quote.revision, event: `Discount approved on ${quote.title}` });
+                      await context.mutate.patch(quote.id, { status: "review", fields }, { replaceFields: true, expectRevision: quote.revision, event: `Discount approved on ${quote.title}` });
                       context.toast("Discount approved", `${quote.title} can be sent. ${context.actor} is recorded as the approver.`);
                     }}
                   >

@@ -348,7 +348,7 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
               status: anySuppressed ? "suppressed" : keep.status,
               fields,
               tags: anySuppressed ? [...new Set([...keep.tags, "suppressed"])] : keep.tags,
-            }, { expectRevision: keep.revision, event: `Contacts merged into ${keep.title}` });
+            }, { replaceFields: true, expectRevision: keep.revision, event: `Contacts merged into ${keep.title}` });
             for (const other of others) {
               for (const deal of dealsOfContact(data, other.id)) {
                 await context.mutate.patch(deal.id, { fields: { ...deal.fields, contactId: keep.id } }, { event: `${deal.title} repointed to the merged contact` });
