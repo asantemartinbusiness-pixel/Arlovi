@@ -44,8 +44,8 @@ export function registerSeed(key: string, run: Contributor): void {
   CONTRIBUTORS.push({ key, run });
 }
 
-export function collectSeeds(now: string): { records: Rec[]; events: Audit[] } {
-  const context: SeedContext = {
+function makeContext(now: string): SeedContext {
+  return {
     northline: ORG_NORTHLINE,
     harbor: ORG_HARBOR,
     now,
@@ -76,6 +76,23 @@ export function collectSeeds(now: string): { records: Rec[]; events: Audit[] } {
       history: [],
     }),
   };
+}
+
+function seedContext(now: string): SeedContext {
+  return makeContext(now);
+}
+
+/** Each contributor's output on its own, so late-loading ones can be topped up. */
+export function collectSeedsByContributor(now: string): { key: string; records: Rec[]; events: Audit[] }[] {
+  const context = seedContext(now);
+  return CONTRIBUTORS.map((contributor) => {
+    const result = contributor.run(context);
+    return { key: contributor.key, records: result.records, events: result.events ?? [] };
+  });
+}
+
+export function collectSeeds(now: string): { records: Rec[]; events: Audit[] } {
+  const context = makeContext(now);
   const records: Rec[] = [];
   const events: Audit[] = [];
   for (const contributor of CONTRIBUTORS) {

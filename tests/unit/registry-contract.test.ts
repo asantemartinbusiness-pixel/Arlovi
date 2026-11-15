@@ -1,12 +1,17 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { describe, expect, it } from "vitest";
-import "@/applications";
+import { beforeAll, describe, expect, it } from "vitest";
+import { loadApplications } from "@/applications";
 import { allApps, getApp } from "@/platform/registry";
 
 interface Contract {
   id: string; title: string; route: string; applicationCode: string; applicationName: string;
   tabs: string[]; actions: string[]; overlays: string[]; archetype: string;
 }
+
+beforeAll(async () => {
+  const failures = await loadApplications();
+  if (failures.length) throw new Error(`Applications failed to load: ${failures.map((f) => `${f.group}: ${f.message}`).join("; ")}`);
+});
 
 const catalog = JSON.parse(readFileSync(new URL("../../src/generated/catalog.json", import.meta.url), "utf8")) as {
   screens: Contract[];

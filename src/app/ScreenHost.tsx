@@ -8,6 +8,7 @@ import { getApp, type ActionDef, type ScreenContext, type ScreenDef } from "@/pl
 import { can as roleCan, canOpen, ROLE_LABELS } from "@/platform/policy";
 import { useMutations, useToast, useWorkspace } from "@/platform/workspace";
 import { ScreenRoute as LegacyScreen } from "@/app/screen";
+import { applicationLoadFailures } from "@/applications";
 
 export function ScreenHost() {
   const location = useLocation();
@@ -108,7 +109,22 @@ export function ScreenHost() {
     );
   }
 
-  if (!app) return <LegacyScreen />;
+  if (!app) {
+    const failed = applicationLoadFailures();
+    if (failed.length > 0) {
+      return (
+        <div className="pg">
+          <div className="pg-head"><h1>{screen.title}</h1></div>
+          <div className="pg-body">
+            <Notice tone="danger" title={`${screen.applicationName} did not load`}>
+              Its application module failed to load ({failed.map((failure) => failure.group).join(", ")}). Other applications are working normally.
+            </Notice>
+          </div>
+        </div>
+      );
+    }
+    return <LegacyScreen />;
+  }
 
   const actions = (def?.actions ?? []).filter((action) => !action.capability || roleCan(workspace.role, action.capability));
   const primary = actions.filter((action) => action.placement === "primary");

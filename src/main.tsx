@@ -8,7 +8,7 @@ import { ensureSeed } from "@/runtime/db";
 import { useUi } from "@/runtime/ui";
 import "@/design-system";
 import "@/styles.css";
-import "@/applications";
+import { loadApplications } from "@/applications";
 
 function Boot() {
   const [ready, setReady] = useState(false);
@@ -18,7 +18,10 @@ function Boot() {
   const palette = useUi((state) => state.palette);
 
   useEffect(() => {
-    ensureSeed()
+    // Applications register first so their fixtures are known to the seeder.
+    // A group that fails to load is reported by the shell; the rest still boot.
+    loadApplications()
+      .then(() => ensureSeed())
       .then(() => setReady(true))
       .catch((error: unknown) => setFailed(error instanceof Error ? error.message : "The workspace could not be opened."));
   }, []);

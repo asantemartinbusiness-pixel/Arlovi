@@ -1,7 +1,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { it } from "vitest";
-import "@/applications";
+import { beforeAll, it } from "vitest";
+import { loadApplications } from "@/applications";
 import { getApp } from "@/platform/registry";
+
+beforeAll(async () => {
+  const failures = await loadApplications();
+  if (failures.length) throw new Error(`Applications failed to load: ${failures.map((f) => `${f.group}: ${f.message}`).join("; ")}`);
+});
 
 const catalog = JSON.parse(readFileSync(new URL("../../src/generated/catalog.json", import.meta.url), "utf8")) as {
   screens: { id: string; title: string; applicationCode: string; actions: string[]; overlays: string[] }[];

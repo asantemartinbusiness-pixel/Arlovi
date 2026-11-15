@@ -7,6 +7,8 @@ import { ArloviMark, brand, palettes } from "@/app/brand";
 import { NAV_GROUPS, APP_ENTRIES, mobileNavFor } from "@/app/nav";
 import { appEntry, screens } from "@/app/catalog";
 import { ScreenHost } from "@/app/ScreenHost";
+import { ScreenErrorBoundary } from "@/app/ErrorBoundary";
+import { applicationLoadFailures } from "@/applications";
 import { CommandPalette } from "@/app/CommandPalette";
 import { AttentionCentre } from "@/app/AttentionCentre";
 import { AskPanel } from "@/app/AskPanel";
@@ -229,6 +231,17 @@ export function AppShell() {
         )}
 
         <main className="hq-main" id="main">
+          {applicationLoadFailures().length > 0 && (
+            <div className="hq-banners">
+              <div className="ds-notice" data-tone="danger" role="alert">
+                <div>
+                  <strong className="ds-notice-title">Some applications could not be loaded</strong>
+                  {applicationLoadFailures().map((failure) => `${failure.group}: ${failure.message}`).join(" · ")}
+                  {" "}Every other application is working normally.
+                </div>
+              </div>
+            </div>
+          )}
           {(ui.offline || paused) && (
             <div className="hq-banners">
               {ui.offline && (
@@ -251,7 +264,9 @@ export function AppShell() {
               )}
             </div>
           )}
-          <ScreenHost />
+          <ScreenErrorBoundary resetKey={location.pathname} label={activeScreen?.title ?? "This screen"}>
+            <ScreenHost />
+          </ScreenErrorBoundary>
           <ExecutionTray missions={data.missions} />
         </main>
       </div>
