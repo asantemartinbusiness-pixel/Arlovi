@@ -278,6 +278,9 @@ table.ds-table { width: 100%; border-collapse: separate; border-spacing: 0; font
 .ds-toast[data-tone="failed"] { border-inline-start-color: var(--danger); }
 .ds-toast strong { display: block; font-size: var(--text-sm); }
 .ds-toast p { font-size: var(--text-xs); color: var(--fg-muted); }
+/* While a dialog is open its actions sit at the bottom; toasts move to the top
+   corner over the backdrop so they never cover a control. */
+body:has([role="dialog"]) .ds-toasts { inset-block-start: var(--space-4); inset-block-end: auto; inset-inline-start: var(--space-4); }
 @media (max-width: 599px) { .ds-toasts { inset-block-end: calc(64px + env(safe-area-inset-bottom)); inset-inline: var(--space-3); } }
 
 /* ========== Toolbar / inspector ========== */

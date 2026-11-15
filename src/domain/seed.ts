@@ -405,7 +405,7 @@ export function buildSeed(): { records: Rec[]; events: Audit[] } {
   records.push(
     rec(NORTH, "services", 1, "Showroom consultation", { status: "active", amountMinor: 0, summary: "45 minutes in Clerkenwell.", fields: { minutes: 45, slug: "showroom-consult" } }),
     rec(NORTH, "services", 2, "On-site specification", { status: "active", amountMinor: 18_000, summary: "Paid specification visit.", fields: { minutes: 90, slug: "specification" } }),
-    rec(NORTH, "resources", 1, "Consultation table", { summary: "One booking at a time.", fields: { kind: "room" } }),
+    rec(NORTH, "resources", 1, "Consultation table", { summary: "One booking at a time.", fields: { kind: "room", bookable: true } }),
     rec(NORTH, "resources", 2, "Priya Shah", { summary: "Showroom host.", fields: { kind: "person", employeeId: "nl-employees-003" } }),
     rec(NORTH, "bookings", 1, "Leo · specification", {
       status: "confirmed",

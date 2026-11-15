@@ -12,7 +12,7 @@ import { CUSTOMER_TAX_STATUSES } from "@/domain/fin-invoice";
 import type { CustomerTaxStatus } from "@/domain/fin-invoice";
 import { ACTIVITY_LABEL, activitiesFor, activityKind, stageOf } from "@/domain/crm-pipeline";
 import {
-  companyById, contactsOfCompany, dealsOfCompany, dealsOfContact, invoicesOfContact, ticketsOfContact, useCrmData,
+  companyById, contactsOfCompany, dealsOfCompany, bookingsOfContact, dealsOfContact, invoicesOfContact, ticketsOfContact, useCrmData,
 } from "./data";
 import type { CrmData } from "./data";
 import { ActivityPill, CapabilityNotice, ConsentPill, Money, StagePill } from "./parts";
@@ -586,11 +586,13 @@ export function ContactTimeline({ context }: { context: ScreenContext }) {
   const activities = activitiesFor(data.activities, contact.id);
   const deals = dealsOfContact(data, contact.id);
   const invoices = invoicesOfContact(data, contact.id);
+  const bookings = bookingsOfContact(data, contact.id);
 
   const entries = [
     ...activities.map((activity) => ({ id: activity.id, at: activity.startAt ?? activity.at ?? activity.createdAt, kind: ACTIVITY_LABEL[activityKind(activity)], title: activity.title, detail: activity.summary, who: String(activity.fields.owner ?? activity.ownerName), outcome: String(activity.fields.outcome ?? "") })),
     ...deals.map((deal) => ({ id: deal.id, at: deal.createdAt, kind: "Deal", title: `${deal.title} created`, detail: deal.summary, who: String(deal.fields.owner ?? deal.ownerName), outcome: stageOf(deal).label })),
     ...invoices.map((invoice) => ({ id: invoice.id, at: invoice.at ?? invoice.createdAt, kind: "Invoice", title: `${invoice.title} ${invoice.status.replace(/_/g, " ")}`, detail: invoice.summary, who: invoice.ownerName, outcome: context.money(Number(invoice.amountMinor ?? 0)) })),
+    ...bookings.map((booking) => ({ id: booking.id, at: booking.startAt ?? booking.at ?? booking.createdAt, kind: "Booking", title: `${booking.title} ${booking.status.replace(/_/g, " ")}`, detail: booking.fields.invoiceNumber ? `Invoiced as ${String(booking.fields.invoiceNumber)}.` : booking.summary, who: booking.ownerName, outcome: booking.amountMinor ? context.money(booking.amountMinor) : "" })),
     ...events.map((event) => ({ id: event.id, at: event.at, kind: "Record", title: event.message, detail: "", who: event.actor, outcome: "" })),
   ].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
 

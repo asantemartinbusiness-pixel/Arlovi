@@ -11,7 +11,7 @@ import { resolveTaxCode } from "@/platform/money";
 import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import {
-  bodyOf, customerStatusOfContact, marginOf, onHandFor, orderTotals, reservedFor, statusTone,
+  bodyOf, marginOf, onHandFor, orderTaxStatus, orderTotals, withDelivery, reservedFor, statusTone,
   stockRows, taxCategoryOfProduct, useCommerceData, PAYMENT_LABEL, paymentTone,
   type OrderBody, type ProductBody,
 } from "./data";
@@ -679,11 +679,11 @@ export function OrderDetail({ context, lens }: { context: ScreenContext; lens: s
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Order total" value={context.money(totals.grossMinor + shipping)} meta="Net, resolved tax and delivery" />
-          <Stat label="Recorded as paid" value={String(order.fields.payment) === "paid_local" ? context.money(totals.grossMinor + shipping) : context.money(0)} meta={PAYMENT_LABEL[String(order.fields.payment)] ?? ""} />
+          <Stat label="Order total" value={context.money(withDelivery(totals, shipping).grossMinor)} meta="Net, resolved tax and delivery" />
+          <Stat label="Recorded as paid" value={String(order.fields.payment) === "paid_local" ? context.money(withDelivery(totals, shipping).grossMinor) : context.money(0)} meta={PAYMENT_LABEL[String(order.fields.payment)] ?? ""} />
           <Stat label="Processor reference" value="Unavailable" unavailable meta="No processor is connected" />
         </StatRow>
-        <TotalsBlock totals={totals} money={context.money} label="Order" extraRows={[{ label: "Delivery", value: <span className="ds-num">{context.money(shipping)}</span> }]} />
+        <TotalsBlock totals={withDelivery(totals, shipping)} money={context.money} label="Order" extraRows={[{ label: "Delivery", value: <span className="ds-num">{context.money(shipping)}</span> }]} />
         <ProviderBoundary id="payment.capture" />
         {returns.length > 0 && (
           <Notice tone="warning" title="A refund cannot be executed here">
@@ -748,13 +748,13 @@ export function OrderDetail({ context, lens }: { context: ScreenContext; lens: s
         <Properties rows={[
           { label: "Name", value: contact?.title ?? String(order.fields.buyerName || "Guest") },
           { label: "Email", value: String(contact?.fields.email ?? order.fields.buyerEmail ?? "Not recorded") },
-          { label: "Tax status", value: customerStatusOfContact(contact).replace("_", " ") },
+          { label: "Tax status", value: orderTaxStatus(order, contact).replace("_", " ") },
           { label: "Ship to", value: [body.shipTo?.line1, body.shipTo?.city, body.shipTo?.postcode].filter(Boolean).join(", ") || "Not recorded" },
           { label: "Channel", value: String(order.fields.channel ?? "—") },
         ]} />
       </Card>
-      <Card span={7} title="Totals" subtitle={`Tax resolved for ${org.jurisdiction} as ${customerStatusOfContact(contact).replace("_", " ")}`}>
-        <TotalsBlock totals={totals} money={context.money} label="Order" extraRows={[{ label: "Delivery", value: <span className="ds-num">{context.money(shipping)}</span> }]} />
+      <Card span={7} title="Totals" subtitle={`Tax resolved for ${org.jurisdiction} as ${orderTaxStatus(order, contact).replace("_", " ")}`}>
+        <TotalsBlock totals={withDelivery(totals, shipping)} money={context.money} label="Order" extraRows={[{ label: "Delivery", value: <span className="ds-num">{context.money(shipping)}</span> }]} />
       </Card>
       <Card span={12} title="Line items" subtitle={`${(body.lines ?? []).length} lines`} flush>
         <DataGrid rows={totals.lines} rowId={(row) => row.id} label="Line items" filterable={false}

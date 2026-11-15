@@ -8,7 +8,8 @@ import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { CHANGED_ELSEWHERE, downloadCsv, ProviderBoundary, type ConfirmSpec } from "@/applications/market/kit";
 import {
-  approverFor, APPROVAL_LIMITS, bodyOf, isPurchaseOrder, isRequisition, outstandingFor, poTotals, statusTone, useProcData,
+  approverFor, APPROVAL_LIMITS, bodyOf, canonicalSuppliers, findSupplier, isPurchaseOrder, isRequisition, outstandingFor, poTotals,
+  resolveSupplierId, statusTone, useProcData,
   type PoBody, type PoLine, type ReceiptBody, type SupplierBody,
 } from "./data";
 
@@ -57,7 +58,7 @@ export function LinkContract({ context, close }: { context: ScreenContext; close
   const linked = data.contracts.filter((contract) => String(contract.fields.supplierId) === supplier.id);
   const available = data.contracts.filter((contract) => String(contract.fields.supplierId) !== supplier.id);
   const chosen = data.contracts.find((contract) => contract.id === (contractId || available[0]?.id));
-  const takenBy = chosen && String(chosen.fields.supplierId) ? data.suppliers.find((item) => item.id === String(chosen.fields.supplierId)) : undefined;
+  const takenBy = chosen && String(chosen.fields.supplierId) ? findSupplier(data, String(chosen.fields.supplierId)) : undefined;
   return (
     <form
       id="link-contract"
@@ -146,7 +147,7 @@ export function QuoteRequests({ context, supplierId }: { context: ScreenContext;
 
 export function SupplierCompare({ context }: { context: ScreenContext }) {
   const data = useProcData();
-  const current = data.suppliers.find((supplier) => supplier.id === context.params.id);
+  const current = findSupplier(data, context.params.id);
   if (!current) return <Empty title="Loading suppliers" />;
   const peers = data.suppliers.filter((supplier) => supplier.status !== "archived" && (supplier.id === current.id || String(supplier.fields.category ?? "") === String(current.fields.category ?? "")));
   const rows = (peers.length > 1 ? peers : data.suppliers.filter((supplier) => supplier.status !== "archived")).map((supplier) => {
@@ -450,10 +451,11 @@ export function suggestionsFrom(products: Rec[], moves: Rec[], orders: Rec[]): S
 }
 
 export async function approveSuggestions(context: ScreenContext) {
-  const [products, moves, orders, suppliers] = await Promise.all([
+  const [products, moves, orders, directory] = await Promise.all([
     listByCollection(context.org.id, "products"), listByCollection(context.org.id, "stockMoves"),
-    listByCollection(context.org.id, "purchaseOrders"), listByCollection(context.org.id, "suppliers"),
+    listByCollection(context.org.id, "purchaseOrders"), listByCollection(context.org.id, "suppliers").then(canonicalSuppliers),
   ]);
+  const suppliers = directory.suppliers;
   const all = suggestionsFrom(products, moves, orders);
   const picked = context.selectedId ? all.filter((row) => row.product.id === context.selectedId) : all;
   const lastSupplierFor = (productId: string) => [...orders].filter(isPurchaseOrder).sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""))
@@ -461,7 +463,7 @@ export async function approveSuggestions(context: ScreenContext) {
   const fallback = suppliers.find((supplier) => supplier.status === "approved") ?? suppliers[0];
   const groups = new Map<string, Suggestion[]>();
   for (const row of picked) {
-    const supplierId = String(lastSupplierFor(row.product.id) ?? fallback?.id ?? "");
+    const supplierId = resolveSupplierId(directory.aliases, String(lastSupplierFor(row.product.id) ?? fallback?.id ?? ""));
     groups.set(supplierId, [...(groups.get(supplierId) ?? []), row]);
   }
   const lineValue = (row: Suggestion) => row.quantity * Number(row.product.fields.unitCostMinor ?? 0);
@@ -547,7 +549,7 @@ export function SpendCompare({ context }: { context: ScreenContext }) {
 export function SupplierInspect({ context }: { context: ScreenContext }) {
   const data = useProcData();
   const [chosen, setChosen] = useState("");
-  const supplier = data.suppliers.find((item) => item.id === (chosen || context.selectedId)) ?? data.suppliers[0];
+  const supplier = findSupplier(data, (chosen || context.selectedId)) ?? data.suppliers[0];
   if (!supplier) return <Empty title="No suppliers" />;
   const orders = data.purchaseOrders.filter((order) => isPurchaseOrder(order) && String(order.fields.supplierId) === supplier.id);
   const counted = orders.filter((order) => !["cancelled", "draft"].includes(order.status));
@@ -569,12 +571,13 @@ export function SupplierInspect({ context }: { context: ScreenContext }) {
 }
 
 export async function exportSpend(context: ScreenContext) {
-  const [orders, suppliers] = await Promise.all([listByCollection(context.org.id, "purchaseOrders"), listByCollection(context.org.id, "suppliers")]);
+  const [orders, directory] = await Promise.all([listByCollection(context.org.id, "purchaseOrders"), listByCollection(context.org.id, "suppliers").then(canonicalSuppliers)]);
+  const suppliers = directory.suppliers;
   const rows = orders.filter(isPurchaseOrder).sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
   const count = downloadCsv(`${context.org.slug}-procurement-spend.csv`,
     ["order", "date", "supplier", "status", "counted_in_spend", "net_minor", "tax_minor", "gross_minor", "currency"],
     rows.map((order) => {
-      const supplier = suppliers.find((item) => item.id === String(order.fields.supplierId));
+      const supplier = findSupplier({ suppliers, supplierAliases: directory.aliases }, String(order.fields.supplierId));
       const totals = poTotals(order, supplier, context.org.jurisdiction);
       return [order.title, order.at, supplier?.title ?? "", order.status, !["cancelled", "draft"].includes(order.status) ? "yes" : "no — excluded", totals.netMinor, totals.taxMinor, totals.grossMinor, context.org.currency];
     }));

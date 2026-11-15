@@ -66,6 +66,66 @@ export function DealHeader({ context }: { context: ScreenContext }) {
   );
 }
 
+/**
+ * Records that the customer confirmed a budget for the deal, which Qualified
+ * requires before the deal advances. The confirmation names who recorded it,
+ * when, and how the customer confirmed it, and is written to the audit trail.
+ */
+function BudgetConfirmation({ context, deal }: { context: ScreenContext; deal: Rec }) {
+  const [open, setOpen] = useState(false);
+  const [how, setHow] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const canEdit = context.can("edit_pipeline");
+  if (deal.fields.budgetConfirmed === true) {
+    const by = String(deal.fields.budgetConfirmedBy ?? "");
+    const at = String(deal.fields.budgetConfirmedAt ?? "");
+    const note = String(deal.fields.budgetEvidence ?? "");
+    return (
+      <Properties rows={[
+        { label: "Budget", value: <Pill tone="success" dot>Confirmed</Pill> },
+        ...(by ? [{ label: "Recorded by", value: `${by}${at ? ` on ${context.date(at)}` : ""}` }] : []),
+        ...(note ? [{ label: "How it was confirmed", value: note }] : []),
+      ]} />
+    );
+  }
+  if (!open) {
+    return (
+      <Row gap={2}>
+        <Button variant="secondary" disabled={!canEdit} title={canEdit ? undefined : "Your role cannot change the pipeline"} onClick={() => setOpen(true)}>
+          Confirm the budget
+        </Button>
+      </Row>
+    );
+  }
+  return (
+    <form
+      className="ds-stack ds-gap-3"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (!how.trim()) { setError("Say how the customer confirmed the budget, so the record can be checked later."); return; }
+        setBusy(true);
+        const saved = await context.mutate.patch(deal.id, {
+          fields: { budgetConfirmed: true, budgetConfirmedBy: context.actor, budgetConfirmedAt: context.now.toISOString(), budgetEvidence: how.trim() },
+        }, { expectRevision: deal.revision, event: `Budget for ${deal.title} confirmed by ${context.actor}: ${how.trim()}` });
+        setBusy(false);
+        if (!saved) { setError("The deal changed after this was opened. Reload it and try again."); return; }
+        context.toast("Budget confirmed", `${deal.title} records a confirmed budget, by ${context.actor}.`);
+        setOpen(false);
+      }}
+    >
+      <Field label="How the customer confirmed it" required hint={`Amount on the deal: ${context.money(Number(deal.amountMinor ?? 0))}`}>
+        <TextInput aria-label="How the customer confirmed it" value={how} onChange={(event) => { setHow(event.target.value); setError(""); }} placeholder="Call with the buyer on 14 November" />
+      </Field>
+      {error && <Notice tone="danger" title="Not recorded">{error}</Notice>}
+      <Row gap={2}>
+        <Button variant="primary" type="submit" busy={busy}>Record the confirmed budget</Button>
+        <Button variant="ghost" onClick={() => { setOpen(false); setError(""); }}>Cancel</Button>
+      </Row>
+    </form>
+  );
+}
+
 export function DealOverview({ context }: { context: ScreenContext }) {
   const { deal, data } = useDeal(context);
   const { org, now } = useWorkspace();
@@ -97,6 +157,7 @@ export function DealOverview({ context }: { context: ScreenContext }) {
           {guard
             ? <Notice tone="warning" title="This deal cannot advance yet">{guard}</Notice>
             : stage.kind === "open" && <Notice tone="success" title={`Ready for ${next.label}`}>Everything {stage.label} requires is recorded.</Notice>}
+          {stage.kind === "open" && <BudgetConfirmation key={deal.id} context={context} deal={deal} />}
         </Stack>
       </Card>
 

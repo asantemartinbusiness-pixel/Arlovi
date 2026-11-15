@@ -10,7 +10,7 @@ import type { Rec } from "@/domain/types";
 import type { TaxCategory } from "@/platform/money";
 import { applyScenario, approvalLimitFor } from "./actions";
 import {
-  approverFor, APPROVAL_LIMITS, billTotals, bodyOf, isPurchaseOrder, MATCH_LABEL, matchTone,
+  approverFor, APPROVAL_LIMITS, billTotals, bodyOf, findSupplier, isPurchaseOrder, MATCH_LABEL, matchTone, resolveSupplierId,
   outstandingFor, poTotals, statusTone, threeWayMatch, useProcData,
   type ContractBody, type PoBody, type PoLine, type ReceiptBody, type SupplierBody,
 } from "./data";
@@ -48,13 +48,13 @@ function RequisitionFormBody({ context, close, existing, loaded }: { context: Sc
       receivedQuantity: 0,
     };
   });
-  const [supplierId, setSupplierId] = useState(String(existing?.fields.supplierId ?? data.suppliers[0]?.id ?? ""));
+  const [supplierId, setSupplierId] = useState(resolveSupplierId(data.supplierAliases, String(existing?.fields.supplierId ?? data.suppliers[0]?.id ?? "")));
   const [budget, setBudget] = useState(String(existing?.fields.budgetLine ?? "Workshop materials"));
   const [priority, setPriority] = useState(String(existing?.fields.priority ?? "normal"));
   const [note, setNote] = useState(existing?.summary ?? "");
   const [lines, setLines] = useState<PoLine[]>(existingBody.lines ?? (seeded.length ? seeded : [{ id: "l1", description: "", quantity: 1, unitPriceMinor: 0, taxCategory: "standard", receivedQuantity: 0 }]));
 
-  const supplier = data.suppliers.find((item) => item.id === supplierId);
+  const supplier = findSupplier(data, supplierId);
   const draft = { ...(existing ?? ({} as Rec)), at: now.toISOString(), body: { lines } } as Rec;
   const totals = poTotals(draft, supplier, org.jurisdiction);
   const invalid = lines.length === 0 || lines.some((line) => !line.description.trim() || line.quantity <= 0) || !note.trim();
@@ -144,12 +144,27 @@ function RequisitionFormBody({ context, close, existing, loaded }: { context: Sc
   );
 }
 
+/**
+ * Separation of duties: the person who raised a requisition does not approve
+ * it. The owner is the exception, because nobody sits above the owner in the
+ * approval chain; that approval is allowed and recorded as a self-approval.
+ */
+export function separationOfDuties(requisition: Rec, actor: string, role: string): { refused?: string; ownerSelfApproval: boolean } {
+  const requester = String(requisition.fields.requester ?? requisition.ownerName ?? "");
+  if (requester !== actor) return { ownerSelfApproval: false };
+  if (role === "owner") return { ownerSelfApproval: true };
+  return {
+    refused: `${actor} raised ${requisition.title}, so ${actor} cannot also approve it. Separation of duties needs a different person with the approval limit to approve it; it stays awaiting approval.`,
+    ownerSelfApproval: false,
+  };
+}
+
 export function RequisitionReview({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useProcData();
   const { org, now, actor } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const requisition = useRecord(payload?.id ?? context.selectedId) ?? data.purchaseOrders.find((item) => item.status === "awaiting_approval");
-  const supplier = data.suppliers.find((item) => item.id === String(requisition?.fields.supplierId ?? ""));
+  const supplier = findSupplier(data, String(requisition?.fields.supplierId ?? ""));
   const [reason, setReason] = useState("");
   if (!requisition) return <Empty title="Nothing to review" />;
   const totals = poTotals(requisition, supplier, org.jurisdiction);
@@ -158,6 +173,7 @@ export function RequisitionReview({ context, close }: { context: ScreenContext; 
   const pending = requisition.status === "awaiting_approval";
   const withinLimit = totals.grossMinor <= limit.limitMinor;
   const canApprove = (context.can("approve_payment") || context.role === "owner");
+  const separation = separationOfDuties(requisition, actor, context.role);
 
   return (
     <Stack gap={4}>
@@ -191,16 +207,28 @@ export function RequisitionReview({ context, close }: { context: ScreenContext; 
               {context.money(totals.grossMinor)} needs {needed} approval. The {limit.role.toLowerCase()} limit is {context.money(limit.limitMinor)}, so this cannot be approved from this view; it stays awaiting approval.
             </Notice>
           )}
+          {pending && separation.refused && (
+            <Notice tone="danger" title="You cannot approve your own requisition">
+              {separation.refused}
+            </Notice>
+          )}
+          {pending && separation.ownerSelfApproval && (
+            <Notice tone="warning" title="You raised this requisition">
+              Separation of duties keeps a requester from approving their own spend. The owner is the last approver in the chain, with no one above to pass it to, so an owner approval of their own requisition is allowed but recorded as a self-approval on the requisition and in the audit trail.
+            </Notice>
+          )}
           <Field label="Note for the record"><TextInput value={reason} onChange={(event) => setReason(event.target.value)} /></Field>
           <Row gap={2}>
             <Button
               variant="primary"
-              disabled={!pending || !withinLimit}
+              disabled={!pending || !withinLimit || Boolean(separation.refused)}
+              title={separation.refused}
               onClick={async () => {
+                if (separation.refused) return;
                 await context.mutate.patch(requisition.id, {
                   status: "approved",
-                  fields: { ...requisition.fields, approver: actor, approverRole: limit.role, approvedAt: now.toISOString(), approvalNote: reason },
-                }, { expectRevision: requisition.revision, event: `${requisition.title} approved by ${actor}` });
+                  fields: { ...requisition.fields, approver: actor, approverRole: limit.role, approvedAt: now.toISOString(), approvalNote: reason, selfApproved: separation.ownerSelfApproval },
+                }, { expectRevision: requisition.revision, event: `${requisition.title} approved by ${actor}${separation.ownerSelfApproval ? " (self-approval by the owner, who raised it)" : ""}` });
                 context.toast("Approved", `${requisition.title} can now be converted into a purchase order with this approval attached.`);
                 close();
               }}
@@ -260,7 +288,7 @@ export function CostInspector({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const bill = useRecord(payload?.id ?? context.selectedId) ?? data.bills[0];
   if (!bill) return <Empty title="No invoice selected" />;
-  const supplier = data.suppliers.find((item) => item.id === String(bill.fields.supplierId));
+  const supplier = findSupplier(data, String(bill.fields.supplierId));
   const totals = billTotals(bill, supplier, org.jurisdiction);
   const match = threeWayMatch(bill, data.purchaseOrders, data.receipts);
   return (
@@ -308,7 +336,8 @@ export function SupplierForm({ context, close }: { context: ScreenContext; close
   const [lead, setLead] = useState(String(existing?.fields.leadTimeDays ?? 14));
   const [category, setCategory] = useState(String(existing?.fields.category ?? "Metal"));
   const [taxStatus, setTaxStatus] = useState(String(existing?.fields.taxStatus ?? "domestic"));
-  const duplicate = data.suppliers.some((supplier) => supplier.id !== existing?.id && supplier.title.trim().toLowerCase() === title.trim().toLowerCase());
+  const duplicate = data.suppliers.some((supplier) => supplier.id !== existing?.id && supplier.title.trim().toLowerCase() === title.trim().toLowerCase())
+    || (email.trim() !== "" && data.suppliers.some((supplier) => supplier.id !== existing?.id && String(supplier.fields.email ?? "").trim().toLowerCase() === email.trim().toLowerCase()));
   const invalid = !title.trim() || duplicate;
   return (
     <form
@@ -358,7 +387,8 @@ export function SupplierForm({ context, close }: { context: ScreenContext; close
 export function SupplierVerification({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useProcData();
   const { actor, now } = useWorkspace();
-  const supplier = useRecord(context.params.id ?? context.selectedId) ?? data.suppliers[0];
+  const routed = useRecord(context.params.id ?? context.selectedId);
+  const supplier = findSupplier(data, routed?.id) ?? routed ?? data.suppliers[0];
   const [calledBack, setCalledBack] = useState(false);
   const [contact, setContact] = useState("");
   const [last4, setLast4] = useState("");
@@ -396,7 +426,8 @@ export function SupplierVerification({ context, close }: { context: ScreenContex
 
 export function SanctionsReview({ context }: { context: ScreenContext }) {
   const data = useProcData();
-  const supplier = useRecord(context.params.id ?? context.selectedId) ?? data.suppliers[0];
+  const routed = useRecord(context.params.id ?? context.selectedId);
+  const supplier = findSupplier(data, routed?.id) ?? routed ?? data.suppliers[0];
   if (!supplier) return <Empty title="No supplier" />;
   return (
     <Stack gap={4}>
@@ -445,7 +476,8 @@ export function ContractViewer({ context }: { context: ScreenContext }) {
 export function RiskEscalation({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useProcData();
   const { actor } = useWorkspace();
-  const supplier = useRecord(context.params.id ?? context.selectedId) ?? data.suppliers[0];
+  const routed = useRecord(context.params.id ?? context.selectedId);
+  const supplier = findSupplier(data, routed?.id) ?? routed ?? data.suppliers[0];
   const [reason, setReason] = useState("");
   if (!supplier) return <Empty title="No supplier" />;
   return (
@@ -494,12 +526,12 @@ function PoEditorForm({ context, close, existing, preset, loaded }: { context: S
   const existingBody = bodyOf<PoBody>(existing ?? preset, {});
   const approvedRequisitions = data.purchaseOrders.filter((item) => String(item.fields.kind) === "requisition" && item.status === "approved" && Boolean(item.fields.approver));
   const [fromRequisition, setFromRequisition] = useState(preset && preset.status === "approved" ? preset.id : "");
-  const [supplierId, setSupplierId] = useState(String((existing ?? preset)?.fields.supplierId ?? data.suppliers[0]?.id ?? ""));
+  const [supplierId, setSupplierId] = useState(resolveSupplierId(data.supplierAliases, String((existing ?? preset)?.fields.supplierId ?? data.suppliers[0]?.id ?? "")));
   const [dueAt, setDueAt] = useState((existing?.dueAt ?? new Date(now.getTime() + 14 * 86_400_000).toISOString()).slice(0, 10));
   const [note, setNote] = useState(existing?.summary ?? preset?.summary ?? "");
   const [lines, setLines] = useState<PoLine[]>(existingBody.lines ?? [{ id: "l1", description: "", quantity: 1, unitPriceMinor: 0, taxCategory: "standard", receivedQuantity: 0 }]);
 
-  const supplier = data.suppliers.find((item) => item.id === supplierId);
+  const supplier = findSupplier(data, supplierId);
   const draft = { ...(existing ?? ({} as Rec)), at: now.toISOString(), body: { lines } } as Rec;
   const totals = poTotals(draft, supplier, org.jurisdiction);
   const source = approvedRequisitions.find((item) => item.id === fromRequisition);
@@ -672,7 +704,7 @@ export function SendPreview({ context, close }: { context: ScreenContext; close:
   const payload = context.overlayPayload as { id?: string } | undefined;
   const order = useRecord(payload?.id ?? context.selectedId) ?? data.purchaseOrders.find(isPurchaseOrder);
   if (!order) return <Empty title="No order" />;
-  const supplier = data.suppliers.find((item) => item.id === String(order.fields.supplierId));
+  const supplier = findSupplier(data, String(order.fields.supplierId));
   const totals = poTotals(order, supplier, org.jurisdiction);
   const approved = Boolean(order.fields.approver);
   const alreadySent = Boolean(order.fields.sentAt);
@@ -864,7 +896,7 @@ function ScanOverlayForm({ context, close, receipt, presetOrder, loaded }: { con
   const openOrders = data.purchaseOrders.filter((order) => isPurchaseOrder(order) && ["approved", "sent"].includes(order.status));
   const [orderId, setOrderId] = useState(presetOrder || String(openOrders[0]?.id ?? ""));
   const order = data.purchaseOrders.find((item) => item.id === orderId);
-  const supplier = data.suppliers.find((item) => item.id === String(order?.fields.supplierId ?? ""));
+  const supplier = findSupplier(data, String(order?.fields.supplierId ?? ""));
   const outstanding = outstandingFor(order);
   const [received, setReceived] = useState<Record<string, string>>({});
   const [scans, setScans] = useState<string[]>(bodyOf<ReceiptBody>(receipt, {}).scans ?? []);
@@ -955,7 +987,7 @@ function ScanOverlayForm({ context, close, receipt, presetOrder, loaded }: { con
     >
       <Field label="Receive against" required>
         <Select value={orderId} onChange={(event) => setOrderId(event.target.value)} required>
-          {openOrders.map((item) => <option key={item.id} value={item.id}>{item.title} · {data.suppliers.find((supplierItem) => supplierItem.id === String(item.fields.supplierId))?.title}</option>)}
+          {openOrders.map((item) => <option key={item.id} value={item.id}>{item.title} · {findSupplier(data, String(item.fields.supplierId))?.title}</option>)}
         </Select>
       </Field>
       {!order ? <Notice tone="warning" title="No order is open for receipt">Goods are only ever received against an approved or issued purchase order.</Notice> : (
@@ -1104,7 +1136,7 @@ export function MovementInspector({ context }: { context: ScreenContext }) {
         { label: "By", value: move.createdBy },
       ]} />
       {order ? (
-        <Notice tone="success" title="Traceable to a purchase order">{order.title} from {data.suppliers.find((item) => item.id === String(order.fields.supplierId))?.title ?? "an unknown supplier"}.</Notice>
+        <Notice tone="success" title="Traceable to a purchase order">{order.title} from {findSupplier(data, String(order.fields.supplierId))?.title ?? "an unknown supplier"}.</Notice>
       ) : reference ? (
         <Notice tone="info" title="Traceable to a reference">{reference} is recorded, but it is not a purchase order in this workspace.</Notice>
       ) : (
@@ -1230,7 +1262,7 @@ export function ThreeWayMatch({ context, close }: { context: ScreenContext; clos
   const payload = context.overlayPayload as { id?: string } | undefined;
   const bill = useRecord(payload?.id ?? context.selectedId) ?? data.bills[0];
   if (!bill) return <Empty title="No supplier invoice" />;
-  const supplier = data.suppliers.find((item) => item.id === String(bill.fields.supplierId));
+  const supplier = findSupplier(data, String(bill.fields.supplierId));
   const match = threeWayMatch(bill, data.purchaseOrders, data.receipts);
   const totals = billTotals(bill, supplier, org.jurisdiction);
   const payable = match.state === "matched";
@@ -1340,7 +1372,8 @@ export function SupplierReview({ context, close }: { context: ScreenContext; clo
   const data = useProcData();
   const { actor } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const supplier = useRecord(payload?.id ?? context.selectedId) ?? data.suppliers[0];
+  const routed = useRecord(payload?.id ?? context.selectedId);
+  const supplier = findSupplier(data, routed?.id) ?? routed ?? data.suppliers[0];
   const [outcome, setOutcome] = useState("keep");
   const [note, setNote] = useState("");
   if (!supplier) return <Empty title="No supplier" />;

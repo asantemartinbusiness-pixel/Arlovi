@@ -11,7 +11,7 @@ import { freshness } from "@/platform/clock";
 import { ProviderBoundary } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import {
-  approverFor, bodyOf, isPurchaseOrder, isRequisition, MATCH_LABEL, matchTone,
+  approverFor, bodyOf, findSupplier, isPurchaseOrder, isRequisition, MATCH_LABEL, matchTone,
   statusTone, threeWayMatch, useProcData,
   type ContractBody, type PoBody, type SupplierBody,
 } from "./data";
@@ -23,7 +23,7 @@ import { QuoteRequests } from "./actions";
  * ====================================================================== */
 
 function supplierOf(data: ReturnType<typeof useProcData>, record: Rec | undefined): Rec | undefined {
-  return data.suppliers.find((item) => item.id === String(record?.fields.supplierId ?? ""));
+  return findSupplier(data, String(record?.fields.supplierId ?? ""));
 }
 
 /* ---------------------------- PROC-001 ---------------------------- */
@@ -214,7 +214,8 @@ export function Suppliers({ context, state }: { context: ScreenContext; state: s
 export function SupplierDetail({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useProcData();
   const { org, now } = useWorkspace();
-  const supplier = useRecord(context.params.id) ?? data.suppliers[0];
+  const routed = useRecord(context.params.id);
+  const supplier = findSupplier(data, routed?.id) ?? routed ?? data.suppliers[0];
   if (!supplier) return <Empty title="Supplier not found" />;
   const orders = data.purchaseOrders.filter((order) => String(order.fields.supplierId) === supplier.id && isPurchaseOrder(order));
   const bills = data.bills.filter((bill) => String(bill.fields.supplierId) === supplier.id);

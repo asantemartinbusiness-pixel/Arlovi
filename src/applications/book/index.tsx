@@ -5,7 +5,7 @@ import { useRecord, useWorkspace } from "@/platform/workspace";
 import { confirmOverlay, submitFooter } from "@/applications/market/kit";
 import {
   archiveService, ArrangeFields, askReceptionist, AssignResource, cancelBooking, ComparePeriods, confirmBooking,
-  exportBookings, PageTestResult, publishService, ReportFilter, RescheduleNotice, scheduleReminders, ScheduleReport,
+  exportBookings, PageTestResult, publishService, raiseBookingInvoice, ReportFilter, RescheduleNotice, scheduleReminders, ScheduleReport,
   sendReminder, testBookingPage,
 } from "./actions";
 import "@/applications/market/growth.css";
@@ -126,6 +126,7 @@ export const bookApp = registerApp({
         { id: "take payment", label: "Take payment (deposit)", placement: "primary", run: (context) => context.openOverlay("take deposit") },
         { id: "reschedule", label: "Reschedule", placement: "secondary", run: (context) => context.openOverlay("Reschedule") },
         { id: "send reminder", label: "Send a reminder", placement: "secondary", run: (context) => sendReminder(context) },
+        { id: "raise invoice", label: "Raise an invoice", placement: "secondary", run: (context) => raiseBookingInvoice(context, context.params.id) },
         { id: "message", label: "Message the customer", placement: "overflow", run: (context) => context.openOverlay("customer message") },
         { id: "cancellation", label: "Cancellation policy", placement: "overflow", run: (context) => context.openOverlay("refund rule") },
       ],

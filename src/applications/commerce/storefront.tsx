@@ -12,6 +12,7 @@ import {
   availableFor, bodyOf, createCartStore, taxCategoryOfProduct,
   type ProductBody, type Variant,
 } from "./cart";
+import { withDelivery } from "./data";
 
 /* ====================================================================== *
  * Storefront preview — a visitor can genuinely browse, choose a variant,
@@ -62,6 +63,7 @@ export function StorefrontPreview({ context, products, moves, orders, promotions
   }));
   const totals = computeInvoice({ lines: invoiceLines, jurisdiction: org.jurisdiction, customerStatus: status, date: now.toISOString() });
   const shippingMinor = lines.length === 0 ? 0 : totals.netMinor >= 50_000 ? 0 : 695;
+  const due = withDelivery(totals, shippingMinor);
 
   function addToCart(product: Rec) {
     const body = bodyOf<ProductBody>(product, {});
@@ -106,7 +108,7 @@ export function StorefrontPreview({ context, products, moves, orders, promotions
                 <Properties rows={[
                   { label: "Order", value: held.number },
                   { label: "State", value: <Pill tone="warning" dot>Awaiting payment</Pill> },
-                  { label: "Total held", value: context.money(totals.grossMinor + shippingMinor) },
+                  { label: "Total held", value: context.money(due.grossMinor) },
                   { label: "Card details collected", value: <Pill tone="success">None — no card field was shown</Pill> },
                 ]} />
                 <Row gap={2}>
@@ -202,7 +204,7 @@ export function StorefrontPreview({ context, products, moves, orders, promotions
                       title: number,
                       status: "awaiting_payment",
                       summary: `${buyer.name} · ${lines.length} line${lines.length === 1 ? "" : "s"} · storefront checkout`,
-                      amountMinor: totals.grossMinor + shippingMinor,
+                      amountMinor: due.grossMinor,
                       at: now.toISOString(),
                       tags: ["storefront"],
                       fields: {
@@ -240,7 +242,7 @@ export function StorefrontPreview({ context, products, moves, orders, promotions
                         ],
                       },
                     }, `${number} placed from the storefront and held awaiting payment`);
-                    await context.mutate.log(`${number} is awaiting payment: ${context.money(totals.grossMinor + shippingMinor)} across ${lines.length} lines. No processor is connected.`, { entityId: created.id, type: "commerce.payment.not_connected", capability: "not_connected" });
+                    await context.mutate.log(`${number} is awaiting payment: ${context.money(due.grossMinor)} across ${lines.length} lines. No processor is connected.`, { entityId: created.id, type: "commerce.payment.not_connected", capability: "not_connected" });
                     setHeld({ number, id: created.id });
                     setStage("held");
                     context.toast("Order held", `${number} is awaiting payment with its full line detail. Nothing was charged.`);
@@ -308,7 +310,7 @@ export function StorefrontPreview({ context, products, moves, orders, promotions
                 </Row>
                 {appliedCode && <Pill tone="success">{String(appliedCode.fields.code)} · {String(appliedCode.fields.value)}% off each line</Pill>}
                 <TotalsBlock
-                  totals={totals}
+                  totals={due}
                   money={context.money}
                   label="Order"
                   extraRows={[{ label: "Delivery", value: <span className="ds-num">{shippingMinor === 0 ? "Free over £500 net" : context.money(shippingMinor)}</span> }]}

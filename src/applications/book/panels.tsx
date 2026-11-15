@@ -12,11 +12,11 @@ import { computeInvoice } from "@/platform/money";
 import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import {
-  blackoutFor, bodyOf, bookedMinutes, conflictsWithLinks, DEPOSIT_LABEL, isLive, statusTone,
+  blackoutFor, bodyOf, bookedMinutes, conflictsWithLinks, DEPOSIT_LABEL, isBookable, isLive, rememberedResource, rememberResource, statusTone,
   useBookData, workingHours, type BookingBody, type PublicPageBody, type ServiceBody,
 } from "./data";
 import { AvailabilityGrid } from "./calendar";
-import { applyReportFilter, ReportFilterNote, useReportFilter } from "./actions";
+import { applyReportFilter, bookingInvoiceBlock, raiseBookingInvoice, ReportFilterNote, useReportFilter } from "./actions";
 
 /* ====================================================================== *
  * BOOK panels — capacity, a real availability calendar with conflict
@@ -53,7 +53,7 @@ export function BookingsOverview({ context, lens }: { context: ScreenContext; le
   const noShows = data.bookings.filter((booking) => booking.status === "no_show");
 
   if (lens === "Capacity") {
-    const bookable = data.resources.filter((resource) => resource.fields.bookable === true);
+    const bookable = data.resources.filter((resource) => isBookable(resource));
     return (
       <Stack gap={4}>
         <Grid>
@@ -176,9 +176,9 @@ export function BookingCalendar({ context, lens }: { context: ScreenContext; len
   const data = useBookData();
   const { now, org } = useWorkspace();
   const [anchor, setAnchor] = useState(() => new Date(now));
-  const [resourceId, setResourceId] = useState(data.resources[0]?.id ?? "");
+  const [resourceId, setResourceId] = useState(() => rememberedResource(org.id));
 
-  const bookable = data.resources.filter((resource) => resource.fields.bookable === true);
+  const bookable = data.resources.filter((resource) => isBookable(resource));
   const active = bookable.find((resource) => resource.id === resourceId) ?? bookable[0];
 
   const move = async ({ bookingId, startAt, endAt, columnId }: { bookingId: string; startAt: string; endAt: string; columnId: string }) => {
@@ -275,7 +275,7 @@ export function BookingCalendar({ context, lens }: { context: ScreenContext; len
         <Button size="sm" variant="secondary" onClick={() => setAnchor(addDays(anchor, mode === "week" ? 7 : 1))} aria-label={`Next ${mode}`}>→</Button>
         <Button size="sm" variant="ghost" onClick={() => setAnchor(new Date(now))}>Today</Button>
         <Field label="Resource">
-          <Select value={active?.id ?? ""} onChange={(event) => setResourceId(event.target.value)}>
+          <Select value={active?.id ?? ""} onChange={(event) => { setResourceId(event.target.value); rememberResource(org.id, event.target.value); }}>
             {bookable.map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}
           </Select>
         </Field>
@@ -314,6 +314,7 @@ export function BookingDetail({ context, lens }: { context: ScreenContext; lens:
   const service = serviceOf(data, booking);
   const resource = resourceOf(data, booking);
   const contact = data.contacts.find((item) => item.id === String(booking?.fields.contactId ?? ""));
+  const invoice = useRecord(booking?.fields.invoiceId ? String(booking.fields.invoiceId) : undefined);
   if (!booking) return <Empty title="Booking not found" />;
 
   const totals = computeInvoice({
@@ -423,6 +424,30 @@ export function BookingDetail({ context, lens }: { context: ScreenContext; lens:
               : "No start time is recorded."}
           </Notice>
         </Stack>
+      </Card>
+      <Card span={12} eyebrow="SERVICE HISTORY" prov="human" title="Invoice" subtitle={invoice ? `${invoice.title} · ${invoice.status.replace("_", " ")}` : "No invoice raised for this booking"}>
+        {invoice ? (
+          <Stack gap={3}>
+            <Properties rows={[
+              { label: "Invoice", value: <Link to={`/o/${org.slug}/fin/invoices/${invoice.id}`}>{invoice.title}</Link> },
+              { label: "State in Finance", value: <Pill tone={invoice.status === "paid" ? "success" : "warning"}>{invoice.status.replace("_", " ")}</Pill> },
+              { label: "Gross", value: <span className="ds-num">{context.money(invoice.amountMinor)}</span> },
+              { label: "Customer", value: contact ? <Link to={`/o/${org.slug}/crm/contacts/${contact.id}`}>{contact.title}</Link> : "—" },
+              { label: "Raised by", value: `${String(booking.fields.invoicedBy ?? invoice.createdBy)} on ${context.dateTime(String(booking.fields.invoicedAt ?? invoice.createdAt))}` },
+            ]} />
+            {invoice.status === "draft" && <Notice tone="info" title="A draft invoice is not in the ledger">Finance approves and posts it; until then nothing is receivable.</Notice>}
+          </Stack>
+        ) : (() => {
+          const why = bookingInvoiceBlock(booking, service);
+          return (
+            <Stack gap={3}>
+              <p className="ds-prose">
+                {why ?? `${booking.title} is completed. Raise a draft invoice in Finance for ${context.money(totals.grossMinor)}, linked to this booking and to the customer's record.`}
+              </p>
+              {!why && <Row gap={2}><Button variant="primary" onClick={() => raiseBookingInvoice(context, booking.id)}>Raise an invoice</Button></Row>}
+            </Stack>
+          );
+        })()}
       </Card>
       {resource && blackoutFor(resource, booking.startAt ?? "", booking.endAt ?? "") && (
         <Card span={12} prov="unknown" title="The resource is marked unavailable in this window">
@@ -571,7 +596,7 @@ export function StaffAndResources({ context, lens }: { context: ScreenContext; l
         const blackouts = bodyOf<import("./data").ResourceBody>(resource, {}).blackouts ?? [];
         return (
           <Card key={resource.id} span={4} eyebrow={String(resource.fields.kind ?? "").toUpperCase()} prov="human" title={resource.title} subtitle={resource.summary}
-            actions={<Pill tone={resource.fields.bookable === true ? "success" : "neutral"}>{resource.fields.bookable === true ? "Bookable" : "Not bookable"}</Pill>}
+            actions={<Pill tone={isBookable(resource) ? "success" : "neutral"}>{isBookable(resource) ? "Bookable" : "Not bookable"}</Pill>}
             footer={<>
               <Button size="sm" variant={context.selectedId === resource.id ? "primary" : "secondary"} aria-pressed={context.selectedId === resource.id} onClick={() => context.select(context.selectedId === resource.id ? undefined : resource.id)}>{context.selectedId === resource.id ? "Selected" : "Select"}</Button>
               <Button size="sm" variant="ghost" onClick={() => { context.select(resource.id); context.openOverlay("Resource editor", { id: resource.id }); }}>Edit</Button>
@@ -950,7 +975,7 @@ function BookingReportsBody({ context, lens }: { context: ScreenContext; lens: s
     );
   }
 
-  const resources = data.resources.filter((resource) => resource.fields.bookable === true);
+  const resources = data.resources.filter((resource) => isBookable(resource));
   return (
     <Stack gap={4}>
       <DataGrid rows={resources} rowId={(row) => row.id} label="Utilisation" filterable={false}

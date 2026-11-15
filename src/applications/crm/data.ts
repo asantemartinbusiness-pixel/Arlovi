@@ -5,7 +5,7 @@ import { forecast, stageOf, type Forecast, type Stage } from "@/domain/crm-pipel
 
 const COLLECTIONS = [
   "deals", "contacts", "companies", "leads", "quotes", "activities", "invoices",
-  "workflows", "workflowRuns", "campaigns", "tickets", "templates", "emailThreads", "messages", "members", "preferences",
+  "workflows", "workflowRuns", "campaigns", "tickets", "templates", "emailThreads", "messages", "members", "preferences", "bookings",
 ];
 
 export interface CrmData {
@@ -25,6 +25,8 @@ export interface CrmData {
   messages: Rec[];
   members: Rec[];
   preferences: Rec[];
+  /** Appointments from BOOK, so a contact's service history includes them. */
+  bookings: Rec[];
   forecast: Forecast;
   owners: string[];
 }
@@ -51,6 +53,7 @@ export function useCrmData(): CrmData {
     messages: data.messages,
     members: data.members,
     preferences: data.preferences,
+    bookings: data.bookings,
     forecast: forecast(data.deals),
     owners: [...new Set(data.deals.map((deal) => String(deal.fields.owner ?? deal.ownerName)))].sort(),
   }), [data]);
@@ -90,6 +93,21 @@ export function quotesOfDeal(data: CrmData, dealId: string | undefined): Rec[] {
 
 export function invoicesOfContact(data: CrmData, contactId: string | undefined): Rec[] {
   return contactId ? data.invoices.filter((invoice) => String(invoice.fields.contactId ?? invoice.parentId ?? "") === contactId) : [];
+}
+
+/**
+ * Quote states that are still open: not yet accepted, declined or expired.
+ * Approval is an internal step, so an approved quote that has not been
+ * accepted is still open value.
+ */
+export const OPEN_QUOTE_STATES = ["draft", "review", "approved", "sent"];
+
+export function openQuoteValueMinor(quotes: Rec[]): number {
+  return quotes.filter((quote) => OPEN_QUOTE_STATES.includes(quote.status)).reduce((sum, quote) => sum + Number(quote.amountMinor ?? 0), 0);
+}
+
+export function bookingsOfContact(data: CrmData, contactId: string | undefined): Rec[] {
+  return contactId ? data.bookings.filter((booking) => String(booking.fields.contactId ?? booking.parentId ?? "") === contactId) : [];
 }
 
 export function invoicesOfDeal(data: CrmData, deal: Rec | undefined): Rec[] {

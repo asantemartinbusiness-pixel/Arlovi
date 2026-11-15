@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useCollections } from "@/platform/workspace";
 import { computeInvoice, type CustomerTaxStatus, type InvoiceTotals, type TaxCategory } from "@/platform/money";
 import type { Rec } from "@/domain/types";
@@ -37,8 +38,92 @@ export function bodyOf<T>(record: Rec | undefined, fallback: T): T {
   return (record?.body as T | undefined) ?? fallback;
 }
 
-export function useProcData() {
-  return useCollections(["purchaseOrders", "suppliers", "receipts", "bills", "contracts", "warehouses", "products", "stockMoves", "orders"]);
+/* ---------------- Supplier identity ---------------- */
+
+/**
+ * The identity of a supplier: its order email when it has one, otherwise its
+ * name. Two records with the same identity are the same supplier.
+ */
+export function supplierIdentity(supplier: Rec): string {
+  const email = String(supplier.fields.email ?? "").trim().toLowerCase();
+  return email || supplier.title.trim().toLowerCase();
+}
+
+export interface SupplierDirectory {
+  /** One record per supplier: the fullest record of each identity. */
+  suppliers: Rec[];
+  /** Every duplicate record id mapped to the record that stands for it. */
+  aliases: Record<string, string>;
+}
+
+/**
+ * Collapse supplier records that describe the same supplier (the same order
+ * email) into one, so a supplier is offered, counted and ordered from once.
+ * The record kept is the most complete live one; the others stay in storage as
+ * evidence and every reference to them resolves to the kept record.
+ */
+export function canonicalSuppliers(all: Rec[]): SupplierDirectory {
+  const groups = new Map<string, Rec[]>();
+  for (const supplier of all) groups.set(supplierIdentity(supplier), [...(groups.get(supplierIdentity(supplier)) ?? []), supplier]);
+  const kept = new Set<string>();
+  const aliases: Record<string, string> = {};
+  for (const members of groups.values()) {
+    const ranked = [...members].sort((a, b) =>
+      Number(a.status === "archived") - Number(b.status === "archived")
+      || Object.keys(b.fields).length - Object.keys(a.fields).length
+      || a.id.localeCompare(b.id));
+    kept.add(ranked[0].id);
+    for (const other of ranked.slice(1)) aliases[other.id] = ranked[0].id;
+  }
+  return { suppliers: all.filter((supplier) => kept.has(supplier.id)), aliases };
+}
+
+export function resolveSupplierId(aliases: Record<string, string>, id: string | undefined): string {
+  const value = String(id ?? "");
+  return aliases[value] ?? value;
+}
+
+/** A supplier by id, resolving a duplicate record to the supplier it stands for. */
+export function findSupplier(data: { suppliers: Rec[]; supplierAliases?: Record<string, string> }, id: string | undefined): Rec | undefined {
+  const resolved = resolveSupplierId(data.supplierAliases ?? {}, id);
+  return resolved ? data.suppliers.find((item) => item.id === resolved) : undefined;
+}
+
+/** Records that reference a supplier, read with the reference resolved to the kept supplier record. */
+function withResolvedSupplier(records: Rec[], aliases: Record<string, string>): Rec[] {
+  return records.map((record) => {
+    const id = String(record.fields.supplierId ?? "");
+    return aliases[id] ? { ...record, fields: { ...record.fields, supplierId: aliases[id] } } : record;
+  });
+}
+
+export interface ProcData {
+  suppliers: Rec[];
+  purchaseOrders: Rec[];
+  bills: Rec[];
+  contracts: Rec[];
+  receipts: Rec[];
+  warehouses: Rec[];
+  products: Rec[];
+  stockMoves: Rec[];
+  orders: Rec[];
+  /** Duplicate supplier record ids mapped to the supplier record kept for them. */
+  supplierAliases: Record<string, string>;
+}
+
+export function useProcData(): ProcData {
+  const data = useCollections(["purchaseOrders", "suppliers", "receipts", "bills", "contracts", "warehouses", "products", "stockMoves", "orders"]);
+  return useMemo(() => {
+    const directory = canonicalSuppliers(data.suppliers);
+    return {
+      ...(data as unknown as Omit<ProcData, "supplierAliases">),
+      suppliers: directory.suppliers,
+      supplierAliases: directory.aliases,
+      purchaseOrders: withResolvedSupplier(data.purchaseOrders, directory.aliases),
+      bills: withResolvedSupplier(data.bills, directory.aliases),
+      contracts: withResolvedSupplier(data.contracts, directory.aliases),
+    };
+  }, [data]);
 }
 
 export const isRequisition = (record: Rec) => String(record.fields.kind ?? "po") === "requisition";

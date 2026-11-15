@@ -9,7 +9,7 @@ import { addDays } from "@/platform/clock";
 import { computeInvoice } from "@/platform/money";
 import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import {
-  blackoutFor, bodyOf, conflictsWithLinks, DEPOSIT_LABEL, isLive, statusTone, useBookData,
+  blackoutFor, bodyOf, conflictsWithLinks, DEPOSIT_LABEL, isBookable, isLive, rememberResource, statusTone, useBookData,
   workingHours, type BookingBody, type PublicPageBody, type ResourceBody, type ServiceBody,
 } from "./data";
 import { ConflictNotice, SlotPicker } from "./calendar";
@@ -62,7 +62,7 @@ export function BookingForm({ context, close }: { context: ScreenContext; close:
   const { org, now, actor } = useWorkspace();
   const payload = context.overlayPayload as { id?: string; resourceId?: string; startAt?: string } | undefined;
   const existing = useRecord(payload?.id);
-  const bookable = data.resources.filter((resource) => resource.fields.bookable === true);
+  const bookable = data.resources.filter((resource) => isBookable(resource));
   const publishedServices = data.services.filter((service) => service.status === "active");
 
   const [serviceId, setServiceId] = useState(String(existing?.fields.serviceId ?? publishedServices[0]?.id ?? ""));
@@ -100,6 +100,7 @@ export function BookingForm({ context, close }: { context: ScreenContext; close:
       onSubmit={async (event) => {
         event.preventDefault();
         if (invalid) return;
+        rememberResource(org.id, resourceId);
         const contact = data.contacts.find((item) => item.id === contactId);
         const name = title.trim() || `${contact?.title ?? "Walk-in"} · ${service?.title.toLowerCase() ?? "appointment"}`;
         const fields = {
@@ -219,7 +220,7 @@ export function BookingInspector({ context }: { context: ScreenContext }) {
 export function CapacityAlert() {
   const data = useBookData();
   const { now } = useWorkspace();
-  const rows = data.resources.filter((resource) => resource.fields.bookable === true).map((resource) => {
+  const rows = data.resources.filter((resource) => isBookable(resource)).map((resource) => {
     const window = workingHours(resource);
     const slots: { startAt: string; free: boolean }[] = [];
     for (let hour = window.startHour; hour < window.endHour; hour += 1) {
@@ -545,7 +546,7 @@ export function ServiceEditor({ context, close }: { context: ScreenContext; clos
       <fieldset className="ds-fieldset">
         <legend>Resources that can deliver it</legend>
         <Stack gap={2}>
-          {data.resources.filter((resource) => resource.fields.bookable === true).map((resource) => (
+          {data.resources.filter((resource) => isBookable(resource)).map((resource) => (
             <Checkbox
               key={resource.id}
               label={`${resource.title} — ${String(resource.fields.workingHours ?? "hours not recorded")}`}
@@ -635,7 +636,7 @@ export function ResourceEditor({ context, close }: { context: ScreenContext; clo
   const [kind, setKind] = useState(String(existing?.fields.kind ?? "person"));
   const [hours, setHours] = useState(String(existing?.fields.workingHours ?? "Mon–Fri 09:00–17:00"));
   const [linked, setLinked] = useState(String(existing?.fields.linkedResourceId ?? ""));
-  const [bookable, setBookable] = useState(existing ? existing.fields.bookable === true : true);
+  const [bookable, setBookable] = useState(existing ? isBookable(existing) : true);
   const invalid = !title.trim() || !/\d{2}:\d{2}\D+\d{2}:\d{2}/.test(hours);
   return (
     <form
@@ -985,7 +986,7 @@ export function SourceProof({ context }: { context: ScreenContext }) {
         { label: "Bookings", value: <span className="ds-num">{String(data.bookings.length)}</span> },
         { label: "Live", value: <span className="ds-num">{String(data.bookings.filter(isLive).length)}</span> },
         { label: "Services", value: <span className="ds-num">{String(data.services.length)}</span> },
-        { label: "Bookable resources", value: <span className="ds-num">{String(data.resources.filter((resource) => resource.fields.bookable === true).length)}</span> },
+        { label: "Bookable resources", value: <span className="ds-num">{String(data.resources.filter((resource) => isBookable(resource)).length)}</span> },
         { label: "External calendar", value: <Pill tone="warning">Not connected</Pill> },
       ]} />
       <DataGrid rows={data.bookings} rowId={(row) => row.id} label="Every booking behind the reports"

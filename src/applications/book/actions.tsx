@@ -8,6 +8,8 @@ import { addDays } from "@/platform/clock";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { useUi } from "@/runtime/ui";
 import type { Rec } from "@/domain/types";
+import { documentTotals, statusFor, writeLines } from "@/domain/fin-invoice";
+import type { TaxCategory } from "@/platform/money";
 import { CHANGED_ELSEWHERE, createStore, downloadCsv, ProviderBoundary, type ConfirmSpec } from "@/applications/market/kit";
 import {
   bodyOf, conflictsWithLinks, DEPOSIT_LABEL, isLive, useBookData,
@@ -64,6 +66,100 @@ export async function confirmBooking(context: ScreenContext, id: string | undefi
       const saved = await context.mutate.patch(booking.id, { status: "confirmed", fields: { ...booking.fields, confirmedBy: context.actor, confirmedAt: iso(context) } }, { expectRevision: booking.revision, event: `${booking.title} confirmed by ${context.actor} after a slot re-check` });
       if (!saved) return CHANGED_ELSEWHERE;
       context.toast("Confirmed", `${booking.title} is confirmed. The customer has not been told: no provider is connected.`);
+    },
+  });
+}
+
+/* ---------------- invoice a completed booking ---------------- */
+
+const TAX_CATEGORIES_KNOWN: TaxCategory[] = ["standard", "reduced", "zero_rated", "exempt", "outside_scope", "reverse_charge"];
+
+/**
+ * Why a booking cannot be invoiced, or undefined when it can. Only a completed
+ * appointment for a priced service is invoiced, and only once.
+ */
+export function bookingInvoiceBlock(booking: Rec, service: Rec | undefined): string | undefined {
+  if (booking.fields.invoiceId) return `${booking.title} is already invoiced as ${String(booking.fields.invoiceNumber || "a draft")}. A second invoice would bill the customer twice.`;
+  if (booking.status !== "completed") return `${booking.title} is ${booking.status.replace("_", " ")}. Only a completed appointment is invoiced.`;
+  if (!service) return "The booking has no service, so there is nothing to price.";
+  if (!(service.amountMinor ?? 0)) return `${service.title} is free, so there is nothing to invoice.`;
+  return undefined;
+}
+
+/**
+ * Raise a draft invoice in Finance from a completed booking. The invoice uses
+ * the Finance record shape and the shared tax engine, is linked to the booking
+ * and the customer, and stays a draft: it is in no ledger until Finance
+ * approves and posts it.
+ */
+export async function raiseBookingInvoice(context: ScreenContext, id: string | undefined) {
+  const booking = await load(context, id);
+  if (!booking) return;
+  const [service, contact, invoices] = await Promise.all([
+    booking.fields.serviceId ? getRecord(String(booking.fields.serviceId)) : Promise.resolve(undefined),
+    booking.fields.contactId ? getRecord(String(booking.fields.contactId)) : Promise.resolve(undefined),
+    listByCollection(context.org.id, "invoices"),
+  ]);
+  const category = String(service?.fields.taxCategory ?? "standard") as TaxCategory;
+  const seats = Math.max(1, Number(booking.fields.seats ?? 1));
+  const line = {
+    id: "l1",
+    description: `${service?.title ?? "Appointment"} on ${context.dateTime(booking.startAt)}`,
+    quantity: seats,
+    unitPriceMinor: service?.amountMinor ?? 0,
+    taxCategory: TAX_CATEGORIES_KNOWN.includes(category) ? category : "standard",
+    discountBp: 0,
+  };
+  const status = statusFor(undefined, contact);
+  const totals = documentTotals({ lines: [line], jurisdiction: context.org.jurisdiction, customerStatus: status, date: (booking.startAt ?? iso(context)).slice(0, 10) });
+  const numbers = invoices.map((invoice) => Number(/(\d+)/.exec(String(invoice.fields.number ?? invoice.title))?.[1] ?? 0)).filter((value) => value > 0);
+  const number = `INV-${Math.max(1000, ...numbers) + 1}`;
+  const deposit = String(booking.fields.depositState) === "paid_local" ? Number(booking.fields.depositMinor ?? 0) : 0;
+  confirm(context, {
+    title: `Raise an invoice for ${booking.title}`,
+    consequence: `A draft invoice ${number} for ${context.money(totals.grossMinor)} is created in Finance, linked to this booking and to ${contact?.title ?? "no customer"}. It is a draft: nothing is posted to the ledger and nothing is sent until Finance approves and issues it.`,
+    facts: [
+      { label: "Service", value: service?.title ?? "—" },
+      { label: "Customer", value: contact?.title ?? "No contact linked" },
+      { label: "Net", value: context.money(totals.netMinor) },
+      { label: "Tax", value: context.money(totals.taxMinor) },
+      { label: "Gross", value: context.money(totals.grossMinor) },
+      ...(deposit ? [{ label: "Deposit recorded as received", value: `${context.money(deposit)}, to be allocated against the invoice in Finance` }] : []),
+    ],
+    blocked: bookingInvoiceBlock(booking, service) ?? (contact ? undefined : "The booking has no customer linked, so the invoice would have no one to bill."),
+    confirmLabel: `Create draft ${number}`,
+    run: async () => {
+      const fresh = await getRecord(booking.id);
+      if (!fresh || fresh.revision !== booking.revision) return CHANGED_ELSEWHERE;
+      if (fresh.fields.invoiceId) return `${booking.title} already has an invoice.`;
+      const invoice = await context.mutate.create({
+        collection: "invoices",
+        title: number,
+        status: "draft",
+        summary: `Raised from the completed booking ${booking.title}.`,
+        amountMinor: totals.grossMinor,
+        at: iso(context),
+        dueAt: addDays(context.now, 14).toISOString(),
+        parentId: contact?.id,
+        tags: ["draft", "from-booking"],
+        fields: {
+          number,
+          contactId: contact?.id ?? "",
+          bookingId: booking.id,
+          serviceId: service?.id ?? "",
+          netMinor: totals.netMinor,
+          taxMinor: totals.taxMinor,
+          customerTaxStatus: status,
+          taxUnresolved: totals.hasUnknownRate,
+          depositReceivedMinor: deposit,
+        },
+        body: writeLines([line]),
+      }, `Invoice ${number} drafted from the completed booking ${booking.title}`);
+      const saved = await context.mutate.patch(booking.id, {
+        fields: { invoiceId: invoice.id, invoiceNumber: number, invoicedBy: context.actor, invoicedAt: iso(context) },
+      }, { expectRevision: booking.revision, event: `${booking.title} invoiced as draft ${number} by ${context.actor}` });
+      if (!saved) return CHANGED_ELSEWHERE;
+      context.toast("Draft invoice created", `${number} for ${context.money(totals.grossMinor)} is a draft in Finance, linked to this booking. It is not on the ledger until Finance approves it.`);
     },
   });
 }

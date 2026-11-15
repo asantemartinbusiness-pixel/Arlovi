@@ -51,6 +51,10 @@ const dialog = (page: Page): Locator => page.getByRole("dialog");
 async function action(page: Page, label: string | RegExp): Promise<void> {
   const bar = page.locator(".pg-actions");
   const direct = bar.getByRole("button", { name: label, exact: typeof label === "string" });
+  /* A route change renders as a transition, so the previous screen's bar can
+     stay on view for a frame after the address changes. Wait briefly for the
+     action to appear in the bar before falling back to the overflow menu. */
+  await direct.first().waitFor({ state: "visible", timeout: 1500 }).catch(() => undefined);
   if (await direct.count()) {
     await direct.first().click();
     return;

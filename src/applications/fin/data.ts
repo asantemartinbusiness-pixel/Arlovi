@@ -97,7 +97,9 @@ export function openInvoices(invoices: Rec[]): Rec[] {
 }
 
 export function outstandingMinor(invoice: Rec): number {
-  return Number(invoice.amountMinor ?? 0) - Number(invoice.fields.paidMinor ?? 0);
+  // A paid or void invoice owes nothing, whether or not its receipts were itemised.
+  if (invoice.status === "paid" || invoice.status === "void") return 0;
+  return Math.max(0, Number(invoice.amountMinor ?? 0) - Number(invoice.fields.paidMinor ?? 0));
 }
 
 export interface ReceivablePosition {

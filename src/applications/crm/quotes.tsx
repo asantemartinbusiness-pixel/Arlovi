@@ -12,7 +12,7 @@ import {
 } from "@/domain/fin-invoice";
 import type { CustomerTaxStatus, DocumentTotals, InvoiceLine, TaxCategory } from "@/domain/fin-invoice";
 import { stageOf } from "@/domain/crm-pipeline";
-import { contactById, quotesOfDeal, useCrmData } from "./data";
+import { contactById, openQuoteValueMinor, quotesOfDeal, useCrmData } from "./data";
 import type { CrmData } from "./data";
 import { CapabilityNotice, CapabilityPill, Money, QuoteStatusPill, isExpired } from "./parts";
 
@@ -524,7 +524,7 @@ export function QuotesStrip({ context }: { context: ScreenContext }) {
   return (
     <Row gap={4} wrap>
       <Pill tone="neutral">{data.quotes.length} quotes</Pill>
-      <span>Open value <Money minor={data.quotes.filter((quote) => ["draft", "review", "sent"].includes(quote.status)).reduce((sum, quote) => sum + Number(quote.amountMinor ?? 0), 0)} context={context} bold /></span>
+      <span>Open value <Money minor={openQuoteValueMinor(data.quotes)} context={context} bold /></span>
       <span>Accepted <Money minor={data.quotes.filter((quote) => quote.status === "accepted").reduce((sum, quote) => sum + Number(quote.amountMinor ?? 0), 0)} context={context} bold /></span>
       {expired.length > 0 && <Pill tone="danger" dot>{expired.length} expired</Pill>}
       <span className="ds-grow" />

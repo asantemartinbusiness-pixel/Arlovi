@@ -103,6 +103,23 @@ export function customerStatusOfContact(contact: Rec | undefined): CustomerTaxSt
   return typeof value === "string" && (allowed as string[]).includes(value) ? (value as CustomerTaxStatus) : contact ? "domestic" : "unknown";
 }
 
+/** The tax status an order was resolved under: its contact's, or the one recorded at checkout. */
+export function orderTaxStatus(order: Rec | undefined, contact: Rec | undefined): CustomerTaxStatus {
+  if (contact) return customerStatusOfContact(contact);
+  const value = order?.fields.taxStatus;
+  const allowed: CustomerTaxStatus[] = ["domestic", "domestic_exempt", "eu_business", "export", "unknown"];
+  return typeof value === "string" && (allowed as string[]).includes(value) ? (value as CustomerTaxStatus) : "unknown";
+}
+
+/**
+ * The amount due on an order: net, resolved tax and delivery. One computation
+ * for the storefront basket, the held order and the order record, so a charge
+ * the totals list is always part of the figure due.
+ */
+export function withDelivery(totals: InvoiceTotals, shippingMinor: number): InvoiceTotals {
+  return { ...totals, grossMinor: totals.grossMinor + shippingMinor };
+}
+
 export function linesOf(order: Rec | undefined): InvoiceLine[] {
   return (bodyOf<OrderBody>(order, {}).lines ?? []).map((line) => ({
     id: line.id,
@@ -119,7 +136,7 @@ export function orderTotals(order: Rec | undefined, contact: Rec | undefined, ju
   return computeInvoice({
     lines: linesOf(order),
     jurisdiction,
-    customerStatus: customerStatusOfContact(contact),
+    customerStatus: orderTaxStatus(order, contact),
     date: order?.at ?? order?.createdAt ?? new Date().toISOString(),
   });
 }

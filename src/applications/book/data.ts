@@ -22,6 +22,33 @@ export function useBookData() {
   return useCollections(["bookings", "services", "resources", "contacts", "templates", "sites"]);
 }
 
+/**
+ * A resource can be booked unless someone switched it off or archived it.
+ * Bookability is opt-out: resources recorded before the flag existed (the
+ * consultation table the public page offers, and the bookings already held on
+ * it) stay bookable, and the resource editor writes an explicit false to stop it.
+ */
+export function isBookable(resource: Rec | undefined): boolean {
+  if (!resource) return false;
+  if (resource.status === "archived" || resource.status === "retired") return false;
+  return resource.fields.bookable !== false;
+}
+
+/*
+ * The calendar opens on the resource this viewer last booked or looked at.
+ * A per-browser convenience only: if storage is unavailable the calendar
+ * falls back to the first bookable resource.
+ */
+const lastResourceKey = (orgId: string) => `arlovi.book.lastResource.${orgId}`;
+
+export function rememberResource(orgId: string, resourceId: string): void {
+  try { window.localStorage.setItem(lastResourceKey(orgId), resourceId); } catch { /* storage unavailable */ }
+}
+
+export function rememberedResource(orgId: string): string {
+  try { return window.localStorage.getItem(lastResourceKey(orgId)) ?? ""; } catch { return ""; }
+}
+
 export const LIVE_BOOKING_STATES = ["confirmed", "hold", "completed", "no_show"];
 
 export function isLive(booking: Rec): boolean {
