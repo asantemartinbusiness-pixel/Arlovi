@@ -588,7 +588,7 @@ function BusinessGraph({ context, view }: { context: ScreenContext; view: "Entit
 /* ---------------------------- BRAIN-005 ---------------------------- */
 
 /** People inside the organisation who can own knowledge: humans, not clients, external contacts or agents. */
-function internalPeople(members: Rec[]): Rec[] {
+export function internalPeople(members: Rec[]): Rec[] {
   const seen = new Set<string>();
   return members.filter((member) => {
     const internal = String(member.fields.kind ?? "human") === "human"
@@ -602,7 +602,7 @@ function internalPeople(members: Rec[]): Rec[] {
 }
 
 /** Unresolved conflict records that name an assertion. The list and the evidence drawer both count these. */
-function conflictsOfFact(fact: Rec, conflicts: Rec[]): Rec[] {
+export function conflictsOfFact(fact: Rec, conflicts: Rec[]): Rec[] {
   return conflicts.filter((conflict) => ["open", "in_review"].includes(conflict.status)
     && (conflict.fields.factId === fact.id || conflictOptions(conflict).some((option) => option.factId === fact.id)));
 }

@@ -380,7 +380,7 @@ export function AuditScreen({ context, tab }: { context: ScreenContext; tab: Aud
           onSelect={context.select}
           onOpen={(id) => { context.select(id); context.openOverlay("Audit detail", { id }); }}
           columns={[
-            { key: "at", header: "When", width: "170px", cell: (row) => <span className="ds-num" title={context.dateTime(row.at)}>{context.relative(row.at)}</span>, sortValue: (row) => new Date(row.at).getTime() },
+            { key: "at", header: "When", width: "170px", cell: (row) => <time className="ds-num" dateTime={row.at} title={context.dateTime(row.at)}>{context.relative(row.at)}</time>, sortValue: (row) => new Date(row.at).getTime() },
             {
               key: "actor", header: "Who", width: "180px",
               cell: (row) => <Row gap={2}><Pill tone={row.actor === "system" ? "accent" : "neutral"}>{row.actor === "system" ? "System" : row.actor}</Pill></Row>,

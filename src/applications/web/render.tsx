@@ -52,7 +52,9 @@ export function BlockView({
   };
 
   const heading = block.type === "hero"
-    ? <h1 style={{ fontSize: scaleAt(width, base) }}>{editable("title")}</h1>
+    /* The site's own page title. Inside Arlovi the editor owns the level-1
+       heading, so the hero is level 2 here; its size still reads as the title. */
+    ? <h2 data-site-heading="1" style={{ fontSize: scaleAt(width, base) }}>{editable("title")}</h2>
     : props.title || onEdit ? <h2 style={{ fontSize: base * 1.4 }}>{editable("title")}</h2> : null;
 
   function editable(key: "title" | "body") {

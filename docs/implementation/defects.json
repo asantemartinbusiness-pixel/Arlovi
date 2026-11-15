@@ -335,7 +335,8 @@
    ],
    "summary": "Brain: route-to-owner offers external contacts as owners",
    "match": null,
-   "status": "open"
+   "status": "fixed",
+   "evidence": "tests/unit/findings.test.ts (internalPeople)"
   },
   {
    "id": "DEF-34",
@@ -345,7 +346,8 @@
    ],
    "summary": "Brain: conflict count differs between list and detail",
    "match": null,
-   "status": "open"
+   "status": "fixed",
+   "evidence": "tests/unit/findings.test.ts (conflictsOfFact)"
   },
   {
    "id": "DEF-35",
@@ -355,7 +357,8 @@
    ],
    "summary": "Audit trail: entries are not strictly ordered by time",
    "match": null,
-   "status": "open"
+   "status": "fixed",
+   "evidence": "e2e/findings.spec.ts audit order"
   },
   {
    "id": "DEF-36",
@@ -374,7 +377,8 @@
    ],
    "summary": "Procurement: a requester can approve their own requisition",
    "match": null,
-   "status": "open"
+   "status": "fixed",
+   "evidence": "tests/unit/findings.test.ts (separationOfDuties); owner self-approval is allowed and recorded"
   },
   {
    "id": "DEF-38",
@@ -382,7 +386,8 @@
    "screens": [],
    "summary": "Full-chrome editors render two level-1 headings",
    "match": null,
-   "status": "open"
+   "status": "fixed",
+   "evidence": "e2e/findings.spec.ts: one h1 on each of 316 screens"
   }
  ]
 }
