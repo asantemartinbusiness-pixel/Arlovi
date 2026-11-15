@@ -96,7 +96,7 @@ export const assetApp = registerApp({
       actions: [
         { id: "Upload", label: "Upload", placement: "primary", run: (context) => context.openOverlay("Media import") },
         { id: "inspect", label: "Inspect", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select an asset"), run: (context) => context.openOverlay("asset inspector", { id: context.selectedId }) },
-        { id: "search", label: "Search the library", placement: "overflow", run: () => { document.querySelector<HTMLInputElement>('input[aria-label="Search the library"]')?.focus(); } },
+        { id: "search", label: "Search the library", placement: "overflow", run: () => { window.setTimeout(() => document.querySelector<HTMLInputElement>('input[aria-label="Search the library"]')?.focus(), 60); } },
         { id: "group", label: "Group the library", placement: "overflow", run: (context) => context.openOverlay("group assets") },
         {
           id: "replace", label: "Replace", placement: "overflow",

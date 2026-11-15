@@ -174,7 +174,7 @@ export const crmApp = registerApp({
       actions: [
         { id: "Create account", label: "New account", placement: "primary", run: (context) => context.openOverlay("Account editor") },
         { id: "link contact", label: "Linked contacts", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select an account first"), run: (context) => context.openOverlay("relationship inspector", { id: context.selectedId }) },
-        { id: "search", label: "Search accounts", placement: "secondary", run: () => { document.querySelector<HTMLInputElement>('input[aria-label^="Filter"]')?.focus(); } },
+        { id: "search", label: "Search accounts", placement: "secondary", run: () => { window.setTimeout(() => document.querySelector<HTMLInputElement>('input[aria-label^="Filter"]')?.focus(), 60); } },
         { id: "export", label: "Export", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("export accounts") },
         { id: "merge accounts", label: "Merge two accounts", placement: "overflow", run: (context) => context.openOverlay("merge preview") },
         { id: "campaign links", label: "Campaign links", placement: "overflow", run: (context) => context.openOverlay("relationship inspector", { campaigns: true }) },

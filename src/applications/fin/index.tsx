@@ -190,7 +190,7 @@ export const finApp = registerApp({
         { id: "Create", label: "Create an invoice", placement: "primary", run: (context) => context.openOverlay("New invoice") },
         { id: "open record", label: "Open the invoice", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select an invoice first"), run: (context) => context.navigate(`/o/${context.org.slug}/fin/invoices/${context.selectedId}`) },
         { id: "bulk reminders", label: "Draft reminders", placement: "secondary", run: (context) => context.openOverlay("reminder approval") },
-        { id: "filter", label: "Filter the list", placement: "overflow", run: () => { document.querySelector<HTMLInputElement>('input[aria-label^="Filter"]')?.focus(); } },
+        { id: "filter", label: "Filter the list", placement: "overflow", run: () => { window.setTimeout(() => document.querySelector<HTMLInputElement>('input[aria-label^="Filter"]')?.focus(), 60); } },
         { id: "ageing report", label: "Ageing report", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/fin/reports?tab=Statements&statement=aged`) },
         { id: "export", label: "Export", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("export invoices") },
       ],

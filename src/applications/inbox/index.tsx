@@ -2670,7 +2670,7 @@ export const inboxApp = registerApp({
         render: (context: ScreenContext) => <NotificationsFeed context={context} tab={tab} />,
       })),
       actions: [
-        { id: "Filter", label: "Filter the feed", placement: "secondary", run: () => { document.querySelector<HTMLInputElement>('input[aria-label^="Filter"]')?.focus(); } },
+        { id: "Filter", label: "Filter the feed", placement: "secondary", run: () => { window.setTimeout(() => document.querySelector<HTMLInputElement>('input[aria-label^="Filter"]')?.focus(), 60); } },
         { id: "follow source", label: "Follow a source", placement: "overflow", run: (context) => context.openOverlay("follow source") },
         { id: "preferences", label: "Delivery preferences", placement: "overflow", run: (context) => context.openOverlay("preference quick view") },
         { id: "grouped", label: "Grouped items", placement: "overflow", run: (context) => context.openOverlay("grouped items") },
