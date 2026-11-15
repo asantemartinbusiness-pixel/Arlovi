@@ -406,7 +406,22 @@
    },
    {
     "kind": "action",
+    "name": "Score a risk",
+    "ok": true
+   },
+   {
+    "kind": "action",
     "name": "Add a risk",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Mitigate — assign a control",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review a risk",
     "ok": true
    },
    {
@@ -415,11 +430,7 @@
     "ok": true
    }
   ],
-  "guarded": [
-   "Score a risk",
-   "Mitigate — assign a control",
-   "Review a risk"
-  ]
+  "guarded": []
  },
  {
   "id": "ARL-LEGAL-007",

@@ -1004,7 +1004,10 @@ test("WF-12 Connector incident recovery: incident on the IT register, local repa
   await open(page, "/connect/health", "Connector health");
   await expect(main(page).getByText("This workspace makes no network calls").first()).toBeVisible();
   await action(page, "Run the health test");
-  if (await dialog(page).count()) await dialog(page).getByRole("button", { name: "Close" }).first().click();
+  // The health report opens once the local checks finish; wait for it, then close it.
+  await expect(dialog(page)).toBeVisible();
+  await dialog(page).getByRole("button", { name: "Close" }).first().click();
+  await expect(dialog(page)).toHaveCount(0);
 
   // Classify provider or internal, then open the incident on the IT register.
   await action(page, "Open an incident");

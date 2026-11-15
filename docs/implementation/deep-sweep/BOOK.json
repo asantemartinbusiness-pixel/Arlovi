@@ -208,6 +208,11 @@
    },
    {
     "kind": "action",
+    "name": "Raise an invoice",
+    "ok": true
+   },
+   {
+    "kind": "action",
     "name": "Confirm",
     "ok": true
    },
