@@ -253,5 +253,78 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-PRESENT-005",
+  "title": "Transitions & Animation",
+  "route": "/o/northline/present/decks/nl-decks-001/animation",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Slides",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Objects",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Timing",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Motion inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "playback",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "accessibility review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test: play the builds",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add animation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Sequence the builds",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reduce motion (on or off)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Accessibility review",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]

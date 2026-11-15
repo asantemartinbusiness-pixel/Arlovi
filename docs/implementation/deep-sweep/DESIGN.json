@@ -139,5 +139,134 @@
    "Crop the frame to the selection",
    "Undo"
   ]
+ },
+ {
+  "id": "ARL-DESIGN-003",
+  "title": "Layers & Pages",
+  "route": "/o/northline/design/files/nl-designs-001/layers",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pages",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Layers",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Assets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Components",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Layer context",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "move-to-page",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "component detach",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Select every editable layer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Clear the selection",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Group",
+   "Lock or unlock",
+   "Rename layer",
+   "Reorder: bring forwards",
+   "Send backwards",
+   "Isolate"
+  ]
+ },
+ {
+  "id": "ARL-DESIGN-004",
+  "title": "Vector Path Editor",
+  "route": "/o/northline/design/files/nl-designs-001/paths",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pen",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Curves",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Boolean",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Offset",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Point inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "path operations",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "stroke editing",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pen tool (P)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Combine options…",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Adjust the point's handles…",
+   "Join the ends",
+   "Add a point",
+   "Subtract the second selected path",
+   "Simplify"
+  ]
  }
 ]
