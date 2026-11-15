@@ -395,5 +395,68 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-DOCS-007",
+  "title": "Document Insights",
+  "route": "/o/northline/docs/documents/nl-documents-001/insights",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Writing",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Accuracy",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Brand",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sources",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Suggestion diff",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "source inspection",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "style settings",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review suggestions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Apply selected…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect citations",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]

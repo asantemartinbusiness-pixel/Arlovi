@@ -460,5 +460,83 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-CRM-007",
+  "title": "Deal Detail",
+  "route": "/o/northline/crm/deals/nl-deals-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Activity",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Products",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Documents",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Team",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Quote builder",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "collaborator picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "closure confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Update the stage",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a proposal",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Close the deal",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pipeline board",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request an approval",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]

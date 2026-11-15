@@ -464,5 +464,83 @@
    "link approval",
    "supersede"
   ]
+ },
+ {
+  "id": "ARL-BRAIN-008",
+  "title": "Brand Intelligence",
+  "route": "/o/northline/brain/brand",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Identity",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Colours",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Typography",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Voice",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Assets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rules",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Brand rule editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "asset selector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "impact preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "approve variant",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "edit token",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Import guide",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "set usage",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]
