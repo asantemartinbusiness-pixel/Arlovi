@@ -280,10 +280,12 @@ export function CommentOnArtifact({ context, close }: { context: ScreenContext; 
 export function HostReview({ context, close }: { context: ScreenContext; close: () => void }) {
   const records = useOrgRecords();
   const room = useRecord(context.params.id);
-  const people = participantsOf(room, records);
+  const listed = participantsOf(room, records);
+  // A room with no recorded participants can still host a review: offer the active people and AI employees.
+  const people = listed.length ? listed : records.filter((record) => (record.collection === "members" && String(record.fields.kind ?? "human") === "human" && record.status === "active") || (record.collection === "agents" && record.status === "active"));
   const [topic, setTopic] = useState("");
   const [picked, setPicked] = useState<string[]>();
-  const chosen = picked ?? people.map((person) => person.id);
+  const chosen = picked ?? (listed.length ? listed.map((person) => person.id) : []);
   const [busy, setBusy] = useState(false);
   if (!room || room.collection !== "channels") return <Empty title="Open a room first" />;
   return (

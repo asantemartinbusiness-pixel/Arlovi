@@ -437,7 +437,7 @@ export function SharedDocuments({ context, state }: { context: ScreenContext; st
 export function ExternalMessaging({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = usePortalData();
   const { portal } = usePortal(context);
-  const { actor } = useWorkspace();
+  const { actor, org } = useWorkspace();
   const [draft, setDraft] = useState("");
   if (!portal) return <Empty title="No portal" />;
   const all = portalMessages(portal, data.messages);
@@ -468,7 +468,7 @@ export function ExternalMessaging({ context, lens }: { context: ScreenContext; l
 
   return (
     <Stack gap={4}>
-      <Card eyebrow="THREAD" prov="human" title={`${portal.title} and ${useWorkspace().org.shortName}`} subtitle={`${rows.length} messages`} flush>
+      <Card eyebrow="THREAD" prov="human" title={`${portal.title} and ${org.shortName}`} subtitle={`${rows.length} messages`} flush>
         <div className="ds-card-body">
           <ol className="t4-timeline">
             {rows.map((message) => (

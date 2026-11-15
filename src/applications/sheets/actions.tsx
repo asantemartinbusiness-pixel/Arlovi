@@ -5,13 +5,12 @@ import { useCollection, useRecord } from "@/platform/workspace";
 import { CAPABILITY_LABELS } from "@/platform/capability";
 import type { Rec } from "@/domain/types";
 import { downloadFile } from "@/runtime/db";
-import { boxLabel, cellAddress, rangeBox, toCsv } from "./engine";
+import { FUNCTION_HELP, boxLabel, cellAddress, rangeBox, toCsv } from "./engine";
 import {
-  chartData, fillRange, nextId, pasteAt, readWorkbook, setCell, sheetToRows, sortRange,
+  chartData, fillRange, nextId, pasteAt, readWorkbook, setCell, sheetToRows, sortRange, usedBox,
   type Sheet, type Workbook,
 } from "./model";
 import { activeWorkbookEditor, protectedSet, useWorkbookEditor, type WorkbookEditor } from "./state";
-import { FUNCTION_HELP } from "./functions";
 
 /* ====================================================================== *
  * Sheets: contract actions that operate on the open workbook, and the
@@ -154,7 +153,10 @@ export function PasteCells({ context, close }: { context: ScreenContext; close: 
 
 export function SortForm({ context, close }: { context: ScreenContext; close: () => void }) {
   const editor = useWorkbookEditor(context, useWorkbookFor(context));
-  const box = editor.selection.box.toRow > editor.selection.box.fromRow ? editor.selection.box : { ...editor.selection.box, fromRow: 0, toRow: Math.max(0, Object.keys(editor.sheet.cells).reduce((max, key) => Math.max(max, Number(key.replace(/^[A-Z]+/, "")) - 1), 0)) };
+  /* A single cell means "the table it sits in": the whole used area, so a
+     sort never reorders one column away from the rest of its rows. */
+  const single = editor.selection.box.toRow === editor.selection.box.fromRow && editor.selection.box.toCol === editor.selection.box.fromCol;
+  const box = single ? usedBox(editor.sheet) : editor.selection.box;
   const [column, setColumn] = useState(box.fromCol);
   const [direction, setDirection] = useState<"asc" | "desc">("asc");
   const [header, setHeader] = useState(true);
@@ -173,6 +175,9 @@ export function SortForm({ context, close }: { context: ScreenContext; close: ()
       }}
     >
       <Properties rows={[{ label: "Range", value: boxLabel(box) }]} />
+      {!single && (box.fromCol > usedBox(editor.sheet).fromCol || box.toCol < usedBox(editor.sheet).toCol) && (
+        <Notice tone="warning" title="Only the selected columns move">Cells outside {boxLabel(box)} stay where they are, so rows can come apart. Select a single cell to sort the whole table.</Notice>
+      )}
       <Row gap={3} wrap>
         <Field label="By column">
           <Select value={column} onChange={(event) => setColumn(Number(event.target.value))}>
@@ -342,11 +347,11 @@ export function DrillDown({ context }: { context: ScreenContext }) {
   const sheet = editor.workbook.sheets.find((item) => item.id === chart.sheetId);
   const data = sheet ? chartData(sheet, chart.ref, chart.seriesInColumns, editor.evaluation.values[sheet.name] ?? {}) : null;
   const box = rangeBox(chart.ref);
-  const labels = data?.series[0]?.points.map((point) => point.label) ?? [];
+  const labels = data?.labels ?? [];
   const chosen = category || labels[0] || "";
   const rows = sheet && box ? sheetToRows(sheet, editor.evaluation.values[sheet.name] ?? {}, editor.format, true).slice(box.fromRow, box.toRow + 1) : [];
   const header = rows[0] ?? [];
-  const matching = rows.slice(1).map((row, index) => ({ row, number: (box?.fromRow ?? 0) + index + 2 })).filter(({ row }) => row.slice(box?.fromCol ?? 0, (box?.toCol ?? 0) + 1).includes(chosen));
+  const matching = rows.slice(1).map((row, index) => ({ row, number: (box?.fromRow ?? 0) + index + 2 })).filter(({ row }) => !chart.seriesInColumns || row[box?.fromCol ?? 0] === chosen);
   return (
     <Stack gap={3}>
       <ChartChoice editor={editor} value={chart.id} onChange={(id) => { setChartId(id); setCategory(""); }} />

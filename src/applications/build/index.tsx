@@ -14,12 +14,12 @@ import {
 import { AppBuilder, ComponentInspector, NoProject, useAppRecord } from "./builder";
 import {
   ApiScreen, AppOverview, AuthScreen, CodeScreen, DatabaseScreen, DeployScreen, ExpressionEditor,
-  GitImportPanel, IntegrationsScreen, MigrationPanel, MonitorScreen, ProjectLibrary,
+  IntegrationsScreen, MigrationPanel, MonitorScreen, ProjectLibrary,
   ProjectSetupForm, ReleaseApproval, TestsScreen,
 } from "./panels";
 import { saveApp, useBuildUi } from "./state";
 import {
-  ConfigInspector, EditFileForm, EventInspector, SafeCommandPanel, TraceInspector, addComponent, approveFix, askEngineer,
+  ConfigInspector, EditFileForm, importRepository, EventInspector, SafeCommandPanel, TraceInspector, addComponent, approveFix, askEngineer,
   attachIntegration, branchProject, commitChange, configureProvider, createIncident, deployFunctions, editStyles,
   exportChecks, exportMonitoring, pauseDeployments, revokeIntegration, revokeSessions, rotateSecret, runChecks, seedEntity,
   testEndpoint, testIntegrations, tuneMonitor, validatePolicy,
@@ -615,7 +615,7 @@ export const buildApp = registerApp({
       ],
       overlays: [
         { id: "Project setup", kind: "modal", title: "New project", width: 620, render: ({ close, ...context }) => <ProjectSetupForm context={context} close={close} />, footer: submitFooter("project-setup", "Create the project") },
-        { id: "Git import", kind: "modal", title: "Import a repository", width: 560, render: ({ ...context }) => <GitImportPanel context={context} />, footer: closeFooter() },
+        importRepository,
         {
           id: "environment config", kind: "drawer", title: "Environment", width: 460,
           render: ({ ...context }) => (

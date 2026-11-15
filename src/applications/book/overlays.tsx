@@ -871,7 +871,7 @@ export function SendPreview({ context }: { context: ScreenContext }) {
         { label: "Recipient", value: String(contact?.fields.email ?? "No contact on the booking") },
       ]} />
       <div className="t4-device">
-        <div className="t4-device-head">{String(template.fields.channel) === "email" ? body.subject || "No subject" : "SMS"}</div>
+        <div className="t4-device-head">{String(template.fields.channel) === "email" ? (body.subject ?? "").replace(/\{\{service\}\}/g, service?.title ?? "your appointment").replace(/\{\{time\}\}/g, booking?.startAt ? new Date(booking.startAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "the booked time") || "No subject" : "SMS"}</div>
         <div className="t4-device-body"><p style={{ whiteSpace: "pre-wrap" }}>{filled}</p></div>
       </div>
       <ProviderBoundary id={String(template.fields.channel) === "sms" ? "telephony" : "email.send"} />

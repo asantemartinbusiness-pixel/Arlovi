@@ -754,6 +754,7 @@ function ExportHours({ context }: { context: ScreenContext }) {
           link.download = `${context.org.slug}-hours.csv`;
           link.click();
           URL.revokeObjectURL(url);
+          void context.mutate.log(`Hours exported as CSV by ${context.actor} (${rows.length} entries)`, { type: "export" });
           context.toast("Exported", "The CSV downloaded from this browser.");
         }}
       >

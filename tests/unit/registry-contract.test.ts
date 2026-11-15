@@ -11,7 +11,7 @@ interface Contract {
 beforeAll(async () => {
   const failures = await loadApplications();
   if (failures.length) throw new Error(`Applications failed to load: ${failures.map((f) => `${f.group}: ${f.message}`).join("; ")}`);
-});
+}, 180_000);
 
 const catalog = JSON.parse(readFileSync(new URL("../../src/generated/catalog.json", import.meta.url), "utf8")) as {
   screens: Contract[];

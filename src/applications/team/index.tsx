@@ -2500,7 +2500,7 @@ export const teamApp = registerApp({
       actions: [
         { id: "Run evaluation", placement: "primary", run: (context) => context.openOverlay("Scenario editor", { run: true }) },
         { id: "approve new version", placement: "secondary", capability: "edit_people", run: (context) => context.openOverlay("promotion approval") },
-        { id: "compare model", placement: "secondary", guard: () => "No model provider is connected, so there is nothing to compare.", run: () => undefined },
+        { id: "compare model", label: "Compare models", placement: "secondary", run: (context) => context.toast("Model comparison needs a provider", "No model provider is connected, so no second model can be run. The scores here come only from the local evaluation runs already recorded.", "blocked") },
         { id: "rollback", placement: "overflow", tone: "danger", capability: "edit_people", run: (context) => context.openOverlay("rollback") },
       ],
       overlays: [

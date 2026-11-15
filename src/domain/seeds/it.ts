@@ -1,6 +1,6 @@
 import { registerSeed } from "@/domain/seedRegistry";
 
-/** Incidents, runbooks and release attempts for the operations console. */
+/** Incidents, runbooks and release attempts for the operations console. Incident numbers start at 50 so they do not collide with the inbox seed, which uses 20–23. */
 registerSeed("it", (context) => {
   const now = new Date(context.now);
   const day = 86_400_000;
@@ -13,7 +13,7 @@ registerSeed("it", (context) => {
   return {
     records: [
       context.rec({
-        org: "nl", collection: "incidents", n: 20, title: "INC-11 Storage persistence was never granted",
+        org: "nl", collection: "incidents", n: 50, title: "INC-11 Storage persistence was never granted",
         status: "open",
         summary: "The browser has not granted persistent storage for this origin, so the workspace can be evicted under storage pressure.",
         at: iso(6), createdAt: iso(6),
@@ -24,7 +24,7 @@ registerSeed("it", (context) => {
         },
       }),
       context.rec({
-        org: "nl", collection: "incidents", n: 21, title: "INC-10 Quote reminders never left the workspace",
+        org: "nl", collection: "incidents", n: 51, title: "INC-10 Quote reminders never left the workspace",
         status: "awaiting_user",
         summary: "A workflow prepared three reminder drafts. With no mail provider connected they stayed as drafts, which is correct but was not noticed for a week.",
         at: iso(13), createdAt: iso(13),
@@ -36,7 +36,7 @@ registerSeed("it", (context) => {
         },
       }),
       context.rec({
-        org: "nl", collection: "incidents", n: 22, title: "INC-9 Site publish stopped at the hosting boundary",
+        org: "nl", collection: "incidents", n: 52, title: "INC-9 Site publish stopped at the hosting boundary",
         status: "resolved",
         summary: "A publish attempt for northline.co.uk was recorded as blocked. The export was taken instead and the pages were reviewed from the file.",
         at: iso(27), endAt: iso(26), createdAt: iso(27),
@@ -49,7 +49,7 @@ registerSeed("it", (context) => {
         },
       }),
       context.rec({
-        org: "nl", collection: "incidents", n: 23, title: "INC-8 Clock skew on a shared machine",
+        org: "nl", collection: "incidents", n: 53, title: "INC-8 Clock skew on a shared machine",
         status: "resolved",
         summary: "The showroom machine's clock was forty minutes behind, so three records were dated wrongly before anyone noticed.",
         at: iso(44), endAt: iso(43), createdAt: iso(44),
@@ -66,14 +66,14 @@ registerSeed("it", (context) => {
         status: "active",
         summary: "Read the storage estimate, write and read back one row, run the indexed query, compare the clocks and detect the browser features the interface needs.",
         createdAt: iso(60),
-        fields: { kind: "runbook", allowed: true },
+        fields: { kind: "runbook", allowed: true, runbookId: "diagnostics" },
       }),
       context.rec({
         org: "nl", collection: "incidents", n: 31, title: "Take a backup before a risky change",
         status: "active",
         summary: "Export every record and event as JSON, confirm the counts match, and keep the file outside this browser.",
         createdAt: iso(60),
-        fields: { kind: "runbook", allowed: true },
+        fields: { kind: "runbook", allowed: true, runbookId: "backup" },
       }),
       context.rec({
         org: "nl", collection: "incidents", n: 40, title: "Site export · northline.co.uk",

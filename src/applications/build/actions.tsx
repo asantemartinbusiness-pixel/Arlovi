@@ -184,6 +184,13 @@ export function EditFileForm({ context, close }: { context: ScreenContext; close
   const [newPath, setNewPath] = useState("");
   const [content, setContent] = useState(kept[0]?.content ?? "");
   const [error, setError] = useState("");
+  /* The project is read asynchronously; pick up the first kept file once it arrives. */
+  if (!path && kept[0]) {
+    setPath(kept[0].path);
+    setContent(kept[0].content);
+  } else if (!path && record) {
+    setPath("__new");
+  }
   if (!record) return <NoProject />;
   const generated = generatedFiles(app).map((file) => file.path);
   const target = path === "__new" ? newPath.trim() : path;
@@ -858,3 +865,31 @@ export function SeedRows({ entityId, app }: { entityId: string; app: AppModel })
     </Stack>
   );
 }
+
+/* ------------------------------ Library ------------------------------ */
+
+const REPO_ADDRESS = /^(https:\/\/|git@)[a-z0-9.-]+\.[a-z]{2,}[:/][\w.-]+\/[\w.-]+?(\.git)?$/i;
+
+export const importRepository = actOverlay({
+  id: "Git import",
+  title: "Import a repository",
+  consequenceTitle: "Nothing is fetched or run",
+  consequence: () => "The repository address is recorded as a draft project waiting for its import. Fetching needs a network call this workspace does not make; when it can happen, the manifest is read without running it and every file stays read-only until a person approves it.",
+  fields: () => [
+    { name: "address", label: "Repository address", required: true, placeholder: "https://github.com/example/app.git" },
+    { name: "title", label: "Project name", required: true, placeholder: "Trade desk import" },
+  ],
+  submit: "Record the import request",
+  apply: async ({ values, context }) => {
+    if (!REPO_ADDRESS.test(values.address)) throw new Error("That is not a repository address. Use https://host/owner/name.git or git@host:owner/name.git.");
+    if (/[?&](token|key|password)=|\/\/[^/@]+:[^/@]+@/i.test(values.address)) throw new Error("The address carries a credential. Remove it: a token never goes into a project record.");
+    const created = await context.mutate.create({
+      collection: "appProjects", title: values.title, status: "draft",
+      summary: `Import requested from ${values.address}. Nothing has been fetched, scanned or run.`,
+      fields: { importSource: values.address, importState: "not_connected", delivery: "not_connected" },
+      body: { entities: [], screens: [], automations: [], roles: [], versions: [], endpoints: [], releases: [], files: [] },
+    }, `Repository import requested: ${values.address}`);
+    await context.mutate.log(`Repository import for ${values.title} stopped before fetching: no network access from this workspace.`, { entityId: created.id, type: "capability", capability: "not_connected" });
+    return { title: "Recorded, not imported", body: `${created.title} is a draft waiting for its import. No code was fetched.`, tone: "blocked" };
+  },
+});

@@ -44,7 +44,8 @@ export function MessageComposer({ context, close }: { context: ScreenContext; cl
   const { actor } = useWorkspace();
   const conversations = data.channels.filter((channel) => channel.status !== "archived" && (payload.dm ? channel.fields.kind === "group" : true) && isMember(channel, actor));
   const replyTo = data.messages.find((message) => message.id === payload.replyToId);
-  const [channelId, setChannelId] = useState(payload.channelId ?? replyTo?.parentId ?? conversations[0]?.id ?? "");
+  const [channelIdRaw, setChannelId] = useState<string | null>(null);
+  const channelId = channelIdRaw ?? (payload.channelId ?? replyTo?.parentId ?? conversations[0]?.id ?? "");
   const [text, setText] = useState("");
   const [mention, setMention] = useState("");
   const [fileRef, setFileRef] = useState("");
@@ -348,7 +349,8 @@ export function AddMember({ context, close }: { context: ScreenContext; close: (
   const data = useCommsData();
   const { actor } = useWorkspace();
   const conversations = data.channels.filter((channel) => channel.fields.kind === "group" && channel.status !== "archived" && isMember(channel, actor));
-  const [channelId, setChannelId] = useState(conversations.find((row) => row.id === context.selectedId)?.id ?? conversations[0]?.id ?? "");
+  const [channelIdRaw, setChannelId] = useState<string | null>(null);
+  const channelId = channelIdRaw ?? (conversations.find((row) => row.id === context.selectedId)?.id ?? conversations[0]?.id ?? "");
   const channel = conversations.find((row) => row.id === channelId);
   const members = channel ? membersOf(channel) : [];
   const candidates = [...data.employees.filter((row) => row.status !== "alumni"), ...data.members.filter((row) => row.fields.kind === "ai")].filter((row) => !members.includes(row.title));
@@ -388,7 +390,8 @@ export function MessageActions({ context }: { context: ScreenContext }) {
   const { actor } = useWorkspace();
   const mine = new Set(data.channels.filter((channel) => channel.fields.kind === "group" && isMember(channel, actor)).map((channel) => channel.id));
   const recent = data.messages.filter((message) => mine.has(String(message.parentId)) && message.status !== "deleted").sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 12);
-  const [id, setId] = useState(recent[0]?.id ?? "");
+  const [idRaw, setId] = useState<string | null>(null);
+  const id = idRaw ?? (recent[0]?.id ?? "");
   const message = recent.find((row) => row.id === id);
   return (
     <Stack gap={4}>
@@ -676,7 +679,8 @@ export function InviteToMeeting({ context, close }: { context: ScreenContext; cl
   const data = useCommsData();
   const upcoming = data.meetings.filter((meeting) => meeting.startAt && new Date(meeting.startAt) >= context.now && meeting.status !== "cancelled");
   const fixed = context.params.id ? data.meetings.find((row) => row.id === context.params.id) : undefined;
-  const [meetingId, setMeetingId] = useState(fixed?.id ?? upcoming.find((row) => row.id === context.selectedId)?.id ?? upcoming[0]?.id ?? "");
+  const [meetingIdRaw, setMeetingId] = useState<string | null>(null);
+  const meetingId = meetingIdRaw ?? (fixed?.id ?? upcoming.find((row) => row.id === context.selectedId)?.id ?? upcoming[0]?.id ?? "");
   const meeting = data.meetings.find((row) => row.id === meetingId);
   const attendees = meeting ? listOf(meeting.fields.attendees) : [];
   const everyone = attendees[0] === "Everyone";
@@ -716,7 +720,8 @@ export function RescheduleMeeting({ context, close }: { context: ScreenContext; 
   const mode = payload?.mode ?? "reschedule";
   const data = useCommsData();
   const upcoming = data.meetings.filter((meeting) => meeting.startAt && meeting.endAt && new Date(meeting.endAt) >= context.now && meeting.status !== "finished");
-  const [meetingId, setMeetingId] = useState(upcoming.find((row) => row.id === context.selectedId)?.id ?? upcoming[0]?.id ?? "");
+  const [meetingIdRaw, setMeetingId] = useState<string | null>(null);
+  const meetingId = meetingIdRaw ?? (upcoming.find((row) => row.id === context.selectedId)?.id ?? upcoming[0]?.id ?? "");
   const meeting = upcoming.find((row) => row.id === meetingId);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -860,7 +865,8 @@ export function Dialer({ context, close }: { context: ScreenContext; close: () =
   const payload = context.overlayPayload as { returnOf?: string } | undefined;
   const original = useRecord(payload?.returnOf);
   const contacts = useCollections(["contacts"]).contacts;
-  const [contactId, setContactId] = useState(String(original?.fields.contactId ?? ""));
+  const [contactIdRaw, setContactId] = useState<string | null>(null);
+  const contactId = contactIdRaw ?? (String(original?.fields.contactId ?? ""));
   const [number, setNumber] = useState("");
   const contact = contacts.find((row) => row.id === contactId);
   const target = contact?.title ?? number.trim();

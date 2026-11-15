@@ -8,6 +8,7 @@ import {
   type DocModel, type DocRange, type EditActor, type History, type HistoryEntry,
 } from "./model";
 import type { EditIntent } from "./canvas";
+import { shareEditor } from "@/applications/sheets/sharedEditor";
 
 export type SaveState = "clean" | "dirty" | "saving" | "saved" | "conflict" | "error";
 
@@ -48,7 +49,7 @@ const AUTOSAVE_MS = 800;
  * model; the record is patched on a debounce with `skipHistory` so the
  * document's own version list is not flooded by keystrokes.
  */
-export function useDocEditor(context: ScreenContext, record: Rec | undefined): DocEditor {
+function useOwnDocEditor(context: ScreenContext, record: Rec | undefined): DocEditor {
   const actor = useMemo<EditActor>(() => ({ author: context.actor, at: context.now.toISOString() }), [context.actor, context.now]);
 
   const [model, setModel] = useState<DocModel>(() => readDoc(record?.body, context.actor, context.now.toISOString()));
@@ -358,3 +359,11 @@ export const SAVE_LABEL: Record<SaveState, string> = {
 export const SAVE_TONE: Record<SaveState, "neutral" | "warning" | "success" | "danger" | "info"> = {
   clean: "neutral", dirty: "warning", saving: "info", saved: "success", conflict: "danger", error: "danger",
 };
+
+const SHARED = shareEditor<DocEditor & { record?: Rec }>(useOwnDocEditor, (editor) => [editor.model, editor.selection, editor.saveState, editor.canUndo, editor.canRedo, editor.conflict, editor.restoreToken]);
+
+/** Open a document for editing; components that open the same document share one editor. */
+export const useDocEditor: (context: ScreenContext, record: Rec | undefined) => DocEditor = SHARED.useShared;
+
+/** The editor that owns a document while it is open, for screen actions. */
+export const activeDocEditor: (id: string | undefined) => DocEditor | undefined = SHARED.active;

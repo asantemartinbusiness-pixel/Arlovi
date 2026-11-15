@@ -2978,12 +2978,11 @@ export const missionApp = registerApp({
         { id: "Approve adjustment", placement: "primary", capability: "approve_payment", run: (context) => context.openOverlay("limit increase approval") },
         { id: "inspect cost", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a ledger entry first"), run: (context) => context.openOverlay("cost source") },
         { id: "set alert", placement: "secondary", run: (context) => context.openOverlay("set alert") },
-        { id: "variance", label: "Variance", placement: "overflow", run: (context) => context.openOverlay("budget variance") },
+        { id: "variance", label: "Variance", placement: "overflow", run: (context) => context.openOverlay("Budget variance") },
         { id: "export", placement: "overflow", capability: "export_data", run: (context) => void exportBudget(context) },
       ],
       overlays: [
         { id: "Budget variance", kind: "drawer", title: "Variance", width: 520, render: ({ ...context }) => <BudgetVariance context={context} /> },
-        { id: "budget variance", kind: "drawer", title: "Variance", width: 520, render: ({ ...context }) => <BudgetVariance context={context} /> },
         { id: "limit increase approval", kind: "modal", title: "Raise the ceiling", width: 560, render: ({ close, ...context }) => <LimitIncrease context={context} close={close} /> },
         { id: "cost source", kind: "drawer", title: "Where this cost came from", width: 520, render: ({ ...context }) => <CostSource context={context} /> },
         { id: "set alert", kind: "modal", title: "Set a budget alert", width: 520, render: ({ close, ...context }) => <SetBudgetAlert context={context} close={close} /> },

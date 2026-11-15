@@ -118,6 +118,8 @@ export function BookingsOverview({ context, lens }: { context: ScreenContext; le
               rowId={(row) => row.id}
               label="Appointments"
               filterable={false}
+              selectedId={context.selectedId}
+              onSelect={(id) => context.select(id)}
               onOpen={(id) => context.navigate(`/o/${org.slug}/book/bookings/${id}`)}
               rowTone={(row) => (row.status === "hold" ? "warning" : row.status === "cancelled" ? "danger" : undefined)}
               columns={[
@@ -156,7 +158,7 @@ export function BookingsOverview({ context, lens }: { context: ScreenContext; le
             series={[{
               name: "Booked value",
               points: data.services.filter((service) => service.status !== "archived").map((service) => ({
-                label: service.title,
+                label: (() => { const same = data.services.filter((other) => other.status !== "archived" && other.title === service.title); return same.length > 1 ? `${service.title} (${same.indexOf(service) + 1})` : service.title; })(),
                 value: rows.filter((booking) => String(booking.fields.serviceId) === service.id && isLive(booking)).reduce((sum) => sum + (service.amountMinor ?? 0), 0),
               })),
             }]}
@@ -571,7 +573,8 @@ export function StaffAndResources({ context, lens }: { context: ScreenContext; l
           <Card key={resource.id} span={4} eyebrow={String(resource.fields.kind ?? "").toUpperCase()} prov="human" title={resource.title} subtitle={resource.summary}
             actions={<Pill tone={resource.fields.bookable === true ? "success" : "neutral"}>{resource.fields.bookable === true ? "Bookable" : "Not bookable"}</Pill>}
             footer={<>
-              <Button size="sm" variant="secondary" onClick={() => { context.select(resource.id); context.openOverlay("Resource editor", { id: resource.id }); }}>Edit</Button>
+              <Button size="sm" variant={context.selectedId === resource.id ? "primary" : "secondary"} aria-pressed={context.selectedId === resource.id} onClick={() => context.select(context.selectedId === resource.id ? undefined : resource.id)}>{context.selectedId === resource.id ? "Selected" : "Select"}</Button>
+              <Button size="sm" variant="ghost" onClick={() => { context.select(resource.id); context.openOverlay("Resource editor", { id: resource.id }); }}>Edit</Button>
               <Button size="sm" variant="ghost" onClick={() => { context.select(resource.id); context.openOverlay("recurrence", { id: resource.id }); }}>Block a period</Button>
             </>}>
             <Stack gap={3}>

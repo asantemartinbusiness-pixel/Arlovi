@@ -78,7 +78,8 @@ export function Staffing({ context, close }: { context: ScreenContext; close: ()
   const rota = data.preferences.filter((row) => row.fields.kind === "careRota");
   const queues = ["Technical", "Orders", "Billing", "Trade"];
   const people = data.employees.filter((row) => row.status !== "alumni");
-  const [person, setPerson] = useState(people[0]?.title ?? "");
+  const [personRaw, setPerson] = useState<string | null>(null);
+  const person = personRaw ?? (people[0]?.title ?? "");
   const current = rota.find((row) => row.fields.person === person);
   return (
     <Stack gap={4}>
@@ -152,7 +153,8 @@ export function TagCase({ context, close }: { context: ScreenContext; close: () 
 export function LinkRecord({ context, close }: { context: ScreenContext; close: () => void }) {
   const ticket = useRecord(context.selectedId);
   const data = useCollections(["contacts", "orders"]);
-  const [contactId, setContactId] = useState(String(ticket?.fields.contactId ?? ""));
+  const [contactIdRaw, setContactId] = useState<string | null>(null);
+  const contactId = contactIdRaw ?? (String(ticket?.fields.contactId ?? ""));
   if (!ticket || ticket.collection !== "tickets") return <Empty title="Choose a case in the list" />;
   const orders = data.orders.filter((order) => !contactId || String(order.fields.contactId ?? "") === contactId);
   return (

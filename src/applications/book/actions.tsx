@@ -450,8 +450,8 @@ export async function scheduleReminders(context: ScreenContext) {
     title: "Schedule reminders",
     consequence: `${plan.length} reminder${plan.length === 1 ? "" : "s"} are queued against ${new Set(plan.map((row) => row.booking.id)).size} bookings in the next 14 days, from ${rules.length} approved rule${rules.length === 1 ? "" : "s"}. ${skipped.length} are left out because the customer's preference does not allow that channel. A reminder already scheduled for a booking is never queued twice.`,
     facts: [
-      ...plan.slice(0, 5).map((row) => ({ label: `${row.booking.title}`, value: `${String(row.rule.fields.channel)} · ${context.dateTime(row.at)}` })),
-      ...skipped.slice(0, 3).map((row) => ({ label: `Left out · ${row.booking.title}`, value: row.why })),
+      ...plan.slice(0, 5).map((row) => ({ label: `${row.booking.title} · ${row.rule.title}`, value: `${String(row.rule.fields.channel)} · ${context.dateTime(row.at)}` })),
+      ...skipped.slice(0, 3).map((row) => ({ label: `Left out · ${row.booking.title} · ${String(row.rule.fields.channel)}`, value: row.why })),
     ],
     blocked: rules.length === 0 ? "No reminder rule is approved and enabled." : plan.length === 0 ? "Every eligible upcoming booking already has its reminders scheduled." : undefined,
     boundary: "email.send",

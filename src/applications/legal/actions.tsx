@@ -67,7 +67,8 @@ export function RecordReview({ context, obligation }: { context: ScreenContext; 
 export function AssignOwnerForm({ context, close, collections, label }: { context: ScreenContext; close: () => void; collections: ("obligations" | "risks" | "contracts")[]; label: string }) {
   const data = useCollections(["obligations", "risks", "contracts", "employees"]);
   const items = collections.flatMap((name) => data[name].filter((row) => row.status !== "done" && row.status !== "closed" && row.status !== "archived"));
-  const [itemId, setItemId] = useState(items.find((row) => row.id === context.selectedId)?.id ?? "");
+  const [itemIdRaw, setItemId] = useState<string | null>(null);
+  const itemId = itemIdRaw ?? (items.find((row) => row.id === context.selectedId)?.id ?? "");
   const item = items.find((row) => row.id === itemId);
   return (
     <form

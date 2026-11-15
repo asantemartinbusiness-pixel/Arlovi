@@ -793,7 +793,7 @@
       "actionsRequired": 4,
       "actionsDeclared": 5,
       "overlaysRequired": 3,
-      "overlaysDeclared": 5,
+      "overlaysDeclared": 4,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -2505,7 +2505,7 @@
       "actionsRequired": 5,
       "actionsDeclared": 5,
       "overlaysRequired": 3,
-      "overlaysDeclared": 3,
+      "overlaysDeclared": 4,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -2521,7 +2521,7 @@
       "actionsRequired": 7,
       "actionsDeclared": 7,
       "overlaysRequired": 4,
-      "overlaysDeclared": 4,
+      "overlaysDeclared": 7,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -2537,7 +2537,7 @@
       "actionsRequired": 4,
       "actionsDeclared": 4,
       "overlaysRequired": 3,
-      "overlaysDeclared": 3,
+      "overlaysDeclared": 5,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -2553,7 +2553,7 @@
       "actionsRequired": 4,
       "actionsDeclared": 4,
       "overlaysRequired": 3,
-      "overlaysDeclared": 3,
+      "overlaysDeclared": 4,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -2569,7 +2569,7 @@
       "actionsRequired": 4,
       "actionsDeclared": 4,
       "overlaysRequired": 3,
-      "overlaysDeclared": 3,
+      "overlaysDeclared": 6,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -2583,9 +2583,9 @@
       "tabsRequired": 4,
       "tabsDeclared": 4,
       "actionsRequired": 5,
-      "actionsDeclared": 5,
+      "actionsDeclared": 6,
       "overlaysRequired": 3,
-      "overlaysDeclared": 3,
+      "overlaysDeclared": 5,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -2601,7 +2601,7 @@
       "actionsRequired": 5,
       "actionsDeclared": 5,
       "overlaysRequired": 3,
-      "overlaysDeclared": 3,
+      "overlaysDeclared": 5,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []

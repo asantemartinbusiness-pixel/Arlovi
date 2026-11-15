@@ -305,7 +305,8 @@ export function MentorAssign({ context, close }: { context: ScreenContext; close
   const data = useCollections(["employees", "tasks"]);
   const starterIds = [...new Set(data.tasks.filter((task) => task.fields.kind === "onboarding").map((task) => String(task.fields.employeeId)))];
   const starters = data.employees.filter((row) => starterIds.includes(row.id));
-  const [starterId, setStarterId] = useState(starters[0]?.id ?? "");
+  const [starterIdRaw, setStarterId] = useState<string | null>(null);
+  const starterId = starterIdRaw ?? (starters[0]?.id ?? "");
   const starter = data.employees.find((row) => row.id === starterId);
   return (
     <form
@@ -343,11 +344,13 @@ export function MentorAssign({ context, close }: { context: ScreenContext; close
   );
 }
 
-export function verifyCompletion(context: ScreenContext): void {
+export async function verifyCompletion(context: ScreenContext): Promise<void> {
+  const { listByCollection } = await import("@/platform/repo");
+  const starters = new Set((await listByCollection(context.org.id, "tasks")).filter((task) => task.fields.kind === "onboarding").map((task) => String(task.fields.employeeId)));
   pickRecord(context, {
     title: "Verify an onboarding checklist",
     collection: "employees",
-    filter: (row) => live(row) && row.fields.onboardingVerifiedBy === undefined,
+    filter: (row) => live(row) && starters.has(row.id) && row.fields.onboardingVerifiedBy === undefined,
     describe: (row) => String(row.fields.title ?? ""),
     pickLabel: "Verify",
     empty: "Every checklist is already verified",
@@ -428,7 +431,8 @@ export function declineLeave(context: ScreenContext): Promise<void> {
 
 export function BalanceAdjust({ context, close }: { context: ScreenContext; close: () => void }) {
   const employees = useCollection("employees").filter(live);
-  const [employeeId, setEmployeeId] = useState(employees[0]?.id ?? "");
+  const [employeeIdRaw, setEmployeeId] = useState<string | null>(null);
+  const employeeId = employeeIdRaw ?? (employees[0]?.id ?? "");
   const [delta, setDelta] = useState("1");
   const [reason, setReason] = useState("");
   const employee = employees.find((row) => row.id === employeeId);
@@ -525,9 +529,11 @@ export async function swapShift(context: ScreenContext): Promise<void> {
 
 export function TimeCorrection({ context, close }: { context: ScreenContext; close: () => void }) {
   const entries = useCollection("shifts").filter((row) => row.fields.kind === "time");
-  const [entryId, setEntryId] = useState(entries.find((row) => row.id === context.selectedId)?.id ?? entries[0]?.id ?? "");
+  const [entryIdRaw, setEntryId] = useState<string | null>(null);
+  const entryId = entryIdRaw ?? (entries.find((row) => row.id === context.selectedId)?.id ?? entries[0]?.id ?? "");
   const entry = entries.find((row) => row.id === entryId);
-  const [hours, setHours] = useState(String(entry?.fields.hours ?? ""));
+  const [hoursRaw, setHours] = useState<string | null>(null);
+  const hours = hoursRaw ?? (String(entry?.fields.hours ?? ""));
   const [reason, setReason] = useState("");
   const value = Number(hours);
   const invalid = !Number.isFinite(value) || value < 0 || value > 24;
@@ -661,7 +667,8 @@ export function ReconcileRun({ context, close }: { context: ScreenContext; close
 export function AssignReviewer({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCollections(["reviews", "employees"]);
   const open = data.reviews.filter((row) => row.status !== "acknowledged");
-  const [reviewId, setReviewId] = useState(open.find((row) => row.id === context.selectedId)?.id ?? open[0]?.id ?? "");
+  const [reviewIdRaw, setReviewId] = useState<string | null>(null);
+  const reviewId = reviewIdRaw ?? (open.find((row) => row.id === context.selectedId)?.id ?? open[0]?.id ?? "");
   const review = data.reviews.find((row) => row.id === reviewId);
   return (
     <form
@@ -746,7 +753,8 @@ export function acknowledgeReview(context: ScreenContext): Promise<void> {
 
 export function AssignCourse({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCollections(["courses", "employees", "learningRecords"]);
-  const [courseId, setCourseId] = useState(data.courses[0]?.id ?? "");
+  const [courseIdRaw, setCourseId] = useState<string | null>(null);
+  const courseId = courseIdRaw ?? (data.courses[0]?.id ?? "");
   const [people, setPeople] = useState<string[]>([]);
   const staff = data.employees.filter(live);
   const already = data.learningRecords.filter((row) => row.parentId === courseId).map((row) => String(row.fields.person ?? ""));

@@ -2773,6 +2773,25 @@ const submitFooter = (formId: string, label: string) => ({ close }: { close: () 
 
 const chiefThread = (context: ScreenContext) => threadKey(context.screen.id, context.selectedId ?? new URLSearchParams(window.location.search).get("thread") ?? "active");
 
+/**
+ * Mute is a real, persisted preference even though no audio service is
+ * connected: when one is, a session starts with the microphone in the state
+ * chosen here. Nothing is captured either way today, and the toast says so.
+ */
+async function toggleVoiceMute(context: ScreenContext): Promise<void> {
+  const rows = await listPreferences(context);
+  const pref = rows.find((row) => row.fields.kind === "voiceSettings");
+  const muted = !(pref?.fields.muted === true);
+  if (pref) await context.mutate.patch(pref.id, { fields: { ...pref.fields, muted } }, { skipHistory: true, event: muted ? "Microphone muted" : "Microphone unmuted" });
+  else await context.mutate.create({ collection: "preferences", title: "Voice settings", status: "active", fields: { kind: "voiceSettings", muted } }, muted ? "Microphone muted" : "Microphone unmuted");
+  context.toast(muted ? "Muted" : "Unmuted", `Sessions will start with the microphone ${muted ? "off" : "on"}. No audio service is connected, so nothing is being captured now.`, "info");
+}
+
+async function listPreferences(context: ScreenContext) {
+  const { listByCollection } = await import("@/platform/repo");
+  return listByCollection(context.org.id, "preferences");
+}
+
 export const aiApp = registerApp({
   code: "AI",
   short: "Ask Arlovi",
@@ -2821,7 +2840,7 @@ export const aiApp = registerApp({
         { id: "create mission", label: "Authorise a mission", placement: "primary", capability: "approve_mission", run: (context) => context.openOverlay("task authorization") },
         { id: "attach", label: "Attach", placement: "secondary", run: (context) => context.openOverlay("upload review") },
         { id: "mention record", label: "Pin records", placement: "secondary", run: (context) => context.openOverlay("Source selector") },
-        { id: "dictate", label: "Dictate", placement: "overflow", guard: () => "No speech service is connected. The voice workspace keeps typed turns instead.", run: (context) => context.navigate(`/o/${context.org.slug}/ai/voice`) },
+        { id: "dictate", label: "Dictate", placement: "overflow", run: (context) => context.toast("Dictation needs a speech service", "No speech service is connected, so nothing was recorded. Type the message instead; it is kept exactly as written.", "blocked") },
         { id: "open artifact", label: "Open artifact", placement: "overflow", run: (context) => void openLatestArtifact(context) },
       ],
       overlays: [
@@ -2936,7 +2955,7 @@ export const aiApp = registerApp({
       actions: [
         { id: "Start stop", label: "Start or end a session", placement: "primary", run: (context) => void startOrEndVoice(context) },
         { id: "view transcript", placement: "secondary", run: (context) => context.setTab("Transcript") },
-        { id: "mute", placement: "overflow", guard: () => "Nothing is being captured, so there is nothing to mute.", run: () => undefined },
+        { id: "mute", label: "Mute or unmute", placement: "overflow", run: (context) => void toggleVoiceMute(context) },
         { id: "change voice", placement: "overflow", run: (context) => context.openOverlay("voice settings") },
         { id: "correct text", placement: "overflow", run: (context) => context.openOverlay("correct text") },
       ],

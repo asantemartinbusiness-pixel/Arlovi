@@ -180,7 +180,11 @@ export function EscalateIncident({ context, close }: { context: ScreenContext; c
   const incidents = useCollection("incidents");
   const members = useCollection("members");
   const record = incidents.find((row) => row.id === context.selectedId);
-  const chain = String(record?.fields.escalation ?? "").split("→").map((part) => part.replace(/after.*$/i, "").trim()).filter(Boolean);
+  const known = new Set(members.map((member) => member.title));
+  // Only names that are people in this workspace count as a step in the chain; prose such as "only" is ignored.
+  const chain = String(record?.fields.escalation ?? "").split("→")
+    .map((part) => [...known].find((name) => part.includes(name)))
+    .filter((name): name is string => Boolean(name));
   const owner = String(record?.fields.owner ?? "");
   const next = chain[chain.indexOf(owner) + 1] ?? chain.find((name) => name !== owner);
   const [toPicked, setTo] = useState<string>();
@@ -188,7 +192,7 @@ export function EscalateIncident({ context, close }: { context: ScreenContext; c
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   if (!record) return <Empty title="Select an incident first" />;
-  const people = [...new Set([...chain, ...members.filter((member) => String(member.fields.kind ?? "human") === "human" && member.status === "active").map((member) => member.title)])];
+  const people = [...new Set([...chain, ...members.filter((member) => String(member.fields.kind ?? "human") === "human" && member.status === "active").map((member) => member.title)])].filter((name) => name !== owner);
   const blocked = record.status === "resolved" ? "A resolved incident cannot be escalated." : !to ? "Choose who it escalates to." : to === owner ? `${to} already owns it.` : !reason.trim() ? "Say why it is escalating." : undefined;
   return (
     <Stack gap={4}>

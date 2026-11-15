@@ -1,0 +1,87 @@
+{
+ "about": "Per-application sign-off that each contract action performs the action it is named for, rather than routing to a related surface. Recorded from remediation reviews; read by scripts/build_screen_ledger.py.",
+ "applications": {
+  "HQ": {
+   "signedOff": true,
+   "basis": "Orchestrator review, 15 Nov 2026: all 40 contract actions classified; 21 routed actions reimplemented and verified in a browser.",
+   "openItems": []
+  },
+  "MOTION": {
+   "signedOff": true,
+   "basis": "Built to the action standard, 15 Nov 2026: every contract action performs its named operation; exports verified by decoding the files.",
+   "openItems": [
+    "A spring inside a segment is sampled over about 1.1 s of its own time.",
+    "The flash test is a luminance/area heuristic, not a certified analyser."
+   ]
+  },
+  "FIN": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": [
+    "FIN-002 map category: typechecks, not driven to completion in a browser."
+   ]
+  },
+  "CRM": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": [
+    "CRM-008 approve: correctly refused on seeded data with an unresolved tax line; save path not exercised."
+   ]
+  },
+  "ANALYTICS": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": [
+    "ANALYTICS-004 cite and -008 compare: refused on seeded data (stale figures, no saved scenario)."
+   ]
+  },
+  "AUTO": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": [
+    "AUTO-005 approve: the dry-run draft does not survive a reload, so approval was not driven end to end."
+   ]
+  },
+  "MISSION": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB. Resume, cancel and pause fixed by the orchestrator.",
+   "openItems": []
+  },
+  "INBOX": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": []
+  },
+  "ADMIN": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": [
+    "ADMIN-005 approve increase: no pending request in seeded data."
+   ]
+  },
+  "ASSET": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": []
+  },
+  "AI": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB. Dictate and mute changed by the orchestrator from disabled buttons to honest, reachable boundary actions; mute persists as a preference.",
+   "openItems": []
+  },
+  "BRAIN": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": [
+    "Most dialogs opened clean; principal buttons not all pressed."
+   ]
+  },
+  "TEAM": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB. Compare models changed by the orchestrator to an honest, reachable boundary action.",
+   "openItems": [
+    "Most dialogs opened clean; principal buttons not all pressed."
+   ]
+  }
+ }
+}
