@@ -4,6 +4,12 @@ import * as PopoverPrimitive from "@radix-ui/react-popover";
 import type { ReactNode } from "react";
 import { Button } from "./primitives";
 
+
+/** A press on a toast is not an intent to leave the dialog. */
+function fromToast(event: { target: EventTarget | null }): boolean {
+  return event.target instanceof Element && Boolean(event.target.closest(".ds-toasts"));
+}
+
 /**
  * Modal — one focused decision. Title, consequence copy, a single principal
  * action. Focus is trapped and returned by Radix; Escape always dismisses
@@ -30,7 +36,7 @@ export function Modal({
           className="ds-modal"
           style={{ ["--modal-w" as string]: `${width}px` }}
           onEscapeKeyDown={(event) => { if (blocking) event.preventDefault(); }}
-          onInteractOutside={(event) => { if (blocking) event.preventDefault(); }}
+          onInteractOutside={(event) => { if (blocking || fromToast(event)) event.preventDefault(); }}
         >
           <header className="ds-overlay-head">
             <div className="ds-grow">
@@ -67,7 +73,12 @@ export function Drawer({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="ds-overlay" />
-        <Dialog.Content className="ds-drawer" style={{ ["--drawer-w" as string]: `${width}px` }} aria-describedby={undefined}>
+        <Dialog.Content
+          className="ds-drawer"
+          style={{ ["--drawer-w" as string]: `${width}px` }}
+          aria-describedby={undefined}
+          onInteractOutside={(event) => { if (fromToast(event)) event.preventDefault(); }}
+        >
           <header className="ds-overlay-head">
             <div className="ds-grow">
               <Dialog.Title asChild><h2>{title}</h2></Dialog.Title>

@@ -90,8 +90,21 @@ export function useCollections(collections: string[]): Record<string, Rec[]> {
   return rows ?? Object.fromEntries(collections.map((name) => [name, [] as Rec[]]));
 }
 
+/**
+ * A record by id, but only if it belongs to the organisation in the address.
+ * Ids are global, so without this check a record from another organisation
+ * could be read and acted on by changing the address.
+ */
 export function useRecord(id: string | undefined): Rec | undefined {
-  return useLiveQuery(() => (id ? repo.getRecord(id) : Promise.resolve(undefined)), [id]);
+  const { org } = useWorkspace();
+  return useLiveQuery(
+    async () => {
+      if (!id) return undefined;
+      const record = await repo.getRecord(id);
+      return record && record.organizationId === org.id ? record : undefined;
+    },
+    [id, org.id],
+  );
 }
 
 export function useChildren(parentId: string | undefined): Rec[] {

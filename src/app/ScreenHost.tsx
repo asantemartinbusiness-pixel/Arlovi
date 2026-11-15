@@ -7,6 +7,8 @@ import { APP_ENTRIES } from "@/app/nav";
 import { getApp, type ActionDef, type ScreenContext, type ScreenDef } from "@/platform/registry";
 import { can as roleCan, canOpen, ROLE_LABELS } from "@/platform/policy";
 import { useMutations, useToast, useWorkspace } from "@/platform/workspace";
+import { getRecord } from "@/platform/repo";
+import { useLiveQuery } from "dexie-react-hooks";
 import { ScreenRoute as LegacyScreen } from "@/app/screen";
 import { applicationLoadFailures } from "@/applications";
 
@@ -18,6 +20,15 @@ export function ScreenHost() {
   const match = findScreen(location.pathname);
   const screen = match?.screen;
   const mutate = useMutations(screen?.id);
+  /* The record in the address must belong to the organisation in the address.
+     Ids are global, so a record from another organisation is refused here
+     before any screen renders or offers an action on it. */
+  const routeId = match?.params.id;
+  const foreign = useLiveQuery(async () => {
+    if (!routeId) return false;
+    const record = await getRecord(routeId);
+    return Boolean(record && record.organizationId !== workspace.org.id);
+  }, [routeId, workspace.org.id]);
 
   const [tab, setTabState] = useState<string>("");
   const [selectedId, setSelectedId] = useState<string | undefined>(match?.params.id);
@@ -86,6 +97,19 @@ export function ScreenHost() {
         <div className="pg-body">
           <Notice tone="warning" title="Not in the screen register">
             The route <code>{location.pathname}</code> is not one of the approved 316 screens.
+          </Notice>
+        </div>
+      </div>
+    );
+  }
+
+  if (foreign) {
+    return (
+      <div className="pg">
+        <div className="pg-head"><h1>Not in {workspace.org.name}</h1></div>
+        <div className="pg-body">
+          <Notice tone="warning" title="This record belongs to another organisation">
+            Records are kept apart per organisation. Switch organisation from the header to open it there.
           </Notice>
         </div>
       </div>

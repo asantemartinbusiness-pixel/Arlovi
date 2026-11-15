@@ -30,6 +30,12 @@ export function getRecord(id: string): Promise<Rec | undefined> {
   return db.records.get(id);
 }
 
+/** A record by id only if it belongs to the given organisation. */
+export async function getRecordInOrg(orgId: string, id: string): Promise<Rec | undefined> {
+  const record = await db.records.get(id);
+  return record && record.organizationId === orgId ? record : undefined;
+}
+
 export async function listChildren(orgId: string, parentId: string): Promise<Rec[]> {
   const rows = await db.records.where("parentId").equals(parentId).toArray();
   return rows.filter((row) => row.organizationId === orgId);

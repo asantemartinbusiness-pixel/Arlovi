@@ -200,3 +200,7 @@
 .pg-cmdbar .pg-actions { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 .pg-cmdbar .pg-actions .ds-btn { min-height: var(--control-h-sm); padding: 0 var(--space-3); font-size: var(--text-xs); }
 @media (max-width: 599px) { .pg-cmdbar-title { display: none; } }
+
+/* Focus not obscured (WCAG 2.4.11): anything scrolled into view, including by
+   keyboard focus, lands above the sticky execution tray rather than under it. */
+.hq-main { scroll-padding-block-end: 64px; }

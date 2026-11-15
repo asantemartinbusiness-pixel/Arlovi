@@ -265,7 +265,7 @@ table.ds-table { width: 100%; border-collapse: separate; border-spacing: 0; font
 .ds-menu-label { font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-subtle); padding: var(--space-2) var(--space-2) 4px; font-weight: 650; }
 
 /* ========== Toasts ========== */
-.ds-toasts { position: fixed; inset-block-end: var(--space-4); inset-inline-end: var(--space-4); z-index: 150; display: flex; flex-direction: column; gap: var(--space-2); pointer-events: none; }
+.ds-toasts { position: fixed; inset-block-end: var(--space-4); inset-inline-start: calc(var(--rail-w) + var(--space-4)); z-index: 150; display: flex; flex-direction: column; gap: var(--space-2); pointer-events: none; }
 .ds-toast {
   pointer-events: auto; width: min(380px, calc(100vw - 32px)); display: flex; gap: var(--space-3);
   background: var(--bg-surface); border: 1px solid var(--border-default); border-inline-start: 3px solid var(--accent);
