@@ -1,2 +1,3 @@
 /* Barrel for the t5b_visual workstream. Each application module registers itself on import. */
-export {};
+import "@/domain/seeds/design";
+import "@/applications/design/index";

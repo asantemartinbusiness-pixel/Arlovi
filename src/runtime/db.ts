@@ -33,7 +33,9 @@ export function ensureSeed(): Promise<void> {
     const extra = collectSeeds(SEED_NOW);
     const seen = new Set(base.records.map((record) => record.id));
     const seed = {
-      records: [...base.records, ...extra.records.filter((record) => !seen.has(record.id))],
+      // First contributor wins: a later seed file reusing an id is dropped
+      // rather than failing the whole bulkAdd with a ConstraintError.
+      records: [...base.records, ...extra.records.filter((record) => (seen.has(record.id) ? false : (seen.add(record.id), true)))],
       events: [...base.events, ...extra.events],
     };
     await db.transaction("rw", [db.records, db.events, db.meta], async () => {
