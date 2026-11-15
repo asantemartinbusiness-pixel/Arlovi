@@ -510,6 +510,9 @@ export function ForecastCurrent({ context }: { context: ScreenContext }) {
             rows={categorised.flatMap((entry) => entry.deals.map((deal) => ({ deal, category: entry.category })))}
             rowId={(row) => row.deal.id}
             label="Forecast detail"
+            selectedId={context.selectedId}
+            onSelect={(id) => context.select(id)}
+            onOpen={(id) => context.navigate(`/o/${org.slug}/crm/deals/${id}`)}
             columns={[
               { key: "category", header: "Category", cell: (row) => <Pill tone={row.category === "commit" ? "success" : row.category === "best case" ? "info" : "neutral"}>{row.category}</Pill>, filterValue: (row) => row.category },
               { key: "deal", header: "Deal", primary: true, cell: (row) => row.deal.title, filterValue: (row) => row.deal.title },
@@ -519,7 +522,6 @@ export function ForecastCurrent({ context }: { context: ScreenContext }) {
               { key: "amount", header: "Amount", align: "end", cell: (row) => <Money minor={row.deal.amountMinor} context={context} />, sortValue: (row) => Number(row.deal.amountMinor ?? 0) },
               { key: "weighted", header: "Weighted", align: "end", cell: (row) => <Money minor={Math.round((Number(row.deal.amountMinor ?? 0) * probabilityOf(row.deal)) / 100)} context={context} bold /> },
             ]}
-            onOpen={(id) => context.navigate(`/o/${org.slug}/crm/deals/${id}`)}
             summary={<Money minor={data.forecast.weightedMinor} context={context} bold />}
           />
         </Card>

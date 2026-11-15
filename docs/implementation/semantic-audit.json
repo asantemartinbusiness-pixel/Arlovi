@@ -216,6 +216,33 @@
     "Tabs were audited exhaustively on VIDEO only.",
     "New forms were not checked at 390px."
    ]
+  },
+  "COMMS": {
+   "signedOff": true,
+   "basis": "Operations remediation review, 15 Nov 2026: every contract action, overlay and tab judged; routed actions reimplemented; more than 160 action runs in a browser with records and audit events checked.",
+   "openItems": [
+    "COMMS-004 audio message: changed by the orchestrator from a disabled button to an honest, reachable boundary action; no audio service exists."
+   ]
+  },
+  "HR": {
+   "signedOff": true,
+   "basis": "Operations remediation review, 15 Nov 2026: every contract action, overlay and tab judged; routed actions reimplemented; more than 160 action runs in a browser with records and audit events checked.",
+   "openItems": []
+  },
+  "PROJECT": {
+   "signedOff": true,
+   "basis": "Operations remediation review, 15 Nov 2026: every contract action, overlay and tab judged; routed actions reimplemented; more than 160 action runs in a browser with records and audit events checked.",
+   "openItems": []
+  },
+  "CARE": {
+   "signedOff": true,
+   "basis": "Operations remediation review, 15 Nov 2026: every contract action, overlay and tab judged; routed actions reimplemented; more than 160 action runs in a browser with records and audit events checked.",
+   "openItems": []
+  },
+  "LEGAL": {
+   "signedOff": true,
+   "basis": "Operations remediation review, 15 Nov 2026: every contract action, overlay and tab judged; routed actions reimplemented; more than 160 action runs in a browser with records and audit events checked.",
+   "openItems": []
   }
  }
 }

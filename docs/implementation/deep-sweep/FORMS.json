@@ -136,5 +136,302 @@
   "guarded": [
    "Change the field type"
   ]
+ },
+ {
+  "id": "ARL-FORMS-003",
+  "title": "Conditional Logic",
+  "route": "/o/northline/forms/forms/nl-forms-001/logic",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rules",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Test",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Rule editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "invalid path",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "scenario tester",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test a scenario",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a condition",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Connect a condition",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Fix a logic problem",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Check the branches",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Scenario tester",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-FORMS-004",
+  "title": "Form Submissions",
+  "route": "/o/northline/forms/forms/nl-forms-001/submissions",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "New",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Reviewed",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Routed",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Submission drawer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "privacy control",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "route retry",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export CSV",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Delete under the retention policy",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Notification routing",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-FORMS-005",
+  "title": "Form Design & Publish",
+  "route": "/o/northline/forms/forms/nl-forms-001/publish",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Design",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Embed",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Access",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Analytics",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Theme inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "access control",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "embed tester",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Generate a link",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish a version",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Style the form",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview the embed",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-FORMS-006",
+  "title": "Form Analytics",
+  "route": "/o/northline/forms/forms/nl-forms-001/analytics",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Funnel",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Responses",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sources",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Timing",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Metric methods",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "test report",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "field insight",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare versions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create an experiment",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "How each figure is made",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Experiment report",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Field insight",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]

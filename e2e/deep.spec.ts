@@ -72,10 +72,12 @@ async function closeDialogs(page: Page) {
  */
 async function load(page: Page, url: string) {
   const booted = await page.evaluate(() => Boolean(document.querySelector(".hq"))).catch(() => false);
-  if (!booted) {
+  if (booted) await closeDialogs(page);
+  // A blocking dialog ignores Escape by design; reload rather than act behind it.
+  const stuck = booted && (await page.getByRole("dialog").count()) > 0;
+  if (!booted || stuck) {
     await page.goto(url, { waitUntil: "domcontentloaded" });
   } else {
-    await closeDialogs(page);
     await page.evaluate((target) => {
       window.history.pushState(null, "", target);
       window.dispatchEvent(new PopStateEvent("popstate"));
@@ -147,6 +149,17 @@ async function sweepScreen(page: Page, screen: Contract, errors: ReturnType<type
   }
 
   const run = async (label: string, inMenu: boolean) => {
+    try {
+      await runAction(label, inMenu);
+    } catch (error) {
+      // Never let one unreachable control abort the rest of the application.
+      const message = error instanceof Error ? error.message.split("\n")[0] : String(error);
+      checks.push({ kind: "action", name: label, ok: false, note: `could not be exercised: ${message.slice(0, 200)}` });
+      await page.goto(`${base}?${CLOCK}`, { waitUntil: "domcontentloaded" }).catch(() => undefined);
+    }
+  };
+
+  const runAction = async (label: string, inMenu: boolean) => {
     await load(page, `${base}?${CLOCK}`);
     errors.take();
     if (inMenu) {

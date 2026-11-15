@@ -515,7 +515,7 @@ export const commsApp = registerApp({
         { id: "Send", label: "Send a message", placement: "primary", run: (context) => context.openOverlay("message composer", { dm: true }) },
         { id: "search", label: "Search messages", placement: "secondary", run: (context) => context.openOverlay("message search") },
         { id: "attach", label: "Attach a document", placement: "overflow", run: (context) => context.openOverlay("message composer", { dm: true, mode: "attach" }) },
-        { id: "audio message", label: "Audio message", placement: "overflow", guard: () => "No microphone is used by this workspace", run: () => undefined },
+        { id: "audio message", label: "Audio message", placement: "overflow", run: (context) => context.toast("Audio messages need an audio service", "No audio or speech service is connected, so nothing was recorded. Write the message instead; it is kept exactly as typed.", "blocked") },
         { id: "call", label: "Call", placement: "overflow", run: (context) => placeCall(context) },
         { id: "new conversation", label: "New conversation", placement: "overflow", run: (context) => context.openOverlay("new conversation") },
         { id: "add member", label: "Add someone", placement: "overflow", run: (context) => context.openOverlay("add member") },

@@ -694,5 +694,150 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-CRM-010",
+  "title": "Sales Forecasts",
+  "route": "/o/northline/crm/forecasts",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Current",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Scenarios",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Methodology",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Forecast model",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "confidence explanation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "override reason",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Drill down",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review the forecast",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Adjust assumptions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Override a weighting",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Confidence",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Method",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CRM-011",
+  "title": "Sales Automation",
+  "route": "/o/northline/crm/automation",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Workflows",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Templates",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Runs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Failures",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Workflow designer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "test data",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "activation approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New rule",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Failures",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Simulate",
+   "Activate",
+   "Stop the rule"
+  ]
  }
 ]

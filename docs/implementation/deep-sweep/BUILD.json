@@ -144,5 +144,695 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-BUILD-003",
+  "title": "Visual App Builder",
+  "route": "/o/northline/build/projects/nl-appProjects-001/builder",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Design",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Logic",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Data",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Responsive",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Component inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "expression editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "binding test",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a component",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Simulate in the preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Responsive widths",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Bind the selection",
+   "Edit styles"
+  ]
+ },
+ {
+  "id": "ARL-BUILD-004",
+  "title": "Code Editor",
+  "route": "/o/northline/build/projects/nl-appProjects-001/code",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Files",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Source control",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Problems",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tests",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "File search",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "diff review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "command authorization",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Search the files",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit a file",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Commit a version",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Run a safe command",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Branch",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit the model",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review the generated output",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Change history",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-BUILD-005",
+  "title": "Database Designer",
+  "route": "/o/northline/build/projects/nl-appProjects-001/database",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Schema",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Data",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Migrations",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Policies",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Column editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "migration diff",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "access policy",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Alter a field",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New entity",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Validate the access policy",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Seed an entity",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Migration check",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-BUILD-006",
+  "title": "API & Functions",
+  "route": "/o/northline/build/projects/nl-appProjects-001/api",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Endpoints",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Functions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Contracts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Runs",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Request builder",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "auth inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "function diff",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test an endpoint",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Define an endpoint",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Deploy",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect the trace",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Authorisation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Contracts",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-BUILD-007",
+  "title": "Authentication & Roles",
+  "route": "/o/northline/build/projects/nl-appProjects-001/auth",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Users",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Roles",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sessions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Providers",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Role editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "policy simulator",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "authentication issue",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Configure a provider",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New role",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Revoke sessions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Providers",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-BUILD-008",
+  "title": "Testing & QA",
+  "route": "/o/northline/build/projects/nl-appProjects-001/tests",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Suites",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Runs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Coverage",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Issues",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Test report",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "AI patch review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "flaky test tracker",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect failures",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Run the suites",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve a fix",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export the results",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Flaky checks",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-BUILD-009",
+  "title": "Deployments & Environments",
+  "route": "/o/northline/build/projects/nl-appProjects-001/deploy",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Environments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Releases",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Logs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rollbacks",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Release approval",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "diff",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "rollback impact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Roll back",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Promote",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect the configuration",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pause or resume deployments",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Environments",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Build logs",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-BUILD-010",
+  "title": "Integrations & Secrets",
+  "route": "/o/northline/build/projects/nl-appProjects-001/integrations",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Connections",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Secrets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Webhooks",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Health",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Secret input",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "webhook test",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "revocation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test the integrations",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Attach an integration",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Rotate a secret",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Revoke an integration",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Integration directory",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Keys",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-BUILD-011",
+  "title": "App Analytics & Monitoring",
+  "route": "/o/northline/build/projects/nl-appProjects-001/monitor",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Errors",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Performance",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Usage",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Costs",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Trace viewer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "alert rule",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "budget panel",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create an incident",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect an event",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Tune the monitor",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Read path",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Failing checks",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Budget",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]
