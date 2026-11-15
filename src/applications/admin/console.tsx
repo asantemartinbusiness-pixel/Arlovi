@@ -132,7 +132,7 @@ export function SecurityScreen({ context, tab }: { context: ScreenContext; tab: 
                 tone: "danger",
                 onRun: (selected) => {
                   const revokable = selected.filter((row) => row.fields.current !== true && row.status === "active");
-                  void Promise.all(revokable.map((row) => context.mutate.patch(row.id, { status: "revoked", fields: { ...row.fields, revokedBy: context.actor, revokedAt: new Date().toISOString() } }, { event: `Session revoked: ${row.title}` })))
+                  void Promise.all(revokable.map((row) => context.mutate.patch(row.id, { status: "revoked", fields: { ...row.fields, revokedBy: context.actor, revokedAt: context.now.toISOString() } }, { event: `Session revoked: ${row.title}` })))
                     .then(() => context.toast(
                       "Revoked",
                       selected.length === revokable.length
@@ -284,7 +284,7 @@ export function EmergencyRevoke({ context, close }: { context: ScreenContext; cl
           for (const session of target) {
             await context.mutate.patch(session.id, {
               status: "revoked",
-              fields: { ...session.fields, revokedBy: context.actor, revokedAt: new Date().toISOString() },
+              fields: { ...session.fields, revokedBy: context.actor, revokedAt: context.now.toISOString() },
             }, { event: `Session revoked: ${session.title}`, expectRevision: session.revision });
           }
           context.toast("Revoked", `${target.length} ${target.length === 1 ? "session record" : "session records"} marked revoked. Your own session is untouched.`);
@@ -358,7 +358,12 @@ function auditClass(event: Audit): AuditTab {
 
 export function AuditScreen({ context, tab }: { context: ScreenContext; tab: AuditTab }) {
   const events = useEvents(undefined, 400);
-  const rows = useMemo(() => (tab === "All" ? events : events.filter((event) => auditClass(event) === tab)), [events, tab]);
+  // Newest first by the moment each event happened, compared as instants rather than strings.
+  const rows = useMemo(() => {
+    const scoped = tab === "All" ? events : events.filter((event) => auditClass(event) === tab);
+    const when = (event: Audit) => { const time = Date.parse(event.at); return Number.isNaN(time) ? 0 : time; };
+    return scoped.map((event, index) => ({ event, index })).sort((a, b) => when(b.event) - when(a.event) || a.index - b.index).map((item) => item.event);
+  }, [events, tab]);
 
   return (
     <Stack gap={4}>
@@ -375,7 +380,7 @@ export function AuditScreen({ context, tab }: { context: ScreenContext; tab: Aud
           onSelect={context.select}
           onOpen={(id) => { context.select(id); context.openOverlay("Audit detail", { id }); }}
           columns={[
-            { key: "at", header: "When", width: "170px", cell: (row) => <span className="ds-num" title={context.dateTime(row.at)}>{context.relative(row.at)}</span>, sortValue: (row) => row.at },
+            { key: "at", header: "When", width: "170px", cell: (row) => <span className="ds-num" title={context.dateTime(row.at)}>{context.relative(row.at)}</span>, sortValue: (row) => new Date(row.at).getTime() },
             {
               key: "actor", header: "Who", width: "180px",
               cell: (row) => <Row gap={2}><Pill tone={row.actor === "system" ? "accent" : "neutral"}>{row.actor === "system" ? "System" : row.actor}</Pill></Row>,
@@ -1466,7 +1471,7 @@ export function DeveloperScreen({ context, tab }: { context: ScreenContext; tab:
                 label: "Revoke",
                 tone: "danger",
                 onRun: (selected) => {
-                  void Promise.all(selected.filter((row) => row.status === "active").map((row) => context.mutate.patch(row.id, { status: "revoked", fields: { ...row.fields, revokedBy: context.actor, revokedAt: new Date().toISOString() } }, { event: `API key revoked: ${row.title}` })))
+                  void Promise.all(selected.filter((row) => row.status === "active").map((row) => context.mutate.patch(row.id, { status: "revoked", fields: { ...row.fields, revokedBy: context.actor, revokedAt: context.now.toISOString() } }, { event: `API key revoked: ${row.title}` })))
                     .then(() => context.toast("Revoked", "The key records say revoked. With no server, nothing was calling them anyway."));
                 },
                 disabled: (selected) => selected.every((row) => row.status !== "active"),

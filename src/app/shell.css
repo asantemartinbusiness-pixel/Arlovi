@@ -67,7 +67,8 @@
 .hq-navlink svg { flex: none; opacity: 0.8; }
 .hq-navbadge { margin-inline-start: auto; font-size: var(--text-2xs); font-weight: 700; background: var(--bg-sunken); border-radius: var(--radius-full); padding: 1px 6px; }
 
-.hq-main { overflow: auto; min-width: 0; display: flex; flex-direction: column; background: var(--bg-canvas); }
+.hq-main { overflow: hidden; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--bg-canvas); }
+.hq-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
 .hq-banners { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) var(--page-pad) 0; }
 
 /* ===================== Page chrome ===================== */
@@ -84,14 +85,14 @@
   padding: 0 var(--page-pad); font-size: var(--text-xs); color: var(--fg-muted);
   border-bottom: 1px solid var(--border-subtle); background: var(--bg-inset);
 }
-.pg-body { padding: var(--space-5) var(--page-pad) calc(var(--space-9) + 48px); flex: 1; min-width: 0; }
+.pg-body { padding: var(--space-5) var(--page-pad) var(--space-9); flex: 1; min-width: 0; }
 .pg-body[data-pad="none"] { padding: 0; }
 .pg-split { display: grid; grid-template-columns: minmax(0, 1fr) var(--inspector-w); flex: 1; min-height: 0; }
 @media (max-width: 1279px) { .pg-split { grid-template-columns: minmax(0, 1fr); } .pg-split > .ds-inspector { display: none; } }
 
 /* ===================== Execution tray ===================== */
 .hq-tray {
-  position: sticky; inset-block-end: 0; z-index: 20; background: var(--bg-surface);
+  position: relative; flex: none; z-index: 20; background: var(--bg-surface);
   border-block-start: 1px solid var(--border-default); display: flex; align-items: center; gap: var(--space-3);
   padding: var(--space-2) var(--page-pad); font-size: var(--text-xs); min-height: 40px;
 }
@@ -200,7 +201,3 @@
 .pg-cmdbar .pg-actions { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 .pg-cmdbar .pg-actions .ds-btn { min-height: var(--control-h-sm); padding: 0 var(--space-3); font-size: var(--text-xs); }
 @media (max-width: 599px) { .pg-cmdbar-title { display: none; } }
-
-/* Focus not obscured (WCAG 2.4.11): anything scrolled into view, including by
-   keyboard focus, lands above the sticky execution tray rather than under it. */
-.hq-main { scroll-padding-block-end: 64px; }

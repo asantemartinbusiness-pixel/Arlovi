@@ -48,7 +48,7 @@ registerSeed("inbox", (ctx) => {
     source: "Commerce", category: "routine", read: true, acknowledged: false, group: "Updates",
   }, 9);
   notification(25, "Mailbox connector still has no grant", "Outbound mail stays in draft until a mail provider is connected.", {
-    kind: "system", priority: "P2", audience: "owner", route: "/o/northline/connect/connectors", entityId: "nl-connectors-002",
+    kind: "system", priority: "P2", audience: "owner", route: "/o/northline/connect/connections", entityId: "nl-connectors-002",
     source: "Platform", category: "security", read: false, acknowledged: true, group: "Platform",
   }, 26);
   notification(26, "Theo Marsh asked for help on the Kinsale install", "The electrician slot moved to Friday; the task needs a new owner for Wednesday.", {

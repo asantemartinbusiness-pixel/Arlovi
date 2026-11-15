@@ -188,7 +188,7 @@ export async function openLatestDraft(context: ScreenContext): Promise<void> {
     context.toast("No drafts", "Nothing in Docs is marked as a draft.", "info");
     return;
   }
-  context.navigate(`/o/${context.org.slug}/docs/files/${latest.id}`);
+  context.navigate(`/o/${context.org.slug}/docs/documents/${latest.id}`);
 }
 
 /** Asks a named teammate for help: a task assigned to them, linked back. */

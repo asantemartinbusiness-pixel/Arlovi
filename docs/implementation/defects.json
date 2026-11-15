@@ -9,7 +9,7 @@
    ],
    "summary": "Northline invoice opened under the Harbor Supply address",
    "match": "switching organization",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-02",
@@ -20,7 +20,7 @@
    ],
    "summary": "Check-in replaced the booking's fields, wiping service, resource, customer and deposit",
    "match": null,
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-03",
@@ -30,7 +30,7 @@
    ],
    "summary": "'Run the next step' ran a step while the organisation was paused",
    "match": "runs a step while the organisation is paused",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-04",
@@ -41,7 +41,7 @@
    ],
    "summary": "'Set the send window' relinked the campaign to the first audience, changing its consent scope",
    "match": null,
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-05",
@@ -51,7 +51,7 @@
    ],
    "summary": "A Qualified deal requires a confirmed budget but no screen records one",
    "match": "no screen can record one",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-06",
@@ -61,7 +61,7 @@
    ],
    "summary": "Approving a quote removed it from the library's Open value while still open",
    "match": "removes its",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-07",
@@ -71,7 +71,7 @@
    ],
    "summary": "Edit profile did not prefill the trading name, so saving blanked it",
    "match": "does not prefill the trading name",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-08",
@@ -81,7 +81,7 @@
    ],
    "summary": "The execution tray covered a control and intercepted the click",
    "match": "/connect/marketplace 'What it needs'",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-09",
@@ -91,7 +91,7 @@
    ],
    "summary": "Revenue recognised summed gross paid invoices instead of posted net revenue",
    "match": "/analytics/forecasts \"Revenue recognised",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-10",
@@ -101,7 +101,7 @@
    ],
    "summary": "A second refund could be requested while one was pending",
    "match": "a second refund can be requested",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-11",
@@ -111,7 +111,7 @@
    ],
    "summary": "The resolution named the case owner, not the person who resolved it",
    "match": "the resolution's \"By\" shows the case owner",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-12",
@@ -121,7 +121,7 @@
    ],
    "summary": "No screen records an accepted offer or moves a candidate to Hired",
    "match": "no screen records an accepted offer",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-13",
@@ -131,7 +131,7 @@
    ],
    "summary": "The execution tray covered an onboarding checklist control",
    "match": "'Payroll inputs added'",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-14",
@@ -141,7 +141,7 @@
    ],
    "summary": "The Consultation table offered publicly was not bookable",
    "match": "is not bookable (no bookable flag)",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-15",
@@ -151,7 +151,7 @@
    ],
    "summary": "A completed paid booking raised no invoice and linked to no service history",
    "match": "raises no invoice",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-16",
@@ -161,7 +161,7 @@
    ],
    "summary": "The requisition supplier list offered duplicate supplier records",
    "match": "offers duplicate supplier records",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-17",
@@ -171,7 +171,7 @@
    ],
    "summary": "HQ 'Waiting on you' said nothing to approve while the Inbox held requests",
    "match": "'Waiting on you' says 'Nothing to approve'",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-18",
@@ -181,7 +181,7 @@
    ],
    "summary": "The wage accrual approval named a different journal and amount than its target",
    "match": "'Post the October wage accrual'",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-19",
@@ -192,7 +192,7 @@
    ],
    "summary": "No screen turns an extracted source line into a proposed fact",
    "match": "no screen turns an extracted source line",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-20",
@@ -202,7 +202,7 @@
    ],
    "summary": "The Corrections count did not change after a recorded correction",
    "match": "Corrections column still reads 0",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-21",
@@ -212,7 +212,7 @@
    ],
    "summary": "A connector incident did not name its connector",
    "match": "does not name the connector",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-22",
@@ -222,7 +222,7 @@
    ],
    "summary": "Opening an incident duplicated the open one instead of reusing it",
    "match": "instead of de-duplicating",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-23",
@@ -232,7 +232,7 @@
    ],
    "summary": "An AI employee was active with five activation blockers",
    "match": "is active although her own profile lists",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-24",
@@ -242,7 +242,7 @@
    ],
    "summary": "The monthly report's revenue disagreed with the posted ledger",
    "match": "/analytics/reports/nl-reports-020 states revenue",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-25",
@@ -253,7 +253,7 @@
    ],
    "summary": "HQ and Finance showed different receivables for the same date",
    "match": "/hq/home shows receivable",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-26",
@@ -264,7 +264,7 @@
    ],
    "summary": "Portal list and portal admin disagreed on external users",
    "match": "lists 3 external users",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-27",
@@ -275,7 +275,7 @@
    ],
    "summary": "Portal list and client dashboard disagreed on shared records",
    "match": "records shared, but its client dashboard",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-28",
@@ -285,7 +285,7 @@
    ],
    "summary": "The privacy register's record count disagreed with the review",
    "match": "request covers 11 records",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-29",
@@ -295,7 +295,7 @@
    ],
    "summary": "An access request's export matched none of the records the register counted",
    "match": "'Export subject data' matches 0",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-30",
@@ -305,7 +305,7 @@
    ],
    "summary": "Posting a journal from its form renamed it to its memo",
    "match": "renames it to its memo",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-31",
@@ -315,7 +315,7 @@
    ],
    "summary": "The basket's Order due omitted delivery",
    "match": "Preview basket lists Delivery",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-32",
@@ -325,7 +325,7 @@
    ],
    "summary": "'Create an invoice' prefilled INV-1001 instead of the next free number",
    "match": "prefills INV-1001",
-   "status": "open"
+   "status": "fixed"
   },
   {
    "id": "DEF-33",

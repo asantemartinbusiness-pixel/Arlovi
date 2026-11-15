@@ -1654,7 +1654,7 @@ function ArtifactScreen({ context, view }: { context: ScreenContext; view: "Prev
         <Stack gap={3}>
           <article className="ds-panel ds-prose" style={{ padding: "var(--space-4)", whiteSpace: "pre-wrap" }}>{text || artifact.summary}</article>
           <Row gap={2} wrap>
-            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/docs/files/${artifact.id}`)}>Open in Documents</Button>
+            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/docs/documents/${artifact.id}`)}>Open in Documents</Button>
             <Button size="sm" variant="ghost" onClick={() => context.openOverlay("share dialog", { id: artifact.id })}>Share</Button>
             <Button size="sm" variant="ghost" onClick={() => context.openOverlay("export dialog", { id: artifact.id })}>Export</Button>
           </Row>
@@ -2907,7 +2907,7 @@ export const aiApp = registerApp({
         { id: "Mention participant", placement: "primary", run: (context) => { useChatState.getState().setDraft(threadKey(context.screen.id, context.params.id), "@"); useChatState.getState().requestFocus(threadKey(context.screen.id, context.params.id)); context.setTab("Discussion"); } },
         { id: "pin decision", label: "Pin a decision", placement: "secondary", run: (context) => context.openOverlay("decision recorder") },
         { id: "assign task", placement: "overflow", run: (context) => context.openOverlay("assign task") },
-        { id: "all tasks", label: "All tasks in Projects", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/project/tasks`) },
+        { id: "all tasks", label: "All tasks in Projects", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/project/workload`) },
         { id: "host review", placement: "overflow", run: (context) => context.openOverlay("host review") },
         { id: "participants", label: "Participants", placement: "overflow", run: (context) => context.openOverlay("Participant selector") },
       ],
@@ -3036,7 +3036,7 @@ export const aiApp = registerApp({
       })),
       actions: [
         { id: "revise with AI", label: "Compose a revision", placement: "primary", run: (context) => void reviseArtifact(context) },
-        { id: "Open in native app", placement: "secondary", run: (context) => context.navigate(`/o/${context.org.slug}/docs/files/${context.params.id}`) },
+        { id: "Open in native app", placement: "secondary", run: (context) => context.navigate(`/o/${context.org.slug}/docs/documents/${context.params.id}`) },
         { id: "comment", placement: "secondary", run: (context) => context.openOverlay("comment") },
         { id: "share", placement: "overflow", run: (context) => context.openOverlay("share dialog", { id: context.params.id }) },
         { id: "export", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("export dialog", { id: context.params.id }) },

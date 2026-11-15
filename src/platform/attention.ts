@@ -203,23 +203,23 @@ function approverRoles(collection: string): Role[] {
   return ["owner"];
 }
 
+/** List and detail screens for each collection; checked against the catalogue in tests. */
+export const RECORD_ROUTES: Record<string, { list: string; detail?: string }> = {
+  invoices: { list: "fin/invoices", detail: "fin/invoices" }, bills: { list: "fin/bills" }, expenses: { list: "fin/expenses" }, journals: { list: "fin/ledger" },
+  deals: { list: "crm/deals", detail: "crm/deals" }, contacts: { list: "crm/contacts", detail: "crm/contacts" }, companies: { list: "crm/companies" }, quotes: { list: "crm/quotes" },
+  employees: { list: "hr/employees", detail: "hr/employees" }, leaveRequests: { list: "hr/leave" }, candidates: { list: "hr/recruitment", detail: "hr/candidates" },
+  projects: { list: "project/projects", detail: "project/projects" }, tasks: { list: "project/projects", detail: "project/tasks" },
+  missions: { list: "mission/missions", detail: "mission/missions" }, agents: { list: "team/agents", detail: "team/agents" },
+  campaigns: { list: "market/campaigns", detail: "market/campaigns" }, products: { list: "commerce/products", detail: "commerce/products" },
+  orders: { list: "commerce/orders", detail: "commerce/orders" }, bookings: { list: "book/calendar", detail: "book/bookings" }, tickets: { list: "care/tickets", detail: "care/tickets" },
+  documents: { list: "docs/files", detail: "docs/documents" }, workbooks: { list: "sheets/workbooks", detail: "sheets/workbooks" }, decks: { list: "present/decks", detail: "present/decks" },
+  designs: { list: "design/files", detail: "design/files" }, contracts: { list: "legal/contracts", detail: "legal/contracts" }, suppliers: { list: "proc/suppliers", detail: "proc/suppliers" },
+};
+
 export function routeForRecord(record: Rec, orgSlug: string): string | undefined {
-  const map: Record<string, string> = {
-    invoices: "fin/invoices", bills: "fin/bills", expenses: "fin/expenses", journals: "fin/ledger",
-    deals: "crm/deals", contacts: "crm/contacts", companies: "crm/companies", quotes: "crm/quotes",
-    employees: "hr/people", leaveRequests: "hr/leave", candidates: "hr/recruiting",
-    projects: "project/projects", tasks: "project/tasks", missions: "mission/missions",
-    agents: "team/agents", campaigns: "market/campaigns", products: "commerce/products",
-    orders: "commerce/orders", bookings: "book/calendar", tickets: "care/tickets",
-    documents: "docs/files", workbooks: "sheets/files", decks: "present/files",
-    designs: "design/files", contracts: "legal/contracts", suppliers: "proc/suppliers",
-  };
-  const base = map[record.collection];
-  if (!base) return undefined;
-  const detailCollections = new Set(["invoices", "deals", "projects", "tasks", "missions", "agents", "contacts", "companies", "documents", "workbooks", "decks", "designs"]);
-  return detailCollections.has(record.collection)
-    ? `/o/${orgSlug}/${base}/${record.id}`
-    : `/o/${orgSlug}/${base}`;
+  const route = RECORD_ROUTES[record.collection];
+  if (!route) return undefined;
+  return route.detail ? `/o/${orgSlug}/${route.detail}/${record.id}` : `/o/${orgSlug}/${route.list}`;
 }
 
 export function filterForRole(items: AttentionItem[], role: Role): AttentionItem[] {

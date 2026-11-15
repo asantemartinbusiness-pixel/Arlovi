@@ -65,8 +65,10 @@ export async function listChildren(orgId: string, parentId: string): Promise<Rec
   return primeAll(rows.filter((row) => row.organizationId === orgId));
 }
 
-export function listEvents(orgId: string, limit = 200): Promise<Audit[]> {
-  return db.events.where("organizationId").equals(orgId).reverse().limit(limit).toArray();
+/** The newest events first, by when they happened (not by storage key order). */
+export async function listEvents(orgId: string, limit = 200): Promise<Audit[]> {
+  const rows = await db.events.where("organizationId").equals(orgId).sortBy("at");
+  return rows.reverse().slice(0, limit);
 }
 
 function snapshot(record: Rec, at: string): Snapshot {

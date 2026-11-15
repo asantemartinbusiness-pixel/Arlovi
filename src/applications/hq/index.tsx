@@ -399,7 +399,7 @@ function MyWorkspace({ context, view }: { context: ScreenContext; view: "Today" 
       <Card span={4} title="Drafts" subtitle={`${data.documents.filter((doc) => doc.status === "draft").length} unfinished`}>
         <Stack gap={2}>
           {data.documents.filter((doc) => doc.status === "draft").slice(0, 4).map((doc) => (
-            <Button key={doc.id} variant="ghost" style={{ justifyContent: "flex-start" }} onClick={() => context.navigate(`/o/${org.slug}/docs/files/${doc.id}`)}>{doc.title}</Button>
+            <Button key={doc.id} variant="ghost" style={{ justifyContent: "flex-start" }} onClick={() => context.navigate(`/o/${org.slug}/docs/documents/${doc.id}`)}>{doc.title}</Button>
           ))}
           {data.documents.filter((doc) => doc.status === "draft").length === 0 && <span className="ds-subtle">No drafts.</span>}
         </Stack>
@@ -645,7 +645,7 @@ function DepartmentWorkspace({ context, lens }: { context: ScreenContext; lens: 
       { key: "title", header: "Document", primary: true, cell: (row) => row.title, filterValue: (row) => row.title },
       { key: "status", header: "Status", cell: (row) => <Pill>{row.status}</Pill> },
       { key: "updated", header: "Updated", align: "end", cell: (row) => context.date(row.updatedAt), sortValue: (row) => row.updatedAt },
-    ]} onOpen={(id) => context.navigate(`/o/${org.slug}/docs/files/${id}`)} />;
+    ]} onOpen={(id) => context.navigate(`/o/${org.slug}/docs/documents/${id}`)} />;
   }
   if (lens === "Performance") {
     return (

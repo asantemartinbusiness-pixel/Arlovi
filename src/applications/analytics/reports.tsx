@@ -841,7 +841,7 @@ export function DeliveryMethod({ context }: { context: ScreenContext }) {
       <Notice tone="warning" title="What happens when you prepare a delivery">
         {capability.localEquivalent} The delivery record keeps the recipient, the period and how many of the report's figures were citable at that moment.
       </Notice>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connectors`)}>Open connections</Button>
+      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>Open connections</Button>
     </Stack>
   );
 }

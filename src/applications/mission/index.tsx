@@ -2300,7 +2300,7 @@ function ArtifactPreviewOverlay({ context }: { context: ScreenContext }) {
         { label: "Produced by", value: String(item.fields.producedBy ?? item.ownerName) },
       ]} />
       <article className="ds-panel ds-prose" style={{ padding: "var(--space-4)", whiteSpace: "pre-wrap" }}>{body?.text ?? item.summary}</article>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/docs/files/${item.id}`)}>Open in Documents</Button>
+      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/docs/documents/${item.id}`)}>Open in Documents</Button>
     </Stack>
   );
 }

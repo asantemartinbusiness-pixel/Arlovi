@@ -303,9 +303,9 @@ function SourceDetail({ context, view }: { context: ScreenContext; view: "Previe
             columns={[
               { key: "line", header: "Extracted", primary: true, cell: (row) => row.line },
               { key: "author", header: "Recorded by", cell: () => source.ownerName },
-              { key: "corrected", header: "Corrections", cell: (row) => String(correctionsOfLine(row.line, corrections).length) },
               { key: "fact", header: "Assertion", cell: (row) => {
-                const proposed = data.facts.find((fact) => fact.fields.sourceId === source.id && fact.fields.sourceLine === row.line && fact.status !== "rejected");
+                const lineage = new Set([row.line, ...correctionsOfLine(row.line, corrections).map((correction) => correction.from)]);
+                const proposed = data.facts.find((fact) => fact.fields.sourceId === source.id && lineage.has(String(fact.fields.sourceLine ?? "")) && fact.status !== "rejected");
                 return proposed
                   ? <Pill tone={CONFIDENCE_TONE[proposed.status] ?? "neutral"}>{proposed.status}</Pill>
                   : <Button size="sm" variant="secondary" disabled={!context.can("edit_knowledge")} onClick={async () => {
@@ -313,6 +313,7 @@ function SourceDetail({ context, view }: { context: ScreenContext; view: "Previe
                     context.toast("Proposed", "The line is a proposed assertion in the fact registry, pending review. It cites this source and line.");
                   }}>Propose as a fact</Button>;
               } },
+              { key: "corrected", header: "Corrections", cell: (row) => String(correctionsOfLine(row.line, corrections).length) },
             ]}
             onOpen={(id) => context.openOverlay("Correction form", { id, line: (body?.extracted ?? [])[Number(id.split("-").pop())] })}
           />
@@ -662,14 +663,16 @@ function FactRegistry({ context, view }: { context: ScreenContext; view: "Verifi
           { key: "title", header: "Assertion", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
           { key: "value", header: "Value", cell: (row) => String(row.fields.value ?? row.summary) },
           { key: "owner", header: "Canonical owner", cell: (row) => row.ownerName },
-          { key: "confidence", header: "Confidence", cell: (row) => <Row gap={2}><Pill tone={CONFIDENCE_TONE[row.status] ?? "neutral"}>{row.status}</Pill><span className="ds-num">{String(row.fields.confidenceScore ?? 0)}%</span></Row>, sortValue: (row) => Number(row.fields.confidenceScore ?? 0) },
+          { key: "confidence", header: "Confidence", cell: (row) => {
+            const open = conflictsOfFact(row, data.conflicts).length;
+            return <Row gap={2}><Pill tone={CONFIDENCE_TONE[row.status] ?? "neutral"}>{row.status}</Pill><span className="ds-num">{String(row.fields.confidenceScore ?? 0)}%</span>{open > 0 && <span className="ds-subtle ds-num" title="Open conflicts naming this assertion">{open} open conflict{open === 1 ? "" : "s"}</span>}</Row>;
+          }, sortValue: (row) => Number(row.fields.confidenceScore ?? 0) },
           { key: "valid", header: "Valid", cell: (row) => {
             const to = String(row.fields.validTo ?? "");
             const expired = to && new Date(to) < now;
             return <span>{context.date(String(row.fields.validFrom ?? row.at))}{to ? ` – ${context.date(to)}` : " – open"}{expired ? " · past" : ""}</span>;
           } },
           { key: "source", header: "Source", cell: (row) => sourceOf(data, row.fields.sourceId)?.title ?? <Pill tone="warning">No source</Pill> },
-          { key: "conflicts", header: "Open conflicts", align: "end", cell: (row) => <span className="ds-num">{String(conflictsOfFact(row, data.conflicts).length)}</span>, sortValue: (row) => conflictsOfFact(row, data.conflicts).length },
         ]}
         bulkActions={[
           {
@@ -1961,7 +1964,7 @@ function AssetSelector({ context }: { context: ScreenContext }) {
         {assets.map((asset) => (
           <Row key={asset.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2)" }}>
             <div className="ds-grow"><strong>{asset.title}</strong><div className="ds-subtle">{String(asset.fields.kind ?? "asset")} · {String(asset.fields.licence ?? "licence not recorded")}</div></div>
-            <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/asset/library`)}>Open</Button>
+            <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/asset/assets`)}>Open</Button>
           </Row>
         ))}
       </Stack>

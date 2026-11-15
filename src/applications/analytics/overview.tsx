@@ -223,7 +223,7 @@ function Opportunities({ context, lens }: { context: ScreenContext; lens: string
         id: "pipeline",
         title: "The pipeline is weighted low",
         body: `${context.money(weight)} weighted against ${context.money(open)} open, so the probabilities recorded on the deals average under half.`,
-        to: `/o/${context.org.slug}/crm/pipeline`,
+        to: `/o/${context.org.slug}/crm/deals`,
       });
     }
     const tickets = runQuery({ measureIds: ["tickets.open"], filters: [] }, queryContext);

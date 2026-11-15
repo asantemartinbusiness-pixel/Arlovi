@@ -231,6 +231,8 @@ export function AppShell() {
         )}
 
         <main className="hq-main" id="main">
+          {/* The page scrolls here, above the tray, so the tray never covers content. */}
+          <div className="hq-scroll">
           {applicationLoadFailures().length > 0 && (
             <div className="hq-banners">
               <div className="ds-notice" data-tone="danger" role="alert">
@@ -267,6 +269,7 @@ export function AppShell() {
           <ScreenErrorBoundary resetKey={location.pathname} label={activeScreen?.title ?? "This screen"}>
             <ScreenHost />
           </ScreenErrorBoundary>
+          </div>
           <ExecutionTray missions={data.missions} />
         </main>
       </div>

@@ -451,7 +451,7 @@ export function ConnectorGrants({ context }: { context: ScreenContext }) {
           value: <Pill tone={CAPABILITY_TONE[capability.state]}>{CAPABILITY_LABELS[capability.state]}</Pill>,
         }))} />
       </Stack>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connectors`)}>Open connections</Button>
+      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>Open connections</Button>
     </Stack>
   );
 }
