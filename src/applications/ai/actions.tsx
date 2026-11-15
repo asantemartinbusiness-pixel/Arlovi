@@ -146,7 +146,8 @@ export function AssignReviewer({ context, close }: { context: ScreenContext; clo
   const gated = tasks.filter((task) => task.fields.approvalRequired === true);
   const pool = gated.length ? gated : tasks;
   const people = records.filter((record) => record.collection === "members" && String(record.fields.kind ?? "human") === "human" && record.status === "active");
-  const [taskId, setTaskId] = useState(pool[0]?.id ?? "");
+  const [taskIdPicked, setTaskId] = useState<string>();
+  const taskId = taskIdPicked ?? (pool[0]?.id ?? "");
   const [reviewer, setReviewer] = useState("");
   const [busy, setBusy] = useState(false);
   const task = pool.find((item) => item.id === taskId);
@@ -201,7 +202,8 @@ export function CorrectTranscript({ context, close }: { context: ScreenContext; 
   const records = useOrgRecords();
   const session = records.find((record) => record.collection === "meetings" && record.fields.kind === "voice");
   const transcript = ((session?.body as { transcript?: TranscriptEntry[] } | undefined)?.transcript) ?? [];
-  const [lineId, setLineId] = useState(transcript.at(-1)?.id ?? "");
+  const [lineIdPicked, setLineId] = useState<string>();
+  const lineId = lineIdPicked ?? (transcript.at(-1)?.id ?? "");
   const line = transcript.find((entry) => entry.id === lineId);
   const [value, setValue] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -268,6 +270,90 @@ export function CommentOnArtifact({ context, close }: { context: ScreenContext; 
         >
           Add the comment
         </Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+/** AI-004: convenes a review in the room: a review record with its participants and a notice in the room. */
+export function HostReview({ context, close }: { context: ScreenContext; close: () => void }) {
+  const records = useOrgRecords();
+  const room = useRecord(context.params.id);
+  const people = participantsOf(room, records);
+  const [topic, setTopic] = useState("");
+  const [picked, setPicked] = useState<string[]>();
+  const chosen = picked ?? people.map((person) => person.id);
+  const [busy, setBusy] = useState(false);
+  if (!room || room.collection !== "channels") return <Empty title="Open a room first" />;
+  return (
+    <Stack gap={4}>
+      <Field label="What is being reviewed" required><TextInput aria-label="What is being reviewed" value={topic} onChange={(event) => setTopic(event.target.value)} /></Field>
+      <Stack gap={1}>
+        {people.map((person) => (
+          <label key={person.id} className="ds-row ds-gap-2">
+            <input type="checkbox" checked={chosen.includes(person.id)} onChange={(event) => setPicked(event.target.checked ? [...chosen, person.id] : chosen.filter((id) => id !== person.id))} />
+            {person.title}{person.collection === "agents" ? " · AI" : ""}
+          </label>
+        ))}
+      </Stack>
+      <Notice tone="info" title="A review is decided by people">AI employees in the review contribute within their grants; a mention in the room never overrides an external tool policy.</Notice>
+      <Row gap={2}>
+        <Button variant="primary" busy={busy} disabled={!topic.trim() || chosen.length === 0} onClick={async () => {
+          setBusy(true);
+          const review = await context.mutate.create({
+            collection: "meetings", title: `Review: ${topic.trim()}`, status: "scheduled", summary: `Hosted in ${room.title} by ${context.actor}.`,
+            startAt: new Date().toISOString(), parentId: room.id,
+            fields: { kind: "review", host: context.actor, roomId: room.id },
+            body: { participants: people.filter((person) => chosen.includes(person.id)).map((person) => ({ id: person.id, name: person.title, kind: person.collection === "agents" ? "ai" : "human" })) },
+          }, `Review on ${topic.trim()} hosted by ${context.actor}`);
+          await context.mutate.create({
+            collection: "messages", title: `Review: ${topic.trim()}`, status: "sent", summary: `${context.actor} opened a review of ${topic.trim()} with ${chosen.length} participant${chosen.length === 1 ? "" : "s"}.`,
+            parentId: room.id, at: new Date().toISOString(), fields: { author: context.actor, kind: "review", reviewId: review.id },
+          }, `Review announced in ${room.title}`);
+          context.toast("Review hosted", `${review.title} is open with ${chosen.length} participant${chosen.length === 1 ? "" : "s"}.`);
+          setBusy(false);
+          close();
+        }}>Host the review</Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+/** AI-005: the coordinator settles a disagreement between agents and records why. */
+export function ResolveDisagreement({ context, close }: { context: ScreenContext; close: () => void }) {
+  const records = useOrgRecords();
+  const messages = records.filter((record) => record.collection === "messages" && record.parentId === context.params.id);
+  const disputes = messages.filter((message) => (message.fields.loop === true || message.fields.disagreement === true) && !message.fields.resolvedBy);
+  const [picked, setPicked] = useState<string>();
+  const id = picked ?? disputes[0]?.id ?? "";
+  const [decision, setDecision] = useState("");
+  const [busy, setBusy] = useState(false);
+  const dispute = disputes.find((message) => message.id === id);
+  if (disputes.length === 0) return <Empty title="No open disagreement">Nothing in this room is flagged as a loop or a disagreement.</Empty>;
+  return (
+    <Stack gap={4}>
+      <Field label="Disagreement">
+        <Select aria-label="Disagreement" value={id} onChange={(event) => setPicked(event.target.value)}>
+          {disputes.map((message) => <option key={message.id} value={message.id}>{message.title}</option>)}
+        </Select>
+      </Field>
+      {dispute && <Properties rows={[{ label: "What was said", value: dispute.summary }]} />}
+      <Field label="The coordinator's decision" required><TextArea aria-label="The coordinator's decision" value={decision} rows={3} onChange={(event) => setDecision(event.target.value)} /></Field>
+      <Row gap={2}>
+        <Button variant="primary" busy={busy} disabled={!dispute || !decision.trim()} onClick={async () => {
+          if (!dispute) return;
+          setBusy(true);
+          await context.mutate.patch(dispute.id, { fields: { ...dispute.fields, resolvedBy: context.actor, resolvedAt: new Date().toISOString(), resolution: decision.trim() } }, { expectRevision: dispute.revision, event: `Disagreement resolved by ${context.actor}` });
+          await context.mutate.create({
+            collection: "messages", title: `Decision: ${decision.trim().slice(0, 60)}`, status: "posted", summary: decision.trim(), parentId: context.params.id,
+            at: new Date().toISOString(), fields: { author: context.actor, kind: "human", decision: true, resolves: dispute.id },
+          }, `Coordinator decision recorded in the mission room`);
+          context.toast("Resolved", "The decision is in the room and the disagreement is marked resolved.");
+          setBusy(false);
+          close();
+        }}>Record the decision</Button>
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>

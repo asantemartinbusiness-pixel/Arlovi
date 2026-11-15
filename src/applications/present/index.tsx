@@ -12,7 +12,7 @@ import {
   Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Switch, Tabs, TextArea,
   TextInput, Tool, Toolbar, ToolbarSeparator,
 } from "@/design-system";
-import { registerApp, type ScreenContext } from "@/platform/registry";
+import { getScreenDef, registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import { capabilityById } from "@/platform/capability";
 import { downloadFile } from "@/runtime/db";
@@ -27,6 +27,13 @@ import {
 } from "./model";
 import { ObjectBody, SlideCanvas, colour } from "./canvas";
 import { SAVE_LABEL, SAVE_TONE, useDeckEditor, type DeckEditor } from "./state";
+import { presenterUi, advanceSlides } from "./session";
+import {
+  AlignObjects, Annotate, CreateLayout, MoveObject, ResizeObject, ResolveComments, SLIDE_ACTIONS, ShareDeck,
+  advanceAction, endAction, formFooter, refreshCharts, sequenceSlide, toggleLabels, toggleReduceMotion,
+} from "./actions";
+import { useStore } from "@/applications/visual/kit";
+import { useGuardRefresh } from "@/applications/design/sharedDoc";
 import "./present.css";
 
 /* ====================================================================== *
@@ -41,7 +48,25 @@ import "./present.css";
 function useDeck(context: ScreenContext): Rec | undefined {
   const fromRoute = useRecord(context.params.id);
   const all = useCollection("decks");
+  useGuardRefresh(context);
   return fromRoute ?? all.find((record) => record.fields.isTemplate !== true) ?? all[0];
+}
+
+/** The screen's contract actions, on the editor's own bar (the full-chrome surface has no page header). */
+function EditorActions({ context }: { context: ScreenContext }) {
+  const def = getScreenDef(context.screen.applicationCode, context.screen.id);
+  return (
+    <Toolbar label="Slide actions">
+      {(def?.actions ?? []).map((action: ActionDef) => {
+        const blocked = action.guard?.(context);
+        return (
+          <Button key={action.id} size="sm" variant="ghost" disabled={Boolean(blocked)} title={blocked ?? action.shortcut} onClick={() => void action.run(context)}>
+            {action.label ?? action.id}
+          </Button>
+        );
+      })}
+    </Toolbar>
+  );
 }
 
 function SaveBadge({ editor, context }: { editor: DeckEditor; context: ScreenContext }) {
@@ -659,6 +684,7 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
           <span>Slide {editor.deck.index + 1} of {editor.deck.slides.length} · {editor.deck.theme.name} · {layoutById(editor.deck, editor.slide.layoutId).name}</span>
         </div>
         <span className="ds-grow" />
+        <EditorActions context={context} />
         <SaveBadge editor={editor} context={context} />
         <Button size="sm" variant="secondary" disabled={editor.saveState === "clean" || editor.saveState === "saved"} onClick={() => void editor.saveNow()}>Save now</Button>
         <Button size="sm" variant="primary" icon={<Play size={15} />} onClick={() => context.navigate(context.path("/o/:org/present/decks/:id/present", record.id))}>Present</Button>
@@ -1295,15 +1321,15 @@ function AnimationScreen({ context, tab }: { context: ScreenContext; tab: "Slide
 function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audience" | "Presenter" | "Rehearsal" }) {
   const record = useDeck(context);
   const editor = useDeckEditor(context, record);
-  const [elapsed, setElapsed] = useState(0);
-  const [running, setRunning] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
-  const [laps, setLaps] = useState<Record<string, number>>({});
-  const lapStart = useRef(0);
+  const session = useStore(presenterUi);
+  const { elapsed, running, fullscreen, laps } = session;
+  const setRunning = (value: boolean) => presenterUi.set((state) => ({ ...state, running: value }));
+  const setFullscreen = (value: boolean) => presenterUi.set((state) => ({ ...state, fullscreen: value }));
+  useGuardRefresh(context);
 
   useEffect(() => {
     if (!running) return;
-    const id = window.setInterval(() => setElapsed((value) => value + 1), 1000);
+    const id = window.setInterval(() => presenterUi.set((state) => ({ ...state, elapsed: state.elapsed + 1 })), 1000);
     return () => window.clearInterval(id);
   }, [running]);
 
@@ -1312,17 +1338,7 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
   const current = visible[position] ?? visible[0];
   const next = visible[position + 1];
 
-  const advance = (delta: number) => {
-    if (!current) return;
-    const target = visible[Math.max(0, Math.min(visible.length - 1, position + delta))];
-    if (!target) return;
-    if (delta > 0) {
-      setLaps((previous) => ({ ...previous, [current.id]: elapsed - lapStart.current }));
-      lapStart.current = elapsed;
-    }
-    const index = editor.deck.slides.findIndex((slide) => slide.id === target.id);
-    editor.selectSlide(index);
-  };
+  const advance = (delta: number) => { advanceSlides(editor, delta); };
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -1345,6 +1361,13 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
       <>
         <div className="px-audience" role="region" aria-label="Audience display">
           <SlideCanvas deck={editor.deck} slide={current} selectedIds={[]} onSelect={() => undefined} onTransform={() => undefined} readOnly scale={Math.min(1.6, (window.innerWidth - 40) / SLIDE_W)} showGuides={false} />
+          {(session.annotations[current.id] ?? []).length > 0 && (
+            <div className="px-annotations" role="note" aria-label="Live annotations" style={{ position: "absolute", insetInline: 24, bottom: 72, display: "grid", gap: 6 }}>
+              {(session.annotations[current.id] ?? []).map((item) => (
+                <div key={item.id} style={{ background: "var(--papaya-300, #FFAE7C)", color: "var(--ink-900, #1A1917)", padding: "6px 10px", borderRadius: 6, fontWeight: 600, justifySelf: "start" }}>{item.text}</div>
+              ))}
+            </div>
+          )}
         </div>
         <div className="px-audience-bar">
           <Button size="sm" variant="secondary" onClick={() => advance(-1)}>Back</Button>
@@ -1388,7 +1411,7 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
         </StatRow>
         <Row gap={2} wrap>
           <Button variant={running ? "secondary" : "primary"} onClick={() => setRunning(!running)}>{running ? "Pause" : "Start"}</Button>
-          <Button variant="ghost" onClick={() => { setRunning(false); setElapsed(0); setLaps({}); lapStart.current = 0; }}>Reset</Button>
+          <Button variant="ghost" onClick={() => presenterUi.set((state) => ({ ...state, running: false, elapsed: 0, laps: {}, lapStart: 0 }))}>Reset</Button>
           <Button variant="secondary" onClick={() => advance(1)}>Next slide</Button>
           <span className="ds-grow" />
           <Button variant="ghost" onClick={() => context.openOverlay("rehearsal report")}>Report</Button>
@@ -2504,7 +2527,8 @@ function DisplaySelector({ context, close }: { context: ScreenContext; close: ()
         event.preventDefault();
         if (!acknowledged) return;
         context.setTab("Audience");
-        context.toast("Audience view ready", "Use Open the audience display on the Audience tab. Speaker notes stay in the presenter view.");
+        presenterUi.set((state) => ({ ...state, fullscreen: true, running: true }));
+        void context.mutate.log(`Presenting ${record.title}`, { entityId: record.id, type: "present" });
         close();
       }}
     >
@@ -2763,18 +2787,14 @@ registerApp({
       chrome: "full",
       surface: (context) => <SlideEditorScreen context={context} />,
       tabs: ["Design", "Insert", "Animate", "Review", "View"].map((id) => ({ id, render: () => null })),
-      actions: [
-        { id: "Insert slide", label: "Insert slide", placement: "toolbar", run: (context) => context.openOverlay("Layout picker") },
-        { id: "drag object", label: "Move object", placement: "toolbar", run: () => undefined },
-        { id: "align", label: "Align", placement: "toolbar", run: (context) => context.setTab("Design") },
-        { id: "resize", label: "Resize", placement: "toolbar", run: () => undefined },
-        { id: "comment", label: "Comment", placement: "toolbar", run: (context) => context.openOverlay("properties", { mode: "comment" }) },
-        { id: "undo", label: "Undo", placement: "toolbar", run: () => undefined },
-      ],
+      actions: SLIDE_ACTIONS,
       overlays: [
         { id: "Layout picker", kind: "drawer", title: "Layouts", width: 640, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="layout-picker">Apply</Button></>, render: (context) => <LayoutPicker context={context} close={context.close} /> },
         { id: "image insert", kind: "modal", title: "Image", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="image-insert">Save</Button></>, render: (context) => <ImageInsert context={context} close={context.close} /> },
         { id: "properties", kind: "modal", title: "Object", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="properties">Save</Button></>, render: (context) => <PropertiesOverlay context={context} close={context.close} /> },
+        { id: "move object", kind: "modal", title: "Move object", width: 440, footer: formFooter("present-move", "Move"), render: (context) => <MoveObject context={context} close={context.close} /> },
+        { id: "resize object", kind: "modal", title: "Resize object", width: 440, footer: formFooter("present-resize", "Resize"), render: (context) => <ResizeObject context={context} close={context.close} /> },
+        { id: "align objects", kind: "modal", title: "Align", width: 520, render: (context) => <AlignObjects context={context} close={context.close} /> },
         { id: "AI suggestion", kind: "drawer", title: "Suggestions", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="ai-suggestion">Apply selected</Button></>, render: (context) => <AiSuggestion context={context} close={context.close} /> },
       ],
     },
@@ -2784,14 +2804,15 @@ registerApp({
       title: () => "Master & theme",
       tabs: (["Masters", "Colours", "Fonts", "Layouts"] as const).map((id) => ({ id, render: (context) => <ThemeScreen context={context} tab={id} /> })),
       actions: [
-        { id: "Change master", label: "Change theme", placement: "primary", run: (context) => context.openOverlay("Theme editor", { themeId: THEMES[1].id }) },
-        { id: "create layout", label: "Layouts", placement: "secondary", run: (context) => context.setTab("Layouts") },
+        { id: "Change master", label: "Change the master theme…", placement: "primary", run: (context) => context.openOverlay("Theme editor", { themeId: THEMES[1].id }) },
+        { id: "create layout", label: "Create a layout…", placement: "secondary", run: (context) => context.openOverlay("create layout") },
         { id: "preview impact", label: "Preview the impact", placement: "overflow", run: (context) => context.openOverlay("global apply review") },
       ],
       overlays: [
         { id: "Theme editor", kind: "modal", title: "Apply a theme", width: 600, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="theme-editor">Apply</Button></>, render: (context) => <ThemeEditor context={context} close={context.close} /> },
         { id: "global apply review", kind: "drawer", title: "Apply the master", width: 640, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="global-apply">Apply</Button></>, render: (context) => <GlobalApplyReview context={context} close={context.close} /> },
         { id: "font resolver", kind: "modal", title: "Fonts", width: 560, render: (context) => <FontResolver context={context} /> },
+        { id: "create layout", kind: "modal", title: "Create a layout", width: 480, footer: formFooter("present-create-layout", "Create"), render: (context) => <CreateLayout context={context} close={context.close} /> },
       ],
     },
 
@@ -2802,8 +2823,9 @@ registerApp({
       actions: [
         { id: "Insert chart", label: "Insert chart", placement: "primary", run: (context) => context.openOverlay("Dataset picker", { mode: "create" }) },
         { id: "link sheet", label: "Link a workbook", placement: "secondary", run: (context) => context.openOverlay("Dataset picker") },
-        { id: "update data", label: "Check freshness", placement: "overflow", run: (context) => context.setTab("Refresh") },
-        { id: "show labels", label: "Inspect a chart", placement: "overflow", run: (context) => context.setTab("Sources") },
+        { id: "update data", label: "Update the linked charts", placement: "overflow", run: (context) => refreshCharts(context) },
+        { id: "show labels", label: "Show or hide data labels", placement: "overflow", run: (context) => toggleLabels(context) },
+        { id: "freshness", label: "Check freshness", placement: "overflow", run: (context) => context.setTab("Refresh") },
       ],
       overlays: [
         { id: "Dataset picker", kind: "drawer", title: "Dataset", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="dataset-picker">Insert</Button></>, render: (context) => <DatasetPicker context={context} close={context.close} /> },
@@ -2818,9 +2840,10 @@ registerApp({
       tabs: (["Slides", "Objects", "Timing", "Preview"] as const).map((id) => ({ id, render: (context) => <AnimationScreen context={context} tab={id} /> })),
       actions: [
         { id: "Add animation", label: "Add animation", placement: "primary", run: (context) => context.openOverlay("Motion inspector") },
-        { id: "test", label: "Play", placement: "secondary", run: (context) => context.setTab("Preview") },
-        { id: "sequence", label: "Sequence", placement: "overflow", run: (context) => context.setTab("Objects") },
-        { id: "reduce motion", label: "Accessibility review", placement: "overflow", run: (context) => context.openOverlay("accessibility review") },
+        { id: "test", label: "Test: play the builds", placement: "secondary", run: (context) => context.openOverlay("playback") },
+        { id: "sequence", label: "Sequence the builds", placement: "overflow", run: (context) => sequenceSlide(context) },
+        { id: "reduce motion", label: "Reduce motion (on or off)", placement: "overflow", run: (context) => toggleReduceMotion(context) },
+        { id: "accessibility", label: "Accessibility review", placement: "overflow", run: (context) => context.openOverlay("accessibility review") },
       ],
       overlays: [
         { id: "Motion inspector", kind: "modal", title: "Motion", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="motion-inspector">Done</Button></>, render: (context) => <MotionInspector context={context} close={context.close} /> },
@@ -2834,10 +2857,10 @@ registerApp({
       title: () => "Presenter mode",
       tabs: (["Audience", "Presenter", "Rehearsal"] as const).map((id) => ({ id, render: (context) => <PresenterScreen context={context} tab={id} /> })),
       actions: [
-        { id: "Present", label: "Audience display", placement: "primary", icon: <MonitorPlay size={15} />, run: (context) => context.openOverlay("Display selector") },
-        { id: "advance", label: "Presenter view", placement: "secondary", run: (context) => context.setTab("Presenter") },
-        { id: "annotate", label: "Annotate", placement: "overflow", run: (context) => context.toast("Annotation is not implemented", "Drawing over a live slide needs an overlay surface this editor does not have. Say it plainly rather than offer a control that does nothing.", "blocked") },
-        { id: "end", label: "Rehearsal", placement: "overflow", run: (context) => context.setTab("Rehearsal") },
+        { id: "Present", label: "Present", placement: "primary", icon: <MonitorPlay size={15} />, run: (context) => context.openOverlay("Display selector") },
+        { id: "advance", label: "Advance a slide", placement: "secondary", run: (context) => advanceAction(context) },
+        { id: "annotate", label: "Annotate the slide…", placement: "overflow", run: (context) => context.openOverlay("annotate") },
+        { id: "end", label: "End the presentation", placement: "overflow", guard: () => (presenterUi.get().running || presenterUi.get().fullscreen ? undefined : "Nothing is being presented"), run: (context) => endAction(context) },
         {
           id: "export notes", label: "Export notes", placement: "overflow", capability: "export_data",
           run: async (context) => {
@@ -2851,6 +2874,7 @@ registerApp({
       overlays: [
         { id: "Display selector", kind: "modal", title: "Audience display", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="display-selector">Continue</Button></>, render: (context) => <DisplaySelector context={context} close={context.close} /> },
         { id: "rehearsal report", kind: "drawer", title: "Rehearsal", width: 600, render: (context) => <RehearsalReport context={context} /> },
+        { id: "annotate", kind: "modal", title: "Annotate the live slide", width: 480, footer: formFooter("present-annotate", "Add"), render: (context) => <Annotate context={context} close={context.close} /> },
         { id: "access confirmation", kind: "modal", title: "Before you present", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="display-selector">Continue</Button></>, render: (context) => <DisplaySelector context={context} close={context.close} /> },
       ],
     },
@@ -2862,12 +2886,14 @@ registerApp({
       actions: [
         { id: "approve", label: "Record an approval", placement: "primary", capability: "edit_knowledge", run: (context) => context.openOverlay("approval") },
         { id: "export", label: "Export", placement: "secondary", run: (context) => context.openOverlay("export settings") },
-        { id: "Resolve", label: "Resolve comments", placement: "overflow", run: (context) => context.setTab("Comments") },
-        { id: "share", label: "Publish", placement: "overflow", run: (context) => context.setTab("Publish") },
+        { id: "Resolve", label: "Resolve comments…", placement: "overflow", run: (context) => context.openOverlay("resolve comments") },
+        { id: "share", label: "Share…", placement: "overflow", run: (context) => context.openOverlay("share deck") },
       ],
       overlays: [
         { id: "Version comparison", kind: "drawer", title: "Compare versions", width: 720, render: (context) => <VersionComparison context={context} /> },
         { id: "export settings", kind: "modal", title: "Export settings", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="export-settings">Export</Button></>, render: (context) => <ExportSettings context={context} close={context.close} /> },
+        { id: "resolve comments", kind: "modal", title: "Resolve comments", width: 560, render: (context) => <ResolveComments context={context} close={context.close} /> },
+        { id: "share deck", kind: "modal", title: "Share the deck", width: 520, footer: formFooter("present-share", "Share"), render: (context) => <ShareDeck context={context} close={context.close} /> },
         { id: "approval", kind: "modal", title: "Approval", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="approval">Record</Button></>, render: (context) => <ApprovalOverlay context={context} close={context.close} /> },
       ],
     },

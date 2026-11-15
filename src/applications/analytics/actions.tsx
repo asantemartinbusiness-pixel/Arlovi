@@ -28,10 +28,13 @@ export function ResizeTile({ context, close }: { context: ScreenContext; close: 
   const record = useRecord(context.params.id);
   const body = readDashboard(record);
   const initial = body.tiles.find((tile) => tile.id === context.selectedId) ?? body.tiles[0];
-  const [tileId, setTileId] = useState(initial?.id ?? "");
+  const [tileIdPicked, setTileId] = useState<string>();
+  const tileId = tileIdPicked ?? (initial?.id ?? "");
   const tile = body.tiles.find((item) => item.id === tileId);
-  const [w, setW] = useState<Tile["w"]>(tile?.w ?? 4);
-  const [h, setH] = useState<Tile["h"]>(tile?.h ?? 1);
+  const [wPicked, setW] = useState<Tile["w"]>();
+  const [hPicked, setH] = useState<Tile["h"]>();
+  const w = wPicked ?? tile?.w ?? 4;
+  const h = hPicked ?? tile?.h ?? 1;
   const [busy, setBusy] = useState(false);
   if (!record || record.collection !== "dashboards") return <Empty title="Open a dashboard first" />;
   if (!tile) return <Empty title="This dashboard has no tile to resize" />;
@@ -537,10 +540,13 @@ export function DeployModel({ context, close }: { context: ScreenContext; close:
 export function AdjustInputs({ context, close }: { context: ScreenContext; close: () => void }) {
   const scenarios = useCollection("scenarios").filter((record) => record.fields.kind === "forecast");
   const { context: queryContext } = useAnalytics();
-  const [id, setId] = useState(scenarios.find((item) => item.id === context.selectedId)?.id ?? scenarios[0]?.id ?? "");
+  const [idPicked, setId] = useState<string>();
+  const id = idPicked ?? (scenarios.find((item) => item.id === context.selectedId)?.id ?? scenarios[0]?.id ?? "");
   const scenario = scenarios.find((item) => item.id === id);
-  const [measureId, setMeasureId] = useState(String(scenario?.fields.measureId ?? "revenue.paid"));
-  const [adjustment, setAdjustment] = useState(Number(scenario?.fields.adjustment ?? 0));
+  const [measureIdPicked, setMeasureId] = useState<string>();
+  const measureId = measureIdPicked ?? (String(scenario?.fields.measureId ?? "revenue.paid"));
+  const [adjustmentPicked, setAdjustment] = useState<number>();
+  const adjustment = adjustmentPicked ?? (Number(scenario?.fields.adjustment ?? 0));
   const [busy, setBusy] = useState(false);
   const model = forecast(measureId, 6, 3, queryContext, adjustment);
   const last = model.projection[model.projection.length - 1];

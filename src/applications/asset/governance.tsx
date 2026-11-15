@@ -1151,7 +1151,8 @@ export function GovernanceExport({ context }: { context: ScreenContext }) {
 export function CompareSources({ context }: { context: ScreenContext }) {
   const data = useAssets();
   const presets = data.transforms.filter((row) => row.fields.kind !== "job");
-  const [presetId, setPresetId] = useState(presets.find((row) => row.id === context.selectedId)?.id ?? presets[0]?.id ?? "");
+  const [presetIdPicked, setPresetId] = useState<string>();
+  const presetId = presetIdPicked ?? (presets.find((row) => row.id === context.selectedId)?.id ?? presets[0]?.id ?? "");
   const preset = presets.find((row) => row.id === presetId);
   const jobs = data.transforms.filter((row) => row.fields.kind === "job" && row.fields.presetId === presetId);
   const sourceIds = new Set(jobs.flatMap((job) => csvList(job.fields.assetIds)));

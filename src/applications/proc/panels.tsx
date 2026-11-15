@@ -142,7 +142,7 @@ export function ProcurementOverview({ context, lens }: { context: ScreenContext;
             series={[{
               name: "Committed",
               points: data.suppliers.filter((supplier) => supplier.status !== "archived").map((supplier) => ({
-                label: supplier.title.split(" ")[0],
+                label: supplier.title,
                 value: openOrders.filter((order) => String(order.fields.supplierId) === supplier.id).reduce((sum, order) => sum + (order.amountMinor ?? 0), 0),
               })),
             }]}
@@ -816,7 +816,7 @@ export function ProcurementAnalytics({ context, lens }: { context: ScreenContext
       <Grid>
         <Card span={7} eyebrow="SPEND" prov="posted" title="Spend by supplier" subtitle="Cancelled and draft orders are excluded">
           <BarChart title="Spend by supplier" height={220} format={(value) => context.money(value)}
-            series={[{ name: "Spend", points: bySupplier.map((row) => ({ label: row.supplier.title.split(" ")[0], value: row.spend })) }]}
+            series={[{ name: "Spend", points: bySupplier.map((row) => ({ label: row.supplier.title, value: row.spend })) }]}
             footer={`Reported in ${org.currency}. Tax on each order resolves through the ${org.jurisdiction} rules for the supplier's status.`} />
         </Card>
         <Card span={5} eyebrow="CATEGORY" prov="posted" title="Spend by category">

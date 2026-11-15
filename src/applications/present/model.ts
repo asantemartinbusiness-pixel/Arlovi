@@ -54,6 +54,8 @@ export interface ChartContent {
   sourceRef?: string;
   capturedAt?: string;
   linked: boolean;
+  /** Draw each value on the chart, not only in the accessible table. */
+  showLabels?: boolean;
 }
 
 export interface TableContent {

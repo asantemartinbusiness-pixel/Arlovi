@@ -2705,7 +2705,8 @@ function TestDraft({ close }: { context: ScreenContext; close: () => void }) {
 function AssignLead({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useWorkforce();
   const member = useRecord(context.selectedId);
-  const [departmentId, setDepartmentId] = useState(String(member?.fields.departmentId ?? data.departments[0]?.id ?? ""));
+  const [departmentIdPicked, setDepartmentId] = useState<string>();
+  const departmentId = departmentIdPicked ?? (String(member?.fields.departmentId ?? data.departments[0]?.id ?? ""));
   const [busy, setBusy] = useState(false);
   const department = data.departments.find((item) => item.id === departmentId);
   if (!member) return <Empty title="Choose a member first" />;
@@ -2802,7 +2803,8 @@ function AcademyTest({ context, close }: { context: ScreenContext; close: () => 
 function RollbackVersion({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useWorkforce();
   const promoted = data.agents.filter((agent) => agent.fields.promotedBy && agent.history.length > 0);
-  const [id, setId] = useState(promoted[0]?.id ?? "");
+  const [idPicked, setId] = useState<string>();
+  const id = idPicked ?? (promoted[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const agent = promoted.find((item) => item.id === id);
   const previous = agent?.history.find((snapshot) => String(snapshot.fields.promotedVersion ?? "") !== String(agent.fields.promotedVersion ?? "") || !snapshot.fields.promotedBy);
@@ -2849,8 +2851,10 @@ function RollbackVersion({ context, close }: { context: ScreenContext; close: ()
 /** TEAM-009: two contracts side by side, counted from records. */
 function CompareAgents({ context }: { context: ScreenContext }) {
   const data = useWorkforce();
-  const [left, setLeft] = useState(data.agents[0]?.id ?? "");
-  const [right, setRight] = useState(data.agents[1]?.id ?? "");
+  const [leftPicked, setLeft] = useState<string>();
+  const left = leftPicked ?? (data.agents[0]?.id ?? "");
+  const [rightPicked, setRight] = useState<string>();
+  const right = rightPicked ?? (data.agents[1]?.id ?? "");
   const pair = [left, right].map((id) => data.agents.find((agent) => agent.id === id));
   const stats = (agent: Rec | undefined) => {
     if (!agent) return undefined;
@@ -2892,7 +2896,8 @@ function CompareAgents({ context }: { context: ScreenContext }) {
 /** TEAM-009: sets one contract's resource policy: its spend ceiling and preferred provider. */
 function AdjustResourcePolicy({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useWorkforce();
-  const [id, setId] = useState(data.agents.find((agent) => agent.id === context.selectedId)?.id ?? data.agents[0]?.id ?? "");
+  const [idPicked, setId] = useState<string>();
+  const id = idPicked ?? (data.agents.find((agent) => agent.id === context.selectedId)?.id ?? data.agents[0]?.id ?? "");
   const agent = data.agents.find((item) => item.id === id);
   const [cap, setCap] = useState<string>();
   const [provider, setProvider] = useState<string>();

@@ -44,7 +44,8 @@ function capabilityLine(id: string): string {
 export function IssueReport({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useFinData();
   const { org } = useWorkspace();
-  const [period, setPeriod] = useState(data.periods[0] ?? data.currentPeriod);
+  const [periodPicked, setPeriod] = useState<string>();
+  const period = periodPicked ?? (data.periods[0] ?? data.currentPeriod);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const scoped = trialForRange(data.accounts, data.journals, org.id, { period });
@@ -133,7 +134,8 @@ export function MapCategory({ context, close }: { context: ScreenContext; close:
   const data = useFinData();
   const account = data.accounts.find((item) => item.id === context.selectedId);
   const current = String(account?.fields.mappedCategories ?? "").split(",").map((item) => item.trim()).filter(Boolean);
-  const [chosen, setChosen] = useState<string[]>(current);
+  const [picked, setChosen] = useState<string[]>();
+  const chosen = picked ?? current;
   const [busy, setBusy] = useState(false);
   if (!account) return <Empty title="Select an account first" />;
   const type = accountType(account);
@@ -159,7 +161,7 @@ export function MapCategory({ context, close }: { context: ScreenContext; close:
                 label={category}
                 checked={chosen.includes(category)}
                 disabled={Boolean(blocked)}
-                onChange={(event) => setChosen((list) => (event.target.checked ? [...list, category] : list.filter((item) => item !== category)))}
+                onChange={(event) => setChosen(event.target.checked ? [...chosen, category] : chosen.filter((item) => item !== category))}
               />
               <span className="ds-grow" />
               {other && <span className="ds-subtle">now {accountCode(other)} {other.title}</span>}
@@ -230,8 +232,9 @@ export function SendInvoice({ context, close }: { context: ScreenContext; close:
   const [busy, setBusy] = useState(false);
   if (!invoice) return <Empty title="No invoice selected" />;
   const to = String(customer?.fields.email ?? "");
-  const sends = ((invoice.body as { sends?: { revision: number; at: string; by: string; to: string }[] })?.sends ?? []);
-  const sameVersion = sends.find((send) => send.revision === invoice.revision);
+  const sends = ((invoice.body as { sends?: { version: number; at: string; by: string; to: string }[] })?.sends ?? []);
+  const issuedVersion = (((invoice.body as { versions?: unknown[] })?.versions) ?? []).length;
+  const sameVersion = sends.find((send) => send.version === issuedVersion);
   const blocked = invoice.status === "draft"
     ? "A draft cannot be sent. Approve and post it first, so the customer receives an immutable version."
     : invoice.status === "void"
@@ -244,7 +247,7 @@ export function SendInvoice({ context, close }: { context: ScreenContext; close:
       <Properties rows={[
         { label: "To", value: to || "No email on the contact record" },
         { label: "Subject", value: `${org.name} · invoice ${invoice.title}` },
-        { label: "Version", value: `Revision ${invoice.revision}, ${context.money(totals.grossMinor)}` },
+        { label: "Version", value: `Issued version ${issuedVersion}, ${context.money(totals.grossMinor)}` },
         { label: "Earlier sends", value: sends.length ? sends.map((send) => `${context.date(send.at)} to ${send.to}`).join(" · ") : "None" },
         { label: "Delivery state", value: <CapabilityPill id="email.send" /> },
       ]} />
@@ -265,12 +268,12 @@ export function SendInvoice({ context, close }: { context: ScreenContext; close:
             await context.mutate.patch(invoice.id, {
               body: {
                 ...(invoice.body as object ?? {}),
-                sends: [...sends, { revision: invoice.revision, at, by: context.actor, to, grossMinor: totals.grossMinor, state: "queued_local" }],
+                sends: [...sends, { version: issuedVersion, revision: invoice.revision, at, by: context.actor, to, grossMinor: totals.grossMinor, state: "queued_local" }],
               },
-              fields: { ...invoice.fields, sendState: "queued_local", lastQueuedAt: at, sentRevision: invoice.revision },
+              fields: { ...invoice.fields, sendState: "queued_local", lastQueuedAt: at, sentVersion: issuedVersion },
             }, { expectRevision: invoice.revision, event: `${invoice.title} queued to send to ${to}. Not sent: no mail provider is connected` });
             await context.mutate.log(`Send of ${invoice.title} held at the mail provider boundary`, { entityId: invoice.id, type: "finance.send", capability: "queued_local" });
-            context.toast("Queued, not sent", `${invoice.title} revision ${invoice.revision} is queued locally for ${to}. No mail provider is connected, so nothing left this browser.`, "info");
+            context.toast("Queued, not sent", `${invoice.title} version ${issuedVersion} is queued locally for ${to}. No mail provider is connected, so nothing left this browser.`, "info");
             setBusy(false);
             close();
           }}
@@ -391,7 +394,8 @@ export function SchedulePayment({ context, close }: { context: ScreenContext; cl
   const data = useFinData();
   const { now } = useWorkspace();
   const approved = data.bills.filter((bill) => bill.status === "approved");
-  const [chosen, setChosen] = useState<string[]>(context.selectedId && approved.some((bill) => bill.id === context.selectedId) ? [context.selectedId] : approved.map((bill) => bill.id));
+  const [picked, setChosen] = useState<string[]>();
+  const chosen = picked ?? (context.selectedId && approved.some((bill) => bill.id === context.selectedId) ? [context.selectedId] : approved.map((bill) => bill.id));
   const [date, setDate] = useState(now.toISOString().slice(0, 10));
   const [busy, setBusy] = useState(false);
   const rows = approved.filter((bill) => chosen.includes(bill.id));
@@ -410,7 +414,7 @@ export function SchedulePayment({ context, close }: { context: ScreenContext; cl
               <Checkbox
                 label={`${bill.title} · ${supplierOf(data, bill)?.title ?? "no supplier"} · due ${context.date(bill.dueAt)}`}
                 checked={chosen.includes(bill.id)}
-                onChange={(event) => setChosen((list) => (event.target.checked ? [...list, bill.id] : list.filter((id) => id !== bill.id)))}
+                onChange={(event) => setChosen(event.target.checked ? [...chosen, bill.id] : chosen.filter((id) => id !== bill.id))}
               />
               <span className="ds-grow" />
               <Amount minor={bill.amountMinor} context={context} />
@@ -453,9 +457,11 @@ export function SchedulePayment({ context, close }: { context: ScreenContext; cl
 export function AssignCategory({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useFinData();
   const expense = data.expenses.find((item) => item.id === context.selectedId);
-  const [category, setCategory] = useState(String(expense?.fields.category ?? "travel"));
+  const [categoryPicked, setCategory] = useState<string>();
+  const category = categoryPicked ?? (String(expense?.fields.category ?? "travel"));
   const mapped = data.accounts.find((account) => String(account.fields.mappedCategories ?? "").split(",").map((item) => item.trim()).includes(category));
-  const [code, setCode] = useState(String(expense?.fields.accountCode ?? "6000"));
+  const [codePicked, setCode] = useState<string>();
+  const code = codePicked ?? (String(expense?.fields.accountCode ?? "6000"));
   const [busy, setBusy] = useState(false);
   if (!expense) return <Empty title="Select a claim first" />;
   const options = data.accounts.filter((account) => accountType(account) === "expense" && account.status !== "inactive");
@@ -568,9 +574,11 @@ export function ReimburseExpense({ context, close }: { context: ScreenContext; c
   const data = useFinData();
   const approved = data.expenses.filter((expense) => expense.status === "approved");
   const initial = approved.find((expense) => expense.id === context.selectedId)?.id ?? approved[0]?.id ?? "";
-  const [id, setId] = useState(initial);
+  const [idPicked, setId] = useState<string>();
+  const id = idPicked ?? (initial);
   const cash = data.accounts.filter((account) => accountType(account) === "asset" && (account.tags.includes("cash") || accountCode(account).startsWith("10")));
-  const [cashId, setCashId] = useState(cash[0]?.id ?? "");
+  const [cashIdPicked, setCashId] = useState<string>();
+  const cashId = cashIdPicked ?? (cash[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const expense = approved.find((item) => item.id === id);
   const account = expense ? data.accounts.find((item) => accountCode(item) === String(expense.fields.accountCode ?? "6000")) : undefined;
@@ -713,7 +721,8 @@ export function ReviewFiling({ context, close }: { context: ScreenContext; close
   const data = useFinData();
   const { org } = useWorkspace();
   const prepared = data.taxCodes.filter((record) => record.fields.kind === "return").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const [id, setId] = useState(prepared[0]?.id ?? "");
+  const [idPicked, setId] = useState<string>();
+  const id = idPicked ?? (prepared[0]?.id ?? "");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const record = prepared.find((item) => item.id === id);
@@ -779,7 +788,8 @@ export function ExportReturnOverlay({ context, close }: { context: ScreenContext
   const data = useFinData();
   const { org } = useWorkspace();
   const periods = periodsWithDocuments(data.invoices);
-  const [period, setPeriod] = useState(periods[0] ?? data.currentPeriod);
+  const [periodPicked, setPeriod] = useState<string>();
+  const period = periodPicked ?? (periods[0] ?? data.currentPeriod);
   const boxes = buildReturn({ period, invoices: data.invoices, bills: data.bills, contacts: data.contacts, jurisdiction: org.jurisdiction, now: context.now });
   return (
     <Stack gap={4}>

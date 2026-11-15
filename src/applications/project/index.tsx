@@ -21,6 +21,13 @@ import {
 } from "./actions";
 import { getRecord } from "@/platform/repo";
 
+/** On project-scoped screens the initial selection is the project itself; a task action needs a task. */
+async function withTask(context: ScreenContext, what: string, then: (task: Rec) => void): Promise<void> {
+  const task = context.selectedId ? await getRecord(context.selectedId) : undefined;
+  if (!task || task.collection !== "tasks") { context.toast(`Select ${what} first`, "Nothing was changed.", "blocked"); return; }
+  then(task);
+}
+
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
   <>
     <Button variant="ghost" onClick={close}>Cancel</Button>
@@ -906,8 +913,8 @@ export const projectApp = registerApp({
       actions: [
         { id: "create", label: "New task", placement: "primary", run: (context) => context.openOverlay("new task") },
         { id: "bulk move", label: "Move Doing to Review", placement: "secondary", run: (context) => context.openOverlay("batch action review") },
-        { id: "Drag task", label: "Move a task", placement: "overflow", guard: needsSelection("a card on the board"), run: (context) => context.openOverlay("move task") },
-        { id: "assign", label: "Assign a task", placement: "overflow", guard: needsSelection("a card"), run: (context) => context.openOverlay("Assignee picker") },
+        { id: "Drag task", label: "Move a task", placement: "overflow", guard: needsSelection("a card on the board"), run: (context) => withTask(context, "a card on the board", () => context.openOverlay("move task")) },
+        { id: "assign", label: "Assign a task", placement: "overflow", guard: needsSelection("a card"), run: (context) => withTask(context, "a card", (task) => context.openOverlay("Assignee picker", { id: task.id })) },
         { id: "filter", label: "Filter the board", placement: "overflow", run: (context) => context.openOverlay("board filter") },
       ],
       overlays: [
@@ -954,10 +961,10 @@ export const projectApp = registerApp({
         id: lens, render: (context: ScreenContext) => <TimelineScreen context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Reschedule", label: "Reschedule", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Pick a bar on the timeline"), run: (context) => context.openOverlay("Date edit") },
-        { id: "link task", label: "Link a task", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Pick a bar on the timeline"), run: (context) => context.openOverlay("link task", { id: context.selectedId }) },
+        { id: "Reschedule", label: "Reschedule", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Pick a bar on the timeline"), run: (context) => withTask(context, "a bar on the timeline", (task) => context.openOverlay("Date edit", { id: task.id })) },
+        { id: "link task", label: "Link a task", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Pick a bar on the timeline"), run: (context) => withTask(context, "a bar on the timeline", (task) => context.openOverlay("link task", { id: task.id })) },
         { id: "compare baseline", label: "Compare to baseline", placement: "overflow", run: (context) => context.setTab("Baseline") },
-        { id: "drag duration", label: "Change a duration", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Pick a bar on the timeline"), run: (context) => context.openOverlay("duration edit") },
+        { id: "drag duration", label: "Change a duration", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Pick a bar on the timeline"), run: (context) => withTask(context, "a bar on the timeline", () => context.openOverlay("duration edit")) },
         { id: "check conflicts", label: "Check for conflicts", placement: "overflow", run: (context) => context.openOverlay("conflict review") },
         { id: "dependency graph", label: "What waits for what", placement: "overflow", run: (context) => context.openOverlay("dependency graph") },
       ],

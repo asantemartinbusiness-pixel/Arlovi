@@ -532,7 +532,7 @@ export function DurationEdit({ context, close }: { context: ScreenContext; close
   const data = useCollections(["tasks"]);
   const current = task?.startAt && task.endAt ? Math.max(0, Math.round((new Date(task.endAt).getTime() - new Date(task.startAt).getTime()) / 86_400_000)) : 0;
   const [days, setDays] = useState(String(current));
-  if (!task || !task.startAt) return <Empty title="Pick a bar on the timeline first" />;
+  if (!task || task.collection !== "tasks" || !task.startAt) return <Empty title="Pick a bar on the timeline first" />;
   const value = Number(days);
   const invalid = !Number.isFinite(value) || value < 0;
   const end = new Date(new Date(task.startAt).getTime() + (invalid ? 0 : value) * 86_400_000);

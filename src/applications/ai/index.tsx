@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   AtSign, Bot, FileText, Layers, MessagesSquare, Mic, Microscope, Pin, Rocket, Sparkles, Users, Video,
 } from "lucide-react";
@@ -17,7 +18,7 @@ import {
 } from "@/applications/t2_shared/pieces";
 import { useChatState, usePanelFlags, type LocalAttachment } from "@/applications/t2_shared/store";
 import type { Rec } from "@/domain/types";
-import { AssignReviewer, AssignRoomTask, AttachToSpecialist, CommentOnArtifact, CorrectTranscript } from "./actions";
+import { AssignReviewer, AssignRoomTask, AttachToSpecialist, CommentOnArtifact, CorrectTranscript, HostReview, ResolveDisagreement } from "./actions";
 
 /* ====================================================================== *
  * AI — Companion & Conversations
@@ -170,9 +171,11 @@ function ChiefChat({ context }: { context: ScreenContext }) {
   );
   const fallback = conversations.find((item) => item.fields.archived !== true && readTurns(item).length > 0)
     ?? conversations.find((item) => item.fields.archived !== true);
-  const selected = useRecord(context.selectedId);
+  const [params] = useSearchParams();
+  const asked = context.selectedId ?? params.get("thread") ?? undefined;
+  const selected = useRecord(asked);
   const conversation = selected?.collection === "conversations" ? selected : fallback;
-  const thread = threadKey(context.screen.id, context.selectedId ?? "active");
+  const thread = threadKey(context.screen.id, asked ?? "active");
   useEffect(() => { useChatState.getState().ensureOrg(org.id); }, [org.id]);
   const requestFocus = useChatState((state) => state.requestFocus);
   const turns = readTurns(conversation);
@@ -2768,7 +2771,7 @@ const submitFooter = (formId: string, label: string) => ({ close }: { close: () 
   </>
 );
 
-const chiefThread = (context: ScreenContext) => threadKey(context.screen.id, context.selectedId ?? "active");
+const chiefThread = (context: ScreenContext) => threadKey(context.screen.id, context.selectedId ?? new URLSearchParams(window.location.search).get("thread") ?? "active");
 
 export const aiApp = registerApp({
   code: "AI",
@@ -2837,7 +2840,7 @@ export const aiApp = registerApp({
         render: (context: ScreenContext) => <ConversationLibrary context={context} view={view} />,
       })),
       actions: [
-        { id: "Open", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Select a thread first"), run: (context) => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/ai/chat`); } },
+        { id: "Open", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Select a thread first"), run: (context) => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/ai/chat?thread=${context.selectedId}`); } },
         { id: "search transcript", label: "Search transcripts", placement: "secondary", run: () => usePanelFlags.getState().set("ai.library.search", true) },
         { id: "rename", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a thread first"), run: (context) => context.openOverlay("Thread preview", { id: context.selectedId, rename: true }) },
         { id: "archive", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a thread first"), run: (context) => void archiveConversation(context) },
@@ -2886,13 +2889,15 @@ export const aiApp = registerApp({
         { id: "pin decision", label: "Pin a decision", placement: "secondary", run: (context) => context.openOverlay("decision recorder") },
         { id: "assign task", placement: "overflow", run: (context) => context.openOverlay("assign task") },
         { id: "all tasks", label: "All tasks in Projects", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/project/tasks`) },
-        { id: "host review", placement: "overflow", run: (context) => context.openOverlay("Participant selector") },
+        { id: "host review", placement: "overflow", run: (context) => context.openOverlay("host review") },
+        { id: "participants", label: "Participants", placement: "overflow", run: (context) => context.openOverlay("Participant selector") },
       ],
       overlays: [
         { id: "Participant selector", kind: "modal", title: "Participants", width: 560, render: ({ close, ...context }) => <ParticipantSelector context={context} close={close} /> },
         { id: "decision recorder", kind: "modal", title: "Record a decision", width: 560, render: ({ close, ...context }) => <DecisionRecorder context={context} close={close} />, footer: submitFooter("decision-recorder", "Record decision") },
         { id: "topic thread", kind: "drawer", title: "Topic", width: 520, render: ({ ...context }) => <TopicThread context={context} /> },
         { id: "assign task", kind: "modal", title: "Assign a task", width: 560, render: ({ close, ...context }) => <AssignRoomTask context={context} close={close} /> },
+        { id: "host review", kind: "modal", title: "Host a review", width: 560, render: ({ close, ...context }) => <HostReview context={context} close={close} /> },
       ],
     },
 
@@ -2907,13 +2912,15 @@ export const aiApp = registerApp({
         { id: "Request status", placement: "primary", run: (context) => { const thread = threadKey(context.screen.id, context.params.id); useChatState.getState().setDraft(thread, "Where is this mission and what is blocked?"); useChatState.getState().requestSend(thread); context.setTab("Discussion"); } },
         { id: "assign reviewer", placement: "secondary", run: (context) => context.openOverlay("assign reviewer") },
         { id: "link evidence", placement: "secondary", run: (context) => context.openOverlay("evidence inspector") },
-        { id: "resolve disagreement", placement: "overflow", run: (context) => context.openOverlay("Task handoff drawer") },
+        { id: "resolve disagreement", placement: "overflow", run: (context) => context.openOverlay("resolve disagreement") },
+        { id: "hand over", label: "Hand a task over", placement: "overflow", run: (context) => context.openOverlay("Task handoff drawer") },
       ],
       overlays: [
         { id: "Task handoff drawer", kind: "drawer", title: "Hand a task over", width: 520, render: ({ close, ...context }) => <TaskHandoffDrawer context={context} close={close} /> },
         { id: "evidence inspector", kind: "drawer", title: "Evidence", width: 520, render: ({ ...context }) => <EvidenceInspector context={context} /> },
         { id: "review dialog", kind: "modal", title: "Record a review", width: 560, render: ({ close, ...context }) => <ReviewDialog context={context} close={close} /> },
         { id: "assign reviewer", kind: "modal", title: "Assign a reviewer", width: 560, render: ({ close, ...context }) => <AssignReviewer context={context} close={close} /> },
+        { id: "resolve disagreement", kind: "modal", title: "Resolve a disagreement", width: 580, render: ({ close, ...context }) => <ResolveDisagreement context={context} close={close} /> },
       ],
     },
 

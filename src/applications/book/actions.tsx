@@ -113,11 +113,16 @@ export function RescheduleNotice({ context, close }: { context: ScreenContext; c
   const payload = context.overlayPayload as { id?: string } | undefined;
   const booking = useRecord(payload?.id ?? context.params.id ?? context.selectedId);
   if (!booking) return <Empty title="Select a booking" />;
-  return <RescheduleNoticeForm key={booking.id} context={context} close={close} booking={booking} />;
+  return <RescheduleNoticeGate context={context} close={close} booking={booking} />;
 }
 
-function RescheduleNoticeForm({ context, close, booking }: { context: ScreenContext; close: () => void; booking: Rec }) {
+function RescheduleNoticeGate({ context, close, booking }: { context: ScreenContext; close: () => void; booking: Rec }) {
   const data = useBookData();
+  if (data.contacts.length === 0) return <Empty title="Loading" />;
+  return <RescheduleNoticeForm key={booking.id} context={context} close={close} booking={booking} data={data} />;
+}
+
+function RescheduleNoticeForm({ context, close, booking, data }: { context: ScreenContext; close: () => void; booking: Rec; data: ReturnType<typeof useBookData> }) {
   const contact = data.contacts.find((item) => item.id === String(booking.fields.contactId ?? ""));
   const [text, setText] = useState(`Hello ${contact?.title.split(" ")[0] ?? "there"}, your appointment is now on ${context.dateTime(booking.startAt)}. Reply if that time does not suit you.`);
   const allowed = contact?.fields.consentEmail === true;

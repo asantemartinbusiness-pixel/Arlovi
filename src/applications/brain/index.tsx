@@ -2524,7 +2524,8 @@ async function linkApproval(context: ScreenContext): Promise<void> {
 /** Undoes a confirmed merge: the link is marked split and both records keep their own identity and history. */
 function SplitRecord({ context, close }: { context: ScreenContext; close: () => void }) {
   const links = useCollection("graphLinks").filter((link) => link.status === "confirmed" && link.fields.confirmedBy);
-  const [id, setId] = useState(links[0]?.id ?? "");
+  const [idPicked, setId] = useState<string>();
+  const id = idPicked ?? (links[0]?.id ?? "");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const link = links.find((item) => item.id === id);
@@ -2563,10 +2564,12 @@ function SplitRecord({ context, close }: { context: ScreenContext; close: () => 
 /** Edits a colour token. A change to an approved token is held as a proposal; it never overwrites silently. */
 function EditToken({ context, close }: { context: ScreenContext; close: () => void }) {
   const brands = useCollection("brands");
-  const [brandId, setBrandId] = useState(brands.find((brand) => brand.status === "approved")?.id ?? brands[0]?.id ?? "");
+  const [brandIdPicked, setBrandId] = useState<string>();
+  const brandId = brandIdPicked ?? (brands.find((brand) => brand.status === "approved")?.id ?? brands[0]?.id ?? "");
   const brand = brands.find((item) => item.id === brandId);
   const colours = ((brand?.body as { colours?: { name: string; value: string; approved: boolean; previousValue?: string }[] } | undefined)?.colours) ?? [];
-  const [name, setName] = useState(colours[0]?.name ?? "");
+  const [namePicked, setName] = useState<string>();
+  const name = namePicked ?? (colours[0]?.name ?? "");
   const token = colours.find((colour) => colour.name === name);
   const [value, setValue] = useState<string>();
   const [busy, setBusy] = useState(false);

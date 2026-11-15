@@ -3246,7 +3246,8 @@ function PostMissionMessage({ context, close }: { context: ScreenContext; close:
 /** MISSION-009: sets the spend alert threshold on the mission budget. */
 function SetBudgetAlert({ context, close }: { context: ScreenContext; close: () => void }) {
   const { mission, costs } = useMission(context);
-  const [percent, setPercent] = useState(String(mission?.fields.alertAtPercent ?? 80));
+  const [percentPicked, setPercent] = useState<string>();
+  const percent = percentPicked ?? (String(mission?.fields.alertAtPercent ?? 80));
   const [busy, setBusy] = useState(false);
   if (!mission) return <Empty title="No mission" />;
   const ceiling = Number(mission.fields.budgetMinor ?? 0);

@@ -27,11 +27,12 @@ export function RequisitionForm({ context, close }: { context: ScreenContext; cl
   const existing = useRecord(payload?.id);
   const data = useProcData();
   if ((payload?.id && !existing) || data.suppliers.length === 0 || ((payload?.productIds ?? []).length > 0 && data.products.length === 0)) return <Empty title="Loading" />;
-  return <RequisitionFormBody key={existing?.id ?? (payload?.productIds ?? []).join("|")} context={context} close={close} existing={existing} />;
+  return <RequisitionFormBody key={existing?.id ?? (payload?.productIds ?? []).join("|")} context={context} close={close} existing={existing} loaded={data} />;
 }
 
-function RequisitionFormBody({ context, close, existing }: { context: ScreenContext; close: () => void; existing: Rec | undefined }) {
-  const data = useProcData();
+function RequisitionFormBody({ context, close, existing, loaded }: { context: ScreenContext; close: () => void; existing: Rec | undefined; loaded: ReturnType<typeof useProcData> }) {
+  const live = useProcData();
+  const data = live.suppliers.length ? live : loaded;
   const { org, now, actor } = useWorkspace();
   const payload = context.overlayPayload as { id?: string; productIds?: string[] } | undefined;
   const existingBody = bodyOf<PoBody>(existing, {});
@@ -483,11 +484,12 @@ export function PoEditor({ context, close }: { context: ScreenContext; close: ()
   const preset = useRecord(payload?.fromRequisition);
   const data = useProcData();
   if ((payload?.id && !existing) || (payload?.fromRequisition && !preset) || data.suppliers.length === 0) return <Empty title="Loading" />;
-  return <PoEditorForm key={existing?.id ?? preset?.id ?? "new"} context={context} close={close} existing={existing} preset={preset} />;
+  return <PoEditorForm key={existing?.id ?? preset?.id ?? "new"} context={context} close={close} existing={existing} preset={preset} loaded={data} />;
 }
 
-function PoEditorForm({ context, close, existing, preset }: { context: ScreenContext; close: () => void; existing: Rec | undefined; preset: Rec | undefined }) {
-  const data = useProcData();
+function PoEditorForm({ context, close, existing, preset, loaded }: { context: ScreenContext; close: () => void; existing: Rec | undefined; preset: Rec | undefined; loaded: ReturnType<typeof useProcData> }) {
+  const live = useProcData();
+  const data = live.suppliers.length ? live : loaded;
   const { org, now, actor } = useWorkspace();
   const existingBody = bodyOf<PoBody>(existing ?? preset, {});
   const approvedRequisitions = data.purchaseOrders.filter((item) => String(item.fields.kind) === "requisition" && item.status === "approved" && Boolean(item.fields.approver));
@@ -852,11 +854,12 @@ export function ScanOverlay({ context, close }: { context: ScreenContext; close:
   }
   const presetOrder = target?.collection === "purchaseOrders" ? target.id : target ? String(target.fields.purchaseOrderId ?? "") : "";
   if (data.purchaseOrders.length === 0) return <Empty title="No purchase order to receive against yet" />;
-  return <ScanOverlayForm key={target?.id ?? "new"} context={context} close={close} receipt={target?.collection === "receipts" ? target : undefined} presetOrder={presetOrder} />;
+  return <ScanOverlayForm key={target?.id ?? "new"} context={context} close={close} receipt={target?.collection === "receipts" ? target : undefined} presetOrder={presetOrder} loaded={data} />;
 }
 
-function ScanOverlayForm({ context, close, receipt, presetOrder }: { context: ScreenContext; close: () => void; receipt: Rec | undefined; presetOrder: string }) {
-  const data = useProcData();
+function ScanOverlayForm({ context, close, receipt, presetOrder, loaded }: { context: ScreenContext; close: () => void; receipt: Rec | undefined; presetOrder: string; loaded: ReturnType<typeof useProcData> }) {
+  const live = useProcData();
+  const data = live.purchaseOrders.length ? live : loaded;
   const { org, now, actor } = useWorkspace();
   const openOrders = data.purchaseOrders.filter((order) => isPurchaseOrder(order) && ["approved", "sent"].includes(order.status));
   const [orderId, setOrderId] = useState(presetOrder || String(openOrders[0]?.id ?? ""));

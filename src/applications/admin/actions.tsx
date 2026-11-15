@@ -34,7 +34,8 @@ function boundary(id: string): string {
 /** Legal identity changes need a deliberate confirmation and the Owner view. */
 export function ConfigureEntity({ context, close }: { context: ScreenContext; close: () => void }) {
   const entities = useCollection("legalEntities").filter((record) => !record.fields.kind);
-  const [id, setId] = useState(entities[0]?.id ?? "");
+  const [idPicked, setId] = useState<string>();
+  const id = idPicked ?? (entities[0]?.id ?? "");
   const entity = entities.find((record) => record.id === id);
   const [name, setName] = useState<string>();
   const [registration, setRegistration] = useState<string>();
@@ -160,7 +161,8 @@ export function MembersExport({ context, close }: { context: ScreenContext; clos
 export function ApproveIncrease({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
   const approvals = useCollection("approvals").filter((row) => row.fields.action === "admin.raise_budget" && row.status === "awaiting_approval");
-  const [id, setId] = useState(approvals.find((row) => row.fields.targetId === context.selectedId)?.id ?? approvals[0]?.id ?? "");
+  const [idPicked, setId] = useState<string>();
+  const id = idPicked ?? (approvals.find((row) => row.fields.targetId === context.selectedId)?.id ?? approvals[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const request = approvals.find((row) => row.id === id);
   const budget = data.budgets.find((row) => row.id === String(request?.fields.targetId ?? ""));
@@ -245,7 +247,8 @@ export function AuditRetention({ context, close }: { context: ScreenContext; clo
   const events = useEvents(undefined, 500);
   const policy = ofKind(data.policies, "auditRetention")[0];
   const current = Number(policy?.fields.years ?? 6);
-  const [years, setYears] = useState(current);
+  const [yearsPicked, setYears] = useState<number>();
+  const years = yearsPicked ?? (current);
   const [busy, setBusy] = useState(false);
   const oldest = events.map((event) => event.at).sort()[0];
   const shorter = years < current;
@@ -295,7 +298,8 @@ function unpaid(rows: Rec[]): Rec[] {
 export function PaySubscription({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
   const open = unpaid(data.billingInvoices);
-  const [id, setId] = useState(open[0]?.id ?? "");
+  const [idPicked, setId] = useState<string>();
+  const id = idPicked ?? (open[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const invoice = open.find((row) => row.id === id);
   if (open.length === 0) return <Empty title="Nothing is due">Every subscription invoice is settled.</Empty>;
@@ -336,14 +340,15 @@ export function PaySubscription({ context, close }: { context: ScreenContext; cl
 
 export function DownloadInvoices({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
-  const [chosen, setChosen] = useState<string[]>(data.billingInvoices.map((row) => row.id));
+  const [picked, setChosen] = useState<string[]>();
+  const chosen = picked ?? data.billingInvoices.map((row) => row.id);
   const rows = data.billingInvoices.filter((row) => chosen.includes(row.id));
   return (
     <Stack gap={4}>
       <Stack gap={2}>
         {data.billingInvoices.map((row) => (
           <Checkbox key={row.id} label={`${row.title} · ${context.money(row.amountMinor)} · ${row.status.replace(/_/g, " ")}`} checked={chosen.includes(row.id)}
-            onChange={(event) => setChosen((list) => (event.target.checked ? [...list, row.id] : list.filter((item) => item !== row.id)))} />
+            onChange={(event) => setChosen(event.target.checked ? [...chosen, row.id] : chosen.filter((item) => item !== row.id))} />
         ))}
       </Stack>
       <Row gap={2}>

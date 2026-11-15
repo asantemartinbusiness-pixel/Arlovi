@@ -181,11 +181,15 @@ export function ObjectBody({ object, deck, onTableCell, readOnly }: { object: Sl
               strokeWidth="2"
               points={points.map((point, index) => `${index * 40 + 20},${100 - (point.value / max) * 90}`).join(" ")}
             />
+            {object.chart.showLabels && points.map((point, index) => (
+              <text key={index} x={index * 40 + 20} y={Math.max(8, 100 - (point.value / max) * 90 - 4)} fontSize="8" textAnchor="middle" fill={colour(deck, "ink")}>{point.value.toLocaleString()}</text>
+            ))}
           </svg>
         ) : (
           <div style={{ flex: 1, display: "flex", gap: 6, alignItems: "flex-end" }}>
             {points.map((point, index) => (
               <div key={`${point.label}-${index}`} style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", gap: 4 }}>
+                {object.chart!.showLabels && <span style={{ fontSize: 11, fontWeight: 600, color: colour(deck, "ink") }}>{point.value.toLocaleString()}</span>}
                 <div style={{ width: "72%", height: `${Math.max(2, (point.value / max) * 100)}%`, background: colour(deck, "accent"), borderRadius: "3px 3px 0 0" }} />
                 <span style={{ fontSize: 10, color: colour(deck, "muted"), textAlign: "center" }}>{point.label}</span>
               </div>

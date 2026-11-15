@@ -408,11 +408,18 @@ export function TakeDeposit({ context, close }: { context: ScreenContext; close:
   const payload = context.overlayPayload as { id?: string } | undefined;
   const target = useRecord(payload?.id ?? context.params.id ?? context.selectedId);
   if (!target) return <Empty title="Select a booking" />;
-  return <TakeDepositForm key={target.id} context={context} close={close} booking={target} />;
+  return <TakeDepositGate context={context} close={close} booking={target} />;
 }
 
-function TakeDepositForm({ context, close, booking }: { context: ScreenContext; close: () => void; booking: Rec }) {
+function TakeDepositGate({ context, close, booking }: { context: ScreenContext; close: () => void; booking: Rec }) {
   const data = useBookData();
+  if (data.services.length === 0) return <Empty title="Loading" />;
+  return <TakeDepositForm key={booking.id} context={context} close={close} booking={booking} loaded={data} />;
+}
+
+function TakeDepositForm({ context, close, booking, loaded }: { context: ScreenContext; close: () => void; booking: Rec; loaded: ReturnType<typeof useBookData> }) {
+  const live = useBookData();
+  const data = live.services.length ? live : loaded;
   const { org, now } = useWorkspace();
   const service = data.services.find((item) => item.id === String(booking?.fields.serviceId ?? ""));
   const [amount, setAmount] = useState(Number(booking?.fields.depositMinor ?? service?.fields.depositMinor ?? 0));

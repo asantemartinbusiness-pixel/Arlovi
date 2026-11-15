@@ -94,7 +94,8 @@ export function FollowSource({ context, close }: { context: ScreenContext; close
   const { items, data } = useInboxData();
   const sources = [...new Set(items.map((item) => item.sourceLabel))].sort();
   const followed = data.preferences.filter((record) => record.fields.kind === "followedSource");
-  const [source, setSource] = useState(sources.find((item) => !followed.some((record) => record.fields.source === item)) ?? sources[0] ?? "");
+  const [sourcePicked, setSource] = useState<string>();
+  const source = sourcePicked ?? (sources.find((item) => !followed.some((record) => record.fields.source === item)) ?? sources[0] ?? "");
   const [busy, setBusy] = useState(false);
   const already = followed.find((record) => record.fields.source === source);
   return (
@@ -182,7 +183,8 @@ export function EscalateIncident({ context, close }: { context: ScreenContext; c
   const chain = String(record?.fields.escalation ?? "").split("→").map((part) => part.replace(/after.*$/i, "").trim()).filter(Boolean);
   const owner = String(record?.fields.owner ?? "");
   const next = chain[chain.indexOf(owner) + 1] ?? chain.find((name) => name !== owner);
-  const [to, setTo] = useState(next ?? "");
+  const [toPicked, setTo] = useState<string>();
+  const to = toPicked ?? (next ?? "");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   if (!record) return <Empty title="Select an incident first" />;
@@ -237,7 +239,8 @@ export function EscalateIncident({ context, close }: { context: ScreenContext; c
 
 export function ToggleChannel({ context, close }: { context: ScreenContext; close: () => void }) {
   const { channels } = useInboxData();
-  const [id, setId] = useState(channels.find((channel) => channel.id === context.selectedId)?.id ?? channels[0]?.id ?? "");
+  const [idPicked, setId] = useState<string>();
+  const id = idPicked ?? (channels.find((channel) => channel.id === context.selectedId)?.id ?? channels[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const channel = channels.find((item) => item.id === id);
   if (channels.length === 0) return <Empty title="No delivery channel is recorded" />;
@@ -283,8 +286,10 @@ export function ToggleChannel({ context, close }: { context: ScreenContext; clos
 export function SetDigest({ context, close }: { context: ScreenContext; close: () => void }) {
   const { data } = useInboxData();
   const existing = data.preferences.find((record) => record.fields.kind === "digestDelivery");
-  const [cadence, setCadence] = useState(String(existing?.fields.cadence ?? "daily"));
-  const [sendAt, setSendAt] = useState(String(existing?.fields.sendAt ?? "08:00"));
+  const [cadencePicked, setCadence] = useState<string>();
+  const cadence = cadencePicked ?? (String(existing?.fields.cadence ?? "daily"));
+  const [sendAtPicked, setSendAt] = useState<string>();
+  const sendAt = sendAtPicked ?? (String(existing?.fields.sendAt ?? "08:00"));
   const [busy, setBusy] = useState(false);
   return (
     <Stack gap={4}>

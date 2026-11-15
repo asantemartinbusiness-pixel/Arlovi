@@ -86,9 +86,11 @@ export function AssignFollowUp({ context, close }: { context: ScreenContext; clo
     const quiet = last ? Math.floor((now.getTime() - new Date(last.startAt ?? last.at ?? last.createdAt).getTime()) / 86_400_000) : 999;
     return { deal, quiet };
   }).sort((a, b) => b.quiet - a.quiet);
-  const [dealId, setDealId] = useState(open[0]?.deal.id ?? "");
+  const [dealIdPicked, setDealId] = useState<string>();
+  const dealId = dealIdPicked ?? (open[0]?.deal.id ?? "");
   const deal = data.deals.find((item) => item.id === dealId);
-  const [owner, setOwner] = useState(String(deal?.fields.owner ?? ""));
+  const [ownerPicked, setOwner] = useState<string>();
+  const owner = ownerPicked ?? (String(deal?.fields.owner ?? ""));
   const [due, setDue] = useState(new Date(now.getTime() + 2 * 86_400_000).toISOString().slice(0, 10));
   const [what, setWhat] = useState("");
   const [busy, setBusy] = useState(false);
@@ -292,7 +294,8 @@ export function AssignLead({ context, close }: { context: ScreenContext; close: 
   const data = useCrmData();
   const owners = ownersOf(data);
   const lead = data.leads.find((item) => item.id === context.selectedId);
-  const [owner, setOwner] = useState(String(lead?.fields.owner ?? ""));
+  const [ownerPicked, setOwner] = useState<string>();
+  const owner = ownerPicked ?? (String(lead?.fields.owner ?? ""));
   const [busy, setBusy] = useState(false);
   if (!lead) return <Empty title="Select a lead first" />;
   const contact = contactById(data, String(lead.fields.contactId ?? ""));
@@ -401,7 +404,8 @@ export function AssignOwner({ context, close }: { context: ScreenContext; close:
   const owners = ownersOf(data);
   const deal = data.deals.find((item) => item.id === context.selectedId);
   const current = String(deal?.fields.owner ?? deal?.ownerName ?? "");
-  const [owner, setOwner] = useState(current);
+  const [ownerPicked, setOwner] = useState<string>();
+  const owner = ownerPicked ?? (current);
   const [busy, setBusy] = useState(false);
   if (!deal) return <Empty title="Select a deal first" />;
   const chosen = owners.find((item) => item.name === owner);
@@ -496,7 +500,8 @@ export function DuplicateQuote({ context, close }: { context: ScreenContext; clo
   const { now } = useWorkspace();
   const quote = data.quotes.find((item) => item.id === context.selectedId);
   const numbers = data.quotes.map((item) => Number(/(\d+)/.exec(String(item.fields.number ?? item.title))?.[1] ?? 0)).filter((value) => value > 0);
-  const [number, setNumber] = useState(`Q-${Math.max(100, ...numbers) + 1}`);
+  const [numberPicked, setNumber] = useState<string>();
+  const number = numberPicked ?? (`Q-${Math.max(100, ...numbers) + 1}`);
   const [busy, setBusy] = useState(false);
   if (!quote) return <Empty title="Select a quote first" />;
   const taken = data.quotes.some((item) => String(item.fields.number ?? "").toLowerCase() === number.trim().toLowerCase());
@@ -606,7 +611,8 @@ export function CompleteTask({ context, close }: { context: ScreenContext; close
   const data = useCrmData();
   const open = data.activities.filter((activity) => activity.status === "open" && ["task", "call", "email"].includes(activityKind(activity)))
     .sort((a, b) => (a.dueAt ?? a.startAt ?? "").localeCompare(b.dueAt ?? b.startAt ?? ""));
-  const [id, setId] = useState(open.find((item) => item.id === context.selectedId)?.id ?? open[0]?.id ?? "");
+  const [idPicked, setId] = useState<string>();
+  const id = idPicked ?? (open.find((item) => item.id === context.selectedId)?.id ?? open[0]?.id ?? "");
   const [outcome, setOutcome] = useState("");
   const [busy, setBusy] = useState(false);
   const task = open.find((item) => item.id === id);

@@ -6,6 +6,7 @@ import {
   evaluate, readWorkbook, replaceSheet, sheetById, type FormatContext, type Sheet, type Workbook,
 } from "./model";
 import { singleSelection, type GridSelection } from "./grid";
+import { shareEditor } from "./sharedEditor";
 
 export type SaveState = "clean" | "dirty" | "saving" | "saved" | "conflict";
 
@@ -34,6 +35,10 @@ export interface WorkbookEditor {
   selectSheet: (id: string) => void;
   conflict?: boolean;
   resolveConflict: (keep: "mine" | "theirs") => Promise<void>;
+  /** The workbook as it was when this editor last loaded or saved it: the base a merge compares against. */
+  base: Workbook;
+  /** Write a merged workbook over the stored one and clear the conflict. */
+  resolveWith: (merged: Workbook, label: string) => Promise<void>;
   record?: Rec;
 }
 
@@ -41,7 +46,7 @@ const AUTOSAVE_MS = 700;
 
 interface Step { workbook: Workbook; label: string; at: number }
 
-export function useWorkbookEditor(context: ScreenContext, record: Rec | undefined): WorkbookEditor {
+function useOwnWorkbookEditor(context: ScreenContext, record: Rec | undefined): WorkbookEditor {
   const [workbook, setWorkbook] = useState<Workbook>(() => readWorkbook(record?.body));
   const [past, setPast] = useState<Step[]>([]);
   const [future, setFuture] = useState<Step[]>([]);
@@ -58,6 +63,7 @@ export function useWorkbookEditor(context: ScreenContext, record: Rec | undefine
   const pending = useRef<Workbook | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const dirty = useRef(false);
+  const baseRef = useRef<Workbook>(workbook);
 
   useEffect(() => {
     if (!record) return;
@@ -68,6 +74,7 @@ export function useWorkbookEditor(context: ScreenContext, record: Rec | undefine
     loadedFor.current = record.id;
     baseRevision.current = record.revision;
     setWorkbook(readWorkbook(record.body));
+    baseRef.current = readWorkbook(record.body);
     setLastSavedAt(record.updatedAt);
     setPast([]);
     setFuture([]);
@@ -84,6 +91,7 @@ export function useWorkbookEditor(context: ScreenContext, record: Rec | undefine
     const result = await context.mutate.patch(recordId, { body: next }, { expectRevision: baseRevision.current, skipHistory: true });
     if (!result) { setConflict(true); setSaveState("conflict"); return; }
     baseRevision.current = result.revision;
+    baseRef.current = next;
     dirty.current = false;
     setLastSavedAt(result.updatedAt);
     setSaveState("saved");
@@ -181,7 +189,24 @@ export function useWorkbookEditor(context: ScreenContext, record: Rec | undefine
     }
   }, [recordId, record, context, workbook]);
 
+  const resolveWith = useCallback(async (merged: Workbook, label: string) => {
+    if (!recordId) return;
+    if (timer.current) window.clearTimeout(timer.current);
+    const result = await context.mutate.patch(recordId, { body: merged }, { event: label });
+    if (!result) return;
+    setPast((current) => [...current.slice(-120), { workbook, label, at: Date.now() }]);
+    setWorkbook(merged);
+    baseRef.current = merged;
+    baseRevision.current = result.revision;
+    dirty.current = false;
+    pending.current = null;
+    setLastSavedAt(result.updatedAt);
+    setConflict(false);
+    setSaveState("saved");
+  }, [recordId, context, workbook]);
+
   return {
+    base: baseRef.current, resolveWith,
     workbook, sheet, evaluation, values, format,
     selection, setSelection,
     saveState, lastSavedAt,
@@ -259,3 +284,11 @@ export function boxAddresses(box: RangeBox): string[] {
   }
   return out;
 }
+
+const SHARED = shareEditor(useOwnWorkbookEditor, (editor) => [editor.workbook, editor.selection, editor.saveState, editor.canUndo, editor.canRedo, editor.conflict, editor.evaluation]);
+
+/** Open a workbook for editing; components that open the same workbook share one editor. */
+export const useWorkbookEditor = SHARED.useShared;
+
+/** The editor that owns a workbook while it is open, for screen actions. */
+export const activeWorkbookEditor = SHARED.active;

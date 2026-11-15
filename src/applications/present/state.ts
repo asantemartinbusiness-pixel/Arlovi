@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { Rec } from "@/domain/types";
 import type { ScreenContext } from "@/platform/registry";
 import { currentSlide, readDeck, replaceSlide, updateObjects, type Deck, type Slide, type SlideObject } from "./model";
@@ -34,7 +34,7 @@ const AUTOSAVE_MS = 700;
 
 interface Step { deck: Deck; label: string; at: number }
 
-export function useDeckEditor(context: ScreenContext, record: Rec | undefined): DeckEditor {
+function useOwnDeckEditor(context: ScreenContext, record: Rec | undefined): DeckEditor {
   const [deck, setDeck] = useState<Deck>(() => readDeck(record?.body));
   const [past, setPast] = useState<Step[]>([]);
   const [future, setFuture] = useState<Step[]>([]);
@@ -213,3 +213,62 @@ export const SAVE_LABEL: Record<SaveState, string> = {
 export const SAVE_TONE: Record<SaveState, "neutral" | "warning" | "success" | "danger" | "info"> = {
   clean: "neutral", dirty: "warning", saving: "info", saved: "success", conflict: "danger",
 };
+
+/* ====================================================================== *
+ * One editor per open deck.
+ *
+ * Every panel and overlay used to open its own editor, each with its own
+ * copy of the deck, its own undo history and its own autosave, so an edit
+ * made in an overlay was invisible to the slide editor and its next save
+ * hit a revision conflict. The first component to open a deck now owns its
+ * editor; anything else that opens the same deck while it is mounted
+ * borrows that editor, so there is one deck, one history and one save.
+ * Screen actions reach the same editor through `activeDeckEditor`.
+ * ====================================================================== */
+
+interface Slot { editor: DeckEditor | null }
+const SLOTS = new Map<string, Slot[]>();
+const LISTENERS = new Set<() => void>();
+let version = 0;
+function emit(): void { version += 1; for (const listener of LISTENERS) listener(); }
+function subscribe(listener: () => void): () => void { LISTENERS.add(listener); return () => { LISTENERS.delete(listener); }; }
+
+export function useDeckEditor(context: ScreenContext, record: Rec | undefined): DeckEditor {
+  useSyncExternalStore(subscribe, () => version, () => version);
+  const slot = useRef<Slot>({ editor: null });
+  const id = record?.id;
+  const primary = id ? SLOTS.get(id)?.[0] : undefined;
+  const borrowing = Boolean(primary && primary !== slot.current && primary.editor);
+  const own = useOwnDeckEditor(context, borrowing ? undefined : record);
+
+  useEffect(() => {
+    if (!id) return undefined;
+    const current = slot.current;
+    SLOTS.set(id, [...(SLOTS.get(id) ?? []), current]);
+    emit();
+    return () => {
+      const rest = (SLOTS.get(id) ?? []).filter((item) => item !== current);
+      if (rest.length) SLOTS.set(id, rest); else SLOTS.delete(id);
+      emit();
+    };
+  }, [id]);
+
+  const signature = useRef<unknown[]>([]);
+  useEffect(() => {
+    slot.current.editor = own;
+    const next = [own.deck, own.selectedIds, own.saveState, own.canUndo, own.canRedo, own.conflict];
+    if (next.some((value, index) => value !== signature.current[index])) {
+      signature.current = next;
+      if (id && SLOTS.get(id)?.[0] === slot.current) emit();
+    }
+  });
+
+  if (borrowing && primary?.editor) return { ...primary.editor, record: record ?? primary.editor.record };
+  return own;
+}
+
+/** The editor that owns a deck while it is open, for screen actions. */
+export function activeDeckEditor(id: string | undefined): DeckEditor | undefined {
+  const editor = id ? SLOTS.get(id)?.[0]?.editor : undefined;
+  return editor ?? undefined;
+}
