@@ -91,7 +91,7 @@ export function AppShell() {
         </Button>
         <Link to={`/o/${org.slug}/hq/home`} className="hq-brand" aria-label={`${brand.name} home`}>
           <ArloviMark size={26} />
-          <strong style={{ fontSize: "var(--text-md)", letterSpacing: "-0.03em" }}>{brand.name}</strong>
+          <strong className="hq-hide-sm" style={{ fontSize: "var(--text-md)", letterSpacing: "-0.03em" }}>{brand.name}</strong>
         </Link>
 
         <Menu
@@ -123,7 +123,7 @@ export function AppShell() {
           <kbd className="ds-kbd">⌘K</kbd>
         </button>
 
-        <Button variant="primary" size="sm" icon={<Sparkles size={15} />} onClick={() => ui.setAsk(true)}>
+        <Button variant="primary" size="sm" icon={<Sparkles size={15} />} aria-label={brand.ask} onClick={() => ui.setAsk(true)}>
           <span className="hq-hide-sm">{brand.ask}</span>
         </Button>
 
@@ -159,7 +159,7 @@ export function AppShell() {
           ]}
         />
 
-        <Button variant="ghost" size="sm" iconOnly aria-label={ui.theme === "light" ? "Use dark appearance" : "Use light appearance"} onClick={() => ui.setTheme(ui.theme === "light" ? "dark" : "light")}>
+        <Button variant="ghost" size="sm" iconOnly className="hq-hide-xs" aria-label={ui.theme === "light" ? "Use dark appearance" : "Use light appearance"} onClick={() => ui.setTheme(ui.theme === "light" ? "dark" : "light")}>
           {ui.theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
         </Button>
       </header>

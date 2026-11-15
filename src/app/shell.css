@@ -122,6 +122,14 @@
 .hq-palette-item .k { font-size: var(--text-2xs); color: var(--fg-subtle); margin-inline-start: auto; }
 .hq-palette-foot { border-block-start: 1px solid var(--border-subtle); padding: var(--space-2) var(--space-4); display: flex; gap: var(--space-3); font-size: var(--text-2xs); color: var(--fg-subtle); }
 
+/* ===================== Responsive utilities ===================== */
+.hq-only-mobile { display: none; }
+@media (max-width: 1023px) { .hq-only-mobile { display: inline-flex; } }
+@media (max-width: 599px) {
+  .hq-hide-sm { display: none; }
+  .hq-hide-xs { display: none !important; }
+}
+
 /* ===================== Mobile ===================== */
 .hq-bottom { display: none; }
 .hq-scrim { display: none; }
@@ -132,7 +140,13 @@
     transform: translateX(-100%); transition: transform var(--dur-drawer) var(--ease-out);
   }
   .hq-rail { inset-inline-start: 0; }
-  .hq-appnav { inset-inline-start: var(--rail-w); width: min(260px, calc(100vw - var(--rail-w))); }
+  /* The sub-nav starts after the rail, so closing it must clear the rail's
+     width as well as its own; translating by its width alone left a 64px
+     slice of it over the content. */
+  .hq-appnav {
+    inset-inline-start: var(--rail-w); width: min(260px, calc(100vw - var(--rail-w)));
+    transform: translateX(calc(-100% - var(--rail-w)));
+  }
   .hq[data-nav-open="true"] .hq-rail, .hq[data-nav-open="true"] .hq-appnav { transform: none; }
   .hq[data-nav-open="true"] .hq-scrim { display: block; position: fixed; inset: var(--header-h) 0 0 0; background: var(--bg-overlay); z-index: 50; }
   .hq-main { padding-block-end: 64px; }
@@ -166,3 +180,12 @@
   max-width: 46ch; text-wrap: balance;
 }
 .hq-state-line > span { display: inline; }
+
+/* The narrowest phones: keep every header control reachable by tightening
+   spacing rather than dropping the attention or account controls. */
+@media (max-width: 359px) {
+  .hq-header { gap: var(--space-1); padding-inline: var(--space-2); }
+  .hq-orgswitch { padding: 0 6px; gap: 4px; }
+  .hq-search { padding: 0 var(--space-2); }
+  .hq-search kbd { display: none; }
+}

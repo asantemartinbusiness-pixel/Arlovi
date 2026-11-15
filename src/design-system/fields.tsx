@@ -1,19 +1,37 @@
-import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import {
+  cloneElement, isValidElement, useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes,
+} from "react";
 
+/**
+ * A labelled form control. The label is programmatically associated with the
+ * control: when the child is a single element without its own id, the field
+ * gives it one, and wires the hint or error to it with aria-describedby.
+ * Without this, a <label htmlFor> would point at an id nothing carries and
+ * screen readers would announce the control with no name.
+ */
 export function Field({
   label, hint, error, required, children, id, htmlFor,
 }: { label: ReactNode; hint?: ReactNode; error?: ReactNode; required?: boolean; children: ReactNode; id?: string; htmlFor?: string }) {
   const auto = useId();
-  const target = htmlFor ?? id ?? auto;
+  const single = isValidElement<{ id?: string; "aria-describedby"?: string; "aria-required"?: boolean }>(children) ? children : null;
+  const target = htmlFor ?? id ?? single?.props.id ?? auto;
+  const describedBy = error ? `${target}-error` : hint ? `${target}-hint` : undefined;
+  const control = single
+    ? cloneElement(single, {
+      id: single.props.id ?? target,
+      "aria-describedby": [single.props["aria-describedby"], describedBy].filter(Boolean).join(" ") || undefined,
+      "aria-required": required || single.props["aria-required"] || undefined,
+    })
+    : children;
   return (
     <div className="ds-field">
       <label className="ds-field-label" htmlFor={target}>
         {label}
         {required && <span className="ds-req" aria-hidden="true">*</span>}
       </label>
-      {children}
-      {hint && !error && <span className="ds-field-hint">{hint}</span>}
-      {error && <span className="ds-field-error" role="alert">{error}</span>}
+      {control}
+      {hint && !error && <span className="ds-field-hint" id={`${target}-hint`}>{hint}</span>}
+      {error && <span className="ds-field-error" id={`${target}-error`} role="alert">{error}</span>}
     </div>
   );
 }

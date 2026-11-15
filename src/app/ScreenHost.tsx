@@ -237,44 +237,51 @@ export function ScreenHost() {
   }
 
   return page;
+}
 
-  function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { context: ScreenContext; def?: ScreenDef; overlayId?: string; onClose: () => void }) {
-    const found = screenDef?.overlays?.find((item) => item.id === overlayId);
-    if (!overlayId) return null;
-    if (!found) {
-      return (
-        <Modal open onOpenChange={onClose} title={overlayId} width={480}>
-          <Notice tone="warning" title="This overlay is not implemented yet">
-            {overlayId} is in the approved contract for {ctx.screen.title} but has not been built. It is recorded as outstanding in the implementation ledger rather than shown as a generic form.
-          </Notice>
-        </Modal>
-      );
-    }
-    const overlayContext = { ...ctx, close: onClose };
-    const overlayTitle = typeof found.title === "function" ? found.title(ctx) : found.title ?? found.id;
-    if (found.kind === "drawer") {
-      return (
-        <Drawer open onOpenChange={(next) => { if (!next) onClose(); }} title={overlayTitle} subtitle={found.description} width={found.width ?? 440} footer={found.footer?.(overlayContext)}>
-          {found.render(overlayContext)}
-        </Drawer>
-      );
-    }
+/**
+ * Rendered at module level, not inside ScreenHost. Defined inside, it would be
+ * a new component type on every render, so React would remount the open
+ * dialog and discard whatever a person had typed into it — including on the
+ * workspace clock's minute tick.
+ */
+function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { context: ScreenContext; def?: ScreenDef; overlayId?: string; onClose: () => void }) {
+  const found = screenDef?.overlays?.find((item) => item.id === overlayId);
+  if (!overlayId) return null;
+  if (!found) {
     return (
-      <Modal
-        open
-        onOpenChange={(next) => { if (!next) onClose(); }}
-        title={overlayTitle}
-        description={found.description}
-        width={found.width ?? 560}
-        tone={found.tone}
-        blocking={found.blocking}
-        footer={found.footer?.(overlayContext)}
-      >
-        {found.render(overlayContext)}
+      <Modal open onOpenChange={onClose} title={overlayId} width={480}>
+        <Notice tone="warning" title="This overlay is not implemented yet">
+          {overlayId} is in the approved contract for {ctx.screen.title} but has not been built. It is recorded as outstanding in the implementation ledger rather than shown as a generic form.
+        </Notice>
       </Modal>
     );
   }
+  const overlayContext = { ...ctx, close: onClose };
+  const overlayTitle = typeof found.title === "function" ? found.title(ctx) : found.title ?? found.id;
+  if (found.kind === "drawer") {
+    return (
+      <Drawer open onOpenChange={(next) => { if (!next) onClose(); }} title={overlayTitle} subtitle={found.description} width={found.width ?? 440} footer={found.footer?.(overlayContext)}>
+        {found.render(overlayContext)}
+      </Drawer>
+    );
+  }
+  return (
+    <Modal
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      title={overlayTitle}
+      description={found.description}
+      width={found.width ?? 560}
+      tone={found.tone}
+      blocking={found.blocking}
+      footer={found.footer?.(overlayContext)}
+    >
+      {found.render(overlayContext)}
+    </Modal>
+  );
 }
+
 
 function ActionButton({ action, context, variant }: { action: ActionDef; context: ScreenContext; variant: "primary" | "secondary" }) {
   const [busy, setBusy] = useState(false);
