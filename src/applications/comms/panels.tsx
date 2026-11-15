@@ -632,6 +632,14 @@ export function MeetingRoom({ context, lens }: { context: ScreenContext; lens: "
           filterable={false}
           columns={[
             { key: "name", header: "Person", primary: true, cell: (row) => <Row gap={2}><Avatar name={row.name} size="sm" />{row.name}</Row> },
+            { key: "here", header: "In the meeting", cell: (row) => (
+              <Row gap={1} wrap>
+                {String(meeting.fields.joined ?? "").split(",").includes(row.name) && <Pill tone="info">Joined</Pill>}
+                {String(meeting.fields.handsRaised ?? "").split(",").includes(row.name) && <Pill tone="warning">Hand raised</Pill>}
+                {String(meeting.fields.muted ?? "").split(",").includes(row.name) && <Pill tone="neutral">Muted</Pill>}
+                {String(meeting.fields.recordingConsent ?? "").split(",").includes(row.name) && <Pill tone="success">Consents to recording</Pill>}
+              </Row>
+            ) },
             { key: "status", header: "Invite status", align: "end", cell: () => <Pill tone="neutral" dot>Invited</Pill> },
           ]}
         />
@@ -747,7 +755,7 @@ export function Announcements({ context, lens }: { context: ScreenContext; lens:
   const staffCount = data.employees.filter((employee) => employee.status !== "alumni").length;
 
   return rows.length === 0 ? (
-    <Empty title={`No ${lens.toLowerCase()} announcements`} icon={<Megaphone size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("post preview")}>Draft one</Button>} />
+    <Empty title={`No ${lens.toLowerCase()} announcements`} icon={<Megaphone size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("draft announcement")}>Draft one</Button>} />
   ) : (
     <Stack gap={3}>
       {rows.map((post) => (
@@ -959,17 +967,17 @@ export function ComposeMail({ context, close }: { context: ScreenContext; close:
 
 export function QuickSwitcher({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCommsData();
-  const { org } = useWorkspace();
+  const { org, actor } = useWorkspace();
   const [query, setQuery] = useState("");
   const matches = useMemo(() => {
     const text = query.trim().toLowerCase();
     const all = [
-      ...data.channels.map((channel) => ({ id: channel.id, label: `#${channel.title}`, to: `/o/${org.slug}/comms/channels/${channel.id}` })),
+      ...data.channels.filter((channel) => channel.fields.visibility !== "private" || String(channel.fields.members ?? "") === "Everyone" || String(channel.fields.members ?? "").split(",").map((name) => name.trim()).includes(actor)).map((channel) => ({ id: channel.id, label: `#${channel.title}`, to: `/o/${org.slug}/comms/channels/${channel.id}` })),
       ...data.meetings.map((meeting) => ({ id: meeting.id, label: meeting.title, to: `/o/${org.slug}/comms/meetings/${meeting.id}` })),
       ...data.emailThreads.map((thread) => ({ id: thread.id, label: thread.title, to: `/o/${org.slug}/comms/email/${thread.id}` })),
     ];
     return text ? all.filter((item) => item.label.toLowerCase().includes(text)).slice(0, 12) : all.slice(0, 12);
-  }, [query, data, org.slug]);
+  }, [query, data, org.slug, actor]);
   return (
     <Stack gap={3}>
       <Field label="Jump to"><TextInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Channel, meeting or thread" autoFocus /></Field>

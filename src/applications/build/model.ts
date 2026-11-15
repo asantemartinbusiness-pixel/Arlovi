@@ -132,6 +132,8 @@ export interface AppModel {
   endpoints: Endpoint[];
   releases: Release[];
   files: { path: string; content: string }[];
+  /** Rows typed by a person for the preview and tests, per entity id. Never workspace records. */
+  seeds?: Record<string, Record<string, string>[]>;
   settings: { name: string; description: string; environment: "preview" | "staging" | "production"; locale: string };
 }
 
@@ -334,6 +336,10 @@ export function readApp(record: Rec | undefined): AppModel {
       const row = asRecord(item);
       return { path: str(row.path, "file.txt"), content: str(row.content) };
     }),
+    seeds: Object.fromEntries(Object.entries(asRecord(body.seeds)).map(([entityId, rows]) => [
+      entityId,
+      (Array.isArray(rows) ? rows : []).map((row) => Object.fromEntries(Object.entries(asRecord(row)).map(([key, value]) => [key, str(value)]))),
+    ])),
     settings: {
       name: str(settings.name, record?.title ?? "App"),
       description: str(settings.description, record?.summary ?? ""),

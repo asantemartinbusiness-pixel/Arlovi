@@ -24,13 +24,14 @@ export function ScreenHost() {
 
   const tabParam = new URLSearchParams(location.search).get("tab");
 
+  /* An overlay can be deep-linked with ?overlay=<id>, so a dialog can be
+     bookmarked or shared, and so every overlay can be opened in testing. */
+  const linkedOverlay = new URLSearchParams(location.search).get("overlay");
+
   useEffect(() => {
     setSelectedId(match?.params.id);
-    /* An overlay can be deep-linked with ?overlay=<id>, so a dialog can be
-       bookmarked or shared, and so every overlay can be opened in testing. */
-    const linked = new URLSearchParams(window.location.search).get("overlay");
-    setOverlay(linked ? { id: linked } : null);
-  }, [match?.screen.id, match?.params.id]);
+    setOverlay(linkedOverlay ? { id: linkedOverlay } : null);
+  }, [match?.screen.id, match?.params.id, linkedOverlay]);
 
   const app = screen ? getApp(screen.applicationCode) : undefined;
   const def: ScreenDef | undefined = screen && app ? app.screens[screen.id] : undefined;

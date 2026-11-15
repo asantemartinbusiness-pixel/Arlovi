@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AtSign, CalendarDays, Hash, Mail, Megaphone, MessageSquare, Phone, Settings2, Video } from "lucide-react";
 import {
   Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
@@ -10,6 +11,14 @@ import {
   MemberManagement, Preferences, PhishingReport, QuickSwitcher, useCommsData,
 } from "./panels";
 import "./comms.css";
+import { kitOverlays, needsSelection } from "@/applications/hr/opsKit";
+import {
+  AddCc, AddMember, AskSummary, AttachCrm, AttachToThread, ChannelSearch, Dialer, DraftAnnouncement, FindTime, ForwardMail,
+  InviteToMeeting, LabelThread, MessageActions, MessageComposer, MessageSearch, NotificationPreferences, RecordingConsent,
+  RescheduleMeeting, SendConfirmation, Voicemail, WorkingHours, archiveThread, blockSender, createTaskFromMessage, endMeeting,
+  joinChannel, joinMeeting, muteChannel, pinMessage, placeCall, replyToMessage, requestMailboxConnection, returnCall,
+  toggleHand, toggleMute,
+} from "./actions";
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
   <>
@@ -18,20 +27,6 @@ const submitFooter = (formId: string, label: string) => ({ close }: { close: () 
     <Button variant="primary" type="submit" form={formId}>{label}</Button>
   </>
 );
-
-function NotificationPreferences() {
-  return (
-    <Stack gap={3}>
-      <Checkbox label="Mentions of my name" defaultChecked />
-      <Checkbox label="Direct messages" defaultChecked />
-      <Checkbox label="Every message in a channel I am in" />
-      <Checkbox label="Announcements that need acknowledgement" defaultChecked />
-      <Notice tone="info" title="Nothing leaves this browser">
-        There is no push service and no mail provider, so a notification is a badge in this workspace.
-      </Notice>
-    </Stack>
-  );
-}
 
 function ChannelArchive({ context, close }: { context: ScreenContext; close: () => void }) {
   const channel = useRecord(context.params.id ?? context.selectedId);
@@ -139,38 +134,6 @@ function ConversationInfo({ context }: { context: ScreenContext }) {
   );
 }
 
-function MessageActions({ context }: { context: ScreenContext }) {
-  return (
-    <Stack gap={3}>
-      <Properties rows={[
-        { label: "Edit", value: "Keeps the earlier version in the record history" },
-        { label: "Delete", value: "Leaves a tombstone so a thread does not lose its shape" },
-        { label: "Pin", value: "Puts it on the channel's pinned tab" },
-        { label: "Make a task", value: "Creates a task in Projects with a link back here" },
-      ]} />
-      <Notice tone="info">Everything a message action does is a change to a record in {context.org.shortName}, with an audit entry.</Notice>
-    </Stack>
-  );
-}
-
-function SendConfirmation({ context, close }: { context: ScreenContext; close: () => void }) {
-  return (
-    <Stack gap={4}>
-      <MailBoundary />
-      <Properties rows={[
-        { label: "What happens when you save", value: "A draft record with its recipients, subject and body" },
-        { label: "What does not happen", value: "No message is transmitted and no recipient is contacted" },
-        { label: "To actually send", value: "Connect a mail provider, then send from a connected mailbox" },
-      ]} />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Back</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" onClick={() => { context.openOverlay("Compose"); }}>Open the composer</Button>
-      </Row>
-    </Stack>
-  );
-}
-
 function RuleEditor({ context, close }: { context: ScreenContext; close: () => void }) {
   return (
     <form
@@ -260,39 +223,6 @@ function ReplyEditor({ context, close }: { context: ScreenContext; close: () => 
   );
 }
 
-function RecordingConsent({ context, close }: { context: ScreenContext; close: () => void }) {
-  const meeting = useRecord(context.params.id);
-  return (
-    <Stack gap={4}>
-      <p className="ds-prose">
-        Recording a meeting needs every participant to agree, and in some places it needs that agreement before the recording
-        starts rather than after. This workspace cannot record anything: there is no microphone access and no conferencing service.
-      </p>
-      <Properties rows={[
-        { label: "Meeting", value: meeting?.title ?? "—" },
-        { label: "Participants", value: String(meeting?.fields.attendees ?? "").split(",").length.toString() },
-        { label: "Recording capability", value: <Pill tone="warning">Not available here</Pill> },
-      ]} />
-      <Notice tone="info" title="What can be recorded instead">
-        Notes and actions typed by a person, attributed to them, kept on the meeting record.
-      </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Close</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" onClick={async () => {
-          if (!meeting) return;
-          const body = meeting.body as { actions?: { label: string; owner: string; done: boolean }[] } | undefined;
-          await context.mutate.patch(meeting.id, {
-            body: { ...(meeting.body as object ?? {}), actions: [...(body?.actions ?? []), { label: "Write up what was agreed", owner: context.actor, done: false }] },
-          }, { event: `Action added to ${meeting.title} by ${context.actor}` });
-          context.toast("Action added", "It is on the meeting record under Notes.");
-          close();
-        }}>Add an action instead</Button>
-      </Row>
-    </Stack>
-  );
-}
-
 function DevicePermissions() {
   return (
     <Stack gap={3}>
@@ -304,18 +234,6 @@ function DevicePermissions() {
       <Notice tone="info" title="No device permission is asked for">
         This workspace never asks for a microphone or a camera, because it has nothing to do with them. A meeting here is a record.
       </Notice>
-    </Stack>
-  );
-}
-
-function Dialer({ context }: { context: ScreenContext }) {
-  return (
-    <Stack gap={4}>
-      <Notice tone="danger" title="There is no telephony service">
-        Nothing here can place a call, and emergency calling is not available from this workspace. Dial from a real phone and
-        record what happened against the contact.
-      </Notice>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/comms/calls`)}>Back to the call log</Button>
     </Stack>
   );
 }
@@ -403,12 +321,14 @@ function PostPreview({ context }: { context: ScreenContext }) {
 }
 
 function PublishReview({ context, close }: { context: ScreenContext; close: () => void }) {
+  const [reviewed, setReviewed] = useState(false);
   const payload = context.overlayPayload as { id?: string } | undefined;
   const post = useRecord(payload?.id ?? context.selectedId);
   const data = useCommsData();
   const staff = data.employees.filter((employee) => employee.status !== "alumni").length;
   if (!post) return <Empty title="Select an announcement" />;
   const wide = String(post.fields.audience ?? "") === "Everyone";
+  const needsReview = wide || post.fields.sensitive === true;
   return (
     <Stack gap={4}>
       <p className="ds-prose">
@@ -424,11 +344,12 @@ function PublishReview({ context, close }: { context: ScreenContext; close: () =
           A company-wide announcement is read by people who cannot reply to it in private. Check the wording before publishing.
         </Notice>
       )}
+      {needsReview && <Checkbox label={`I have reviewed the wording and the audience${post.fields.sensitive === true ? " of this sensitive post" : ""}`} checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} />}
       <Row gap={2}>
         <Button variant="ghost" onClick={close}>Cancel</Button>
         <span className="ds-grow" />
-        <Button variant="primary" onClick={async () => {
-          await context.mutate.patch(post.id, { status: "published", at: new Date().toISOString() }, { expectRevision: post.revision, event: `${post.title} published by ${context.actor}` });
+        <Button variant="primary" disabled={needsReview && !reviewed} onClick={async () => {
+          await context.mutate.patch(post.id, { status: "published", at: new Date().toISOString(), fields: { ...post.fields, publishedBy: context.actor, reviewedBy: needsReview ? context.actor : "" } }, { expectRevision: post.revision, event: `${post.title} published by ${context.actor}${needsReview ? " after review" : ""}` });
           context.toast("Published", "It is on the announcement board in this workspace.");
           close();
         }}>Publish</Button>
@@ -459,7 +380,7 @@ function SignatureEditor({ context, close }: { context: ScreenContext; close: ()
   );
 }
 
-function AccountSetup() {
+function AccountSetup({ context, close }: { context: ScreenContext; close: () => void }) {
   return (
     <Stack gap={4}>
       <MailBoundary what="Connecting a mailbox" />
@@ -469,6 +390,11 @@ function AccountSetup() {
         { label: "What already works", value: "Threads, drafts, labels, rules and links to records" },
       ]} />
       <Notice tone="info">No credential is asked for here, because there is nothing to authenticate against.</Notice>
+      <Row gap={2}>
+        <Button variant="ghost" onClick={close}>Close</Button>
+        <span className="ds-grow" />
+        <Button variant="primary" disabled={!context.can("manage_connectors")} onClick={async () => { await requestMailboxConnection(context); close(); }}>Record the connection request</Button>
+      </Row>
     </Stack>
   );
 }
@@ -514,15 +440,21 @@ export const commsApp = registerApp({
         id: lens, render: (context: ScreenContext) => <CommsHome context={context} lens={lens} />,
       })),
       actions: [
-        { id: "reply", label: "Compose", placement: "primary", run: (context) => context.openOverlay("Compose") },
-        { id: "browse", label: "Jump to", placement: "secondary", run: (context) => context.openOverlay("quick switcher") },
-        { id: "Join meeting", label: "Today's diary", placement: "overflow", run: (context) => context.setTab("Calendar") },
-        { id: "ask summary", label: "Notification settings", placement: "overflow", run: (context) => context.openOverlay("notification preferences") },
+        { id: "reply", label: "Reply to a message", placement: "primary", run: (context) => replyToMessage(context) },
+        { id: "browse", label: "Browse and jump to", placement: "secondary", run: (context) => context.openOverlay("quick switcher") },
+        { id: "Join meeting", label: "Join a meeting", placement: "overflow", run: (context) => joinMeeting(context) },
+        { id: "ask summary", label: "Ask for a summary", placement: "overflow", run: (context) => context.openOverlay("summary") },
+        { id: "compose", label: "Compose an email", placement: "overflow", run: (context) => context.openOverlay("Compose") },
+        { id: "notifications", label: "Notification settings", placement: "overflow", run: (context) => context.openOverlay("notification preferences") },
+        { id: "diary", label: "Today's diary", placement: "overflow", run: (context) => context.setTab("Calendar") },
       ],
       overlays: [
+        ...kitOverlays,
+        { id: "message composer", kind: "modal", title: "Write a message", width: 560, render: ({ close, ...context }) => <MessageComposer context={context} close={close} />, footer: submitFooter("cm-message", "Post") },
+        { id: "summary", kind: "drawer", title: "What needs you", width: 520, render: ({ ...context }) => <AskSummary context={context} /> },
         { id: "Compose", kind: "modal", title: "Compose", width: 620, render: ({ close, ...context }) => <ComposeMail context={context} close={close} />, footer: submitFooter("cm-compose", "Save as a draft") },
         { id: "quick switcher", kind: "modal", title: "Jump to", width: 520, render: ({ close, ...context }) => <QuickSwitcher context={context} close={close} /> },
-        { id: "notification preferences", kind: "modal", title: "Notifications", width: 520, render: () => <NotificationPreferences /> },
+        { id: "notification preferences", kind: "modal", title: "Notifications", width: 520, render: ({ close, ...context }) => <NotificationPreferences context={context} close={close} />, footer: submitFooter("cm-notifications", "Save notifications") },
       ],
     },
 
@@ -534,11 +466,14 @@ export const commsApp = registerApp({
       })),
       actions: [
         { id: "Create channel", label: "Create a channel", placement: "primary", run: (context) => context.openOverlay("Channel creation") },
-        { id: "join", label: "Members", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose a channel first"), run: (context) => context.openOverlay("member management") },
-        { id: "mute", label: "Archive a channel", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose a channel first"), run: (context) => context.openOverlay("channel archive") },
-        { id: "search", label: "Jump to a channel", placement: "overflow", run: (context) => context.openOverlay("Channel creation") },
+        { id: "join", label: "Join the channel", placement: "secondary", guard: needsSelection("a channel"), run: (context) => joinChannel(context) },
+        { id: "mute", label: "Mute or unmute", placement: "overflow", guard: needsSelection("a channel"), run: (context) => muteChannel(context) },
+        { id: "search", label: "Search channels", placement: "overflow", run: (context) => context.openOverlay("channel search") },
+        { id: "members", label: "Members", placement: "overflow", guard: needsSelection("a channel"), run: (context) => context.openOverlay("member management") },
+        { id: "archive", label: "Archive a channel", placement: "overflow", tone: "danger", guard: needsSelection("a channel"), run: (context) => context.openOverlay("channel archive") },
       ],
       overlays: [
+        { id: "channel search", kind: "modal", title: "Search channels", width: 560, render: ({ close, ...context }) => <ChannelSearch context={context} close={close} /> },
         { id: "Channel creation", kind: "modal", title: "Create a channel", width: 560, render: ({ close, ...context }) => <ChannelCreation context={context} close={close} />, footer: submitFooter("cm-channel", "Create channel") },
         { id: "member management", kind: "drawer", title: "Members", width: 480, render: ({ ...context }) => <MemberManagement context={context} /> },
         { id: "channel archive", kind: "modal", title: "Archive this channel", tone: "danger", width: 520, render: ({ close, ...context }) => <ChannelArchive context={context} close={close} /> },
@@ -553,13 +488,17 @@ export const commsApp = registerApp({
         id: lens, render: (context: ScreenContext) => <ChannelConversation context={context} lens={lens} />,
       })),
       actions: [
-        { id: "create task", label: "Make a task", placement: "primary", run: (context) => context.setTab("Conversation") },
+        { id: "create task", label: "Make a task", placement: "primary", run: (context) => createTaskFromMessage(context) },
         { id: "thread", label: "Threads", placement: "secondary", run: (context) => context.openOverlay("Thread drawer") },
-        { id: "pin", label: "Pinned", placement: "overflow", run: (context) => context.setTab("Pinned") },
-        { id: "Reply", label: "Files", placement: "overflow", run: (context) => context.openOverlay("file preview") },
-        { id: "mention", label: "Report a message", placement: "overflow", run: (context) => context.openOverlay("moderation report") },
+        { id: "pin", label: "Pin a message", placement: "overflow", run: (context) => pinMessage(context) },
+        { id: "Reply", label: "Reply in the channel", placement: "overflow", run: (context) => context.openOverlay("message composer", { channelId: context.params.id }) },
+        { id: "mention", label: "Mention someone", placement: "overflow", run: (context) => context.openOverlay("message composer", { channelId: context.params.id, mode: "mention" }) },
+        { id: "files", label: "Files", placement: "overflow", run: (context) => context.openOverlay("file preview") },
+        { id: "report", label: "Report a message", placement: "overflow", run: (context) => context.openOverlay("moderation report") },
       ],
       overlays: [
+        ...kitOverlays,
+        { id: "message composer", kind: "modal", title: "Write a message", width: 560, render: ({ close, ...context }) => <MessageComposer context={context} close={close} />, footer: submitFooter("cm-message", "Post") },
         { id: "Thread drawer", kind: "drawer", title: "Threads in this channel", width: 520, render: ({ ...context }) => <ThreadDrawer context={context} /> },
         { id: "file preview", kind: "drawer", title: "Files referenced here", width: 480, render: ({ ...context }) => <FilePreview context={context} /> },
         { id: "moderation report", kind: "modal", title: "Report a message", width: 520, render: ({ close, ...context }) => <ModerationReport context={context} close={close} />, footer: submitFooter("cm-moderation", "Record the report") },
@@ -573,17 +512,24 @@ export const commsApp = registerApp({
         id: lens, render: (context: ScreenContext) => <DirectMessages context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Send", label: "New conversation", placement: "primary", run: (context) => context.openOverlay("add member") },
-        { id: "search", label: "Jump to", placement: "secondary", run: (context) => context.openOverlay("conversation info") },
-        { id: "attach", label: "Message actions", placement: "overflow", run: (context) => context.openOverlay("message actions") },
+        { id: "Send", label: "Send a message", placement: "primary", run: (context) => context.openOverlay("message composer", { dm: true }) },
+        { id: "search", label: "Search messages", placement: "secondary", run: (context) => context.openOverlay("message search") },
+        { id: "attach", label: "Attach a document", placement: "overflow", run: (context) => context.openOverlay("message composer", { dm: true, mode: "attach" }) },
         { id: "audio message", label: "Audio message", placement: "overflow", guard: () => "No microphone is used by this workspace", run: () => undefined },
-        { id: "call", label: "Call", placement: "overflow", guard: () => "No telephony service is connected", run: () => undefined },
+        { id: "call", label: "Call", placement: "overflow", run: (context) => placeCall(context) },
+        { id: "new conversation", label: "New conversation", placement: "overflow", run: (context) => context.openOverlay("new conversation") },
+        { id: "add member", label: "Add someone", placement: "overflow", run: (context) => context.openOverlay("add member") },
+        { id: "message actions", label: "Message actions", placement: "overflow", run: (context) => context.openOverlay("message actions") },
       ],
       overlays: [
+        ...kitOverlays,
+        { id: "message composer", kind: "modal", title: "Write a message", width: 560, render: ({ close, ...context }) => <MessageComposer context={context} close={close} />, footer: submitFooter("cm-message", "Post") },
+        { id: "message search", kind: "drawer", title: "Search messages", width: 520, render: ({ ...context }) => <MessageSearch context={context} /> },
+        { id: "new conversation", kind: "modal", title: "Start a conversation", width: 520, render: ({ close, ...context }) => <ChannelCreation context={context} close={close} />, footer: submitFooter("cm-channel", "Create") },
         { id: "Conversation info", kind: "drawer", title: "Conversation", width: 440, render: ({ ...context }) => <ConversationInfo context={context} /> },
         { id: "conversation info", kind: "drawer", title: "Conversation", width: 440, render: ({ ...context }) => <ConversationInfo context={context} /> },
-        { id: "add member", kind: "modal", title: "Start a conversation", width: 520, render: ({ close, ...context }) => <ChannelCreation context={context} close={close} />, footer: submitFooter("cm-channel", "Create") },
-        { id: "message actions", kind: "modal", title: "What a message action does", width: 520, render: ({ ...context }) => <MessageActions context={context} /> },
+        { id: "add member", kind: "modal", title: "Add someone to a conversation", width: 520, render: ({ close, ...context }) => <AddMember context={context} close={close} />, footer: submitFooter("cm-add-member", "Add") },
+        { id: "message actions", kind: "modal", title: "Message actions", width: 560, render: ({ ...context }) => <MessageActions context={context} /> },
       ],
     },
 
@@ -595,14 +541,19 @@ export const commsApp = registerApp({
       })),
       actions: [
         { id: "Compose", label: "Compose", placement: "primary", run: (context) => context.openOverlay("Compose window") },
-        { id: "archive", label: "Rules", placement: "secondary", run: (context) => context.openOverlay("rule editor") },
-        { id: "reply", label: "Open a thread", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a thread first"), run: (context) => context.navigate(`/o/${context.org.slug}/comms/email/${context.selectedId}`) },
-        { id: "forward", label: "What sending does", placement: "overflow", run: (context) => context.openOverlay("send confirmation") },
-        { id: "label", label: "Spam", placement: "overflow", run: (context) => context.setTab("Spam") },
+        { id: "archive", label: "Archive", placement: "secondary", guard: needsSelection("a thread"), run: (context) => archiveThread(context) },
+        { id: "reply", label: "Reply", placement: "overflow", guard: needsSelection("a thread"), run: (context) => context.openOverlay("reply") },
+        { id: "forward", label: "Forward", placement: "overflow", guard: needsSelection("a thread"), run: (context) => context.openOverlay("forward") },
+        { id: "label", label: "Label", placement: "overflow", guard: needsSelection("a thread"), run: (context) => context.openOverlay("label") },
+        { id: "rules", label: "Rules", placement: "overflow", run: (context) => context.openOverlay("rule editor") },
+        { id: "open thread", label: "Open a thread", placement: "overflow", guard: needsSelection("a thread"), run: (context) => context.navigate(`/o/${context.org.slug}/comms/email/${context.selectedId}`) },
       ],
       overlays: [
+        { id: "reply", kind: "modal", title: "Reply", width: 640, render: ({ close, ...context }) => <ReplyEditor context={context} close={close} />, footer: submitFooter("cm-reply", "Save the draft reply") },
+        { id: "forward", kind: "modal", title: "Forward", width: 600, render: ({ ...context }) => <ForwardMail context={context} />, footer: submitFooter("cm-forward", "Check recipients") },
+        { id: "label", kind: "modal", title: "Label this thread", width: 480, render: ({ close, ...context }) => <LabelThread context={context} close={close} />, footer: submitFooter("cm-label", "Save labels") },
         { id: "Compose window", kind: "modal", title: "Compose", width: 640, render: ({ close, ...context }) => <ComposeMail context={context} close={close} />, footer: submitFooter("cm-compose", "Save as a draft") },
-        { id: "send confirmation", kind: "modal", title: "What sending does here", width: 560, render: ({ close, ...context }) => <SendConfirmation context={context} close={close} /> },
+        { id: "send confirmation", kind: "modal", title: "Confirm the recipients", width: 560, render: ({ close, ...context }) => <SendConfirmation context={context} close={close} /> },
         { id: "rule editor", kind: "modal", title: "Mail rule", width: 560, render: ({ close, ...context }) => <RuleEditor context={context} close={close} />, footer: submitFooter("cm-rule", "Save rule") },
       ],
     },
@@ -617,21 +568,29 @@ export const commsApp = registerApp({
       actions: [
         { id: "Reply", label: "Reply", placement: "primary", run: (context) => context.openOverlay("Reply editor") },
         { id: "turn into task", label: "Make a task", placement: "secondary", run: async (context) => {
-          const title = context.screen.title;
-          await context.mutate.create({
+          const { getRecord } = await import("@/platform/repo");
+          const thread = await getRecord(context.params.id ?? "");
+          if (!thread || thread.collection !== "emailThreads") { context.toast("Open a thread first", "No task was created.", "blocked"); return; }
+          const task = await context.mutate.create({
             collection: "tasks",
-            title: `Follow up: ${title}`,
+            title: `Follow up: ${thread.title}`,
             status: "ready",
-            summary: `Raised from an email thread by ${context.actor}.`,
-            fields: { stage: "ready", assignee: context.actor, priority: "normal", estimateHours: 1, loggedHours: 0, sprint: "", kind: "task", dependsOn: "", delegatedToAgent: false },
-          }, "Task raised from an email thread");
-          context.toast("Task created", "It is in Projects, assigned to you.");
+            summary: `Raised from the email thread “${thread.title}” by ${context.actor}.`,
+            fields: { stage: "ready", assignee: context.actor, priority: "normal", estimateHours: 1, loggedHours: 0, sprint: "", kind: "task", dependsOn: "", delegatedToAgent: false, sourceThreadId: thread.id },
+          }, `Task raised from ${thread.title} by ${context.actor}`);
+          await context.mutate.patch(thread.id, { fields: { ...thread.fields, taskId: task.id } }, { event: `Thread linked to task ${task.title}` });
+          context.toast("Task created", "It is in Projects, assigned to you, with a link back to this thread.");
         } },
-        { id: "add CC", label: "Contact", placement: "overflow", run: (context) => context.openOverlay("contact inspector") },
-        { id: "attach", label: "Report phishing", placement: "overflow", run: (context) => context.openOverlay("report phishing") },
-        { id: "block sender", label: "Block the sender", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("report phishing") },
+        { id: "add CC", label: "Add a CC", placement: "overflow", run: (context) => context.openOverlay("add cc") },
+        { id: "attach", label: "Attach a document", placement: "overflow", run: (context) => context.openOverlay("attach") },
+        { id: "block sender", label: "Block the sender", placement: "overflow", tone: "danger", run: (context) => blockSender(context) },
+        { id: "contact", label: "Contact", placement: "overflow", run: (context) => context.openOverlay("contact inspector") },
+        { id: "report phishing", label: "Report phishing", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("report phishing") },
       ],
       overlays: [
+        ...kitOverlays,
+        { id: "add cc", kind: "modal", title: "Add a CC", width: 500, render: ({ close, ...context }) => <AddCc context={context} close={close} />, footer: submitFooter("cm-cc", "Add to CC") },
+        { id: "attach", kind: "modal", title: "Attach a document", width: 520, render: ({ close, ...context }) => <AttachToThread context={context} close={close} />, footer: submitFooter("cm-attach", "Attach") },
         { id: "Reply editor", kind: "modal", title: "Reply", width: 640, render: ({ close, ...context }) => <ReplyEditor context={context} close={close} />, footer: submitFooter("cm-reply", "Save the draft reply") },
         { id: "contact inspector", kind: "drawer", title: "Contact", width: 460, render: ({ ...context }) => <ContactInspector context={context} /> },
         { id: "report phishing", kind: "modal", title: "Report this message", tone: "danger", width: 540, render: ({ close, ...context }) => <PhishingReport context={context} close={close} /> },
@@ -646,12 +605,17 @@ export const commsApp = registerApp({
       })),
       actions: [
         { id: "Create event", label: "Create an event", placement: "primary", run: (context) => context.openOverlay("Event editor") },
-        { id: "find time", label: "Check for clashes", placement: "secondary", run: (context) => context.openOverlay("conflict inspector") },
-        { id: "invite", label: "Attendee status", placement: "overflow", run: (context) => context.openOverlay("attendee status") },
-        { id: "move", label: "Month view", placement: "overflow", run: (context) => context.setTab("Month") },
-        { id: "reschedule", label: "Week view", placement: "overflow", run: (context) => context.setTab("Week") },
+        { id: "find time", label: "Find a time", placement: "secondary", run: (context) => context.openOverlay("find time") },
+        { id: "invite", label: "Invite someone", placement: "overflow", run: (context) => context.openOverlay("invite") },
+        { id: "move", label: "Move a meeting", placement: "overflow", run: (context) => context.openOverlay("reschedule meeting", { mode: "move" }) },
+        { id: "reschedule", label: "Reschedule a meeting", placement: "overflow", run: (context) => context.openOverlay("reschedule meeting", { mode: "reschedule" }) },
+        { id: "check clashes", label: "Check for clashes", placement: "overflow", run: (context) => context.openOverlay("conflict inspector") },
+        { id: "attendee status", label: "Attendee status", placement: "overflow", run: (context) => context.openOverlay("attendee status") },
       ],
       overlays: [
+        { id: "find time", kind: "drawer", title: "Find a time", width: 540, render: ({ close, ...context }) => <FindTime context={context} close={close} /> },
+        { id: "invite", kind: "modal", title: "Invite someone", width: 520, render: ({ close, ...context }) => <InviteToMeeting context={context} close={close} />, footer: submitFooter("cm-invite", "Invite") },
+        { id: "reschedule meeting", kind: "modal", title: "Move or reschedule a meeting", width: 540, render: ({ close, ...context }) => <RescheduleMeeting context={context} close={close} />, footer: submitFooter("cm-reschedule", "Save the new time") },
         { id: "Event editor", kind: "modal", title: "New event", width: 620, render: ({ close, ...context }) => <EventEditor context={context} close={close} />, footer: submitFooter("cm-event", "Create event") },
         { id: "conflict inspector", kind: "drawer", title: "Clashes", width: 520, render: ({ ...context }) => <ClashInspector context={context} /> },
         { id: "attendee status", kind: "drawer", title: "Attendee status", width: 480, render: ({ ...context }) => <AttendeeStatus context={context} /> },
@@ -667,14 +631,16 @@ export const commsApp = registerApp({
       })),
       actions: [
         { id: "record consent", label: "Recording and consent", placement: "primary", run: (context) => context.openOverlay("recording consent") },
-        { id: "end", label: "End the meeting", placement: "secondary", run: (context) => context.setTab("Notes") },
-        { id: "Mute", label: "Device permissions", placement: "overflow", run: (context) => context.openOverlay("Device permissions") },
-        { id: "share", label: "Invite someone", placement: "overflow", run: (context) => context.openOverlay("invite") },
-        { id: "raise hand", label: "Participants", placement: "overflow", run: (context) => context.setTab("Participants") },
+        { id: "end", label: "End the meeting", placement: "secondary", run: (context) => endMeeting(context) },
+        { id: "Mute", label: "Mute or unmute", placement: "overflow", run: (context) => toggleMute(context) },
+        { id: "share", label: "Share — invite someone", placement: "overflow", run: (context) => context.openOverlay("invite") },
+        { id: "raise hand", label: "Raise or lower a hand", placement: "overflow", run: (context) => toggleHand(context) },
+        { id: "device permissions", label: "Device permissions", placement: "overflow", run: (context) => context.openOverlay("Device permissions") },
       ],
       overlays: [
+        ...kitOverlays,
         { id: "Device permissions", kind: "modal", title: "Device permissions", width: 520, render: () => <DevicePermissions /> },
-        { id: "invite", kind: "modal", title: "Invite somebody", width: 560, render: ({ close, ...context }) => <EventEditor context={context} close={close} />, footer: submitFooter("cm-event", "Save") },
+        { id: "invite", kind: "modal", title: "Invite someone to this meeting", width: 520, render: ({ close, ...context }) => <InviteToMeeting context={context} close={close} />, footer: submitFooter("cm-invite", "Invite") },
         { id: "recording consent", kind: "modal", title: "Recording and consent", width: 580, render: ({ close, ...context }) => <RecordingConsent context={context} close={close} /> },
       ],
     },
@@ -686,13 +652,18 @@ export const commsApp = registerApp({
         id: lens, render: (context: ScreenContext) => <CallsScreen context={context} lens={lens} />,
       })),
       actions: [
-        { id: "attach CRM", label: "Open the transcript", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Select a call first"), run: (context) => context.openOverlay("call transcript") },
-        { id: "Call", label: "Dialer", placement: "secondary", run: (context) => context.openOverlay("Dialer") },
-        { id: "return call", label: "Recording rules", placement: "overflow", run: (context) => context.openOverlay("recording notice") },
-        { id: "play voicemail", label: "Voicemail", placement: "overflow", run: (context) => context.setTab("Voicemail") },
+        { id: "attach CRM", label: "Attach to a contact", placement: "primary", guard: needsSelection("a call"), run: (context) => context.openOverlay("attach to contact") },
+        { id: "Call", label: "Call", placement: "secondary", run: (context) => context.openOverlay("Dialer") },
+        { id: "return call", label: "Return a call", placement: "overflow", run: (context) => returnCall(context) },
+        { id: "play voicemail", label: "Play voicemail", placement: "overflow", guard: needsSelection("a voicemail on the Voicemail tab"), run: (context) => context.openOverlay("voicemail") },
+        { id: "transcript", label: "Open the call record", placement: "overflow", guard: needsSelection("a call"), run: (context) => context.openOverlay("call transcript") },
+        { id: "recording rules", label: "Recording rules", placement: "overflow", run: (context) => context.openOverlay("recording notice") },
       ],
       overlays: [
-        { id: "Dialer", kind: "modal", title: "Dialer", tone: "danger", width: 520, render: ({ ...context }) => <Dialer context={context} /> },
+        ...kitOverlays,
+        { id: "attach to contact", kind: "modal", title: "Attach the call to a contact", width: 520, render: ({ close, ...context }) => <AttachCrm context={context} close={close} />, footer: submitFooter("cm-crm", "Attach") },
+        { id: "voicemail", kind: "modal", title: "Voicemail", width: 520, render: ({ close, ...context }) => <Voicemail context={context} close={close} /> },
+        { id: "Dialer", kind: "modal", title: "Dialer", tone: "danger", width: 520, render: ({ close, ...context }) => <Dialer context={context} close={close} /> },
         { id: "recording notice", kind: "modal", title: "Call recording", width: 520, render: () => <RecordingNotice /> },
         { id: "call transcript", kind: "drawer", title: "Call", width: 480, render: ({ ...context }) => <CallTranscript context={context} /> },
       ],
@@ -705,12 +676,13 @@ export const commsApp = registerApp({
         id: lens, render: (context: ScreenContext) => <Announcements context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Draft", label: "Draft an announcement", placement: "primary", run: (context) => context.openOverlay("post preview") },
+        { id: "Draft", label: "Draft an announcement", placement: "primary", run: (context) => context.openOverlay("draft announcement") },
         { id: "publish", label: "Publish", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Choose an announcement first"), run: (context) => context.openOverlay("publish review") },
         { id: "target audience", label: "Audience", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Choose an announcement first"), run: (context) => context.openOverlay("Audience selector") },
-        { id: "preview", label: "Preview", placement: "overflow", run: (context) => context.openOverlay("post preview") },
+        { id: "preview", label: "Preview", placement: "overflow", guard: needsSelection("an announcement"), run: (context) => context.openOverlay("post preview") },
       ],
       overlays: [
+        { id: "draft announcement", kind: "modal", title: "Draft an announcement", width: 600, render: ({ close, ...context }) => <DraftAnnouncement context={context} close={close} />, footer: submitFooter("cm-draft", "Save the draft") },
         { id: "Audience selector", kind: "modal", title: "Audience", width: 520, render: ({ close, ...context }) => <AudienceSelector context={context} close={close} />, footer: submitFooter("cm-audience", "Save audience") },
         { id: "post preview", kind: "modal", title: "Preview", width: 620, render: ({ ...context }) => <PostPreview context={context} /> },
         { id: "publish review", kind: "modal", title: "Publish this announcement", tone: "danger", width: 560, render: ({ close, ...context }) => <PublishReview context={context} close={close} /> },
@@ -726,11 +698,12 @@ export const commsApp = registerApp({
       actions: [
         { id: "Edit signature", label: "Edit signature", placement: "primary", run: (context) => context.openOverlay("Signature editor") },
         { id: "connect mailbox", label: "Connect a mailbox", placement: "secondary", capability: "manage_connectors", run: (context) => context.openOverlay("account setup") },
-        { id: "set schedule", label: "Working hours", placement: "overflow", run: (context) => context.setTab("Availability") },
+        { id: "set schedule", label: "Set working hours", placement: "overflow", run: (context) => context.openOverlay("working hours") },
       ],
       overlays: [
+        { id: "working hours", kind: "modal", title: "Set your working hours", width: 520, render: ({ close, ...context }) => <WorkingHours context={context} close={close} />, footer: submitFooter("cm-hours", "Save the schedule") },
         { id: "Signature editor", kind: "modal", title: "Signature", width: 560, render: ({ close, ...context }) => <SignatureEditor context={context} close={close} />, footer: submitFooter("cm-signature", "Save signature") },
-        { id: "account setup", kind: "modal", title: "Connect a mailbox", width: 560, render: () => <AccountSetup /> },
+        { id: "account setup", kind: "modal", title: "Connect a mailbox", width: 560, render: ({ close, ...context }) => <AccountSetup context={context} close={close} /> },
         { id: "privacy warning", kind: "modal", title: "About these settings", width: 520, render: () => <PrivacyWarning /> },
       ],
     },

@@ -424,8 +424,9 @@ export function TimingPreview() {
   }, [playing, span, fps]);
   if (!doc || !found || !found.next) return <Notice tone="warning" title="Select a segment first">The timing preview plays one segment against a linear ramp.</Notice>;
   const eased = easeAt(found.keyframe.easing, progress);
-  const rows = Array.from({ length: Math.min(13, Math.max(2, Math.round(span * fps) + 1)) }, (_, index, all) => {
-    const p = index / (all.length - 1);
+  const count = Math.min(13, Math.max(2, Math.round(span * fps) + 1));
+  const rows = Array.from({ length: count }, (_, index) => {
+    const p = index / (count - 1);
     const t = found.keyframe.t + p * span;
     return { frame: Math.round(t * fps), p, value: sampleTrack([found.keyframe, found.next!], t, 0) };
   });

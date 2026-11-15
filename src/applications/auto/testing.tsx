@@ -427,3 +427,101 @@ export function RunComparison({ context }: { context: ScreenContext }) {
     </Stack>
   );
 }
+
+/* ---------------------- AUTO-005 contract actions ---------------------- */
+
+/** Runs the dry run itself: every step is evaluated against real records and nothing is written. */
+export function RunDryRun({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, draft, pool } = useTestContext(context);
+  const [busy, setBusy] = useState(false);
+  if (!record) return <Empty title="Open an automation first" />;
+  if (!draft) return <Empty title="Opening the graph…" />;
+  const providerSteps = draft.graph.nodes.filter((node) => node.config?.kind === "provider.call");
+  return (
+    <Stack gap={4}>
+      <Notice tone="info" title="A dry run writes nothing and sends nothing">
+        Conditions, expressions and gates are evaluated against the records this company holds. Steps that would send an email, take a payment or call a provider are simulated and recorded as not run.
+      </Notice>
+      <Properties rows={[
+        { label: "Automation", value: record.title },
+        { label: "Steps in the graph", value: String(draft.graph.nodes.length) },
+        { label: "Provider steps simulated", value: String(providerSteps.length) },
+        { label: "Fixture", value: Object.keys(draft.fixture ?? {}).length ? `${Object.keys(draft.fixture).length} fixture values over this company's records` : "Records from this company" },
+        { label: "Assertions", value: String(draft.graph.assertions?.length ?? 0) },
+      ]} />
+      <Row gap={2}>
+        <Button
+          variant="primary"
+          busy={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              const result = executeDry({ context, graph: draft.graph, pool, fixture: draft.fixture });
+              updateDraft(record.id, { dryRun: result, dryRunAt: new Date(context.now).toISOString() });
+              await executeRun({ context, workflow: record, graph: draft.graph, pool, mode: "dry", trigger: "Dry run from the action bar", fixture: draft.fixture });
+              const checks = evaluateAssertions(draft.graph, result, context.now);
+              context.toast("Dry run recorded", `${result.steps.length} steps, ${result.status.replace(/_/g, " ")}. ${checks.filter((item) => item.pass).length} of ${checks.length} assertions pass. No record was written.`, result.status === "failed" ? "failed" : "ok");
+              close();
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Run the dry run
+        </Button>
+        <Button variant="secondary" onClick={() => context.openOverlay("Fixture editor")}>Edit the fixture first</Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}
+
+/** Approves the tested version: only when the latest dry run passed every assertion. */
+export function ApproveTestResult({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { record, draft } = useTestContext(context);
+  const [busy, setBusy] = useState(false);
+  if (!record) return <Empty title="Open an automation first" />;
+  if (!draft) return <Empty title="Opening the graph…" />;
+  const run = draft.dryRun;
+  const checks = run ? evaluateAssertions(draft.graph, run, context.now) : [];
+  const failing = checks.filter((item) => !item.pass);
+  const blocked = !run ? "Run a dry run first. Approval is bound to a tested result."
+    : run.status === "failed" ? "The latest dry run failed."
+      : checks.length === 0 ? "Add at least one assertion so the approval says what was checked."
+        : failing.length > 0 ? `${failing.length} assertion${failing.length === 1 ? "" : "s"} fail.`
+          : draft.dirty ? "The graph has unsaved changes since it was tested. Save it and run again." : undefined;
+  return (
+    <Stack gap={4}>
+      <Properties rows={[
+        { label: "Automation", value: record.title },
+        { label: "Latest dry run", value: draft.dryRunAt ? context.dateTime(draft.dryRunAt) : "None" },
+        { label: "Outcome", value: run ? run.status.replace(/_/g, " ") : "—" },
+        { label: "Assertions passing", value: `${checks.length - failing.length} of ${checks.length}` },
+        { label: "Previously approved", value: record.fields.testApprovedBy ? `${String(record.fields.testApprovedBy)}, ${context.dateTime(String(record.fields.testApprovedAt ?? ""))}` : "Never" },
+      ]} />
+      <Notice tone={blocked ? "danger" : "info"} title={blocked ? "This result cannot be approved" : "Approval is recorded against this tested version"}>
+        {blocked ?? `${context.actor} is recorded as approving revision ${record.revision}. Activation still asks separately.`}
+      </Notice>
+      <Row gap={2}>
+        <Button
+          variant="primary"
+          busy={busy}
+          disabled={Boolean(blocked) || !context.can("run_automation")}
+          onClick={async () => {
+            setBusy(true);
+            const saved = await context.mutate.patch(record.id, {
+              fields: { ...record.fields, testApprovedBy: context.actor, testApprovedAt: new Date().toISOString(), testApprovedRevision: record.revision, testAssertions: checks.length },
+            }, { expectRevision: record.revision, event: `Test result approved by ${context.actor}: ${checks.length} assertions pass` });
+            if (saved) context.toast("Test result approved", `${record.title} is approved as tested by ${context.actor}.`);
+            setBusy(false);
+            close();
+          }}
+        >
+          Approve the test result
+        </Button>
+        <Button variant="secondary" onClick={() => context.openOverlay("assertion builder")}>Add an assertion</Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+      </Row>
+    </Stack>
+  );
+}

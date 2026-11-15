@@ -16,6 +16,7 @@ import {
   type OrderBody, type ProductBody,
 } from "./data";
 import { StorefrontPreview } from "./storefront";
+import { applyOrderFilter, orderFilter, useOrderFilter } from "./actions";
 
 /* ====================================================================== *
  * COMMERCE panels — catalogue, inventory, orders, fulfilment, returns,
@@ -573,13 +574,23 @@ export function Orders({ context, state }: { context: ScreenContext; state: stri
     Delivered: (order) => order.status === "delivered",
     Returns: (order) => data.returns.some((item) => String(item.fields.orderId) === order.id),
   };
-  const rows = data.orders.filter(map[state] ?? (() => true));
+  const filter = useOrderFilter();
+  const filtered = filter.payment || filter.channel;
+  const rows = applyOrderFilter(data.orders.filter(map[state] ?? (() => true)), filter);
+  const filterNote = filtered ? (
+    <Notice tone="info" title={`Filtered: ${[filter.payment && (PAYMENT_LABEL[filter.payment] ?? filter.payment), filter.channel].filter(Boolean).join(" · ")}`}
+      actions={<Button size="sm" variant="ghost" onClick={() => orderFilter.set({ payment: "", channel: "" })}>Clear filter</Button>}>
+      Only orders matching the filter are listed on every tab.
+    </Notice>
+  ) : null;
 
   if (rows.length === 0) {
-    return <Empty title={`No ${state.toLowerCase()} orders`} icon={<ShoppingBag size={20} />}>Orders arrive from the storefront preview or are entered by the showroom.</Empty>;
+    return <Stack gap={3}>{filterNote}<Empty title={`No ${state.toLowerCase()} orders`} icon={<ShoppingBag size={20} />}>Orders arrive from the storefront preview or are entered by the showroom.</Empty></Stack>;
   }
 
   return (
+    <Stack gap={3}>
+    {filterNote}
     <DataGrid
       rows={[...rows].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""))}
       rowId={(row) => row.id}
@@ -602,6 +613,7 @@ export function Orders({ context, state }: { context: ScreenContext; state: stri
       ]}
       summary={<span>{rows.length} orders · {context.money(rows.reduce((sum, order) => sum + (order.amountMinor ?? 0), 0))}</span>}
     />
+    </Stack>
   );
 }
 
@@ -755,7 +767,8 @@ export function OrderDetail({ context, lens }: { context: ScreenContext; lens: s
 
 export function StorefrontBuilder({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useCommerceData();
-  const site = data.sites.find((item) => String(item.fields.kind) === "storefront") ?? data.sites[0];
+  const site = data.sites.find((item) => String(item.fields.kind) === "storefront");
+  const sections = (site?.body as { sections?: string[] } | undefined)?.sections;
 
   if (lens === "Preview") {
     return (
@@ -774,10 +787,12 @@ export function StorefrontBuilder({ context, lens }: { context: ScreenContext; l
         <Card span={6} title="Theme" subtitle="Tokens the storefront reads">
           <Stack gap={3}>
             <Properties rows={[
-              { label: "Palette", value: "Studio brass on paper" },
-              { label: "Heading face", value: "Inter, tight tracking" },
-              { label: "Radius", value: "10px cards, 6px controls" },
-              { label: "Product grid", value: "Auto-fill, minimum 190px" },
+              { label: "Palette", value: String(site?.fields.theme ?? "Studio brass on paper") },
+              { label: "Headings", value: String(site?.fields.headingFace ?? "Display") },
+              { label: "Corners", value: String(site?.fields.radius ?? "Rounded") },
+              { label: "Layout template", value: String(site?.fields.layout ?? "Shelf and basket") },
+              { label: "Section order", value: (sections ?? ["Hero", "Product shelf", "Discount code", "Basket", "Delivery note"]).join(" · ") },
+              { label: "Published version", value: site?.fields.publishedVersion ? `v${String(site.fields.publishedVersion)}` : "None" },
             ]} />
             <div className="t4-swatches">
               {["var(--accent)", "var(--bg-sunken)", "var(--bg-surface)", "var(--fg-strong)", "var(--success)"].map((colour) => (
@@ -1194,7 +1209,8 @@ export function Promotions({ context, lens }: { context: ScreenContext; lens: st
           <Card key={promotion.id} span={6} title={promotion.title} subtitle={promotion.summary}
             actions={<Pill tone={live ? "success" : statusTone(promotion.status)} dot>{live ? "Live" : promotion.status}</Pill>}
             footer={<>
-              <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Offer builder", { id: promotion.id })}>Edit</Button>
+              <Button size="sm" variant={context.selectedId === promotion.id ? "primary" : "secondary"} aria-pressed={context.selectedId === promotion.id} onClick={() => context.select(context.selectedId === promotion.id ? undefined : promotion.id)}>{context.selectedId === promotion.id ? "Selected" : "Select"}</Button>
+              <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Offer builder", { id: promotion.id })}>Edit</Button>
               <Button size="sm" variant="ghost" onClick={() => context.openOverlay("margin check", { id: promotion.id })}>Margin check</Button>
               {live && <Button size="sm" variant="ghost" onClick={async () => {
                 await context.mutate.patch(promotion.id, { status: "paused" }, { expectRevision: promotion.revision, event: `${promotion.title} paused` });

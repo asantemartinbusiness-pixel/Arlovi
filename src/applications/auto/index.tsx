@@ -17,7 +17,7 @@ import {
   SampleInspection, ScheduleRecurrence, TriggerConfiguration, TriggerSelection, WebhookSetup,
 } from "./triggers";
 import { ActionNodes, ActionParameter, PolicySimulation, VariableSelector } from "./actions";
-import { AssertionBuilder, RunComparison, SimulatedReceipt, WorkflowTesting } from "./testing";
+import { ApproveTestResult, AssertionBuilder, RunComparison, RunDryRun, SimulatedReceipt, WorkflowTesting } from "./testing";
 import {
   IncidentLink, NodeTrace, RedactionPanel, ReplayConfirmation, RetrySafetyCheck, RunDetail,
   RunDetailHeader, RunHistory, RunInspector, exportRun, type RunTab,
@@ -99,7 +99,7 @@ export const autoApp = registerApp({
         render: (context: ScreenContext) => <AutomationLibrary context={context} tab={tab} />,
       })),
       actions: [
-        { id: "Create", label: "New automation", placement: "primary", run: (context) => context.openOverlay("Create workflow") },
+        { id: "Create", label: "Create an automation", placement: "primary", run: (context) => context.openOverlay("Create workflow") },
         { id: "duplicate", label: "Duplicate", placement: "secondary", guard: needsSelection, run: (context) => context.openOverlay("duplicate copy") },
         { id: "activate", label: "Activation review", placement: "secondary", capability: "run_automation", guard: needsSelection, run: (context) => context.openOverlay("activation review") },
         {
@@ -193,7 +193,7 @@ export const autoApp = registerApp({
       })),
       actions: [
         { id: "Select trigger", label: "Select trigger", placement: "primary", run: (context) => context.openOverlay("trigger selection") },
-        { id: "set timezone", label: "Recurrence", placement: "secondary", run: (context) => context.openOverlay("schedule recurrence") },
+        { id: "set timezone", label: "Set the time zone", placement: "secondary", run: (context) => context.openOverlay("schedule recurrence") },
         { id: "test", label: "Record a test delivery", placement: "secondary", run: (context) => context.openOverlay("Webhook setup") },
         {
           id: "activate", label: "Activate", placement: "overflow", capability: "run_automation",
@@ -251,16 +251,20 @@ export const autoApp = registerApp({
         render: (context: ScreenContext) => <WorkflowTesting context={context} />,
       })),
       actions: [
-        { id: "Run dry-run", label: "Fixture", placement: "secondary", run: (context) => context.openOverlay("Fixture editor") },
-        { id: "inspect", label: "Step receipt", placement: "secondary", run: (context) => context.openOverlay("simulated receipt") },
+        { id: "Run dry-run", label: "Run a dry run", placement: "primary", run: (context) => context.openOverlay("run dry run") },
+        { id: "inspect", label: "Inspect a step receipt", placement: "secondary", run: (context) => context.openOverlay("simulated receipt") },
         { id: "compare", label: "Compare runs", placement: "overflow", run: (context) => context.openOverlay("run comparison") },
-        { id: "approve", label: "Assertions", placement: "overflow", run: (context) => context.openOverlay("assertion builder") },
+        { id: "approve", label: "Approve the test result", placement: "secondary", capability: "run_automation", run: (context) => context.openOverlay("approve test") },
+        { id: "fixture", label: "Edit the fixture", placement: "overflow", run: (context) => context.openOverlay("Fixture editor") },
+        { id: "assertions", label: "Add an assertion", placement: "overflow", run: (context) => context.openOverlay("assertion builder") },
       ],
       overlays: [
         { id: "Fixture editor", kind: "modal", title: "Dry-run fixture", width: 520, render: ({ close, ...context }) => <FixtureEditor context={context} close={close} /> },
         { id: "assertion builder", kind: "modal", title: "Add an assertion", width: 520, render: ({ close, ...context }) => <AssertionBuilder context={context} close={close} /> },
         { id: "simulated receipt", kind: "drawer", title: "Simulated receipt", width: 540, render: ({ ...context }) => <SimulatedReceipt context={context} /> },
         { id: "run comparison", kind: "drawer", title: "Compare two runs", width: 560, render: ({ ...context }) => <RunComparison context={context} /> },
+        { id: "run dry run", kind: "modal", title: "Run a dry run", width: 560, render: ({ close, ...context }) => <RunDryRun context={context} close={close} /> },
+        { id: "approve test", kind: "modal", title: "Approve the test result", width: 580, render: ({ close, ...context }) => <ApproveTestResult context={context} close={close} /> },
       ],
     },
 
@@ -342,7 +346,7 @@ export const autoApp = registerApp({
           },
         },
         { id: "change concurrency", label: "Concurrency", placement: "secondary", run: (context) => context.openOverlay("queue priority") },
-        { id: "inspect", label: "Impact", placement: "overflow", run: (context) => context.openOverlay("impact warning") },
+        { id: "inspect", label: "Inspect the impact", placement: "overflow", run: (context) => context.openOverlay("impact warning") },
       ],
       overlays: [
         { id: "Schedule editor", kind: "modal", title: "Reschedule", width: 560, render: ({ close, ...context }) => <ScheduleEditor context={context} close={close} /> },
@@ -363,7 +367,7 @@ export const autoApp = registerApp({
         { id: "Assign", label: "Assign", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Select an exception first"), run: (context) => context.openOverlay("assign exception") },
         { id: "retry", label: "Retry", placement: "secondary", capability: "run_automation", guard: (context) => (context.selectedId ? undefined : "Select an exception first"), run: (context) => context.openOverlay("retry from exception") },
         { id: "fix connection", label: "Fix the connection", placement: "secondary", run: (context) => context.openOverlay("connector reconnect") },
-        { id: "close", label: "Record a resolution", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select an exception first"), run: (context) => context.openOverlay("resolution record") },
+        { id: "close", label: "Close with a resolution", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select an exception first"), run: (context) => context.openOverlay("resolution record") },
       ],
       overlays: [
         { id: "Incident detail", kind: "drawer", title: "Exception", width: 540, render: ({ ...context }) => <IncidentDetail context={context} /> },

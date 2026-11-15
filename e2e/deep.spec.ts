@@ -65,10 +65,24 @@ async function closeDialogs(page: Page) {
   }
 }
 
+/**
+ * Client-side navigation. The first visit is a real page load; every later one
+ * pushes history and lets the router render, which exercises the same code
+ * paths as following a link in the app and is far faster than reloading.
+ */
 async function load(page: Page, url: string) {
-  await page.goto(url, { waitUntil: "domcontentloaded" });
+  const booted = await page.evaluate(() => Boolean(document.querySelector(".hq"))).catch(() => false);
+  if (!booted) {
+    await page.goto(url, { waitUntil: "domcontentloaded" });
+  } else {
+    await closeDialogs(page);
+    await page.evaluate((target) => {
+      window.history.pushState(null, "", target);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }, url);
+  }
   await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 8000 }).catch(() => undefined);
-  await settle(page, 220);
+  await settle(page, 120);
 }
 
 async function sweepScreen(page: Page, screen: Contract, errors: ReturnType<typeof watch>): Promise<ScreenResult> {
@@ -132,7 +146,7 @@ async function sweepScreen(page: Page, screen: Contract, errors: ReturnType<type
       if (await button.isDisabled()) { guarded.push(label); return; }
       await button.click();
     }
-    await page.waitForTimeout(260);
+    await page.waitForTimeout(200);
     const dialog = page.getByRole("dialog").first();
     const text = (await dialog.isVisible().catch(() => false)) ? await dialog.innerText().catch(() => "") : "";
     const actionErrors = errors.take();
@@ -162,11 +176,13 @@ for (const code of apps) {
     const page = await context.newPage();
     const errors = watch(page);
     const results: ScreenResult[] = [];
-    for (const screen of screens) results.push(await sweepScreen(page, screen, errors));
-    await context.close();
-
     mkdirSync(OUT, { recursive: true });
-    writeFileSync(new URL(`${code}.json`, OUT), `${JSON.stringify(results, null, 1)}\n`);
+    for (const screen of screens) {
+      results.push(await sweepScreen(page, screen, errors));
+      // Written after every screen, so a timeout never discards finished work.
+      writeFileSync(new URL(`${code}.json`, OUT), `${JSON.stringify(results, null, 1)}\n`);
+    }
+    await context.close();
 
     const failures = results.flatMap((result) => result.checks.filter((check) => !check.ok).map((check) => `${result.id} ${check.kind} "${check.name}": ${check.note ?? "failed"}`));
     expect(failures, `${code}: ${failures.length} failing checks`).toEqual([]);
