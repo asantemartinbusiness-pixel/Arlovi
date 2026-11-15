@@ -9,7 +9,7 @@ import {
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useOrgRecords, useRecord, useWorkspace } from "@/platform/workspace";
-import { freshness } from "@/platform/clock";
+import { freshness, wallMs } from "@/platform/clock";
 import { CAPABILITY_LABELS, capabilityById } from "@/platform/capability";
 import { composeAnswer, suggestions } from "@/applications/t2_shared/engine";
 import {
@@ -939,7 +939,7 @@ function VoiceLive({ context }: { context: ScreenContext }) {
             onSubmit={async (event) => {
               event.preventDefault();
               if (!text.trim()) return;
-              const entry: TranscriptEntry = { id: `tr-${Date.now()}`, at: context.now.toISOString(), speaker, text: text.trim(), source: "typed" };
+              const entry: TranscriptEntry = { id: `tr-${wallMs()}`, at: context.now.toISOString(), speaker, text: text.trim(), source: "typed" };
               const body = (session.body ?? {}) as Record<string, unknown>;
               await context.mutate.patch(session.id, { body: { ...body, transcript: [...entries, entry] } }, { expectRevision: session.revision, event: "Transcript turn added" });
               setText("");
@@ -1139,7 +1139,7 @@ function MeetingRoom({ context, view }: { context: ScreenContext; view: "Meeting
               event.preventDefault();
               if (consentBlocked || !line.trim()) return;
               const body = (meeting.body ?? {}) as Record<string, unknown>;
-              const entry: TranscriptEntry = { id: `tr-${Date.now()}`, at: context.now.toISOString(), speaker: speaker || context.actor, text: line.trim(), source: "typed" };
+              const entry: TranscriptEntry = { id: `tr-${wallMs()}`, at: context.now.toISOString(), speaker: speaker || context.actor, text: line.trim(), source: "typed" };
               await context.mutate.patch(meeting.id, { body: { ...body, transcript: [...transcript, entry] } }, { expectRevision: meeting.revision, event: "Meeting transcript line added" });
               setLine("");
               context.toast("Line added", "It is stored against the meeting as typed text.");
@@ -1605,7 +1605,7 @@ function ArtifactScreen({ context, view }: { context: ScreenContext; view: "Prev
               if (!comment.trim()) return;
               const body = (artifact.body ?? {}) as Record<string, unknown>;
               await context.mutate.patch(artifact.id, {
-                body: { ...body, comments: [...comments, { id: `c-${Date.now()}`, at: context.now.toISOString(), author: context.actor, text: comment.trim() }] },
+                body: { ...body, comments: [...comments, { id: `c-${wallMs()}`, at: context.now.toISOString(), author: context.actor, text: comment.trim() }] },
               }, { expectRevision: artifact.revision, event: `Comment added to ${artifact.title}` });
               setComment("");
               context.toast("Comment saved", "It is stored on the artifact record.");

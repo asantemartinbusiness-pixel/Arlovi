@@ -7,6 +7,7 @@ import { useCollection, useEvents, useOrgRecords } from "@/platform/workspace";
 import { capabilityById, CAPABILITY_LABELS } from "@/platform/capability";
 import type { Rec } from "@/domain/types";
 import { ofKind, StepUp, useAdmin } from "./pieces";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * ADMIN contract actions that change the record they name.
@@ -71,7 +72,7 @@ export function ConfigureEntity({ context, close }: { context: ScreenContext; cl
             const previous = { title: entity.title, registration: entity.fields.registration ?? "", taxId: entity.fields.taxId ?? entity.fields.vatNumber ?? "" };
             const saved = await context.mutate.patch(entity.id, {
               title: nextName.trim(),
-              fields: { ...entity.fields, registration: nextRegistration, taxId: nextTax, identityChangedBy: context.actor, identityChangedAt: new Date().toISOString(), previousIdentity: JSON.stringify(previous) },
+              fields: { ...entity.fields, registration: nextRegistration, taxId: nextTax, identityChangedBy: context.actor, identityChangedAt: clockIso(), previousIdentity: JSON.stringify(previous) },
             }, { expectRevision: entity.revision, event: `Legal identity of ${entity.title} changed by ${context.actor} after a typed confirmation` });
             if (saved) context.toast("Entity updated", `${nextName.trim()} is saved. The previous identity is kept on the record.`);
             setBusy(false);
@@ -114,11 +115,11 @@ export function SuspendMember({ context, close }: { context: ScreenContext; clos
             setBusy(true);
             const saved = await context.mutate.patch(member.id, {
               status: suspended ? "active" : "suspended",
-              fields: { ...member.fields, ...(suspended ? { reinstatedBy: context.actor, reinstatedAt: new Date().toISOString() } : { suspendedBy: context.actor, suspendedAt: new Date().toISOString() }) },
+              fields: { ...member.fields, ...(suspended ? { reinstatedBy: context.actor, reinstatedAt: clockIso() } : { suspendedBy: context.actor, suspendedAt: clockIso() }) },
             }, { expectRevision: member.revision, event: `${member.title} ${suspended ? "reinstated" : "suspended"} by ${context.actor}` });
             if (!suspended) {
               for (const session of sessions) {
-                await context.mutate.patch(session.id, { status: "revoked", fields: { ...session.fields, revokedBy: context.actor, revokedAt: new Date().toISOString() } }, { event: `Session ended on suspension: ${session.title}` });
+                await context.mutate.patch(session.id, { status: "revoked", fields: { ...session.fields, revokedBy: context.actor, revokedAt: clockIso() } }, { event: `Session ended on suspension: ${session.title}` });
               }
             }
             if (saved) context.toast(suspended ? "Reinstated" : "Suspended", suspended ? `${member.title} can use the workspace again.` : `${member.title} is suspended and ${sessions.length} session${sessions.length === 1 ? " was" : "s were"} ended.`);
@@ -197,10 +198,10 @@ export function ApproveIncrease({ context, close }: { context: ScreenContext; cl
             // Bound to the revision the request was raised against, so a concurrent change is refused.
             const saved = await context.mutate.patch(budget.id, {
               amountMinor: Number(request.amountMinor ?? 0),
-              fields: { ...budget.fields, previousCapMinor: Number(budget.amountMinor ?? 0), capRaisedBy: context.actor, capRaisedAt: new Date().toISOString() },
+              fields: { ...budget.fields, previousCapMinor: Number(budget.amountMinor ?? 0), capRaisedBy: context.actor, capRaisedAt: clockIso() },
             }, { expectRevision: budget.revision, event: `Cap on ${budget.title} raised to ${context.money(request.amountMinor)} by ${context.actor}` });
             if (saved) {
-              await context.mutate.patch(request.id, { status: "approved", fields: { ...request.fields, decision: "approved", decidedBy: context.actor, decidedAt: new Date().toISOString() } }, { expectRevision: request.revision, event: `Budget increase approved by ${context.actor}` });
+              await context.mutate.patch(request.id, { status: "approved", fields: { ...request.fields, decision: "approved", decidedBy: context.actor, decidedAt: clockIso() } }, { expectRevision: request.revision, event: `Budget increase approved by ${context.actor}` });
               context.toast("Increase approved", `${budget.title} is capped at ${context.money(request.amountMinor)}. ${context.actor} is recorded as approver.`);
             }
             setBusy(false);
@@ -322,7 +323,7 @@ export function PaySubscription({ context, close }: { context: ScreenContext; cl
             if (!invoice) return;
             setBusy(true);
             const saved = await context.mutate.patch(invoice.id, {
-              fields: { ...invoice.fields, paymentState: "awaiting_external_confirmation", paymentRequestedBy: context.actor, paymentRequestedAt: new Date().toISOString() },
+              fields: { ...invoice.fields, paymentState: "awaiting_external_confirmation", paymentRequestedBy: context.actor, paymentRequestedAt: clockIso() },
             }, { expectRevision: invoice.revision, event: `Payment of ${invoice.title} requested by ${context.actor}; awaiting a payment processor` });
             await context.mutate.log(`Payment of ${invoice.title} held at the processor boundary`, { entityId: invoice.id, type: "billing.payment", capability: "awaiting_external_confirmation" });
             if (saved) context.toast("Awaiting the processor", `${invoice.title} is marked for payment. Nothing was charged and no card data was collected.`, "info");
@@ -386,7 +387,7 @@ export function UpdatePaymentMethod({ context, close }: { context: ScreenContext
             if (!subscription) return;
             setBusy(true);
             const saved = await context.mutate.patch(subscription.id, {
-              fields: { ...subscription.fields, methodUpdateRequestedBy: context.actor, methodUpdateRequestedAt: new Date().toISOString(), methodUpdateState: "not_connected" },
+              fields: { ...subscription.fields, methodUpdateRequestedBy: context.actor, methodUpdateRequestedAt: clockIso(), methodUpdateState: "not_connected" },
             }, { expectRevision: subscription.revision, event: `Payment method update requested by ${context.actor}; no processor connected` });
             if (saved) context.toast("Request recorded", "The update is waiting for a payment processor. No card data was collected.", "info");
             setBusy(false);
@@ -416,7 +417,7 @@ export function ExportEverything({ context, close }: { context: ScreenContext; c
       <Row gap={2}>
         <Button variant="primary" busy={busy} disabled={!context.can("export_data")} onClick={async () => {
           setBusy(true);
-          const payload = JSON.stringify({ organisation: context.org.slug, exportedAt: new Date().toISOString(), count: records.length, records }, null, 2);
+          const payload = JSON.stringify({ organisation: context.org.slug, exportedAt: clockIso(), count: records.length, records }, null, 2);
           download(`${context.org.slug}-export.json`, payload, "application/json");
           await context.mutate.create({
             collection: "backups", title: "Full export", status: "ok",
@@ -508,7 +509,7 @@ export function RotateKey({ context, close }: { context: ScreenContext; close: (
             setBusy(true);
             const secret = `${String(key.fields.environment) === "live" ? "arl_live" : "arl_test"}_${randomKey()}`;
             const saved = await context.mutate.patch(key.id, {
-              fields: { ...key.fields, prefix: secret.slice(0, 13), last4: secret.slice(-4), rotatedBy: context.actor, rotatedAt: new Date().toISOString(), previousLast4: String(key.fields.last4 ?? ""), shownOnce: true },
+              fields: { ...key.fields, prefix: secret.slice(0, 13), last4: secret.slice(-4), rotatedBy: context.actor, rotatedAt: clockIso(), previousLast4: String(key.fields.last4 ?? ""), shownOnce: true },
             }, { expectRevision: key.revision, event: `API key rotated by ${context.actor}: ${key.title}` });
             if (saved) setIssued(secret);
             setBusy(false);
@@ -535,7 +536,7 @@ export function RevokeKey({ context, close }: { context: ScreenContext; close: (
       busy={busy}
       onConfirm={async () => {
         setBusy(true);
-        const saved = await context.mutate.patch(key.id, { status: "revoked", fields: { ...key.fields, revokedBy: context.actor, revokedAt: new Date().toISOString() } }, { expectRevision: key.revision, event: `API key revoked by ${context.actor}: ${key.title}` });
+        const saved = await context.mutate.patch(key.id, { status: "revoked", fields: { ...key.fields, revokedBy: context.actor, revokedAt: clockIso() } }, { expectRevision: key.revision, event: `API key revoked by ${context.actor}: ${key.title}` });
         if (saved) context.toast("Revoked", `${key.title} no longer works. The record stays for the audit trail.`, "blocked");
         setBusy(false);
         close();

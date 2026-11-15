@@ -11,6 +11,7 @@ import { motionUi } from "./model";
 import { EasingGraph, Stage, TransportRow } from "./parts";
 import { PROPERTY_LABEL, editorKeys, selectedKeyframe } from "./editor";
 import { MissingComposition, useMotionDoc, usePrefersReducedMotion, useSession, FormField } from "./shared";
+import { clockIso, wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * ARL-MOTION-003 — Easing & Timing
@@ -44,7 +45,7 @@ export function runMotionTest(handle: DocHandle<MotionDoc>, actor: string): Moti
   const findings = accessibilityFindings(doc);
   const serious = findings.filter((finding) => finding.severity !== "info");
   const test: MotionTest = {
-    id: `test-${Date.now().toString(36)}`, kind: "accessibility", at: new Date().toISOString(), by: actor,
+    id: `test-${wallMs().toString(36)}`, kind: "accessibility", at: clockIso(), by: actor,
     pass: serious.length === 0,
     findings: findings.length ? findings.map((finding) => `${finding.severity}: ${finding.title}. ${finding.detail}`) : ["No flashing, large-area travel, fast zoom or unreachable trigger found."],
   };
@@ -316,7 +317,7 @@ function ReviewPanel({ handle, doc, context }: { handle: DocHandle<MotionDoc>; d
             <FormField label="Review note" hint="Say why the motion is acceptable, for example that the flashing area is under the threshold at the size it ships.">
               <TextArea rows={3} value={note} onChange={(event) => setNote(event.target.value)} />
             </FormField>
-            <Button size="sm" variant="secondary" disabled={note.trim().length < 10} onClick={() => handle.edit((current) => ({ ...current, review: { ...current.review, state: "approved", reviewer: context.actor, reviewedAt: new Date().toISOString(), note: note.trim() } }), "Accessibility review recorded")}>
+            <Button size="sm" variant="secondary" disabled={note.trim().length < 10} onClick={() => handle.edit((current) => ({ ...current, review: { ...current.review, state: "approved", reviewer: context.actor, reviewedAt: clockIso(), note: note.trim() } }), "Accessibility review recorded")}>
               Record the review
             </Button>
             <span className="vx-mini">The role view shapes the interface; it is not an account security boundary.</span>

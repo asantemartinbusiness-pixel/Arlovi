@@ -6,7 +6,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
-import { daysBetween } from "@/platform/clock";
+import { clockIso, clockNow, daysBetween } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { AssetPreview, FileStateTag, assetPreviewUri, fileState, palette, storedBytes } from "./thumbs";
 
@@ -192,7 +192,7 @@ export function AssetLibrary({ context, tab }: { context: ScreenContext; tab: Li
                 label: "Archive",
                 tone: "danger",
                 onRun: (selected) => {
-                  void Promise.all(selected.filter((row) => row.status !== "archived").map((row) => context.mutate.patch(row.id, { status: "archived", fields: { ...row.fields, archivedBy: context.actor, archivedAt: new Date().toISOString() } }, { event: `Asset archived: ${row.title}` })))
+                  void Promise.all(selected.filter((row) => row.status !== "archived").map((row) => context.mutate.patch(row.id, { status: "archived", fields: { ...row.fields, archivedBy: context.actor, archivedAt: clockIso() } }, { event: `Asset archived: ${row.title}` })))
                     .then(() => context.toast("Archived", "Archived assets stay resolvable so older documents still find them."));
                 },
                 disabled: (selected) => selected.every((row) => row.status === "archived"),
@@ -387,7 +387,7 @@ export function MediaImport({ context, close }: { context: ScreenContext; close:
                 collection: "assets",
                 title: name,
                 status: "pending_review",
-                summary: `Imported in this browser on ${context.date(new Date())}. Held locally; nothing was uploaded.`,
+                summary: `Imported in this browser on ${context.date(clockNow())}. Held locally; nothing was uploaded.`,
                 tags: ["imported"],
                 fields: {
                   kind: "image", format, fileState: "uploaded",
@@ -905,7 +905,7 @@ export function ReplacementImpact({ context, close }: { context: ScreenContext; 
             try {
               await context.mutate.patch(record.id, {
                 status: "archived",
-                fields: { ...record.fields, supersededBy: replacement.id, archivedBy: context.actor, archivedAt: new Date().toISOString() },
+                fields: { ...record.fields, supersededBy: replacement.id, archivedBy: context.actor, archivedAt: clockIso() },
               }, { event: `Asset superseded by ${replacement.title}`, expectRevision: record.revision });
               await context.mutate.patch(replacement.id, {
                 fields: { ...replacement.fields, usedIn: [...new Set([...usedIn(replacement), ...uses])].join(", "), replaces: record.id },
@@ -1007,7 +1007,7 @@ export function ArchiveAsset({ context, close }: { context: ScreenContext; close
           disabled={Boolean(blocked)}
           onClick={async () => {
             setBusy(true);
-            const saved = await context.mutate.patch(record.id, { status: "archived", fields: { ...record.fields, archivedBy: context.actor, archivedAt: new Date().toISOString(), statusBeforeArchive: record.status } }, { expectRevision: record.revision, event: `Asset archived by ${context.actor}: ${record.title}` });
+            const saved = await context.mutate.patch(record.id, { status: "archived", fields: { ...record.fields, archivedBy: context.actor, archivedAt: clockIso(), statusBeforeArchive: record.status } }, { expectRevision: record.revision, event: `Asset archived by ${context.actor}: ${record.title}` });
             if (saved) context.toast("Archived", `${record.title} is archived. ${uses.length} use${uses.length === 1 ? "" : "s"} still resolve to it.`);
             setBusy(false);
             close();

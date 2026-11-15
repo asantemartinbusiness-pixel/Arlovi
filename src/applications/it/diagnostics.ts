@@ -1,5 +1,6 @@
 import { db } from "@/runtime/db";
 import type { Audit, Rec } from "@/domain/types";
+import { clockIso, wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * Diagnostics that genuinely run.
@@ -104,7 +105,7 @@ const FEATURES: { id: string; label: string; test: () => boolean; why: string }[
 
 /** A real IndexedDB write, read back and delete, timed. */
 export async function checkDatabaseRoundTrip(): Promise<CheckResult> {
-  const id = `t6-diagnostic-${Date.now().toString(36)}`;
+  const id = `t6-diagnostic-${wallMs().toString(36)}`;
   const token = Math.floor(Math.random() * 1_000_000);
   const start = performance.now();
   try {
@@ -210,7 +211,7 @@ export async function checkStorageQuota(): Promise<CheckResult[]> {
 
 /** Skew between the clock the workspace uses and this device's clock. */
 export function checkClockSkew(workspaceNow: Date): CheckResult {
-  const device = Date.now();
+  const device = wallMs();
   const skewMs = device - workspaceNow.getTime();
   const abs = Math.abs(skewMs);
   const frozen = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("clock");
@@ -219,7 +220,7 @@ export function checkClockSkew(workspaceNow: Date): CheckResult {
       id: "clock-skew", group: "Clock", label: "Workspace clock against the device clock",
       state: "warn",
       value: `${(skewMs / 1000).toFixed(1)} s`,
-      method: "Compared the workspace clock with Date.now() at the moment the check ran.",
+      method: "Compared the workspace clock with wallMs() at the moment the check ran.",
       detail: "The workspace clock is frozen by the clock parameter in the address, so this difference is deliberate rather than a fault.",
     };
   }
@@ -227,7 +228,7 @@ export function checkClockSkew(workspaceNow: Date): CheckResult {
     id: "clock-skew", group: "Clock", label: "Workspace clock against the device clock",
     state: abs > 120_000 ? "warn" : "pass",
     value: `${(skewMs / 1000).toFixed(2)} s`,
-    method: "Compared the workspace clock with Date.now() at the moment the check ran.",
+    method: "Compared the workspace clock with wallMs() at the moment the check ran.",
     detail: abs > 120_000
       ? "The two disagree by more than two minutes, which will make dates on new records look wrong."
       : "The workspace and the device agree. There is no time server here, so neither is checked against an authority.",
@@ -244,12 +245,12 @@ export function checkMonotonicClock(): CheckResult {
       detail: "Durations in this page cannot be checked against wall clock.",
     };
   }
-  const drift = Date.now() - (performance.timeOrigin + performance.now());
+  const drift = wallMs() - (performance.timeOrigin + performance.now());
   return {
     id: "clock-monotonic", group: "Clock", label: "Monotonic clock against wall clock",
     state: Math.abs(drift) > 1000 ? "warn" : "pass",
     value: `${drift.toFixed(0)} ms`,
-    method: "Date.now() minus performance.timeOrigin plus performance.now().",
+    method: "wallMs() minus performance.timeOrigin plus performance.now().",
     detail: Math.abs(drift) > 1000
       ? "The wall clock moved during this session, so a duration measured across that moment may be wrong."
       : "The page timeline and the wall clock agree, so measured durations are sound.",
@@ -350,7 +351,7 @@ export async function runAllChecks(orgId: string, orgName: string, workspaceNow:
     ...checkRecordCounts(counts, orgName),
     checkLastError(events, sessionErrors),
   ];
-  return { results, counts, storage, at: new Date().toISOString() };
+  return { results, counts, storage, at: clockIso() };
 }
 
 export function summarise(results: CheckResult[]): { pass: number; warn: number; fail: number; unavailable: number } {
@@ -383,7 +384,7 @@ export async function buildBackup(): Promise<BackupFile> {
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
-    takenAt: new Date().toISOString(),
+    takenAt: clockIso(),
     organizationIds: [...new Set(records.map((record) => record.organizationId))],
     counts: { records: records.length, events: events.length },
     records,

@@ -13,6 +13,7 @@ import {
   appsForRole, CAPABILITIES, capabilityLabel, csvList, ofKind, ROLES, RoleReach, StepUp,
   useAdmin, useOrganisationRecord, useSeeded, useSeededList,
 } from "./pieces";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * ADMIN panels — organisation, members, roles, autonomy, budgets.
@@ -544,7 +545,7 @@ export function InviteWizard({ context, close }: { context: ScreenContext; close
                     status: "pending",
                     summary: "Kept as a local draft: no mail provider is connected to send it.",
                     dueAt: new Date(context.now.getTime() + 7 * 86_400_000).toISOString(),
-                    fields: { role, invitedBy: context.actor, sentAt: new Date().toISOString(), expiresAt: new Date(context.now.getTime() + 7 * 86_400_000).toISOString(), seat: "full", deliveryState: "not_connected", note },
+                    fields: { role, invitedBy: context.actor, sentAt: clockIso(), expiresAt: new Date(context.now.getTime() + 7 * 86_400_000).toISOString(), seat: "full", deliveryState: "not_connected", note },
                   }, `Invitation drafted for ${email} as ${ROLE_LABELS[role]}`);
                   context.toast("Invitation saved", "It is in Invitations with its role, scope and expiry. Nothing was emailed.", "blocked");
                   close();
@@ -642,19 +643,19 @@ export function RevokeConfirmation({ context, close }: { context: ScreenContext;
           for (const member of members) {
             await context.mutate.patch(member.id, {
               status: "suspended",
-              fields: { ...member.fields, suspendedBy: context.actor, suspendedAt: new Date().toISOString() },
+              fields: { ...member.fields, suspendedBy: context.actor, suspendedAt: clockIso() },
             }, { event: `Access suspended for ${member.title}`, expectRevision: member.revision });
           }
           for (const session of sessions) {
             await context.mutate.patch(session.id, {
               status: "revoked",
-              fields: { ...session.fields, revokedBy: context.actor, revokedAt: new Date().toISOString() },
+              fields: { ...session.fields, revokedBy: context.actor, revokedAt: clockIso() },
             }, { event: `Session revoked during offboarding: ${session.title}` });
           }
           for (const key of keys) {
             await context.mutate.patch(key.id, {
               status: "revoked",
-              fields: { ...key.fields, revokedBy: context.actor, revokedAt: new Date().toISOString() },
+              fields: { ...key.fields, revokedBy: context.actor, revokedAt: clockIso() },
             }, { event: `API key revoked during offboarding: ${key.title}` });
           }
           context.toast("Offboarded", `${members.length} suspended, ${sessions.length} ${sessions.length === 1 ? "session" : "sessions"} revoked, ${keys.length} ${keys.length === 1 ? "key" : "keys"} revoked.`);
@@ -966,7 +967,7 @@ export function ImpactReview({ context, close }: { context: ScreenContext; close
                 onClick={async () => {
                   setBusy(true);
                   try {
-                    await context.mutate.patch(role.id, { status: "published", fields: { ...role.fields, publishedBy: context.actor, publishedAt: new Date().toISOString() } }, { event: `Role published: ${role.title}`, expectRevision: role.revision });
+                    await context.mutate.patch(role.id, { status: "published", fields: { ...role.fields, publishedBy: context.actor, publishedAt: clockIso() } }, { event: `Role published: ${role.title}`, expectRevision: role.revision });
                     context.toast("Published", `${role.title} is live in the interface and the change is in the audit trail.`);
                     close();
                   } finally {
@@ -1367,7 +1368,7 @@ export function AutonomyRevoke({ context, close }: { context: ScreenContext; clo
       onConfirm={async () => {
         setBusy(true);
         try {
-          await context.mutate.patch(grant.id, { status: "revoked", fields: { ...grant.fields, revokedBy: context.actor, revokedAt: new Date().toISOString() } }, { event: `Autonomy grant revoked: ${grant.title}`, expectRevision: grant.revision });
+          await context.mutate.patch(grant.id, { status: "revoked", fields: { ...grant.fields, revokedBy: context.actor, revokedAt: clockIso() } }, { event: `Autonomy grant revoked: ${grant.title}`, expectRevision: grant.revision });
           context.toast("Revoked", `${grant.title} no longer applies. Anything it allowed now needs a person.`);
           close();
         } finally { setBusy(false); }

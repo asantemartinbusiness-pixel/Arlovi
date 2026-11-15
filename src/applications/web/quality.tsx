@@ -6,7 +6,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
-import { addMonths, startOfMonth } from "@/platform/clock";
+import { addMonths, startOfMonth, wallMs } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { BoundaryNotice, CapabilityState, downloadCsv, downloadFile } from "@/applications/t6kit/kit";
 import {
@@ -467,7 +467,7 @@ export function PublishReview({ context, close }: { context: ScreenContext; clos
             setBusy(true);
             try {
               const entry: DeployEntry = {
-                id: `dep-${Date.now().toString(36)}`,
+                id: `dep-${wallMs().toString(36)}`,
                 at: now.toISOString(),
                 environment,
                 state: "blocked",
@@ -512,7 +512,7 @@ export function DomainAttachForm({ context, close }: { context: ScreenContext; c
         event.preventDefault();
         if (!valid || duplicate) return;
         const domain: DomainEntry = {
-          id: `d-${Date.now().toString(36)}`,
+          id: `d-${wallMs().toString(36)}`,
           host: host.trim().toLowerCase(),
           primary: site.domains.length === 0,
           verified: false,

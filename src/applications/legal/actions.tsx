@@ -5,6 +5,7 @@ import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { askFirst, Boundary, logBoundary, pickRecord, recordOf, selectedOf } from "@/applications/hr/opsKit";
 import { clausesOf, lifecycleLabel, type Clause } from "./panels";
+import { clockIso } from "@/platform/clock";
 export { RecordReview } from "./review";
 
 /* ------------------------------------------------------------------ *
@@ -110,10 +111,10 @@ export function DraftContract({ context, close }: { context: ScreenContext; clos
         const clauses = STANDARD_CLAUSES.filter((clause) => included.includes(clause.id));
         const text = clauses.map((clause) => `${clause.id}. ${clause.title}\n${clause.text}`).join("\n\n");
         const created = await context.mutate.create({
-          collection: "contracts", title: title.trim(), status: "draft", summary: String(form.get("summary") ?? ""), at: new Date().toISOString(),
+          collection: "contracts", title: title.trim(), status: "draft", summary: String(form.get("summary") ?? ""), at: clockIso(),
           tags: [String(form.get("type") ?? "supply"), "draft"],
           fields: { counterparty: String(form.get("counterparty") ?? ""), type: String(form.get("type") ?? "supply"), owner: context.actor, noticeDays: 30, signedAt: "", signatureProvider: "not_connected", clauseCount: clauses.length, versions: 1, immutableSigned: false, valueMinor: 0, draftedFrom: "standard clauses" },
-          body: { clauses, versions: [{ label: "First draft", at: new Date().toISOString(), author: context.actor, text }], signatures: [] },
+          body: { clauses, versions: [{ label: "First draft", at: clockIso(), author: context.actor, text }], signatures: [] },
         }, `Contract drafted from standard clauses by ${context.actor}: ${title.trim()}`);
         context.select(created.id);
         context.toast("Draft created", `${title.trim()} is a draft with ${clauses.length} standard clauses. Nothing has been agreed with anybody.`);
@@ -156,7 +157,7 @@ export async function approveLegalStep(context: ScreenContext): Promise<void> {
     rows: [{ label: "Flagged clauses", value: flagged.length ? `${flagged.length} — ${flagged.map((clause) => clause.title).join(", ")}` : "None" }],
     confirm: `Approve and move to ${lifecycleLabel(next)}`,
     run: async () => {
-      await context.mutate.patch(contract.id, { status: next, fields: { ...contract.fields, [`${next}By`]: context.actor, [`${next}At`]: new Date().toISOString() } }, { expectRevision: contract.revision, event: `${contract.title}: ${lifecycleLabel(contract.status)} approved by ${context.actor}; now ${lifecycleLabel(next)}` });
+      await context.mutate.patch(contract.id, { status: next, fields: { ...contract.fields, [`${next}By`]: context.actor, [`${next}At`]: clockIso() } }, { expectRevision: contract.revision, event: `${contract.title}: ${lifecycleLabel(contract.status)} approved by ${context.actor}; now ${lifecycleLabel(next)}` });
       context.toast("Step approved", `${contract.title} is ${lifecycleLabel(next)}.`);
     },
   });
@@ -176,7 +177,7 @@ export function CommentOnContract({ context, close }: { context: ScreenContext; 
       onSubmit={async (event) => {
         event.preventDefault();
         if (!text.trim()) return;
-        const comment: Comment = { id: crypto.randomUUID(), clauseId, by: context.actor, at: new Date().toISOString(), text: text.trim() };
+        const comment: Comment = { id: crypto.randomUUID(), clauseId, by: context.actor, at: clockIso(), text: text.trim() };
         await context.mutate.patch(contract.id, { body: { ...(contract.body as object ?? {}), comments: [...existing, comment] } }, { expectRevision: contract.revision, event: `${context.actor} commented on ${contract.title}${clauseId ? ` clause ${clauseId}` : ""}` });
         context.toast("Comment added", contract.fields.immutableSigned === true ? "The comment sits beside the signed text; the signed version is unchanged." : "It is on the contract with your name.");
         close();
@@ -207,7 +208,7 @@ export async function publishPolicy(context: ScreenContext, policy: Rec): Promis
     run: async () => {
       const due = new Date(context.now);
       due.setUTCFullYear(due.getUTCFullYear() + 1);
-      await context.mutate.patch(policy.id, { status: "published", at: new Date().toISOString(), dueAt: due.toISOString(), fields: { ...policy.fields, publishedBy: context.actor, acknowledged: 0 } }, { expectRevision: policy.revision, event: `${policy.title} v${String(policy.fields.version ?? "")} published by ${context.actor}` });
+      await context.mutate.patch(policy.id, { status: "published", at: clockIso(), dueAt: due.toISOString(), fields: { ...policy.fields, publishedBy: context.actor, acknowledged: 0 } }, { expectRevision: policy.revision, event: `${policy.title} v${String(policy.fields.version ?? "")} published by ${context.actor}` });
       const old = await recordOf(context, supersededId, "policies");
       if (old && old.status !== "superseded") {
         await context.mutate.patch(old.id, { status: "superseded", fields: { ...old.fields, supersededBy: policy.id } }, { expectRevision: old.revision, event: `${old.title} v${String(old.fields.version ?? "")} superseded by v${String(policy.fields.version ?? "")}; kept for history` });
@@ -227,7 +228,7 @@ export async function requestAcknowledgment(context: ScreenContext, reach: numbe
     boundary: "email.send",
     confirm: "Request acknowledgement",
     run: async () => {
-      await context.mutate.patch(policy.id, { fields: { ...policy.fields, acknowledgementRequired: true, ackRequestedBy: context.actor, ackRequestedAt: new Date().toISOString(), ackRequestedOf: reach } }, { expectRevision: policy.revision, event: `Acknowledgement of ${policy.title} v${String(policy.fields.version ?? "")} requested from ${reach} people by ${context.actor}` });
+      await context.mutate.patch(policy.id, { fields: { ...policy.fields, acknowledgementRequired: true, ackRequestedBy: context.actor, ackRequestedAt: clockIso(), ackRequestedOf: reach } }, { expectRevision: policy.revision, event: `Acknowledgement of ${policy.title} v${String(policy.fields.version ?? "")} requested from ${reach} people by ${context.actor}` });
       await logBoundary(context, "email.send", `Acknowledgement request for ${policy.title} kept locally`, policy.id);
       context.toast("Acknowledgement requested", `${reach} people are asked in this workspace. No email left the browser.`);
     },
@@ -290,7 +291,7 @@ export function RiskReview({ context, close }: { context: ScreenContext; close: 
         if (ai && !ownerConfirms) return;
         const form = new FormData(event.currentTarget);
         const next = String(form.get("next") ?? "");
-        await context.mutate.patch(risk.id, { status: String(form.get("status") ?? risk.status), dueAt: next ? new Date(`${next}T09:00:00.000Z`).toISOString() : risk.dueAt, fields: { ...risk.fields, reviewedAt: new Date().toISOString().slice(0, 10), reviewedBy: context.actor, reviewNote: String(form.get("note") ?? ""), aiSuggested: false } }, { expectRevision: risk.revision, event: `${risk.title} reviewed by ${context.actor}` });
+        await context.mutate.patch(risk.id, { status: String(form.get("status") ?? risk.status), dueAt: next ? new Date(`${next}T09:00:00.000Z`).toISOString() : risk.dueAt, fields: { ...risk.fields, reviewedAt: clockIso().slice(0, 10), reviewedBy: context.actor, reviewNote: String(form.get("note") ?? ""), aiSuggested: false } }, { expectRevision: risk.revision, event: `${risk.title} reviewed by ${context.actor}` });
         context.toast("Review recorded", `${risk.title} was reviewed by ${context.actor}; the score is theirs to own.`);
         close();
       }}
@@ -333,7 +334,7 @@ export function AssemblePack({ context, close }: { context: ScreenContext; close
         const summary = String(new FormData(event.currentTarget).get("summary") ?? "");
         const draft = { title: title.trim(), summary, items: members.length, memberIds: members.map((row) => row.id).join(","), assembledBy: context.actor };
         const hash = await contentHash({ ...draft, members: members.map((row) => ({ id: row.id, title: row.title, revision: row.revision, updatedAt: row.updatedAt })) });
-        await context.mutate.create({ collection: "documents", title: title.trim(), status: "assembled", summary, at: new Date().toISOString(), tags: ["evidence"], fields: { kind: "evidencePack", items: members.length, memberIds: draft.memberIds, legalHold: false, hash, hashMethod: "sha256-members", assembledBy: context.actor, exportable: restricted === 0, restrictedItems: restricted } }, `Evidence pack ${title.trim()} assembled from ${members.length} records by ${context.actor}`);
+        await context.mutate.create({ collection: "documents", title: title.trim(), status: "assembled", summary, at: clockIso(), tags: ["evidence"], fields: { kind: "evidencePack", items: members.length, memberIds: draft.memberIds, legalHold: false, hash, hashMethod: "sha256-members", assembledBy: context.actor, exportable: restricted === 0, restrictedItems: restricted } }, `Evidence pack ${title.trim()} assembled from ${members.length} records by ${context.actor}`);
         context.toast("Pack assembled", `${members.length} records, SHA-256 computed in this browser.${restricted ? ` ${restricted} restricted item${restricted === 1 ? "" : "s"} make the pack non-exportable.` : ""}`);
         close();
       }}
@@ -404,6 +405,6 @@ export async function hashPack(context: ScreenContext): Promise<void> {
   const stored = String(pack.fields.hash ?? "");
   const comparable = pack.fields.hashMethod === "sha256-members" || pack.fields.hashMethod === "sha256-record";
   const matches = comparable && stored === fresh;
-  await context.mutate.patch(pack.id, { fields: { ...pack.fields, hash: comparable ? stored : fresh, hashMethod: comparable ? String(pack.fields.hashMethod) : "sha256-record", previousHash: comparable ? String(pack.fields.previousHash ?? "") : stored, lastHashCheck: new Date().toISOString(), lastHashResult: comparable ? (matches ? "unchanged" : "changed") : "first computed", lastHashBy: context.actor } }, { expectRevision: pack.revision, event: comparable ? `${pack.title} hash checked by ${context.actor}: ${matches ? "unchanged" : `changed (now ${fresh})`}` : `${pack.title} hashed with SHA-256 by ${context.actor}; earlier value ${stored} kept` });
+  await context.mutate.patch(pack.id, { fields: { ...pack.fields, hash: comparable ? stored : fresh, hashMethod: comparable ? String(pack.fields.hashMethod) : "sha256-record", previousHash: comparable ? String(pack.fields.previousHash ?? "") : stored, lastHashCheck: clockIso(), lastHashResult: comparable ? (matches ? "unchanged" : "changed") : "first computed", lastHashBy: context.actor } }, { expectRevision: pack.revision, event: comparable ? `${pack.title} hash checked by ${context.actor}: ${matches ? "unchanged" : `changed (now ${fresh})`}` : `${pack.title} hashed with SHA-256 by ${context.actor}; earlier value ${stored} kept` });
   context.toast(comparable ? (matches ? "Hash unchanged" : "Contents changed") : "Hash computed", comparable ? (matches ? "The pack's contents match the stored hash." : `The recomputed hash ${fresh.slice(0, 20)}… differs from the stored one.`) : `SHA-256 ${fresh.slice(0, 20)}… is stored; the earlier value is kept as previous.`, comparable && !matches ? "blocked" : "ok");
 }

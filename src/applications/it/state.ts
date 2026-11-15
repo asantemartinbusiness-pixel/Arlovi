@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { CheckResult, StorageFacts, WorkspaceCounts } from "./diagnostics";
+import { clockIso } from "@/platform/clock";
 
 export interface SessionError { message: string; at: string }
 
@@ -34,7 +35,7 @@ export const useItUi = create<ItUi>((set) => ({
   setLogFilter: (filter) => set({ logFilter: filter }),
   setRunning: (running) => set({ running }),
   setResults: ({ results, counts, storage, at }) => set({ results, counts, storage, ranAt: at, running: false }),
-  noteError: (message) => set((state) => ({ sessionErrors: [{ message, at: new Date().toISOString() }, ...state.sessionErrors].slice(0, 20) })),
+  noteError: (message) => set((state) => ({ sessionErrors: [{ message, at: clockIso() }, ...state.sessionErrors].slice(0, 20) })),
   setRestorePreview: (text) => set({ restorePreview: text }),
 }));
 

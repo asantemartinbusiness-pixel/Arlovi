@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import type { Rec } from "@/domain/types";
 import type { ScreenContext } from "@/platform/registry";
 import { currentSlide, readDeck, replaceSlide, updateObjects, type Deck, type Slide, type SlideObject } from "./model";
+import { wallMs } from "@/platform/clock";
 
 export type SaveState = "clean" | "dirty" | "saving" | "saved" | "conflict";
 
@@ -96,7 +97,7 @@ function useOwnDeckEditor(context: ScreenContext, record: Rec | undefined): Deck
   const commit = useCallback((next: Deck, label: string, coalesce = false) => {
     setPast((current) => {
       const last = current[current.length - 1];
-      const at = Date.now();
+      const at = wallMs();
       if (coalesce && last && last.label === label && at - last.at < COALESCE_MS) {
         return [...current.slice(0, -1), { ...last, at }];
       }
@@ -128,7 +129,7 @@ function useOwnDeckEditor(context: ScreenContext, record: Rec | undefined): Deck
     const base = dragBase.current;
     dragBase.current = null;
     if (!base) return;
-    setPast((current) => [...current.slice(-120), { deck: base, label, at: Date.now() }]);
+    setPast((current) => [...current.slice(-120), { deck: base, label, at: wallMs() }]);
     setFuture([]);
     setDeck((current) => { schedule(current); return current; });
   }, [schedule]);

@@ -1,6 +1,7 @@
 import { useCollections } from "@/platform/workspace";
 import { computeInvoice, type CustomerTaxStatus, type InvoiceLine, type InvoiceTotals, type TaxCategory } from "@/platform/money";
 import type { Rec } from "@/domain/types";
+import { clockIso } from "@/platform/clock";
 
 /* ---------------- Record body shapes used by COMMERCE ---------------- */
 
@@ -137,7 +138,7 @@ export function orderTotals(order: Rec | undefined, contact: Rec | undefined, ju
     lines: linesOf(order),
     jurisdiction,
     customerStatus: orderTaxStatus(order, contact),
-    date: order?.at ?? order?.createdAt ?? new Date().toISOString(),
+    date: order?.at ?? order?.createdAt ?? clockIso(),
   });
 }
 

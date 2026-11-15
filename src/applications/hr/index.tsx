@@ -24,6 +24,7 @@ function payrollRecords(context: ScreenContext, collection: string) {
   return listByCollection(context.org.id, collection);
 }
 import "./hr.css";
+import { clockIso, clockNow } from "@/platform/clock";
 
 /** Focus a control the screen already renders, rather than faking an action. */
 function focusWithin(selector: string): void {
@@ -69,7 +70,7 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
           onClick={async () => {
             await context.mutate.patch(employee.id, {
               status: "alumni",
-              endAt: new Date().toISOString(),
+              endAt: clockIso(),
               fields: { ...employee.fields, accessRevoked: true },
             }, { expectRevision: employee.revision, event: `${employee.title} offboarded by ${context.actor}; access grants recorded as revoked` });
             const rescinded = await rescindQueuedGrants(context, employee.id, tasks);
@@ -538,7 +539,7 @@ function OfferApproval({ context, close }: { context: ScreenContext; close: () =
           variant="primary"
           disabled={!context.can("edit_people") || issued || !scored}
           onClick={async () => {
-            await context.mutate.patch(applicant.id, { fields: { ...applicant.fields, stage: "offer", offerIssuedBy: context.actor, offerIssuedAt: new Date().toISOString(), offerDelivery: "queued_local" } }, { expectRevision: applicant.revision, event: `Offer issued to ${applicant.title} by ${context.actor}; letter kept as a local draft` });
+            await context.mutate.patch(applicant.id, { fields: { ...applicant.fields, stage: "offer", offerIssuedBy: context.actor, offerIssuedAt: clockIso(), offerDelivery: "queued_local" } }, { expectRevision: applicant.revision, event: `Offer issued to ${applicant.title} by ${context.actor}; letter kept as a local draft` });
             await context.mutate.log(`Offer letter for ${applicant.title} queued locally — no mail service is connected, so nothing has left this browser.`, { entityId: applicant.id, type: "boundary", capability: "queued_local" });
             context.toast("Offer issued", `Recorded against ${applicant.title} by ${context.actor}. The letter is a local draft; nothing was sent.`);
             close();
@@ -674,7 +675,7 @@ function ShiftEdit({ context, close }: { context: ScreenContext; close: () => vo
         const hours = Number(form.get("hours") ?? 8);
         const day = String(form.get("day") ?? "");
         const time = String(form.get("time") ?? "");
-        const startAt = day && time ? new Date(`${day}T${time}:00.000Z`) : shift.startAt ? new Date(shift.startAt) : new Date();
+        const startAt = day && time ? new Date(`${day}T${time}:00.000Z`) : shift.startAt ? new Date(shift.startAt) : clockNow();
         const endAt = new Date(startAt.getTime() + hours * 3_600_000);
         const clash = data.shifts.find((row) => row.id !== shift.id && row.fields.kind === "shift" && row.fields.employeeId === employeeId && row.startAt && row.endAt && new Date(row.startAt) < endAt && new Date(row.endAt) > startAt);
         if (clash) { context.toast("Shift not moved", `${employee?.title ?? "That person"} already works ${context.dateTime(clash.startAt)}. Nothing changed.`, "blocked"); return; }

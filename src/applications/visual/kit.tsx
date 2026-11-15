@@ -9,6 +9,7 @@ import { can as roleCan } from "@/platform/policy";
 import { useMutations } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import "./visual.css";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * Editor chrome and document plumbing shared by the visual applications.
@@ -182,7 +183,7 @@ function readDraft<T>(id: string): { at: string; doc: T } | null {
 }
 
 function writeDraft<T>(id: string, doc: T): void {
-  try { window.localStorage.setItem(DRAFT_PREFIX + id, JSON.stringify({ at: new Date().toISOString(), doc })); } catch { /* quota */ }
+  try { window.localStorage.setItem(DRAFT_PREFIX + id, JSON.stringify({ at: clockIso(), doc })); } catch { /* quota */ }
 }
 
 function clearDraft(id: string): void {

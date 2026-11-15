@@ -18,6 +18,7 @@ import {
 } from "./model";
 import { ScreenPreview } from "./preview";
 import { saveApp, useBuildUi } from "./state";
+import { wallMs } from "@/platform/clock";
 
 const COMPONENT_ICONS: Record<ComponentKind, React.ReactNode> = {
   table: <Table2 size={15} />, detail: <LayoutList size={15} />, stat: <SquareStack size={15} />,
@@ -302,7 +303,7 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
             const name = `Screen ${model.screens.length + 1}`;
             await write({
               ...model,
-              screens: [...model.screens, { id: `sc-${Date.now().toString(36)}`, name, route: `/screen-${model.screens.length + 1}`, components: [] }],
+              screens: [...model.screens, { id: `sc-${wallMs().toString(36)}`, name, route: `/screen-${model.screens.length + 1}`, components: [] }],
             }, `Screen ${name} added`);
             context.toast("Screen added", `${name} is in the screen list.`);
           }}>New screen</Button>

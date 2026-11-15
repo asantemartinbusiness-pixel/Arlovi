@@ -26,6 +26,7 @@ import { AdjustControls, CurveEditor, HistogramView, LayerProperties, PhotoLayer
 import {
   bumpPixels, newPixelLayer, parsePhoto, photoUi, setPhotoTool, starterPhoto, unsupportedReason, type PhotoTool,
 } from "./model";
+import { clockIso, wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * PHOTO — Photo & Image Editing
@@ -302,7 +303,7 @@ function AdjustmentPanel({ handle, context }: { handle: DocHandle<RasterDoc>; co
         ))}
         <Button
           variant="primary"
-          onClick={() => handle.edit((current) => addLayer(current, newAdjustmentLayer(`adj-${Date.now().toString(36)}`, `Adjustment ${current.layers.filter((item) => item.kind === "adjustment").length + 1}`)), "Add an adjustment layer")}
+          onClick={() => handle.edit((current) => addLayer(current, newAdjustmentLayer(`adj-${wallMs().toString(36)}`, `Adjustment ${current.layers.filter((item) => item.kind === "adjustment").length + 1}`)), "Add an adjustment layer")}
         >
           Add an adjustment layer
         </Button>
@@ -494,7 +495,7 @@ function AdjustScreen({ context, lens }: { context: ScreenContext; lens: "Basic"
   const target = layer?.kind === "adjustment" ? layer : doc.layers.filter((item) => item.kind === "adjustment").at(-1);
 
   const ensureAdjustment = () => {
-    handle.edit((current) => addLayer(current, newAdjustmentLayer(`adj-${Date.now().toString(36)}`, "Adjustment")), "Add an adjustment layer");
+    handle.edit((current) => addLayer(current, newAdjustmentLayer(`adj-${wallMs().toString(36)}`, "Adjustment")), "Add an adjustment layer");
   };
 
   if (!target?.adjust) {
@@ -569,7 +570,7 @@ function AdjustScreen({ context, lens }: { context: ScreenContext; lens: "Basic"
             variant="primary"
             onClick={() => {
               const name = `Preset ${doc.presets.length + 1}`;
-              handle.edit((current) => ({ ...current, presets: [...current.presets, { id: `pr-${Date.now().toString(36)}`, name, adjust: { ...target.adjust!, curve: [...target.adjust!.curve] } }] }), "Save a preset");
+              handle.edit((current) => ({ ...current, presets: [...current.presets, { id: `pr-${wallMs().toString(36)}`, name, adjust: { ...target.adjust!, curve: [...target.adjust!.curve] } }] }), "Save a preset");
               context.toast("Preset saved", `${name} stores ${describeAdjust(target.adjust!)}.`);
             }}
           >
@@ -747,7 +748,7 @@ function LayerTable({ handle, bank, context, grouping }: { handle: DocHandle<Ras
         {
           label: "Group",
           onRun: (selected) => {
-            const id = `grp-${Date.now().toString(36)}`;
+            const id = `grp-${wallMs().toString(36)}`;
             handle.edit((current) => groupLayers(current, selected.map((row) => row.id), `Group ${current.layers.filter((layer) => layer.kind === "group").length + 1}`, id), "Group the layers");
             context.toast("Grouped", `${selected.length} layers moved into a group. Hiding the group hides them all.`);
           },
@@ -1110,7 +1111,7 @@ function BulkImport({ context, close }: { context: ScreenContext; close: () => v
                   collection: "photos", title: file.name, status: "imported",
                   summary: `${image.naturalWidth} × ${image.naturalHeight}, ${(file.size / 1024).toFixed(0)} kB.`,
                   body: doc,
-                  fields: { kind: "image", width: image.naturalWidth, height: image.naturalHeight, bytes: file.size, license: "Unknown", importedAt: new Date().toISOString() },
+                  fields: { kind: "image", width: image.naturalWidth, height: image.naturalHeight, bytes: file.size, license: "Unknown", importedAt: clockIso() },
                 }, `Imported ${file.name}`);
                 report.push({ name: file.name, state: "ok", note: `${image.naturalWidth} × ${image.naturalHeight}` });
               } catch (error) {
@@ -1283,7 +1284,7 @@ function AdjustmentLayerPicker({ context, close }: { context: ScreenContext; clo
             <Button
               variant="secondary"
               onClick={() => {
-                handle.edit((current) => addLayer(current, newAdjustmentLayer(`adj-${Date.now().toString(36)}`, preset.name, preset.adjust)), `Add a ${preset.name.toLowerCase()} layer`);
+                handle.edit((current) => addLayer(current, newAdjustmentLayer(`adj-${wallMs().toString(36)}`, preset.name, preset.adjust)), `Add a ${preset.name.toLowerCase()} layer`);
                 context.toast("Adjustment added", `${preset.name} sits above the stack and can be turned off at any time.`);
                 close();
               }}
@@ -1470,7 +1471,7 @@ function LinkedObject({ context }: { context: ScreenContext }) {
                   disabled={!body?.src}
                   onClick={() => {
                     handle.edit((current) => addLayer(current, {
-                      id: `layer-${Date.now().toString(36)}`, name: asset.title, kind: "pixel",
+                      id: `layer-${wallMs().toString(36)}`, name: asset.title, kind: "pixel",
                       visible: true, locked: false, opacity: 1, blend: "normal",
                       src: body!.src, naturalWidth: body?.width, naturalHeight: body?.height,
                       x: 0, y: 0, w: body?.width ?? current.width, h: body?.height ?? current.height, rotation: 0,
@@ -1936,7 +1937,7 @@ registerApp({
           guard: needsImage,
           run: (context) => withPhoto(context, (doc) => {
             const target = doc.layers.filter((layer) => layer.kind === "adjustment").at(-1);
-            if (!target?.adjust) return addLayer(doc, newAdjustmentLayer(`adj-${Date.now().toString(36)}`, "Exposure", { exposure: 0.33 }));
+            if (!target?.adjust) return addLayer(doc, newAdjustmentLayer(`adj-${wallMs().toString(36)}`, "Exposure", { exposure: 0.33 }));
             return patchLayer(doc, target.id, { adjust: { ...target.adjust, exposure: target.adjust.exposure + 0.33 } });
           }, "Raised the exposure by a third of a stop"),
         },
@@ -1954,7 +1955,7 @@ registerApp({
           run: (context) => withPhoto(context, (doc) => {
             const target = doc.layers.filter((layer) => layer.kind === "adjustment").at(-1);
             if (!target?.adjust) return doc;
-            return { ...doc, presets: [...doc.presets, { id: `pr-${Date.now().toString(36)}`, name: `Preset ${doc.presets.length + 1}`, adjust: { ...target.adjust, curve: [...target.adjust.curve] } }] };
+            return { ...doc, presets: [...doc.presets, { id: `pr-${wallMs().toString(36)}`, name: `Preset ${doc.presets.length + 1}`, adjust: { ...target.adjust, curve: [...target.adjust.curve] } }] };
           }, "Saved an adjustment preset"),
         },
         { id: "compare", label: "Compare", placement: "overflow", run: () => photoUi.set((current) => ({ ...current, compare: !current.compare })) },
@@ -1994,7 +1995,7 @@ registerApp({
             const index = doc.layers.findIndex((layer) => layer.id === doc.activeLayerId);
             const ids = [doc.layers[index - 1].id, doc.layers[index].id];
             const count = doc.layers.filter((layer) => layer.kind === "group").length + 1;
-            return groupLayers(doc, ids, `Group ${count}`, `grp-${Date.now().toString(36)}`);
+            return groupLayers(doc, ids, `Group ${count}`, `grp-${wallMs().toString(36)}`);
           }, "Group two layers"),
         },
         { id: "blend", label: "Blend mode…", placement: "secondary", guard: (context) => activeLayerGuard(context), run: (context) => context.openOverlay("Blend picker") },

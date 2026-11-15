@@ -17,4 +17,25 @@ export default tseslint.config(
       "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
+  {
+    /* Time is read in one place. A bare clock read in application code stamps
+       records with real time when the workspace clock is frozen or set, so
+       the two disagree. Use clockNow() / clockIso() for "when", and wallMs()
+       for ids, undo windows, playback and device diagnostics. */
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/platform/clock.tsx"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+          message: "Read the workspace clock with clockNow() or clockIso() from @/platform/clock, not new Date().",
+        },
+        {
+          selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+          message: "Use clockNow() for the workspace time, or wallMs() for ids and elapsed time, from @/platform/clock.",
+        },
+      ],
+    },
+  },
 );

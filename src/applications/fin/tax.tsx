@@ -15,6 +15,7 @@ import type { CustomerTaxStatus, ReturnBoxes, TaxCategory } from "@/domain/fin-i
 import { periodLabel } from "@/domain/fin-ledger";
 import { contactOf, useFinData } from "./data";
 import { Amount, CapabilityNotice, CapabilityPill, SourceNote, StatementRow, TaxCodePill, taxRateText } from "./parts";
+import { clockIso } from "@/platform/clock";
 
 /* ---------------------------- FIN-011 ---------------------------- */
 
@@ -462,7 +463,7 @@ export function TaxConfiguration({ context, close }: { context: ScreenContext; c
                     setBusy(true);
                     await context.mutate.patch(record.id, {
                       status: "superseded",
-                      fields: { ...record.fields, supersededBy: "tax engine", supersededAt: new Date().toISOString() },
+                      fields: { ...record.fields, supersededBy: "tax engine", supersededAt: clockIso() },
                     }, { expectRevision: record.revision, event: `Tax code record ${record.title} marked superseded` });
                     context.toast("Marked superseded", `${record.title} no longer claims to be current. No computed figure changed, because the engine was always the source.`);
                     setBusy(false);

@@ -6,7 +6,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
-import { addDays, daysBetween, startOfMonth, startOfWeek } from "@/platform/clock";
+import { addDays, clockIso, daysBetween, startOfMonth, startOfWeek } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { RecordReview } from "./review";
 import { Redline, type Version } from "./redline";
@@ -916,7 +916,7 @@ export function ObligationQuickView({ context }: { context: ScreenContext }) {
           variant="primary"
           disabled={obligation.status === "done"}
           onClick={async () => {
-            await context.mutate.patch(obligation.id, { status: "done", fields: { ...obligation.fields, completedBy: context.actor, completedAt: new Date().toISOString() } }, { expectRevision: obligation.revision, event: `${obligation.title} completed by ${context.actor}` });
+            await context.mutate.patch(obligation.id, { status: "done", fields: { ...obligation.fields, completedBy: context.actor, completedAt: clockIso() } }, { expectRevision: obligation.revision, event: `${obligation.title} completed by ${context.actor}` });
             context.toast("Marked complete", "The record changed, with your name and the date against it.");
           }}
         >
@@ -965,7 +965,7 @@ export function DeadlineEditor({ context, close }: { context: ScreenContext; clo
             status: "upcoming",
             summary: String(form.get("detail") ?? ""),
             dueAt: new Date(`${date}T09:00:00.000Z`).toISOString(),
-            at: new Date().toISOString(),
+            at: clockIso(),
             fields,
           }, `Obligation created by ${context.actor}`);
         }
@@ -1033,7 +1033,7 @@ export function ScoreRationale({ context, close }: { context: ScreenContext; clo
           summary: String(form.get("why") ?? risk.summary),
           fields: {
             ...risk.fields, impact, likelihood, score: scoreOf(impact) * scoreOf(likelihood),
-            aiSuggested: false, reviewedAt: new Date().toISOString().slice(0, 10), scoredBy: context.actor,
+            aiSuggested: false, reviewedAt: clockIso().slice(0, 10), scoredBy: context.actor,
           },
         }, { expectRevision: risk.revision, event: `${risk.title} scored by ${context.actor}` });
         context.toast("Score recorded", `${risk.title} is scored by ${context.actor}, with the reasoning on the record.`);

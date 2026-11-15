@@ -9,7 +9,7 @@ import {
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
 import { CAPABILITY_LABELS, CAPABILITY_TONE } from "@/platform/capability";
-import { freshness } from "@/platform/clock";
+import { clockIso, freshness } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { downloadCsv } from "@/applications/t6kit/kit";
 import {
@@ -1092,7 +1092,7 @@ export function ConnectorHealth({ context, lens }: { context: ScreenContext; len
               ))}
             </div>
             <Button variant="primary" onClick={async () => {
-              const at = new Date().toISOString();
+              const at = clockIso();
               setRan(at);
               await context.mutate.log("Connector health test: 2 local checks passed, 2 not met, 1 not attempted. No provider was contacted.", { type: "capability", capability: "not_connected" });
               context.toast("Health test recorded", "Two checks passed locally. Nothing was contacted.", "blocked");

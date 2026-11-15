@@ -15,6 +15,7 @@ import { stageOf } from "@/domain/crm-pipeline";
 import { contactById, openQuoteValueMinor, quotesOfDeal, useCrmData } from "./data";
 import type { CrmData } from "./data";
 import { CapabilityNotice, CapabilityPill, Money, QuoteStatusPill, isExpired } from "./parts";
+import { clockIso } from "@/platform/clock";
 
 /* ---------------------------- CRM-008 ---------------------------- *
  * Quotes priced through the same tax engine as an invoice: one resolved code
@@ -491,16 +492,16 @@ export function SendPreview({ context, close }: { context: ScreenContext; close:
             setBusy(true);
             await context.mutate.patch(quote.id, {
               status: "sent",
-              body: { ...(quote.body as object ?? {}), sends: [...(((quote.body as { sends?: unknown[] })?.sends) ?? []), { at: new Date().toISOString(), by: context.actor, to, body: drafted }] },
-              fields: { ...quote.fields, sentAt: new Date().toISOString(), sentBy: context.actor, delivery: "queued_local" },
+              body: { ...(quote.body as object ?? {}), sends: [...(((quote.body as { sends?: unknown[] })?.sends) ?? []), { at: clockIso(), by: context.actor, to, body: drafted }] },
+              fields: { ...quote.fields, sentAt: clockIso(), sentBy: context.actor, delivery: "queued_local" },
             }, { expectRevision: quote.revision, event: `Quote ${quote.title} issued; the message is queued locally and was not delivered` });
             await context.mutate.create({
               collection: "activities",
               title: `Quote ${String(quote.fields.number ?? quote.title)} sent`,
               status: "draft",
               summary: `Draft message to ${to}. Delivery is not connected, so it stays in this workspace.`,
-              startAt: new Date().toISOString(),
-              at: new Date().toISOString(),
+              startAt: clockIso(),
+              at: clockIso(),
               parentId: String(quote.fields.dealId ?? quote.parentId ?? ""),
               fields: { kind: "email", dealId: String(quote.fields.dealId ?? ""), contactId: String(quote.fields.contactId ?? ""), delivery: "not_connected", owner: context.actor },
             }, `Activity logged for quote ${quote.title}`);

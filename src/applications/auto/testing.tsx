@@ -12,6 +12,7 @@ import {
 import { setDraftGraph, updateDraft, useBuilderDraft } from "./store";
 import { executeDry, executeRun, useGraphRecords } from "./runner";
 import { JsonBlock, RunHeadline, RunTimeline, readRun } from "./panels";
+import { clockIso, wallMs } from "@/platform/clock";
 
 function coverage(graph: WorkflowGraph, run: RunResult): { used: Set<string>; total: number } {
   const used = new Set<string>();
@@ -316,7 +317,7 @@ export function AssertionBuilder({ context, close }: { context: ScreenContext; c
         disabled={subject === "status" ? nodeId === "" : name.trim() === ""}
         onClick={() => {
           const assertion: WfAssertion = {
-            id: `a${(draft.graph.assertions?.length ?? 0) + 1}-${Date.now().toString(36)}`,
+            id: `a${(draft.graph.assertions?.length ?? 0) + 1}-${wallMs().toString(36)}`,
             nodeId,
             subject,
             name: name.trim() || undefined,
@@ -510,7 +511,7 @@ export function ApproveTestResult({ context, close }: { context: ScreenContext; 
           onClick={async () => {
             setBusy(true);
             const saved = await context.mutate.patch(record.id, {
-              fields: { ...record.fields, testApprovedBy: context.actor, testApprovedAt: new Date().toISOString(), testApprovedRevision: record.revision, testAssertions: checks.length },
+              fields: { ...record.fields, testApprovedBy: context.actor, testApprovedAt: clockIso(), testApprovedRevision: record.revision, testAssertions: checks.length },
             }, { expectRevision: record.revision, event: `Test result approved by ${context.actor}: ${checks.length} assertions pass` });
             if (saved) context.toast("Test result approved", `${record.title} is approved as tested by ${context.actor}.`);
             setBusy(false);

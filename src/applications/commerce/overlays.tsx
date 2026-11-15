@@ -13,6 +13,7 @@ import {
   bodyOf, marginOf, onHandFor, orderTotals, reservedFor,
   statusTone, taxCategoryOfProduct, useCommerceData, type OrderBody, type ProductBody,
 } from "./data";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * COMMERCE overlays. One component per overlay in the approved contract.
@@ -582,7 +583,7 @@ export function RefundApproval({ context, close }: { context: ScreenContext; clo
         const body = bodyOf<OrderBody>(order, {});
         await context.mutate.patch(order.id, {
           fields: { ...order.fields, refundProposedMinor: amount, refundProposedBy: actor, payment: "refund_proposed" },
-          body: { ...body, timeline: [...(body.timeline ?? []), { at: new Date().toISOString(), label: "Refund proposed", detail: `${context.money(amount)} proposed by ${actor}: ${reason}. No processor is connected, so nothing has been sent.` }] },
+          body: { ...body, timeline: [...(body.timeline ?? []), { at: clockIso(), label: "Refund proposed", detail: `${context.money(amount)} proposed by ${actor}: ${reason}. No processor is connected, so nothing has been sent.` }] },
         }, { expectRevision: order.revision, event: `Refund of ${amount} proposed on ${order.title}` });
         context.toast("Refund proposed", "The proposal is on the order with its reason. The money moves only when someone sends it and records it in the ledger.");
         close();
@@ -691,7 +692,7 @@ export function CancellationImpact({ context, close }: { context: ScreenContext;
           await context.mutate.patch(order.id, {
             status: "cancelled",
             fields: { ...order.fields, fulfilment: "cancelled", payment: paid ? String(order.fields.payment) : "void" },
-            body: { ...body, timeline: [...(body.timeline ?? []), { at: new Date().toISOString(), label: "Cancelled", detail: `${lines.reduce((sum, line) => sum + line.quantity, 0)} units released back to available.` }] },
+            body: { ...body, timeline: [...(body.timeline ?? []), { at: clockIso(), label: "Cancelled", detail: `${lines.reduce((sum, line) => sum + line.quantity, 0)} units released back to available.` }] },
           }, { expectRevision: order.revision, event: `${order.title} cancelled` });
           context.toast("Cancelled", paid ? "Stock is released. The payment still needs a refund proposal." : "Stock is released and nothing was charged.");
           close();
@@ -874,7 +875,7 @@ export function DeliveryException({ context, close }: { context: ScreenContext; 
         await context.mutate.patch(order.id, {
           status: next,
           fields: { ...order.fields, fulfilment: decision === "resend" ? "unfulfilled" : "exception", exceptionDecision: decision },
-          body: { ...body, timeline: [...(body.timeline ?? []), { at: new Date().toISOString(), label: `Exception decision: ${decision}`, detail: note || "No note recorded." }] },
+          body: { ...body, timeline: [...(body.timeline ?? []), { at: clockIso(), label: `Exception decision: ${decision}`, detail: note || "No note recorded." }] },
         }, { expectRevision: order.revision, event: `Exception on ${order.title} decided: ${decision}` });
         context.toast("Decision recorded", decision === "resend" ? "The order is back in the pick queue. No second label was created automatically." : "The decision and its note are on the order.");
         close();

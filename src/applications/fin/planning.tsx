@@ -11,6 +11,7 @@ import type { VarianceRow } from "@/domain/fin-ledger";
 import { useFinData } from "./data";
 import type { FinData } from "./data";
 import { Amount, SourceNote, StatementRow } from "./parts";
+import { wallMs } from "@/platform/clock";
 
 /* ---------------------------- FIN-010 ---------------------------- */
 
@@ -364,7 +365,7 @@ export function ModelAssumptions({ context, close }: { context: ScreenContext; c
         ))}
       </Stack>
       <Row gap={2}>
-        <Button variant="secondary" onClick={() => setRows([...rows, { id: `a${rows.length + 1}${Date.now().toString(36)}`, label: "", valueMinor: 0, note: "" }])}>Add an assumption</Button>
+        <Button variant="secondary" onClick={() => setRows([...rows, { id: `a${rows.length + 1}${wallMs().toString(36)}`, label: "", valueMinor: 0, note: "" }])}>Add an assumption</Button>
         <span className="ds-grow" />
         <Button
           variant="primary"

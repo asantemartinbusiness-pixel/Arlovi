@@ -16,6 +16,7 @@ import {
   runStep, wouldCycle, type StepResult,
 } from "./interpreter";
 import type { Rec } from "@/domain/types";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * MISSION — Missions & Autonomous Execution
@@ -3251,7 +3252,7 @@ function PostMissionMessage({ context, close }: { context: ScreenContext; close:
           setBusy(true);
           await context.mutate.create({
             collection: "messages", title: text.trim().slice(0, 60), status: "posted", summary: text.trim(), parentId: mission.id,
-            at: new Date().toISOString(), fields: { author: context.actor, kind: "human", room: "mission" },
+            at: clockIso(), fields: { author: context.actor, kind: "human", room: "mission" },
           }, `Message posted in the ${mission.title} room`);
           context.toast("Posted", "The message is in the Discussion tab.");
           context.setTab("Discussion");

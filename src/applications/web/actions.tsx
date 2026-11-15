@@ -4,7 +4,7 @@ import { BarChart, Button, Empty, Field, Notice, Pill, Properties, Row, Segmente
 import type { Rec } from "@/domain/types";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
-import { addMonths, startOfMonth } from "@/platform/clock";
+import { addMonths, startOfMonth, wallMs } from "@/platform/clock";
 import { actOverlay, type ActInput } from "@/applications/t6kit/act";
 import { downloadCsv } from "@/applications/t6kit/kit";
 import {
@@ -208,7 +208,7 @@ export const importComponents = actOverlay({
     const source = site(records.find((row) => row.id === siteId)).components.find((component) => component.id === componentId);
     if (!source) throw new Error("Choose a component.");
     const app = site(record);
-    const copy = { ...source, id: `c-${Date.now().toString(36)}`, shared: false, usedOn: [], blocks: source.blocks.map((block) => ({ ...block, id: makeBlock(block.type).id })) };
+    const copy = { ...source, id: `c-${wallMs().toString(36)}`, shared: false, usedOn: [], blocks: source.blocks.map((block) => ({ ...block, id: makeBlock(block.type).id })) };
     await saveSite(context, record, { ...app, components: [...app.components, copy] }, `Component ${source.name} imported`);
     return `${source.name} imported with ${copy.blocks.length} blocks.`;
   },

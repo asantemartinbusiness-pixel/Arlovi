@@ -12,7 +12,7 @@ import { registerApp, type ScreenContext } from "@/platform/registry";
 import { db, useCollection, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import { capabilityById, CAPABILITY_LABELS, CAPABILITY_TONE } from "@/platform/capability";
 import { ROLE_LABELS, can as roleCan, type Capability } from "@/platform/policy";
-import { freshness } from "@/platform/clock";
+import { clockIso, clockNow, freshness } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import {
   activeQueue, approvalRows, attentionBus, busItem, csv, groupBy, PRIORITIES, PRIORITY_LABEL, PRIORITY_TONE,
@@ -857,7 +857,7 @@ function StepUpAuth({ context, close }: { context: ScreenContext; close: () => v
       }, { event: `Approved ${record!.title} at plan version ${planVersion}`, expectRevision: record!.revision });
       if (target) {
         await context.mutate.patch(target.id, {
-          fields: { ...target.fields, approvedBy: actor, approvedAt: new Date().toISOString(), approvalId: record!.id },
+          fields: { ...target.fields, approvedBy: actor, approvedAt: clockIso(), approvalId: record!.id },
         }, { event: `Approval recorded against ${target.title}` });
       }
       await context.mutate.log(`Step-up confirmation entered for ${record!.title}. Local confirmation only.`, { entityId: record!.id, type: "approval.step_up", capability: "ready_local" });
@@ -1420,7 +1420,7 @@ function IncidentBoard({ context, tab }: { context: ScreenContext; tab: Incident
                         variant="secondary"
                         disabled={Boolean(row.fields.acknowledgedBy)}
                         onClick={async () => {
-                          await context.mutate.patch(row.id, { status: row.status === "urgent" ? "waiting" : row.status, fields: { ...row.fields, acknowledgedBy: context.actor, acknowledgedAt: new Date().toISOString() } }, { event: `Incident acknowledged: ${row.title}`, expectRevision: row.revision });
+                          await context.mutate.patch(row.id, { status: row.status === "urgent" ? "waiting" : row.status, fields: { ...row.fields, acknowledgedBy: context.actor, acknowledgedAt: clockIso() } }, { event: `Incident acknowledged: ${row.title}`, expectRevision: row.revision });
                           context.toast("Acknowledged", "The incident record now names you and the time.");
                         }}
                       >
@@ -1469,7 +1469,7 @@ function IncidentSummary({ context }: { context: ScreenContext }) {
           variant="primary"
           disabled={record.status === "resolved"}
           onClick={async () => {
-            await context.mutate.patch(record.id, { status: "resolved", fields: { ...record.fields, resolvedBy: context.actor, resolvedAt: new Date().toISOString() } }, { event: `Incident resolved: ${record.title}`, expectRevision: record.revision });
+            await context.mutate.patch(record.id, { status: "resolved", fields: { ...record.fields, resolvedBy: context.actor, resolvedAt: clockIso() } }, { event: `Incident resolved: ${record.title}`, expectRevision: record.revision });
             context.toast("Resolved", "The incident moved to Resolved with your name and the time.");
           }}
         >
@@ -1512,7 +1512,7 @@ function OwnerHandoff({ context, close }: { context: ScreenContext; close: () =>
           disabled={!to || !brief.trim()}
           onClick={async () => {
             await context.mutate.patch(record.id, {
-              fields: { ...record.fields, owner: to, handoverBrief: brief, handoverBy: context.actor, handoverAt: new Date().toISOString() },
+              fields: { ...record.fields, owner: to, handoverBrief: brief, handoverBy: context.actor, handoverAt: clockIso() },
             }, { event: `Incident handed to ${to}: ${brief}`, expectRevision: record.revision });
             context.toast("Handed over", `${to} owns the incident and the brief is on the record.`);
             close();
@@ -2143,14 +2143,14 @@ async function buildDigestPreview(context: ScreenContext, digest: Rec | undefine
   const body = lines.map((line) => `${line.label}: ${line.value} — ${line.source}`).join("\n");
   await context.mutate.create({
     collection: "documents",
-    title: `${name} · ${context.date(new Date())}`,
+    title: `${name} · ${context.date(clockNow())}`,
     status: "draft",
     summary: `Digest composed from ${lines.filter((line) => line.known).length} available sources; ${lines.filter((line) => !line.known).length} unavailable.`,
     fields: { kind: "digest", digestId: digest?.id ?? "", builtBy: context.actor },
     body: { text: body },
   }, `Digest composed: ${name}`);
   if (digest) {
-    await context.mutate.patch(digest.id, { fields: { ...digest.fields, lastBuiltAt: new Date().toISOString() } }, { event: `Digest built: ${name}` });
+    await context.mutate.patch(digest.id, { fields: { ...digest.fields, lastBuiltAt: clockIso() } }, { event: `Digest built: ${name}` });
   }
   context.toast("Digest composed", `It is a draft document in Documents, with ${lines.filter((line) => !line.known).length} lines marked unavailable.`);
 }

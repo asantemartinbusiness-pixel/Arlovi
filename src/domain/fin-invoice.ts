@@ -3,6 +3,7 @@ import {
   computeInvoice, customerStatusOf, linesFromRecord, resolveTaxCode, taxCodesFor,
   type CustomerTaxStatus, type InvoiceLine, type InvoiceTotals, type TaxCategory, type TaxCode,
 } from "@/platform/money";
+import { wallMs } from "@/platform/clock";
 
 /* ------------------------------------------------------------------ *
  * Invoice and quote documents.
@@ -113,7 +114,7 @@ export function statusFor(record: Rec | undefined, customer: Rec | undefined): C
 
 export function blankLine(index: number): InvoiceLine {
   return {
-    id: `line-${Date.now().toString(36)}-${index}`,
+    id: `line-${wallMs().toString(36)}-${index}`,
     description: "",
     quantity: 1,
     unitPriceMinor: 0,

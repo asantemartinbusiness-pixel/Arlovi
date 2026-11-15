@@ -6,7 +6,7 @@ import {
 import { FileText, LifeBuoy, MessageSquare, ShieldCheck, Users } from "lucide-react";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
-import { freshness } from "@/platform/clock";
+import { clockIso, freshness } from "@/platform/clock";
 import { computeInvoice } from "@/platform/money";
 import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
@@ -502,7 +502,7 @@ export function ExternalMessaging({ context, lens }: { context: ScreenContext; l
               title: `Message · ${actor}`,
               status: "answered",
               summary: draft.trim(),
-              at: new Date().toISOString(),
+              at: clockIso(),
               parentId: portal.id,
               tags: ["portal", "message"],
               fields: { portalId: portal.id, direction: "out", kind: "message", author: actor, delivery: "not_connected", attachments: 0, internalOnly: false },

@@ -9,6 +9,7 @@ import { useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { AssetPreview, fileState, storedBytes } from "./thumbs";
 import { csvList, formatBytes, licence, licenceTone, useAssets, usedIn, useSeeded } from "./panels";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * ASSET — brand kits, transformations, usage and governance.
@@ -389,7 +390,7 @@ export function GlobalImpact({ context, close }: { context: ScreenContext; close
               if (master && master.id !== brand.id) {
                 await context.mutate.patch(master.id, { fields: { ...master.fields, master: false } }, { event: `${master.title} is no longer the master kit` });
               }
-              await context.mutate.patch(brand.id, { status: "active", fields: { ...brand.fields, master: true, publishedBy: context.actor, publishedAt: new Date().toISOString() } }, { event: `${brand.title} published as the master kit`, expectRevision: brand.revision });
+              await context.mutate.patch(brand.id, { status: "active", fields: { ...brand.fields, master: true, publishedBy: context.actor, publishedAt: clockIso() } }, { event: `${brand.title} published as the master kit`, expectRevision: brand.revision });
               context.toast("Published", `${brand.title} is the master kit. The previous master is kept and can be restored.`);
               close();
             } finally { setBusy(false); }
@@ -1022,7 +1023,7 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
               for (const row of drop) {
                 await context.mutate.patch(row.id, {
                   status: "archived",
-                  fields: { ...row.fields, supersededBy: keep.id, archivedBy: context.actor, archivedAt: new Date().toISOString() },
+                  fields: { ...row.fields, supersededBy: keep.id, archivedBy: context.actor, archivedAt: clockIso() },
                 }, { event: `Duplicate archived in favour of ${keep.title}`, expectRevision: row.revision });
               }
               await context.mutate.patch(keep.id, {

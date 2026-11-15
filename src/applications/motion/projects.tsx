@@ -11,6 +11,7 @@ import { keyframeCount, type MotionAsset, type MotionDoc, type MotionLayer } fro
 import { parseMotion, starterMotion, storyboardFromBrief } from "./model";
 import { Stage } from "./parts";
 import { useAssetLookup, FormField } from "./shared";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * ARL-MOTION-001 — Motion Projects
@@ -485,7 +486,7 @@ export function PublishTemplate({ context, close }: { context: ScreenContext; cl
             try {
               const saved = await context.mutate.patch(record.id, {
                 status: "published",
-                fields: { ...record.fields, kind: "template", publishedBy: context.actor, publishedAt: new Date().toISOString(), templateNote: note },
+                fields: { ...record.fields, kind: "template", publishedBy: context.actor, publishedAt: clockIso(), templateNote: note },
               }, { expectRevision: record.revision, event: `Published ${record.title} as a brand motion template` });
               if (saved) { close(); context.setTab("Templates"); }
             } finally { setBusy(false); }

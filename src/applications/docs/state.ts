@@ -9,6 +9,7 @@ import {
 } from "./model";
 import type { EditIntent } from "./canvas";
 import { shareEditor } from "@/applications/sheets/sharedEditor";
+import { wallMs } from "@/platform/clock";
 
 export type SaveState = "clean" | "dirty" | "saving" | "saved" | "conflict" | "error";
 
@@ -119,7 +120,7 @@ function useOwnDocEditor(context: ScreenContext, record: Rec | undefined): DocEd
 
   const commit = useCallback((next: DocModel, label: string, nextSelection?: DocRange | null, coalesce = false) => {
     setHistory((current) => {
-      const entry: HistoryEntry = { model, selection: selection ?? collapsed({ blockId: model.blocks[0]?.id ?? "", offset: 0 }), label, at: Date.now() };
+      const entry: HistoryEntry = { model, selection: selection ?? collapsed({ blockId: model.blocks[0]?.id ?? "", offset: 0 }), label, at: wallMs() };
       const last = current.past[current.past.length - 1];
       if (coalesce && last && last.label === label && entry.at - last.at < 700) return { past: current.past, future: [] };
       return { past: [...current.past.slice(-80), entry], future: [] };

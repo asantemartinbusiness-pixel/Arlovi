@@ -12,6 +12,7 @@ import {
 } from "./model";
 import { activeDeckEditor, useDeckEditor, type DeckEditor } from "./state";
 import { advanceSlides, endPresenting, presenterUi } from "./session";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * Present: the contract actions that operate on the open deck, and the
@@ -269,7 +270,7 @@ export function Annotate({ context, close }: { context: ScreenContext; close: ()
       onSubmit={(event) => {
         event.preventDefault();
         if (!text.trim()) return;
-        presenterUi.set((state) => ({ ...state, annotations: { ...state.annotations, [editor.slide.id]: [...(state.annotations[editor.slide.id] ?? []), { id: nextId("an"), text: text.trim(), at: new Date().toISOString() }] } }));
+        presenterUi.set((state) => ({ ...state, annotations: { ...state.annotations, [editor.slide.id]: [...(state.annotations[editor.slide.id] ?? []), { id: nextId("an"), text: text.trim(), at: clockIso() }] } }));
         close();
       }}
     >

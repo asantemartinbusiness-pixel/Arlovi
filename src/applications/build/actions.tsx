@@ -14,6 +14,7 @@ import {
 } from "./model";
 import { NoProject, useAppRecord } from "./builder";
 import { saveApp, useBuildUi } from "./state";
+import { wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * BUILD contract actions. Every write goes through saveApp (patch with
@@ -246,7 +247,7 @@ export const commitChange = actOverlay({
   apply: async ({ record, values, context }) => {
     if (!record) return;
     const app = model(record);
-    const version = { id: `ve-${Date.now().toString(36)}`, label: `v${app.versions.length + 1}`, at: nowIso(context), note: values.message, actor: context.actor, entities: app.entities.length, screens: app.screens.length };
+    const version = { id: `ve-${wallMs().toString(36)}`, label: `v${app.versions.length + 1}`, at: nowIso(context), note: values.message, actor: context.actor, entities: app.entities.length, screens: app.screens.length };
     await saveApp(context, record, { ...app, versions: [...app.versions, version] }, `Commit ${version.label} (${version.entities} entities, ${version.screens} screens): ${values.message}`);
     return `${version.label} recorded. Nothing was pushed: there is no remote.`;
   },
@@ -463,7 +464,7 @@ export const deployFunctions = actOverlay({
   apply: async ({ record, context }) => {
     if (!record) return;
     const app = model(record);
-    const release = { id: `re-${Date.now().toString(36)}`, environment: "production" as const, at: nowIso(context), state: "blocked" as const, note: `API with ${app.endpoints.length} endpoints stopped at the runtime boundary: nothing hosts it.`, actor: context.actor };
+    const release = { id: `re-${wallMs().toString(36)}`, environment: "production" as const, at: nowIso(context), state: "blocked" as const, note: `API with ${app.endpoints.length} endpoints stopped at the runtime boundary: nothing hosts it.`, actor: context.actor };
     await saveApp(context, record, { ...app, releases: [...app.releases, release] }, "API deployment recorded as blocked at the runtime boundary");
     await context.mutate.log(`API deployment for ${record.title} stopped: no runtime is connected.`, { entityId: record.id, type: "capability", capability: "not_connected" });
     return { title: "Not deployed", body: "The attempt is in the release history as blocked.", tone: "blocked" };

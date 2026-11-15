@@ -4,7 +4,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
-import { freshness } from "@/platform/clock";
+import { clockIso, freshness } from "@/platform/clock";
 import { ROLE_LABELS } from "@/platform/policy";
 import type { Rec, Role } from "@/domain/types";
 import {
@@ -153,7 +153,7 @@ export function CiteFigures({ context, close }: { context: ScreenContext; close:
           disabled={citable.length === 0}
           onClick={async () => {
             setBusy(true);
-            const at = new Date().toISOString();
+            const at = clockIso();
             const citations = checks.map((check) => {
               const measure = check.block.measureId ? measureById(check.block.measureId) : undefined;
               return {
@@ -230,7 +230,7 @@ export function GrantDataset({ context, close }: { context: ScreenContext; close
           title={!context.can("manage_policy") ? "Granting needs the Owner view" : blocked}
           onClick={async () => {
             setBusy(true);
-            const next = [...grants, { role, access, by: context.actor, at: new Date().toISOString() }];
+            const next = [...grants, { role, access, by: context.actor, at: clockIso() }];
             if (existing) {
               await context.mutate.patch(existing.id, { body: { ...(existing.body as object ?? {}), grants: next } }, { expectRevision: existing.revision, event: `${ROLE_LABELS[role]} granted ${access} on ${collection}` });
             } else {
@@ -284,7 +284,7 @@ export function RefreshDataset({ context, close }: { context: ScreenContext; clo
           disabled={existing?.status === "retired"}
           onClick={async () => {
             setBusy(true);
-            const fields = { collection, kind: "native", refreshedAt: new Date().toISOString(), refreshedBy: context.actor, recordCount: rows.length, newestAt: asOf ?? "", failing };
+            const fields = { collection, kind: "native", refreshedAt: clockIso(), refreshedBy: context.actor, recordCount: rows.length, newestAt: asOf ?? "", failing };
             if (existing) await context.mutate.patch(existing.id, { fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Dataset ${collection} refreshed: ${rows.length} records` });
             else await context.mutate.create({ collection: "datasets", title: collection, status: "documented", summary: `Catalogue entry for ${collection}.`, fields }, `Dataset ${collection} refreshed: ${rows.length} records`);
             context.toast("Refreshed", `${collection}: ${rows.length} records re-read, ${failing} quality failure${failing === 1 ? "" : "s"}.`);
@@ -431,7 +431,7 @@ export function ValidateModel({ context, close }: { context: ScreenContext; clos
           busy={busy}
           onClick={async () => {
             setBusy(true);
-            const fields = { lastValidatedAt: new Date().toISOString(), lastValidatedBy: context.actor, passing: results.length - failing.length, failing: failing.length };
+            const fields = { lastValidatedAt: clockIso(), lastValidatedBy: context.actor, passing: results.length - failing.length, failing: failing.length };
             if (model) await context.mutate.patch(model.id, { fields: { ...model.fields, ...fields } }, { expectRevision: model.revision, event: `Data model validated: ${fields.passing} pass, ${fields.failing} fail` });
             else await context.mutate.create({ collection: "dataModels", title: "Data model", status: "active", summary: "Relationships between the collections.", fields, body: { relations: results.map((item) => item.relation) } }, `Data model validated: ${fields.passing} pass, ${fields.failing} fail`);
             context.toast("Validation recorded", `${fields.passing} pass, ${fields.failing} fail.`, failing.length ? "blocked" : "ok");
@@ -475,7 +475,7 @@ export function RefreshModel({ context, close }: { context: ScreenContext; close
           onClick={async () => {
             setBusy(true);
             const relations = results.map((item) => ({ ...item.relation, kind: (item.check.fanOut ? "one-to-many" : "many-to-one") as "one-to-many" | "many-to-one" }));
-            const fields = { refreshedAt: new Date().toISOString(), refreshedBy: context.actor };
+            const fields = { refreshedAt: clockIso(), refreshedBy: context.actor };
             if (model) await context.mutate.patch(model.id, { body: { ...(model.body as object ?? {}), relations }, fields: { ...model.fields, ...fields } }, { expectRevision: model.revision, event: `Data model refreshed: ${changed.length} declaration${changed.length === 1 ? "" : "s"} corrected` });
             else await context.mutate.create({ collection: "dataModels", title: "Data model", status: "active", summary: "Relationships between the collections.", fields, body: { relations } }, `Data model refreshed: ${changed.length} corrected`);
             context.toast("Model refreshed", `${results.length} joins re-measured; ${changed.length} declaration${changed.length === 1 ? "" : "s"} corrected.`);
@@ -519,8 +519,8 @@ export function DeployModel({ context, close }: { context: ScreenContext; close:
             const body = model.body as { relations?: unknown[]; deployed?: unknown[] } | undefined;
             const saved = await context.mutate.patch(model.id, {
               status: "deployed",
-              body: { ...(body ?? {}), relations, deployed: [...(body?.deployed ?? []), { version, relations, at: new Date().toISOString(), by: context.actor }] },
-              fields: { ...model.fields, deployedVersion: version, deployedBy: context.actor, deployedAt: new Date().toISOString() },
+              body: { ...(body ?? {}), relations, deployed: [...(body?.deployed ?? []), { version, relations, at: clockIso(), by: context.actor }] },
+              fields: { ...model.fields, deployedVersion: version, deployedBy: context.actor, deployedAt: clockIso() },
             }, { expectRevision: model.revision, event: `Data model v${version} deployed by ${context.actor}` });
             if (saved) context.toast("Deployed", `Version ${version} is the model every measure reads.`);
             setBusy(false);
@@ -588,7 +588,7 @@ export function AdjustInputs({ context, close }: { context: ScreenContext; close
             const saved = await context.mutate.patch(scenario.id, {
               status: "proposed",
               fields: { ...scenario.fields, measureId, adjustment, projected: Math.round(last?.value ?? 0), adjustedBy: context.actor },
-              body: { ...(scenario.body as object ?? {}), inputs: [...history, { measureId: scenario.fields.measureId, adjustment: scenario.fields.adjustment, at: new Date().toISOString(), by: context.actor }] },
+              body: { ...(scenario.body as object ?? {}), inputs: [...history, { measureId: scenario.fields.measureId, adjustment: scenario.fields.adjustment, at: clockIso(), by: context.actor }] },
             }, { expectRevision: scenario.revision, event: `Scenario ${scenario.title} inputs adjusted to ${adjustment}%` });
             if (saved) context.toast("Inputs adjusted", `${scenario.title} now uses ${adjustment}% on the slope. It is back to proposed for review.`);
             setBusy(false);

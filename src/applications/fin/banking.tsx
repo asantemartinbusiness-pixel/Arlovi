@@ -14,6 +14,7 @@ import type { JLine, MatchCandidate, Reconciliation } from "@/domain/fin-ledger"
 import { useFinData } from "./data";
 import type { FinData } from "./data";
 import { AccountLabel, Amount, CapabilityNotice, CapabilityPill, SourceNote, StatementRow } from "./parts";
+import { wallMs } from "@/platform/clock";
 
 /* ---------------------------- FIN-008 ---------------------------- */
 
@@ -822,7 +823,7 @@ export function AdjustmentReview({ context, close }: { context: ScreenContext; c
           </table>
         </div>
         <div className="ds-grid-foot">
-          <Button size="sm" variant="secondary" onClick={() => setSplits([...rows, { key: `k${rows.length}${Date.now().toString(36)}`, accountId: "", amountMinor: Math.max(0, remaining) }])}>
+          <Button size="sm" variant="secondary" onClick={() => setSplits([...rows, { key: `k${rows.length}${wallMs().toString(36)}`, accountId: "", amountMinor: Math.max(0, remaining) }])}>
             Split further
           </Button>
           <span className="ds-row ds-gap-2">

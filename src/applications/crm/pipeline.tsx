@@ -12,6 +12,7 @@ import {
 import type { Stage } from "@/domain/crm-pipeline";
 import { companyOfDeal, contactOfDeal, quotesOfDeal, stagesWithDeals, useCrmData } from "./data";
 import { ForecastNote, Money, ProbabilityPill, StagePill } from "./parts";
+import { clockIso } from "@/platform/clock";
 
 /* ---------------------------- CRM-006 ---------------------------- *
  * Pipeline board.
@@ -560,7 +561,7 @@ export function LostReason({ context, close }: { context: ScreenContext; close: 
             await context.mutate.patch(deal.id, {
               status: "lost",
               summary: note || deal.summary,
-              fields: { ...deal.fields, stage: "lost", probability: 0, lostReason: reason, lostAt: new Date().toISOString(), lostBy: context.actor },
+              fields: { ...deal.fields, stage: "lost", probability: 0, lostReason: reason, lostAt: clockIso(), lostBy: context.actor },
             }, { expectRevision: deal.revision, event: `${deal.title} closed lost: ${reason}` });
             context.toast("Deal closed lost", `${deal.title} is recorded as lost for ${reason.toLowerCase()}. The weighted forecast fell by ${context.money(Math.round((Number(deal.amountMinor ?? 0) * probabilityOf(deal)) / 100))}.`);
             setBusy(false);

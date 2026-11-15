@@ -8,6 +8,7 @@
 
 import { createStore } from "@/applications/visual/kit";
 import type { DeckEditor } from "./state";
+import { clockIso } from "@/platform/clock";
 
 export interface PresenterSession {
   running: boolean;
@@ -43,6 +44,6 @@ export function endPresenting(editor: DeckEditor | undefined): void {
   presenterUi.set((state) => {
     const current = editor?.slide;
     const laps = current && state.running ? { ...state.laps, [current.id]: state.elapsed - state.lapStart } : state.laps;
-    return { ...state, running: false, fullscreen: false, laps, lastEnded: { at: new Date().toISOString(), elapsed: state.elapsed, slides: Object.keys(laps).length } };
+    return { ...state, running: false, fullscreen: false, laps, lastEnded: { at: clockIso(), elapsed: state.elapsed, slides: Object.keys(laps).length } };
   });
 }

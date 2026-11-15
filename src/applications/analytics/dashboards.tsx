@@ -8,7 +8,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
-import { freshness } from "@/platform/clock";
+import { freshness, wallMs } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import {
   DIMENSIONS, dimensionById, measureById, runQuery, type QueryFilter,
@@ -625,7 +625,7 @@ export function WidgetChooser({ context, close }: { context: ScreenContext; clos
         variant="primary"
         onClick={async () => {
           const tile: Tile = {
-            id: `t${body.tiles.length + 1}-${Date.now().toString(36)}`,
+            id: `t${body.tiles.length + 1}-${wallMs().toString(36)}`,
             title: measure?.name ?? "Tile",
             measureId,
             dimensionId: dimensionId || undefined,

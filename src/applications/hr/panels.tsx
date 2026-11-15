@@ -8,7 +8,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
-import { addDays, daysBetween, startOfMonth, startOfWeek } from "@/platform/clock";
+import { addDays, clockIso, daysBetween, startOfMonth, startOfWeek } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { EmploymentPill, RoleViewNote, leaveBalance, salaryText } from "./kit";
 import { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
@@ -1033,7 +1033,7 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
                   size="sm"
                   variant="primary"
                   onClick={async () => {
-                    await context.mutate.patch(request.id, { status: "approved", fields: { ...request.fields, decidedBy: context.actor, decidedAt: new Date().toISOString() } }, { expectRevision: request.revision, event: `Leave approved for ${leavePerson(request, data.employees)} by ${context.actor}` });
+                    await context.mutate.patch(request.id, { status: "approved", fields: { ...request.fields, decidedBy: context.actor, decidedAt: clockIso() } }, { expectRevision: request.revision, event: `Leave approved for ${leavePerson(request, data.employees)} by ${context.actor}` });
                     if (employee) {
                       await context.mutate.patch(employee.id, { fields: { ...employee.fields, leaveTaken: Number(employee.fields.leaveTaken ?? 0) + requested } }, { event: "Leave balance updated after approval" });
                     }
@@ -1046,7 +1046,7 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
                   size="sm"
                   variant="outline-danger"
                   onClick={async () => {
-                    await context.mutate.patch(request.id, { status: "declined", fields: { ...request.fields, decidedBy: context.actor, decidedAt: new Date().toISOString() } }, { expectRevision: request.revision, event: `Leave declined for ${leavePerson(request, data.employees)} by ${context.actor}` });
+                    await context.mutate.patch(request.id, { status: "declined", fields: { ...request.fields, decidedBy: context.actor, decidedAt: clockIso() } }, { expectRevision: request.revision, event: `Leave declined for ${leavePerson(request, data.employees)} by ${context.actor}` });
                     context.toast("Leave declined", "The request is recorded as declined with the decision maker's name.");
                   }}
                 >
@@ -1694,7 +1694,7 @@ export function LeaveForm({ context, close }: { context: ScreenContext; close: (
           summary: note || `${type} leave requested from the leave screen.`,
           startAt: new Date(`${from}T00:00:00.000Z`).toISOString(),
           endAt: new Date(`${to}T00:00:00.000Z`).toISOString(),
-          at: new Date().toISOString(),
+          at: clockIso(),
           fields: { employeeId: employee.id, employeeName: employee.title, type, days, approver: String(employee.fields.manager ?? "Elena Voss"), halfDay: false },
         }, `Leave requested by ${employee.title}`);
         context.toast("Leave requested", `${days} days are waiting for ${String(employee.fields.manager ?? "a manager")} to decide.`);
@@ -1756,7 +1756,7 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
         <Button
           variant="primary"
           onClick={async () => {
-            await context.mutate.patch(chosen.id, { status: "approved", fields: { ...chosen.fields, decidedBy: context.actor, decidedAt: new Date().toISOString() } }, { expectRevision: chosen.revision, event: `Leave approved for ${String(chosen.fields.employeeName ?? "")} by ${context.actor}` });
+            await context.mutate.patch(chosen.id, { status: "approved", fields: { ...chosen.fields, decidedBy: context.actor, decidedAt: clockIso() } }, { expectRevision: chosen.revision, event: `Leave approved for ${String(chosen.fields.employeeName ?? "")} by ${context.actor}` });
             if (employee) await context.mutate.patch(employee.id, { fields: { ...employee.fields, leaveTaken: Number(employee.fields.leaveTaken ?? 0) + days } }, { event: "Leave balance updated after approval" });
             context.toast("Leave approved", "The request and the balance both changed.");
             context.closeOverlay();
@@ -1767,7 +1767,7 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
         <Button
           variant="outline-danger"
           onClick={async () => {
-            await context.mutate.patch(chosen.id, { status: "declined", fields: { ...chosen.fields, decidedBy: context.actor, decidedAt: new Date().toISOString() } }, { expectRevision: chosen.revision, event: `Leave declined for ${String(chosen.fields.employeeName ?? "")} by ${context.actor}` });
+            await context.mutate.patch(chosen.id, { status: "declined", fields: { ...chosen.fields, decidedBy: context.actor, decidedAt: clockIso() } }, { expectRevision: chosen.revision, event: `Leave declined for ${String(chosen.fields.employeeName ?? "")} by ${context.actor}` });
             context.toast("Leave declined", "Recorded as declined against the request.");
             context.closeOverlay();
           }}

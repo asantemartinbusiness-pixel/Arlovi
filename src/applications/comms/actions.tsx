@@ -5,6 +5,7 @@ import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { askFirst, Boundary, boundaryText, logBoundary, pickRecord, recordOf, selectedOf } from "@/applications/hr/opsKit";
 import { messagesOf, useCommsData } from "./panels";
+import { clockIso } from "@/platform/clock";
 
 /* ------------------------------------------------------------------ *
  * Contract actions for the Communications module that change records.
@@ -71,7 +72,7 @@ export function MessageComposer({ context, close }: { context: ScreenContext; cl
           status: "sent",
           summary: body,
           parentId: channel.id,
-          at: new Date().toISOString(),
+          at: clockIso(),
           fields: { author: actor, kind: "human", threadRootId: root, reactions: "", mentions: mentions.join(","), fileRef, pinned: false },
         }, `${actor} ${replyTo ? "replied" : "posted"} in ${channel.title}${mentions.length ? `, mentioning ${mentions.join(", ")}` : ""}`);
         context.toast(replyTo ? "Reply posted" : "Message posted", `It is in ${channel.title} in this workspace. Nothing was sent anywhere else.`);
@@ -337,7 +338,7 @@ export function placeCall(context: ScreenContext): void {
       boundary: "telephony",
       confirm: "Record the call attempt",
       run: async () => {
-        const call = await context.mutate.create({ collection: "calls", title: `${conversation.title} — not placed`, status: "not placed", summary: `Call attempt recorded by ${context.actor}; no telephony service is connected.`, at: new Date().toISOString(), fields: { direction: "outbound", seconds: 0, outcome: "not placed", voicemail: false, queue: "Direct", conversationId: conversation.id } }, `Call attempt recorded by ${context.actor}`);
+        const call = await context.mutate.create({ collection: "calls", title: `${conversation.title} — not placed`, status: "not placed", summary: `Call attempt recorded by ${context.actor}; no telephony service is connected.`, at: clockIso(), fields: { direction: "outbound", seconds: 0, outcome: "not placed", voicemail: false, queue: "Direct", conversationId: conversation.id } }, `Call attempt recorded by ${context.actor}`);
         await logBoundary(context, "telephony", `Call to ${conversation.title} not placed`, call.id);
         context.toast("Call not placed", boundaryText("telephony"), "info");
       },
@@ -525,9 +526,9 @@ export function SendConfirmation({ context, close }: { context: ScreenContext; c
           onClick={async () => {
             const from = `${context.actor.split(" ")[0].toLowerCase()}@${domain}`;
             const draft = await context.mutate.create({
-              collection: "emailThreads", title: request.subject, status: "draft", summary: request.body.slice(0, 160), at: new Date().toISOString(), tags: ["draft"],
+              collection: "emailThreads", title: request.subject, status: "draft", summary: request.body.slice(0, 160), at: clockIso(), tags: ["draft"],
               fields: { folder: "drafts", from, to: request.to.join(", "), unread: false, risk: "none", labels: "draft", delivery: "queued_local", messageCount: 1, forwardedFrom: request.sourceId ?? "", recipientsConfirmedBy: needsCheck ? context.actor : "" },
-              body: { messages: [{ from, at: new Date().toISOString(), body: request.body, external: false }] },
+              body: { messages: [{ from, at: clockIso(), body: request.body, external: false }] },
             }, `Forward of ${source?.title ?? "a thread"} queued by ${context.actor}`);
             await logBoundary(context, "email.send", `Forward to ${request.to.join(", ")} queued locally`, draft.id);
             context.toast("Forward queued locally", boundaryText("email.send"));
@@ -794,7 +795,7 @@ export function RecordingConsent({ context, close }: { context: ScreenContext; c
         <Button variant="ghost" onClick={close}>Close</Button>
         <span className="ds-grow" />
         <Button variant="primary" disabled={everyoneMode} onClick={async () => {
-          await context.mutate.patch(meeting.id, { fields: { ...meeting.fields, recordingConsent: consented.join(","), consentComplete: all, consentRecordedBy: context.actor, consentRecordedAt: new Date().toISOString() } }, { expectRevision: meeting.revision, event: `Recording consent recorded on ${meeting.title} by ${context.actor}: ${consented.length} of ${attendees.length} agreed` });
+          await context.mutate.patch(meeting.id, { fields: { ...meeting.fields, recordingConsent: consented.join(","), consentComplete: all, consentRecordedBy: context.actor, consentRecordedAt: clockIso() } }, { expectRevision: meeting.revision, event: `Recording consent recorded on ${meeting.title} by ${context.actor}: ${consented.length} of ${attendees.length} agreed` });
           context.toast("Consent recorded", all ? "Everyone agreed. Recording is still not available in this workspace." : `${consented.length} of ${attendees.length} agreed, so recording would not be allowed.`);
           close();
         }}>Record the answers</Button>
@@ -812,7 +813,7 @@ export async function endMeeting(context: ScreenContext): Promise<void> {
     body: `${meeting.title} is marked finished at ${context.dateTime(context.now)}, ended by ${context.actor}. Notes and actions stay editable.`,
     confirm: "End the meeting",
     run: async () => {
-      await context.mutate.patch(meeting.id, { status: "finished", fields: { ...meeting.fields, endedBy: context.actor, endedAt: new Date().toISOString() } }, { expectRevision: meeting.revision, event: `${meeting.title} ended by ${context.actor}` });
+      await context.mutate.patch(meeting.id, { status: "finished", fields: { ...meeting.fields, endedBy: context.actor, endedAt: clockIso() } }, { expectRevision: meeting.revision, event: `${meeting.title} ended by ${context.actor}` });
       context.toast("Meeting ended", "The record is finished; write up what was decided.");
       context.setTab("Notes");
     },
@@ -888,7 +889,7 @@ export function Dialer({ context, close }: { context: ScreenContext; close: () =
         <Button variant="ghost" onClick={close}>Close</Button>
         <span className="ds-grow" />
         <Button variant="primary" disabled={!target} onClick={async () => {
-          const call = await context.mutate.create({ collection: "calls", title: `${target} — not placed`, status: "not placed", summary: `${original ? "Return call" : "Call"} recorded by ${context.actor}; no telephony service is connected.`, at: new Date().toISOString(), fields: { contactId: contact?.id ?? "", direction: "outbound", seconds: 0, outcome: "not placed", voicemail: false, queue: "Direct", returnOf: original?.id ?? "", number: contact ? String(contact.fields.phone ?? "") : number.trim() } }, `${original ? "Return call" : "Call"} to ${target} recorded by ${context.actor}`);
+          const call = await context.mutate.create({ collection: "calls", title: `${target} — not placed`, status: "not placed", summary: `${original ? "Return call" : "Call"} recorded by ${context.actor}; no telephony service is connected.`, at: clockIso(), fields: { contactId: contact?.id ?? "", direction: "outbound", seconds: 0, outcome: "not placed", voicemail: false, queue: "Direct", returnOf: original?.id ?? "", number: contact ? String(contact.fields.phone ?? "") : number.trim() } }, `${original ? "Return call" : "Call"} to ${target} recorded by ${context.actor}`);
           if (original) await context.mutate.patch(original.id, { fields: { ...original.fields, returnedBy: context.actor, returnCallId: call.id } }, { expectRevision: original.revision, event: `${original.title} returned by ${context.actor} (not placed: no telephony)` });
           await logBoundary(context, "telephony", `Call to ${target} not placed`, call.id);
           context.toast("Call recorded, not placed", boundaryText("telephony"), "info");
@@ -930,7 +931,7 @@ export function Voicemail({ context, close }: { context: ScreenContext; close: (
         <Button variant="ghost" onClick={close}>Close</Button>
         <span className="ds-grow" />
         <Button variant="primary" disabled={Boolean(call.fields.heardBy)} onClick={async () => {
-          await context.mutate.patch(call.id, { fields: { ...call.fields, heardBy: context.actor, heardAt: new Date().toISOString() } }, { expectRevision: call.revision, event: `Voicemail note from ${call.title} reviewed by ${context.actor}` });
+          await context.mutate.patch(call.id, { fields: { ...call.fields, heardBy: context.actor, heardAt: clockIso() } }, { expectRevision: call.revision, event: `Voicemail note from ${call.title} reviewed by ${context.actor}` });
           context.toast("Marked reviewed", "The voicemail note is recorded as dealt with.");
           close();
         }}>Mark the voicemail reviewed</Button>
@@ -952,7 +953,7 @@ export function DraftAnnouncement({ context, close }: { context: ScreenContext; 
         const title = String(form.get("title") ?? "").trim();
         const body = String(form.get("body") ?? "").trim();
         if (!title || !body) return;
-        const created = await context.mutate.create({ collection: "announcements", title, status: "draft", summary: body, at: new Date().toISOString(), fields: { audience: String(form.get("audience") ?? "Everyone"), acknowledgements: 0, requiresAck: form.get("ack") === "on", reach: 0, sensitive: form.get("sensitive") === "on" } }, `Announcement drafted by ${context.actor}`);
+        const created = await context.mutate.create({ collection: "announcements", title, status: "draft", summary: body, at: clockIso(), fields: { audience: String(form.get("audience") ?? "Everyone"), acknowledgements: 0, requiresAck: form.get("ack") === "on", reach: 0, sensitive: form.get("sensitive") === "on" } }, `Announcement drafted by ${context.actor}`);
         context.select(created.id);
         context.toast("Draft saved", "It is on the Draft tab. Nobody sees it until it is published.");
         close();

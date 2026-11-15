@@ -49,6 +49,17 @@ figure { margin: 0; }
 
 ::selection { background: var(--accent-soft); color: var(--accent-soft-fg); }
 
+/* Plain tables.
+   The default for a hand-written <table>: statement and matrix screens put
+   <th> row headers in a body row, which the grid styles (.ds-table thead th)
+   do not reach. :where() keeps this at zero specificity, so every classed
+   table (.ds-table, .dx-table, matrices) overrides it. */
+:where(table) { width: 100%; border-collapse: collapse; font-size: 14px; /* the size plain tables always had */ }
+:where(th, td) { text-align: start; padding: 10px var(--space-3); border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
+:where(th) { font-size: var(--text-xs); letter-spacing: 0.04em; text-transform: uppercase; color: var(--fg-muted); }
+:where(tr[aria-selected="true"]) { background: var(--bg-selected); }
+
+
 /* ---- Provenance: the one signature device ----
    An element that asserts a fact says where the fact came from.
    posted  immutable, already in the books

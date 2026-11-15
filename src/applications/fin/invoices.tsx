@@ -17,6 +17,7 @@ import type { JLine } from "@/domain/fin-ledger";
 import { contactOf, openInvoices, outstandingMinor, useFinData } from "./data";
 import type { FinData } from "./data";
 import { Amount, CapabilityNotice, CapabilityPill, OverdueBadge, SourceNote, StatementRow, StatusPill, TaxCodePill, taxRateText } from "./parts";
+import { clockIso } from "@/platform/clock";
 
 /* ------------------------------------------------------------------ *
  * FIN-004 Invoice list and FIN-005 Invoice detail.
@@ -963,8 +964,8 @@ export function EmailPreview({ context, close }: { context: ScreenContext; close
             setBusy(true);
             const existing = ((invoice.body as { reminders?: unknown[] })?.reminders ?? []) as unknown[];
             await context.mutate.patch(invoice.id, {
-              body: { ...(invoice.body as object ?? {}), reminders: [...existing, { at: new Date().toISOString(), by: context.actor, to, body: drafted }] },
-              fields: { ...invoice.fields, lastReminderAt: new Date().toISOString(), reminderCount: existing.length + 1 },
+              body: { ...(invoice.body as object ?? {}), reminders: [...existing, { at: clockIso(), by: context.actor, to, body: drafted }] },
+              fields: { ...invoice.fields, lastReminderAt: clockIso(), reminderCount: existing.length + 1 },
             }, { expectRevision: invoice.revision, event: `Reminder drafted for ${invoice.title}` });
             context.toast("Kept as a draft", `The message for ${to} is stored on the invoice. No mail provider is connected, so nothing was sent.`, "info");
             setBusy(false);
@@ -1312,13 +1313,13 @@ export function BulkActionPreview({ context, close }: { context: ScreenContext; 
                 body: {
                   ...(invoice.body as object ?? {}),
                   reminders: [...existing, {
-                    at: new Date().toISOString(),
+                    at: clockIso(),
                     by: context.actor,
                     to,
                     body: `${invoice.title} for ${context.money(outstandingMinor(invoice))} was due ${context.date(invoice.dueAt)}.`,
                   }],
                 },
-                fields: { ...invoice.fields, lastReminderAt: new Date().toISOString(), reminderCount: existing.length + 1 },
+                fields: { ...invoice.fields, lastReminderAt: clockIso(), reminderCount: existing.length + 1 },
               }, { event: `Reminder drafted for ${invoice.title}` });
             }
             context.toast("Reminders drafted", `${eligible.length} drafts are stored on their invoices. Nothing has been sent.`, "info");
@@ -1492,11 +1493,11 @@ export function ApproveInvoice({ context, close }: { context: ScreenContext; clo
             amountMinor: totals.grossMinor,
             body: {
               ...(invoice.body as object ?? {}),
-              versions: [...versions, { at: new Date().toISOString(), by: context.actor, note: "Issued and posted", grossMinor: totals.grossMinor }],
+              versions: [...versions, { at: clockIso(), by: context.actor, note: "Issued and posted", grossMinor: totals.grossMinor }],
             },
             fields: {
               ...invoice.fields, journalId: journal.id, netMinor: totals.netMinor, taxMinor: totals.taxMinor,
-              issuedAt: new Date().toISOString(), approvedBy: context.actor, approvedAt: new Date().toISOString(),
+              issuedAt: clockIso(), approvedBy: context.actor, approvedAt: clockIso(),
             },
           }, { expectRevision: invoice.revision, event: `${invoice.title} approved by ${context.actor} and issued` });
           setBusy(false);

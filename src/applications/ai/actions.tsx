@@ -3,6 +3,7 @@ import { Button, Empty, Field, Notice, Properties, Row, Select, Stack, TextArea,
 import type { ScreenContext } from "@/platform/registry";
 import { useOrgRecords, useRecord } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
+import { clockIso, wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * AI contract actions that change the record they name.
@@ -54,7 +55,7 @@ export function AttachToSpecialist({ context, close }: { context: ScreenContext;
               status: "sent",
               summary: `${context.actor} attached ${record.collection} ${record.title}.`,
               parentId: agent.id,
-              at: new Date().toISOString(),
+              at: clockIso(),
               fields: { author: context.actor, kind: "attachment", attachedRecordId: record.id, attachedCollection: record.collection },
             }, `${record.title} attached to the conversation with ${agent.title}`);
             context.toast("Record attached", `${record.title} is in the conversation with ${agent.title}.`);
@@ -123,7 +124,7 @@ export function AssignRoomTask({ context, close }: { context: ScreenContext; clo
               status: "sent",
               summary: `${context.actor} assigned “${task.title}” to ${person.title}, due ${context.date(due)}.`,
               parentId: room.id,
-              at: new Date().toISOString(),
+              at: clockIso(),
               fields: { author: context.actor, kind: "assignment", taskId: task.id },
             }, `Assignment posted in ${room.title}`);
             context.toast("Task assigned", `${person.title} owns “${task.title}”.`);
@@ -226,7 +227,7 @@ export function CorrectTranscript({ context, close }: { context: ScreenContext; 
           onClick={async () => {
             if (!line) return;
             setBusy(true);
-            const next = transcript.map((entry) => (entry.id === line.id ? { ...entry, text: text.trim(), corrected: { from: entry.corrected?.from ?? entry.text, at: new Date().toISOString(), by: context.actor } } : entry));
+            const next = transcript.map((entry) => (entry.id === line.id ? { ...entry, text: text.trim(), corrected: { from: entry.corrected?.from ?? entry.text, at: clockIso(), by: context.actor } } : entry));
             const saved = await context.mutate.patch(session.id, { body: { ...(session.body as object), transcript: next } }, { expectRevision: session.revision, event: `Transcript line corrected by ${context.actor}` });
             if (saved) context.toast("Line corrected", "The previous text is kept on the line.");
             setBusy(false);
@@ -261,7 +262,7 @@ export function CommentOnArtifact({ context, close }: { context: ScreenContext; 
           onClick={async () => {
             setBusy(true);
             const saved = await context.mutate.patch(artifact.id, {
-              body: { ...body, comments: [...comments, { id: `c-${Date.now()}`, at: new Date().toISOString(), author: context.actor, text: text.trim() }] },
+              body: { ...body, comments: [...comments, { id: `c-${wallMs()}`, at: clockIso(), author: context.actor, text: text.trim() }] },
             }, { expectRevision: artifact.revision, event: `Comment added to ${artifact.title} by ${context.actor}` });
             if (saved) { context.toast("Comment added", "It shows on the Comments tab."); context.setTab("Comments"); }
             setBusy(false);
@@ -305,13 +306,13 @@ export function HostReview({ context, close }: { context: ScreenContext; close: 
           setBusy(true);
           const review = await context.mutate.create({
             collection: "meetings", title: `Review: ${topic.trim()}`, status: "scheduled", summary: `Hosted in ${room.title} by ${context.actor}.`,
-            startAt: new Date().toISOString(), parentId: room.id,
+            startAt: clockIso(), parentId: room.id,
             fields: { kind: "review", host: context.actor, roomId: room.id },
             body: { participants: people.filter((person) => chosen.includes(person.id)).map((person) => ({ id: person.id, name: person.title, kind: person.collection === "agents" ? "ai" : "human" })) },
           }, `Review on ${topic.trim()} hosted by ${context.actor}`);
           await context.mutate.create({
             collection: "messages", title: `Review: ${topic.trim()}`, status: "sent", summary: `${context.actor} opened a review of ${topic.trim()} with ${chosen.length} participant${chosen.length === 1 ? "" : "s"}.`,
-            parentId: room.id, at: new Date().toISOString(), fields: { author: context.actor, kind: "review", reviewId: review.id },
+            parentId: room.id, at: clockIso(), fields: { author: context.actor, kind: "review", reviewId: review.id },
           }, `Review announced in ${room.title}`);
           context.toast("Review hosted", `${review.title} is open with ${chosen.length} participant${chosen.length === 1 ? "" : "s"}.`);
           setBusy(false);
@@ -347,10 +348,10 @@ export function ResolveDisagreement({ context, close }: { context: ScreenContext
         <Button variant="primary" busy={busy} disabled={!dispute || !decision.trim()} onClick={async () => {
           if (!dispute) return;
           setBusy(true);
-          await context.mutate.patch(dispute.id, { fields: { ...dispute.fields, resolvedBy: context.actor, resolvedAt: new Date().toISOString(), resolution: decision.trim() } }, { expectRevision: dispute.revision, event: `Disagreement resolved by ${context.actor}` });
+          await context.mutate.patch(dispute.id, { fields: { ...dispute.fields, resolvedBy: context.actor, resolvedAt: clockIso(), resolution: decision.trim() } }, { expectRevision: dispute.revision, event: `Disagreement resolved by ${context.actor}` });
           await context.mutate.create({
             collection: "messages", title: `Decision: ${decision.trim().slice(0, 60)}`, status: "posted", summary: decision.trim(), parentId: context.params.id,
-            at: new Date().toISOString(), fields: { author: context.actor, kind: "human", decision: true, resolves: dispute.id },
+            at: clockIso(), fields: { author: context.actor, kind: "human", decision: true, resolves: dispute.id },
           }, `Coordinator decision recorded in the mission room`);
           context.toast("Resolved", "The decision is in the room and the disagreement is marked resolved.");
           setBusy(false);

@@ -7,6 +7,7 @@ import {
 } from "./model";
 import { singleSelection, type GridSelection } from "./grid";
 import { shareEditor } from "./sharedEditor";
+import { clockNow, wallMs } from "@/platform/clock";
 
 export type SaveState = "clean" | "dirty" | "saving" | "saved" | "conflict";
 
@@ -106,10 +107,10 @@ function useOwnWorkbookEditor(context: ScreenContext, record: Rec | undefined): 
   }, [flush]);
 
   const commit = useCallback((next: Workbook, label: string) => {
-    setPast((current) => [...current.slice(-120), { workbook, label, at: Date.now() }]);
+    setPast((current) => [...current.slice(-120), { workbook, label, at: wallMs() }]);
     setFuture([]);
     setWorkbook(next);
-    setRecalculatedAt(new Date());
+    setRecalculatedAt(clockNow());
     schedule(next);
   }, [workbook, schedule]);
 
@@ -158,7 +159,7 @@ function useOwnWorkbookEditor(context: ScreenContext, record: Rec | undefined): 
   const values = evaluation.values[sheet.name] ?? {};
 
   const recalculate = useCallback(() => {
-    setRecalculatedAt(new Date());
+    setRecalculatedAt(clockNow());
     setRecalcToken((value) => value + 1);
   }, []);
 
@@ -194,7 +195,7 @@ function useOwnWorkbookEditor(context: ScreenContext, record: Rec | undefined): 
     if (timer.current) window.clearTimeout(timer.current);
     const result = await context.mutate.patch(recordId, { body: merged }, { event: label });
     if (!result) return;
-    setPast((current) => [...current.slice(-120), { workbook, label, at: Date.now() }]);
+    setPast((current) => [...current.slice(-120), { workbook, label, at: wallMs() }]);
     setWorkbook(merged);
     baseRef.current = merged;
     baseRevision.current = result.revision;

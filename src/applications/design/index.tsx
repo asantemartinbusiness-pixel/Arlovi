@@ -28,6 +28,7 @@ import { NodeView, pageToSvg, svgToPng } from "./render";
 import { DesignCanvas, PathCanvas } from "./canvas";
 import { DesignThumb, GeometryInspector, LayersPanel, PagesPanel } from "./panels";
 import { designUi, importSvg, parseDesign, requestFit, setSelection, setTool, starterDoc, type DesignTool, type ImportReport } from "./model";
+import { clockIso, wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * DESIGN — Vector Design & UI Studio
@@ -393,8 +394,8 @@ function CanvasScreen({ context, actions }: { context: ScreenContext; actions: A
           handle.edit((current) => ({
             ...current,
             comments: [...current.comments, {
-              id: `c-${Date.now().toString(36)}`, pageId: current.activePageId,
-              x: point.x, y: point.y, author: context.actor, at: new Date().toISOString(),
+              id: `c-${wallMs().toString(36)}`, pageId: current.activePageId,
+              x: point.x, y: point.y, author: context.actor, at: clockIso(),
               text: "", resolved: false,
             }],
           }), "Add comment pin");
@@ -566,7 +567,7 @@ function LayersScreen({ context, lens }: { context: ScreenContext; lens: "Pages"
             variant="primary"
             icon={<Plus size={15} />}
             onClick={() => handle.edit((current) => {
-              const id = `page-${Date.now().toString(36)}`;
+              const id = `page-${wallMs().toString(36)}`;
               return { ...current, pages: [...current.pages, { id, name: `Page ${current.pages.length + 1}`, background: "#F2F4F8", grid: { kind: "square" as const, size: 8, count: 12, gutter: 24, visible: true }, children: { [id]: [] }, nodes: {} }], activePageId: id };
             }, "Add page")}
           >
@@ -685,7 +686,7 @@ function PathScreen({ context, actions }: { context: ScreenContext; actions: Act
   const anchor = active?.path?.anchors.find((item) => item.id === anchorId);
 
   const convert = (node: SceneNode) => {
-    const ids = Array.from({ length: 8 }, (_, index) => `a-${Date.now().toString(36)}-${index}`);
+    const ids = Array.from({ length: 8 }, (_, index) => `a-${wallMs().toString(36)}-${index}`);
     const path = node.kind === "ellipse" ? ellipseToPath(node.w, node.h, ids)
       : node.kind === "polygon" ? polygonToPath(node.w, node.h, node.sides ?? 6, ids)
         : rectToPath(node.w, node.h, node.radius ?? 0, ids);
@@ -845,7 +846,7 @@ function PathInspector({ handle, context, tab }: { handle: DocHandle<DesignDoc>;
             size="sm"
             variant="secondary"
             disabled={!anchorId}
-            onClick={() => handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { path: splitSegment(path, anchorId, `a-${Date.now().toString(36)}`) })), "Split segment")}
+            onClick={() => handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { path: splitSegment(path, anchorId, `a-${wallMs().toString(36)}`) })), "Split segment")}
           >
             Insert a point after the selected one
           </Button>
@@ -1394,7 +1395,7 @@ function StylesScreen({ context, lens }: { context: ScreenContext; lens: "Text" 
         <Card span={4} title="Add a token">
           <Button
             variant="primary"
-            onClick={() => handle.edit((current) => ({ ...current, colors: [...current.colors, { id: `tok-${Date.now().toString(36)}`, name: `Colour ${current.colors.length + 1}`, value: "#234FE8", group: "Custom" }] }), "Create style")}
+            onClick={() => handle.edit((current) => ({ ...current, colors: [...current.colors, { id: `tok-${wallMs().toString(36)}`, name: `Colour ${current.colors.length + 1}`, value: "#234FE8", group: "Custom" }] }), "Create style")}
           >
             New colour token
           </Button>
@@ -1720,7 +1721,7 @@ function AssetsScreen({ context, lens }: { context: ScreenContext; lens: "Assets
               disabled={ui.selected.length === 0}
               onClick={() => handle.edit((current) => ({
                 ...current,
-                exports: [...current.exports, ...ui.selected.map((id, index) => ({ id: `ex-${Date.now().toString(36)}-${index}`, nodeId: id, format: "png" as const, scale: 2, suffix: "@2x" }))],
+                exports: [...current.exports, ...ui.selected.map((id, index) => ({ id: `ex-${wallMs().toString(36)}-${index}`, nodeId: id, format: "png" as const, scale: 2, suffix: "@2x" }))],
               }), "Add export slices")}
             >
               Add slices for the selection
@@ -1794,7 +1795,7 @@ function AssetsScreen({ context, lens }: { context: ScreenContext; lens: "Assets
               variant="secondary"
               onClick={() => handle.edit((current) => ({
                 ...current,
-                versions: [{ id: `v-${Date.now().toString(36)}`, at: new Date().toISOString(), by: context.actor, label: `Mark at revision ${record.revision}`, nodeCount: Object.keys(activePage(current).nodes).length }, ...current.versions],
+                versions: [{ id: `v-${wallMs().toString(36)}`, at: clockIso(), by: context.actor, label: `Mark at revision ${record.revision}`, nodeCount: Object.keys(activePage(current).nodes).length }, ...current.versions],
               }), "Mark a version")}
             >
               Mark this version
@@ -2200,7 +2201,7 @@ const PATH_ACTIONS: ActionDef[] = [
       if (!doc || !nodeId) return;
       const path = activePage(doc).nodes[nodeId].path!;
       const after = designUi.get().selectedAnchors[0] ?? path.anchors[path.anchors.length - (path.closed ? 1 : 2)]?.id;
-      const id = `a-${Date.now().toString(36)}`;
+      const id = `a-${wallMs().toString(36)}`;
       const next = after ? splitSegment(path, after, id) : path;
       if (next === path) { context.toast("No segment to split", "A path needs two points before one can be added between them; use the pen tool to start one.", "blocked"); return; }
       await withDoc(context, (current) => updatePage(current, (page) => patchNode(page, nodeId, { path: next })), "Add a point");
@@ -2485,7 +2486,7 @@ function PublishPrototype({ context, close }: { context: ScreenContext; close: (
       className="ds-stack ds-gap-3"
       onSubmit={(event) => {
         event.preventDefault();
-        const publication = { state: "queued_local" as const, at: new Date().toISOString(), by: context.actor, digest: designDigest(doc) };
+        const publication = { state: "queued_local" as const, at: clockIso(), by: context.actor, digest: designDigest(doc) };
         handle.edit((current) => ({ ...current, prototype: { ...current.prototype, publication } }), "Queue the prototype for publishing");
         void context.mutate.log("Prototype publication queued locally; no hosting is connected", { entityId: record.id, type: "publish", capability: "queued_local" });
         context.toast("Queued locally, not published", "No hosting provider is connected, so no link exists and nothing left this browser. The request is recorded on the file.", "info");
@@ -2899,12 +2900,12 @@ registerApp({
       actions: [
         {
           id: "Create style", label: "New text style", placement: "primary",
-          run: (context) => withDoc(context, (doc) => ({ ...doc, textStyles: [...doc.textStyles, { id: `ts-${Date.now().toString(36)}`, name: `Style ${doc.textStyles.length + 1}`, family: "Inter", size: 18, weight: 500, lineHeight: 1.4, letterSpacing: 0 }] }), "Create a text style"),
+          run: (context) => withDoc(context, (doc) => ({ ...doc, textStyles: [...doc.textStyles, { id: `ts-${wallMs().toString(36)}`, name: `Style ${doc.textStyles.length + 1}`, family: "Inter", size: 18, weight: 500, lineHeight: 1.4, letterSpacing: 0 }] }), "Create a text style"),
         },
         { id: "edit token", label: "Edit a colour token…", placement: "secondary", guard: (context) => (openDesign(context)?.colors.length ? undefined : "There is no colour token yet"), run: (context) => context.openOverlay("token editor") },
         {
           id: "new token", label: "New colour token", placement: "overflow",
-          run: (context) => withDoc(context, (doc) => ({ ...doc, colors: [...doc.colors, { id: `tok-${Date.now().toString(36)}`, name: `Colour ${doc.colors.length + 1}`, value: "#234FE8", group: "Custom" }] }), "Create a colour token"),
+          run: (context) => withDoc(context, (doc) => ({ ...doc, colors: [...doc.colors, { id: `tok-${wallMs().toString(36)}`, name: `Colour ${doc.colors.length + 1}`, value: "#234FE8", group: "Custom" }] }), "Create a colour token"),
         },
         { id: "apply to selection", label: "Apply a style to the selection…", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("apply style") },
         { id: "inspect contrast", label: "Inspect contrast", placement: "secondary", run: (context) => context.openOverlay("style impact") },
@@ -3650,7 +3651,7 @@ function AssetPicker({ context, close }: { context: ScreenContext; close: () => 
           handle.edit((current) => ({
             ...current,
             assets: [...current.assets, {
-              id: `as-${Date.now().toString(36)}`, name, kind: "image",
+              id: `as-${wallMs().toString(36)}`, name, kind: "image",
               src: image?.src, license, credit: credit || "not recorded",
               width: image?.width ?? 0, height: image?.height ?? 0,
             }],
@@ -3727,9 +3728,9 @@ function CommentEditor({ context, close }: { context: ScreenContext; close: () =
               handle.edit((current) => ({
                 ...current,
                 comments: [...current.comments, {
-                  id: `c-${Date.now().toString(36)}`, pageId: current.activePageId,
+                  id: `c-${wallMs().toString(36)}`, pageId: current.activePageId,
                   x: bounds.x + bounds.w / 2, y: bounds.y + 40,
-                  author: context.actor, at: new Date().toISOString(), text, resolved: false,
+                  author: context.actor, at: clockIso(), text, resolved: false,
                 }],
               }), "Add comment");
               context.toast("Comment added", "Pinned at the top of the page; drag it on the canvas Comments tab.");
@@ -3759,7 +3760,7 @@ function SignOff({ context, close }: { context: ScreenContext; close: () => void
         event.preventDefault();
         handle.edit((current) => ({
           ...current,
-          reviews: [{ id: `r-${Date.now().toString(36)}`, version: record.revision, digest: designDigest(current), by: context.actor, at: new Date().toISOString(), state, note }, ...current.reviews],
+          reviews: [{ id: `r-${wallMs().toString(36)}`, version: record.revision, digest: designDigest(current), by: context.actor, at: clockIso(), state, note }, ...current.reviews],
         }), "Record a review");
         void context.mutate.log(`Design review: ${state} by ${context.actor}, version ${designDigest(handle.doc!)}`, { entityId: record.id, type: "approve" });
         context.toast("Decision recorded", `Bound to version ${designDigest(handle.doc!)} of the design. Any later edit changes it, and the approval then shows as given for an earlier version.`);

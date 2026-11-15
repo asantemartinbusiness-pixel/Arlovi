@@ -5,7 +5,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
-import { addDays, startOfWeek } from "@/platform/clock";
+import { addDays, clockIso, clockNow, startOfWeek } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { ACTIVITY_LABEL, activitiesFor, activityKind, probabilityOf, stageOf } from "@/domain/crm-pipeline";
 import { periodLabel, recentPeriods } from "@/domain/fin-ledger";
@@ -541,7 +541,7 @@ export function ForecastScenarios({ context }: { context: ScreenContext }) {
     const probability = Math.max(0, Math.min(100, probabilityOf(deal) + win));
     return sum + Math.round((Number(deal.amountMinor ?? 0) * probability) / 100);
   }, 0);
-  const slipped = open.filter((deal) => deal.dueAt && new Date(deal.dueAt).getTime() < Date.now() + slip * 86_400_000);
+  const slipped = open.filter((deal) => deal.dueAt && new Date(deal.dueAt).getTime() < clockNow().getTime() + slip * 86_400_000);
 
   return (
     <Stack gap={4}>
@@ -1137,7 +1137,7 @@ export function ActivationApproval({ context, close }: { context: ScreenContext;
             setBusy(true);
             await context.mutate.patch(workflow.id, {
               status: "active",
-              fields: { ...workflow.fields, activatedBy: context.actor, activatedAt: new Date().toISOString() },
+              fields: { ...workflow.fields, activatedBy: context.actor, activatedAt: clockIso() },
             }, { expectRevision: workflow.revision, event: `Workflow ${workflow.title} activated by ${context.actor}` });
             context.toast("Rule activated", `${workflow.title} is active. ${context.actor} is recorded as the approver, and every run will be listed under Runs.`);
             setBusy(false);

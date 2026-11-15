@@ -3,6 +3,7 @@ import { Hash, Lock, MessageSquare, Paperclip, Pin } from "lucide-react";
 import { Avatar, Button, Empty, Notice, Pill, Row, Stack, TextArea } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import type { Rec } from "@/domain/types";
+import { clockIso } from "@/platform/clock";
 
 /* ------------------------------------------------------------------ *
  * Reactions are stored on the message as "emoji:name,name;emoji:name".
@@ -125,7 +126,7 @@ export function Conversation({
         status: "sent",
         summary: text,
         parentId: channel.id,
-        at: new Date().toISOString(),
+        at: clockIso(),
         fields: {
           author: context.actor, kind: "human",
           threadRootId: root?.id ?? "", reactions: "", mentions: mentioned.join(","),

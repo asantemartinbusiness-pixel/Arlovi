@@ -16,6 +16,7 @@ import {
 import { NodeView } from "./render";
 import { designUi, setSelection, setTool, toggleSelection, type DesignTool } from "./model";
 import { appendAnchor, nearestAnchor, pathToD, samplePath } from "./path";
+import { wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * The infinite canvas: pan, zoom, draw, select, move, resize, rotate,
@@ -273,12 +274,12 @@ export function DesignCanvas({ handle, context, mode, onPlaceComment, onLinkNode
     if (target?.path) {
       const local = { x: point.x - absoluteRect(activePage(doc), target).x, y: point.y - absoluteRect(activePage(doc), target).y };
       handle.edit((value) => updatePage(value, (p) => patchNode(p, target.id, {
-        path: appendAnchor(target.path!, local, `a-${Date.now().toString(36)}`),
+        path: appendAnchor(target.path!, local, `a-${wallMs().toString(36)}`),
       })), "Add point");
       return;
     }
     const node = makeNode("path", { x: point.x, y: point.y, w: 1, h: 1 }, { name: "Pen path" });
-    node.path = { anchors: [{ id: `a-${Date.now().toString(36)}`, x: 0, y: 0, in: { x: 0, y: 0 }, out: { x: 0, y: 0 }, type: "corner" }], closed: false, fillRule: "nonzero" };
+    node.path = { anchors: [{ id: `a-${wallMs().toString(36)}`, x: 0, y: 0, in: { x: 0, y: 0 }, out: { x: 0, y: 0 }, type: "corner" }], closed: false, fillRule: "nonzero" };
     handle.edit((value) => updatePage(value, (p) => addNode(p, node, p.id)), "Start path");
     designUi.set((value) => ({ ...value, pathNodeId: node.id, selected: [node.id] }));
   };
@@ -336,7 +337,7 @@ export function DesignCanvas({ handle, context, mode, onPlaceComment, onLinkNode
         for (const id of ids) {
           const node = p.nodes[id];
           if (!node) continue;
-          next = addNode(next, { ...node, id: `${node.id}-copy-${Date.now().toString(36)}`, x: node.x + 16, y: node.y + 16, name: `${node.name} copy` }, parentOf(p, id) ?? p.id);
+          next = addNode(next, { ...node, id: `${node.id}-copy-${wallMs().toString(36)}`, x: node.x + 16, y: node.y + 16, name: `${node.name} copy` }, parentOf(p, id) ?? p.id);
         }
         return next;
       }), "Duplicate");
@@ -709,7 +710,7 @@ export function PathCanvas({ handle, nodeId, onConvert }: { handle: DocHandle<De
     }
     if (ui.tool === "pen") {
       const local = toLocal(event.clientX, event.clientY);
-      handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { path: appendAnchor(path, local, `a-${Date.now().toString(36)}`) })), "Add point");
+      handle.edit((current) => updatePage(current, (p) => patchNode(p, node.id, { path: appendAnchor(path, local, `a-${wallMs().toString(36)}`) })), "Add point");
       return;
     }
     const local = toLocal(event.clientX, event.clientY);

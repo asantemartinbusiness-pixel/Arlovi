@@ -19,6 +19,7 @@ import {
   joinChannel, joinMeeting, muteChannel, pinMessage, placeCall, replyToMessage, requestMailboxConnection, returnCall,
   toggleHand, toggleMute,
 } from "./actions";
+import { clockIso } from "@/platform/clock";
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
   <>
@@ -199,7 +200,7 @@ function ReplyEditor({ context, close }: { context: ScreenContext; close: () => 
         const existing = (thread.body as { messages?: { from: string; at: string; body: string; external: boolean }[] } | undefined)?.messages ?? [];
         const reply = {
           from: `${context.actor.split(" ")[0].toLowerCase()}@${context.org.slug}.example`,
-          at: new Date().toISOString(),
+          at: clockIso(),
           body: String(form.get("body") ?? ""),
           external: false,
         };
@@ -349,7 +350,7 @@ function PublishReview({ context, close }: { context: ScreenContext; close: () =
         <Button variant="ghost" onClick={close}>Cancel</Button>
         <span className="ds-grow" />
         <Button variant="primary" disabled={needsReview && !reviewed} onClick={async () => {
-          await context.mutate.patch(post.id, { status: "published", at: new Date().toISOString(), fields: { ...post.fields, publishedBy: context.actor, reviewedBy: needsReview ? context.actor : "" } }, { expectRevision: post.revision, event: `${post.title} published by ${context.actor}${needsReview ? " after review" : ""}` });
+          await context.mutate.patch(post.id, { status: "published", at: clockIso(), fields: { ...post.fields, publishedBy: context.actor, reviewedBy: needsReview ? context.actor : "" } }, { expectRevision: post.revision, event: `${post.title} published by ${context.actor}${needsReview ? " after review" : ""}` });
           context.toast("Published", "It is on the announcement board in this workspace.");
           close();
         }}>Publish</Button>

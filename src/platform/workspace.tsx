@@ -8,6 +8,7 @@ import { useClock, formatDate, formatDateTime, formatRelative } from "./clock";
 import { money as formatMoney, compactMoney } from "./money";
 import { orgBySlug, ORGS, type OrgProfile } from "./org";
 import * as repo from "./repo";
+import { clockIso } from "@/platform/clock";
 
 export const ACTOR_BY_ROLE: Record<Role, string> = {
   owner: "Maya Chen",
@@ -54,7 +55,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     actor,
     now: new Date(nowIso),
     timezone: org.timezone,
-    writeContext: (screenId?: string) => ({ actor, now: new Date().toISOString(), screenId }),
+    writeContext: (screenId?: string) => ({ actor, now: clockIso(), screenId }),
     money: (minor) => formatMoney(minor ?? 0, org),
     compactMoney: (minor) => compactMoney(minor ?? 0, org),
     date: (input, options) => formatDate(input, org.locale, options),
@@ -144,7 +145,7 @@ export function useMutations(screenId?: string): Mutations {
   const { org, actor } = useWorkspace();
   const pushToast = useUi((state) => state.pushToast);
 
-  const context = useCallback(() => ({ actor, now: new Date().toISOString(), screenId }), [actor, screenId]);
+  const context = useCallback(() => ({ actor, now: clockIso(), screenId }), [actor, screenId]);
 
   return useMemo<Mutations>(() => ({
     async create(input, event) {

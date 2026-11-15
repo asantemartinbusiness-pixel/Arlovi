@@ -20,6 +20,7 @@ import {
   PortfolioReport, TaskEditor, duplicateProject, duplicateTemplate, exportTime, matchesPortfolio, portfolioFilter, requestUpdate, togglePin,
 } from "./actions";
 import { getRecord } from "@/platform/repo";
+import { clockNow } from "@/platform/clock";
 
 /** On project-scoped screens the initial selection is the project itself; a task action needs a task. */
 async function withTask(context: ScreenContext, what: string, then: (task: Rec) => void): Promise<void> {
@@ -53,7 +54,7 @@ function ProjectFromTemplate({ context, close }: { context: ScreenContext; close
       onSubmit={async (event) => {
         event.preventDefault();
         if (!title.trim() || duplicate) return;
-        const now = new Date();
+        const now = clockNow();
         const end = new Date(now.getTime() + 60 * 86_400_000);
         const project = await context.mutate.create({
           collection: "projects",
@@ -487,7 +488,7 @@ function TemplatePreview({ context, close }: { context: ScreenContext; close: ()
           variant="primary"
           disabled={!name.trim()}
           onClick={async () => {
-            const now = new Date();
+            const now = clockNow();
             const end = new Date(now.getTime() + 60 * 86_400_000);
             const project = await context.mutate.create({
               collection: "projects", title: name.trim(), status: "planning",
@@ -594,7 +595,7 @@ function TimerOverlay({ context, close }: { context: ScreenContext; close: () =>
         const taskId = String(form.get("task") ?? "");
         const task = data.tasks.find((row) => row.id === taskId);
         const hours = Math.round((minutes / 60) * 4) / 4;
-        const now = new Date();
+        const now = clockNow();
         await context.mutate.create({
           collection: "shifts",
           title: `${context.actor.split(" ")[0]} · ${hours}h`,

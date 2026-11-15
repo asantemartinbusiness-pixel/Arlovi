@@ -13,6 +13,7 @@ import {
   MergePreview, OverwriteReview, TokenEditor, TransformInspector, TransformRights,
   Transformations, UsageInspector,
 } from "./governance";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * ASSET — Assets, Media Library & Brand Resources
@@ -189,7 +190,7 @@ export const assetApp = registerApp({
             }
             await context.mutate.patch(id, {
               status: "published",
-              fields: { ...record.fields, publishedBy: context.actor, publishedAt: new Date().toISOString() },
+              fields: { ...record.fields, publishedBy: context.actor, publishedAt: clockIso() },
             }, { event: `Transformation preset published: ${record.title}`, expectRevision: record.revision });
             context.toast("Preset published", `${record.title} is available wherever a variant can be produced.`);
           },

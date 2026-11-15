@@ -7,6 +7,7 @@ import type { Rec } from "@/domain/types";
 import { listByCollection, getRecord } from "@/platform/repo";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * Headquarters actions.
@@ -415,7 +416,7 @@ export function MessageTeam({ context, close }: { context: ScreenContext; close:
           title: text.trim().slice(0, 48),
           status: "sent",
           summary: text.trim(),
-          at: new Date().toISOString(),
+          at: clockIso(),
           tags: ["local", dept.id],
           fields: { author: context.actor, kind: "human", channel: dept.title, departmentId: dept.id },
         }, `${context.actor} messaged ${dept.title}`);
@@ -543,7 +544,7 @@ export function ReviewGoal({ context, close }: { context: ScreenContext; close: 
         event.preventDefault();
         if (!objective) return;
         await context.mutate.patch(objective.id, {
-          fields: { ...objective.fields, reviewedAt: new Date().toISOString(), reviewedBy: context.actor, confidence, reviewNote: note.trim() },
+          fields: { ...objective.fields, reviewedAt: clockIso(), reviewedBy: context.actor, confidence, reviewNote: note.trim() },
         }, { expectRevision: objective.revision, event: `${objective.title} reviewed by ${context.actor}: ${confidence.replace(/_/g, " ")}` });
         context.toast("Review recorded", `${objective.title} reviewed as ${confidence.replace(/_/g, " ")}.`);
         close();
@@ -693,7 +694,7 @@ export function StartConversation({ context, close }: { context: ScreenContext; 
           title: text.trim().slice(0, 48),
           status: "sent",
           summary: text.trim(),
-          at: new Date().toISOString(),
+          at: clockIso(),
           tags: ["local", "direct"],
           fields: { author: actor, kind: "human", to: who, channel: `${actor} and ${who}` },
         }, `${actor} started a conversation with ${who}`);

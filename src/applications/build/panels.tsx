@@ -6,7 +6,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
-import { freshness } from "@/platform/clock";
+import { freshness, wallMs } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { BoundaryNotice, CapabilityState, downloadCsv, downloadFile } from "@/applications/t6kit/kit";
 import {
@@ -1104,7 +1104,7 @@ export function ReleaseApproval({ context, close }: { context: ScreenContext; cl
             setBusy(true);
             try {
               const release: Release = {
-                id: `re-${Date.now().toString(36)}`,
+                id: `re-${wallMs().toString(36)}`,
                 environment,
                 at: now.toISOString(),
                 state: "blocked",
@@ -1366,7 +1366,7 @@ export function ExpressionEditor({ context, close }: { context: ScreenContext; c
         event.preventDefault();
         if (!name.trim() || unreachable) return;
         const automation: Automation = {
-          id: existing?.id ?? `au-${Date.now().toString(36)}`,
+          id: existing?.id ?? `au-${wallMs().toString(36)}`,
           name: name.trim(),
           trigger,
           entityId,

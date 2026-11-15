@@ -14,6 +14,7 @@ import { editShared, readShared } from "@/applications/design/sharedDoc";
 import { parseVideo, videoUi } from "./model";
 import { exportWebm, recorderSupport } from "./render";
 import type { RenderJob, VideoDoc } from "./timeline";
+import { clockIso, wallMs } from "@/platform/clock";
 
 export interface RenderPreset { width: number; height: number; bitrate: number }
 
@@ -81,7 +82,7 @@ export async function startRender(context: ScreenContext, title: string, presetN
   const doc = await readShared<VideoDoc>(context, parseVideo);
   if (!doc) return;
   const preset = RENDER_PRESETS[presetName] ?? RENDER_PRESETS["720p WebM"];
-  const id = resumeId ?? `job-${Date.now().toString(36)}`;
+  const id = resumeId ?? `job-${wallMs().toString(36)}`;
   cancelFlag.cancelled = false;
   renderUi.set((current) => ({ ...current, busy: true, jobId: id, projectId: context.params.id, progress: { frame: 0, frames: Math.round(doc.duration * doc.fps) } }));
 
@@ -90,7 +91,7 @@ export async function startRender(context: ScreenContext, title: string, presetN
   } else {
     await editShared<VideoDoc>(context, parseVideo, (current) => ({
       ...current,
-      renders: [{ id, at: new Date().toISOString(), by: context.actor, preset: presetName, state: "running", note: "Drawing every frame onto a canvas and recording the stream." }, ...current.renders],
+      renders: [{ id, at: clockIso(), by: context.actor, preset: presetName, state: "running", note: "Drawing every frame onto a canvas and recording the stream." }, ...current.renders],
     }), "Start a render job");
   }
 

@@ -1,4 +1,5 @@
 import type { Rec } from "@/domain/types";
+import { wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * App model. An app project is an entity model, a set of screens bound to
@@ -140,7 +141,7 @@ export interface AppModel {
 let counter = 0;
 function nextId(prefix: string): string {
   counter += 1;
-  return `${prefix}${Date.now().toString(36).slice(-4)}${counter.toString(36)}`;
+  return `${prefix}${wallMs().toString(36).slice(-4)}${counter.toString(36)}`;
 }
 
 export function makeField(kind: FieldKind): EntityField {

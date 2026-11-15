@@ -6,7 +6,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useWorkspace } from "@/platform/workspace";
-import { freshness } from "@/platform/clock";
+import { freshness, wallMs } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import {
   ANALYTICS_COLLECTIONS, DIMENSIONS, FILTER_OPS_BY_TYPE, allMeasures, buildCustomMeasure,
@@ -335,7 +335,7 @@ export function FilterRows({
       <Row gap={2}>
         <Button
           variant="secondary"
-          onClick={() => onChange([...filters, { id: `f${filters.length + 1}-${Date.now().toString(36)}`, dimensionId: "status", op: "is", value: "" }])}
+          onClick={() => onChange([...filters, { id: `f${filters.length + 1}-${wallMs().toString(36)}`, dimensionId: "status", op: "is", value: "" }])}
         >
           Add a filter
         </Button>

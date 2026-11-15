@@ -1,4 +1,5 @@
 import type { Rec } from "@/domain/types";
+import { wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * Form model. Records seeded before this module existed carry only
@@ -116,7 +117,7 @@ export const DEFAULT_SETTINGS: FormSettings = {
 let counter = 0;
 function nextId(prefix: string): string {
   counter += 1;
-  return `${prefix}${Date.now().toString(36).slice(-4)}${counter.toString(36)}`;
+  return `${prefix}${wallMs().toString(36).slice(-4)}${counter.toString(36)}`;
 }
 
 export function makeField(type: FieldType): FormField {

@@ -10,6 +10,7 @@ import { useRecord } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { CHANGED_ELSEWHERE, createStore, downloadCsv, type ConfirmSpec } from "@/applications/market/kit";
 import { bodyOf, networkOf, rollUp, useMarketData, type CampaignBody, type PageBlock, type PostBody, type SiteBody } from "./data";
+import { wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * MARKET contract actions that change a record. Each one reads the record
@@ -508,7 +509,7 @@ function VisualEditorForm({ context, close, page }: { context: ScreenContext; cl
       {blocks.length === 0 && <Empty title="No blocks yet" />}
       <Row gap={2}>
         <Field label="Add a block"><Select value={kind} onChange={(event) => setKind(event.target.value)}>{BLOCK_KINDS.map((item) => <option key={item}>{item}</option>)}</Select></Field>
-        <Button variant="secondary" onClick={() => setBlocks((current) => [...current, { id: `b${Date.now().toString(36)}`, kind, heading: kind, body: "", fields: kind === "form" ? ["name", "email", "consent"] : undefined }])}>Add</Button>
+        <Button variant="secondary" onClick={() => setBlocks((current) => [...current, { id: `b${wallMs().toString(36)}`, kind, heading: kind, body: "", fields: kind === "form" ? ["name", "email", "consent"] : undefined }])}>Add</Button>
       </Row>
     </form>
   );

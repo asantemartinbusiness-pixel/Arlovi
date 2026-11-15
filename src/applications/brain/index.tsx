@@ -6,7 +6,7 @@ import {
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
-import { freshness } from "@/platform/clock";
+import { freshness, wallMs } from "@/platform/clock";
 import { CapabilityLine, DiagramToggle } from "@/applications/t2_shared/pieces";
 import { usePanelFlags } from "@/applications/t2_shared/store";
 import type { Rec } from "@/domain/types";
@@ -1418,7 +1418,7 @@ function CorrectionForm({ context, close }: { context: ScreenContext; close: () 
         event.preventDefault();
         const corrections = body?.corrections ?? [];
         const extracted = body?.extracted ?? [];
-        const correction: Correction = { id: `corr-${Date.now()}`, at: context.now.toISOString(), by: context.actor, from: original, to: annotate ? original : value, note };
+        const correction: Correction = { id: `corr-${wallMs()}`, at: context.now.toISOString(), by: context.actor, from: original, to: annotate ? original : value, note };
         await context.mutate.patch(source.id, {
           body: {
             ...(source.body as object),
@@ -1931,7 +1931,7 @@ function BrandRuleEditor({ context, close }: { context: ScreenContext; close: ()
         const rules = body?.rules ?? [];
         const next = existing
           ? rules.map((item) => (item.id === existing.id ? { ...item, rule, source, status } : item))
-          : [...rules, { id: `rule-${Date.now()}`, rule, source, status }];
+          : [...rules, { id: `rule-${wallMs()}`, rule, source, status }];
         await context.mutate.patch(proposal.id, { body: { ...(proposal.body as object), rules: next } }, { expectRevision: proposal.revision, event: `Brand rule ${existing ? "updated" : "added"}: ${rule.slice(0, 40)}` });
         context.toast("Rule saved", status === "approved" ? "It is an approved rule with its evidence." : "It stays proposed until a person approves it.");
         close();
@@ -2312,7 +2312,7 @@ async function importBrandGuide(context: ScreenContext): Promise<void> {
   const existing = body.rules ?? [];
   const added = lines
     .filter((line) => !existing.some((rule) => rule.rule === line))
-    .map((line, index) => ({ id: `rule-import-${Date.now()}-${index}`, rule: line, source: guide.id, status: "proposed" }));
+    .map((line, index) => ({ id: `rule-import-${wallMs()}-${index}`, rule: line, source: guide.id, status: "proposed" }));
   if (added.length === 0) { context.toast("Nothing new", `Every line in ${guide.title} is already a rule.`, "info"); return; }
   await context.mutate.patch(proposal.id, { body: { ...(proposal.body as object), rules: [...existing, ...added] } }, { expectRevision: proposal.revision, event: `${added.length} brand rules proposed from ${guide.title}` });
   context.toast("Rules proposed", `${added.length} line${added.length === 1 ? "" : "s"} from ${guide.title} are proposed. None was applied to the approved set.`);

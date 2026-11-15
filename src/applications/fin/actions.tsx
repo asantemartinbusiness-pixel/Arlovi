@@ -19,6 +19,7 @@ import { useInvoice } from "./invoices";
 import { exportReturn, periodsWithDocuments } from "./tax";
 import { exportStatement, STATEMENT_LABEL, type Statement } from "./reports";
 import { AccountLabel, Amount, CapabilityNotice, CapabilityPill, SourceNote, StatementRow } from "./parts";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * Contract actions that perform the named operation.
@@ -97,7 +98,7 @@ export function IssueReport({ context, close }: { context: ScreenContext; close:
           title={scoped.journalCount === 0 ? "Nothing is posted in this period" : undefined}
           onClick={async () => {
             setBusy(true);
-            const issuedAt = new Date().toISOString();
+            const issuedAt = clockIso();
             const report = await context.mutate.create({
               collection: "reports",
               title: `Management report · ${periodLabel(period, org.locale)}`,
@@ -264,7 +265,7 @@ export function SendInvoice({ context, close }: { context: ScreenContext; close:
           disabled={Boolean(blocked) || Boolean(sameVersion)}
           onClick={async () => {
             setBusy(true);
-            const at = new Date().toISOString();
+            const at = clockIso();
             await context.mutate.patch(invoice.id, {
               body: {
                 ...(invoice.body as object ?? {}),
@@ -371,7 +372,7 @@ export function ApproveBill({ context, close }: { context: ScreenContext; close:
               }, `Purchase posted for bill ${bill.title}`);
               journalId = journal.id;
             }
-            const approvedAt = new Date().toISOString();
+            const approvedAt = clockIso();
             const saved = await context.mutate.patch(bill.id, {
               status: "approved",
               fields: { ...bill.fields, approvedBy: context.actor, approvedAt, ...(journalId ? { journalId } : {}) },
@@ -554,7 +555,7 @@ export function ApproveExpense({ context, close }: { context: ScreenContext; clo
             setBusy(true);
             const saved = await context.mutate.patch(expense.id, {
               status: "approved",
-              fields: { ...expense.fields, approvedBy: context.actor, approvedAt: new Date().toISOString() },
+              fields: { ...expense.fields, approvedBy: context.actor, approvedAt: clockIso() },
             }, { expectRevision: expense.revision, event: `Expense ${expense.title} approved by ${context.actor}` });
             if (saved) context.toast("Claim approved", `${expense.title} is approved by ${context.actor}.`);
             setBusy(false);
@@ -639,7 +640,7 @@ export function ReimburseExpense({ context, close }: { context: ScreenContext; c
             }, `Expense ${expense.title} reimbursement posted`);
             await context.mutate.patch(expense.id, {
               status: "reimbursed",
-              fields: { ...expense.fields, journalId: journal.id, reimbursedAt: new Date().toISOString(), reimbursedBy: context.actor, paymentState: "awaiting_external_confirmation" },
+              fields: { ...expense.fields, journalId: journal.id, reimbursedAt: clockIso(), reimbursedBy: context.actor, paymentState: "awaiting_external_confirmation" },
             }, { expectRevision: expense.revision, event: `Expense ${expense.title} reimbursed by ${context.actor}; payment awaits external confirmation` });
             await context.mutate.log(`Reimbursement of ${expense.title} held at the payment boundary`, { entityId: expense.id, type: "finance.payment", capability: "awaiting_external_confirmation" });
             context.toast("Reimbursement recorded", `${context.money(amount)} is posted as a balanced journal. No money moved: pay the claimant from your bank.`, "info");
@@ -768,7 +769,7 @@ export function ReviewFiling({ context, close }: { context: ScreenContext; close
             setBusy(true);
             const saved = await context.mutate.patch(record.id, {
               status: "reviewed",
-              fields: { ...record.fields, reviewedBy: context.actor, reviewedAt: new Date().toISOString(), filingState: "not_connected", reviewNote: note },
+              fields: { ...record.fields, reviewedBy: context.actor, reviewedAt: clockIso(), filingState: "not_connected", reviewNote: note },
             }, { expectRevision: record.revision, event: `Return for ${period} reviewed by ${context.actor}. Not filed: no filing connection` });
             await context.mutate.log(`Return for ${period} is ready to file but cannot be submitted from this browser`, { entityId: record.id, type: "finance.tax", capability: "not_connected" });
             if (saved) context.toast("Review recorded", `The ${period} return is reviewed by ${context.actor}. Nothing was submitted to the tax authority.`, "info");

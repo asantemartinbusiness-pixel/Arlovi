@@ -24,6 +24,7 @@ import {
   BASE_STYLES, layoutUi, newImageFrame, newShapeFrame, newTextFrame,
   parsePublication, selectFrame, setLayoutTool, starterPublication, type LayoutTool,
 } from "./model";
+import { wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * LAYOUT — Editorial Layout & Publishing
@@ -229,7 +230,7 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
                 variant="ghost"
                 icon={<Plus size={13} />}
                 onClick={() => handle.edit((current) => {
-                  const id = `pg-${current.pages.length + 1}-${Date.now().toString(36)}`;
+                  const id = `pg-${current.pages.length + 1}-${wallMs().toString(36)}`;
                   return { ...current, pages: [...current.pages, { id, masterId: current.masters[0]?.id, frames: [], overrides: [] }], activePageId: id };
                 }, "Add a page")}
               >
@@ -595,7 +596,7 @@ function MastersScreen({ context, lens }: { context: ScreenContext; lens: "Maste
                 onClick={() => handle.edit((current) => ({
                   ...current,
                   masters: current.masters.map((item) => (item.id === master.id
-                    ? { ...item, frames: [...item.frames, { id: `mf-${Date.now().toString(36)}`, kind: "folio" as const, box: { x: mm(18), y: current.size.height - mm(14), w: current.size.width - mm(36), h: 14 }, template: "{page}", styleId: "ps-caption" }] }
+                    ? { ...item, frames: [...item.frames, { id: `mf-${wallMs().toString(36)}`, kind: "folio" as const, box: { x: mm(18), y: current.size.height - mm(14), w: current.size.width - mm(36), h: 14 }, template: "{page}", styleId: "ps-caption" }] }
                     : item)),
                 }), "Add a folio")}
               >
@@ -624,7 +625,7 @@ function MastersScreen({ context, lens }: { context: ScreenContext; lens: "Maste
             variant="secondary"
             onClick={() => handle.edit((current) => ({
               ...current,
-              masters: [...current.masters, { id: `mp-${Date.now().toString(36)}`, name: `Master ${current.masters.length + 1}`, side: "both" as const, frames: [] }],
+              masters: [...current.masters, { id: `mp-${wallMs().toString(36)}`, name: `Master ${current.masters.length + 1}`, side: "both" as const, frames: [] }],
             }), "Create a master")}
           >
             Create a master
@@ -676,7 +677,7 @@ function MastersScreen({ context, lens }: { context: ScreenContext; lens: "Maste
                 onClick={() => handle.edit((current) => ({
                   ...current,
                   masters: current.masters.map((item) => (item.id === master.id
-                    ? { ...item, frames: [...item.frames, { id: `mf-${Date.now().toString(36)}`, kind: "shape" as const, box: { x: mm(18), y: mm(24), w: current.size.width - mm(36), h: 0.6 }, fill: "#D9D4CB" }] }
+                    ? { ...item, frames: [...item.frames, { id: `mf-${wallMs().toString(36)}`, kind: "shape" as const, box: { x: mm(18), y: mm(24), w: current.size.width - mm(36), h: 0.6 }, fill: "#D9D4CB" }] }
                     : item)),
                 }), "Add a rule to the master")}
               >
@@ -749,8 +750,8 @@ function TypographyScreen({ context, lens }: { context: ScreenContext; lens: "Pa
                         variant="secondary"
                         onClick={() => {
                           const last = chain[chain.length - 1];
-                          const id = `pg-${Date.now().toString(36)}`;
-                          const frameId = `fr-${Date.now().toString(36)}`;
+                          const id = `pg-${wallMs().toString(36)}`;
+                          const frameId = `fr-${wallMs().toString(36)}`;
                           handle.edit((current) => ({
                             ...current,
                             pages: [
@@ -828,7 +829,7 @@ function TypographyScreen({ context, lens }: { context: ScreenContext; lens: "Pa
             variant="secondary"
             onClick={() => handle.edit((current) => ({
               ...current,
-              characterStyles: [...current.characterStyles, { id: `cs-${Date.now().toString(36)}`, name: `Character ${current.characterStyles.length + 1}`, weight: 700 }],
+              characterStyles: [...current.characterStyles, { id: `cs-${wallMs().toString(36)}`, name: `Character ${current.characterStyles.length + 1}`, weight: 700 }],
             }), "Create a character style")}
           >
             New character style
@@ -873,7 +874,7 @@ function TypographyScreen({ context, lens }: { context: ScreenContext; lens: "Pa
             variant="secondary"
             onClick={() => handle.edit((current) => ({
               ...current,
-              paragraphStyles: [...current.paragraphStyles, { ...BASE_STYLES[0], id: `ps-${Date.now().toString(36)}`, name: `Style ${current.paragraphStyles.length + 1}` }],
+              paragraphStyles: [...current.paragraphStyles, { ...BASE_STYLES[0], id: `ps-${wallMs().toString(36)}`, name: `Style ${current.paragraphStyles.length + 1}` }],
             }), "Create a paragraph style")}
           >
             New style
@@ -1616,7 +1617,7 @@ const EDITOR_ACTIONS: ActionDef[] = [
     id: "Create page", label: "Add a page", placement: "primary",
     guard: needsPublication,
     run: (context) => withPublication(context, (doc) => {
-      const id = `pg-${Date.now().toString(36)}`;
+      const id = `pg-${wallMs().toString(36)}`;
       const active = doc.pages.find((page) => page.id === doc.activePageId);
       return { ...doc, pages: [...doc.pages, { id, masterId: active?.masterId ?? doc.masters[0]?.id, frames: [], overrides: [] }], activePageId: id };
     }, "Add a page"),
@@ -1629,7 +1630,7 @@ const EDITOR_ACTIONS: ActionDef[] = [
       if (!doc) return;
       const pageIndex = Math.max(0, doc.pages.findIndex((page) => page.id === doc.activePageId));
       const area = liveArea(doc, pageIndex);
-      const storyId = `st-${Date.now().toString(36)}`;
+      const storyId = `st-${wallMs().toString(36)}`;
       const frame = newTextFrame({ x: area.x, y: area.y, w: area.w, h: Math.min(area.h, mm(60)) }, storyId);
       await withPublication(context, (current) => ({
         ...current,
@@ -1663,7 +1664,7 @@ const EDITOR_ACTIONS: ActionDef[] = [
       const frame = newTextFrame(area, tail.storyId!);
       const addPage = pageIndex >= doc.pages.length;
       await withPublication(context, (current) => {
-        const pages = addPage ? [...current.pages, { id: `pg-${Date.now().toString(36)}`, masterId: current.pages[tailPage]?.masterId, frames: [], overrides: [] }] : current.pages;
+        const pages = addPage ? [...current.pages, { id: `pg-${wallMs().toString(36)}`, masterId: current.pages[tailPage]?.masterId, frames: [], overrides: [] }] : current.pages;
         const withFrame = { ...current, pages: pages.map((page, index) => (index === pageIndex ? { ...page, frames: [...page.frames, { ...frame, styleId: tail.styleId }] } : page)) };
         return patchFrame(withFrame, tail.id, { next: frame.id });
       }, `Flow the text onto page ${pageIndex + 1}`);
@@ -1736,7 +1737,7 @@ async function fixPreflight(context: ScreenContext): Promise<void> {
     let next = current;
     if (fixable.some((issue) => issue.fix === "add-bleed")) { next = { ...next, bleed: mm(3) }; done.push("set a 3mm bleed"); }
     if (fixable.some((issue) => issue.fix === "add-page")) {
-      const id = `pg-${Date.now().toString(36)}`;
+      const id = `pg-${wallMs().toString(36)}`;
       next = { ...next, pages: [...next.pages, { id, masterId: next.pages.at(-1)?.masterId, frames: [], overrides: [] }] };
       done.push("added a page for the overset text to flow onto");
     }
@@ -1956,7 +1957,7 @@ registerApp({
           id: "Create master", label: "Create a master", placement: "primary",
           run: (context) => withPublication(context, (doc) => ({
             ...doc,
-            masters: [...doc.masters, { id: `mp-${Date.now().toString(36)}`, name: `Master ${doc.masters.length + 1}`, side: "both", frames: [] }],
+            masters: [...doc.masters, { id: `mp-${wallMs().toString(36)}`, name: `Master ${doc.masters.length + 1}`, side: "both", frames: [] }],
           }), "Create a master"),
         },
         { id: "apply", label: "Apply to pages", placement: "secondary", run: (context) => context.openOverlay("Master editor") },
@@ -1987,7 +1988,7 @@ registerApp({
           guard: needsPublication,
           run: (context) => withPublication(context, (doc) => ({
             ...doc,
-            paragraphStyles: [...doc.paragraphStyles, { ...BASE_STYLES[0], id: `ps-${Date.now().toString(36)}`, name: `Style ${doc.paragraphStyles.length + 1}` }],
+            paragraphStyles: [...doc.paragraphStyles, { ...BASE_STYLES[0], id: `ps-${wallMs().toString(36)}`, name: `Style ${doc.paragraphStyles.length + 1}` }],
           }), "Create a paragraph style"),
         },
         { id: "link frames", label: "Link frames…", placement: "secondary", guard: needsPublication, run: (context) => context.openOverlay("link frames") },

@@ -12,6 +12,7 @@ import { CapabilityLine, DiagramToggle } from "@/applications/t2_shared/pieces";
 import { useAgentBuilder } from "@/applications/t2_shared/store";
 import { SAFETY_SCORE, activationBlockers, assertionsOf, latestRunFor, runScenario, type RunResult } from "./evaluator";
 import type { Rec } from "@/domain/types";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * TEAM — AI Workforce & Agent Academy
@@ -2844,7 +2845,7 @@ function RollbackVersion({ context, close }: { context: ScreenContext; close: ()
             setBusy(true);
             const saved = await context.mutate.patch(agent.id, {
               status: "paused",
-              fields: { ...previous.fields, rolledBackBy: context.actor, rolledBackAt: new Date().toISOString(), rolledBackFrom: String(agent.fields.promotedVersion ?? "") },
+              fields: { ...previous.fields, rolledBackBy: context.actor, rolledBackAt: clockIso(), rolledBackFrom: String(agent.fields.promotedVersion ?? "") },
               body: previous.body ?? agent.body,
             }, { expectRevision: agent.revision, event: `${agent.title} rolled back from v${String(agent.fields.promotedVersion ?? "?")} by ${context.actor} and paused` });
             if (saved) context.toast("Rolled back", `${agent.title} is on its earlier version and paused until it passes again.`, "blocked");

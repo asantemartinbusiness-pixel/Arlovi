@@ -1,4 +1,5 @@
 import type { Rec } from "@/domain/types";
+import { wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * Site model — the structural document behind every WEB screen.
@@ -135,7 +136,7 @@ export const BLOCK_HINTS: Record<BlockType, string> = {
 let counter = 0;
 function nextId(prefix: string): string {
   counter += 1;
-  return `${prefix}${Date.now().toString(36).slice(-4)}${counter.toString(36)}`;
+  return `${prefix}${wallMs().toString(36).slice(-4)}${counter.toString(36)}`;
 }
 
 export function makeBlock(type: BlockType): Block {

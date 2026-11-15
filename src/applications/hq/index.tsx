@@ -11,7 +11,7 @@ import {
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import * as repo from "@/platform/repo";
-import { freshness, resolveRange, addDays, sameDay } from "@/platform/clock";
+import { addDays, clockIso, freshness, resolveRange, sameDay } from "@/platform/clock";
 import { Building } from "@/applications/hq/pieces";
 import { outstandingMinor, receivablePosition } from "@/applications/fin/data";
 import { approvalRows } from "@/applications/inbox/engine";
@@ -1525,7 +1525,7 @@ export const hqApp = registerApp({
                 title: String(data.get("title") ?? "Milestone"),
                 status: "recorded",
                 summary: String(data.get("note") ?? ""),
-                at: new Date().toISOString(),
+                at: clockIso(),
                 fields: { kind: String(data.get("kind") ?? "decision") },
               }, "Milestone added to the company timeline");
               context.toast("Milestone added", "It is on the company timeline.");

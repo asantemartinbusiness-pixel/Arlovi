@@ -25,6 +25,7 @@ import {
 import { contactSheet, frameDataUrl, frameScopes, playSamples, recorderSupport } from "./render";
 import { MixWaveform, PreviewMonitor, TimelineView, TransportBar, transportKeys, useTransport } from "./parts";
 import { parseVideo, setPlayhead, setVideoTool, starterVideo, videoUi, type VideoTool } from "./model";
+import { clockIso, wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * VIDEO — Video Production & Editing
@@ -331,7 +332,7 @@ function ColourPanel({ handle, context }: { handle: DocHandle<VideoDoc>; context
     handle.edit((current) => patchClip(current, clip.id, {
       effects: clip.effects.some((effect) => effect.kind === kind)
         ? clip.effects.map((effect) => (effect.kind === kind ? { ...effect, amount } : effect))
-        : [...clip.effects, { id: `fx-${kind}-${Date.now().toString(36)}`, kind, amount, bypassed: false }],
+        : [...clip.effects, { id: `fx-${kind}-${wallMs().toString(36)}`, kind, amount, bypassed: false }],
     }), `Set ${kind}`);
   };
   return (
@@ -352,7 +353,7 @@ function ColourPanel({ handle, context }: { handle: DocHandle<VideoDoc>; context
               const lut = event.target.value;
               handle.edit((current) => patchClip(current, clip.id, {
                 effects: lut
-                  ? [...clip.effects.filter((effect) => effect.kind !== "lut"), { id: `fx-lut-${Date.now().toString(36)}`, kind: "lut" as const, amount: 100, lut, bypassed: false }]
+                  ? [...clip.effects.filter((effect) => effect.kind !== "lut"), { id: `fx-lut-${wallMs().toString(36)}`, kind: "lut" as const, amount: 100, lut, bypassed: false }]
                   : clip.effects.filter((effect) => effect.kind !== "lut"),
               }), "Apply a look");
             }}
@@ -453,7 +454,7 @@ function CaptionPanel({ handle, context }: { handle: DocHandle<VideoDoc>; contex
               variant="secondary"
               onClick={() => handle.edit((current) => ({
                 ...current,
-                captions: [...current.captions, { id: `cap-${Date.now().toString(36)}`, start: ui.playhead, end: Math.min(current.duration, ui.playhead + 2.5), text: "", reviewed: false, language: ui.language }].sort((a, b) => a.start - b.start),
+                captions: [...current.captions, { id: `cap-${wallMs().toString(36)}`, start: ui.playhead, end: Math.min(current.duration, ui.playhead + 2.5), text: "", reviewed: false, language: ui.language }].sort((a, b) => a.start - b.start),
               }), "Add a cue")}
             >
               Add a cue here
@@ -967,7 +968,7 @@ function CaptionScreen({ context, lens }: { context: ScreenContext; lens: "Trans
                 variant="primary"
                 onClick={() => handle.edit((current) => ({
                   ...current,
-                  captions: [...current.captions, { id: `cap-${Date.now().toString(36)}`, start: 0, end: Math.min(3, current.duration), text: "", reviewed: false, language: ui.language }],
+                  captions: [...current.captions, { id: `cap-${wallMs().toString(36)}`, start: 0, end: Math.min(3, current.duration), text: "", reviewed: false, language: ui.language }],
                 }), "Add the first cue")}
               >
                 Add the first cue
@@ -1010,7 +1011,7 @@ function CaptionScreen({ context, lens }: { context: ScreenContext; lens: "Trans
             onClick={() => handle.edit((current) => {
               const last = [...current.captions].filter((item) => item.language === ui.language).sort((a, b) => a.start - b.start).at(-1);
               const start = last ? Math.min(current.duration - 1, last.end) : 0;
-              return { ...current, captions: [...current.captions, { id: `cap-${Date.now().toString(36)}`, start, end: Math.min(current.duration, start + 2.5), text: "", reviewed: false, language: ui.language }] };
+              return { ...current, captions: [...current.captions, { id: `cap-${wallMs().toString(36)}`, start, end: Math.min(current.duration, start + 2.5), text: "", reviewed: false, language: ui.language }] };
             }, "Add a cue")}
           >
             Add a cue after the last
@@ -1045,7 +1046,7 @@ const BUILT_IN_PRESETS: { name: string; effects: { kind: Clip["effects"][number]
 ];
 
 function presetEffects(preset: { effects: { kind: Clip["effects"][number]["kind"]; amount: number }[] }): Clip["effects"] {
-  return preset.effects.map((effect, index) => ({ id: `fx-${index}-${Date.now().toString(36)}`, kind: effect.kind, amount: effect.amount, bypassed: false }));
+  return preset.effects.map((effect, index) => ({ id: `fx-${index}-${wallMs().toString(36)}`, kind: effect.kind, amount: effect.amount, bypassed: false }));
 }
 
 function EffectsScreen({ context, lens }: { context: ScreenContext; lens: "Colour" | "Effects" | "Presets" | "Compare" }) {
@@ -1445,7 +1446,7 @@ function ReviewScreen({ context, lens }: { context: ScreenContext; lens: "Commen
               onClick={() => {
                 handle.edit((current) => ({
                   ...current,
-                  markers: [...current.markers, { id: `mk-${Date.now().toString(36)}`, time: ui.playhead, text: note, author: context.actor, at: new Date().toISOString(), resolved: false }],
+                  markers: [...current.markers, { id: `mk-${wallMs().toString(36)}`, time: ui.playhead, text: note, author: context.actor, at: clockIso(), resolved: false }],
                 }), "Add a timecoded note");
                 setNote("");
                 context.toast("Note added", `Pinned at ${timecode(ui.playhead, doc.fps)} and shown on the timeline.`);
@@ -1586,7 +1587,7 @@ function MediaImport({ context, close }: { context: ScreenContext; close: () => 
         variant="primary"
         disabled={!name.trim()}
         onClick={() => {
-          const id = `src-${Date.now().toString(36)}`;
+          const id = `src-${wallMs().toString(36)}`;
           handle.edit((current) => ({
             ...current,
             sources: [...current.sources, {
@@ -1640,7 +1641,7 @@ function TransitionEditor({ context, close }: { context: ScreenContext; close: (
                 ...current,
                 transitions: existing
                   ? current.transitions.map((transition) => (transition.id === existing.id ? { ...transition, kind: event.target.value as "cross-dissolve" } : transition))
-                  : [...current.transitions, { id: `x-${Date.now().toString(36)}`, fromClipId: previous.id, toClipId: clip.id, kind: event.target.value as "cross-dissolve", duration: 0.8 }],
+                  : [...current.transitions, { id: `x-${wallMs().toString(36)}`, fromClipId: previous.id, toClipId: clip.id, kind: event.target.value as "cross-dissolve", duration: 0.8 }],
               }), "Set the transition")}
             >
               <option value="cross-dissolve">Cross dissolve</option>
@@ -1661,7 +1662,7 @@ function TransitionEditor({ context, close }: { context: ScreenContext; close: (
                 ...current,
                 transitions: existing
                   ? current.transitions.map((transition) => (transition.id === existing.id ? { ...transition, duration: snapFrame(Number(event.target.value), doc.fps) } : transition))
-                  : [...current.transitions, { id: `x-${Date.now().toString(36)}`, fromClipId: previous.id, toClipId: clip.id, kind: "cross-dissolve", duration: snapFrame(Number(event.target.value), doc.fps) }],
+                  : [...current.transitions, { id: `x-${wallMs().toString(36)}`, fromClipId: previous.id, toClipId: clip.id, kind: "cross-dissolve", duration: snapFrame(Number(event.target.value), doc.fps) }],
               }), "Set the transition duration")}
             />
           </Field>
@@ -1975,7 +1976,7 @@ function FinalSignoff({ context, close }: { context: ScreenContext; close: () =>
         event.preventDefault();
         handle.edit((current) => ({
           ...current,
-          reviews: [{ id: `rv-${Date.now().toString(36)}`, at: new Date().toISOString(), by: context.actor, state, note, revision: record.revision, digest: cutDigest(current) }, ...current.reviews],
+          reviews: [{ id: `rv-${wallMs().toString(36)}`, at: clockIso(), by: context.actor, state, note, revision: record.revision, digest: cutDigest(current) }, ...current.reviews],
         }), "Record a review decision");
         context.toast("Decision recorded", `Bound to revision ${record.revision} and to the cut digest ${cutDigest(doc)}. Any edit changes the digest.`);
         close();
@@ -2132,7 +2133,7 @@ function AutomationPoint({ context, close }: { context: ScreenContext; close: ()
         if (!track) { setError("Choose an audio track."); return; }
         if (!Number.isFinite(at) || at < 0 || at > doc.duration) { setError(`The time must be between 0 and ${doc.duration.toFixed(2)} seconds.`); return; }
         if (!Number.isFinite(db) || db < -60 || db > 12) { setError("Gain must be between −60 and +12 dB."); return; }
-        const point = { id: `au-${Date.now().toString(36)}`, time: snapFrame(at, doc.fps), gainDb: db };
+        const point = { id: `au-${wallMs().toString(36)}`, time: snapFrame(at, doc.fps), gainDb: db };
         handle.edit((current) => ({
           ...current,
           tracks: current.tracks.map((item) => (item.id === track.id
@@ -2312,7 +2313,7 @@ function SavePreset({ context, close }: { context: ScreenContext; close: () => v
         if (!name.trim() || taken) return;
         handle.edit((current) => ({
           ...current,
-          effectPresets: [...(current.effectPresets ?? []), { id: `pre-${Date.now().toString(36)}`, name: name.trim(), effects: clip.effects.filter((effect) => !effect.bypassed).map((effect) => ({ kind: effect.kind, amount: effect.amount })), by: context.actor, at: new Date().toISOString() }],
+          effectPresets: [...(current.effectPresets ?? []), { id: `pre-${wallMs().toString(36)}`, name: name.trim(), effects: clip.effects.filter((effect) => !effect.bypassed).map((effect) => ({ kind: effect.kind, amount: effect.amount })), by: context.actor, at: clockIso() }],
         }), `Save the preset ${name.trim()}`);
         close();
       }}
@@ -2386,7 +2387,7 @@ function PublishRender({ context, close }: { context: ScreenContext; close: () =
       className="ds-stack ds-gap-3"
       onSubmit={(event) => {
         event.preventDefault();
-        const delivery = { state: "queued_local" as const, at: new Date().toISOString(), by: context.actor, destination, note: "No video host is connected. The request is recorded here and nothing left this browser." };
+        const delivery = { state: "queued_local" as const, at: clockIso(), by: context.actor, destination, note: "No video host is connected. The request is recorded here and nothing left this browser." };
         handle.edit((current) => ({ ...current, renders: current.renders.map((item) => (item.id === job.id ? { ...item, delivery } : item)) }), `Queue ${job.artifact} for publishing`);
         void context.mutate.log(`Publishing ${job.artifact} to ${destination} queued locally; no host is connected`, { entityId: record.id, type: "publish", capability: "queued_local" });
         context.toast("Queued locally, not published", `${job.artifact} is recorded as ${CAPABILITY_LABELS.queued_local.toLowerCase()} for ${destination}. No video host is connected, so nothing left this browser.`, "info");
@@ -2669,7 +2670,7 @@ registerApp({
           guard: needsProject,
           run: (context) => editVideo(context, (doc) => ({
             ...doc,
-            captions: [...doc.captions, { id: `cap-${Date.now().toString(36)}`, start: videoUi.get().playhead, end: Math.min(doc.duration, videoUi.get().playhead + 2.5), text: "", reviewed: false, language: videoUi.get().language }].sort((a, b) => a.start - b.start),
+            captions: [...doc.captions, { id: `cap-${wallMs().toString(36)}`, start: videoUi.get().playhead, end: Math.min(doc.duration, videoUi.get().playhead + 2.5), text: "", reviewed: false, language: videoUi.get().language }].sort((a, b) => a.start - b.start),
           }), "Add a caption cue"),
         },
         {

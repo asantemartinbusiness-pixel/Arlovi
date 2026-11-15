@@ -8,7 +8,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
-import { daysBetween, freshness } from "@/platform/clock";
+import { clockIso, daysBetween, freshness } from "@/platform/clock";
 import { CAPABILITY_LABELS, PROVIDER_CAPABILITIES } from "@/platform/capability";
 import { persistAll } from "@/runtime/db";
 import type { Rec } from "@/domain/types";
@@ -512,7 +512,7 @@ export function RemediationPanel({ context, record }: { context: ScreenContext; 
             onClick={async () => {
               await context.mutate.patch(record.id, {
                 status: "resolved",
-                endAt: new Date().toISOString(),
+                endAt: clockIso(),
                 fields: { ...record.fields, verifiedBy: context.actor },
               }, { expectRevision: record.revision, event: `Incident ${record.title} resolved after a verified check` });
               context.toast("Resolved", "The record carries the check that verified it.");

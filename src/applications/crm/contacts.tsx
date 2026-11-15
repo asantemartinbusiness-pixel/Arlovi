@@ -17,6 +17,7 @@ import {
 import type { CrmData } from "./data";
 import { ActivityPill, CapabilityNotice, ConsentPill, Money, StagePill } from "./parts";
 import { MergeGroups } from "./actions";
+import { clockIso } from "@/platform/clock";
 
 /* ---------------------------- CRM-002 ---------------------------- */
 
@@ -206,7 +207,7 @@ export function ContactForm({ context, close }: { context: ScreenContext; close:
         if (companyId) fields.companyId = companyId;
         if (taxStatus) fields.taxStatus = taxStatus;
         if (suppressed) fields.suppressed = true;
-        if (consent && !suppressed) fields.consent = contact?.fields.consent ? String(contact.fields.consent) : `recorded-${new Date().toISOString().slice(0, 10)}`;
+        if (consent && !suppressed) fields.consent = contact?.fields.consent ? String(contact.fields.consent) : `recorded-${clockIso().slice(0, 10)}`;
         if (contact) {
           await context.mutate.patch(contact.id, {
             title: title.trim(), summary, fields,
@@ -359,7 +360,7 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
               // Keep the merged-away record as evidence: its fields, consent and history stay readable.
               await context.mutate.patch(other.id, {
                 status: "merged",
-                fields: { ...other.fields, mergedInto: keep.id, mergedAt: new Date().toISOString(), mergedBy: context.actor },
+                fields: { ...other.fields, mergedInto: keep.id, mergedAt: clockIso(), mergedBy: context.actor },
               }, { expectRevision: other.revision, event: `Duplicate contact ${other.title} merged into ${keep.title}; the original record is kept` });
             }
             context.toast("Contacts merged", `${others.length} record${others.length === 1 ? "" : "s"} merged into ${keep.title}. ${anySuppressed ? "The suppression survived the merge." : "The earliest consent was kept."}`);
@@ -769,15 +770,15 @@ export function ComposeMessage({ context, close }: { context: ScreenContext; clo
               status: "draft",
               summary: body.slice(0, 160),
               fields: { to, delivery: "not_connected", contactId: contact.id, author: context.actor },
-              body: { messages: [{ at: new Date().toISOString(), from: `${context.actor} at ${org.name}`, body }] },
+              body: { messages: [{ at: clockIso(), from: `${context.actor} at ${org.name}`, body }] },
             }, `Message drafted to ${contact.title}`);
             await context.mutate.create({
               collection: "activities",
               title: `Email drafted to ${contact.title}`,
               status: "draft",
               summary: body.slice(0, 120),
-              startAt: new Date().toISOString(),
-              at: new Date().toISOString(),
+              startAt: clockIso(),
+              at: clockIso(),
               parentId: contact.id,
               fields: { kind: "email", contactId: contact.id, delivery: "not_connected", owner: context.actor },
             }, `Activity logged for the draft to ${contact.title}`);

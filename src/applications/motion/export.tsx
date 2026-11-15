@@ -15,6 +15,7 @@ import { motionUi } from "./model";
 import { Stage, TransportRow, reducedFrame } from "./parts";
 import { recorderSupport, renderGif, renderWebm } from "./render";
 import { MissingComposition, current, useMotionDoc, useSession, FormField } from "./shared";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * ARL-MOTION-005 — Motion Export
@@ -43,7 +44,7 @@ function textFile(doc: MotionDoc, title: string, format: ExportFormat, loop: boo
   if (format === "css") return toCss(target, `.${slug(title)}`);
   if (format === "html") return toHtml(target, title);
   if (format === "svg") return toSvgAnimation(target, title);
-  return JSON.stringify({ title, exportedAt: new Date().toISOString(), format: "arlovi-motion", composition: { ...target, renders: [], tests: [] } }, null, 2);
+  return JSON.stringify({ title, exportedAt: clockIso(), format: "arlovi-motion", composition: { ...target, renders: [], tests: [] } }, null, 2);
 }
 
 async function writeRender(recordId: string, change: (doc: MotionDoc) => MotionDoc, label: string, context: ScreenContext): Promise<void> {
@@ -68,7 +69,7 @@ export function exportText(context: ScreenContext, options: ExportOptions): { na
   downloadText(name, text, format.mime);
   const bytes = new Blob([text]).size;
   const unsupported = compatibility(open.doc, options.format).filter((row) => row.level !== "exact").map((row) => `${row.feature.label}: ${row.level}`);
-  const entry: MotionRender = { id: uid("rnd"), at: new Date().toISOString(), by: context.actor, format: format.id, state: "done", artifact: name, bytes, note: `${format.name}. Reduced motion: ${open.doc.reducedMotion.strategy}.${unsupported.length ? ` Declared: ${unsupported.join("; ")}.` : ""}` };
+  const entry: MotionRender = { id: uid("rnd"), at: clockIso(), by: context.actor, format: format.id, state: "done", artifact: name, bytes, note: `${format.name}. Reduced motion: ${open.doc.reducedMotion.strategy}.${unsupported.length ? ` Declared: ${unsupported.join("; ")}.` : ""}` };
   open.handle.edit((doc) => ({ ...doc, renders: [entry, ...doc.renders] }), `Export ${format.name}`);
   return { name, bytes };
 }
@@ -84,7 +85,7 @@ export async function runRender(context: ScreenContext, options: ExportOptions):
   const doc = { ...open.doc, loop: options.loop };
   const recordId = open.recordId;
   const title = open.title;
-  const entry: MotionRender = { id, at: new Date().toISOString(), by: context.actor, format: format.id, state: "rendering", note: `${options.width}px wide at ${options.fps} fps${options.reduced ? ", reduced-motion alternative" : ""}.` };
+  const entry: MotionRender = { id, at: clockIso(), by: context.actor, format: format.id, state: "rendering", note: `${options.width}px wide at ${options.fps} fps${options.reduced ? ", reduced-motion alternative" : ""}.` };
   open.handle.edit((current) => ({ ...current, renders: [entry, ...current.renders] }), `Render ${format.name}`);
   renderProgress.set({ id, frame: 0, frames: Math.round(doc.duration * options.fps), format: format.id, cancel });
   const onProgress = (progress: { frame: number; frames: number }) => renderProgress.set((current) => ({ ...current, ...progress }));
@@ -137,7 +138,7 @@ export function testFallback(handle: DocHandle<MotionDoc>, actor: string, title:
     findings.push(still ? `Sampled ${frames} frames of the alternative: nothing moves, scales or turns.` : `The alternative still moves: up to ${travel.toFixed(1)}px of travel.`);
     findings.push(doc.reducedMotion.strategy === "cross-fade" ? "The alternative fades in over 0.4s into the final frame." : "The alternative shows the first frame and holds it.");
   }
-  const test: MotionTest = { id: uid("test"), kind: "fallback", at: new Date().toISOString(), by: actor, pass, findings };
+  const test: MotionTest = { id: uid("test"), kind: "fallback", at: clockIso(), by: actor, pass, findings };
   handle.edit((current) => ({ ...current, tests: [test, ...current.tests].slice(0, 30) }), pass ? "Reduced-motion fallback passed" : "Reduced-motion fallback failed");
   return test;
 }
@@ -438,7 +439,7 @@ export function ReducedMotionReview({ context, close }: { context: ScreenContext
       <Row gap={2}>
         <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Close</Button>
-        <Button variant="primary" disabled={note.trim().length < 6 || doc.reducedMotion.strategy === "none"} onClick={() => { handle.edit((current) => ({ ...current, fallbackReview: { by: context.actor, at: new Date().toISOString(), note: note.trim() } }), "Reduced-motion alternative reviewed"); close(); }}>Record the review</Button>
+        <Button variant="primary" disabled={note.trim().length < 6 || doc.reducedMotion.strategy === "none"} onClick={() => { handle.edit((current) => ({ ...current, fallbackReview: { by: context.actor, at: clockIso(), note: note.trim() } }), "Reduced-motion alternative reviewed"); close(); }}>Record the review</Button>
       </Row>
     </Stack>
   );
@@ -488,7 +489,7 @@ export function PublishExport({ context, close }: { context: ScreenContext; clos
       </Notice>
       <Row gap={2}><span className="ds-grow" /><Button variant="ghost" onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={async () => {
-          const at = new Date().toISOString();
+          const at = clockIso();
           handle.edit((current) => ({ ...current, renders: current.renders.map((render) => (render.id === latest.id ? { ...render, publish: { state: "queued_local", at, by: context.actor } } : render)) }), `Publish ${latest.artifact} queued locally`);
           await context.mutate.log(`Publish of ${latest.artifact} queued locally; hosting is not connected, nothing left the browser.`, { entityId: current()?.recordId, type: "publish", capability: "queued_local" });
           context.setTab("History");

@@ -19,6 +19,7 @@ import {
   publishPolicy, requestAcknowledgment, reviewItem,
 } from "./actions";
 import { getRecord, listByCollection } from "@/platform/repo";
+import { clockIso, clockNow, wallMs } from "@/platform/clock";
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
   <>
@@ -55,13 +56,13 @@ function IssueCreate({ context, close }: { context: ScreenContext; close: () => 
           title: String(form.get("title") ?? "Issue"),
           status: "open",
           summary: String(form.get("detail") ?? ""),
-          at: new Date().toISOString(),
+          at: clockIso(),
           tags: [String(form.get("category") ?? "legal"), impact],
           fields: {
             category: String(form.get("category") ?? "legal"), impact, likelihood,
             score: scoreOf(impact) * scoreOf(likelihood),
             mitigation: String(form.get("mitigation") ?? ""), control: "To be agreed",
-            reviewedAt: new Date().toISOString().slice(0, 10), aiSuggested: false, owner: context.actor,
+            reviewedAt: clockIso().slice(0, 10), aiSuggested: false, owner: context.actor,
           },
         }, `Issue raised by ${context.actor}`);
         context.toast("Issue raised", "It is on the risk register with you as its owner.");
@@ -135,7 +136,7 @@ function ContractUpload({ context, close }: { context: ScreenContext; close: () 
           startAt: start ? new Date(`${start}T09:00:00.000Z`).toISOString() : undefined,
           endAt: end ? new Date(`${end}T09:00:00.000Z`).toISOString() : undefined,
           dueAt: end ? new Date(`${end}T09:00:00.000Z`).toISOString() : undefined,
-          at: new Date().toISOString(),
+          at: clockIso(),
           tags: [String(form.get("type") ?? "supply"), "draft"],
           fields: {
             counterparty: String(form.get("counterparty") ?? ""), type: String(form.get("type") ?? "supply"),
@@ -144,7 +145,7 @@ function ContractUpload({ context, close }: { context: ScreenContext; close: () 
           },
           body: {
             clauses: [],
-            versions: [{ label: "Working draft", at: new Date().toISOString(), author: context.actor, text }],
+            versions: [{ label: "Working draft", at: clockIso(), author: context.actor, text }],
             signatures: [],
           },
         }, `Contract added: ${title.trim()}`);
@@ -193,7 +194,7 @@ function ReviewerPicker({ context, close }: { context: ScreenContext; close: () 
         const reviewer = String(form.get("reviewer") ?? "");
         await context.mutate.patch(contract.id, {
           status: "in_review",
-          fields: { ...contract.fields, reviewer, reviewRequestedBy: context.actor, reviewRequestedAt: new Date().toISOString() },
+          fields: { ...contract.fields, reviewer, reviewRequestedBy: context.actor, reviewRequestedAt: clockIso() },
         }, { expectRevision: contract.revision, event: `${contract.title} sent for review to ${reviewer} by ${context.actor}` });
         context.toast("Review requested", `${contract.title} is in review with ${reviewer}.`);
         close();
@@ -240,7 +241,7 @@ function ESignRequest({ context, close }: { context: ScreenContext; close: () =>
           onClick={async () => {
             await context.mutate.patch(contract.id, {
               status: "awaiting_signature",
-              fields: { ...contract.fields, signatureRequestedBy: context.actor, signatureRequestedAt: new Date().toISOString() },
+              fields: { ...contract.fields, signatureRequestedBy: context.actor, signatureRequestedAt: clockIso() },
             }, { expectRevision: contract.revision, event: `${contract.title} marked awaiting signature by ${context.actor}` });
             context.toast("Marked awaiting signature", "The record changed. Nothing was sent to anybody.");
             close();
@@ -326,7 +327,7 @@ function SignAuthorization({ context, close }: { context: ScreenContext; close: 
           disabled={!confirmed || !context.can("view_legal")}
           onClick={async () => {
             const body = contract.body as { signatures?: { party: string; name: string; at: string; method: string }[] } | undefined;
-            const now = new Date().toISOString();
+            const now = clockIso();
             await context.mutate.patch(contract.id, {
               status: "active",
               fields: { ...contract.fields, signedAt: now, immutableSigned: true },
@@ -366,7 +367,7 @@ function PolicyEditor({ context, close }: { context: ScreenContext; close: () =>
           audience: String(form.get("audience") ?? "All employees"),
           supersedes: existing ? current : "",
         };
-        const due = new Date();
+        const due = clockNow();
         due.setFullYear(due.getFullYear() + 1);
         if (existing && existing.status === "draft") {
           await context.mutate.patch(existing.id, {
@@ -380,7 +381,7 @@ function PolicyEditor({ context, close }: { context: ScreenContext; close: () =>
             title: String(form.get("title") ?? existing.title),
             status: "draft",
             summary: String(form.get("summary") ?? existing.summary),
-            at: new Date().toISOString(),
+            at: clockIso(),
             dueAt: due.toISOString(),
             tags: ["governance"],
             fields: { ...existing.fields, ...fields, supersedesId: existing.id },
@@ -391,7 +392,7 @@ function PolicyEditor({ context, close }: { context: ScreenContext; close: () =>
             title: String(form.get("title") ?? "Policy"),
             status: "draft",
             summary: String(form.get("summary") ?? ""),
-            at: new Date().toISOString(),
+            at: clockIso(),
             dueAt: due.toISOString(),
             tags: ["governance"],
             fields,
@@ -495,11 +496,11 @@ function EvidenceUpload({ context, close }: { context: ScreenContext; close: () 
           title,
           status: "assembled",
           summary: String(form.get("detail") ?? ""),
-          at: new Date().toISOString(),
+          at: clockIso(),
           tags: ["evidence"],
           fields: {
             kind: "evidencePack", items: Number(form.get("items") ?? 1), legalHold: false,
-            hash: `sha256:${title.toLowerCase().replace(/[^a-z]/g, "").slice(0, 12)}${Date.now().toString(36).slice(-4)}`,
+            hash: `sha256:${title.toLowerCase().replace(/[^a-z]/g, "").slice(0, 12)}${wallMs().toString(36).slice(-4)}`,
             assembledBy: context.actor, exportable: true,
           },
         }, `Evidence pack assembled by ${context.actor}`);
@@ -723,7 +724,7 @@ function ScheduleAudit({ context, close }: { context: ScreenContext; close: () =
           status: "upcoming",
           summary: String(form.get("scope") ?? ""),
           dueAt: new Date(`${date}T09:00:00.000Z`).toISOString(),
-          at: new Date().toISOString(),
+          at: clockIso(),
           tags: ["compliance", "audit"],
           fields: {
             kind: "compliance", owner: context.actor, recurrence: "Annual",

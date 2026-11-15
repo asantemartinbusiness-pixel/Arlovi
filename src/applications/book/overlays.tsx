@@ -5,7 +5,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
-import { addDays } from "@/platform/clock";
+import { addDays, clockIso } from "@/platform/clock";
 import { computeInvoice } from "@/platform/money";
 import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import {
@@ -775,7 +775,7 @@ export function PublishBookingPage({ context, close }: { context: ScreenContext;
       <Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(page.id, { status: "published", fields: { ...page.fields, published: true, exportedAt: new Date().toISOString() } }, { expectRevision: page.revision, event: `${page.title} exported locally` });
+          await context.mutate.patch(page.id, { status: "published", fields: { ...page.fields, published: true, exportedAt: clockIso() } }, { expectRevision: page.revision, event: `${page.title} exported locally` });
           context.toast("Exported", "The page is marked exported in this workspace. No public URL exists.");
           close();
         }}

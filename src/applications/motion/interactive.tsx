@@ -13,6 +13,7 @@ import { motionUi } from "./model";
 import { LayerShape } from "./parts";
 import { PROPERTY_LABEL } from "./editor";
 import { MissingComposition, current, useMotionDoc, usePrefersReducedMotion, useSession, FormField } from "./shared";
+import { clockIso, wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * ARL-MOTION-004 — Interactive Motion
@@ -344,7 +345,7 @@ export function exportInteractions(context: ScreenContext): void {
   const { name, bytes } = downloadInteractionHtml(open.doc, open.title);
   open.handle.edit((doc) => ({
     ...doc,
-    renders: [{ id: uid("rnd"), at: new Date().toISOString(), by: context.actor, format: "html-interactions", state: "done", artifact: name, bytes, note: `${doc.triggers.length} trigger(s), ${doc.states.length} state(s). Downloaded to this device.` }, ...doc.renders],
+    renders: [{ id: uid("rnd"), at: clockIso(), by: context.actor, format: "html-interactions", state: "done", artifact: name, bytes, note: `${doc.triggers.length} trigger(s), ${doc.states.length} state(s). Downloaded to this device.` }, ...doc.renders],
   }), "Export the interactions");
   context.toast("Interactions exported", `${name} (${(bytes / 1024).toFixed(1)} KB) was written by this browser. It is listed in the render history.`);
 }
@@ -355,7 +356,7 @@ export function recordInteractionTest(handle: DocHandle<MotionDoc>, actor: strin
   const checks = testTriggers(doc);
   const failing = checks.filter((check) => !check.pointer || !check.keyboard || !check.touch);
   const test: MotionTest = {
-    id: `test-${Date.now().toString(36)}`, kind: "interaction", at: new Date().toISOString(), by: actor,
+    id: `test-${wallMs().toString(36)}`, kind: "interaction", at: clockIso(), by: actor,
     pass: failing.length === 0,
     findings: checks.length === 0 ? ["No triggers to test."] : checks.map((check) => `${check.label}: pointer ${check.pointer ? "reaches" : "does not reach"}, keyboard ${check.keyboard ? `reaches (${check.keyboardHow})` : "does not reach"}, touch ${check.touch ? `reaches (${check.touchHow})` : "does not reach"} the state.`),
   };

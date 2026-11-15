@@ -9,7 +9,7 @@ import {
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { capabilityById } from "@/platform/capability";
-import { sameDay } from "@/platform/clock";
+import { clockIso, sameDay } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { ChannelList, Conversation } from "./chat";
 import { CalendarSurface, type CalendarView } from "./calendar";
@@ -936,14 +936,14 @@ export function ComposeMail({ context, close }: { context: ScreenContext; close:
           title: subject || "(no subject)",
           status: "draft",
           summary: body.slice(0, 160),
-          at: new Date().toISOString(),
+          at: clockIso(),
           tags: ["draft"],
           fields: {
             folder: "drafts", from: `${context.actor.split(" ")[0].toLowerCase()}@${context.org.slug}.example`,
             to: recipients.join(", "), unread: false, risk: "none", labels: "draft",
             delivery: "not_connected", messageCount: 1,
           },
-          body: { messages: [{ from: `${context.actor.split(" ")[0].toLowerCase()}@${context.org.slug}.example`, at: new Date().toISOString(), body, external: false }] },
+          body: { messages: [{ from: `${context.actor.split(" ")[0].toLowerCase()}@${context.org.slug}.example`, at: clockIso(), body, external: false }] },
         }, `Email draft saved by ${context.actor}`);
         context.toast("Draft saved", "The draft is in this workspace with its recipients and body. No mail provider is connected, so nothing was sent.");
         close();
@@ -1088,7 +1088,7 @@ export function EventEditor({ context, close }: { context: ScreenContext; close:
   const payload = context.overlayPayload as { date?: string; id?: string } | undefined;
   const existing = useRecord(payload?.id);
   const data = useCommsData();
-  const [date, setDate] = useState(payload?.date ?? new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(payload?.date ?? clockIso().slice(0, 10));
   const [start, setStart] = useState("10:00");
   const [minutes, setMinutes] = useState(30);
   const [attendees, setAttendees] = useState<string[]>([]);

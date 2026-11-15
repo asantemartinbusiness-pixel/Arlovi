@@ -58,7 +58,7 @@ function SiteSettingsForm({ context, close }: { context: ScreenContext; close: (
           if (!site.pages.some((page) => page.path === path)) {
             const { makePage } = await import("./model");
             next.pages = [...site.pages, makePage(pageName, path)];
-            next.nav = { ...site.nav, header: [...site.nav.header, { id: `n-${Date.now().toString(36)}`, label: pageName, target: path, kind: "page", children: [] }] };
+            next.nav = { ...site.nav, header: [...site.nav.header, { id: `n-${wallMs().toString(36)}`, label: pageName, target: path, kind: "page", children: [] }] };
           }
         }
         await saveSite(context, record, next, pageName ? `Site settings saved and page ${pageName} added` : "Site settings saved");
@@ -462,7 +462,7 @@ export const webApp = registerApp({
             const forms = await import("@/platform/repo").then((module) => module.listByCollection(context.org.id, "forms"));
             const record = sites.find((item) => item.id === context.params.id) ?? sites[0];
             if (!record) return;
-            await RunAuditAction(context, record, readSite(record), Object.fromEntries(forms.map((form) => [form.id, form.title])), new Date().toISOString());
+            await RunAuditAction(context, record, readSite(record), Object.fromEntries(forms.map((form) => [form.id, form.title])), clockIso());
           },
         },
         { id: "view issue", label: "Inspect an issue", placement: "secondary", run: (context) => context.openOverlay("Issue detail") },
@@ -542,6 +542,7 @@ function SiteSetupFormLazy({ context, close }: { context: ScreenContext; close: 
 }
 
 import * as PanelsModule from "./panels";
+import { clockIso, wallMs } from "@/platform/clock";
 const PANELS = { SiteSetupForm: PanelsModule.SiteSetupForm };
 
 function SiteFieldEditor({ context, close }: { context: ScreenContext; close: () => void }) {
@@ -560,7 +561,7 @@ function SiteFieldEditor({ context, close }: { context: ScreenContext; close: ()
         const data = new FormData(event.currentTarget);
         const label = String(data.get("label") ?? "").trim();
         if (!label) return;
-        const next = { id: field?.id ?? `ff-${Date.now().toString(36)}`, label, type: String(data.get("type") ?? "text"), required: data.get("required") === "on" };
+        const next = { id: field?.id ?? `ff-${wallMs().toString(36)}`, label, type: String(data.get("type") ?? "text"), required: data.get("required") === "on" };
         const fields = field ? form.fields.map((item) => (item.id === field.id ? next : item)) : [...form.fields, next];
         await saveSite(context, record, { ...site, forms: site.forms.map((item) => (item.id === form.id ? { ...item, fields } : item)) }, `Field ${label} saved on ${form.name}`);
         context.toast("Field saved", `${label} is ${next.required ? "required" : "optional"} on ${form.name}.`);

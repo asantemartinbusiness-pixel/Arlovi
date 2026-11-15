@@ -6,6 +6,7 @@ import {
   STRUCTURAL, answerText, evaluate, pages, validate,
   type Answers, type FieldError, type FormField, type FormModel,
 } from "./model";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * The form as a person meets it. The same component renders the builder
@@ -167,11 +168,11 @@ export function FormRuntime({
           const name = answered.find(([label]) => /name/i.test(label))?.[1];
           const created = await context.mutate.create({
             collection: "submissions",
-            title: name || `Response ${new Date().toISOString().slice(0, 10)}`,
+            title: name || `Response ${clockIso().slice(0, 10)}`,
             status: "new",
             summary: `Answered version ${model.settings.version} of ${record.title}.`,
             parentId: record.id,
-            at: new Date().toISOString(),
+            at: clockIso(),
             fields: {
               ...Object.fromEntries(answered),
               formVersion: model.settings.version,

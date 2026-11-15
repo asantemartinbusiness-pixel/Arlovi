@@ -9,7 +9,7 @@ import {
 import { CAPABILITY_LABELS, capabilityById } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
-import { freshness } from "@/platform/clock";
+import { freshness, wallMs } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { describeSchedule, nextOccurrences, readSchedule as readAutoSchedule } from "@/applications/auto/schedule";
 import { dimensionById, formatMeasure, measureById, runQuery, type QueryFilter } from "./metrics";
@@ -395,7 +395,7 @@ export function ReportBlockOverlay({ context, close }: { context: ScreenContext;
         variant="primary"
         onClick={async () => {
           const block: ReportBlock = {
-            id: `b${body.blocks.length + 1}-${Date.now().toString(36)}`,
+            id: `b${body.blocks.length + 1}-${wallMs().toString(36)}`,
             kind,
             text: text.trim() || undefined,
             measureId: kind === "heading" || kind === "commentary" ? undefined : measureId,

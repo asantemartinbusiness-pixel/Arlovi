@@ -1,3 +1,4 @@
+import { clockNow } from "@/platform/clock";
 /* ====================================================================== *
  * Spreadsheet calculation engine.
  *
@@ -673,7 +674,7 @@ function literal(raw: string): Scalar {
  * read before the cell it depends on has been produced.
  */
 export function evaluateWorkbook(input: WorkbookInput): EvaluationResult {
-  const now = input.now ?? new Date();
+  const now = input.now ?? clockNow();
   const namedList = input.namedRanges ?? [];
   const namedByName = new Map(namedList.map((item) => [item.name.toUpperCase(), item]));
   const named = (name: string) => namedByName.get(name.toUpperCase());

@@ -32,3 +32,28 @@ test("DEF-35 the audit trail lists entries newest first", async ({ page }) => {
   const sorted = [...stamps].sort((a, b) => Date.parse(b) - Date.parse(a));
   expect(stamps).toEqual(sorted);
 });
+
+test("DEF-36 a write under a frozen clock is stamped with the workspace time", async ({ page }) => {
+  await page.goto(`/o/northline/hq/home?${CLOCK}`);
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Dismiss" }).first().click();
+  await expect(page.getByText("Recommendation dismissed")).toBeVisible();
+
+  // The sandbox's real date differs from the frozen date, so wall time cannot pass for it.
+  const stamped = await page.evaluate(async () => {
+    const open = indexedDB.open((await indexedDB.databases()).find((db) => db.name)?.name ?? "");
+    const db: IDBDatabase = await new Promise((resolve, reject) => { open.onsuccess = () => resolve(open.result); open.onerror = () => reject(open.error); });
+    const all = <T,>(store: string): Promise<T[]> => new Promise((resolve, reject) => {
+      const request = db.transaction(store).objectStore(store).getAll();
+      request.onsuccess = () => resolve(request.result as T[]);
+      request.onerror = () => reject(request.error);
+    });
+    const records = await all<{ updatedAt: string; collection: string }>("records");
+    const events = await all<{ at: string }>("events");
+    const newest = (rows: { updatedAt?: string; at?: string }[]) => rows.map((row) => row.updatedAt ?? row.at ?? "").sort().at(-1) ?? "";
+    return { record: newest(records), event: newest(events), wall: new Date().toISOString() };
+  });
+  expect(stamped.record.startsWith("2026-11-14T09:30")).toBe(true);
+  expect(stamped.event.startsWith("2026-11-14T09:30")).toBe(true);
+  expect(stamped.wall.startsWith("2026-11-14T09:30")).toBe(false);
+});

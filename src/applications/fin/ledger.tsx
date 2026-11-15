@@ -13,6 +13,7 @@ import {
 import type { JLine, PostCheck } from "@/domain/fin-ledger";
 import { useFinData } from "./data";
 import { AccountLabel, Amount, SourceNote } from "./parts";
+import { clockIso, wallMs } from "@/platform/clock";
 
 /* ---------------------------- FIN-003 ---------------------------- */
 
@@ -25,7 +26,7 @@ function toDraft(lines: JLine[]): DraftLine[] {
 }
 
 function blank(index: number): DraftLine {
-  return { key: `k${Date.now().toString(36)}${index}`, accountId: "", debitMinor: 0, creditMinor: 0, memo: "" };
+  return { key: `k${wallMs().toString(36)}${index}`, accountId: "", debitMinor: 0, creditMinor: 0, memo: "" };
 }
 
 /**
@@ -76,7 +77,7 @@ export function JournalForm({ context, close }: { context: ScreenContext; close:
       if (post && recheck.reason) { setError(recheck.reason); setBusy(undefined); return; }
       const fields: Record<string, string | number | boolean> = { date, source: "manual" };
       if (reference) fields.reference = reference;
-      if (post) { fields.postedBy = context.actor; fields.postedAt = new Date().toISOString(); }
+      if (post) { fields.postedBy = context.actor; fields.postedAt = clockIso(); }
       if (existing) {
         /* A journal keeps its title when it is saved or posted: the narrative
            is its memo, and approvals and links name the journal by title. */
@@ -457,7 +458,7 @@ export function LedgerJournals({ context }: { context: ScreenContext }) {
                 if (journal.status !== "draft") continue;
                 const check = checkPosting({ lines: journalLines(journal), period: periodOf(journalDate(journal)), locked: data.locked, accounts: data.accounts });
                 if (check.reason) { refused += 1; continue; }
-                await context.mutate.patch(journal.id, { status: "posted", fields: { ...journal.fields, postedBy: context.actor, postedAt: new Date().toISOString() } }, { expectRevision: journal.revision, event: `Posted journal ${journal.title}` });
+                await context.mutate.patch(journal.id, { status: "posted", fields: { ...journal.fields, postedBy: context.actor, postedAt: clockIso() } }, { expectRevision: journal.revision, event: `Posted journal ${journal.title}` });
                 posted += 1;
               }
               context.toast(
@@ -498,7 +499,7 @@ export function LedgerPeriods({ context }: { context: ScreenContext }) {
         ...(body ?? {}),
         locked: next,
         closedBy: { ...((body?.closedBy as Record<string, string>) ?? {}), ...(lock ? { [period]: context.actor } : {}) },
-        closedAt: { ...((body?.closedAt as Record<string, string>) ?? {}), ...(lock ? { [period]: new Date().toISOString() } : {}) },
+        closedAt: { ...((body?.closedAt as Record<string, string>) ?? {}), ...(lock ? { [period]: clockIso() } : {}) },
       },
     }, { expectRevision: record.revision, event: lock ? `Closed period ${period}` : `Reopened period ${period}` });
     context.toast(

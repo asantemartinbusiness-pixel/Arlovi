@@ -16,6 +16,70 @@ function frozenFromLocation(): Date | null {
 
 const ClockContext = createContext<Clock>({ now: () => new Date(), timezone: "UTC" });
 
+/* ------------------------------------------------------------------ */
+/* Ambient clock.
+ *
+ * Code that has no React context (model helpers, handlers that run after an
+ * await) still has to agree with the workspace about what time it is, or a
+ * frozen test clock stamps some records with real time. These three
+ * functions are the only sanctioned way to read time in application code;
+ * a lint rule rejects a bare `new Date()` or `Date.now()` anywhere else.
+ */
+
+let activeClock: Clock | null = null;
+let lastStampMs = 0;
+let persistArmed = false;
+
+function stampFloor(): number {
+  if (lastStampMs) return lastStampMs;
+  try {
+    lastStampMs = Number(window.sessionStorage.getItem("arlovi:last-stamp") ?? 0) || 0;
+  } catch {
+    lastStampMs = 0;
+  }
+  return lastStampMs;
+}
+
+/* Written once when the page goes away, not on every stamp: a reload under a
+   frozen clock then continues the sequence instead of restarting it. */
+function armPersistence(): void {
+  if (persistArmed || typeof window === "undefined") return;
+  persistArmed = true;
+  window.addEventListener("pagehide", () => {
+    try {
+      window.sessionStorage.setItem("arlovi:last-stamp", String(lastStampMs));
+    } catch {
+      /* private window or blocked storage: ordering still holds within one page */
+    }
+  });
+}
+
+/** The workspace's current time: the provider's clock, or ?clock= before it mounts. */
+export function clockNow(): Date {
+  return activeClock ? activeClock.now() : (frozenFromLocation() ?? new Date());
+}
+
+/**
+ * An ISO timestamp for a record or audit entry. Strictly increasing, even
+ * under a frozen clock, so the order things happened in is never lost to a tie.
+ */
+export function clockIso(): string {
+  let ms = clockNow().getTime();
+  const floor = stampFloor();
+  if (ms <= floor) ms = floor + 1;
+  lastStampMs = ms;
+  armPersistence();
+  return new Date(ms).toISOString();
+}
+
+/**
+ * Real elapsed time, never frozen: unique ids, undo windows, playback and
+ * device diagnostics. Not for anything a person reads as "when".
+ */
+export function wallMs(): number {
+  return Date.now();
+}
+
 export function ClockProvider({ children, timezone, fixed }: { children: ReactNode; timezone?: string; fixed?: Date }) {
   const frozen = fixed ?? frozenFromLocation();
   const [, setTick] = useState(0);
@@ -24,10 +88,15 @@ export function ClockProvider({ children, timezone, fixed }: { children: ReactNo
     const id = window.setInterval(() => setTick((value) => value + 1), 60_000);
     return () => window.clearInterval(id);
   }, [frozen]);
-  const value = useMemo<Clock>(() => ({
-    now: () => (frozen ? new Date(frozen) : new Date()),
-    timezone: timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
-  }), [frozen, timezone]);
+  const value = useMemo<Clock>(() => {
+    const clock: Clock = {
+      now: () => (frozen ? new Date(frozen) : new Date()),
+      timezone: timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
+    };
+    activeClock = clock;
+    return clock;
+  }, [frozen, timezone]);
+  useEffect(() => () => { activeClock = null; }, []);
   return <ClockContext.Provider value={value}>{children}</ClockContext.Provider>;
 }
 

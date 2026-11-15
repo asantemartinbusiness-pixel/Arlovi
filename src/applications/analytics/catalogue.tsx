@@ -9,7 +9,7 @@ import {
 import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useWorkspace } from "@/platform/workspace";
-import { freshness } from "@/platform/clock";
+import { clockIso, freshness, wallMs } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import {
   ANALYTICS_COLLECTIONS, DIMENSIONS, allMeasures, formatMeasure, joinCheck,
@@ -668,7 +668,7 @@ export function ImpactReview({ context }: { context: ScreenContext }) {
           onClick={async () => {
             const saved = await context.mutate.patch(definition.id, {
               status: "approved",
-              fields: { ...definition.fields, approvedBy: context.actor, approvedAt: new Date().toISOString(), approvedVersion: Number(definition.fields.version ?? 1) },
+              fields: { ...definition.fields, approvedBy: context.actor, approvedAt: clockIso(), approvedVersion: Number(definition.fields.version ?? 1) },
             }, { expectRevision: definition.revision, event: `Measure ${definition.title} approved at v${String(definition.fields.version ?? 1)} by ${context.actor}` });
             if (saved) context.toast("Approved", `${definition.title} is approved at version ${String(definition.fields.version ?? 1)} by ${context.actor}.`);
           }}
@@ -967,7 +967,7 @@ export function TransformEditor({ context, close }: { context: ScreenContext; cl
         variant="primary"
         disabled={preview.matched === 0}
         onClick={async () => {
-          const relation: Relation = { id: `r${relations.length + 1}-${Date.now().toString(36)}`, from, to, key, kind: preview.fanOut ? "one-to-many" : "many-to-one" };
+          const relation: Relation = { id: `r${relations.length + 1}-${wallMs().toString(36)}`, from, to, key, kind: preview.fanOut ? "one-to-many" : "many-to-one" };
           if (model) {
             await context.mutate.patch(model.id, { body: { relations: [...relations, relation] } }, { event: `Relation ${from} → ${to} added` });
           } else {

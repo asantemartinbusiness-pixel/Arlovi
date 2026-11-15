@@ -6,7 +6,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useChildren, useCollection, useEvents, useWorkspace } from "@/platform/workspace";
-import { daysBetween } from "@/platform/clock";
+import { daysBetween, wallMs } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { BoundaryNotice, downloadCsv, downloadFile } from "@/applications/t6kit/kit";
 import {
@@ -402,7 +402,7 @@ export function RuleEditorForm({ context, close }: { context: ScreenContext; clo
       onSubmit={async (event) => {
         event.preventDefault();
         if (selfRef || !targetId || !whenFieldId) return;
-        const rule: LogicRule = { id: existing?.id ?? `l-${Date.now().toString(36)}`, targetId, action, whenFieldId, operator, value };
+        const rule: LogicRule = { id: existing?.id ?? `l-${wallMs().toString(36)}`, targetId, action, whenFieldId, operator, value };
         const logic = existing ? model.logic.map((item) => (item.id === existing.id ? rule : item)) : [...model.logic, rule];
         const targetLabel = model.fields.find((field) => field.id === targetId)?.label ?? "a field";
         await saveForm(context, record, { ...model, logic }, `Rule ${existing ? "changed" : "added"}: ${action} ${targetLabel}`);

@@ -13,6 +13,7 @@ import {
 } from "./data";
 import { InvoiceTotalsCard, usePortal } from "./panels";
 import { ReportPayment } from "./actions";
+import { clockIso, wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * PORTAL overlays. Every grant is explicit: nothing is shared by a rule.
@@ -208,7 +209,7 @@ export function DataGrant({ context, close }: { context: ScreenContext; close: (
         if (existing) existing.ids = [...existing.ids, recordId];
         else shared.push({ collection, ids: [recordId] });
         await context.mutate.patch(portal.id, {
-          body: { ...body, shared, activity: [{ at: new Date().toISOString(), actor: context.actor, detail: `Shared ${chosen?.title} with the portal.` }, ...(body.activity ?? [])] },
+          body: { ...body, shared, activity: [{ at: clockIso(), actor: context.actor, detail: `Shared ${chosen?.title} with the portal.` }, ...(body.activity ?? [])] },
         }, { expectRevision: portal.revision, event: `${chosen?.title} shared with ${portal.title}` });
         context.toast("Shared", `${chosen?.title} is now visible in ${portal.title}. Nothing else was shared.`);
         close();
@@ -264,7 +265,7 @@ export function PublishReview({ context, close }: { context: ScreenContext; clos
         onClick={async () => {
           await context.mutate.patch(portal.id, {
             status: "live",
-            fields: { ...portal.fields, publishedAt: new Date().toISOString() },
+            fields: { ...portal.fields, publishedAt: clockIso() },
           }, { expectRevision: portal.revision, event: `${portal.title} marked live` });
           context.toast("Marked live", "The portal reads as live in this workspace. Reaching it from outside needs hosting.");
           close();
@@ -325,7 +326,7 @@ export function ClientMessage({ context, close }: { context: ScreenContext; clos
           title: `Message · ${actor}`,
           status: "open",
           summary: text.trim(),
-          at: new Date().toISOString(),
+          at: clockIso(),
           parentId: portal.id,
           tags: ["portal", "message"],
           fields: { portalId: portal.id, direction: context.role === "client" ? "in" : "out", kind: "message", author: actor, delivery: "not_connected", attachments: 0, internalOnly: false },
@@ -358,7 +359,7 @@ export function AccessRequest({ context, close }: { context: ScreenContext; clos
           title: `Access request · ${actor}`,
           status: "open",
           summary: what.trim(),
-          at: new Date().toISOString(),
+          at: clockIso(),
           parentId: portal.id,
           tags: ["portal", "request"],
           fields: { portalId: portal.id, direction: "in", kind: "request", author: actor, delivery: "not_connected", attachments: 0, internalOnly: false },
@@ -526,7 +527,7 @@ export function ComplaintForm({ context, close }: { context: ScreenContext; clos
           title: `Complaint · ${actor}`,
           status: "escalated",
           summary: what.trim(),
-          at: new Date().toISOString(),
+          at: clockIso(),
           parentId: portal.id,
           tags: ["portal", "complaint"],
           fields: { portalId: portal.id, direction: "in", kind: "complaint", author: actor, delivery: "not_connected", attachments: 0, internalOnly: false, severity },
@@ -588,7 +589,7 @@ export function DisputeForm({ context, close }: { context: ScreenContext; close:
           title: `${isRequest ? "Request" : "Dispute"} · ${actor}`,
           status: isRequest ? "open" : "escalated",
           summary: reason.trim(),
-          at: new Date().toISOString(),
+          at: clockIso(),
           parentId: portal.id,
           tags: ["portal", isRequest ? "request" : "complaint"],
           fields: { portalId: portal.id, direction: "in", kind: isRequest ? "request" : "complaint", author: actor, delivery: "not_connected", attachments: 0, internalOnly: false, invoiceId: invoice?.id ?? "" },
@@ -677,7 +678,7 @@ export function ExternalInvite({ context, close }: { context: ScreenContext; clo
           fields: { ...portal.fields, invitesPending: Number(portal.fields.invitesPending ?? 0) + 1, externalUsers: (body.users ?? []).length + 1 },
           body: {
             ...body,
-            users: [...(body.users ?? []), { id: `u-${Date.now()}`, name: name.trim(), email: email.trim(), role: portalRole, lastSeenAt: "", expiresAt: expires }],
+            users: [...(body.users ?? []), { id: `u-${wallMs()}`, name: name.trim(), email: email.trim(), role: portalRole, lastSeenAt: "", expiresAt: expires }],
             activity: [{ at: now.toISOString(), actor: context.actor, detail: `Invited ${email.trim()} as ${portalRole.replace("_", " ")}.` }, ...(body.activity ?? [])],
           },
         }, { expectRevision: portal.revision, event: `${email.trim()} invited to ${portal.title}` });

@@ -6,6 +6,7 @@ import { listByCollection } from "@/platform/repo";
 import type { Rec } from "@/domain/types";
 import { askFirst, Boundary, logBoundary, selectedOf } from "@/applications/hr/opsKit";
 import { LANES, stageOf, type LaneId } from "./board";
+import { clockIso } from "@/platform/clock";
 
 /* ------------------------------------------------------------------ *
  * Contract actions for the Projects module that change records.
@@ -230,7 +231,7 @@ export function requestUpdate(context: ScreenContext, project: Rec | undefined):
         summary: `Requested by ${context.actor}.`, parentId: project.id, dueAt: due.toISOString(),
         fields: { requestedBy: context.actor, requestedOf: project.ownerName, projectId: project.id },
       }, `${context.actor} requested a status update on ${project.title} from ${project.ownerName}`);
-      await context.mutate.patch(project.id, { fields: { ...project.fields, updateRequestedAt: new Date().toISOString(), updateRequestedOf: project.ownerName } }, { expectRevision: project.revision, event: `Update requested from ${project.ownerName}` });
+      await context.mutate.patch(project.id, { fields: { ...project.fields, updateRequestedAt: clockIso(), updateRequestedOf: project.ownerName } }, { expectRevision: project.revision, event: `Update requested from ${project.ownerName}` });
       await logBoundary(context, "email.send", `Update request notification for ${project.ownerName} kept locally`, request.id);
       context.toast("Update requested", `${project.ownerName} owes an update by ${context.date(due)}.`);
     },

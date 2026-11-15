@@ -6,6 +6,7 @@ import { capabilityById, CAPABILITY_LABELS } from "@/platform/capability";
 import { can as roleCan, type Capability } from "@/platform/policy";
 import type { Rec, Role } from "@/domain/types";
 import { useInboxData } from "./engine";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * Inbox contract actions that change the record they name.
@@ -73,7 +74,7 @@ export function DelegateApproval({ context, close }: { context: ScreenContext; c
           onClick={async () => {
             setBusy(true);
             const saved = await context.mutate.patch(record.id, {
-              fields: { ...record.fields, delegatedTo: to, delegatedBy: context.actor, delegatedAt: new Date().toISOString(), assignee: to, delegationNote: note },
+              fields: { ...record.fields, delegatedTo: to, delegatedBy: context.actor, delegatedAt: clockIso(), assignee: to, delegationNote: note },
             }, { expectRevision: record.revision, event: `${record.title} delegated by ${context.actor} to ${to}` });
             if (saved) context.toast("Delegated", `${to} now holds ${record.title}. It shows under Delegated.`);
             setBusy(false);
@@ -161,7 +162,7 @@ export function AcknowledgeIncident({ context, close }: { context: ScreenContext
             setBusy(true);
             const saved = await context.mutate.patch(record.id, {
               status: record.status === "urgent" ? "waiting" : record.status,
-              fields: { ...record.fields, acknowledgedBy: context.actor, acknowledgedAt: new Date().toISOString() },
+              fields: { ...record.fields, acknowledgedBy: context.actor, acknowledgedAt: clockIso() },
             }, { expectRevision: record.revision, event: `Incident acknowledged by ${context.actor}: ${record.title}` });
             if (saved) context.toast("Acknowledged", `${record.title} is acknowledged by ${context.actor}. It is still open.`);
             setBusy(false);
@@ -221,7 +222,7 @@ export function EscalateIncident({ context, close }: { context: ScreenContext; c
             const saved = await context.mutate.patch(record.id, {
               status: record.status === "waiting" ? "urgent" : record.status,
               fields: {
-                ...record.fields, owner: to, previousOwner: owner, escalatedBy: context.actor, escalatedAt: new Date().toISOString(),
+                ...record.fields, owner: to, previousOwner: owner, escalatedBy: context.actor, escalatedAt: clockIso(),
                 escalationLevel: Number(record.fields.escalationLevel ?? 0) + 1, escalationReason: reason.trim(), pageState: "not_connected",
               },
             }, { expectRevision: record.revision, event: `Incident escalated by ${context.actor} from ${owner || "nobody"} to ${to}: ${reason.trim()}` });
@@ -353,7 +354,7 @@ export function RevokeRule({ context, close }: { context: ScreenContext; close: 
             setBusy(true);
             const saved = await context.mutate.patch(rule.id, {
               status: "revoked",
-              fields: { ...rule.fields, enabled: false, revokedBy: context.actor, revokedAt: new Date().toISOString() },
+              fields: { ...rule.fields, enabled: false, revokedBy: context.actor, revokedAt: clockIso() },
             }, { expectRevision: rule.revision, event: `Escalation rule revoked by ${context.actor}: ${String(rule.fields.condition)} → ${String(rule.fields.backup)}` });
             for (const row of covering) {
               const fields = { ...row.fields, assignee: String(rule.fields.owner ?? row.fields.assignee ?? "") };

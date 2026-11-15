@@ -9,7 +9,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
-import { freshness } from "@/platform/clock";
+import { freshness, wallMs } from "@/platform/clock";
 import { BoundaryNotice, SortableRow, ReorderArea, move, plural, slugify } from "@/applications/t6kit/kit";
 import {
   BLOCK_LABELS, auditSite, exportBytes, issueCounts, liveState, makeBlock, makePage, pageHtml,
@@ -543,7 +543,7 @@ export function CmsEditor({ context, lens }: { context: ScreenContext; lens: "Co
             onClick={async () => {
               if (!active) return;
               const created: CmsEntry[] = parsed.rows.map((row, index) => ({
-                id: `imp-${Date.now().toString(36)}-${index}`,
+                id: `imp-${wallMs().toString(36)}-${index}`,
                 collectionId: active.id,
                 title: row[parsed.header.indexOf("title")] ?? row[0] ?? `Imported ${index + 1}`,
                 status: "draft",
@@ -752,7 +752,7 @@ export function SiteForms({ context, lens }: { context: ScreenContext; lens: "Fo
       <Stack gap={4}>
         <Row gap={2}>
           <Button variant="primary" icon={<Plus size={15} />} onClick={() => void writeForms([...siteForms, {
-            id: `sf-${Date.now().toString(36)}`, name: "New site form", formRecordId: forms[0]?.id ?? "",
+            id: `sf-${wallMs().toString(36)}`, name: "New site form", formRecordId: forms[0]?.id ?? "",
             fields: [{ id: "n", label: "Name", type: "text", required: true }, { id: "e", label: "Email", type: "email", required: true }],
             consent: "Keep my enquiry on file so the studio can reply.", honeypot: true, route: "record", webhook: "",
           }], "Site form added")}>Add a form</Button>
@@ -1054,7 +1054,7 @@ export function LinkPickerForm({ context, close }: { context: ScreenContext; clo
         event.preventDefault();
         if (!label.trim()) return;
         const links = which === "footer" ? site.nav.footer : site.nav.header;
-        const next: NavLink = { id: existing?.id ?? `n-${Date.now().toString(36)}`, label: label.trim(), kind, target, children: existing?.children ?? [] };
+        const next: NavLink = { id: existing?.id ?? `n-${wallMs().toString(36)}`, label: label.trim(), kind, target, children: existing?.children ?? [] };
         const updated = existing ? links.map((link) => (link.id === existing.id ? next : link)) : [...links, next];
         await saveSite(context, record, { ...site, nav: { ...site.nav, [which]: updated } }, existing ? `Menu link ${next.label} updated` : `Menu link ${next.label} added`);
         context.toast("Menu saved", `${next.label} points at ${next.target}.`);
@@ -1100,7 +1100,7 @@ export function RedirectForm({ context, close }: { context: ScreenContext; close
         if (!from.trim() || loop) return;
         await saveSite(context, record, {
           ...site,
-          nav: { ...site.nav, redirects: [...site.nav.redirects, { id: `r-${Date.now().toString(36)}`, from: from.trim(), to: to.trim(), code: code === "302" ? 302 : 301 }] },
+          nav: { ...site.nav, redirects: [...site.nav.redirects, { id: `r-${wallMs().toString(36)}`, from: from.trim(), to: to.trim(), code: code === "302" ? 302 : 301 }] },
         }, `Redirect ${from.trim()} added`);
         context.toast("Redirect added", `${from.trim()} will answer with a ${code}.`);
         close();
@@ -1181,7 +1181,7 @@ export function SchemaEditorForm({ context, close }: { context: ScreenContext; c
       onSubmit={async (event) => {
         event.preventDefault();
         if (!name.trim()) return;
-        const collection: CmsCollection = { id: existing?.id ?? `col-${Date.now().toString(36)}`, name: name.trim(), slug: slugify(name), fields: parsed };
+        const collection: CmsCollection = { id: existing?.id ?? `col-${wallMs().toString(36)}`, name: name.trim(), slug: slugify(name), fields: parsed };
         const collections = existing
           ? site.cms.collections.map((item) => (item.id === existing.id ? collection : item))
           : [...site.cms.collections, collection];
@@ -1268,7 +1268,7 @@ export function EntryDetailForm({ context, close }: { context: ScreenContext; cl
         event.preventDefault();
         if (!title.trim() || missing.length) return;
         const entry: CmsEntry = {
-          id: existing?.id ?? `e-${Date.now().toString(36)}`,
+          id: existing?.id ?? `e-${wallMs().toString(36)}`,
           collectionId: collection.id,
           title: title.trim(),
           status: existing?.status ?? "draft",
@@ -1318,7 +1318,7 @@ export function ComponentPropertyForm({ context, close }: { context: ScreenConte
         event.preventDefault();
         if (!name.trim()) return;
         const component = {
-          id: existing?.id ?? `c-${Date.now().toString(36)}`,
+          id: existing?.id ?? `c-${wallMs().toString(36)}`,
           name: name.trim(),
           shared,
           variants: variants.split(",").map((item) => item.trim()).filter(Boolean),

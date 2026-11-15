@@ -24,6 +24,7 @@ import {
   exportChecks, exportMonitoring, pauseDeployments, revokeIntegration, revokeSessions, rotateSecret, runChecks, seedEntity,
   testEndpoint, testIntegrations, tuneMonitor, validatePolicy,
 } from "./actions";
+import { wallMs } from "@/platform/clock";
 
 /* ====================================================================== *
  * BUILD — App Builder & Development
@@ -403,7 +404,7 @@ function RequestBuilder({ context, close }: { context: ScreenContext; close: () 
         event.preventDefault();
         const data = new FormData(event.currentTarget);
         const endpoint = {
-          id: `ep-${Date.now().toString(36)}`,
+          id: `ep-${wallMs().toString(36)}`,
           method: String(data.get("method") ?? "GET") as "GET" | "POST" | "PATCH" | "DELETE",
           path: String(data.get("path") ?? "/"),
           entityId: String(data.get("entityId") ?? ""),
@@ -484,7 +485,7 @@ function RoleEditorForm({ context, close }: { context: ScreenContext; close: () 
         const name = String(data.get("name") ?? "").trim();
         if (!name) return;
         const role = {
-          id: `ro-${Date.now().toString(36)}`,
+          id: `ro-${wallMs().toString(36)}`,
           name,
           grants: Object.fromEntries(model.entities.map((entity) => [entity.id, "none" as const])),
           canApprove: false,

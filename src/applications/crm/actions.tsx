@@ -11,6 +11,7 @@ import { companyById, contactById, contactOfDeal, useCrmData } from "./data";
 import type { CrmData } from "./data";
 import { CapabilityNotice, ConsentPill, Money, StagePill, isExpired } from "./parts";
 import { quoteTotals } from "./quotes";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * CRM contract actions that perform the named operation. Each writes the
@@ -245,7 +246,7 @@ export function AttachRecord({ context, close }: { context: ScreenContext; close
             if (!record) return;
             setBusy(true);
             const saved = await context.mutate.patch(contact.id, {
-              body: { ...(contact.body as object ?? {}), attached: [...attached, { id: record.id, collection: record.collection, title: record.title, by: context.actor, at: new Date().toISOString() }] },
+              body: { ...(contact.body as object ?? {}), attached: [...attached, { id: record.id, collection: record.collection, title: record.title, by: context.actor, at: clockIso() }] },
             }, { expectRevision: contact.revision, event: `${record.title} attached to ${contact.title}` });
             if (saved) context.toast("Record attached", `${record.title} is linked on ${contact.title}'s profile.`);
             setBusy(false);
@@ -320,7 +321,7 @@ export function AssignLead({ context, close }: { context: ScreenContext; close: 
             setBusy(true);
             const saved = await context.mutate.patch(lead.id, {
               status: lead.status === "new" ? "working" : lead.status,
-              fields: { ...lead.fields, owner, assignedBy: context.actor, assignedAt: new Date().toISOString() },
+              fields: { ...lead.fields, owner, assignedBy: context.actor, assignedAt: clockIso() },
             }, { expectRevision: lead.revision, event: `Lead ${lead.title} assigned to ${owner} by ${context.actor}` });
             if (saved) context.toast("Lead assigned", `${owner} now owns ${lead.title}. Nobody was contacted.`);
             setBusy(false);
@@ -477,7 +478,7 @@ export function ApproveQuote({ context, close }: { context: ScreenContext; close
           onClick={async () => {
             setBusy(true);
             const fields: Record<string, string | number | boolean> = {
-              ...quote.fields, approvedBy: context.actor, approvedAt: new Date().toISOString(), approvedVersion: Number(quote.fields.version ?? 1), approvedGrossMinor: totals.grossMinor,
+              ...quote.fields, approvedBy: context.actor, approvedAt: clockIso(), approvedVersion: Number(quote.fields.version ?? 1), approvedGrossMinor: totals.grossMinor,
             };
             delete fields.discountApproval;
             const saved = await context.mutate.patch(quote.id, { status: "approved", fields }, { replaceFields: true, expectRevision: quote.revision, event: `Quote ${quote.title} approved by ${context.actor}` });
@@ -635,7 +636,7 @@ export function CompleteTask({ context, close }: { context: ScreenContext; close
             setBusy(true);
             const saved = await context.mutate.patch(task.id, {
               status: "done",
-              fields: { ...task.fields, completedBy: context.actor, completedAt: new Date().toISOString(), ...(outcome ? { outcome } : {}) },
+              fields: { ...task.fields, completedBy: context.actor, completedAt: clockIso(), ...(outcome ? { outcome } : {}) },
             }, { expectRevision: task.revision, event: `Activity ${task.title} completed by ${context.actor}` });
             if (saved) context.toast("Task completed", `${task.title} is done and moved to History.`);
             setBusy(false);
@@ -786,7 +787,7 @@ export function ReviewForecast({ context, close }: { context: ScreenContext; clo
               status: "reviewed",
               summary: note || "Forecast reviewed with no comment.",
               amountMinor: f.weightedMinor,
-              at: new Date().toISOString(),
+              at: clockIso(),
               fields: { kind: "salesForecastSnapshot", pipelineMinor: f.pipelineMinor, weightedMinor: f.weightedMinor, openCount: f.openCount, reviewedBy: context.actor },
               body: { byStage: f.byStage.map((entry) => ({ stage: entry.stage.id, count: entry.count, amountMinor: entry.amountMinor, weightedMinor: entry.weightedMinor })) },
             }, `Sales forecast reviewed by ${context.actor}`);
@@ -854,7 +855,7 @@ export function StopRule({ context, close }: { context: ScreenContext; close: ()
             setBusy(true);
             const saved = await context.mutate.patch(rule.id, {
               status: "stopped",
-              fields: { ...rule.fields, stoppedBy: context.actor, stoppedAt: new Date().toISOString(), stopReason: reason.trim() },
+              fields: { ...rule.fields, stoppedBy: context.actor, stoppedAt: clockIso(), stopReason: reason.trim() },
             }, { expectRevision: rule.revision, event: `Workflow ${rule.title} stopped by ${context.actor}: ${reason.trim()}` });
             for (const run of queued) {
               await context.mutate.patch(run.id, { status: "cancelled", fields: { ...run.fields, cancelledBy: context.actor } }, { event: `Run of ${rule.title} cancelled when the rule stopped` });

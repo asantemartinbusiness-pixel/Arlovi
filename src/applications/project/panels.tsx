@@ -6,7 +6,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
-import { addDays, daysBetween, startOfWeek } from "@/platform/clock";
+import { addDays, clockIso, daysBetween, startOfWeek } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { LANES, TaskBoard, stageOf, type LaneId } from "./board";
 import { BoardFilterNotice, PortfolioFilterNotice, TaskComments, boardFilter, matchesBoard, matchesPortfolio, pinnedBy, portfolioFilter } from "./actions";
@@ -1326,7 +1326,7 @@ export function CheckInDialog({ context, close }: { context: ScreenContext; clos
       onSubmit={async (event) => {
         event.preventDefault();
         const checkIns = (objective.body as { checkIns?: CheckIn[] } | undefined)?.checkIns ?? [];
-        const next = [...checkIns, { at: new Date().toISOString(), by: context.actor, note, value: Number(value) || 0 }];
+        const next = [...checkIns, { at: clockIso(), by: context.actor, note, value: Number(value) || 0 }];
         await context.mutate.patch(objective.id, {
           fields: { ...objective.fields, current: Number(value) || Number(objective.fields.current ?? 0) },
           body: { ...(objective.body as object ?? {}), checkIns: next },

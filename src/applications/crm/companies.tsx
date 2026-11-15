@@ -15,6 +15,7 @@ import {
 } from "./data";
 import type { CrmData } from "./data";
 import { ActivityPill, ConsentPill, Money, StagePill } from "./parts";
+import { clockIso } from "@/platform/clock";
 
 /* ---------------------------- CRM-004 ---------------------------- */
 
@@ -173,7 +174,7 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
         } else {
           const created = await context.mutate.create({
             collection: "companies", title: title.trim(), status, summary,
-            fields: { ...fields, customerSince: new Date().toISOString().slice(0, 10) },
+            fields: { ...fields, customerSince: clockIso().slice(0, 10) },
           }, `Account ${title.trim()} created`);
           context.select(created.id);
           context.toast("Account created", `${created.title} can now hold contacts and deals.`);

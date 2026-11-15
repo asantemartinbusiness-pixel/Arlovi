@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useCollections } from "@/platform/workspace";
 import { computeInvoice, type CustomerTaxStatus, type InvoiceTotals, type TaxCategory } from "@/platform/money";
 import type { Rec } from "@/domain/types";
+import { clockIso } from "@/platform/clock";
 
 /* ---------------- Record body shapes used by PROC ---------------- */
 
@@ -147,7 +148,7 @@ export function poTotals(order: Rec | undefined, supplier: Rec | undefined, juri
     })),
     jurisdiction,
     customerStatus: supplierStatusOf(supplier),
-    date: order?.at ?? order?.createdAt ?? new Date().toISOString(),
+    date: order?.at ?? order?.createdAt ?? clockIso(),
   });
 }
 
@@ -162,7 +163,7 @@ export function billTotals(bill: Rec | undefined, supplier: Rec | undefined, jur
     })),
     jurisdiction,
     customerStatus: supplierStatusOf(supplier),
-    date: bill?.at ?? bill?.createdAt ?? new Date().toISOString(),
+    date: bill?.at ?? bill?.createdAt ?? clockIso(),
   });
 }
 

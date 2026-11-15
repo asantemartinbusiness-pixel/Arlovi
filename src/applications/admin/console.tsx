@@ -10,6 +10,7 @@ import { CAPABILITY_LABELS, CAPABILITY_TONE, capabilityById } from "@/platform/c
 import { ROLE_LABELS } from "@/platform/policy";
 import type { Audit, Rec } from "@/domain/types";
 import { csvList, ofKind, StepUp, useAdmin, useSeeded } from "./pieces";
+import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
  * ADMIN console — security, audit, privacy, billing, recovery, developer.
@@ -974,7 +975,7 @@ export function BillingScreen({ context, tab }: { context: ScreenContext; tab: "
             {
               label: "Mark paid locally",
               onRun: (selected) => {
-                void Promise.all(selected.filter((row) => row.status !== "paid_locally").map((row) => context.mutate.patch(row.id, { status: "paid_locally", fields: { ...row.fields, paidAt: new Date().toISOString(), paidBy: context.actor } }, { event: `Subscription invoice marked paid locally: ${row.title}` })))
+                void Promise.all(selected.filter((row) => row.status !== "paid_locally").map((row) => context.mutate.patch(row.id, { status: "paid_locally", fields: { ...row.fields, paidAt: clockIso(), paidBy: context.actor } }, { event: `Subscription invoice marked paid locally: ${row.title}` })))
                   .then(() => context.toast("Marked paid locally", "The record says paid locally, which is not the same as a processor confirming a payment.", "info"));
               },
               disabled: (selected) => selected.every((row) => row.status === "paid_locally"),
@@ -1104,7 +1105,7 @@ export function CancellationOverlay({ context, close }: { context: ScreenContext
         if (!subscription) return;
         setBusy(true);
         try {
-          await context.mutate.patch(subscription.id, { status: "cancelled", fields: { ...subscription.fields, cancelledBy: context.actor, cancelledAt: new Date().toISOString() } }, { event: "Subscription cancellation recorded", expectRevision: subscription.revision });
+          await context.mutate.patch(subscription.id, { status: "cancelled", fields: { ...subscription.fields, cancelledBy: context.actor, cancelledAt: clockIso() } }, { event: "Subscription cancellation recorded", expectRevision: subscription.revision });
           context.toast("Cancellation recorded", "The subscription record says cancelled. Your records stay in this browser and can be exported.", "info");
           close();
         } finally { setBusy(false); }
@@ -1697,7 +1698,7 @@ export function CallbackTester({ context, close }: { context: ScreenContext; clo
   const example = {
     event: csvList(hook.fields.events)[0] ?? "record.updated",
     organisation: context.org.slug,
-    at: new Date().toISOString(),
+    at: clockIso(),
     data: { id: "nl-invoices-001", collection: "invoices", status: "issued" },
   };
 
@@ -1719,7 +1720,7 @@ export function CallbackTester({ context, close }: { context: ScreenContext; clo
         <Button
           variant="primary"
           onClick={async () => {
-            await context.mutate.patch(hook.id, { fields: { ...hook.fields, lastTestAt: new Date().toISOString(), lastTestBy: context.actor } }, { event: `Webhook payload inspected: ${hook.title}` });
+            await context.mutate.patch(hook.id, { fields: { ...hook.fields, lastTestAt: clockIso(), lastTestBy: context.actor } }, { event: `Webhook payload inspected: ${hook.title}` });
             await context.mutate.log(`Webhook test on ${hook.title}: payload shown, nothing delivered.`, { entityId: hook.id, type: "developer.webhook_test", capability: "not_connected" });
             setResult("Recorded as inspected. No delivery was attempted, so there is no response code to show.");
           }}
