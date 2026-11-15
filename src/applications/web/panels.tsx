@@ -1251,6 +1251,13 @@ export function EntryDetailForm({ context, close }: { context: ScreenContext; cl
   const existing = site.cms.entries.find((entry) => entry.id === payload?.id);
   const [title, setTitle] = useState(existing?.title ?? "");
   const [values, setValues] = useState<Record<string, string>>(existing?.values ?? {});
+  const [loadedId, setLoadedId] = useState(existing?.id);
+  /* The site is read asynchronously, so the entry can arrive after the first render. */
+  if (existing && loadedId !== existing.id) {
+    setLoadedId(existing.id);
+    setTitle(existing.title);
+    setValues(existing.values);
+  }
   if (!record || !collection) return <Empty title="No collection to write into" icon={<Database size={20} />} />;
   const missing = collection.fields.filter((field) => field.required && !(values[field.id] ?? "").trim());
   return (
