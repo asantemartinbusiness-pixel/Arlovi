@@ -205,5 +205,146 @@
    "Edit easing",
    "Timing preview"
   ]
+ },
+ {
+  "id": "ARL-MOTION-004",
+  "title": "Interactive Motion",
+  "route": "/o/northline/motion/projects/nl-motions-001/interactive",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "States",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Triggers",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "State inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "interaction guard",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "device preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test pointer, keyboard and touch",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Bind a trigger",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "State inspector",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Device preview",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Export the interactions",
+   "Remove the trigger"
+  ]
+ },
+ {
+  "id": "ARL-MOTION-005",
+  "title": "Motion Export",
+  "route": "/o/northline/motion/projects/nl-motions-001/export",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Formats",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Presets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Queue",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Export options",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "reduced-motion review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "compatibility",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test the reduced-motion fallback",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Render video or GIF",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export a file",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compatibility matrix",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Publish"
+  ]
  }
 ]

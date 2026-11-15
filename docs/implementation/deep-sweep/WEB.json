@@ -144,5 +144,153 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-WEB-003",
+  "title": "Visual Page Builder",
+  "route": "/o/northline/web/sites/nl-sites-001/builder",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Build",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Style",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Responsive",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Interactions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Element inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "insert panel",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "AI edit diff",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Place a component (drag or insert)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Resize the block",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Next breakpoint",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Move the block",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Undo",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Edit the selection"
+  ]
+ },
+ {
+  "id": "ARL-WEB-004",
+  "title": "Component Library",
+  "route": "/o/northline/web/sites/nl-sites-001/components",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Local",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Shared",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Variants",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Usage",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Component property",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "breaking change",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "token update",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Import a component",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Extract a section",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Update everywhere",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish to the workspace",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Design tokens",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]

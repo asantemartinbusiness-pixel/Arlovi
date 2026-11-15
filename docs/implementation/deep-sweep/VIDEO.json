@@ -345,5 +345,69 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-VIDEO-006",
+  "title": "Colour & Effects",
+  "route": "/o/northline/video/projects/nl-videos-001/effects",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Colour",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Effects",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Presets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Compare",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Effect inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "scope display",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "preset save",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Bypass every effect",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare with and without",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Preview the grade",
+   "Apply a preset…",
+   "Reorder: reverse the effect stack",
+   "Reset the grade",
+   "Save the grade as a preset…"
+  ]
  }
 ]
