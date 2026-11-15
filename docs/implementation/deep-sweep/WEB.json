@@ -292,5 +292,146 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-WEB-005",
+  "title": "CMS Editor",
+  "route": "/o/northline/web/sites/nl-sites-001/cms",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Collections",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Entries",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Relations",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Import",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Schema editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "entry detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "migration preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit an entry",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New collection",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish entries in bulk",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Import CSV",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New entry",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-WEB-006",
+  "title": "Site Navigation",
+  "route": "/o/northline/web/sites/nl-sites-001/navigation",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Header",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Footer",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Mobile",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Redirects",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Link picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "redirect rules",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "broken link scan",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reorder the menu",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a route",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview at 390px",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish review",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]

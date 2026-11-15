@@ -66,5 +66,83 @@
    }
   ],
   "guarded": []
+ },
+ {
+  "id": "ARL-BUILD-002",
+  "title": "Application Overview",
+  "route": "/o/northline/build/projects/nl-appProjects-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pages",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Data",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tests",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Deployments",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Incident inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "release preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "task creation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Run the tests",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open the builder",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create an issue (task)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Ask an engineer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Failing checks",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]

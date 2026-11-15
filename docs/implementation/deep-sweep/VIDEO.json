@@ -409,5 +409,144 @@
    "Reset the grade",
    "Save the grade as a preset…"
   ]
+ },
+ {
+  "id": "ARL-VIDEO-007",
+  "title": "Video Export & Render",
+  "route": "/o/northline/video/projects/nl-videos-001/export",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Queue",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Failures",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Render settings",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "compatibility",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "delivery confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Render a preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export to WebM",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Cancel the render",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "What this browser can encode",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Publish…",
+   "Download the last render"
+  ]
+ },
+ {
+  "id": "ARL-VIDEO-008",
+  "title": "Video Review",
+  "route": "/o/northline/video/projects/nl-videos-001/review",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Comments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Versions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approval",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Delivery",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Review marker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "version comparison",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "final signoff",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare versions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve this cut",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Comment at the playhead",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign every open note",
+    "ok": true
+   }
+  ],
+  "guarded": []
  }
 ]
