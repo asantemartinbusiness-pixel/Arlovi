@@ -289,6 +289,20 @@ registerSeed("team", (ctx) => {
       fields: { kind: "run", agentId: "nl-agents-061", scenarioId: "nl-evaluations-063", score: 100, passed: 2, failed: 0, contractVersion: "1.1" },
       body: { results: [{ id: "a1", pass: true, note: "Cap £600." }, { id: "a2", pass: true, note: "Manager Maya Chen." }] },
     }),
+    // The four base contracts (Chief of Staff, Finance, Creative, Care) are seeded
+    // active, so each carries the governance run that activation requires.
+    ...([
+      [76, "nl-agents-001", "Nia Okonkwo", "Cap £500 is bounded.", "Manager Maya Chen."],
+      [77, "nl-agents-002", "Idris Cole", "Cap £300 is bounded.", "Manager Maya Chen."],
+      [78, "nl-agents-003", "Sable Nguyen", "Cap £200 is bounded.", "Manager Maya Chen."],
+      [79, "nl-agents-004", "Remy Alves", "Cap £150 is bounded.", "Manager Priya Shah."],
+    ] as const).map(([n, agentId, name, cap, manager]) => ctx.rec({
+      org: "nl", collection: "evaluations", n, title: `${name} · governance`,
+      status: "passed", owner: "Soren Fisk", at: at(-8),
+      summary: "Cap and manager both recorded before the contract was activated.",
+      fields: { kind: "run", agentId, scenarioId: "nl-evaluations-063", score: 100, passed: 2, failed: 0, contractVersion: "1.0" },
+      body: { results: [{ id: "a1", pass: true, note: cap }, { id: "a2", pass: true, note: manager }] },
+    })),
     ctx.rec({
       org: "nl", collection: "evaluations", n: 75, title: "Wren Halliday · figure sourcing",
       status: "passed", owner: "Soren Fisk", at: at(-16),

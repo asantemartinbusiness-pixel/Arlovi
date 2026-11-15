@@ -410,7 +410,7 @@ function AgentProfile({ context, view }: { context: ScreenContext; view: "Overvi
           ]} />
         </Stack>
       </Card>
-      <Card span={5} eyebrow="ACTIVATION" prov={blockers.length === 0 ? "posted" : "unknown"} title="Can it be activated?" subtitle={blockers.length === 0 ? "Everything required is recorded" : `${blockers.length} blocker${blockers.length === 1 ? "" : "s"}`}>
+      <Card span={5} eyebrow="ACTIVATION" prov={blockers.length === 0 ? "posted" : "unknown"} title="Can it be activated?" subtitle={blockers.length === 0 ? "No blockers · everything required is recorded" : `${blockers.length} blocker${blockers.length === 1 ? "" : "s"}`}>
         {blockers.length === 0 ? (
           <Notice tone="success" title="Ready">This contract has a role, a manager, a bounded ceiling, at least one skill, a granted tool and a passing evaluation.</Notice>
         ) : (
@@ -2081,7 +2081,8 @@ function PromotionApproval({ context, close }: { context: ScreenContext; close: 
   if (!run) return <Empty title="No run to promote" />;
   const agent = data.agents.find((item) => item.id === run.fields.agentId);
   const score = Number(run.fields.score ?? 0);
-  const blocked = score < SAFETY_SCORE;
+  const contractBlockers = agent ? activationBlockers(agent, data.evaluations).filter((item) => !item.startsWith("The latest evaluation") && !item.startsWith("No evaluation run")) : [];
+  const blocked = score < SAFETY_SCORE || contractBlockers.length > 0;
   return (
     <Stack gap={4}>
       <Properties rows={[
@@ -2089,7 +2090,11 @@ function PromotionApproval({ context, close }: { context: ScreenContext; close: 
         { label: "Score", value: `${score} / 100` },
         { label: "Safety line", value: String(SAFETY_SCORE) },
       ]} />
-      {blocked ? (
+      {contractBlockers.length > 0 ? (
+        <Notice tone="danger" title="Promotion is blocked">
+          The contract has {contractBlockers.length} activation blocker{contractBlockers.length === 1 ? "" : "s"}: {contractBlockers.join(" ")}
+        </Notice>
+      ) : blocked ? (
         <Notice tone="danger" title="Promotion is blocked">
           A version below the safety line cannot be promoted. The line is not lowered by a newer run, and nothing is promoted silently.
         </Notice>
@@ -2245,6 +2250,13 @@ async function pauseAgent(context: ScreenContext): Promise<void> {
   const agent = context.selectedId ? await db.records.get(context.selectedId) : undefined;
   if (!agent || agent.collection !== "agents") { context.toast("Choose an AI employee", "Select one on the roster first.", "info"); return; }
   const paused = agent.status === "paused";
+  if (paused) {
+    const blockers = activationBlockers(agent, await teamRecords(context, "evaluations"));
+    if (blockers.length > 0) {
+      context.toast("Cannot resume", `${agent.title} has ${blockers.length} activation blocker${blockers.length === 1 ? "" : "s"}: ${blockers[0]}`, "blocked");
+      return;
+    }
+  }
   await context.mutate.patch(agent.id, {
     status: paused ? "active" : "paused",
     fields: { ...agent.fields, pausedReason: paused ? "" : `Paused by ${context.actor}.` },

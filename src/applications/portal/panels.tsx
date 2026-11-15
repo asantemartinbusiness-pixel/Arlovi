@@ -12,7 +12,7 @@ import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import {
   bodyOf, expiryState, GATE_LABELS, MODULE_LABELS, portalDocuments, portalForRole, portalInvoices,
-  portalMessages, sharedRecords, statusTone, usePortalData, type PortalBody,
+  listedPortals, portalMessages, portalUsers, resolvePortal, sharedRecords, sharedWithPortal, statusTone, usePortalData, type PortalBody,
 } from "./data";
 
 /* ====================================================================== *
@@ -24,12 +24,12 @@ import {
 export function usePortal(context: ScreenContext): { portal: Rec | undefined; locked: boolean } {
   const data = usePortalData();
   const { role, actor } = useWorkspace();
-  const fromRoute = data.portals.find((item) => item.id === context.params.id);
+  const fromRoute = resolvePortal(context.params.id, data.portals);
   if (role === "client") {
     const mine = portalForRole(role, data.portals, actor, data.contacts);
     return { portal: mine, locked: true };
   }
-  return { portal: fromRoute ?? data.portals[0], locked: false };
+  return { portal: fromRoute ?? listedPortals(data.portals)[0], locked: false };
 }
 
 export function ClientOnlyNotice({ context }: { context: ScreenContext }) {
@@ -55,7 +55,7 @@ export function PortalDirectory({ context, audience }: { context: ScreenContext;
   if (role === "client") return <ClientOnlyNotice context={context} />;
 
   const wanted = audience.toLowerCase().replace(/s$/, "");
-  const rows = data.portals.filter((portal) => String(portal.fields.audience ?? "") === wanted);
+  const rows = listedPortals(data.portals).filter((portal) => String(portal.fields.audience ?? "") === wanted);
 
   if (rows.length === 0) {
     return <Empty title={`No ${audience.toLowerCase()} portals`} icon={<LifeBuoy size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Portal wizard")}>Create a portal</Button>}>
@@ -66,7 +66,6 @@ export function PortalDirectory({ context, audience }: { context: ScreenContext;
   return (
     <Grid>
       {rows.map((portal) => {
-        const shared = sharedRecords(portal, data);
         const visit = freshness(String(portal.fields.lastVisitAt ?? ""), now, 14);
         return (
           <Card
@@ -92,8 +91,8 @@ export function PortalDirectory({ context, audience }: { context: ScreenContext;
                 </div>
               </Row>
               <Properties rows={[
-                { label: "External users", value: <span className="ds-num">{String(portal.fields.externalUsers ?? 0)}</span> },
-                { label: "Records shared", value: <span className="ds-num">{String(shared.length + portalDocuments(portal, data.documents).length)}</span> },
+                { label: "External users", value: <span className="ds-num">{String(portalUsers(portal).length)}</span> },
+                { label: "Records shared", value: <span className="ds-num">{String(sharedWithPortal(portal, data).length)}</span> },
                 { label: "Visits, 90 days", value: <span className="ds-num">{String(portal.fields.visits90d ?? 0)}</span> },
                 { label: "Last visit", value: visit.known ? context.relative(String(portal.fields.lastVisitAt)) : "Never opened" },
                 { label: "Inherits internal access", value: portal.fields.inheritsInternalAccess === true ? <Pill tone="danger">Yes</Pill> : <Pill tone="success">No</Pill> },
@@ -333,7 +332,7 @@ export function ExternalDashboard({ context, lens }: { context: ScreenContext; l
         </Notice>
       )}
       <StatRow>
-        <Stat label="Shared with you" value={String(shared.length + documents.length)} prov="human" meta="Records this portal names" />
+        <Stat label="Shared with you" value={String(sharedWithPortal(portal, data).length)} prov="human" meta="Records this portal names" />
         <Stat label="Needs your review" value={String(documents.filter((document) => document.status === "needs_review").length)} prov="human" meta="Documents awaiting sign-off" />
         <Stat label="Open requests" value={String(messages.filter((message) => message.status === "open").length)} prov="human" meta="Waiting on the studio" />
         <Stat label="Outstanding invoices" value={context.money(invoices.filter((invoice) => invoice.status !== "paid").reduce((sum, invoice) => sum + (invoice.amountMinor ?? 0), 0))} prov="posted" meta={`${invoices.filter((invoice) => invoice.status !== "paid").length} unpaid`} />
@@ -774,10 +773,10 @@ export function PortalSelector({ context }: { context: ScreenContext }) {
   return (
     <Field label="Portal">
       <Select
-        value={context.params.id ?? data.portals[0]?.id ?? ""}
+        value={resolvePortal(context.params.id, data.portals)?.id ?? listedPortals(data.portals)[0]?.id ?? ""}
         onChange={(event) => context.navigate(`/o/${org.slug}/portal/portals/${event.target.value}/dashboard`)}
       >
-        {data.portals.map((portal) => <option key={portal.id} value={portal.id}>{portal.title}</option>)}
+        {listedPortals(data.portals).map((portal) => <option key={portal.id} value={portal.id}>{portal.title}</option>)}
       </Select>
     </Field>
   );

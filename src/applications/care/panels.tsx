@@ -290,13 +290,13 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
       status: internal ? "note" : "sent",
       summary: draft.trim(),
       parentId: active.id,
-      at: new Date().toISOString(),
+      at: context.now.toISOString(),
       fields: { kind: "ticket", author: actor, side: "agent", channel: internal ? "internal" : String(active.fields.channel ?? "email"), internal },
     }, `${internal ? "Internal note added" : "Reply sent"} on ${String(active.fields.ref ?? active.title)} by ${actor}`);
     if (!internal && !active.fields.firstResponseAt) {
       await context.mutate.patch(active.id, {
         status: active.status === "new" ? "open" : active.status,
-        fields: { ...active.fields, firstResponseAt: new Date().toISOString(), assignee: String(active.fields.assignee || actor) },
+        fields: { ...active.fields, firstResponseAt: context.now.toISOString(), assignee: String(active.fields.assignee || actor) },
       }, { event: `First response recorded on ${String(active.fields.ref ?? "")}` });
     }
     setDraft("");
@@ -590,7 +590,7 @@ export function TicketDetail({ context, lens }: { context: ScreenContext; lens: 
           <Stack gap={3}>
             <Properties rows={[
               { label: "Resolved", value: context.dateTime(String(ticket.fields.resolvedAt)) },
-              { label: "By", value: String(ticket.fields.assignee ?? "") },
+              { label: "By", value: String(ticket.fields.resolvedBy || "Not recorded") },
             ]} />
             <Button variant="secondary" onClick={() => context.openOverlay("internal note")}>Reopen this case</Button>
           </Stack>
@@ -602,7 +602,7 @@ export function TicketDetail({ context, lens }: { context: ScreenContext; lens: 
               onClick={async () => {
                 await context.mutate.patch(ticket.id, {
                   status: "resolved",
-                  fields: { ...ticket.fields, resolvedAt: new Date().toISOString(), assignee: String(ticket.fields.assignee || context.actor) },
+                  fields: { ...ticket.fields, resolvedAt: context.now.toISOString(), resolvedBy: context.actor, assignee: String(ticket.fields.assignee || context.actor) },
                 }, { expectRevision: ticket.revision, event: `${String(ticket.fields.ref ?? ticket.title)} resolved by ${context.actor}` });
                 context.toast("Case resolved", "The record changed and the clock stopped.");
               }}
@@ -1110,13 +1110,13 @@ export function ResponseComposer({ context, close }: { context: ScreenContext; c
           status: "sent",
           summary: text.trim(),
           parentId: ticket.id,
-          at: new Date().toISOString(),
+          at: context.now.toISOString(),
           fields: { kind: "ticket", author: context.actor, side: "agent", channel: String(ticket.fields.channel ?? "email"), internal: false },
         }, `Reply recorded on ${String(ticket.fields.ref ?? ticket.title)} by ${context.actor}`);
         if (!ticket.fields.firstResponseAt) {
           await context.mutate.patch(ticket.id, {
             status: ticket.status === "new" ? "open" : ticket.status,
-            fields: { ...ticket.fields, firstResponseAt: new Date().toISOString(), assignee: String(ticket.fields.assignee || context.actor) },
+            fields: { ...ticket.fields, firstResponseAt: context.now.toISOString(), assignee: String(ticket.fields.assignee || context.actor) },
           }, { event: `First response recorded on ${String(ticket.fields.ref ?? "")}` });
         }
         if (macro) {
@@ -1237,7 +1237,7 @@ export function Escalation({ context, close }: { context: ScreenContext; close: 
           status: "note",
           summary: `Escalated to ${to}. ${String(form.get("why") ?? "")}`,
           parentId: ticket.id,
-          at: new Date().toISOString(),
+          at: context.now.toISOString(),
           fields: { kind: "ticket", author: context.actor, side: "agent", channel: "internal", internal: true },
         }, `Escalation note added to ${String(ticket.fields.ref ?? "")}`);
         context.toast("Escalated", `${to} owns this case now, and the reason is on the record.`);
@@ -1279,7 +1279,7 @@ export function InternalNote({ context, close }: { context: ScreenContext; close
           status: "note",
           summary: String(form.get("note") ?? ""),
           parentId: ticket.id,
-          at: new Date().toISOString(),
+          at: context.now.toISOString(),
           fields: { kind: "ticket", author: context.actor, side: "agent", channel: "internal", internal: true },
         }, `Internal note added to ${String(ticket.fields.ref ?? "")}`);
         if (reopen && resolved) {
@@ -1309,17 +1309,46 @@ export function InternalNote({ context, close }: { context: ScreenContext; close
   );
 }
 
+const FINISHED_TASK = new Set(["done", "closed", "cancelled", "canceled", "rejected", "declined"]);
+
+/** The refund request still waiting on finance for this case, if there is one. */
+export function pendingRefundFor(ticket: Rec | undefined, tasks: Rec[]): Rec | undefined {
+  if (!ticket) return undefined;
+  return tasks.find((task) => task.fields.ticketId === ticket.id
+    && task.title.startsWith("Refund request")
+    && !FINISHED_TASK.has(task.status)
+    && !FINISHED_TASK.has(String(task.fields.stage ?? "")));
+}
+
+export function RefundFooter({ context, close }: { context: ScreenContext; close: () => void }) {
+  const data = useCareData();
+  const ticket = useRecord(context.params.id ?? context.selectedId) ?? data.tickets[0];
+  const pending = pendingRefundFor(ticket, data.tasks);
+  return (
+    <>
+      <Button variant="ghost" onClick={close}>Cancel</Button>
+      <span className="ds-grow" />
+      <Button variant="primary" type="submit" form="cr-refund" disabled={Boolean(pending)}>Request from finance</Button>
+    </>
+  );
+}
+
 export function RefundRequest({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCareData();
   const ticket = useRecord(context.params.id ?? context.selectedId) ?? data.tickets[0];
   const [amount, setAmount] = useState("0.00");
   if (!ticket) return <Empty title="No case" />;
+  const pending = pendingRefundFor(ticket, data.tasks);
   return (
     <form
       id="cr-refund"
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
+        if (pendingRefundFor(ticket, data.tasks)) {
+          context.toast("Refund already requested", "This case already has a refund request waiting on finance. A second one is refused.", "blocked");
+          return;
+        }
         await context.mutate.create({
           collection: "tasks",
           title: `Refund request for ${String(ticket.fields.ref ?? "")}`,
@@ -1333,6 +1362,11 @@ export function RefundRequest({ context, close }: { context: ScreenContext; clos
       }}
     >
       <Properties rows={[{ label: "Case", value: ticket.title }, { label: "Customer", value: data.contacts.find((row) => row.id === ticket.fields.contactId)?.title ?? "Not linked" }]} />
+      {pending ? (
+        <Notice tone="danger" title="A refund has already been requested on this case">
+          {pending.summary || pending.title} Finance has not decided it yet, so a second request is refused. One case carries one refund request at a time.
+        </Notice>
+      ) : null}
       <Field label="Amount" required>
         <Row gap={2}>
           <span className="ds-subtle">{context.org.currency}</span>

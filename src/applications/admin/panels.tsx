@@ -31,8 +31,8 @@ export function OrganizationSettings({ context, tab }: { context: ScreenContext;
         <Card eyebrow="IDENTITY" prov="human" span={7} title="Company identity" subtitle="Held on the organisation record in this browser">
           <Properties rows={[
             { label: "Workspace name", value: context.org.name },
-            { label: "Legal name", value: String(record?.fields.legalName ?? `${context.org.name} Ltd`) },
-            { label: "Trading name", value: String(record?.fields.tradingName ?? context.org.shortName) },
+            { label: "Legal name", value: legalNameOf(record, context) },
+            { label: "Trading name", value: tradingNameOf(record, context) },
             { label: "Registration", value: context.org.registration ?? "Not recorded" },
             { label: "Company number", value: String(record?.fields.companyNumber ?? "Not recorded") },
             { label: "Jurisdiction", value: context.org.jurisdiction },
@@ -152,15 +152,24 @@ export function OrganizationSettings({ context, tab }: { context: ScreenContext;
   );
 }
 
+/** The legal and trading names as the profile shows them, so the edit form starts from the same values. */
+function legalNameOf(record: Rec | undefined, context: ScreenContext): string {
+  return String(record?.fields.legalName ?? `${context.org.name} Ltd`);
+}
+
+function tradingNameOf(record: Rec | undefined, context: ScreenContext): string {
+  return String(record?.fields.tradingName ?? context.org.shortName);
+}
+
 export function IdentityForm({ context, close }: { context: ScreenContext; close: () => void }) {
   const record = useOrganisationRecord();
-  const [legalName, setLegalName] = useSeeded(String(record?.fields.legalName ?? ""));
-  const [tradingName, setTradingName] = useSeeded(String(record?.fields.tradingName ?? ""));
+  const [legalName, setLegalName] = useSeeded(record ? legalNameOf(record, context) : "");
+  const [tradingName, setTradingName] = useSeeded(record ? tradingNameOf(record, context) : "");
   const [companyNumber, setCompanyNumber] = useSeeded(String(record?.fields.companyNumber ?? ""));
   const [busy, setBusy] = useState(false);
   if (!record) return <Empty title="Organisation record unavailable" />;
 
-  const legalChanged = legalName !== String(record.fields.legalName ?? "") || companyNumber !== String(record.fields.companyNumber ?? "");
+  const legalChanged = legalName !== legalNameOf(record, context) || companyNumber !== String(record.fields.companyNumber ?? "");
 
   async function save() {
     setBusy(true);
@@ -189,7 +198,7 @@ export function IdentityForm({ context, close }: { context: ScreenContext; close
       {legalChanged ? (
         <StepUp word="CHANGE" label="Change the legal identity" busy={busy} onConfirm={save}>
           <Properties rows={[
-            { label: "Legal name", value: `${String(record.fields.legalName ?? "—")} → ${legalName}` },
+            { label: "Legal name", value: `${legalNameOf(record, context)} → ${legalName}` },
             { label: "Company number", value: `${String(record.fields.companyNumber ?? "—")} → ${companyNumber || "—"}` },
             { label: "Documents already issued", value: "Keep the name they were issued under; nothing is rewritten." },
           ]} />

@@ -8,7 +8,7 @@ import type { ScreenContext } from "@/platform/registry";
 import { useEvents, useOrgRecords, useWorkspace } from "@/platform/workspace";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, capabilityById } from "@/platform/capability";
 import { ROLE_LABELS } from "@/platform/policy";
-import type { Audit } from "@/domain/types";
+import type { Audit, Rec } from "@/domain/types";
 import { csvList, ofKind, StepUp, useAdmin, useSeeded } from "./pieces";
 
 /* ====================================================================== *
@@ -639,7 +639,7 @@ export function PrivacyScreen({ context, tab }: { context: ScreenContext; tab: P
           columns={[
             { key: "title", header: "Request", primary: true, cell: (row) => <div><strong>{row.title}</strong><p className="ds-subtle">{row.summary}</p></div>, filterValue: (row) => `${row.title} ${row.summary} ${String(row.fields.subject ?? "")}` },
             { key: "type", header: "Kind", cell: (row) => <Pill tone={row.fields.type === "erasure" ? "warning" : "neutral"}>{String(row.fields.type)}</Pill> },
-            { key: "records", header: "Records", align: "end", cell: (row) => <span className="ds-num">{String(row.fields.recordCount ?? 0)}</span> },
+            { key: "records", header: "Records", align: "end", cell: (row) => <span className="ds-num">{String(subjectRecords(row, records).length)}</span>, sortValue: (row) => subjectRecords(row, records).length },
             { key: "due", header: "Due", align: "end", cell: (row) => (row.dueAt ? <span className="ds-num">{context.date(row.dueAt)}</span> : "—"), sortValue: (row) => row.dueAt ?? "" },
             { key: "hold", header: "Hold", align: "end", cell: (row) => (row.fields.legalHold === true ? <Pill tone="danger">Legal hold</Pill> : <span className="ds-subtle">None</span>) },
             { key: "status", header: "State", align: "end", cell: (row) => <Pill tone={row.status === "completed" ? "success" : "info"}>{row.status}</Pill> },
@@ -710,6 +710,47 @@ export function PrivacyScreen({ context, tab }: { context: ScreenContext; tab: P
   );
 }
 
+/**
+ * The records a subject request covers, computed one way for the register, the
+ * review, the export and the deletion impact. A record in one of the request's
+ * collections is the subject's when it names them (its title, owner or any
+ * field equals one of their names, or lists them) or when it links, through
+ * its parent, contact, employee or member reference, to a record that is.
+ */
+export function subjectNames(request: Rec): string[] {
+  const subject = String(request.fields.subject ?? "").trim();
+  if (!subject) return [];
+  const names = new Set([subject]);
+  const bracket = /^(.*?)\s*\(([^)]+)\)\s*$/.exec(subject);
+  if (bracket) { names.add(bracket[1].trim()); names.add(bracket[2].trim()); }
+  return [...names].filter(Boolean);
+}
+
+const LINK_FIELDS = ["contactId", "employeeId", "memberId", "companyId", "applicantId", "ticketId"];
+
+export function subjectRecords(request: Rec, records: Rec[]): Rec[] {
+  const names = subjectNames(request);
+  if (names.length === 0) return [];
+  const collections = csvList(request.fields.collections);
+  const pool = records.filter((record) => collections.includes(record.collection) && record.organizationId === request.organizationId);
+  const wanted = new Set(names);
+  const namesIt = (value: unknown) => typeof value === "string" && (wanted.has(value.trim()) || csvList(value).some((entry) => wanted.has(entry)));
+  const direct = (record: Rec) => wanted.has(record.title.trim()) || wanted.has(record.ownerName) || Object.values(record.fields).some(namesIt);
+  const matched = new Map(pool.filter(direct).map((record) => [record.id, record]));
+  // Records about a matched record belong to the subject too: follow links until nothing new joins.
+  const all = records.filter((record) => record.organizationId === request.organizationId);
+  const anchors = new Set([...matched.keys(), ...all.filter(direct).map((record) => record.id)]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const record of pool) {
+      if (matched.has(record.id)) continue;
+      const linked = (record.parentId && anchors.has(record.parentId)) || LINK_FIELDS.some((key) => anchors.has(String(record.fields[key] ?? "")));
+      if (linked) { matched.set(record.id, record); anchors.add(record.id); grew = true; }
+    }
+  }
+  return [...matched.values()];
+}
+
 export function DataRequestOverlay({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
   const records = useOrgRecords();
@@ -720,7 +761,7 @@ export function DataRequestOverlay({ context, close }: { context: ScreenContext;
 
   const subject = String(request.fields.subject ?? "");
   const collections = csvList(request.fields.collections);
-  const matching = records.filter((record) => collections.includes(record.collection) && (record.title === subject || record.ownerName === subject || record.summary.includes(subject)));
+  const matching = subjectRecords(request, records);
   const hold = request.fields.legalHold === true;
 
   return (
@@ -750,7 +791,7 @@ export function DataRequestOverlay({ context, close }: { context: ScreenContext;
               const header = "collection,id,title,status,summary,updated\n";
               const body = matching.map((record) => [record.collection, record.id, record.title, record.status, record.summary, record.updatedAt].map(quote).join(",")).join("\n");
               download(`${context.org.slug}-${subject.replace(/\W+/g, "-").toLowerCase()}-data.csv`, header + body);
-              await context.mutate.patch(request.id, { fields: { ...request.fields, exportedAt: new Date().toISOString(), exportedBy: context.actor } }, { event: `Subject data exported for ${subject} (${matching.length} records)` });
+              await context.mutate.patch(request.id, { fields: { ...request.fields, exportedAt: context.now.toISOString(), exportedBy: context.actor } }, { event: `Subject data exported for ${subject} (${matching.length} records)` });
               context.toast("Copy prepared", `${matching.length} records downloaded as CSV, and the request records that it happened.`);
             } finally { setBusy(false); }
           }}
@@ -760,7 +801,7 @@ export function DataRequestOverlay({ context, close }: { context: ScreenContext;
         <Button
           variant="secondary"
           onClick={async () => {
-            await context.mutate.patch(request.id, { status: "restricted", fields: { ...request.fields, restrictedBy: context.actor, restrictedAt: new Date().toISOString() } }, { event: `Processing restricted for ${subject}`, expectRevision: request.revision });
+            await context.mutate.patch(request.id, { status: "restricted", fields: { ...request.fields, restrictedBy: context.actor, restrictedAt: context.now.toISOString() } }, { event: `Processing restricted for ${subject}`, expectRevision: request.revision });
             context.toast("Processing restricted", "The request is marked restricted: the records stay but are not used further.");
           }}
         >
@@ -793,8 +834,9 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
   const collections = csvList(request.fields.collections);
   const retention = ofKind(data.policies, "retention").filter((policy) => csvList(policy.fields.collections).some((entry) => collections.includes(entry)));
   const held = retention.filter((policy) => policy.fields.legalHold === true);
-  const deletable = records.filter((record) => collections.includes(record.collection) && record.title === subject && !held.some((policy) => csvList(policy.fields.collections).includes(record.collection)));
-  const blocked = records.filter((record) => collections.includes(record.collection) && record.title === subject && held.some((policy) => csvList(policy.fields.collections).includes(record.collection)));
+  const covered = subjectRecords(request, records);
+  const deletable = covered.filter((record) => !held.some((policy) => csvList(policy.fields.collections).includes(record.collection)));
+  const blocked = covered.filter((record) => held.some((policy) => csvList(policy.fields.collections).includes(record.collection)));
 
   return (
     <StepUp
@@ -1156,7 +1198,7 @@ export function RecoveryScreen({ context, tab }: { context: ScreenContext; tab: 
                 size="sm"
                 variant="primary"
                 onClick={async () => {
-                  const payload = JSON.stringify({ organisation: context.org.slug, exportedAt: new Date().toISOString(), count: records.length, records }, null, 2);
+                  const payload = JSON.stringify({ organisation: context.org.slug, exportedAt: context.now.toISOString(), count: records.length, records }, null, 2);
                   download(`${context.org.slug}-export.json`, payload, "application/json");
                   await context.mutate.create({
                     collection: "backups",

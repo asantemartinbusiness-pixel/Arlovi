@@ -553,13 +553,31 @@ export async function runHealthTest(context: ScreenContext): Promise<void> {
   context.toast("Health test recorded", "Two checks passed locally. Nothing was contacted.", "blocked");
 }
 
+const ACTIVE_INCIDENT = ["open", "investigating", "mitigating"];
+
+/** The unresolved incident already on the IT register for this connector, if any. */
+export function activeIncidentFor(connector: Rec | undefined, incidents: Rec[]): Rec | undefined {
+  if (!connector) return undefined;
+  const mine = incidents.filter((incident) => String(incident.fields.kind ?? "incident") === "incident"
+    && String(incident.fields.connectorId ?? "") === connector.id
+    && ACTIVE_INCIDENT.includes(incident.status));
+  return mine.sort((a, b) => (a.at ?? a.createdAt).localeCompare(b.at ?? b.createdAt))[0];
+}
+
 export const openConnectorIncident = actOverlay({
   id: "open incident",
   title: "Open a connector incident",
   collection: "connectors",
   noun: "connector",
   candidates: (records) => records.filter((record) => String(record.fields.kind ?? "") !== "custom"),
-  consequence: () => "An incident is opened on the IT register against this connector. If the fault is the provider's, it is recorded as theirs and not internally repairable, so nobody is asked to fix what only the provider can.",
+  useWatch: () => useCollection("incidents"),
+  consequenceTitle: ({ record, watched }) => (activeIncidentFor(record, (watched as Rec[] | undefined) ?? []) ? "This connector already has an open incident" : "What this will do"),
+  consequence: ({ record, watched }) => {
+    const existing = activeIncidentFor(record, (watched as Rec[] | undefined) ?? []);
+    return existing
+      ? `${existing.title} is already open on the IT register for ${record?.title ?? "this connector"}. Your report is added to it and that incident opens, rather than a second copy being raised.`
+      : "An incident is opened on the IT register against this connector. If the fault is the provider's, it is recorded as theirs and not internally repairable, so nobody is asked to fix what only the provider can.";
+  },
   fields: () => [
     { name: "title", label: "What is wrong", required: true },
     { name: "origin", label: "Whose fault", kind: "select", options: [{ value: "ours", label: "Ours — for example, no grant obtained" }, { value: "provider", label: "The provider's — an outage on their side" }] },
@@ -567,18 +585,31 @@ export const openConnectorIncident = actOverlay({
     { name: "impact", label: "What is affected", kind: "textarea" },
   ],
   submit: "Open the incident",
-  apply: async ({ record, values, context }) => {
+  apply: async ({ record, values, context, watched }) => {
     if (!record) return;
     const provider = values.origin === "provider";
+    const existing = activeIncidentFor(record, (watched as Rec[] | undefined) ?? []);
+    if (existing) {
+      const reports = Number(existing.fields.reportCount ?? 1) + 1;
+      await context.mutate.patch(existing.id, {
+        fields: {
+          connectorId: record.id, connectorName: record.title, service: String(existing.fields.service ?? "Connectors"),
+          latestReport: values.title, latestReportBy: context.actor, latestReportAt: nowIso(context), reportCount: reports,
+          ...(values.impact ? { impact: values.impact } : {}),
+        },
+      }, { expectRevision: existing.revision, event: `Report added to ${existing.title} by ${context.actor}: ${values.title}` });
+      context.navigate(`/o/${context.org.slug}/it/incidents/${existing.id}`);
+      return { title: "Added to the open incident", body: `${existing.title} was already open for ${record.title}, so your report was added to it instead of opening a second incident.`, tone: "info" };
+    }
     const created = await context.mutate.create({
       collection: "incidents",
       title: values.title,
       status: provider ? "awaiting_user" : "open",
       summary: provider ? `Provider-side fault on ${record.title}. Not internally repairable; waiting on the provider.` : `Fault on ${record.title} that is ours to fix.`,
       at: nowIso(context),
-      fields: { kind: "incident", severity: values.severity, service: "Connectors", origin: values.origin, owner: context.actor, connectorId: record.id, impact: values.impact, repairable: !provider },
+      fields: { kind: "incident", severity: values.severity, service: "Connectors", origin: values.origin, owner: context.actor, connectorId: record.id, connectorName: record.title, impact: values.impact, repairable: !provider, reportCount: 1 },
     }, `Incident opened on ${record.title}: ${values.title}`);
-    return `${created.title} is on the incident register${provider ? " as a provider fault, not repairable here" : ""}.`;
+    return `${created.title} is on the incident register against ${record.title}${provider ? " as a provider fault, not repairable here" : ""}.`;
   },
 });
 

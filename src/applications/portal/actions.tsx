@@ -9,7 +9,7 @@ import type { Rec } from "@/domain/types";
 import { CHANGED_ELSEWHERE, ProviderBoundary, type ConfirmSpec } from "@/applications/market/kit";
 import { useBookData } from "@/applications/book/data";
 import { freeSlots } from "@/applications/book/overlays";
-import { bodyOf, expiryState, GATE_LABELS, MODULE_LABELS, portalDocuments, sharedRecords, usePortalData, type PortalBody, type PortalPage } from "./data";
+import { bodyOf, expiryState, GATE_LABELS, MODULE_LABELS, portalDocuments, resolvePortal, sharedRecords, usePortalData, type PortalBody, type PortalPage } from "./data";
 import { usePortal } from "./panels";
 
 /* ====================================================================== *
@@ -247,7 +247,7 @@ export async function approveScopedItem(context: ScreenContext) {
   const record = await load(context, context.selectedId);
   if (!record) return;
   const portals = await listByCollection(context.org.id, "portals");
-  const portal = portals.find((item) => item.id === context.params.id);
+  const portal = resolvePortal(context.params.id, portals);
   const shared = portal ? (bodyOf<PortalBody>(portal, {}).shared ?? []).some((scope) => scope.ids.includes(record.id)) || String(record.fields.portalId ?? "") === portal.id : false;
   const signature = String(record.fields.signature ?? "");
   confirm(context, {

@@ -95,6 +95,9 @@ registerSeed("portal", (ctx) => {
         inheritsInternalAccess: false,
         linkExpiryDays: 30,
         termsVersion: "2026-09",
+        // The base workspace keeps Harrow House as a bare stub (nl-portals-001);
+        // this record is its full definition, and both ids read and write it.
+        ...(portal.n === 20 ? { canonicalFor: "nl-portals-001" } : {}),
       },
       body: {
         pages: portal.pages.map((page, index) => ({

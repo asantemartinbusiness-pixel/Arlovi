@@ -8,7 +8,7 @@ import { useRecord, useWorkspace } from "@/platform/workspace";
 import { ProviderBoundary } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import {
-  bodyOf, expiryState, portalDocuments, sharedRecords, statusTone,
+  bodyOf, expiryState, listedPortals, portalDocuments, portalUsers, resolvePortal, sharedRecords, sharedWithPortal, statusTone,
   usePortalData, type PortalBody,
 } from "./data";
 import { InvoiceTotalsCard, usePortal } from "./panels";
@@ -138,7 +138,8 @@ export function PortalBranding({ context, close }: { context: ScreenContext; clo
 export function AccessSetup({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = usePortalData();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const portal = useRecord(payload?.id ?? context.selectedId) ?? data.portals[0];
+  const asked = useRecord(payload?.id ?? context.selectedId);
+  const portal = (asked ? resolvePortal(asked.id, data.portals) : undefined) ?? listedPortals(data.portals)[0];
   const [expiry, setExpiry] = useState(String(portal?.fields.linkExpiryDays ?? 30));
   const [inherits, setInherits] = useState(portal?.fields.inheritsInternalAccess === true);
   if (!portal) return <Empty title="No portal" />;
@@ -158,8 +159,8 @@ export function AccessSetup({ context, close }: { context: ScreenContext; close:
     >
       <Properties rows={[
         { label: "Portal", value: portal.title },
-        { label: "External users", value: <span className="ds-num">{String(portal.fields.externalUsers ?? 0)}</span> },
-        { label: "Records shared", value: <span className="ds-num">{String(sharedRecords(portal, data).length)}</span> },
+        { label: "External users", value: <span className="ds-num">{String(portalUsers(portal).length)}</span> },
+        { label: "Records shared", value: <span className="ds-num">{String(sharedWithPortal(portal, data).length)}</span> },
       ]} />
       <Field label="Link expiry in days" hint="A shared link stops working after this many days."><TextInput value={expiry} inputMode="numeric" align="end" onChange={(event) => setExpiry(event.target.value)} /></Field>
       <Checkbox label="Let this portal inherit internal permissions" checked={inherits} onChange={(event) => setInherits(event.target.checked)} />
@@ -673,7 +674,7 @@ export function ExternalInvite({ context, close }: { context: ScreenContext; clo
         if (invalid) return;
         const expires = new Date(now.getTime() + (Number(days) || 30) * 86_400_000).toISOString();
         await context.mutate.patch(portal.id, {
-          fields: { ...portal.fields, invitesPending: Number(portal.fields.invitesPending ?? 0) + 1 },
+          fields: { ...portal.fields, invitesPending: Number(portal.fields.invitesPending ?? 0) + 1, externalUsers: (body.users ?? []).length + 1 },
           body: {
             ...body,
             users: [...(body.users ?? []), { id: `u-${Date.now()}`, name: name.trim(), email: email.trim(), role: portalRole, lastSeenAt: "", expiresAt: expires }],
@@ -709,18 +710,18 @@ export function ScopePreview({ context }: { context: ScreenContext }) {
   const data = usePortalData();
   const { portal } = usePortal(context);
   if (!portal) return <Empty title="No portal" />;
-  const shared = sharedRecords(portal, data);
-  const documents = portalDocuments(portal, data.documents);
-  const everything = data.orders.length + data.invoices.length + data.bookings.length + data.documents.length;
+  const reach = sharedWithPortal(portal, data);
+  const everything = data.orders.length + data.invoices.length + data.bookings.length + data.documents.length
+    + data.purchaseOrders.length + data.returns.length;
   return (
     <Stack gap={4}>
       <Properties rows={[
-        { label: "Visible to this portal", value: <strong className="ds-num">{String(shared.length + documents.length)}</strong> },
+        { label: "Visible to this portal", value: <strong className="ds-num">{String(reach.length)}</strong> },
         { label: "Records in the workspace", value: <span className="ds-num">{String(everything)}</span> },
-        { label: "Share of the workspace", value: <span className="ds-num">{everything === 0 ? "0%" : `${Math.round(((shared.length + documents.length) / everything) * 100)}%`}</span> },
-        { label: "Other portals", value: <span className="ds-num">{String(data.portals.length - 1)}</span> },
+        { label: "Share of the workspace", value: <span className="ds-num">{everything === 0 ? "0%" : `${Math.round((reach.length / everything) * 100)}%`}</span> },
+        { label: "Other portals", value: <span className="ds-num">{String(listedPortals(data.portals).length - 1)}</span> },
       ]} />
-      <DataGrid rows={[...shared.map((item) => ({ id: item.record.id, kind: item.collection, title: item.record.title })), ...documents.map((document) => ({ id: document.id, kind: "document", title: document.title }))]}
+      <DataGrid rows={reach.map((record) => ({ id: record.id, kind: record.collection === "purchaseOrders" ? "purchase order" : record.collection.replace(/s$/, ""), title: record.title }))}
         rowId={(row) => row.id} label="Everything this portal can reach" filterable={false}
         columns={[
           { key: "kind", header: "Kind", primary: true, cell: (row) => <Pill>{row.kind}</Pill> },

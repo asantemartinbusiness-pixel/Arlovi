@@ -266,8 +266,17 @@ export function OperationsHome({ context, lens }: { context: ScreenContext; lens
  * ARL-IT-002 — Incident Queue
  * ================================================================ */
 
+/** The service an incident is against, naming the connector when it is about one. */
+export function incidentService(record: Rec, connectors: Rec[]): string {
+  const connectorId = String(record.fields.connectorId ?? "");
+  const connector = connectorId ? String(record.fields.connectorName ?? "") || connectors.find((item) => item.id === connectorId)?.title || "" : "";
+  const service = String(record.fields.service ?? (connector ? "Connectors" : "Workspace"));
+  return connector ? `${service} · ${connector}` : service;
+}
+
 export function IncidentQueue({ context, lens }: { context: ScreenContext; lens: "Active" | "Awaiting user" | "Resolved" | "Postmortems" }) {
   const incidents = useCollection("incidents").filter((record) => String(record.fields.kind ?? "incident") === "incident");
+  const connectors = useCollection("connectors");
   const { org, now } = useWorkspace();
   const rows = incidents.filter((record) => {
     if (lens === "Active") return ["open", "investigating", "mitigating"].includes(record.status);
@@ -312,9 +321,11 @@ export function IncidentQueue({ context, lens }: { context: ScreenContext; lens:
       label="Incidents"
       rowTone={(row) => (String(row.fields.severity) === "high" ? "danger" : row.status === "open" ? "warning" : undefined)}
       columns={[
-        { key: "title", header: "Incident", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
+        { key: "title", header: "Incident", primary: true, cell: (row) => (row.fields.latestReport
+          ? <span className="ds-stack"><span>{row.title}</span><span className="ds-subtle">Latest report: {String(row.fields.latestReport)}</span></span>
+          : row.title), sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary} ${String(row.fields.latestReport ?? "")}` },
         { key: "severity", header: "Severity", cell: (row) => <Pill tone={SEVERITY_TONE[String(row.fields.severity ?? "medium")] ?? "warning"}>{String(row.fields.severity ?? "medium")}</Pill> },
-        { key: "service", header: "Service", cell: (row) => String(row.fields.service ?? "Workspace") },
+        { key: "service", header: "Service", cell: (row) => incidentService(row, connectors) },
         { key: "origin", header: "Origin", cell: (row) => <Pill tone={String(row.fields.origin) === "provider" ? "neutral" : "info"}>{String(row.fields.origin ?? "ours")}</Pill> },
         { key: "owner", header: "Owner", cell: (row) => String(row.fields.owner ?? row.ownerName) },
         { key: "started", header: "Started", cell: (row) => <span className="ds-num">{context.dateTime(row.at)}</span>, sortValue: (row) => row.at ?? "" },
@@ -442,7 +453,8 @@ export function IncidentDetail({ context, lens }: { context: ScreenContext; lens
           { label: "State", value: <Pill tone={record.status === "resolved" ? "success" : "info"} dot>{record.status.replace(/_/g, " ")}</Pill> },
           { label: "Started", value: <span className="ds-num">{context.dateTime(record.at)}</span> },
           { label: "Owner", value: String(record.fields.owner ?? record.ownerName) },
-          { label: "Service", value: String(record.fields.service ?? "Workspace") },
+          { label: "Service", value: incidentService(record, connectors) },
+          ...(record.fields.latestReport ? [{ label: "Latest report", value: `${String(record.fields.latestReport)} — ${String(record.fields.latestReportBy ?? "")}, ${context.dateTime(String(record.fields.latestReportAt ?? ""))}` }] : []),
           { label: "Origin", value: String(record.fields.origin ?? "ours") },
           { label: "Revision", value: <span className="ds-num">{String(record.revision)}</span> },
         ]} />

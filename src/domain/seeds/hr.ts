@@ -65,6 +65,7 @@ const NORTHLINE_PEOPLE: Person[] = [
   { n: 31, name: "Hugh Tennant", title: "Finance assistant", departmentId: COMMERCIAL, manager: "Jonah Adeyemi", employment: "full-time", status: "probation", office: "Clerkenwell studio", salaryMinor: 2_900_000, startOffsetDays: -48, allowance: 25, taken: 1, pronouns: "he/him", skills: "Bookkeeping, reconciliation", summary: "Six-month probation ends in the new year. Reconciles the local ledger." },
   { n: 32, name: "Yvonne Serrano", title: "Studio manager", departmentId: STUDIO, manager: "Maya Chen", employment: "full-time", status: "notice", office: "Clerkenwell studio", salaryMinor: 4_700_000, startOffsetDays: -1_890, allowance: 25, taken: 22, pronouns: "she/her", skills: "Scheduling, supplier liaison", summary: "Working notice. Handover to Rowan Patel is in progress.", endOffsetDays: 34 },
   { n: 33, name: "Oliver Grant", title: "Maker", departmentId: WORKSHOP, manager: "Rowan Patel", employment: "full-time", status: "alumni", office: "Clerkenwell workshop", salaryMinor: 3_300_000, startOffsetDays: -1_240, allowance: 25, taken: 25, pronouns: "he/him", skills: "Brass work, assembly", summary: "Left in the summer for a furniture workshop in Margate.", endOffsetDays: -126 },
+  { n: 34, name: "Rowan Pike", title: "Maker", departmentId: WORKSHOP, manager: "Rowan Patel", employment: "full-time", status: "alumni", office: "Clerkenwell workshop", salaryMinor: 3_200_000, startOffsetDays: -670, allowance: 25, taken: 18, pronouns: "they/them", skills: "Assembly, wiring", summary: "Left the workshop in September. The employment file is kept under the six-year retention schedule.", endOffsetDays: -60 },
 ];
 
 /** Offset so these ids cannot collide with another application's member fixtures. */
@@ -106,6 +107,24 @@ const APPLICANTS: ApplicantSeed[] = [
   { n: 28, name: "Ana Petrova", positionN: 23, stage: "withdrawn", source: "University fair", appliedOffset: -72, rating: 3, email: "a.petrova@example.com", summary: "Withdrew when the role was put on hold. Asked to be contacted in spring.", consentMonths: 6 },
 ];
 
+/** First name at the studio domain; a later colleague with the same first name gets first.last. */
+function workEmail(person: Person): string {
+  const [first, ...rest] = person.name.toLowerCase().split(" ");
+  const earlier = NORTHLINE_PEOPLE.some((other) => other.n < person.n && other.name.toLowerCase().split(" ")[0] === first);
+  return `${earlier ? `${first}.${rest.join("-")}` : first}@northline.example`;
+}
+
+/** Everyone on the payroll in a period: employed for some of that month, contractors excluded. */
+function paidIn(now: string, back: number): string {
+  const key = monthKey(now, back);
+  const start = new Date(`${key}-01T00:00:00.000Z`);
+  const end = new Date(start); end.setUTCMonth(end.getUTCMonth() + 1);
+  return NORTHLINE_PEOPLE.filter((person) => person.employment !== "contractor"
+    && new Date(dayOf(now, person.startOffsetDays)) < end
+    && (person.endOffsetDays === undefined || new Date(dayOf(now, person.endOffsetDays)) >= start))
+    .map((person) => person.name).join(",");
+}
+
 function employeeRecords(ctx: SeedContext): Rec[] {
   return NORTHLINE_PEOPLE.map((person) => ctx.rec({
     org: "nl",
@@ -127,7 +146,7 @@ function employeeRecords(ctx: SeedContext): Rec[] {
       office: person.office,
       pronouns: person.pronouns,
       skills: person.skills,
-      email: `${person.name.split(" ")[0].toLowerCase()}@northline.example`,
+      email: workEmail(person),
       phone: "Held under this person's privacy setting",
       salaryMinor: person.salaryMinor,
       salaryBasis: person.employment === "contractor" ? "day rate, invoiced" : "annual",
@@ -201,6 +220,13 @@ function leaveRecords(ctx: SeedContext): Rec[] {
     { n: 28, employeeN: 21, name: "Theo Marsh", type: "unpaid", from: -60, to: -58, status: "declined", note: "Declined: clashed with the catalogue shoot." },
     { n: 29, employeeN: 27, name: "Marcus Reiss", type: "parental", from: 46, to: 74, status: "approved", note: "Shared parental leave, agreed in writing." },
     { n: 30, employeeN: 22, name: "Sable Nguyen", type: "annual", from: -45, to: -41, status: "approved", note: "Summer break." },
+    { n: 31, employeeN: 34, name: "Rowan Pike", type: "annual", from: -300, to: -296, status: "approved", note: "Winter break." },
+    { n: 32, employeeN: 34, name: "Rowan Pike", type: "sick", from: -240, to: -239, status: "approved", note: "Absence recorded. No health detail is held in the team calendar." },
+    { n: 33, employeeN: 34, name: "Rowan Pike", type: "annual", from: -205, to: -200, status: "approved", note: "Spring week away." },
+    { n: 34, employeeN: 34, name: "Rowan Pike", type: "unpaid", from: -170, to: -169, status: "declined", note: "Declined: the bench was short that week." },
+    { n: 35, employeeN: 34, name: "Rowan Pike", type: "annual", from: -140, to: -133, status: "approved", note: "Summer holiday." },
+    { n: 36, employeeN: 34, name: "Rowan Pike", type: "annual", from: -100, to: -98, status: "approved", note: "Long weekend." },
+    { n: 37, employeeN: 34, name: "Rowan Pike", type: "annual", from: -70, to: -66, status: "approved", note: "Untaken leave used before the leaving date." },
   ];
   return rows.map((row) => ctx.rec({
     org: "nl",
@@ -279,19 +305,19 @@ function payrollRecords(ctx: SeedContext): Rec[] {
       org: "nl", collection: "payrollRuns", n: 20, title: `Payroll ${monthKey(ctx.now, 1)}`, status: "approved",
       summary: "Approved locally. No statutory submission and no bank file left this browser.",
       owner: "Elena Voss", at: dayOf(ctx.now, -16), amountMinor: 0,
-      fields: { period: monthKey(ctx.now, 1), approvedBy: "Maya Chen", payDay: dayOf(ctx.now, -16).slice(0, 10), filed: false, banked: false },
+      fields: { period: monthKey(ctx.now, 1), paidEmployees: paidIn(ctx.now, 1), approvedBy: "Maya Chen", payDay: dayOf(ctx.now, -16).slice(0, 10), filed: false, banked: false },
     }),
     ctx.rec({
       org: "nl", collection: "payrollRuns", n: 21, title: `Payroll ${monthKey(ctx.now, 2)}`, status: "approved",
       summary: "Approved locally. Exported as CSV for the accountant.",
       owner: "Elena Voss", at: dayOf(ctx.now, -47), amountMinor: 0,
-      fields: { period: monthKey(ctx.now, 2), approvedBy: "Maya Chen", payDay: dayOf(ctx.now, -47).slice(0, 10), filed: false, banked: false },
+      fields: { period: monthKey(ctx.now, 2), paidEmployees: paidIn(ctx.now, 2), approvedBy: "Maya Chen", payDay: dayOf(ctx.now, -47).slice(0, 10), filed: false, banked: false },
     }),
     ctx.rec({
       org: "nl", collection: "payrollRuns", n: 22, title: `Payroll ${monthKey(ctx.now, 3)}`, status: "approved",
       summary: "Approved locally.",
       owner: "Elena Voss", at: dayOf(ctx.now, -78), amountMinor: 0,
-      fields: { period: monthKey(ctx.now, 3), approvedBy: "Maya Chen", payDay: dayOf(ctx.now, -78).slice(0, 10), filed: false, banked: false },
+      fields: { period: monthKey(ctx.now, 3), paidEmployees: paidIn(ctx.now, 3), approvedBy: "Maya Chen", payDay: dayOf(ctx.now, -78).slice(0, 10), filed: false, banked: false },
     }),
   ];
 }

@@ -21,33 +21,27 @@ registerSeed("admin", (ctx) => {
   const member = (n: number, name: string, fields: Record<string, string | number | boolean>, status = "active", summary = "") =>
     records.push(ctx.rec({ org: "nl", collection: "members", n, title: name, status, summary, fields, tags: [String(fields.kind ?? "human")] }));
 
-  member(20, "Theo Marsh", {
-    kind: "human", role: "member", departmentId: "nl-departments-003", title: "Install lead", email: "theo@northline.example",
-    lastAccessAt: at(4), mfa: true, seat: "full", invitedBy: "Maya Chen", joinedAt: at(9_000),
-  }, "active", "Runs installs. Member view.");
-  member(21, "Amara Diallo", {
+  // Ids 40+: the HQ seed already holds nl-members-020..025 (Theo Marsh and Sable
+  // Nguyen among them), so these people are added beside them, not over them.
+  member(41, "Amara Diallo", {
     kind: "human", role: "sales", departmentId: "nl-departments-002", title: "Showroom assistant", email: "amara@northline.example",
     lastAccessAt: at(31), mfa: false, seat: "full", invitedBy: "Priya Shah", joinedAt: at(4_200),
   }, "active", "Weekend showroom cover. Sales view.");
-  member(22, "Rowan Pike", {
+  member(42, "Rowan Pike", {
     kind: "human", role: "member", departmentId: "nl-departments-003", title: "Workshop", email: "rowan@northline.example",
     lastAccessAt: at(1_900), mfa: false, seat: "full", suspendedReason: "Left the workshop in September. Access suspended, records kept.",
     invitedBy: "Maya Chen", joinedAt: at(16_000),
   }, "suspended", "Suspended. Kept for the audit trail.");
-  member(23, "Hollis Metalwork (Dana Rees)", {
+  member(43, "Hollis Metalwork (Dana Rees)", {
     kind: "human", role: "client", departmentId: "", title: "Supplier contact", email: "dana@hollismetal.example",
     lastAccessAt: at(220), mfa: false, seat: "external", external: true, scope: "Purchase orders and delivery notes only",
     invitedBy: "Jonah Adeyemi", joinedAt: at(5_400),
   }, "active", "External collaborator. Sees only what is shared with the portal.");
-  member(24, "Lumen Hotel Group (Sam Okafor)", {
+  member(44, "Lumen Hotel Group (Sam Okafor)", {
     kind: "human", role: "client", departmentId: "", title: "Client contact", email: "sam@lumenhotels.example",
     lastAccessAt: at(78), mfa: false, seat: "external", external: true, scope: "Their own quotes, invoices and bookings",
     invitedBy: "Priya Shah", joinedAt: at(2_600),
   }, "active", "Client portal access for one account.");
-  member(25, "Sable Nguyen", {
-    kind: "ai", role: "agent", departmentId: "nl-departments-002", title: "Creative agent", agentId: "nl-agents-003",
-    lastAccessAt: at(9), mfa: false, seat: "agent", autonomy: "draft", grantedBy: "Maya Chen",
-  }, "active", "Creative agent. Drafts only, no publishing grant.");
 
   /* ---------------- Invitations ---------------- */
   const invite = (n: number, email: string, fields: Record<string, string | number | boolean>, status: string, summary: string) =>
@@ -218,20 +212,20 @@ registerSeed("admin", (ctx) => {
 
   request(20, "Sam Okafor — copy of their data", "Client asked for everything held about them and their hotel group.", {
     type: "access", subject: "Lumen Hotel Group (Sam Okafor)", channel: "Email, recorded by Priya", lawfulBasis: "UK GDPR Article 15",
-    collections: "contacts,companies,quotes,invoices,bookings,tickets", recordCount: 34, legalHold: false, handler: "Maya Chen",
+    collections: "members,sessions,contacts,tickets,messages", legalHold: false, handler: "Maya Chen",
   }, "open", 40, inDays(21));
   request(21, "Rowan Pike — erasure of personal data", "Former workshop member asked to be removed.", {
     type: "erasure", subject: "Rowan Pike", channel: "In person, recorded by Elena", lawfulBasis: "UK GDPR Article 17",
-    collections: "members,employees,payrollRuns,leaveRequests", recordCount: 11, legalHold: true,
+    collections: "members,employees,payrollRuns,leaveRequests", legalHold: true,
     holdReason: "Employment records are kept six years, and a grievance file from September is open.", handler: "Elena Voss",
   }, "open", 90, inDays(8));
   request(22, "Dana Rees — correct a supplier contact", "Supplier contact asked for a corrected job title and phone number.", {
     type: "rectification", subject: "Hollis Metalwork (Dana Rees)", channel: "Portal message", lawfulBasis: "UK GDPR Article 16",
-    collections: "contacts,suppliers", recordCount: 3, legalHold: false, handler: "Jonah Adeyemi",
+    collections: "contacts,suppliers", legalHold: false, handler: "Jonah Adeyemi",
   }, "completed", 400, at(380));
   request(23, "Amara Diallo — portable copy of her records", "Weekend assistant asked for a machine-readable copy before a course application.", {
     type: "portability", subject: "Amara Diallo", channel: "Direct message", lawfulBasis: "UK GDPR Article 20",
-    collections: "members,shifts,tasks", recordCount: 46, legalHold: false, handler: "Elena Voss",
+    collections: "members,shifts,tasks", legalHold: false, handler: "Elena Voss",
   }, "open", 14, inDays(26));
 
   /* ---------------- Backups, exports, restores ---------------- */

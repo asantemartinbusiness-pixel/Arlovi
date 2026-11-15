@@ -206,25 +206,58 @@ export function ScheduleInterview({ context, close }: { context: ScreenContext; 
 
 /* ---------------- ARL-HR-005 · Review (stage decision) ---------------- */
 
-const STAGES = ["applied", "screen", "interview", "offer", "rejected"];
+const STAGES = ["applied", "screen", "interview", "offer", "hired", "rejected"];
 
 export function StageDecision({ context, close }: { context: ScreenContext; close: () => void }) {
   const applicant = useRecord(context.params.id ?? context.selectedId);
+  const employees = useCollection("employees");
   const [stage, setStage] = useState("");
   const [reason, setReason] = useState("");
   if (!applicant) return <Empty title="Open an applicant first" />;
   const scored = applicant.fields.rating !== undefined && Number(applicant.fields.rating) > 0;
   const needsScore = (stage === "offer" || stage === "rejected") && !scored;
+  const offerIssued = applicant.fields.offerIssuedBy !== undefined && String(applicant.fields.offerIssuedBy) !== "";
+  const needsOffer = stage === "hired" && !offerIssued;
+  const email = String(applicant.fields.email ?? "").toLowerCase();
+  const existing = employees.find((row) => row.title === applicant.title || (email !== "" && String(row.fields.email ?? "").toLowerCase() === email));
   return (
     <form
       id="hr-stage"
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!stage || !reason.trim() || needsScore) return;
+        if (!stage || !reason.trim() || needsScore || needsOffer) return;
+        const at = context.now.toISOString();
+        if (stage === "hired") {
+          let employeeId = existing?.id;
+          if (!existing) {
+            const created = await context.mutate.create({
+              collection: "employees",
+              title: applicant.title,
+              status: "probation",
+              summary: `Hired from an accepted offer recorded by ${context.actor}. Any invitation is a local draft.`,
+              startAt: String(applicant.fields.startDate ?? "") || undefined,
+              fields: {
+                kind: "human", title: String(applicant.fields.role ?? ""), employment: String(applicant.fields.employment ?? "full-time"),
+                email: String(applicant.fields.email ?? ""), manager: context.actor, office: "Clerkenwell studio",
+                leaveAllowance: 25, leaveTaken: 0, salaryMinor: 0, pensionPct: 5, phone: "Not shared", applicantId: applicant.id,
+              },
+            }, `Employee record created for ${applicant.title} from an accepted offer`);
+            employeeId = created.id;
+          }
+          await context.mutate.patch(applicant.id, {
+            status: "hired",
+            fields: { stage: "hired", offerAcceptedAt: at, offerAcceptedRecordedBy: context.actor, employeeId: employeeId ?? "", decidedBy: context.actor, decisionReason: reason.trim(), decidedAt: at },
+          }, { expectRevision: applicant.revision, event: `${applicant.title} accepted the offer; hired, recorded by ${context.actor}: ${reason.trim()}` });
+          context.toast("Hired", existing
+            ? `${applicant.title} accepted the offer. Their existing employee record is linked; no second record was made.`
+            : `${applicant.title} accepted the offer. An employee record was created in the directory; no invitation left this browser.`);
+          close();
+          return;
+        }
         await context.mutate.patch(applicant.id, {
           status: stage === "rejected" ? "rejected" : applicant.status === "rejected" ? "active" : applicant.status,
-          fields: { ...applicant.fields, stage, decidedBy: context.actor, decisionReason: reason.trim(), decidedAt: new Date().toISOString() },
+          fields: { ...applicant.fields, stage, decidedBy: context.actor, decisionReason: reason.trim(), decidedAt: at },
         }, { expectRevision: applicant.revision, event: `${applicant.title} moved to ${stage} by ${context.actor}: ${reason.trim()}` });
         context.toast("Decision recorded", `${applicant.title} is at ${stage}, decided by ${context.actor} with a reason on the record.`);
         close();
@@ -233,18 +266,27 @@ export function StageDecision({ context, close }: { context: ScreenContext; clos
       <Properties rows={[
         { label: "Current stage", value: String(applicant.fields.stage ?? applicant.status) },
         { label: "Scorecard", value: scored ? `${String(applicant.fields.rating)} of 5` : "None recorded" },
+        { label: "Offer", value: offerIssued ? `Issued by ${String(applicant.fields.offerIssuedBy)}` : "Not issued" },
         { label: "Accountable", value: context.actor },
       ]} />
       <Field label="Move to" required>
         <Select value={stage} onChange={(event) => setStage(event.target.value)} required>
           <option value="">Choose a stage</option>
-          {STAGES.filter((option) => option !== applicant.fields.stage).map((option) => <option key={option}>{option}</option>)}
+          {STAGES.filter((option) => option !== applicant.fields.stage).map((option) => <option key={option} value={option}>{option === "hired" ? "hired (offer accepted)" : option}</option>)}
         </Select>
       </Field>
       <Field label="Reason, against the role requirements" required hint="Not an impression. Protected characteristics are never a reason.">
         <TextArea rows={3} value={reason} onChange={(event) => setReason(event.target.value)} required />
       </Field>
       {needsScore && <Notice tone="danger" title="A scorecard comes first">An offer or a rejection needs a recorded scorecard so the decision rests on evidence.</Notice>}
+      {needsOffer && <Notice tone="danger" title="No offer has been issued">A candidate is hired only after an issued offer is accepted. Issue the offer from Recruitment first.</Notice>}
+      {stage === "hired" && !needsOffer && (
+        <Notice tone="info" title="Recording the candidate's acceptance">
+          {existing
+            ? `${applicant.title} already has an employee record; it is linked rather than duplicated.`
+            : `This records that ${applicant.title} accepted the offer and creates their employee record in the directory. No invitation or contract is sent.`}
+        </Notice>
+      )}
       <Notice tone="info" title="A person decides">Nothing ranks or moves candidates automatically. The decision is attributed to {context.actor}.</Notice>
     </form>
   );

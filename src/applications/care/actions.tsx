@@ -270,7 +270,7 @@ export function AssignSpecialist({ context, close }: { context: ScreenContext; c
         const reason = String(form.get("reason") ?? "").trim();
         if (!specialist || !reason) return;
         await context.mutate.patch(ticket.id, { fields: { ...ticket.fields, assignee: specialist, specialist, previousAssignee: String(ticket.fields.assignee ?? ""), specialistReason: reason } }, { expectRevision: ticket.revision, event: `${ref(ticket)} assigned to specialist ${specialist} by ${context.actor}: ${reason}` });
-        await context.mutate.create({ collection: "messages", title: `${ref(ticket)} — internal`, status: "note", summary: `Handed to ${specialist}: ${reason}`, parentId: ticket.id, at: new Date().toISOString(), fields: { kind: "ticket", author: context.actor, side: "agent", channel: "internal", internal: true } }, `Hand-off note on ${ref(ticket)}`);
+        await context.mutate.create({ collection: "messages", title: `${ref(ticket)} — internal`, status: "note", summary: `Handed to ${specialist}: ${reason}`, parentId: ticket.id, at: context.now.toISOString(), fields: { kind: "ticket", author: context.actor, side: "agent", channel: "internal", internal: true } }, `Hand-off note on ${ref(ticket)}`);
         context.toast("Specialist assigned", `${specialist} owns ${ref(ticket)}; the hand-off note is internal.`);
         close();
       }}
@@ -410,7 +410,7 @@ export function ReviewMacro({ context, close }: { context: ScreenContext; close:
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         const outcome = String(form.get("outcome") ?? "approved");
-        await context.mutate.patch(macro.id, { status: outcome === "approved" ? macro.status : "draft", fields: { ...macro.fields, reviewedBy: context.actor, reviewedAt: new Date().toISOString(), reviewOutcome: outcome, reviewNote: String(form.get("note") ?? "") } }, { expectRevision: macro.revision, event: `${macro.title} reviewed by ${context.actor}: ${outcome}` });
+        await context.mutate.patch(macro.id, { status: outcome === "approved" ? macro.status : "draft", fields: { ...macro.fields, reviewedBy: context.actor, reviewedAt: context.now.toISOString(), reviewOutcome: outcome, reviewNote: String(form.get("note") ?? "") } }, { expectRevision: macro.revision, event: `${macro.title} reviewed by ${context.actor}: ${outcome}` });
         context.toast("Review recorded", outcome === "approved" ? "The macro is approved as it stands." : "The macro is back to draft until it is fixed.");
         close();
       }}
@@ -475,7 +475,7 @@ export function acknowledgeBreach(context: ScreenContext, tickets: Rec[], slas: 
       body: "Records that a named person has seen this breach. The clock and the breach stay exactly as counted; acknowledging does not pause or excuse anything.",
       confirm: "Acknowledge the breach",
       run: async () => {
-        await context.mutate.patch(ticket.id, { fields: { ...ticket.fields, breachAcknowledgedBy: context.actor, breachAcknowledgedAt: new Date().toISOString() } }, { expectRevision: ticket.revision, event: `SLA breach on ${ref(ticket)} acknowledged by ${context.actor}` });
+        await context.mutate.patch(ticket.id, { fields: { ...ticket.fields, breachAcknowledgedBy: context.actor, breachAcknowledgedAt: context.now.toISOString() } }, { expectRevision: ticket.revision, event: `SLA breach on ${ref(ticket)} acknowledged by ${context.actor}` });
         context.toast("Breach acknowledged", `${ref(ticket)} still counts as breached; your acknowledgement is on the record.`);
       },
     }),

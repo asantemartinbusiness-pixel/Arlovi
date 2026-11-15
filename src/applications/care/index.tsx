@@ -9,7 +9,7 @@ import { useRecord, useWorkspace } from "@/platform/workspace";
 import { capabilityById } from "@/platform/capability";
 import {
   Automation, CannedReply, CustomerContext, CustomerInspector, Escalation, InternalNote, KnowledgeBase,
-  OmnichannelInbox, QueueRules, Quality, RefundRequest, ResponseComposer, ServiceOverview, SlaInspector,
+  OmnichannelInbox, QueueRules, Quality, RefundFooter, RefundRequest, ResponseComposer, ServiceOverview, SlaInspector,
   Slas, TicketDetail, TicketList, policyFor, useCareData,
 } from "./panels";
 import { formatMinutes, slaState } from "./sla";
@@ -90,7 +90,7 @@ function TicketCreate({ context, close }: { context: ScreenContext; close: () =>
           title: `${nextRef} ${String(form.get("subject") ?? "")}`,
           status: "new",
           summary: String(form.get("detail") ?? ""),
-          at: new Date().toISOString(),
+          at: context.now.toISOString(),
           tags: [priority, String(form.get("channel") ?? "email")],
           fields: {
             ref: nextRef, priority, channel: String(form.get("channel") ?? "email"),
@@ -105,7 +105,7 @@ function TicketCreate({ context, close }: { context: ScreenContext; close: () =>
           status: "received",
           summary: String(form.get("detail") ?? ""),
           parentId: created.id,
-          at: new Date().toISOString(),
+          at: context.now.toISOString(),
           fields: { kind: "ticket", author: data.contacts.find((row) => row.id === String(form.get("contact") ?? ""))?.title ?? "Customer", side: "customer", channel: String(form.get("channel") ?? "email"), internal: false },
         }, `Opening message recorded on ${nextRef}`);
         context.toast("Case created", `${nextRef} is in the queue with its SLA clock running.`);
@@ -850,7 +850,7 @@ export const careApp = registerApp({
         { id: "assign specialist", kind: "modal", title: "Assign a specialist", width: 540, render: ({ close, ...context }) => <AssignSpecialist context={context} close={close} />, footer: submitFooter("cr-specialist", "Assign") },
         { id: "Response composer", kind: "modal", title: "Reply", width: 680, render: ({ close, ...context }) => <ResponseComposer context={context} close={close} />, footer: submitFooter("cr-response", "Record the reply") },
         { id: "internal note", kind: "modal", title: "Internal note", width: 560, render: ({ close, ...context }) => <InternalNote context={context} close={close} />, footer: submitFooter("cr-note", "Add the note") },
-        { id: "refund request", kind: "modal", title: "Request a refund", tone: "danger", width: 560, render: ({ close, ...context }) => <RefundRequest context={context} close={close} />, footer: submitFooter("cr-refund", "Request from finance") },
+        { id: "refund request", kind: "modal", title: "Request a refund", tone: "danger", width: 560, render: ({ close, ...context }) => <RefundRequest context={context} close={close} />, footer: ({ close, ...context }) => <RefundFooter context={context} close={close} /> },
       ],
     },
 

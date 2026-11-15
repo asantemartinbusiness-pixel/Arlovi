@@ -45,6 +45,17 @@ const TICKETS: TicketSeed[] = [
   { n: 60, ref: "CARE-51", subject: "Unassigned: pendant height advice", status: "new", priority: "normal", channel: "chat", queue: "Technical", assignee: "", contact: 20, openedHoursAgo: 2, summary: "No owner yet. Sitting in the unassigned queue.", slaN: 22 },
   { n: 61, ref: "CARE-52", subject: "Unassigned: bulk order enquiry", status: "new", priority: "high", channel: "email", queue: "Trade", assignee: "", contact: 21, openedHoursAgo: 6, summary: "Forty units for a hotel refurbishment. Needs a trade owner.", slaN: 21 },
   { n: 62, ref: "CARE-53", subject: "Unassigned: spare parts list", status: "new", priority: "low", channel: "portal", queue: "Technical", assignee: "", contact: 22, openedHoursAgo: 20, summary: "Asking whether collars are sold separately.", slaN: 23 },
+  // Lumen Hotel Group (Sam Okafor): the case history their access request covers.
+  { n: 63, ref: "CARE-54", subject: "Lobby pendants for the Bristol hotel", status: "resolved", priority: "normal", channel: "email", queue: "Trade", assignee: "Priya Shah", contact: 30, openedHoursAgo: 2_520, firstResponseHours: 2, resolvedHoursAgo: 2_440, csat: 5, summary: "Trade enquiry for eighteen pendants in the Bristol lobby.", slaN: 22 },
+  { n: 64, ref: "CARE-55", subject: "Drop lengths for a double-height lobby", status: "resolved", priority: "normal", channel: "email", queue: "Technical", assignee: "Marcus Reiss", contact: 30, openedHoursAgo: 2_300, firstResponseHours: 3, resolvedHoursAgo: 2_250, csat: 4, summary: "Asked which drop lengths suit a nine-metre ceiling.", slaN: 22 },
+  { n: 65, ref: "CARE-56", subject: "Delivery window for the Bath site", status: "resolved", priority: "normal", channel: "phone", queue: "Orders", assignee: "Clara Mendoza", contact: 30, openedHoursAgo: 2_000, firstResponseHours: 1, resolvedHoursAgo: 1_990, csat: 5, summary: "Needed a delivery before the hotel's soft opening.", slaN: 22 },
+  { n: 66, ref: "CARE-57", subject: "Dimmer advice for the restaurant", status: "resolved", priority: "high", channel: "email", queue: "Technical", assignee: "Marcus Reiss", contact: 30, openedHoursAgo: 1_700, firstResponseHours: 2, resolvedHoursAgo: 1_660, csat: 4, summary: "Restaurant fittings flickered on the existing dimmers.", slaN: 21 },
+  { n: 67, ref: "CARE-58", subject: "Trade invoice copy", status: "resolved", priority: "low", channel: "portal", queue: "Billing", assignee: "Hugh Tennant", contact: 30, openedHoursAgo: 1_400, firstResponseHours: 4, resolvedHoursAgo: 1_390, csat: 5, summary: "Asked for a copy of the September trade invoice.", slaN: 23 },
+  { n: 68, ref: "CARE-59", subject: "Replacement collar for room 214", status: "resolved", priority: "normal", channel: "email", queue: "Orders", assignee: "Clara Mendoza", contact: 30, openedHoursAgo: 1_100, firstResponseHours: 2, resolvedHoursAgo: 1_020, csat: 4, summary: "A brass collar arrived bent in a single-room order.", slaN: 22 },
+  { n: 69, ref: "CARE-60", subject: "Care of lacquered brass in bathrooms", status: "resolved", priority: "low", channel: "chat", queue: "Technical", assignee: "Iris Lindqvist", contact: 30, openedHoursAgo: 800, firstResponseHours: 1, resolvedHoursAgo: 790, csat: 5, summary: "Housekeeping asked how to clean lacquered brass.", slaN: 23 },
+  { n: 70, ref: "CARE-61", subject: "Lead time for the Cardiff refurbishment", status: "resolved", priority: "normal", channel: "email", queue: "Trade", assignee: "Priya Shah", contact: 30, openedHoursAgo: 500, firstResponseHours: 3, resolvedHoursAgo: 470, csat: 5, summary: "Planning a spring refurbishment and asked about lead times.", slaN: 22 },
+  { n: 71, ref: "CARE-62", subject: "Account contact change", status: "resolved", priority: "low", channel: "email", queue: "Trade", assignee: "Priya Shah", contact: 30, openedHoursAgo: 300, firstResponseHours: 2, resolvedHoursAgo: 290, csat: 4, summary: "Asked for the accounts contact to be updated.", slaN: 23 },
+  { n: 72, ref: "CARE-63", subject: "Copy of everything held about us", status: "open", priority: "normal", channel: "email", queue: "Trade", assignee: "Priya Shah", contact: 30, openedHoursAgo: 40, firstResponseHours: 4, summary: "Sam Okafor asked for a copy of the data held about them and the hotel group. Logged as a subject access request in Privacy.", slaN: 22 },
 ];
 
 interface ContactSeed { n: number; name: string; company: string; email: string; kind: string; since: number; consent: string }
@@ -60,6 +71,7 @@ const CONTACTS: ContactSeed[] = [
   { n: 27, name: "Dylan Pryce", company: "", email: "d.pryce@example.com", kind: "retail", since: -30, consent: "Marketing consent given" },
   { n: 28, name: "Beatrice Okafor", company: "Okafor Studio", email: "b.okafor@okaforstudio.example", kind: "trade", since: -800, consent: "Marketing consent given" },
   { n: 29, name: "Rafael Ortiz", company: "", email: "r.ortiz@example.com", kind: "retail", since: -150, consent: "Marketing consent withheld" },
+  { n: 30, name: "Sam Okafor", company: "Lumen Hotel Group", email: "sam@lumenhotels.example", kind: "trade", since: -110, consent: "Marketing consent withheld" },
 ];
 
 interface ArticleSeed { n: number; title: string; audience: string; status: string; version: string; helpful: number; unhelpful: number; body: string; summary: string }
@@ -125,6 +137,7 @@ registerSeed("care", (ctx) => {
         slaId: `nl-slas-${String(ticket.slaN).padStart(3, "0")}`,
         firstResponseAt: ticket.firstResponseHours === undefined ? "" : at(ctx.now, -ticket.openedHoursAgo + ticket.firstResponseHours),
         resolvedAt: ticket.resolvedHoursAgo === undefined ? "" : at(ctx.now, -ticket.resolvedHoursAgo),
+        resolvedBy: ticket.resolvedHoursAgo === undefined ? "" : ticket.assignee,
         csat: ticket.csat ?? 0, reopened: Boolean(ticket.reopened),
         aiDrafted: ticket.assignee === "Wren Ashby",
       },

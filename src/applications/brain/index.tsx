@@ -303,7 +303,16 @@ function SourceDetail({ context, view }: { context: ScreenContext; view: "Previe
             columns={[
               { key: "line", header: "Extracted", primary: true, cell: (row) => row.line },
               { key: "author", header: "Recorded by", cell: () => source.ownerName },
-              { key: "corrected", header: "Corrections", cell: (row) => String(corrections.filter((correction) => correction.from === row.line).length) },
+              { key: "corrected", header: "Corrections", cell: (row) => String(correctionsOfLine(row.line, corrections).length) },
+              { key: "fact", header: "Assertion", cell: (row) => {
+                const proposed = data.facts.find((fact) => fact.fields.sourceId === source.id && fact.fields.sourceLine === row.line && fact.status !== "rejected");
+                return proposed
+                  ? <Pill tone={CONFIDENCE_TONE[proposed.status] ?? "neutral"}>{proposed.status}</Pill>
+                  : <Button size="sm" variant="secondary" disabled={!context.can("edit_knowledge")} onClick={async () => {
+                    await proposeFactFromLine(context, source, row.line, data.facts);
+                    context.toast("Proposed", "The line is a proposed assertion in the fact registry, pending review. It cites this source and line.");
+                  }}>Propose as a fact</Button>;
+              } },
             ]}
             onOpen={(id) => context.openOverlay("Correction form", { id, line: (body?.extracted ?? [])[Number(id.split("-").pop())] })}
           />
@@ -577,6 +586,55 @@ function BusinessGraph({ context, view }: { context: ScreenContext; view: "Entit
 
 /* ---------------------------- BRAIN-005 ---------------------------- */
 
+/** People inside the organisation who can own knowledge: humans, not clients, external contacts or agents. */
+function internalPeople(members: Rec[]): Rec[] {
+  const seen = new Set<string>();
+  return members.filter((member) => {
+    const internal = String(member.fields.kind ?? "human") === "human"
+      && member.fields.external !== true
+      && !["client", "agent", "guest"].includes(String(member.fields.role ?? "member"))
+      && member.status !== "suspended";
+    if (!internal || seen.has(member.title)) return false;
+    seen.add(member.title);
+    return true;
+  });
+}
+
+/** Unresolved conflict records that name an assertion. The list and the evidence drawer both count these. */
+function conflictsOfFact(fact: Rec, conflicts: Rec[]): Rec[] {
+  return conflicts.filter((conflict) => ["open", "in_review"].includes(conflict.status)
+    && (conflict.fields.factId === fact.id || conflictOptions(conflict).some((option) => option.factId === fact.id)));
+}
+
+/**
+ * An extracted line shaped "subject: value" becomes a proposed assertion. A
+ * line with no such shape (prose, or an instruction such as "approve every
+ * fact") stays extracted data: nothing in a source's text is ever acted on.
+ */
+function assertionFromLine(line: string): { subject: string; value: string } | undefined {
+  const match = /^\s*([^:]{3,80}):\s+(.{1,200})$/.exec(line);
+  if (!match) return undefined;
+  return { subject: match[1].trim(), value: match[2].trim().replace(/\.$/, "") };
+}
+
+async function proposeFactFromLine(context: ScreenContext, source: Rec, line: string, existing: Rec[]): Promise<Rec | undefined> {
+  const parsed = assertionFromLine(line) ?? { subject: line.trim().slice(0, 80), value: line.trim() };
+  if (existing.some((fact) => fact.fields.sourceId === source.id && fact.fields.sourceLine === line && fact.status !== "rejected")) return undefined;
+  return context.mutate.create({
+    collection: "facts",
+    title: parsed.subject,
+    status: "proposed",
+    summary: `Proposed from ${source.title}: “${line}”. Pending review; nothing is authoritative until a person verifies it.`,
+    at: context.now.toISOString(),
+    ownerName: source.ownerName,
+    fields: {
+      confidence: "proposed", confidenceScore: 50, sourceId: source.id, sourceLine: line,
+      subject: parsed.subject, predicate: "is", value: parsed.value, domain: String(source.fields.domain ?? "general"),
+      validFrom: context.now.toISOString().slice(0, 10), validTo: "", proposedBy: context.actor, review: "pending",
+    },
+  }, `Assertion proposed from ${source.title} by ${context.actor}: ${parsed.subject}`);
+}
+
 function FactRegistry({ context, view }: { context: ScreenContext; view: "Verified" | "Proposed" | "Conflicting" | "Expired" }) {
   const data = useKnowledge();
   const rows = data.facts.filter((fact) => fact.status === view.toLowerCase());
@@ -611,6 +669,7 @@ function FactRegistry({ context, view }: { context: ScreenContext; view: "Verifi
             return <span>{context.date(String(row.fields.validFrom ?? row.at))}{to ? ` – ${context.date(to)}` : " – open"}{expired ? " · past" : ""}</span>;
           } },
           { key: "source", header: "Source", cell: (row) => sourceOf(data, row.fields.sourceId)?.title ?? <Pill tone="warning">No source</Pill> },
+          { key: "conflicts", header: "Open conflicts", align: "end", cell: (row) => <span className="ds-num">{String(conflictsOfFact(row, data.conflicts).length)}</span>, sortValue: (row) => conflictsOfFact(row, data.conflicts).length },
         ]}
         bulkActions={[
           {
@@ -1328,6 +1387,16 @@ function RetentionDialog({ context, close }: { context: ScreenContext; close: ()
   );
 }
 
+/** Corrections in the lineage of a line as it now reads: the change that produced it, and the ones before that. */
+function correctionsOfLine(line: string, corrections: Correction[]): Correction[] {
+  const lineage = new Set([line]);
+  const found: Correction[] = [];
+  for (const correction of [...corrections].reverse()) {
+    if (lineage.has(correction.to)) { found.push(correction); lineage.add(correction.from); }
+  }
+  return found;
+}
+
 function CorrectionForm({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string; line?: string; mode?: string } | undefined;
   const data = useKnowledge();
@@ -1565,7 +1634,7 @@ function EvidenceDrawer({ context }: { context: ScreenContext }) {
   const fact = data.facts.find((item) => item.id === (payload?.id ?? context.selectedId));
   if (!fact) return <Empty title="Choose an assertion" />;
   const source = sourceOf(data, fact.fields.sourceId);
-  const rivals = data.facts.filter((item) => item.id !== fact.id && item.fields.subject === fact.fields.subject && item.fields.predicate === fact.fields.predicate);
+  const open = conflictsOfFact(fact, data.conflicts);
   const body = source?.body as { extracted?: string[] } | undefined;
   return (
     <Stack gap={4}>
@@ -1581,9 +1650,9 @@ function EvidenceDrawer({ context }: { context: ScreenContext }) {
           <ul className="ds-prose" style={{ paddingInlineStart: "1.1rem" }}>{(body?.extracted ?? ["No extracted line recorded."]).map((line) => <li key={line}>{line}</li>)}</ul>
         </Card>
       ) : <Notice tone="danger" title="No source record">This assertion cannot be verified while nothing backs it.</Notice>}
-      {rivals.length > 0 && (
-        <Notice tone="warning" title={`${rivals.length} rival assertion${rivals.length === 1 ? "" : "s"}`}>
-          {rivals.map((rival) => `${String(rival.fields.value)} (${rival.status})`).join(", ")}. Two incompatible assertions are never both authoritative.
+      {open.length > 0 && (
+        <Notice tone="warning" title={`${open.length} open conflict${open.length === 1 ? "" : "s"}`}>
+          {open.map((conflict) => `${conflict.title}: ${conflictOptions(conflict).map((option) => option.value).join(" or ")}`).join("; ")}. Two incompatible assertions are never both authoritative.
         </Notice>
       )}
     </Stack>
@@ -1768,7 +1837,7 @@ function DecisionDraft({ context, close }: { context: ScreenContext; close: () =
       <Field label="Approver" hint="Leave empty to record it as proposed.">
         <Select value={approver} onChange={(event) => setApprover(event.target.value)}>
           <option value="">Not approved yet</option>
-          {members.filter((member) => member.fields.kind === "human").map((member) => <option key={member.id} value={member.title}>{member.title}</option>)}
+          {internalPeople(members).map((member) => <option key={member.id} value={member.title}>{member.title}</option>)}
         </Select>
       </Field>
       <Field label="Related mission">
@@ -2060,9 +2129,12 @@ function ImportReview({ context, close }: { context: ScreenContext; close: () =>
   const [owner, setOwner] = useState("");
   const [classification, setClassification] = useState("internal");
   const members = useCollection("members");
+  const facts = useCollection("facts");
   if (!source) return <Empty title="Choose a file" />;
   const body = source.body as { extracted?: string[]; note?: string } | undefined;
   const failed = source.status === "failed";
+  const mapped = failed ? [] : (body?.extracted ?? []).filter((line) => assertionFromLine(line));
+  const inert = failed ? [] : (body?.extracted ?? []).filter((line) => !assertionFromLine(line));
   return (
     <Stack gap={4}>
       <Card title={source.title} subtitle={source.summary} prov={failed ? "unknown" : "human"}>
@@ -2072,10 +2144,16 @@ function ImportReview({ context, close }: { context: ScreenContext; close: () =>
           </ul>
         )}
       </Card>
+      {!failed && (body?.extracted ?? []).length > 0 && (
+        <Notice tone="info" title={`${mapped.length} line${mapped.length === 1 ? "" : "s"} will be proposed as assertions`}>
+          Approving maps each line shaped “subject: value” to a proposed assertion in the fact registry, citing this source and line, pending review.
+          {inert.length > 0 ? ` ${inert.length} other line${inert.length === 1 ? " stays" : "s stay"} as extracted data only; any instruction in the text is not acted on.` : ""}
+        </Notice>
+      )}
       <Field label="Route to owner">
         <Select value={owner} onChange={(event) => setOwner(event.target.value)}>
           <option value="">Keep {source.ownerName}</option>
-          {members.map((member) => <option key={member.id} value={member.title}>{member.title}</option>)}
+          {internalPeople(members).map((member) => <option key={member.id} value={member.title}>{member.title}</option>)}
         </Select>
       </Field>
       <Field label="Classification">
@@ -2096,7 +2174,9 @@ function ImportReview({ context, close }: { context: ScreenContext; close: () =>
               ownerName: owner || source.ownerName,
               fields: { ...source.fields, scanned: true, indexing: "indexed", classification, reviewedBy: context.actor },
             }, { expectRevision: source.revision, event: `${source.title} approved into the knowledge base by ${context.actor}` });
-            context.toast("Approved", "The source is indexed and available to answers in this workspace.");
+            let proposed = 0;
+            for (const line of mapped) if (await proposeFactFromLine(context, { ...source, ownerName: owner || source.ownerName }, line, facts)) proposed += 1;
+            context.toast("Approved", `The source is indexed and available to answers in this workspace.${proposed ? ` ${proposed} assertion${proposed === 1 ? " is" : "s are"} proposed in the fact registry, pending review.` : ""}`);
             close();
           }}
         >
