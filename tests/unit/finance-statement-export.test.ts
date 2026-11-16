@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Rec } from "@/domain/types";
 import {
   balanceSheet, profitAndLoss, trialForRange,
-  type BalanceSheet, type CashFlow, type TrialRow,
+  type CashFlow, type TrialRow,
 } from "@/domain/fin-ledger";
 import { statementCsv } from "@/applications/fin/statementExport";
 
@@ -29,7 +29,7 @@ const invoice={
   id:"inv-1",collection:"invoices",organizationId:"org-northline",
   title:"INV-1",status:"part_paid",dueAt:"2026-11-20",
   amountMinor:12000,fields:{paidMinor:5000},
-} as Rec;
+} as unknown as Rec;
 const input={period:"2026-11",pl,bs,flow,trialRows,invoices:[invoice]};
 
 describe("native statement-specific CSV exports",()=>{
