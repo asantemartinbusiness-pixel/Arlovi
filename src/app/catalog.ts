@@ -65,7 +65,8 @@ export function nativeNavPath(
   const needsId = /:id\b/.test(target.route);
   const needsSlug = /:slug\b/.test(target.route);
   if (!needsId && !needsSlug) return target.route.replace(":org", slug);
-  if (!current || current.screen.applicationCode !== target.applicationCode ||
+  if (!current || current.params.org !== slug ||
+      current.screen.applicationCode !== target.applicationCode ||
       current.screen.collection !== target.collection) return null;
   if (needsId && !current.params.id) return null;
   if (needsSlug && !current.params.slug) return null;
