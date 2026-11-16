@@ -36,7 +36,7 @@ export function AppShell() {
   const activeCode = activeScreen?.applicationCode ?? "HQ";
   const appModule = getApp(activeCode);
 
-  const data = useCollections(["notifications", "invoices", "bills", "tasks", "missions", "deals", "leaveRequests", "expenses", "organizations"]);
+  const data = useCollections(["notifications", "invoices", "bills", "tasks", "missions", "deals", "leaveRequests", "expenses", "organizations", "preferences"]);
   const attention = useMemo(() => applyAttentionReceipts(filterForRole(buildAttention({
     notifications: data.notifications,
     invoices: data.invoices,
@@ -48,6 +48,25 @@ export function AppShell() {
     now,
   }), role), ui.attentionReceipts, org.id, role), [data, org.slug, org.id, now, role, ui.attentionReceipts]);
   const counts = attentionCounts(attention);
+  const favourites = useMemo(() => {
+    const pinned = new Set(data.preferences.filter((pref) => pref.fields.pinned === true).map((pref) => String(pref.fields.app)));
+    return NAV_GROUPS.flatMap((group) => group.apps).filter((app) => pinned.has(app.short) && canOpen(role, app.code));
+  }, [data.preferences, role]);
+  const railGroups = favourites.length ? [{ label: "Favourites", apps: favourites }, ...NAV_GROUPS] : NAV_GROUPS;
+  const activePreference = data.preferences.find((item) => item.fields.app === APP_ENTRIES[activeCode]?.short);
+  const activePinned = activePreference?.fields.pinned === true;
+
+  async function toggleFavourite() {
+    const app = APP_ENTRIES[activeCode];
+    if (!app) return;
+    if (activePreference) {
+      await mutate.patch(activePreference.id, { fields: { pinned: !activePinned } }, { event: `${app.short} ${activePinned ? "removed from" : "added to"} favourites` });
+    } else {
+      await mutate.create({ collection: "preferences", title: `App preference: ${app.short}`, status: "active",
+        fields: { app: app.short, pinned: true, mode: "native_local" },
+        summary: "Application is pinned in the local navigation." }, `${app.short} added to favourites`);
+    }
+  }
 
   const paused = data.organizations.find((record) => record.id === org.id)?.fields.executionPaused === true;
 
@@ -146,6 +165,7 @@ export function AppShell() {
               group: "Role view (not a security boundary)",
               onSelect: () => ui.setRole(item),
             })),
+            { label: `${activePinned ? "Remove" : "Pin"} ${APP_ENTRIES[activeCode]?.short ?? "this app"} ${activePinned ? "from" : "to"} favourites`, group: "Navigation", separatorBefore: true, onSelect: () => { void toggleFavourite(); } },
             { label: ui.theme === "light" ? "Dark appearance" : "Light appearance", group: "Appearance", separatorBefore: true, onSelect: () => ui.setTheme(ui.theme === "light" ? "dark" : "light") },
             ...(["comfortable", "balanced", "compact"] as const).map((item) => ({
               label: item === ui.density ? `Density: ${item} · current` : `Density: ${item}`,
@@ -169,7 +189,7 @@ export function AppShell() {
         <button type="button" className="hq-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />
 
         <nav className="hq-rail" aria-label="Applications">
-          {NAV_GROUPS.map((group, index) => {
+          {railGroups.map((group, index) => {
             const apps = group.apps.filter((app) => canOpen(role, app.code));
             if (apps.length === 0) return null;
             return (
