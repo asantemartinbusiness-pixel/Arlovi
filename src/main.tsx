@@ -52,7 +52,7 @@ function Boot() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/o/northline/hq/home" replace />} />
+        <Route path="/" element={<Navigate to="/setup" replace />} />
         <Route path="/setup" element={<CompanyOnboarding />} />
         <Route
           path="/o/:org/*"
