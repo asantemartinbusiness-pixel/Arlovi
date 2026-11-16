@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: { "@": path.resolve(__dirname, "src") },
   },
+  build: { manifest: true },
   server: { host: "127.0.0.1", port: 5173 },
   preview: { host: "127.0.0.1", port: 4173 },
   test: {
