@@ -5,7 +5,7 @@ import { Button, Pill, Row } from "@/design-system";
 import { Menu } from "@/design-system/overlays";
 import { ArloviMark, brand, palettes } from "@/app/brand";
 import { NAV_GROUPS, APP_ENTRIES } from "@/app/nav";
-import { appEntry, findScreen, screens } from "@/app/catalog";
+import { appEntry, findScreen, nativeNavPath, screens } from "@/app/catalog";
 import { destinationForOrganization } from "@/app/organizationNavigation";
 import { ScreenHost } from "@/app/ScreenHost";
 import { FirstRunGuide } from "@/app/FirstRunGuide";
@@ -44,7 +44,8 @@ export function AppShell() {
 
   const isWorkspaceArea = isWorkAreaPath(location.pathname, org.slug);
   const activeArea = currentWorkArea(location.pathname);
-  const activeScreen = useMemo(() => findScreen(location.pathname)?.screen, [location.pathname]);
+  const activeMatch = useMemo(() => findScreen(location.pathname), [location.pathname]);
+  const activeScreen = activeMatch?.screen;
   const activeCode = activeScreen?.applicationCode ?? "HQ";
   const appModule = getApp(activeCode);
 
@@ -119,6 +120,15 @@ export function AppShell() {
 
   const activePreference = data.preferences.find((item) => item.fields.app === APP_ENTRIES[activeCode]?.short);
   const activePinned = activePreference?.fields.pinned === true;
+
+  function chooseRoleView(nextRole: Role) {
+    ui.setRole(nextRole);
+    // A role view is not authentication. Avoid stranding the user on a
+    // native application hidden by the new local navigation perspective.
+    if (activeScreen && !canOpen(nextRole, activeScreen.applicationCode)) {
+      navigate(nextRole === "client" ? appEntry("PORTAL", org.slug) : workAreaPath(org.slug, "home"));
+    }
+  }
 
   async function toggleFavourite() {
     const app = APP_ENTRIES[activeCode];
@@ -276,10 +286,13 @@ export function AppShell() {
             ...(["owner", "finance", "sales", "people", "member", "client"] as Role[]).map((item) => ({
               label: item === role ? `${ROLE_LABELS[item]} · current view` : ROLE_LABELS[item],
               group: "Role view (not a security boundary)",
-              onSelect: () => ui.setRole(item),
+              onSelect: () => chooseRoleView(item),
             })),
             { label: "Take a guided tour", group: "Help", separatorBefore: true, onSelect: () => window.dispatchEvent(new Event("arlovi:start-tour")) },
-            { label: `${activePinned ? "Remove" : "Pin"} ${APP_ENTRIES[activeCode]?.short ?? "this app"} ${activePinned ? "from" : "to"} favourites`, group: "Navigation", separatorBefore: true, onSelect: () => { void toggleFavourite(); } },
+            ...(activeScreen && APP_ENTRIES[activeCode] ? [{
+              label: `${activePinned ? "Remove" : "Pin"} ${APP_ENTRIES[activeCode].short} ${activePinned ? "from" : "to"} favourites`,
+              group: "Navigation", separatorBefore: true, onSelect: () => { void toggleFavourite(); },
+            }] : []),
             ...(org.ownerName ? [{ label: "Review company setup", group: "Navigation", onSelect: () => navigate(`/o/${org.slug}/hq/home?gettingStarted=1`) }] : []),
             { label: ui.theme === "light" ? "Dark appearance" : "Light appearance", group: "Appearance", separatorBefore: true, onSelect: () => ui.setTheme(ui.theme === "light" ? "dark" : "light") },
             ...(["comfortable", "balanced", "compact"] as const).map((item) => ({
@@ -341,16 +354,23 @@ export function AppShell() {
                   {section.items.map((item) => {
                     const target = screens.find((screen) => screen.id === item.screenId);
                     if (!target) return null;
-                    const to = target.route
-                      .replace(":org", org.slug)
-                      .replace(":id", target.sampleId)
-                      .replace(":slug", "showroom-consult");
+                    const to = nativeNavPath(target, org.slug, activeMatch);
                     const ItemIcon = item.icon;
-                    return (
+                    const content = <>
+                      {ItemIcon && <ItemIcon size={15} />}
+                      <span className="ds-truncate">{item.label}</span>
+                    </>;
+                    // Detail-only views are not destinations until the user
+                    // opens an actual record in this company's application.
+                    return to ? (
                       <NavLink key={item.screenId} to={to} end className="hq-navlink">
-                        {ItemIcon && <ItemIcon size={15} />}
-                        <span className="ds-truncate">{item.label}</span>
+                        {content}
                       </NavLink>
+                    ) : (
+                      <span key={item.screenId} className="hq-navlink" aria-disabled="true"
+                        title="Open a record in this application to access this view">
+                        {content}
+                      </span>
                     );
                   })}
                 </div>
