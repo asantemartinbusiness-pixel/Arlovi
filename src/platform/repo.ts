@@ -195,7 +195,9 @@ export async function putMany(records: Rec[], context: WriteContext, events: Omi
           if (!original || original.revision !== expected) {
             throw new ConflictError(record.id, expected, original?.revision ?? -1);
           }
-        } else if (original && record.revision === 1) {
+        } else if (Object.keys(expectedRevisions).length > 0 && original) {
+          // When a caller asks for an atomic CAS batch, every other record in
+          // that batch must be genuinely new rather than an unguarded update.
           throw new ConflictError(record.id, 0, original.revision);
         }
       }
