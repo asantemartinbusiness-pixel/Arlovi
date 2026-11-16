@@ -1069,22 +1069,26 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
   const { invoice, data, totals } = useInvoice(context);
   const { now } = useWorkspace();
   const paid = Number(invoice?.fields.paidMinor ?? 0);
-  const outstanding = totals.grossMinor - paid;
+  const outstanding = Math.max(0, totals.grossMinor - paid);
   const [amount, setAmount] = useState(outstanding);
   const [date, setDate] = useState(now.toISOString().slice(0, 10));
   const [accountId, setAccountId] = useState("");
   const [method, setMethod] = useState("Bank transfer");
   const [busy, setBusy] = useState(false);
 
-  const cashAccounts = data.accounts.filter((account) => accountType(account) === "asset" && (account.tags.includes("cash") || accountCode(account).startsWith("10")));
+  const cashAccounts = data.accounts.filter((account) => account.status !== "inactive"
+    && accountType(account) === "asset"
+    && (account.tags.includes("cash") || accountCode(account).startsWith("10")));
   useEffect(() => { setAccountId((current) => current || cashAccounts[0]?.id || ""); }, [cashAccounts]);
   useEffect(() => { setAmount(outstanding); }, [outstanding]);
 
   if (!invoice) return <Empty title="No invoice selected" />;
   const ar = data.accounts.find((account) => accountCode(account) === "1100");
   const tooMuch = amount > outstanding;
-  const blocked = !ar
-    ? "The chart of accounts has no 1100 receivables account."
+  const blocked = !["awaiting_payment", "part_paid"].includes(invoice.status)
+    ? "Only an issued invoice with an outstanding balance can receive a payment."
+    : !ar
+      ? "The chart of accounts has no 1100 receivables account."
     : !accountId
       ? "Choose the account the money arrived in."
       : amount <= 0
