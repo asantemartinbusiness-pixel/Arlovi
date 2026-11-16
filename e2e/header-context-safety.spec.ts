@@ -63,7 +63,8 @@ test("native sidebar disables detail-only links until a real company record is o
 test("native sidebar follows the active mission record between detail screens", async ({page}) => {
   await page.goto("/o/northline/mission/missions");
   const id = await page.evaluate(async () => {
-    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts") as typeof import("../src/platform/repo");
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
     return (await repo.listByCollection("org-northline", "missions"))[0]?.id;
   });
   test.skip(!id, "No Northline mission has been seeded");
