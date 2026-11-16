@@ -23,9 +23,21 @@ const GROUPS: { group: string; load: () => Promise<unknown> }[] = [
   { group: "Automation", load: () => import("./t2b_automation") },
   { group: "Finance and CRM", load: () => import("./t3a_money") },
   { group: "People and operations", load: () => import("./t3b_people") },
-  { group: "Growth", load: () => import("./t4_growth") },
+  { group: "Growth", load: () => Promise.all([
+    import("@/domain/seeds/market"), import("./market/index"),
+    import("@/domain/seeds/commerce"), import("./commerce/index"),
+    import("@/domain/seeds/book"), import("./book/index"),
+    import("@/domain/seeds/proc"), import("./proc/index"),
+    import("@/domain/seeds/portal"), import("./portal/index"),
+  ]) },
   { group: "Documents", load: () => import("./t5a_documents") },
-  { group: "Visual tools", load: () => import("./t5b_visual") },
+  { group: "Visual tools", load: () => Promise.all([
+    import("@/domain/seeds/design"), import("./design/index"),
+    import("@/domain/seeds/photo"), import("./photo/index"),
+    import("@/domain/seeds/layout"), import("./layout/index"),
+    import("@/domain/seeds/video"), import("./video/index"),
+    import("@/domain/seeds/motion"), import("./motion/index"),
+  ]) },
   { group: "Platform", load: () => import("./t6_platform") },
 ];
 
