@@ -11,7 +11,7 @@ test("cross-organization edits, deletions, upserts and bulk writes are blocked",
     const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
     const harbor = (await repo.listByOrg("org-harbor"))[0];
     if (!harbor) return { missingFixture: true };
-    const context: repo.WriteContext = { actor: "Isolation test", now: "2026-11-16T00:00:00Z" };
+    const context = { actor: "Isolation test", now: "2026-11-16T00:00:00Z" };
     const blocked: string[] = [];
     async function reject(name: string, run: () => Promise<unknown>) {
       try { await run(); } catch (error) {
