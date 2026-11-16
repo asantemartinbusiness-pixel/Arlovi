@@ -1,3 +1,4 @@
+import type { ScreenContext } from "@/platform/registry";
 import type { Rec } from "@/domain/types";
 import { touch } from "@/domain/types";
 import { isStatementLine, matchCandidates } from "@/domain/fin-ledger";
@@ -90,4 +91,38 @@ export function prepareStatementUnmatch(input: {
       expectedRevisions: { [line.id]: line.revision, [journal.id]: journal.revision },
     },
   };
+}
+
+/** Commit a manual match atomically and keep both audit trails linked. */
+export async function commitStatementMatch(
+  context: ScreenContext, line: Rec, journal: Rec, bankAccountId: string | undefined,
+): Promise<void> {
+  const outcome = prepareStatementMatch({ line, journal, bankAccountId, actor: context.actor, now: context.now });
+  if (!outcome.prepared) throw new Error(outcome.blocked ?? "The statement match is not valid.");
+  await context.mutate.putMany(
+    outcome.prepared.records,
+    [
+      `Statement line ${line.title} matched to ${journal.title}`,
+      `${journal.title} linked to statement line ${line.title}`,
+    ],
+    outcome.prepared.expectedRevisions,
+    ["update", "update"],
+  );
+}
+
+/** Unmatching removes both links together; it never reverses a ledger journal. */
+export async function commitStatementUnmatch(
+  context: ScreenContext, line: Rec, journal: Rec | undefined,
+): Promise<void> {
+  const outcome = prepareStatementUnmatch({ line, journal, actor: context.actor, now: context.now });
+  if (!outcome.prepared || !journal) throw new Error(outcome.blocked ?? "The statement link has changed.");
+  await context.mutate.putMany(
+    outcome.prepared.records,
+    [
+      `Statement line ${line.title} unmatched`,
+      `${journal.title} unlinked from statement line ${line.title}`,
+    ],
+    outcome.prepared.expectedRevisions,
+    ["update", "update"],
+  );
 }
