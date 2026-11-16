@@ -7,6 +7,7 @@ import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
 import { CAPABILITY_LABELS, PROVIDER_CAPABILITIES } from "@/platform/capability";
 import type { Rec } from "@/domain/types";
+import { touch } from "@/domain/types";
 import {
   accountCode, accountType, isStatementLine, journalLines, matchCandidates, periodOf, reconcile, statementSummaries,
 } from "@/domain/fin-ledger";
@@ -900,36 +901,55 @@ export function AdjustmentReview({ context, close }: { context: ScreenContext; c
           disabled={Boolean(blocked) || !context.can("post_journal")}
           title={!context.can("post_journal") ? "Posting needs the Finance or Owner role view" : blocked}
           onClick={async () => {
+            if (busy || blocked) return;
             setBusy(true);
-            const date = (line.at ?? context.now.toISOString()).slice(0, 10);
-            const lines: JLine[] = amount >= 0
-              ? [
-                { accountId: recon.bankAccountId!, debitMinor: amount, creditMinor: 0, memo: line.title },
-                ...rows.map((row) => ({ accountId: row.accountId, debitMinor: 0, creditMinor: row.amountMinor, memo: line.title })),
-              ]
-              : [
-                ...rows.map((row) => ({ accountId: row.accountId, debitMinor: row.amountMinor, creditMinor: 0, memo: line.title })),
-                { accountId: recon.bankAccountId!, debitMinor: 0, creditMinor: Math.abs(amount), memo: line.title },
-              ];
-            const journal = await context.mutate.create({
-              collection: "journals",
-              title: `Adjustment · ${line.title}`,
-              status: "posted",
-              summary: `Posted from an unmatched statement line on ${context.date(line.at)}.`,
-              amountMinor: Math.abs(amount),
-              at: `${date}T09:00:00.000Z`,
-              parentId: line.id,
-              tags: ["ledger", "reconciliation"],
-              fields: { date, source: "reconciliation", bankLineId: line.id },
-              body: { date, memo: line.title, lines },
-            }, `Adjustment posted for statement line ${line.title}`);
-            await context.mutate.patch(line.id, {
-              status: "matched",
-              fields: { ...line.fields, matched: true, journalId: journal.id, matchedBy: context.actor },
-            }, { expectRevision: line.revision, event: `Statement line ${line.title} matched to a new adjustment` });
-            context.toast("Adjustment posted", `${context.money(Math.abs(amount))} is now on the ledger and the line is matched. The difference has moved by that amount.`);
-            setBusy(false);
-            close();
+            try {
+              const date = (line.at ?? context.now.toISOString()).slice(0, 10);
+              const journalLines: JLine[] = amount >= 0
+                ? [
+                  { accountId: recon.bankAccountId!, debitMinor: amount, creditMinor: 0, memo: line.title },
+                  ...rows.map((row) => ({ accountId: row.accountId, debitMinor: 0, creditMinor: row.amountMinor, memo: line.title })),
+                ]
+                : [
+                  ...rows.map((row) => ({ accountId: row.accountId, debitMinor: row.amountMinor, creditMinor: 0, memo: line.title })),
+                  { accountId: recon.bankAccountId!, debitMinor: 0, creditMinor: Math.abs(amount), memo: line.title },
+                ];
+              const ctx = { actor: context.actor, now: context.now.toISOString() };
+              const journal = newRecord({
+                organizationId: context.org.id,
+                currency: context.org.currency,
+                collection: "journals",
+                title: `Adjustment · ${line.title}`,
+                status: "posted",
+                summary: `Posted from an unmatched statement line on ${context.date(line.at)}.`,
+                amountMinor: Math.abs(amount),
+                at: `${date}T09:00:00.000Z`,
+                parentId: line.id,
+                tags: ["ledger", "reconciliation"],
+                fields: { date, source: "reconciliation", bankLineId: line.id },
+                body: { date, memo: line.title, lines: journalLines },
+              }, ctx);
+              const matched = touch(line, context.actor, ctx.now, {
+                status: "matched",
+                fields: { ...line.fields, matched: true, journalId: journal.id, matchedBy: context.actor },
+              });
+              await context.mutate.putMany(
+                [matched, journal],
+                [
+                  `Statement line ${line.title} matched to posted adjustment ${journal.title}`,
+                  `Adjustment posted for statement line ${line.title}`,
+                ],
+                { [line.id]: line.revision },
+                ["update", "create"],
+              );
+              context.toast("Adjustment posted", `${context.money(Math.abs(amount))} is now on the ledger and the statement line has a reciprocal match.`);
+              close();
+            } catch (error) {
+              context.toast("Adjustment was not posted", error instanceof Error ? error.message : "The statement or period changed. Reopen the record.", "failed");
+            } finally {
+              setBusy(false);
+            }
+
           }}
         >
           Post the adjustment
