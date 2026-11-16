@@ -1,9 +1,7 @@
-@import "@fontsource/inter/400.css";
-@import "@fontsource/inter/500.css";
-@import "@fontsource/inter/600.css";
-@import "@fontsource/ibm-plex-sans-condensed/500.css";
-@import "@fontsource/ibm-plex-sans-condensed/600.css";
-@import "@fontsource/ibm-plex-sans-condensed/700.css";
+@import "@fontsource/hanken-grotesk/300.css";
+@import "@fontsource/hanken-grotesk/400.css";
+@import "@fontsource/hanken-grotesk/500.css";
+@import "@fontsource/hanken-grotesk/600.css";
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
 @import "@fontsource/ibm-plex-mono/600.css";
@@ -28,21 +26,22 @@ button { cursor: pointer; background: none; border: 0; padding: 0; }
 a { color: var(--fg-link); text-decoration-thickness: 1px; text-underline-offset: 2px; }
 
 :focus { outline: none; }
-:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-xs); }
+:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
-/* Display face carries the headings; Inter carries the reading text. */
+/* Hierarchy comes from the gap between light statements and medium labels,
+   never from bold display type. */
 h1, h2, h3, h4, h5, h6 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: var(--tracking-tight);
-  line-height: var(--leading-tight);
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.2;
   color: var(--fg-strong);
 }
-h1 { font-size: var(--text-3xl); font-weight: 700; letter-spacing: var(--tracking-tighter); }
-h2 { font-size: var(--text-xl); }
-h3 { font-size: var(--text-lg); }
-h4 { font-size: var(--text-md); }
+h1 { font-size: var(--text-3xl); font-weight: 300; line-height: 1.05; letter-spacing: var(--tracking-tighter); }
+h2 { font-size: var(--text-xl); font-weight: 300; line-height: 1.1; letter-spacing: var(--tracking-tighter); }
+h3 { font-size: var(--text-lg); font-weight: 400; letter-spacing: -0.01em; }
+h4 { font-size: var(--text-md); font-weight: 500; }
 p { margin: 0; }
 ul, ol { margin: 0; padding: 0; list-style: none; }
 figure { margin: 0; }
@@ -56,7 +55,7 @@ figure { margin: 0; }
    table (.ds-table, .dx-table, matrices) overrides it. */
 :where(table) { width: 100%; border-collapse: collapse; font-size: 14px; /* the size plain tables always had */ }
 :where(th, td) { text-align: start; padding: 10px var(--space-3); border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
-:where(th) { font-size: var(--text-xs); letter-spacing: 0.04em; text-transform: uppercase; color: var(--fg-muted); }
+:where(th) { font-size: var(--text-xs); font-weight: 500; letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--fg-muted); }
 :where(tr[aria-selected="true"]) { background: var(--bg-selected); }
 
 
@@ -68,7 +67,7 @@ figure { margin: 0; }
    unknown no source, or a source too old to trust                        */
 [data-prov] { position: relative; }
 [data-prov]::before {
-  content: ""; position: absolute; inset-block: 10px; inset-inline-start: 0;
+  content: ""; position: absolute; inset-block: 12px; inset-inline-start: 0;
   width: var(--mat-width); border-radius: var(--mat-width);
 }
 [data-prov="posted"]::before { background: var(--mat-posted); }
@@ -82,9 +81,9 @@ tr[data-prov]::before { inset-block: 0; }
 /* On a tall panel the material is a flag at the head, not a border down the side. */
 .ds-card[data-prov]::before { inset-block: 15px auto; height: 22px; }
 
-/* A label that names what a thing is, set in the data face. */
+/* A label that names what a thing is. */
 .ds-eyebrow {
-  font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: 500;
+  font-size: var(--text-xs); font-weight: 500;
   letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--fg-subtle);
 }
 
@@ -98,7 +97,7 @@ tr[data-prov]::before { inset-block: 0; }
 .ds-skip {
   position: fixed; left: var(--space-3); top: calc(var(--space-3) * -6);
   z-index: 200; background: var(--bg-surface); color: var(--fg-default);
-  border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
   padding: var(--space-2) var(--space-4); box-shadow: var(--shadow-2);
   transition: top var(--dur-menu) var(--ease-out);
 }

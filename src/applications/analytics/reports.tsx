@@ -784,7 +784,7 @@ export function RecipientPreview({ context, close }: { context: ScreenContext; c
       <Field label="Recipient">
         <Select aria-label="Recipient" value={recipient} onChange={(event) => setRecipient(event.target.value)}>
           <option value="">Choose a recipient</option>
-          {people.map((person) => <option key={`${person.kind}-${person.name}`} value={person.name}>{person.name} ({person.kind}{person.consent ? "" : ", no consent"})</option>)}
+          {people.map((person, personIndex) => <option key={`${person.kind}-${person.name}-${personIndex}`} value={person.name}>{person.name} ({person.kind}{person.consent ? "" : ", no consent"})</option>)}
         </Select>
       </Field>
       <Properties rows={[

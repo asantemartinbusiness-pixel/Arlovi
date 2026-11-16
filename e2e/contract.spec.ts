@@ -23,11 +23,21 @@ interface Result {
 test.describe("screen contract sweep", () => {
   test.describe.configure({ mode: "serial" });
 
-  test("every approved screen renders without a console error", async ({ page }) => {
+  test("every approved screen renders without a console error", async ({ page: firstPage }) => {
     test.setTimeout(20 * 60_000);
+    let page = firstPage;
     const results: Result[] = [];
 
+    let visited = 0;
     for (const screen of catalog.screens) {
+      /* One renderer cannot hold 300+ screens in a constrained container; a
+         fresh page every 40 screens keeps the sweep about the screens. */
+      if (visited > 0 && visited % 40 === 0) {
+        const context = page.context();
+        if (page !== firstPage) await page.close();
+        page = await context.newPage();
+      }
+      visited += 1;
       const errors: string[] = [];
       const onConsole = (message: { type: () => string; text: () => string }) => {
         if (message.type() === "error") errors.push(message.text().slice(0, 240));

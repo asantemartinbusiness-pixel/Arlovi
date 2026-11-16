@@ -158,10 +158,10 @@ registerSeed("asset", (ctx) => {
   });
 
   /* ---------------- Fonts and video: catalogued, no file here ---------------- */
-  asset(37, "Inter — variable", "The workspace typeface. Served by the application, not stored as an asset file.", {
-    kind: "font", format: "woff2", fileState: "metadata_only", licence: "royalty_free", licensor: "The Inter Project Authors",
-    licenceRef: "SIL Open Font License 1.1", approvedBy: "Maya Chen", checksum: "font-inter", usedIn: "Every surface in this workspace",
-    weights: "100–900", version: 1,
+  asset(37, "Hanken Grotesk", "The workspace typeface. Served by the application, not stored as an asset file.", {
+    kind: "font", format: "woff2", fileState: "metadata_only", licence: "royalty_free", licensor: "The Hanken Grotesk Project Authors",
+    licenceRef: "SIL Open Font License 1.1", approvedBy: "Maya Chen", checksum: "font-hanken-grotesk", usedIn: "Every surface in this workspace",
+    weights: "300–600", version: 1,
   }, 2_000, { tags: ["brand", "type"] });
 
   asset(38, "Bodoni Display", "Licensed display face for the collection headline. Seat licence, two users.", {

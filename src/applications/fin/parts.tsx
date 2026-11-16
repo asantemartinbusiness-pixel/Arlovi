@@ -149,8 +149,8 @@ export function StatementRow({ rows, context }: { rows: { label: string; minor?:
   return (
     <table className="ds-table">
       <tbody>
-        {rows.map((row) => (
-          <tr key={row.label}>
+        {rows.map((row, index) => (
+          <tr key={`${row.label}-${index}`}>
             <th scope="row" style={{ textAlign: "start", fontWeight: row.bold ? 650 : 400, paddingInlineStart: row.indent ? "var(--space-5)" : undefined }}>
               {row.label}
               {row.note && <span className="ds-subtle" style={{ display: "block", fontSize: "var(--text-xs)" }}>{row.note}</span>}

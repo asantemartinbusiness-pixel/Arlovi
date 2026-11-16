@@ -2,11 +2,11 @@ import { useMemo, useState, type JSX } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  Building2, CalendarDays, Clock, Compass, Flag, Landmark, Network, Target, Users,
+  BookOpen, Building2, CalendarDays, Clock, Compass, Flag, Landmark, Network, Sparkles, Target, Users,
 } from "lucide-react";
 import {
   BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice,
-  Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Avatar,
+  Pill, Properties, RoutingLine, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Avatar,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
@@ -106,6 +106,7 @@ function StateOfPlay({
           </span>
         ))}
       </h2>
+      <RoutingLine nodes={[{ icon: <Users size={18} />, label: "People" }, { icon: <Sparkles size={18} />, label: "Agents" }, { icon: <BookOpen size={18} />, label: "Books" }]} />
       {ledgerStale && (
         <p className="ds-subtle" style={{ maxWidth: "52ch" }}>
           Figures below come from posted journals in this browser. Nothing is read from a bank feed.
