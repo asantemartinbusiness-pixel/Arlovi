@@ -54,8 +54,11 @@ export function ResourceLibrary({ scope = null }: { scope?: Scope }) {
   const q = query.trim().toLocaleLowerCase();
   const visibleFolders = scopedFolders.filter(f=>
     (q ? (f.title+" "+f.summary).toLowerCase().includes(q) : (f.fields.parentFolderId || "")===(activeFolderId??"")));
-  const visibleDocs = scopedDocs.filter(d=>
-    (q ? (d.title+" "+d.summary).toLowerCase().includes(q) : (d.fields.resourceFolderId||"")===(activeFolderId??"")));
+  const visibleDocs = scopedDocs.filter(d=>{
+    const folder = scopedFolders.find(f=>f.id===d.fields.resourceFolderId);
+    const effectiveFolderId = folder?.id ?? "";
+    return q ? (d.title+" "+d.summary).toLowerCase().includes(q) : effectiveFolderId===(activeFolderId??"");
+  });
   const selected = scopedDocs.find(d=>d.id===selectedId);
   const selectable = scope ? documents.filter(d=>!CLOSED.has(d.status)&&!belongsToResourceScope(d,scope)&&!linkedIds.has(d.id)) : [];
   const names = new Map<string,string>([
