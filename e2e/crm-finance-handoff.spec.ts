@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("a stale deal revision never leaves an orphan draft invoice in Finance", async ({page}) => {
   await page.goto("/o/northline/crm/deals/nl-deals-721");
+  await expect(page.locator("#main")).toContainText("Pike trade account");
   const outcome = await page.evaluate(async () => {
     const path = "/src/platform/repo.ts";
     const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
@@ -34,6 +35,7 @@ test("a stale deal revision never leaves an orphan draft invoice in Finance", as
 
 test("native CRM deal cannot silently accept an unaccepted quote during closure", async ({page}) => {
   await page.goto("/o/northline/crm/deals/nl-deals-721");
+  await expect(page.locator("#main")).toContainText("Pike trade account");
   await page.locator(".pg-actions").getByRole("button", {name: "Close the deal"}).click();
   const dialog = page.getByRole("dialog", {name: "Close the deal"});
   await expect(dialog).toContainText("The quote has not been accepted by the customer");
@@ -82,6 +84,7 @@ test("accepted quote evidence flows through a won CRM deal into the real Finance
   await page.goto("/o/northline/crm/quotes?tab=Accepted");
   await expect(page.getByRole("row", {name: /Q-126/})).toBeVisible();
   await page.goto("/o/northline/crm/deals/nl-deals-721");
+  await expect(page.locator("#main")).toContainText("Pike trade account");
   await runAction("Close the deal");
   await expect(page.getByRole("dialog")).toContainText("Q-126 (accepted)");
   await page.getByRole("dialog").getByRole("button", {name: "Close won"}).click();
