@@ -263,23 +263,52 @@ describe("bank reconciliation", () => {
     expect(recon.differenceMinor).toBe((recon.statementClosingMinor ?? 0) - recon.ledgerMinor);
   });
 
-  it("explains the whole difference with the lines that have no ledger entry", () => {
+  it("shows unexplained movement when a statement is compared to ledger postings only through its closing date", () => {
     expect(recon.needsPosting.length).toBeGreaterThan(0);
     expect(recon.needsPostingMinor).toBe(recon.needsPosting.reduce((sum, line) => sum + Number(line.amountMinor ?? 0), 0));
-    expect(recon.unexplainedMinor).toBe(0);
+    expect(recon.unexplainedMinor).toBe((recon.differenceMinor ?? 0) - recon.needsPostingMinor);
+    // A later ledger posting must not silently make a historic statement tie.
+    expect(recon.unexplainedMinor).not.toBe(0);
   });
 
-  it("separates a line that only needs linking from one that needs posting", () => {
-    expect(recon.suggested.length).toBeGreaterThan(0);
-    for (const entry of recon.suggested) {
-      expect(entry.candidates[0].confidence).toBeGreaterThanOrEqual(60);
-      expect(entry.candidates[0].reason).toMatch(/Amount matches exactly/);
-    }
+  it("suggests an exact posted journal for a new, unmatched line in the same statement batch", () => {
+    const bankAccountId = account("1000");
+    const arAccountId = account("1100");
+    const date = "2026-11-10";
+    const syntheticJournal: Rec = {
+      ...NL_JOURNALS[0], id: "qa-matched-journal", title: "QA exact bank receipt",
+      status: "posted", at: `${date}T09:00:00.000Z`,
+      fields: { source: "payment", date },
+      body: { date, memo: "QA exact bank receipt", lines: [
+        { accountId: bankAccountId, debitMinor: 7700, creditMinor: 0 },
+        { accountId: arAccountId, debitMinor: 0, creditMinor: 7700 },
+      ] },
+    };
+    const syntheticLine: Rec = {
+      ...NL_BANK.find((line) => line.fields.source === "statement-import")!,
+      id: "qa-unmatched-statement-line", title: "QA exact bank receipt", status: "unmatched",
+      at: `${date}T00:00:00.000Z`, amountMinor: 7700,
+      fields: {
+        source: "statement-import", reference: "QA exact bank receipt",
+        bankAccountCode: "1000", importBatch: String(recon.statement?.record.fields.importBatch ?? ""),
+        matched: false,
+      },
+    };
+    const withCandidate = reconcile({
+      accounts: NL_ACCOUNTS,
+      journals: [...NL_JOURNALS, syntheticJournal],
+      lines: [...NL_BANK, syntheticLine],
+      bankAccountCode: "1000",
+    });
+    const candidate = withCandidate.suggested.find((item) => item.line.id === syntheticLine.id);
+    expect(candidate?.candidates[0].journal.id).toBe(syntheticJournal.id);
+    expect(candidate?.candidates[0].confidence).toBeGreaterThanOrEqual(60);
+    expect(candidate?.candidates[0].reason).toMatch(/Amount matches exactly/);
   });
 
   it("refuses to be confirmed while a line is open", () => {
     expect(recon.complete).toBe(false);
-    expect(recon.blockedReason).toMatch(/still open/);
+    expect(recon.blockedReason).toMatch(/difference|still open/);
   });
 
   it("never matches an approximate amount", () => {
