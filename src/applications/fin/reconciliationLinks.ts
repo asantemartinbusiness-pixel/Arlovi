@@ -71,9 +71,12 @@ export function prepareStatementUnmatch(input: {
     return { blocked: "The linked journal could not be verified in this company." };
   }
   if (line.fields.matched !== true || String(line.fields.journalId ?? "") !== journal.id
-    || String(journal.fields.bankLineId ?? "") !== line.id) {
+    || (journal.fields.bankLineId && String(journal.fields.bankLineId) !== line.id)) {
     return { blocked: "This line and journal are no longer linked to one another. Reload and review." };
   }
+  // Older imported lines could point to a posted journal without its
+  // reciprocal bankLineId. Permit a guarded unlink to repair that legacy
+  // state, but never clear a link that belongs to a different statement.
   const stamp = now.toISOString();
   const lineFields = { ...line.fields };
   delete lineFields.journalId;
