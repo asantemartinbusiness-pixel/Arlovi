@@ -11,6 +11,13 @@ import type { Audit, Rec, Snapshot } from "@/domain/types";
  * clobber each other.
  * ------------------------------------------------------------------ */
 
+export class OrganizationScopeError extends Error {
+  constructor(public readonly id: string, public readonly expectedOrgId: string, public readonly actualOrgId: string) {
+    super(`Record ${id} does not belong to the selected organization.`);
+    this.name = "OrganizationScopeError";
+  }
+}
+
 export class ConflictError extends Error {
   constructor(public readonly id: string, public readonly expected: number, public readonly actual: number) {
     super(`Record ${id} changed since it was read (expected revision ${expected}, found ${actual}).`);
@@ -92,6 +99,8 @@ export interface WriteContext {
 export interface PatchOptions {
   /** Revision the caller read; a mismatch raises ConflictError. */
   expectRevision?: number;
+  /** Optional transaction-time tenant enforcement; required for UI mutations. */
+  expectedOrganizationId?: string;
   /** Suppress history snapshot for high-frequency editor saves. */
   skipHistory?: boolean;
   /** Replace the whole fields map instead of merging. Only for deliberate removals. */
@@ -103,6 +112,9 @@ export async function patchRecord(id: string, patch: Partial<Rec>, context: Writ
   return db.transaction("rw", [db.records, db.events], async () => {
     const current = await db.records.get(id);
     if (!current) throw new Error(`Record ${id} is not in this workspace.`);
+    if (options.expectedOrganizationId && current.organizationId !== options.expectedOrganizationId) {
+      throw new OrganizationScopeError(id, options.expectedOrganizationId, current.organizationId);
+    }
     if (options.expectRevision !== undefined && current.revision !== options.expectRevision) {
       throw new ConflictError(id, options.expectRevision, current.revision);
     }
@@ -138,6 +150,10 @@ export async function patchRecord(id: string, patch: Partial<Rec>, context: Writ
 
 export async function putRecord(record: Rec, context: WriteContext, event?: Omit<Audit, "id" | "at" | "actor" | "organizationId">): Promise<Rec> {
   return db.transaction("rw", [db.records, db.events], async () => {
+    const previous = await db.records.get(record.id);
+    if (previous && previous.organizationId !== record.organizationId) {
+      throw new OrganizationScopeError(record.id, record.organizationId, previous.organizationId);
+    }
     await db.records.put(record);
     if (event) {
       await db.events.add({
@@ -154,15 +170,28 @@ export async function putRecord(record: Rec, context: WriteContext, event?: Omit
   });
 }
 
-export async function putMany(records: Rec[], context: WriteContext, events: Omit<Audit, "id" | "at" | "actor" | "organizationId">[] = []): Promise<void> {
+export async function putMany(records: Rec[], context: WriteContext, events: Omit<Audit, "id" | "at" | "actor" | "organizationId">[] = [], expectedOrgId?: string): Promise<void> {
   if (records.length === 0 && events.length === 0) return;
+  const scopeId = expectedOrgId ?? records[0]?.organizationId;
+  if (!scopeId) throw new Error("Bulk audit events require an organization scope.");
   await db.transaction("rw", [db.records, db.events], async () => {
-    if (records.length) await db.records.bulkPut(records);
+    for (const record of records) {
+      if (record.organizationId !== scopeId) throw new OrganizationScopeError(record.id, scopeId, record.organizationId);
+    }
+    if (records.length) {
+      const existing = await db.records.bulkGet(records.map((record) => record.id));
+      for (const original of existing) {
+        if (original && original.organizationId !== scopeId) {
+          throw new OrganizationScopeError(original.id, scopeId, original.organizationId);
+        }
+      }
+      await db.records.bulkPut(records);
+    }
     if (events.length) {
       await db.events.bulkAdd(events.map((event) => ({
         ...event,
         id: crypto.randomUUID(),
-        organizationId: records[0]?.organizationId ?? event.entityId ?? "",
+        organizationId: scopeId,
         at: context.now,
         actor: context.actor,
         screenId: event.screenId ?? context.screenId,
@@ -171,9 +200,13 @@ export async function putMany(records: Rec[], context: WriteContext, events: Omi
   });
 }
 
-export async function deleteRecord(id: string, context: WriteContext, event?: Omit<Audit, "id" | "at" | "actor" | "organizationId">): Promise<void> {
+export async function deleteRecord(id: string, context: WriteContext, event?: Omit<Audit, "id" | "at" | "actor" | "organizationId">, expectedOrgId?: string): Promise<void> {
   await db.transaction("rw", [db.records, db.events], async () => {
     const current = await db.records.get(id);
+    if (!current) return;
+    if (expectedOrgId && current.organizationId !== expectedOrgId) {
+      throw new OrganizationScopeError(id, expectedOrgId, current.organizationId);
+    }
     await db.records.delete(id);
     if (event && current) {
       await db.events.add({

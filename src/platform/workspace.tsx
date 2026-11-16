@@ -147,7 +147,7 @@ export function useOrgRecords(): Rec[] {
 
 export interface Mutations {
   create: (input: Omit<repo.NewRecordInput, "organizationId" | "currency"> & { currency?: string }, event?: string) => Promise<Rec>;
-  patch: (id: string, patch: Partial<Rec>, options?: Omit<repo.PatchOptions, "event"> & { event?: string }) => Promise<Rec | null>;
+  patch: (id: string, patch: Partial<Rec>, options?: Omit<repo.PatchOptions, "event" | "expectedOrganizationId"> & { event?: string }) => Promise<Rec | null>;
   remove: (id: string, event?: string) => Promise<void>;
   putMany: (records: Rec[], messages?: string[]) => Promise<void>;
   log: (message: string, options?: { entityId?: string; type?: string; capability?: Audit["capability"] }) => Promise<void>;
@@ -171,9 +171,14 @@ export function useMutations(screenId?: string): Mutations {
       try {
         return await repo.patchRecord(id, patch, ctx, {
           ...options,
+          expectedOrganizationId: org.id,
           event: options?.event ? { type: "update", message: options.event } : undefined,
         });
       } catch (error) {
+        if (error instanceof repo.OrganizationScopeError) {
+          pushToast({ title: "Action blocked", body: "This record belongs to a different organization.", tone: "blocked" });
+          return null;
+        }
         if (error instanceof repo.ConflictError) {
           pushToast({
             title: "This record changed elsewhere",
@@ -187,11 +192,19 @@ export function useMutations(screenId?: string): Mutations {
     },
     async remove(id, event) {
       const ctx = context();
-      await repo.deleteRecord(id, ctx, event ? { type: "delete", message: event } : undefined);
+      try {
+        await repo.deleteRecord(id, ctx, event ? { type: "delete", message: event } : undefined, org.id);
+      } catch (error) {
+        if (error instanceof repo.OrganizationScopeError) {
+          pushToast({ title: "Action blocked", body: "This record belongs to a different organization.", tone: "blocked" });
+          return;
+        }
+        throw error;
+      }
     },
     async putMany(records, messages = []) {
       const ctx = context();
-      await repo.putMany(records, ctx, messages.map((message) => ({ type: "update", message })));
+      await repo.putMany(records, ctx, messages.map((message) => ({ type: "update", message })), org.id);
     },
     async log(message, options) {
       const ctx = context();
