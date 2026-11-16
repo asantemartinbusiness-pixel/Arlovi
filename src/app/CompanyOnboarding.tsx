@@ -19,15 +19,25 @@ interface Setup {
   description: string;
   departments: string[];
   agents: string[];
+  knowledgeNotes: string;
+  colleagues: string;
+  preferredApps: string[];
+  teamChannels: string[];
+  dailyBriefing: boolean;
+  approvalMode: "review_all" | "supervised_drafts";
   goal: string;
 }
 const KEY = "arlovi-company-setup-draft-v1";
-const STEPS = ["Company", "Identity", "Departments", "Intelligence", "Launch"];
+const STEPS = ["Company", "Identity", "Knowledge", "Departments", "People", "Intelligence", "Applications", "Collaboration", "Authority", "Launch"];
 const DEFAULT: Setup = {
   company: "", slug: "", owner: "", territory: "GB", currency: "GBP",
   timezone: "Europe/London", accent: "#234FE8", description: "",
   departments: ["Operations", "Finance", "Sales", "Marketing", "People", "Creative", "Customer Care", "Engineering"],
-  agents: ["Chief of Staff", "Finance Analyst", "Creative Director"], goal: "",
+  agents: ["Chief of Staff", "Finance Analyst", "Creative Director"],
+  knowledgeNotes: "", colleagues: "",
+  preferredApps: ["Headquarters", "AI Workforce", "Missions", "Finance", "CRM", "Projects", "Communications", "Docs", "Sheets", "Design"],
+  teamChannels: ["Company Updates", "Leadership", "Operations"],
+  dailyBriefing: true, approvalMode: "review_all", goal: "",
 };
 const TERRITORIES: Record<Territory, { currency: string; timezone: string; locale: string; label: string }> = {
   GB: { currency: "GBP", timezone: "Europe/London", locale: "en-GB", label: "United Kingdom" },
@@ -38,13 +48,20 @@ const TERRITORIES: Record<Territory, { currency: string; timezone: string; local
 const DEPARTMENTS = ["Operations", "Finance", "Sales", "Marketing", "People", "Creative", "Customer Care", "Engineering", "Legal", "Procurement", "IT", "Research"];
 const AGENTS = ["Chief of Staff", "Finance Analyst", "Creative Director", "Sales Researcher", "Operations Coordinator", "Customer Care Specialist"];
 const COLORS = ["#234FE8", "#006E70", "#6236D1", "#C24B24", "#A51F63", "#20242B"];
+const APPS = ["Headquarters", "Inbox", "Assets", "Administration", "Ask Arlovi", "Company Brain", "AI Workforce", "Missions", "Automation", "Analytics", "Finance", "CRM", "People", "Projects", "Communications", "Customer Care", "Legal", "Marketing", "Commerce", "Bookings", "Procurement", "Portals", "Docs", "Sheets", "Present", "Design", "Photo", "Layout", "Video", "Motion", "Websites", "App Builder", "Forms", "Integrations", "IT Operations"];
+const CHANNELS = ["Company Updates", "Leadership", "Operations", "Announcements", "Creative", "Sales", "Support", "Engineering"];
 
 function restored(): Setup {
   try {
     const stored = localStorage.getItem(KEY);
     if (!stored) return DEFAULT;
     const parsed = JSON.parse(stored) as Partial<Setup>;
-    return { ...DEFAULT, ...parsed, departments: Array.isArray(parsed.departments) ? parsed.departments : DEFAULT.departments, agents: Array.isArray(parsed.agents) ? parsed.agents : DEFAULT.agents };
+    return { ...DEFAULT, ...parsed,
+      departments: Array.isArray(parsed.departments) ? parsed.departments : DEFAULT.departments,
+      agents: Array.isArray(parsed.agents) ? parsed.agents : DEFAULT.agents,
+      preferredApps: Array.isArray(parsed.preferredApps) ? parsed.preferredApps : DEFAULT.preferredApps,
+      teamChannels: Array.isArray(parsed.teamChannels) ? parsed.teamChannels : DEFAULT.teamChannels,
+    };
   } catch { return DEFAULT; }
 }
 function slugify(value: string): string {
@@ -65,7 +82,7 @@ export function CompanyOnboarding() {
     setSetup((current) => ({ ...current, [key]: value }));
     setError("");
   }
-  function toggle(key: "departments" | "agents", value: string) {
+  function toggle(key: "departments" | "agents" | "preferredApps" | "teamChannels", value: string) {
     setSetup((current) => ({
       ...current,
       [key]: current[key].includes(value) ? current[key].filter((entry) => entry !== value) : [...current[key], value],
@@ -77,7 +94,7 @@ export function CompanyOnboarding() {
       if (!isOrganizationSlugAvailable(setup.slug)) return "Choose an available company address using letters, numbers and hyphens.";
       if (!setup.owner.trim()) return "Enter the name of the person managing this workspace.";
     }
-    if (at === 2 && setup.departments.length === 0) return "Select at least one department.";
+    if (at === 3 && setup.departments.length === 0) return "Select at least one department.";
     return "";
   }
   function next() {
@@ -87,8 +104,8 @@ export function CompanyOnboarding() {
     setError("");
   }
   async function finish() {
-    const issue = validate(0) || validate(2);
-    if (issue) { setError(issue); setStep(issue.includes("department") ? 2 : 0); return; }
+    const issue = validate(0) || validate(3);
+    if (issue) { setError(issue); setStep(issue.includes("department") ? 3 : 0); return; }
     setBusy(true); setError("");
     const now = clockIso();
     const orgId = "org-" + crypto.randomUUID();
@@ -106,7 +123,7 @@ export function CompanyOnboarding() {
       createdBy: setup.owner.trim(), updatedBy: setup.owner.trim(), history: [],
     });
     const organization = { ...build("organizations", profile.name, "active", {
-      slug: profile.slug, locale: profile.locale, legalName: profile.name, executionPaused: false,
+      slug: profile.slug, locale: profile.locale, legalName: profile.name, executionPaused: true,
       jurisdiction: profile.jurisdiction, timezone: profile.timezone, brandAccent: profile.accent,
     }, setup.description.trim()), id: orgId };
     const records: Rec[] = [organization];
@@ -125,6 +142,20 @@ export function CompanyOnboarding() {
       }));
     }
     if (setup.description.trim()) records.push(build("sources", "Company overview", "awaiting_review", { source: "owner-setup", trusted: false }, setup.description.trim(), { text: setup.description.trim() }));
+    if (setup.knowledgeNotes.trim()) records.push(build("sources", "Initial company knowledge", "awaiting_review", { source: "owner-setup", trusted: false }, setup.knowledgeNotes.trim(), { text: setup.knowledgeNotes.trim() }));
+    for (const colleague of setup.colleagues.split("\n").map((person) => person.trim()).filter(Boolean)) {
+      records.push(build("members", colleague, "invitation_draft", { kind: "human", role: "member", invitationSent: false }, "Invitation not sent. Confirm access and contact details in Administration."));
+    }
+    for (const app of APPS) {
+      records.push(build("preferences", `App preference: ${app}`, "active", { app, pinned: setup.preferredApps.includes(app), mode: "native_local" }, "App remains available. Preference controls starting workspace navigation only."));
+    }
+    for (const channel of setup.teamChannels) {
+      records.push(build("channels", channel, "active", { visibility: "internal", createdFromSetup: true }, "Local team space, with no externally delivered invitations."));
+    }
+    records.push(build("policies", "Company autonomy policy", "draft", {
+      mode: setup.approvalMode, approvalRequired: true, externalActionsAllowed: false, spendCapMinor: 0,
+    }, "Agents remain drafts, company execution starts paused, and external actions require verified connections."));
+    records.push(build("preferences", "Executive briefing", "active", { dailyBriefing: setup.dailyBriefing, externalDelivery: false }, "Local notification preference only."));
     records.push(build("missions", setup.goal.trim() || "Establish our company workspace", "draft",
       { stage: "planning", requiresApproval: true, execution: "not_connected" },
       "First mission brief awaiting human review. No AI task or external action has executed."));
