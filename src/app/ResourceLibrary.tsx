@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { Archive, ArrowLeft, ChevronRight, Clock3, File, FileText, Folder, FolderPlus, Link2, Search, Unlink2, X } from "lucide-react";
+import { Archive, ChevronRight, Clock3, File, FileText, Folder, FolderPlus, Link2, Search, Unlink2, X } from "lucide-react";
 import { useCollections, useMutations, useToast, useWorkspace } from "@/platform/workspace";
 import { readDoc, toPlainText } from "@/applications/docs/model";
 import { routeForRecord } from "@/platform/attention";
