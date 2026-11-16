@@ -14,6 +14,7 @@ import { WORK_AREAS, WorkspaceNavigation, WorkspaceSideNav, currentWorkArea, isW
 import { ScreenErrorBoundary } from "@/app/ErrorBoundary";
 import { applicationLoadFailures } from "@/applications";
 import { CommandPalette } from "@/app/CommandPalette";
+import { recordNavigation } from "@/platform/navigationContinuity";
 import { AttentionCentre } from "@/app/AttentionCentre";
 import { AskPanel } from "@/app/AskPanel";
 import { ExecutionTray } from "@/app/ExecutionTray";
@@ -103,6 +104,10 @@ export function AppShell() {
   }, [ui]);
 
   useEffect(() => { setNavOpen(false); }, [location.pathname]);
+
+  useEffect(() => {
+    recordNavigation(org.id, org.slug, location.pathname);
+  }, [org.id, org.slug, location.pathname]);
 
   useEffect(() => {
     try { localStorage.setItem("arlovi-last-workspace", org.slug); } catch { /* optional local preference */ }
