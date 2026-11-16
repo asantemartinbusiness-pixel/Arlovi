@@ -116,6 +116,7 @@
    second icon catalogue. It collapses when the canvas needs more room. */
 .hq-appnav { min-width:0; }
 .hq-appnav-head { padding:17px 15px 13px; }
+.hq-appnav-back { display:none; }
 .hq-appnav-heading { display:flex; align-items:center; gap:9px; }
 .hq-appnav-identity { display:flex; flex:1; min-width:0; flex-direction:column; }
 .hq-appnav-identity strong { font-size:14px; color:var(--fg-strong); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
@@ -276,6 +277,8 @@
   }
   .hq-sidebar-collapse { display:none; }
   .hq-appnav { flex-direction:column; }
+  .hq-appnav-back { display:inline-grid; }
+  .hq-appnav-collapse { display:none; }
   .hq-bottom { gap:0; }
   .hq-launcher-backdrop { padding:10px; align-items:center; }
   .hq-launcher { max-height:calc(100dvh - 20px); }
