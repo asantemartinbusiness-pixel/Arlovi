@@ -30,12 +30,35 @@ export function ensureSeed(): Promise<void> {
     const meta = await db.meta.get("seed");
     if (meta?.value !== SEED_VERSION) {
       const base = buildSeed();
+      // A seed version bump must NEVER erase browser-local customer work.
+      // Only insert missing fixtures. Explicit resetWorkspace remains the
+      // separate user-directed operation that clears the local workspace.
       await db.transaction("rw", [db.records, db.events, db.meta], async () => {
-        await db.records.clear();
-        await db.events.clear();
-        await db.meta.clear();
-        await db.records.bulkAdd(base.records);
-        await db.events.bulkAdd(base.events);
+        const existingRecordIds = new Set(
+          (await db.records.bulkGet(base.records.map((record) => record.id)))
+            .filter((record): record is Rec => Boolean(record))
+            .map((record) => record.id),
+        );
+        const seenRecords = new Set<string>();
+        const newRecords = base.records.filter((record) => {
+          if (existingRecordIds.has(record.id) || seenRecords.has(record.id)) return false;
+          seenRecords.add(record.id);
+          return true;
+        });
+        if (newRecords.length) await db.records.bulkAdd(newRecords);
+
+        const existingEventIds = new Set(
+          (await db.events.bulkGet(base.events.map((event) => event.id)))
+            .filter((event): event is Audit => Boolean(event))
+            .map((event) => event.id),
+        );
+        const seenEvents = new Set<string>();
+        const newEvents = base.events.filter((event) => {
+          if (existingEventIds.has(event.id) || seenEvents.has(event.id)) return false;
+          seenEvents.add(event.id);
+          return true;
+        });
+        if (newEvents.length) await db.events.bulkAdd(newEvents);
         await db.meta.put({ id: "seed", value: SEED_VERSION });
       });
     }
