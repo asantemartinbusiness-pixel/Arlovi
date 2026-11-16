@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { findScreen, screens } from "@/app/catalog";
 import { APP_ENTRIES } from "@/app/nav";
@@ -100,7 +100,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
   }, [index]);
 
-  function onDialogKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+  function onDialogKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
     if (event.key !== "Tab") return;
     const dialog = event.currentTarget;
