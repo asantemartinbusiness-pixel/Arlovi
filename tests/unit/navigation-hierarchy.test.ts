@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { NAV_GROUPS } from "@/app/nav";
 import { screens } from "@/app/catalog";
 import { areaForApplication, contextualScreenPath } from "@/app/navigationModel";
-import { primaryDestinations } from "@/app/HeadquartersNavigation";
+import { primaryDestinations, visiblePrimaryGroups } from "@/app/HeadquartersNavigation";
 
 describe("three-level headquarters navigation contract", () => {
   it("retains every native application in one discoverable catalogue", () => {
@@ -28,6 +28,15 @@ describe("three-level headquarters navigation contract", () => {
     expect(contextualScreenPath(detail!, "new-company", "real-id-123"))
       .toBe("/o/new-company/design/files/real-id-123");
   });
+  it("shows client-appropriate destinations without inaccessible company-wide links", () => {
+    const groups = visiblePrimaryGroups("client");
+    expect(groups).toHaveLength(1);
+    expect(groups[0].links.map((item) => item.label)).toEqual(
+      ["Client Portal", "Bookings", "Customer Care"],
+    );
+    expect(groups.flatMap((group) => group.links).some((entry) => entry.path?.startsWith("hq/"))).toBe(false);
+  });
+
   it("keeps professional tools in their correct areas", () => {
     expect(areaForApplication("DESIGN")).toBe("Studio");
     expect(areaForApplication("PHOTO")).toBe("Studio");
