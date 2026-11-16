@@ -1,0 +1,498 @@
+[
+ {
+  "id": "ARL-LEGAL-001",
+  "title": "Governance Overview",
+  "route": "/o/northline/legal/home",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Obligations",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Policies",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Risks",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Obligation quick view",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "issue create",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "risk summary",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Risk report",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review an obligation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Raise an issue",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign counsel",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule an audit",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-LEGAL-002",
+  "title": "Contract Library",
+  "route": "/o/northline/legal/contracts",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Draft",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Review",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Active",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Expiring",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archived",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Contract upload",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "reviewer picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "e-sign request",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Send for review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Upload — record a contract",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Send for signature",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Draft a contract",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-LEGAL-003",
+  "title": "Contract Detail",
+  "route": "/o/northline/legal/contracts/nl-contracts-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Clauses",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Redline",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Signatures",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Clause inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "redline diff",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "sign authorization",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request a review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare versions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve the legal step",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Comment",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Record a signature",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Flagged clauses",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "What changed",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-LEGAL-004",
+  "title": "Policy Register",
+  "route": "/o/northline/legal/policies",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Due review",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Draft",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Published",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Policy editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "audience",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "publication impact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a policy",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Revise",
+   "Publish a draft",
+   "Request acknowledgement",
+   "What publishing does",
+   "Who it reaches"
+  ]
+ },
+ {
+  "id": "ARL-LEGAL-005",
+  "title": "Obligation Calendar",
+  "route": "/o/northline/legal/obligations",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Calendar",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Owner",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overdue",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Completed",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Deadline editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "evidence upload",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "escalation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign an owner",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a deadline",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "What is overdue",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Record evidence",
+   "Set a reminder",
+   "Escalate"
+  ]
+ },
+ {
+  "id": "ARL-LEGAL-006",
+  "title": "Risk Register",
+  "route": "/o/northline/legal/risks",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "High",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Owned",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Closed",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Risk form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "score rationale",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "control assignment",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Score a risk",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a risk",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Mitigate — assign a control",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review a risk",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "High risks",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-LEGAL-007",
+  "title": "Audit & Evidence",
+  "route": "/o/northline/legal/evidence",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Packs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Requests",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Holds",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exports",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Evidence detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "legal hold",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "export permissions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assemble a pack",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export rules",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Legal hold",
+   "Share a pack",
+   "Hash or verify a pack",
+   "Open a pack"
+  ]
+ }
+]

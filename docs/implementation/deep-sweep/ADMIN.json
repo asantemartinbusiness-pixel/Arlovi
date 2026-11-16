@@ -1,0 +1,810 @@
+[
+ {
+  "id": "ARL-ADMIN-001",
+  "title": "Organization Settings",
+  "route": "/o/northline/admin/organization",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Profile",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Branding",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Business hours",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Regional",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Identity form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "region change impact",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "domain verify",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Configure a legal entity",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit profile",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Locations in Headquarters",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Verify a domain",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set business hours",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Regional impact",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ADMIN-002",
+  "title": "Members & Invitations",
+  "route": "/o/northline/admin/members",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Members",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Invitations",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Teams",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "External",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Invite wizard",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "role impact",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "revoke confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Change role view",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Invite",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Suspend or reinstate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Revoke access (offboard)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export the member list",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ADMIN-003",
+  "title": "Roles & Permissions",
+  "route": "/o/northline/admin/roles",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Roles",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Policies",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Effective access",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exceptions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Policy editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "effective rights",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "impact review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare two views",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Simulate a role",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create role",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish a draft",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ADMIN-004",
+  "title": "Autonomy Centre",
+  "route": "/o/northline/admin/autonomy",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Company",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Departments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Agents",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Missions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Grant editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "action simulator",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "revoke confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test a permission",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set grant",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Suspend automation",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Cap an action"
+  ]
+ },
+ {
+  "id": "ARL-ADMIN-005",
+  "title": "Budget & AI Usage",
+  "route": "/o/northline/admin/budgets",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "AI",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Missions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Providers",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Limits",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Invoices",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Spend limit",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "cost allocation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "budget warning",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set quota",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Allocate to a department",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve an increase",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Inspect headroom",
+   "Request an increase"
+  ]
+ },
+ {
+  "id": "ARL-ADMIN-006",
+  "title": "Security & Sessions",
+  "route": "/o/northline/admin/security",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Authentication",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sessions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Devices",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Threats",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Provider setup",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "emergency revoke",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "security review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Revoke sessions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Configure SSO",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Require a second factor",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export sessions",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ADMIN-007",
+  "title": "Audit Trail",
+  "route": "/o/northline/admin/audit",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Access",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Data",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Financial",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "AI",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Audit detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "export authorization",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "event chain",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Filter",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect the receipt",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Audit retention",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ADMIN-008",
+  "title": "Privacy & Data Controls",
+  "route": "/o/northline/admin/privacy",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Retention",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Consent",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Requests",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Processing",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Residency",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Data request",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "deletion impact",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "jurisdiction disclaimer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export subject data",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review request",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Restrict processing",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Delete where lawful",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Limits of this page",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ADMIN-009",
+  "title": "Billing & Subscription",
+  "route": "/o/northline/admin/billing",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Invoices",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Usage",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Payment",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Checkout",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "cancellation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "billing support",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pay (held at the processor)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Manage subscription",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Download invoices",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Update the payment method",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Ask a billing question",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Cancel subscription",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ADMIN-010",
+  "title": "Backups & Recovery",
+  "route": "/o/northline/admin/recovery",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Backups",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exports",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Restores",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Failures",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Restore impact",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "retention check",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "disaster drill",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Rehearse a restore",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export everything",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request a backup",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Archive the organisation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Recovery drill",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-ADMIN-011",
+  "title": "Environment & Developer Access",
+  "route": "/o/northline/admin/developer",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "API",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Webhooks",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sandbox",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Logs",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Key creation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "scope limits",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "callback tester",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test an endpoint",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Issue key",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Rotate a key",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Revoke a key",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "What a key can reach",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add an endpoint",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

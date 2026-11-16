@@ -1,0 +1,125 @@
+{
+ "source": "e2e/workflows.spec.ts",
+ "tests": [
+  {
+   "title": "WF-05 Sales-to-cash: lead, quote approval, won deal, posted invoice, receipt, reconciliation",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-01 Company onboarding: identity, domain claim, connector boundary, brain approval, authority, first mission",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-02 Cross-department campaign: creative rights gate, consented recipients, local send, receipts",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-03 Revenue decline investigation: question, reconciled actuals, drivers, fact versus hypothesis",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-04 Customer request to resolution: verified contact, approved answer, refund request, no double refund",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-06 Hire-to-onboard: offer on evidence, employee record, IT access decision, payroll input, manager sign-off",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-10 Booking-to-service: atomic slot, deposit boundary, check-in, service history",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-11 Replenishment-to-payment: requisition, approval, purchase order, receipt into stock, payable",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-14 Notification and approval: scoped request, typed confirmation, decision recorded everywhere",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-20 Company emergency pause: dispatch held everywhere, accepted actions not claimed reversed, safe resume",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-07 Design-to-publish: editable file, brand rules, review approval, publish boundary",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-08 Build-to-deploy: local checks, secrets masked, production promotion recorded at the hosting boundary, rollback offered",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-09 Document-to-knowledge: quarantine on upload, injected text inert, review, fact approval, append-only correction",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-12 Connector incident recovery: incident on the IT register, local repair approved, provider step left to a person",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-13 AI workforce lifecycle: validated contract, evaluation before activation, directory and org chart, pause",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-15 Monthly executive reporting: cited figures, reconciled to the ledger, reviewed, distributed only to the boundary",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-16 External client collaboration: scoped portal, invitation at the boundary, no cross-client leakage",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-17 Multi-entity organization: switching organization rescopes records, currency and locale",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-18 Personal-device continuation: a document drafted on desktop continues on a phone and the desktop sees the change",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "WF-19 Sensitive data deletion/export: legal hold refuses erasure, export scoped to the subject, evidence kept",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "Journeys \u203a executive home and a posted journal survive reload",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "Journeys \u203a a storefront order is held awaiting payment and appears in Orders with the basket's total",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "Journeys \u203a an invoice can be created, issued, and found in the ledger after reload",
+   "status": "passed",
+   "errors": []
+  },
+  {
+   "title": "Journeys \u203a moving a task with the keyboard updates the project board after reload",
+   "status": "passed",
+   "errors": []
+  }
+ ]
+}

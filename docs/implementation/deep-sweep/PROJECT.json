@@ -1,0 +1,716 @@
+[
+ {
+  "id": "ARL-PROJECT-001",
+  "title": "Project Portfolio",
+  "route": "/o/northline/project/portfolios",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Departments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Timeline",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Risks",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Portfolio filter",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "initiative detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "priority change",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Filter the portfolio",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a project",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect health",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Portfolio report",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Change a priority"
+  ]
+ },
+ {
+  "id": "ARL-PROJECT-002",
+  "title": "Project Directory",
+  "route": "/o/northline/project/projects",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Mine",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Following",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archived",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Project template",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "archive impact",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "quick detail",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Duplicate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a project",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Archive",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pin or unpin",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Search projects",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Quick detail",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PROJECT-003",
+  "title": "Project Overview",
+  "route": "/o/northline/project/projects/nl-projects-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tasks",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Timeline",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Files",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Activity",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Metrics",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Milestone editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "project settings",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "status note",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request an update",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Change status",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign an owner",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Attach a file",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Post an update",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a milestone",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Project settings",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open the board",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PROJECT-004",
+  "title": "Task Board",
+  "route": "/o/northline/project/projects/nl-projects-001/board",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Board",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "List",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "By owner",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "By sprint",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Task drawer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "stage rule",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "batch action review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Move Doing to Review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Move a task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign a task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Filter the board",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PROJECT-005",
+  "title": "Task Detail",
+  "route": "/o/northline/project/tasks/nl-tasks-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Details",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Discussion",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Subtasks",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Assignee picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "dependency selector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "completion check",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit the task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Mark complete",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Link work",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Comment",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Delegate to an AI employee",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reassign",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PROJECT-006",
+  "title": "Timeline & Dependencies",
+  "route": "/o/northline/project/projects/nl-projects-001/timeline",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Timeline",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Critical path",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Baseline",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Risks",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Date edit",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "conflict review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "dependency graph",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Link a task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reschedule",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare to baseline",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Change a duration",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Check for conflicts",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "What waits for what",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PROJECT-007",
+  "title": "Resource Workload",
+  "route": "/o/northline/project/workload",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "People",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "AI",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Departments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Calendar",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Workload detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "allocation editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "over-capacity alert",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "View who is over capacity",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Reassign",
+   "Adjust an estimate"
+  ]
+ },
+ {
+  "id": "ARL-PROJECT-008",
+  "title": "Project Templates",
+  "route": "/o/northline/project/templates",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Company",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Industry",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Personal",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Template editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "revision confirm",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a template",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Apply a template",
+   "Duplicate",
+   "Publish a revision",
+   "Edit"
+  ]
+ },
+ {
+  "id": "ARL-PROJECT-009",
+  "title": "Goals & OKRs",
+  "route": "/o/northline/project/goals",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Company",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Team",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Personal",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Check-ins",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Metric source",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "check-in dialog",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "goal revision",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set a target",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Report progress",
+   "Link a project",
+   "Where a number comes from"
+  ]
+ },
+ {
+  "id": "ARL-PROJECT-010",
+  "title": "Time & Cost",
+  "route": "/o/northline/project/time",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "My time",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Team",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Costs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approvals",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Timer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "timesheet correction",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "billing link",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve time",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Log time",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Correct an entry",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export timesheets",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Billable time",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

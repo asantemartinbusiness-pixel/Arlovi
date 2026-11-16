@@ -1,0 +1,2675 @@
+[
+ {
+  "screen": "ARL-MARKET-001",
+  "title": "Marketing Overview",
+  "route": "/o/:org/market/home",
+  "contractActions": [
+   "Create campaign",
+   "inspect KPI",
+   "ask Marketing",
+   "view alerts"
+  ],
+  "contractOverlays": [
+   "Metric source",
+   "campaign wizard",
+   "budget inspector"
+  ],
+  "edge": "Attribution uncertainty clearly displayed",
+  "declared": [
+   {
+    "id": "Create campaign",
+    "label": "Create campaign",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"campaign wizard\""
+   },
+   {
+    "id": "inspect KPI",
+    "label": "Inspect a figure",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Metric source\""
+   },
+   {
+    "id": "ask Marketing",
+    "label": "Ask Marketing",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/ai/chat`"
+   },
+   {
+    "id": "view alerts",
+    "label": "Opportunities",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Opportunities\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MARKET-002",
+  "title": "Campaign Library",
+  "route": "/o/:org/market/campaigns",
+  "contractActions": [
+   "Create",
+   "duplicate",
+   "archive",
+   "compare"
+  ],
+  "contractOverlays": [
+   "Campaign template",
+   "plan approval",
+   "duplicate rules"
+  ],
+  "edge": "Copy must not duplicate live external spend authorization",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New campaign",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"campaign wizard\""
+   },
+   {
+    "id": "duplicate",
+    "label": "Duplicate",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"duplicate rules\""
+   },
+   {
+    "id": "archive",
+    "label": "Archive",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"plan approval\""
+   },
+   {
+    "id": "compare",
+    "label": "Compare performance",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/market/analytics`"
+   },
+   {
+    "id": "From a template",
+    "label": "Start from a template",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"Campaign template\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MARKET-003",
+  "title": "Campaign Detail",
+  "route": "/o/:org/market/campaigns/:id",
+  "contractActions": [
+   "Edit draft",
+   "approve",
+   "launch",
+   "pause",
+   "request review"
+  ],
+  "contractOverlays": [
+   "Creative preview",
+   "launch approval",
+   "pause consequence"
+  ],
+  "edge": "Stop ad spending only within real provider control limits",
+  "declared": [
+   {
+    "id": "approve",
+    "label": "Approve plan",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"launch approval\""
+   },
+   {
+    "id": "launch",
+    "label": "Launch locally",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"launch approval\""
+   },
+   {
+    "id": "Edit draft",
+    "label": "Edit brief",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"email builder\""
+   },
+   {
+    "id": "pause",
+    "label": "Pause",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"pause consequence\""
+   },
+   {
+    "id": "request review",
+    "label": "Request review",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { await context.mutate.log(`Review requested for campaign ${context.params.id}`, { entityId: context.params.id, type: \"review.requested\" })"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MARKET-004",
+  "title": "Content Calendar",
+  "route": "/o/:org/market/calendar",
+  "contractActions": [
+   "Drag schedule",
+   "preview",
+   "edit caption",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Post editor",
+   "asset picker",
+   "publish preview"
+  ],
+  "edge": "Provider-supported media and API restrictions validated",
+  "declared": [
+   {
+    "id": "publish",
+    "label": "Review and queue",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"publish preview\""
+   },
+   {
+    "id": "preview",
+    "label": "Preview",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"publish preview\""
+   },
+   {
+    "id": "Drag schedule",
+    "label": "Reschedule selected",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Post editor\""
+   },
+   {
+    "id": "edit caption",
+    "label": "Edit caption",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Post editor\""
+   },
+   {
+    "id": "attach media",
+    "label": "Attach media",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"asset picker\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MARKET-005",
+  "title": "Social Publishing",
+  "route": "/o/:org/market/social",
+  "contractActions": [
+   "Connect account",
+   "create post",
+   "schedule",
+   "retry safely"
+  ],
+  "contractOverlays": [
+   "Account authorization",
+   "post composer",
+   "delivery receipt"
+  ],
+  "edge": "Unknown publication state blocks blind duplicate retries",
+  "declared": [
+   {
+    "id": "create post",
+    "label": "New post",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"post composer\""
+   },
+   {
+    "id": "Connect account",
+    "label": "Connect an account",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Account authorization\""
+   },
+   {
+    "id": "schedule",
+    "label": "Schedule selected",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"post composer\""
+   },
+   {
+    "id": "retry safely",
+    "label": "Delivery receipt",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"delivery receipt\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MARKET-006",
+  "title": "Email Campaigns",
+  "route": "/o/:org/market/email",
+  "contractActions": [
+   "Build email",
+   "test send",
+   "approve recipients",
+   "schedule"
+  ],
+  "contractOverlays": [
+   "Audience preview",
+   "send review",
+   "suppression check"
+  ],
+  "edge": "Unsubscribe, permission and large-send safeguards required",
+  "declared": [
+   {
+    "id": "Build email",
+    "label": "Build an email",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"email builder\""
+   },
+   {
+    "id": "approve recipients",
+    "label": "Approve recipients",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"send review\""
+   },
+   {
+    "id": "test send",
+    "label": "Test send",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"send review\""
+   },
+   {
+    "id": "schedule",
+    "label": "Set the send window",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"email builder\""
+   },
+   {
+    "id": "suppression",
+    "label": "Suppression check",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"suppression check\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MARKET-007",
+  "title": "Audience Segments",
+  "route": "/o/:org/market/audiences",
+  "contractActions": [
+   "Build segment",
+   "preview",
+   "export",
+   "set exclusion"
+  ],
+  "contractOverlays": [
+   "Segment builder",
+   "consent inspector",
+   "export permission"
+  ],
+  "edge": "No outreach to suppressed or ineligible contacts",
+  "declared": [
+   {
+    "id": "Build segment",
+    "label": "Build a segment",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Segment builder\""
+   },
+   {
+    "id": "preview",
+    "label": "Preview members",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Audience preview\""
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"export permission\""
+   },
+   {
+    "id": "set exclusion",
+    "label": "Set exclusions",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Segment builder\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MARKET-008",
+  "title": "Advertising",
+  "route": "/o/:org/market/ads",
+  "contractActions": [
+   "Build draft",
+   "change allocation",
+   "pause",
+   "reconcile"
+  ],
+  "contractOverlays": [
+   "Ad preview",
+   "spend approval",
+   "campaign diagnostics"
+  ],
+  "edge": "Asynchronous provider spend needs reserve plus buffer",
+  "declared": [
+   {
+    "id": "Build draft",
+    "label": "New paid campaign",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"campaign wizard\""
+   },
+   {
+    "id": "change allocation",
+    "label": "Change allocation",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"spend approval\""
+   },
+   {
+    "id": "pause",
+    "label": "Pause selected",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.selectedId; await context.mutate.patch(id, { status: \"paused\" }, { event: \"Campaign paused from Advertising\" }); conte"
+   },
+   {
+    "id": "reconcile",
+    "label": "Diagnose",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"campaign diagnostics\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MARKET-009",
+  "title": "SEO & Content",
+  "route": "/o/:org/market/seo",
+  "contractActions": [
+   "Run audit",
+   "assign issue",
+   "edit metadata",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Audit issue",
+   "page editor",
+   "technical recommendation"
+  ],
+  "edge": "SEO rankings are not promised as deterministic results",
+  "declared": [
+   {
+    "id": "Run audit",
+    "label": "Re-read the page model",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: { await context.mutate.log(\"SEO audit re-read the saved page model in this browser.\", { type: \"audit.local\", capability: \"ready_local\" });"
+   },
+   {
+    "id": "assign issue",
+    "label": "Assign an issue",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Audit issue\""
+   },
+   {
+    "id": "edit metadata",
+    "label": "Edit metadata",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"page editor\""
+   },
+   {
+    "id": "publish",
+    "label": "Open landing pages",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/market/pages`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MARKET-010",
+  "title": "Landing Pages",
+  "route": "/o/:org/market/pages",
+  "contractActions": [
+   "Create",
+   "visually edit",
+   "test",
+   "publish",
+   "revert"
+  ],
+  "contractOverlays": [
+   "Page template",
+   "publish confirm",
+   "version compare"
+  ],
+  "edge": "Published URLs, redirects, consent and analytics verified",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New page",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Page template\""
+   },
+   {
+    "id": "publish",
+    "label": "Export version",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"publish confirm\""
+   },
+   {
+    "id": "visually edit",
+    "label": "Open the builder",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Builder\""
+   },
+   {
+    "id": "test",
+    "label": "Tests",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Tests\""
+   },
+   {
+    "id": "revert",
+    "label": "Versions",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"version compare\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MARKET-011",
+  "title": "Attribution & Analytics",
+  "route": "/o/:org/market/analytics",
+  "contractActions": [
+   "Filter",
+   "compare",
+   "drill down",
+   "export"
+  ],
+  "contractOverlays": [
+   "Attribution model",
+   "source inspector",
+   "metric notes"
+  ],
+  "edge": "Ad privacy/consent gaps shown instead of fabricated conversions",
+  "declared": [
+   {
+    "id": "compare",
+    "label": "Compare models",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Models\""
+   },
+   {
+    "id": "Filter",
+    "label": "Revenue view",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Revenue\""
+   },
+   {
+    "id": "drill down",
+    "label": "Inspect a source",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"source inspector\""
+   },
+   {
+    "id": "export",
+    "label": "Export channel table",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"metric notes\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MARKET-012",
+  "title": "Marketing Templates",
+  "route": "/o/:org/market/templates",
+  "contractActions": [
+   "Create",
+   "fork",
+   "review",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Template editor",
+   "approval",
+   "global update impact"
+  ],
+  "edge": "Template change does not overwrite live published campaign",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New template",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Template editor\""
+   },
+   {
+    "id": "fork",
+    "label": "Fork",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Template editor\""
+   },
+   {
+    "id": "review",
+    "label": "Review",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"approval\""
+   },
+   {
+    "id": "publish",
+    "label": "Impact of a change",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"global update impact\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMERCE-001",
+  "title": "Commerce Overview",
+  "route": "/o/:org/commerce/home",
+  "contractActions": [
+   "Review order",
+   "inspect product",
+   "create promotion",
+   "ask Commerce"
+  ],
+  "contractOverlays": [
+   "KPI explanation",
+   "exception list",
+   "store picker"
+  ],
+  "edge": "Sales and margin metrics reconcile with Finance policy",
+  "declared": [
+   {
+    "id": "Review order",
+    "label": "Review orders",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/commerce/orders`"
+   },
+   {
+    "id": "create promotion",
+    "label": "New promotion",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Offer builder\""
+   },
+   {
+    "id": "inspect product",
+    "label": "Products",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/commerce/products`"
+   },
+   {
+    "id": "ask Commerce",
+    "label": "Ask Commerce",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/ai/chat`"
+   },
+   {
+    "id": "exceptions",
+    "label": "Exceptions",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"exception list\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMERCE-002",
+  "title": "Products",
+  "route": "/o/:org/commerce/products",
+  "contractActions": [
+   "Create",
+   "bulk edit",
+   "categorize",
+   "duplicate",
+   "archive"
+  ],
+  "contractOverlays": [
+   "Product editor",
+   "import mapping",
+   "bulk preview"
+  ],
+  "edge": "Bulk publish requires preview and stock/price validation",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New product",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Product editor\""
+   },
+   {
+    "id": "bulk edit",
+    "label": "Bulk publish preview",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"bulk preview\""
+   },
+   {
+    "id": "categorize",
+    "label": "Collections",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Collections\""
+   },
+   {
+    "id": "duplicate",
+    "label": "Duplicate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Product editor\""
+   },
+   {
+    "id": "archive",
+    "label": "Import from CSV",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"import mapping\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMERCE-003",
+  "title": "Product Detail",
+  "route": "/o/:org/commerce/products/:id",
+  "contractActions": [
+   "Edit",
+   "add variant",
+   "change price",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Variant editor",
+   "media picker",
+   "margin impact",
+   "publish"
+  ],
+  "edge": "Price changes affecting live promotions checked against contract",
+  "declared": [
+   {
+    "id": "Edit",
+    "label": "Edit product",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Product editor\""
+   },
+   {
+    "id": "publish",
+    "label": "Publish",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"publish\""
+   },
+   {
+    "id": "add variant",
+    "label": "Add variant",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Variant editor\""
+   },
+   {
+    "id": "change price",
+    "label": "Margin impact",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"margin impact\""
+   },
+   {
+    "id": "media",
+    "label": "Media",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"media picker\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMERCE-004",
+  "title": "Inventory",
+  "route": "/o/:org/commerce/inventory",
+  "contractActions": [
+   "Adjust",
+   "transfer",
+   "receive",
+   "count",
+   "reorder"
+  ],
+  "contractOverlays": [
+   "Stock adjustment",
+   "transfer approval",
+   "count reconciliation"
+  ],
+  "edge": "Concurrent order reservations must be atomic",
+  "declared": [
+   {
+    "id": "Adjust",
+    "label": "Adjust stock",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Stock adjustment\""
+   },
+   {
+    "id": "transfer",
+    "label": "Transfer",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"transfer approval\""
+   },
+   {
+    "id": "count",
+    "label": "Stock count",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"count reconciliation\""
+   },
+   {
+    "id": "receive",
+    "label": "Receive against a PO",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/proc/receiving`"
+   },
+   {
+    "id": "reorder",
+    "label": "Replenishment",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Replenishment\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMERCE-005",
+  "title": "Orders",
+  "route": "/o/:org/commerce/orders",
+  "contractActions": [
+   "View",
+   "filter",
+   "bulk fulfil",
+   "export",
+   "assign"
+  ],
+  "contractOverlays": [
+   "Order quick view",
+   "bulk operation",
+   "refund approval"
+  ],
+  "edge": "No duplicate shipment or refund on retry",
+  "declared": [
+   {
+    "id": "View",
+    "label": "Quick view",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Order quick view\""
+   },
+   {
+    "id": "bulk fulfil",
+    "label": "Bulk fulfil",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"bulk operation\""
+   },
+   {
+    "id": "filter",
+    "label": "Unfulfilled",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Unfulfilled\""
+   },
+   {
+    "id": "export",
+    "label": "Export CSV",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"bulk operation\""
+   },
+   {
+    "id": "assign",
+    "label": "Propose a refund",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"refund approval\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMERCE-006",
+  "title": "Order Detail",
+  "route": "/o/:org/commerce/orders/:id",
+  "contractActions": [
+   "Fulfil",
+   "refund proposal",
+   "contact buyer",
+   "cancel"
+  ],
+  "contractOverlays": [
+   "Shipping label",
+   "cancellation impact",
+   "refund confirmation"
+  ],
+  "edge": "Financial state and physical stock adjust consistently",
+  "declared": [
+   {
+    "id": "Fulfil",
+    "label": "Record handover",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Shipping label\""
+   },
+   {
+    "id": "refund proposal",
+    "label": "Propose a refund",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"refund confirmation\""
+   },
+   {
+    "id": "contact buyer",
+    "label": "Contact the buyer",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { await context.mutate.log(`Contact attempt recorded for order ${context.params.id}`, { entityId: context.params.id, type: \"email.draft\", c"
+   },
+   {
+    "id": "cancel",
+    "label": "Cancel order",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"cancellation impact\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMERCE-007",
+  "title": "Storefront Builder",
+  "route": "/o/:org/commerce/storefront",
+  "contractActions": [
+   "Drag layout",
+   "edit theme",
+   "preview",
+   "publish",
+   "rollback"
+  ],
+  "contractOverlays": [
+   "Theme inspector",
+   "template picker",
+   "publication review"
+  ],
+  "edge": "Failed publish preserves prior production site",
+  "declared": [
+   {
+    "id": "preview",
+    "label": "Open the preview",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Preview\""
+   },
+   {
+    "id": "edit theme",
+    "label": "Theme",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Theme inspector\""
+   },
+   {
+    "id": "Drag layout",
+    "label": "Layout",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"template picker\""
+   },
+   {
+    "id": "publish",
+    "label": "Publication review",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"publication review\""
+   },
+   {
+    "id": "rollback",
+    "label": "What a failed publish does",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"publication review\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMERCE-008",
+  "title": "Checkout & Payments",
+  "route": "/o/:org/commerce/checkout",
+  "contractActions": [
+   "Configure",
+   "test",
+   "preview",
+   "deploy",
+   "monitor"
+  ],
+  "contractOverlays": [
+   "Provider setup",
+   "checkout test",
+   "policy change review"
+  ],
+  "edge": "PCI and payment processing delegated appropriately and verified",
+  "declared": [
+   {
+    "id": "Configure",
+    "label": "Checkout policy",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"policy change review\""
+   },
+   {
+    "id": "test",
+    "label": "Run the checks",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"checkout test\""
+   },
+   {
+    "id": "preview",
+    "label": "Open the storefront",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/commerce/storefront?tab=Preview`"
+   },
+   {
+    "id": "deploy",
+    "label": "Connect a processor",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Provider setup\""
+   },
+   {
+    "id": "monitor",
+    "label": "Held orders",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Recovery\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMERCE-009",
+  "title": "Fulfilment & Shipping",
+  "route": "/o/:org/commerce/fulfilment",
+  "contractActions": [
+   "Create label",
+   "scan",
+   "handoff",
+   "report exception"
+  ],
+  "contractOverlays": [
+   "Carrier selector",
+   "label preview",
+   "delivery exception"
+  ],
+  "edge": "Unknown carrier response must not create duplicate label",
+  "declared": [
+   {
+    "id": "Create label",
+    "label": "Record a handover",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"label preview\""
+   },
+   {
+    "id": "scan",
+    "label": "Choose a carrier",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Carrier selector\""
+   },
+   {
+    "id": "handoff",
+    "label": "Exceptions",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Exceptions\""
+   },
+   {
+    "id": "report exception",
+    "label": "Record an exception",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"delivery exception\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMERCE-010",
+  "title": "Returns & Refunds",
+  "route": "/o/:org/commerce/returns",
+  "contractActions": [
+   "Approve",
+   "restock",
+   "refund",
+   "communicate"
+  ],
+  "contractOverlays": [
+   "Return inspector",
+   "restock assessment",
+   "refund authorization"
+  ],
+  "edge": "Disputed refunds need human escalation by risk",
+  "declared": [
+   {
+    "id": "Approve",
+    "label": "Inspect return",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Return inspector\""
+   },
+   {
+    "id": "restock",
+    "label": "Assess restocking",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"restock assessment\""
+   },
+   {
+    "id": "refund",
+    "label": "Authorise a credit note",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"refund authorization\""
+   },
+   {
+    "id": "communicate",
+    "label": "Record a message",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: { await context.mutate.log(`Customer message drafted for return ${context.selectedId}`, { entityId: context.selectedId, type: \"email.draft\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMERCE-011",
+  "title": "Promotions & Pricing",
+  "route": "/o/:org/commerce/promotions",
+  "contractActions": [
+   "Create promotion",
+   "model margin",
+   "schedule",
+   "pause"
+  ],
+  "contractOverlays": [
+   "Offer builder",
+   "margin check",
+   "launch approval"
+  ],
+  "edge": "Stacking discounts cannot violate minimum-price guardrail",
+  "declared": [
+   {
+    "id": "Create promotion",
+    "label": "New offer",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Offer builder\""
+   },
+   {
+    "id": "model margin",
+    "label": "Margin check",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"margin check\""
+   },
+   {
+    "id": "schedule",
+    "label": "Make it live",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"launch approval\""
+   },
+   {
+    "id": "pause",
+    "label": "Pause selected",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.selectedId; await context.mutate.patch(id, { status: \"paused\" }, { event: \"Offer paused\" }); context.toast(\"Paused\", \""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMERCE-012",
+  "title": "Commerce Analytics",
+  "route": "/o/:org/commerce/analytics",
+  "contractActions": [
+   "Compare",
+   "segment",
+   "inspect source",
+   "export"
+  ],
+  "contractOverlays": [
+   "Chart builder",
+   "KPI inspector",
+   "report schedule"
+  ],
+  "edge": "Results must identify which returns/refunds are included",
+  "declared": [
+   {
+    "id": "Compare",
+    "label": "Build a chart",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Chart builder\""
+   },
+   {
+    "id": "segment",
+    "label": "Customers",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Customers\""
+   },
+   {
+    "id": "inspect source",
+    "label": "What is included",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"KPI inspector\""
+   },
+   {
+    "id": "export",
+    "label": "Schedule a report",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"report schedule\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BOOK-001",
+  "title": "Bookings Overview",
+  "route": "/o/:org/book/home",
+  "contractActions": [
+   "Create booking",
+   "check in",
+   "reschedule",
+   "ask receptionist"
+  ],
+  "contractOverlays": [
+   "Quick booking",
+   "booking inspector",
+   "capacity alert"
+  ],
+  "edge": "Unavailable slot never displayed as confirmed",
+  "declared": [
+   {
+    "id": "Create booking",
+    "label": "New booking",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Quick booking\""
+   },
+   {
+    "id": "check in",
+    "label": "Check in",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.selectedId; await context.mutate.patch(id, { fields: { checkedIn: true }, status: \"completed\" }, { event: \"Guest check"
+   },
+   {
+    "id": "reschedule",
+    "label": "Calendar",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/book/calendar`"
+   },
+   {
+    "id": "ask receptionist",
+    "label": "Capacity",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"capacity alert\""
+   },
+   {
+    "id": "inspect",
+    "label": "Inspect a booking",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"booking inspector\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BOOK-002",
+  "title": "Booking Calendar",
+  "route": "/o/:org/book/calendar",
+  "contractActions": [
+   "Drag booking",
+   "create",
+   "move",
+   "cancel",
+   "confirm"
+  ],
+  "contractOverlays": [
+   "Booking form",
+   "conflict review",
+   "reschedule notice"
+  ],
+  "edge": "Concurrent booking attempts protected by slot reservation",
+  "declared": [
+   {
+    "id": "create",
+    "label": "New booking",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Booking form\""
+   },
+   {
+    "id": "confirm",
+    "label": "Confirm held slot",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.selectedId; await context.mutate.patch(id, { status: \"confirmed\" }, { event: \"Held slot confirmed\" }); context.toast(\""
+   },
+   {
+    "id": "move",
+    "label": "Review conflicts",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"conflict review\""
+   },
+   {
+    "id": "Drag booking",
+    "label": "Reschedule selected",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Booking form\""
+   },
+   {
+    "id": "cancel",
+    "label": "Cancel selected",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"reschedule notice\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BOOK-003",
+  "title": "Booking Detail",
+  "route": "/o/:org/book/bookings/:id",
+  "contractActions": [
+   "Confirm",
+   "reschedule",
+   "take payment",
+   "send reminder"
+  ],
+  "contractOverlays": [
+   "Reschedule",
+   "refund rule",
+   "customer message"
+  ],
+  "edge": "Cancellation fees and notice policies shown before action",
+  "declared": [
+   {
+    "id": "Confirm",
+    "label": "Confirm",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { await context.mutate.patch(context.params.id, { status: \"confirmed\" }, { event: \"Booking confirmed\" }); context.toast(\"Confirmed\", \"The b"
+   },
+   {
+    "id": "take payment",
+    "label": "Deposit",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"take deposit\""
+   },
+   {
+    "id": "reschedule",
+    "label": "Reschedule",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Reschedule\""
+   },
+   {
+    "id": "send reminder",
+    "label": "Message the customer",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"customer message\""
+   },
+   {
+    "id": "cancellation",
+    "label": "Cancellation policy",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"refund rule\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BOOK-004",
+  "title": "Services & Pricing",
+  "route": "/o/:org/book/services",
+  "contractActions": [
+   "Create service",
+   "edit buffers",
+   "publish",
+   "archive"
+  ],
+  "contractOverlays": [
+   "Service editor",
+   "pricing review",
+   "availability test"
+  ],
+  "edge": "Cannot archive service with unreconciled active bookings",
+  "declared": [
+   {
+    "id": "Create service",
+    "label": "New service",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Service editor\""
+   },
+   {
+    "id": "edit buffers",
+    "label": "Edit selected",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Service editor\""
+   },
+   {
+    "id": "publish",
+    "label": "Pricing review",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"pricing review\""
+   },
+   {
+    "id": "archive",
+    "label": "Archive selected",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"availability test\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BOOK-005",
+  "title": "Staff & Resources",
+  "route": "/o/:org/book/resources",
+  "contractActions": [
+   "Set availability",
+   "assign resource",
+   "block period"
+  ],
+  "contractOverlays": [
+   "Resource editor",
+   "conflict dialog",
+   "recurrence"
+  ],
+  "edge": "Linked resource overlap prevents conflicting confirmed slots",
+  "declared": [
+   {
+    "id": "Set availability",
+    "label": "New resource",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Resource editor\""
+   },
+   {
+    "id": "assign resource",
+    "label": "Edit selected",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Resource editor\""
+   },
+   {
+    "id": "block period",
+    "label": "Block a period",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"recurrence\""
+   },
+   {
+    "id": "conflicts",
+    "label": "Conflicts",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"conflict dialog\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BOOK-006",
+  "title": "Public Booking Page",
+  "route": "/o/:org/book/public/:slug",
+  "contractActions": [
+   "Arrange fields",
+   "preview",
+   "publish",
+   "test"
+  ],
+  "contractOverlays": [
+   "Form field inspector",
+   "publish",
+   "privacy policy"
+  ],
+  "edge": "Timezone and daylight-saving conversion verified",
+  "declared": [
+   {
+    "id": "publish",
+    "label": "Export the page",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"publish\""
+   },
+   {
+    "id": "preview",
+    "label": "Preview",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Preview\""
+   },
+   {
+    "id": "Arrange fields",
+    "label": "Edit a field",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Form field inspector\""
+   },
+   {
+    "id": "test",
+    "label": "Privacy notice",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"privacy policy\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BOOK-007",
+  "title": "Reminders & No-shows",
+  "route": "/o/:org/book/reminders",
+  "contractActions": [
+   "Schedule reminders",
+   "edit template",
+   "test send"
+  ],
+  "contractOverlays": [
+   "Template editor",
+   "send preview",
+   "suppression"
+  ],
+  "edge": "Customer contact preferences honored",
+  "declared": [
+   {
+    "id": "Schedule reminders",
+    "label": "New rule",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Template editor\""
+   },
+   {
+    "id": "edit template",
+    "label": "Edit selected",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Template editor\""
+   },
+   {
+    "id": "test send",
+    "label": "Preview a send",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"send preview\""
+   },
+   {
+    "id": "suppression",
+    "label": "Who is left out",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"suppression\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BOOK-008",
+  "title": "Booking Reports",
+  "route": "/o/:org/book/reports",
+  "contractActions": [
+   "Filter",
+   "compare",
+   "export",
+   "schedule"
+  ],
+  "contractOverlays": [
+   "Metric calculation",
+   "report design",
+   "source proof"
+  ],
+  "edge": "Group booking counts reflect real seats and resources",
+  "declared": [
+   {
+    "id": "Filter",
+    "label": "How this is counted",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Metric calculation\""
+   },
+   {
+    "id": "compare",
+    "label": "Seats and slots",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Metric calculation\""
+   },
+   {
+    "id": "export",
+    "label": "Every source record",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"source proof\""
+   },
+   {
+    "id": "schedule",
+    "label": "Save a report",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"report design\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROC-001",
+  "title": "Procurement Overview",
+  "route": "/o/:org/proc/home",
+  "contractActions": [
+   "Create requisition",
+   "inspect risk",
+   "approve PO"
+  ],
+  "contractOverlays": [
+   "Requisition",
+   "stock alert",
+   "cost inspector"
+  ],
+  "edge": "Budget owner approval required for financial commitments",
+  "declared": [
+   {
+    "id": "Create requisition",
+    "label": "Raise a requisition",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Requisition form\""
+   },
+   {
+    "id": "approve PO",
+    "label": "Approvals",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Approvals\""
+   },
+   {
+    "id": "inspect risk",
+    "label": "Stock risk",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"stock alert\""
+   },
+   {
+    "id": "costs",
+    "label": "Inspect an invoice",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"cost inspector\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROC-002",
+  "title": "Suppliers",
+  "route": "/o/:org/proc/suppliers",
+  "contractActions": [
+   "Create",
+   "evaluate",
+   "link contract",
+   "open"
+  ],
+  "contractOverlays": [
+   "Supplier form",
+   "verification",
+   "sanctions/compliance review"
+  ],
+  "edge": "Bank detail updates require privileged separate verification",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "Add a supplier",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Supplier form\""
+   },
+   {
+    "id": "evaluate",
+    "label": "Review selected",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"sanctions/compliance review\""
+   },
+   {
+    "id": "link contract",
+    "label": "Verify bank detail",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"verification\""
+   },
+   {
+    "id": "open",
+    "label": "Open supplier",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/proc/suppliers/${context.selectedId}`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROC-003",
+  "title": "Supplier Detail",
+  "route": "/o/:org/proc/suppliers/:id",
+  "contractActions": [
+   "Request quote",
+   "update",
+   "compare",
+   "flag"
+  ],
+  "contractOverlays": [
+   "Supplier editor",
+   "contract viewer",
+   "risk escalation"
+  ],
+  "edge": "Supplier contract clauses require qualified review",
+  "declared": [
+   {
+    "id": "Request quote",
+    "label": "Raise a requisition",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Requisition form\""
+   },
+   {
+    "id": "update",
+    "label": "Edit supplier",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Supplier editor\""
+   },
+   {
+    "id": "compare",
+    "label": "Review performance",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"supplier review\""
+   },
+   {
+    "id": "flag",
+    "label": "Flag a risk",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"risk escalation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROC-004",
+  "title": "Purchase Requisitions",
+  "route": "/o/:org/proc/requisitions",
+  "contractActions": [
+   "Create",
+   "approve",
+   "reject",
+   "convert to PO"
+  ],
+  "contractOverlays": [
+   "Requisition form",
+   "budget check",
+   "rejection reason"
+  ],
+  "edge": "Approval chain cannot be bypassed by conversion",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "Raise a requisition",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Requisition form\""
+   },
+   {
+    "id": "approve",
+    "label": "Review selected",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Requisition\""
+   },
+   {
+    "id": "reject",
+    "label": "Budget check",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"budget check\""
+   },
+   {
+    "id": "convert to PO",
+    "label": "Convert to a purchase order",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"PO editor\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROC-005",
+  "title": "Purchase Orders",
+  "route": "/o/:org/proc/orders",
+  "contractActions": [
+   "Create",
+   "revise",
+   "send",
+   "receive",
+   "close"
+  ],
+  "contractOverlays": [
+   "PO editor",
+   "change impact",
+   "send preview"
+  ],
+  "edge": "Sent revisions versioned; double ordering prevented",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "Raise a purchase order",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"PO editor\""
+   },
+   {
+    "id": "send",
+    "label": "Issue selected",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"send preview\""
+   },
+   {
+    "id": "receive",
+    "label": "Receive against it",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"receive\""
+   },
+   {
+    "id": "revise",
+    "label": "Revisions",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"change impact\""
+   },
+   {
+    "id": "close",
+    "label": "Close selected",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.selectedId; await context.mutate.patch(id, { status: \"closed\" }, { event: \"Purchase order closed\" }); context.toast(\"C"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROC-006",
+  "title": "Warehouse Locations",
+  "route": "/o/:org/proc/warehouses",
+  "contractActions": [
+   "Add bin",
+   "transfer",
+   "inspect",
+   "audit"
+  ],
+  "contractOverlays": [
+   "Location editor",
+   "stock count",
+   "transfer"
+  ],
+  "edge": "Physical stock changes require scan/receipt proof when mandated",
+  "declared": [
+   {
+    "id": "Add bin",
+    "label": "Add a location",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Location editor\""
+   },
+   {
+    "id": "transfer",
+    "label": "Transfer stock",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"transfer\""
+   },
+   {
+    "id": "inspect",
+    "label": "Count a site",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"stock count\""
+   },
+   {
+    "id": "audit",
+    "label": "Activity",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Activity\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROC-007",
+  "title": "Receiving & Scanning",
+  "route": "/o/:org/proc/receiving",
+  "contractActions": [
+   "Scan",
+   "count",
+   "flag damage",
+   "put away"
+  ],
+  "contractOverlays": [
+   "Scan overlay",
+   "discrepancy",
+   "receipt confirmation"
+  ],
+  "edge": "Duplicate scans and offline sessions de-duplicated",
+  "declared": [
+   {
+    "id": "Scan",
+    "label": "Receive a delivery",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Scan overlay\""
+   },
+   {
+    "id": "count",
+    "label": "Open selected",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"receipt confirmation\""
+   },
+   {
+    "id": "flag damage",
+    "label": "Flag a discrepancy",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"discrepancy\""
+   },
+   {
+    "id": "put away",
+    "label": "Stock movements",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/proc/movements`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROC-008",
+  "title": "Stock Movements",
+  "route": "/o/:org/proc/movements",
+  "contractActions": [
+   "Create move",
+   "approve adjustment",
+   "export"
+  ],
+  "contractOverlays": [
+   "Movement inspector",
+   "count reconciliation",
+   "authorization"
+  ],
+  "edge": "Inventory ledger never updated without traceable transaction",
+  "declared": [
+   {
+    "id": "Create move",
+    "label": "Record a movement",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"authorization\""
+   },
+   {
+    "id": "approve adjustment",
+    "label": "Inspect selected",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Movement inspector\""
+   },
+   {
+    "id": "reconcile",
+    "label": "Count reconciliation",
+    "placement": "secondary",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"count reconciliation\""
+   },
+   {
+    "id": "export",
+    "label": "Export movements",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Movement inspector\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROC-009",
+  "title": "Replenishment",
+  "route": "/o/:org/proc/replenishment",
+  "contractActions": [
+   "Adjust forecast",
+   "create requisition",
+   "approve"
+  ],
+  "contractOverlays": [
+   "Reorder policy",
+   "scenario",
+   "purchase preview"
+  ],
+  "edge": "No autonomous financial commitment beyond limit",
+  "declared": [
+   {
+    "id": "create requisition",
+    "label": "Raise a requisition",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"purchase preview\""
+   },
+   {
+    "id": "Adjust forecast",
+    "label": "Model a change",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"scenario\""
+   },
+   {
+    "id": "approve",
+    "label": "How a suggestion is made",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"reorder policy\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROC-010",
+  "title": "Procurement Analytics",
+  "route": "/o/:org/proc/reports",
+  "contractActions": [
+   "Compare",
+   "inspect",
+   "report",
+   "export"
+  ],
+  "contractOverlays": [
+   "Metric source",
+   "report designer",
+   "supplier review"
+  ],
+  "edge": "Cancelled orders excluded appropriately from spend",
+  "declared": [
+   {
+    "id": "Compare",
+    "label": "What is counted",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Metric source\""
+   },
+   {
+    "id": "inspect",
+    "label": "Review a supplier",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"supplier review\""
+   },
+   {
+    "id": "report",
+    "label": "Save a report",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"report designer\""
+   },
+   {
+    "id": "export",
+    "label": "Three-way match",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"three-way match\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PORTAL-001",
+  "title": "Portal Directory",
+  "route": "/o/:org/portal/portals",
+  "contractActions": [
+   "Create",
+   "clone",
+   "preview",
+   "suspend"
+  ],
+  "contractOverlays": [
+   "Portal wizard",
+   "branding",
+   "access setup"
+  ],
+  "edge": "Portal never inherits internal company permissions by default",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New portal",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Portal wizard\""
+   },
+   {
+    "id": "clone",
+    "label": "Branding",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"branding\""
+   },
+   {
+    "id": "preview",
+    "label": "Access",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"access setup\""
+   },
+   {
+    "id": "suspend",
+    "label": "Suspend selected",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.selectedId; await context.mutate.patch(id, { status: \"suspended\" }, { event: \"Portal suspended\" }); context.toast(\"Sus"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PORTAL-002",
+  "title": "Portal Builder",
+  "route": "/o/:org/portal/portals/:id/builder",
+  "contractActions": [
+   "Drag modules",
+   "bind permitted data",
+   "test",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Module picker",
+   "data grant",
+   "publish review"
+  ],
+  "edge": "External users cannot traverse internal object IDs",
+  "declared": [
+   {
+    "id": "Drag modules",
+    "label": "Edit a page",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Module picker\""
+   },
+   {
+    "id": "bind permitted data",
+    "label": "Share a record",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"data grant\""
+   },
+   {
+    "id": "test",
+    "label": "Preview as the client",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Preview\""
+   },
+   {
+    "id": "publish",
+    "label": "Publish review",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"publish review\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PORTAL-003",
+  "title": "External Dashboard",
+  "route": "/o/:org/portal/portals/:id/dashboard",
+  "contractActions": [
+   "View",
+   "comment",
+   "approve scoped item",
+   "request service"
+  ],
+  "contractOverlays": [
+   "Shared item inspector",
+   "client message",
+   "access request"
+  ],
+  "edge": "Portal must not expose cross-client aggregated records",
+  "declared": [
+   {
+    "id": "View",
+    "label": "Message the studio",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"client message\""
+   },
+   {
+    "id": "request service",
+    "label": "Request something",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"access request\""
+   },
+   {
+    "id": "comment",
+    "label": "Inspect a shared item",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Shared item inspector\""
+   },
+   {
+    "id": "approve scoped item",
+    "label": "Accept a document",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Shared item inspector\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PORTAL-004",
+  "title": "Shared Documents",
+  "route": "/o/:org/portal/portals/:id/files",
+  "contractActions": [
+   "View",
+   "download",
+   "comment",
+   "request access"
+  ],
+  "contractOverlays": [
+   "Document preview",
+   "permission request",
+   "signature"
+  ],
+  "edge": "Expired links and revocation applied immediately",
+  "declared": [
+   {
+    "id": "View",
+    "label": "Open selected",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Document preview\""
+   },
+   {
+    "id": "download",
+    "label": "Accept and sign",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"signature\""
+   },
+   {
+    "id": "comment",
+    "label": "Ask about it",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"permission request\""
+   },
+   {
+    "id": "request access",
+    "label": "Request access",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"permission request\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PORTAL-005",
+  "title": "External Messaging",
+  "route": "/o/:org/portal/portals/:id/messages",
+  "contractActions": [
+   "Reply",
+   "upload",
+   "book meeting",
+   "escalate"
+  ],
+  "contractOverlays": [
+   "Conversation details",
+   "attachment preview",
+   "complaint"
+  ],
+  "edge": "AI cannot discuss internal project notes not shared",
+  "declared": [
+   {
+    "id": "Reply",
+    "label": "Reply",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"client message\""
+   },
+   {
+    "id": "upload",
+    "label": "Attachments",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"attachment preview\""
+   },
+   {
+    "id": "book meeting",
+    "label": "Book a meeting",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/book/calendar`"
+   },
+   {
+    "id": "escalate",
+    "label": "Raise a complaint",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"complaint\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PORTAL-006",
+  "title": "Portal Billing & Requests",
+  "route": "/o/:org/portal/portals/:id/billing",
+  "contractActions": [
+   "Pay",
+   "download",
+   "submit request",
+   "dispute"
+  ],
+  "contractOverlays": [
+   "Payment provider",
+   "dispute form",
+   "document receipt"
+  ],
+  "edge": "Sensitive payment details delegated to compliant provider",
+  "declared": [
+   {
+    "id": "Pay",
+    "label": "How to pay",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Payment provider\""
+   },
+   {
+    "id": "download",
+    "label": "Download an invoice",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"document receipt\""
+   },
+   {
+    "id": "submit request",
+    "label": "Submit a request",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"dispute form\""
+   },
+   {
+    "id": "dispute",
+    "label": "Dispute an invoice",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"dispute form\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PORTAL-007",
+  "title": "Portal Access & Analytics",
+  "route": "/o/:org/portal/portals/:id/admin",
+  "contractActions": [
+   "Invite",
+   "revoke",
+   "set expiry",
+   "review activity"
+  ],
+  "contractOverlays": [
+   "External invite",
+   "scope preview",
+   "account recovery"
+  ],
+  "edge": "Client cannot grant themselves broad internal access",
+  "declared": [
+   {
+    "id": "Invite",
+    "label": "Invite someone",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"External invite\""
+   },
+   {
+    "id": "set expiry",
+    "label": "Extend or revoke",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"account recovery\""
+   },
+   {
+    "id": "revoke",
+    "label": "What this portal reaches",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"scope preview\""
+   },
+   {
+    "id": "review activity",
+    "label": "Audit",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Audit\""
+   }
+  ],
+  "missingActions": []
+ }
+]

@@ -1,0 +1,824 @@
+[
+ {
+  "id": "ARL-HR-001",
+  "title": "People Overview",
+  "route": "/o/northline/hr/home",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "My team",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "HR tasks",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Trends",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Staffing alert",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "leave approval",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "new position",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Start a hire",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve leave",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "View an employee",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect a metric",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Employee directory",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Coverage detail",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-HR-002",
+  "title": "Employee Directory",
+  "route": "/o/northline/hr/employees",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "People",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Teams",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Contractors",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Alumni",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Invite employee",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "directory card",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "export permissions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Invite someone",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Search the directory",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Filter by team",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Open profile"
+  ]
+ },
+ {
+  "id": "ARL-HR-003",
+  "title": "Employee Profile",
+  "route": "/o/northline/hr/employees/nl-employees-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Job",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Documents",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Leave",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Performance",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Access",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Contract upload",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "access request",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "offboarding confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request an access change",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Update profile",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a document",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Offboard",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-HR-004",
+  "title": "Recruitment Pipeline",
+  "route": "/o/northline/hr/recruitment",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Positions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Candidates",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Interviews",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Offers",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Job spec editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "candidate profile",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "offer approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review a candidate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a role",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule an interview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Issue an offer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open the calendar",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-HR-005",
+  "title": "Applicant Profile",
+  "route": "/o/northline/hr/candidates/nl-applicants-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Documents",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Interviews",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Decisions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Applicant communications",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "interviewer scorecard",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "rejection preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review and move stage",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Record a scorecard",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Message the candidate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule an interview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Communications history",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview the rejection",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-HR-006",
+  "title": "Onboarding Centre",
+  "route": "/o/northline/hr/onboarding",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Incoming",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "In progress",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Waiting",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Completed",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Onboarding template",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "IT access",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "welcome preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Decide access requests",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Launch a checklist",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign a mentor",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Verify completion",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Welcome note",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-HR-007",
+  "title": "Leave & Absence",
+  "route": "/o/northline/hr/leave",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "My leave",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Team calendar",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approvals",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Policy",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Leave form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "policy explanation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "conflict review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve leave",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request leave",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Decline leave",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Adjust a balance",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Check cover",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "How a balance is worked out",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-HR-008",
+  "title": "Scheduling & Time",
+  "route": "/o/northline/hr/scheduling",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Roster",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Timesheets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Availability",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exceptions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Shift edit",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "time correction",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "overtime approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve hours",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Swap shifts",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export hours",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Overtime approvals",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Correct a time entry",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Move a shift"
+  ]
+ },
+ {
+  "id": "ARL-HR-009",
+  "title": "Payroll",
+  "route": "/o/northline/hr/payroll",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Runs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Inputs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approvals",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Payslips",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Payroll review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "exception report",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "submission signoff",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve the run",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Prepare a run",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Validate the run",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export CSV",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reconcile to the ledger",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Exceptions",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-HR-010",
+  "title": "Performance Reviews",
+  "route": "/o/northline/hr/performance",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Cycles",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "My reviews",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Team",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Templates",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Review form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "calibration panel",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "confidentiality control",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign a reviewer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Submit a review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Acknowledge a review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Calibration",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Who sees a review",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-HR-011",
+  "title": "Learning & Policies",
+  "route": "/o/northline/hr/learning",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Courses",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Policies",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Compliance",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "My learning",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Course builder",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "quiz",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "policy publication",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Acknowledge a policy",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign a course",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Complete a module",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Build a course",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

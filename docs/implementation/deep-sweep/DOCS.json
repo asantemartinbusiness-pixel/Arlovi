@@ -1,0 +1,462 @@
+[
+ {
+  "id": "ARL-DOCS-001",
+  "title": "Document Library",
+  "route": "/o/northline/docs/files",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Recent",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "My docs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Shared",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Templates",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archive",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "New doc",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "folder selector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "sharing",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "trash confirm",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Upload",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New document",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Search documents…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Move to folder",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Share",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-DOCS-002",
+  "title": "Document Editor",
+  "route": "/o/northline/docs/documents/nl-documents-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Write",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Review",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Layout",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "References",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Styles",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "insert table",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "citations",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "link",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "export",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-DOCS-003",
+  "title": "Outline & Navigation",
+  "route": "/o/northline/docs/documents/nl-documents-001/outline",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Headings",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Bookmarks",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Comments",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Heading properties",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "document structure warning",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Jump to a heading…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a section…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open the editor",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reorder a heading…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Collapse or expand every heading",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-DOCS-004",
+  "title": "Review & Comments",
+  "route": "/o/northline/docs/documents/nl-documents-001/review",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Comments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Changes",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approvals",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Versions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Comment thread",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "diff",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "reviewer assignment",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Suggest an edit…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Accept or reject…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Mention someone…",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-DOCS-005",
+  "title": "Templates",
+  "route": "/o/northline/docs/templates",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Company",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Department",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "My templates",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Template editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "token mapping",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "change impact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New template",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Use the template",
+   "Edit the master",
+   "Retire"
+  ]
+ },
+ {
+  "id": "ARL-DOCS-006",
+  "title": "Publishing & Export",
+  "route": "/o/northline/docs/documents/nl-documents-001/publish",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Share",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Publish",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "PDF settings",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "link permissions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "signature request",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview the export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request signature",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Revoke a link…",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-DOCS-007",
+  "title": "Document Insights",
+  "route": "/o/northline/docs/documents/nl-documents-001/insights",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Writing",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Accuracy",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Brand",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sources",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Suggestion diff",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "source inspection",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "style settings",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review suggestions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Apply selected…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect citations",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

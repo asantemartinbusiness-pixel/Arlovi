@@ -1,5 +1,7 @@
 import Dexie, { type Table } from "dexie";
 import { buildSeed } from "@/domain/seed";
+import { collectSeedsByContributor } from "@/domain/seedRegistry";
+import { SEED_NOW } from "@/domain/types";
 import type { Audit, Rec } from "@/domain/types";
 
 class ArloviDB extends Dexie {
@@ -17,6 +19,8 @@ class ArloviDB extends Dexie {
   }
 }
 
+export const SEED_VERSION = 3;
+
 export const db = new ArloviDB();
 
 let opening: Promise<void> | null = null;
@@ -24,17 +28,50 @@ let opening: Promise<void> | null = null;
 export function ensureSeed(): Promise<void> {
   opening ??= (async () => {
     const meta = await db.meta.get("seed");
-    if (meta?.value === 1) return;
-    const seed = buildSeed();
-    await db.transaction("rw", [db.records, db.events, db.meta], async () => {
-      await db.records.clear();
-      await db.events.clear();
-      await db.records.bulkAdd(seed.records);
-      await db.events.bulkAdd(seed.events);
-      await db.meta.put({ id: "seed", value: 1 });
-    });
+    if (meta?.value !== SEED_VERSION) {
+      const base = buildSeed();
+      await db.transaction("rw", [db.records, db.events, db.meta], async () => {
+        await db.records.clear();
+        await db.events.clear();
+        await db.meta.clear();
+        await db.records.bulkAdd(base.records);
+        await db.events.bulkAdd(base.events);
+        await db.meta.put({ id: "seed", value: SEED_VERSION });
+      });
+    }
+    await topUpContributors();
   })();
   return opening;
+}
+
+/**
+ * Adds each application's fixtures once, tracked per contributor. A contributor
+ * whose application loads later (for example after a failed load is fixed) is
+ * still seeded. Only missing ids are added, so nothing a person has edited is
+ * ever overwritten, and a later file reusing an id cannot fail the whole batch.
+ */
+async function topUpContributors(): Promise<void> {
+  for (const contributor of collectSeedsByContributor(SEED_NOW)) {
+    const key = `seed:${contributor.key}`;
+    const done = await db.meta.get(key);
+    if (done?.value === SEED_VERSION) continue;
+    await db.transaction("rw", [db.records, db.events, db.meta], async () => {
+      const ids = contributor.records.map((record) => record.id);
+      const existing = new Set((await db.records.bulkGet(ids)).filter(Boolean).map((record) => record!.id));
+      const seen = new Set<string>();
+      const fresh = contributor.records.filter((record) => {
+        if (existing.has(record.id) || seen.has(record.id)) return false;
+        seen.add(record.id);
+        return true;
+      });
+      if (fresh.length) await db.records.bulkAdd(fresh);
+      const eventIds = contributor.events.map((event) => event.id);
+      const existingEvents = new Set((await db.events.bulkGet(eventIds)).filter(Boolean).map((event) => event!.id));
+      const freshEvents = contributor.events.filter((event) => !existingEvents.has(event.id));
+      if (freshEvents.length) await db.events.bulkAdd(freshEvents);
+      await db.meta.put({ id: key, value: SEED_VERSION });
+    });
+  }
 }
 
 export async function persistAll(records: Rec[], events: Audit[]): Promise<void> {

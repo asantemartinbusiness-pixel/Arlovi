@@ -1,0 +1,393 @@
+{
+ "note": "Defects found by e2e/workflows.spec.ts. 'match' is a substring of the DEFECT message; a defect is fixed only when its journey ran and that message no longer fires. Unasserted findings are closed by hand with evidence.",
+ "defects": [
+  {
+   "id": "DEF-01",
+   "workflow": "WF-17",
+   "screens": [
+    "ARL-FIN-005"
+   ],
+   "summary": "Northline invoice opened under the Harbor Supply address",
+   "match": "switching organization",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-02",
+   "workflow": "WF-10",
+   "screens": [
+    "ARL-BOOK-001",
+    "ARL-BOOK-003"
+   ],
+   "summary": "Check-in replaced the booking's fields, wiping service, resource, customer and deposit",
+   "match": null,
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-03",
+   "workflow": "WF-20",
+   "screens": [
+    "ARL-MISSION-006"
+   ],
+   "summary": "'Run the next step' ran a step while the organisation was paused",
+   "match": "runs a step while the organisation is paused",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-04",
+   "workflow": "WF-02",
+   "screens": [
+    "ARL-MARKET-006",
+    "ARL-MARKET-003"
+   ],
+   "summary": "'Set the send window' relinked the campaign to the first audience, changing its consent scope",
+   "match": null,
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-05",
+   "workflow": "WF-05",
+   "screens": [
+    "ARL-CRM-007"
+   ],
+   "summary": "A Qualified deal requires a confirmed budget but no screen records one",
+   "match": "no screen can record one",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-06",
+   "workflow": "WF-05",
+   "screens": [
+    "ARL-CRM-008"
+   ],
+   "summary": "Approving a quote removed it from the library's Open value while still open",
+   "match": "removes its",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-07",
+   "workflow": "WF-01",
+   "screens": [
+    "ARL-ADMIN-001"
+   ],
+   "summary": "Edit profile did not prefill the trading name, so saving blanked it",
+   "match": "does not prefill the trading name",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-08",
+   "workflow": "WF-01",
+   "screens": [
+    "ARL-CONNECT-001"
+   ],
+   "summary": "The execution tray covered a control and intercepted the click",
+   "match": "/connect/marketplace 'What it needs'",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-09",
+   "workflow": "WF-03",
+   "screens": [
+    "ARL-ANALYTICS-008"
+   ],
+   "summary": "Revenue recognised summed gross paid invoices instead of posted net revenue",
+   "match": "/analytics/forecasts \"Revenue recognised",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-10",
+   "workflow": "WF-04",
+   "screens": [
+    "ARL-CARE-004"
+   ],
+   "summary": "A second refund could be requested while one was pending",
+   "match": "a second refund can be requested",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-11",
+   "workflow": "WF-04",
+   "screens": [
+    "ARL-CARE-004"
+   ],
+   "summary": "The resolution named the case owner, not the person who resolved it",
+   "match": "the resolution's \"By\" shows the case owner",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-12",
+   "workflow": "WF-06",
+   "screens": [
+    "ARL-HR-005"
+   ],
+   "summary": "No screen records an accepted offer or moves a candidate to Hired",
+   "match": "no screen records an accepted offer",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-13",
+   "workflow": "WF-06",
+   "screens": [
+    "ARL-HR-006"
+   ],
+   "summary": "The execution tray covered an onboarding checklist control",
+   "match": "'Payroll inputs added'",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-14",
+   "workflow": "WF-10",
+   "screens": [
+    "ARL-BOOK-002"
+   ],
+   "summary": "The Consultation table offered publicly was not bookable",
+   "match": "is not bookable (no bookable flag)",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-15",
+   "workflow": "WF-10",
+   "screens": [
+    "ARL-BOOK-003"
+   ],
+   "summary": "A completed paid booking raised no invoice and linked to no service history",
+   "match": "raises no invoice",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-16",
+   "workflow": "WF-11",
+   "screens": [
+    "ARL-PROC-004"
+   ],
+   "summary": "The requisition supplier list offered duplicate supplier records",
+   "match": "offers duplicate supplier records",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-17",
+   "workflow": "WF-14",
+   "screens": [
+    "ARL-HQ-001"
+   ],
+   "summary": "HQ 'Waiting on you' said nothing to approve while the Inbox held requests",
+   "match": "'Waiting on you' says 'Nothing to approve'",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-18",
+   "workflow": "WF-14",
+   "screens": [
+    "ARL-INBOX-002"
+   ],
+   "summary": "The wage accrual approval named a different journal and amount than its target",
+   "match": "'Post the October wage accrual'",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-19",
+   "workflow": "WF-09",
+   "screens": [
+    "ARL-BRAIN-003",
+    "ARL-BRAIN-005"
+   ],
+   "summary": "No screen turns an extracted source line into a proposed fact",
+   "match": "no screen turns an extracted source line",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-20",
+   "workflow": "WF-09",
+   "screens": [
+    "ARL-BRAIN-003"
+   ],
+   "summary": "The Corrections count did not change after a recorded correction",
+   "match": "Corrections column still reads 0",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-21",
+   "workflow": "WF-12",
+   "screens": [
+    "ARL-CONNECT-008"
+   ],
+   "summary": "A connector incident did not name its connector",
+   "match": "does not name the connector",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-22",
+   "workflow": "WF-12",
+   "screens": [
+    "ARL-CONNECT-008"
+   ],
+   "summary": "Opening an incident duplicated the open one instead of reusing it",
+   "match": "instead of de-duplicating",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-23",
+   "workflow": "WF-13",
+   "screens": [
+    "ARL-TEAM-003"
+   ],
+   "summary": "An AI employee was active with five activation blockers",
+   "match": "is active although her own profile lists",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-24",
+   "workflow": "WF-15",
+   "screens": [
+    "ARL-ANALYTICS-004"
+   ],
+   "summary": "The monthly report's revenue disagreed with the posted ledger",
+   "match": "/analytics/reports/nl-reports-020 states revenue",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-25",
+   "workflow": "WF-15",
+   "screens": [
+    "ARL-HQ-001",
+    "ARL-FIN-001"
+   ],
+   "summary": "HQ and Finance showed different receivables for the same date",
+   "match": "/hq/home shows receivable",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-26",
+   "workflow": "WF-16",
+   "screens": [
+    "ARL-PORTAL-001",
+    "ARL-PORTAL-007"
+   ],
+   "summary": "Portal list and portal admin disagreed on external users",
+   "match": "lists 3 external users",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-27",
+   "workflow": "WF-16",
+   "screens": [
+    "ARL-PORTAL-001",
+    "ARL-PORTAL-003"
+   ],
+   "summary": "Portal list and client dashboard disagreed on shared records",
+   "match": "records shared, but its client dashboard",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-28",
+   "workflow": "WF-19",
+   "screens": [
+    "ARL-ADMIN-008"
+   ],
+   "summary": "The privacy register's record count disagreed with the review",
+   "match": "request covers 11 records",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-29",
+   "workflow": "WF-19",
+   "screens": [
+    "ARL-ADMIN-008"
+   ],
+   "summary": "An access request's export matched none of the records the register counted",
+   "match": "'Export subject data' matches 0",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-30",
+   "workflow": "Journey: posted journal",
+   "screens": [
+    "ARL-FIN-003"
+   ],
+   "summary": "Posting a journal from its form renamed it to its memo",
+   "match": "renames it to its memo",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-31",
+   "workflow": "Journey: storefront order",
+   "screens": [
+    "ARL-COMMERCE-007"
+   ],
+   "summary": "The basket's Order due omitted delivery",
+   "match": "Preview basket lists Delivery",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-32",
+   "workflow": "Journey: invoice",
+   "screens": [
+    "ARL-FIN-004"
+   ],
+   "summary": "'Create an invoice' prefilled INV-1001 instead of the next free number",
+   "match": "prefills INV-1001",
+   "status": "fixed"
+  },
+  {
+   "id": "DEF-33",
+   "workflow": "observed, not asserted",
+   "screens": [
+    "ARL-BRAIN-005"
+   ],
+   "summary": "Brain: route-to-owner offers external contacts as owners",
+   "match": null,
+   "status": "fixed",
+   "evidence": "tests/unit/findings.test.ts (internalPeople)"
+  },
+  {
+   "id": "DEF-34",
+   "workflow": "observed, not asserted",
+   "screens": [
+    "ARL-BRAIN-005"
+   ],
+   "summary": "Brain: conflict count differs between list and detail",
+   "match": null,
+   "status": "fixed",
+   "evidence": "tests/unit/findings.test.ts (conflictsOfFact)"
+  },
+  {
+   "id": "DEF-35",
+   "workflow": "observed, not asserted",
+   "screens": [
+    "ARL-ADMIN-007"
+   ],
+   "summary": "Audit trail: entries are not strictly ordered by time",
+   "match": null,
+   "status": "fixed",
+   "evidence": "e2e/findings.spec.ts audit order"
+  },
+  {
+   "id": "DEF-36",
+   "workflow": "observed, not asserted",
+   "screens": [],
+   "summary": "Records and audit entries were stamped with wall time when the workspace clock was frozen",
+   "match": null,
+   "status": "fixed",
+   "evidence": "e2e/findings.spec.ts DEF-36 (a write under a frozen clock is stamped with the frozen time; red on the previous build, green on this one); tests/unit/clock-seam.test.ts; lint rule bans bare clock reads in src"
+  },
+  {
+   "id": "DEF-37",
+   "workflow": "observed, not asserted",
+   "screens": [
+    "ARL-PROC-004"
+   ],
+   "summary": "Procurement: a requester can approve their own requisition",
+   "match": null,
+   "status": "fixed",
+   "evidence": "tests/unit/findings.test.ts (separationOfDuties); owner self-approval is allowed and recorded"
+  },
+  {
+   "id": "DEF-38",
+   "workflow": "observed, not asserted",
+   "screens": [],
+   "summary": "Full-chrome editors render two level-1 headings",
+   "match": null,
+   "status": "fixed",
+   "evidence": "e2e/findings.spec.ts: one h1 on each of 316 screens"
+  }
+ ]
+}

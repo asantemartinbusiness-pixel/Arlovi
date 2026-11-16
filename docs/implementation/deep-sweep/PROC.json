@@ -1,0 +1,736 @@
+[
+ {
+  "id": "ARL-PROC-001",
+  "title": "Procurement Overview",
+  "route": "/o/northline/proc/home",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approvals",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Suppliers",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Stock",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Requisition",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "stock alert",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "cost inspector",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Stock risk",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Raise a requisition",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Approve selected",
+   "Inspect an invoice"
+  ]
+ },
+ {
+  "id": "ARL-PROC-002",
+  "title": "Suppliers",
+  "route": "/o/northline/proc/suppliers",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approved",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Review",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archived",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Supplier form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "verification",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "sanctions/compliance review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Evaluate selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Link a contract",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a supplier",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open supplier",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Verify bank detail",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compliance screening",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PROC-003",
+  "title": "Supplier Detail",
+  "route": "/o/northline/proc/suppliers/nl-suppliers-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Contracts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Orders",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Communications",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Supplier editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "contract viewer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "risk escalation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Update supplier",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare suppliers",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request a quote",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review performance",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Raise a requisition",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Flag a risk",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PROC-004",
+  "title": "Purchase Requisitions",
+  "route": "/o/northline/proc/requisitions",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Mine",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Team",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Awaiting approval",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Closed",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Requisition form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "budget check",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "rejection reason",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Raise a requisition",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Budget check",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Approve selected",
+   "Reject selected",
+   "Convert to a purchase order"
+  ]
+ },
+ {
+  "id": "ARL-PROC-005",
+  "title": "Purchase Orders",
+  "route": "/o/northline/proc/orders",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Draft",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approved",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sent",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Received",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Closed",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "PO editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "change impact",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "send preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Receive against it",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Revise selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Raise a purchase order",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Issue selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Close selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Revision history",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PROC-006",
+  "title": "Warehouse Locations",
+  "route": "/o/northline/proc/warehouses",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sites",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Bins",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Capacity",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Activity",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Location editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "stock count",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "transfer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Transfer stock",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a location",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Audit selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Count a site",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PROC-007",
+  "title": "Receiving & Scanning",
+  "route": "/o/northline/proc/receiving",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Expected",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Receiving",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exceptions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Complete",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Scan overlay",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "discrepancy",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "receipt confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Count selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Flag a discrepancy",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Scan a delivery",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Put away selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Stock movements",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PROC-008",
+  "title": "Stock Movements",
+  "route": "/o/northline/proc/movements",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Transfers",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Adjustments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Counts",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Movement inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "count reconciliation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "authorization",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve adjustment",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Count reconciliation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Record a movement",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export movements (CSV)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect selected",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PROC-009",
+  "title": "Replenishment",
+  "route": "/o/northline/proc/replenishment",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Suggested",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Planned",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Ordered",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exceptions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Reorder policy",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "scenario",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "purchase preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Adjust reorder points",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve suggestions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Raise a requisition",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "How a suggestion is made",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-PROC-010",
+  "title": "Procurement Analytics",
+  "route": "/o/northline/proc/reports",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Spend",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Service",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Inventory",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Forecast",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Metric source",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "report designer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "supplier review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect a supplier",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Save a report",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare periods",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export spend (CSV)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "What is counted",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Three-way match",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Review a supplier"
+  ]
+ }
+]

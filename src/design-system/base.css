@@ -1,0 +1,124 @@
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/ibm-plex-sans-condensed/500.css";
+@import "@fontsource/ibm-plex-sans-condensed/600.css";
+@import "@fontsource/ibm-plex-sans-condensed/700.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--fg-default);
+  background: var(--bg-canvas);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; margin: 0; }
+button { cursor: pointer; background: none; border: 0; padding: 0; }
+a { color: var(--fg-link); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+:focus { outline: none; }
+:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-xs); }
+
+/* Display face carries the headings; Inter carries the reading text. */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  color: var(--fg-strong);
+}
+h1 { font-size: var(--text-3xl); font-weight: 700; letter-spacing: var(--tracking-tighter); }
+h2 { font-size: var(--text-xl); }
+h3 { font-size: var(--text-lg); }
+h4 { font-size: var(--text-md); }
+p { margin: 0; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+figure { margin: 0; }
+
+::selection { background: var(--accent-soft); color: var(--accent-soft-fg); }
+
+/* Plain tables.
+   The default for a hand-written <table>: statement and matrix screens put
+   <th> row headers in a body row, which the grid styles (.ds-table thead th)
+   do not reach. :where() keeps this at zero specificity, so every classed
+   table (.ds-table, .dx-table, matrices) overrides it. */
+:where(table) { width: 100%; border-collapse: collapse; font-size: 14px; /* the size plain tables always had */ }
+:where(th, td) { text-align: start; padding: 10px var(--space-3); border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
+:where(th) { font-size: var(--text-xs); letter-spacing: 0.04em; text-transform: uppercase; color: var(--fg-muted); }
+:where(tr[aria-selected="true"]) { background: var(--bg-selected); }
+
+
+/* ---- Provenance: the one signature device ----
+   An element that asserts a fact says where the fact came from.
+   posted  immutable, already in the books
+   human   made by a person in this workspace
+   agent   made by an AI employee (machine grain)
+   unknown no source, or a source too old to trust                        */
+[data-prov] { position: relative; }
+[data-prov]::before {
+  content: ""; position: absolute; inset-block: 10px; inset-inline-start: 0;
+  width: var(--mat-width); border-radius: var(--mat-width);
+}
+[data-prov="posted"]::before { background: var(--mat-posted); }
+[data-prov="human"]::before { background: var(--mat-human); }
+[data-prov="agent"]::before { background: var(--hatch-agent); }
+[data-prov="unknown"]::before { background: var(--mat-unknown); opacity: 0.85; }
+[data-prov="unknown"]::before {
+  background: repeating-linear-gradient(to bottom, var(--mat-unknown) 0 3px, transparent 3px 6px);
+}
+tr[data-prov]::before { inset-block: 0; }
+/* On a tall panel the material is a flag at the head, not a border down the side. */
+.ds-card[data-prov]::before { inset-block: 15px auto; height: 22px; }
+
+/* A label that names what a thing is, set in the data face. */
+.ds-eyebrow {
+  font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: 500;
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--fg-subtle);
+}
+
+[hidden] { display: none !important; }
+
+.ds-sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.ds-skip {
+  position: fixed; left: var(--space-3); top: calc(var(--space-3) * -6);
+  z-index: 200; background: var(--bg-surface); color: var(--fg-default);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4); box-shadow: var(--shadow-2);
+  transition: top var(--dur-menu) var(--ease-out);
+}
+.ds-skip:focus { top: var(--space-3); }
+
+/* Scrollbars that do not shout. */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--radius-full); border: 3px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .ds-btn, .ds-card, .ds-panel { border: 1px solid ButtonBorder; }
+}

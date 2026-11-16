@@ -1,0 +1,961 @@
+[
+ {
+  "id": "ARL-FIN-001",
+  "title": "Finance Overview",
+  "route": "/o/northline/fin/home",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Cashflow",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tasks",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Insights",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Metric drilldown",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "reporting-period selector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "correction proposal",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reconcile",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Issue a report",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect a figure",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Choose a period",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Ask Finance",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open the Chief of Staff chat",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-FIN-002",
+  "title": "Chart of Accounts",
+  "route": "/o/northline/fin/accounts",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Assets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Liabilities",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Equity",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Revenue",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Expenses",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Account editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "account history",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "deactivation impact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New account",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export the chart",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Deactivate",
+   "Map categories to this account",
+   "Categories posting here"
+  ]
+ },
+ {
+  "id": "ARL-FIN-003",
+  "title": "General Ledger",
+  "route": "/o/northline/fin/ledger",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Entries",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Journals",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Periods",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Audit",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Journal form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "balancing validator",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "reverse confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reverse",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Post a journal",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Search the ledger",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Inspect lines"
+  ]
+ },
+ {
+  "id": "ARL-FIN-004",
+  "title": "Invoice List",
+  "route": "/o/northline/fin/invoices",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Draft",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Awaiting payment",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overdue",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Paid",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Void",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "New invoice",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "bulk action preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "reminder approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open the invoice",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Draft reminders",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create an invoice",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Filter the list",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Ageing report",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-FIN-005",
+  "title": "Invoice Detail",
+  "route": "/o/northline/fin/invoices/nl-invoices-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Line items",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Payments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Activity",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Line item editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "email preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "payment form",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "void reason",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit the lines",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview the document",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve and post",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Record a payment",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Send (queued locally)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Draft an email",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Void or credit",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-FIN-006",
+  "title": "Bills & Payables",
+  "route": "/o/northline/fin/bills",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Inbox",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Due",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approved",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Paid",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exceptions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Bill capture",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "match inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "payment authorization",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Match",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Capture a bill",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule a payment",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Record a payment run",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-FIN-007",
+  "title": "Expenses",
+  "route": "/o/northline/fin/expenses",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "My expenses",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Team review",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approved",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Reimbursed",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Receipt capture",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "expense detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "approval chain",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign a category",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Upload a receipt",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reimburse",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open the claim",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approval chain",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Chart of accounts",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-FIN-008",
+  "title": "Banking & Feeds",
+  "route": "/o/northline/fin/banking",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Accounts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Transactions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Imports",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Feed health",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Bank connection",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "CSV mapper",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "feed incident",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Connect a bank",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reconcile",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Import a statement",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect a mismatch",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Feed incidents",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-FIN-009",
+  "title": "Bank Reconciliation",
+  "route": "/o/northline/fin/reconciliation",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "To reconcile",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Matched",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exceptions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Match candidates",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "adjustment review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "reconciliation approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Confirm the statement",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Match candidates",
+   "Create an adjustment",
+   "Split a line"
+  ]
+ },
+ {
+  "id": "ARL-FIN-010",
+  "title": "Budgets & Forecasts",
+  "route": "/o/northline/fin/budgets",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Budgets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Forecasts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Scenarios",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approval",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Model assumptions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "revision history",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "budget approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Submit a budget",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare scenarios",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit assumptions",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-FIN-011",
+  "title": "Tax & Compliance",
+  "route": "/o/northline/fin/tax",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Codes",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Periods",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Returns",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Audit",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Tax configuration",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "return review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "filing authorization",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Validate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review the filing",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Prepare a return",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export the figures",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Code configuration",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-FIN-012",
+  "title": "Financial Reports",
+  "route": "/o/northline/fin/reports",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Statements",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Management",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Custom",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Scheduled",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Report designer",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "source note",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "schedule",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Drill into an account",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Filter statements",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Build a report",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Source note",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Report designer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-FIN-013",
+  "title": "Multi-Entity Finance",
+  "route": "/o/northline/fin/entities",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Entities",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Intercompany",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Consolidation",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "FX",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Entity config",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "consolidation preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "FX sources",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Eliminate intercompany",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Prepare a consolidation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect postings",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

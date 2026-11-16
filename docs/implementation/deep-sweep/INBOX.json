@@ -1,0 +1,601 @@
+[
+ {
+  "id": "ARL-INBOX-001",
+  "title": "Unified Inbox",
+  "route": "/o/northline/inbox/inbox",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "For You",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approvals",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Messages",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Updates",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Activity",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Notification detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "snooze picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "action preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Mark read",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Snooze",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open record",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Bulk triage",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-INBOX-002",
+  "title": "Approvals",
+  "route": "/o/northline/inbox/approvals",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Mine",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Delegated",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pending",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Approval review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "step-up auth",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "scope diff",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Deny",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Ask for changes",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Delegate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Escalation rules",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-INBOX-003",
+  "title": "Messages Inbox",
+  "route": "/o/northline/inbox/messages",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Unread",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Assigned",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Mentions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Escalated",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Message inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "reassignment",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "mute",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open thread",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reply",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open Comms channels",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Convert to task",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-INBOX-004",
+  "title": "Notifications Feed",
+  "route": "/o/northline/inbox/notifications",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Milestones",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Routine",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archived",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Event detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "grouped items",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "preference quick view",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Filter the feed",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Clear read items",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open deep link",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Follow a source",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Delivery preferences",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Grouped items",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-INBOX-005",
+  "title": "Incident Alerts",
+  "route": "/o/northline/inbox/incidents",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Urgent",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Waiting",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Resolved",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Security",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Incident summary",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "owner handoff",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "emergency pause",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Emergency pause",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Assign an owner",
+   "Acknowledge",
+   "Inspect impact",
+   "Escalate"
+  ]
+ },
+ {
+  "id": "ARL-INBOX-006",
+  "title": "Notification Preferences",
+  "route": "/o/northline/inbox/settings",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Channels",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Categories",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Schedule",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Delegation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Delivery test",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "quiet-hour rules",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "exception explanation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Toggle a channel",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test a delivery",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set the digest",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Digest centre",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Mute mission updates",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add quiet hours",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Why some items still arrive",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-INBOX-007",
+  "title": "Digest Centre",
+  "route": "/o/northline/inbox/digests",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Daily",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Weekly",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Custom",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Digest editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "audience",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "schedule",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New digest",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export the brief",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Send a test",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Audience",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-INBOX-008",
+  "title": "Escalations & Delegation",
+  "route": "/o/northline/inbox/escalations",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rules",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Coverage",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Conflicts",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Delegation grant",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "simulation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "escalation conflict",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set the condition",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Simulate cover",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign backup",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Revoke",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Authority conflicts",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

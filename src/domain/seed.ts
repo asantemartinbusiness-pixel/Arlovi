@@ -101,6 +101,7 @@ export function buildSeed(): { records: Rec[]; events: Audit[] } {
     rent: `${NORTH.prefix}-accounts-010`,
     software: `${NORTH.prefix}-accounts-011`,
     wages: `${NORTH.prefix}-accounts-012`,
+    accruedWages: `${NORTH.prefix}-accounts-013`,
   };
 
   records.push(
@@ -116,6 +117,7 @@ export function buildSeed(): { records: Rec[]; events: Audit[] } {
     account(NORTH, 10, "6100", "Rent", "expense"),
     account(NORTH, 11, "6200", "Software", "expense"),
     account(NORTH, 12, "6300", "Wages", "expense"),
+    account(NORTH, 13, "2200", "Accrued wages", "liability"),
     journal(NORTH, 1, "Opening balances", [
       { accountId: A.bank, debitMinor: 8_500_000, creditMinor: 0 },
       { accountId: A.inventory, debitMinor: 2_400_000, creditMinor: 0 },
@@ -149,7 +151,7 @@ export function buildSeed(): { records: Rec[]; events: Audit[] } {
     ]),
     journal(NORTH, 8, "Wage accrual draft", [
       { accountId: A.wages, debitMinor: 100_000, creditMinor: 0 },
-      { accountId: A.bank, debitMinor: 0, creditMinor: 100_000 },
+      { accountId: A.accruedWages, debitMinor: 0, creditMinor: 100_000 },
     ], "draft", "Balanced draft waiting for Finance approval."),
   );
 
@@ -403,7 +405,7 @@ export function buildSeed(): { records: Rec[]; events: Audit[] } {
   records.push(
     rec(NORTH, "services", 1, "Showroom consultation", { status: "active", amountMinor: 0, summary: "45 minutes in Clerkenwell.", fields: { minutes: 45, slug: "showroom-consult" } }),
     rec(NORTH, "services", 2, "On-site specification", { status: "active", amountMinor: 18_000, summary: "Paid specification visit.", fields: { minutes: 90, slug: "specification" } }),
-    rec(NORTH, "resources", 1, "Consultation table", { summary: "One booking at a time.", fields: { kind: "room" } }),
+    rec(NORTH, "resources", 1, "Consultation table", { summary: "One booking at a time.", fields: { kind: "room", bookable: true } }),
     rec(NORTH, "resources", 2, "Priya Shah", { summary: "Showroom host.", fields: { kind: "person", employeeId: "nl-employees-003" } }),
     rec(NORTH, "bookings", 1, "Leo · specification", {
       status: "confirmed",
@@ -551,10 +553,10 @@ export function buildSeed(): { records: Rec[]; events: Audit[] } {
   );
 
   records.push(
-    rec(NORTH, "agents", 1, "Nia Okonkwo", { status: "active", summary: "Chief of Staff. Drafts plans from local records and waits for approval.", fields: { role: "Chief of Staff", model: "not_connected", autonomy: "draft" } }),
-    rec(NORTH, "agents", 2, "Idris Cole", { status: "active", summary: "Finance agent. Can prepare journals. Cannot post them.", fields: { role: "Finance", model: "not_connected", autonomy: "draft" } }),
-    rec(NORTH, "agents", 3, "Sable Nguyen", { status: "active", summary: "Creative agent for briefs, decks and layout notes.", fields: { role: "Creative", model: "not_connected", autonomy: "draft" } }),
-    rec(NORTH, "agents", 4, "Remy Alves", { status: "active", summary: "Care agent. Replies only from approved articles.", fields: { role: "Care", model: "not_connected", autonomy: "suggest" } }),
+    rec(NORTH, "agents", 1, "Nia Okonkwo", { status: "active", summary: "Chief of Staff. Drafts plans from local records and waits for approval.", fields: { role: "Chief of Staff", model: "not_connected", autonomy: "draft", manager: "Maya Chen", spendCapMinor: 50_000, recordedCostMinor: 0 }, body: { skills: ["nl-skills-060", "nl-skills-064"], tools: [{ id: "workspace.read", label: "Read workspace records", granted: true }], authority: ["Drafts plans", "Waits for approval"], sources: [] } }),
+    rec(NORTH, "agents", 2, "Idris Cole", { status: "active", summary: "Finance agent. Can prepare journals. Cannot post them.", fields: { role: "Finance", model: "not_connected", autonomy: "draft", manager: "Maya Chen", spendCapMinor: 30_000, recordedCostMinor: 0 }, body: { skills: ["nl-skills-001", "nl-skills-065"], tools: [{ id: "workspace.read", label: "Read workspace records", granted: true }], authority: ["Prepares journals", "Cannot post them"], sources: [] } }),
+    rec(NORTH, "agents", 3, "Sable Nguyen", { status: "active", summary: "Creative agent for briefs, decks and layout notes.", fields: { role: "Creative", model: "not_connected", autonomy: "draft", manager: "Maya Chen", spendCapMinor: 20_000, recordedCostMinor: 0 }, body: { skills: ["nl-skills-060"], tools: [{ id: "workspace.read", label: "Read workspace records", granted: true }], authority: ["Drafts briefs, decks and layout notes"], sources: [] } }),
+    rec(NORTH, "agents", 4, "Remy Alves", { status: "active", summary: "Care agent. Replies only from approved articles.", fields: { role: "Care", model: "not_connected", autonomy: "suggest", manager: "Priya Shah", spendCapMinor: 15_000, recordedCostMinor: 0 }, body: { skills: ["nl-skills-063"], tools: [{ id: "workspace.read", label: "Read workspace records", granted: true }], authority: ["Replies only from approved articles"], sources: ["nl-sources-067"] } }),
     rec(NORTH, "skills", 1, "Ledger check", { summary: "Confirms a journal balances before a person posts it.", fields: { version: "1.2" } }),
     rec(NORTH, "evaluations", 1, "Ledger check · November", { status: "passed", summary: "Balanced and unbalanced fixtures both behaved as expected.", fields: { skillId: "nl-skills-001", passed: 12, failed: 0 } }),
     rec(NORTH, "conversations", 1, "Morning brief", { summary: "Maya and Nia, 14 November.", fields: { agentId: "nl-agents-001" } }),

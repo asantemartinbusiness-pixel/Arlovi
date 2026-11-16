@@ -1,34 +1,103 @@
 # Handoff
 
-The frontend is not complete. Continue from `cursor/arlovi-frontend-9636`.
+Current numbers are not written here, so this file cannot go stale. Read them from
+the generated evidence:
 
-## Verified in the browser
+- `SCREEN_LEDGER.md` / `SCREEN_LEDGER.csv`: per-screen status, journey results, open defects
+- `defects.json`: every defect the journeys found, and how each was closed
+- `workflow-results.json`: the last recorded run of the cross-application journeys
 
-| Journey | Evidence |
-|---|---|
-| Invoice create, line edit, issue, ledger, awaiting-payment tab, reload | `e2e/screens.spec.ts` |
-| Deal drafts an invoice that opens in Finance | `e2e/screens.spec.ts` |
-| Wage journal posts and stays posted | `e2e/screens.spec.ts` |
-| Design file create, add rectangle, reload | `e2e/screens.spec.ts` |
-| Agent contract creates a directory member and an organization-chart node | `e2e/screens.spec.ts` |
-| Task board move updates the project overview and survives reload | `e2e/screens.spec.ts` |
-| All 316 routes render title, first tab, and first action with no page error | `e2e/screens.spec.ts` |
-| Axe on home, finance home, document editor, deal board | `e2e/a11y.spec.ts` |
-| Invoice Create stays in view at 375, 768, and 1440 | `e2e/viewport.spec.ts` |
+Nothing in the ledger is written by hand. A screen is **verified** only when its
+contract is complete, the browser sweep exercised it with no console error, its
+application's actions were signed off as doing what they are named for, and no
+journey defect is open against it.
 
-## Still open
+## Re-running the evidence
 
-- Most overlays are one shared form. The registry describes distinct drawers, inspectors, and wizards.
-- Most tabs change a filter, not a specialist layout.
-- Communications, care, HR, legal, marketing, procurement, websites, and the app builder still use the shared shell plus the editor that matches the record type.
-- Board drag-and-drop moves a card onto another card. Keyboard and button moves are the tested path.
-- Formula support is arithmetic plus SUM, AVERAGE, MIN, MAX, and COUNT.
-- Photo, video, and motion editors are structured local tools, not full desktop applications.
-- IndexedDB does not sync across devices.
-- No mail, payments, bank feed, tax filing, publish, or language model is connected. Do not mark those actions as completed.
+Run against a production build, not the dev server: it is faster and it is what ships.
+
+```bash
+npx vite build --outDir /tmp/arlovi-dist
+```
+
+```bash
+npx vite preview --outDir /tmp/arlovi-dist --host 127.0.0.1 --port 4173 --strictPort
+```
+
+| Evidence | Command | Writes |
+| --- | --- | --- |
+| Static gates | `npm run typecheck && npm run lint && npm test` | `registry-coverage.json` |
+| Deep sweep (every tab, overlay, action) | `BASE_URL=http://127.0.0.1:4173 DEEP_SWEEP_OUT=<dir> npm run test:sweep` | `deep-sweep/*.json` (copy in from `<dir>`) |
+| Cross-application journeys | `BASE_URL=... npx playwright test e2e/workflows.spec.ts --reporter=json > report.json` then `python3 scripts/record_workflow_results.py report.json` | `workflow-results.json`, resolves `defects.json` |
+| Accessibility, contract, viewport, findings | `BASE_URL=... npx playwright test e2e/a11y.spec.ts e2e/contract.spec.ts e2e/viewport.spec.ts e2e/findings.spec.ts` | none |
+| Ledger | `npm run ledger` | `SCREEN_LEDGER.md`, `.csv` |
+
+`semantic-audit.json` is a human sign-off per application, recorded from review. It
+is the one input that is not measured; re-review an application's actions before
+changing its entry.
+
+A defect in `defects.json` is closed only when its journey ran to the end and its
+`DEFECT:` message no longer fires. Findings no journey asserts are closed with a
+named test in `evidence`.
+
+## Rules the code depends on
+
+These each closed a real defect. Keep them.
+
+1. **Screens are owned by their application.** `registerApp()` declares a screen's
+   tabs, actions and overlays; `src/app/ScreenHost.tsx` renders them. There is no
+   generic fallback: an unimplemented screen shows an honest "not built" notice,
+   and `tests/unit/registry-contract.test.ts` keeps that unreachable.
+2. **Organisation isolation.** `useRecord` returns a record only if it belongs to the
+   organisation in the address, and `ScreenHost` refuses a route id from another one.
+3. **Writes merge.** `mutate.patch` merges `fields`. Pass `{ replaceFields: true }`
+   only to remove keys on purpose.
+4. **Forms seed from loaded records.** Reads are primed (`repo.knownRecord`) and
+   overlays mount after their record is read, so an edit form never saves its
+   defaults over real values.
+5. **Time is read in one place.** Use `clockNow()` / `clockIso()` for "when" and
+   `wallMs()` for ids, undo windows and device diagnostics, all from
+   `@/platform/clock`. Lint rejects a bare `new Date()` or `Date.now()` in `src`.
+   `clockIso()` is strictly increasing, so audit order survives a frozen clock.
+6. **One source per figure.** A number shown on two screens comes from one
+   computation, with Finance as the source for money (revenue recognised is posted
+   net revenue; receivable is one shared position).
+7. **Provider boundaries are honest.** Send, pay, publish, file, call and model
+   inference stop at a stated boundary and are never shown as having happened.
+8. **Autonomy respects the pause.** A mission step never runs while the mission or
+   the organisation is paused; the check lives in `executeStep`, so every entry
+   point is covered.
+
+## Design system
+
+- Palettes and density are owned by `src/design-system/tokens.css`. The retired
+  `src/styles.css` had been overriding some token values by re-declaring the same
+  custom property names; removing it moved links, status text and heading spacing
+  onto the design system's own values.
+- Headings have zero margin by design; components own their spacing.
+- `base.css` carries a zero-specificity default for plain `<table>`s. Classed tables
+  (`.ds-table`, `.dx-table`, matrices) override it.
+
+## Known limits
+
+- **Selection-guarded actions.** The sweep cannot press actions that need a specific
+  record selected. The count is in `SCREEN_LEDGER.md`; they were judged in the
+  semantic review and many are exercised by the journeys.
+- **Pressing is not completing.** The sweep opens what an action opens and checks for
+  errors; it does not fill and submit every form.
+- **External services are not connected.** No mail, payments, bank feed, tax filing,
+  publishing or language model. Do not mark those actions as completed.
+- **Visual quality is sampled**, not measured across every screen.
+- **Owner self-approval** of a requisition is allowed and recorded as a
+  self-approval. Anyone else is refused. This is a product decision to confirm.
+- IndexedDB is per browser; there is no cross-device sync.
+- Photo, video and motion editors are structured local tools, not desktop applications.
 
 ## Where to work next
 
-Specialist desks live in `src/views/desks.tsx` and are chosen in `src/app/screen.tsx` before the shared archetype. New records are shaped in `src/domain/create.ts`. Add the next desk the same way, then add a Playwright journey and move that screen's ledger status to `verified` only after the journey passes.
-
-Regenerate the ledger with `python3 scripts/build_ledger.py` after changing the verified set. Do not mark a screen verified because its route renders.
+- Add or change a screen in `src/applications/<code>/`, then a journey in
+  `e2e/workflows.spec.ts` if it crosses applications.
+- New records are shaped in `src/domain/create.ts`; seeds are contributed with
+  `registerSeed` and topped up additively (bump `SEED_VERSION` to add records).
+- A new cross-application workflow should land with a journey and a defect-register
+  entry for anything it finds, not with a ledger edit.

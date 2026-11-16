@@ -36,23 +36,38 @@ routes = [screen["route"] for screen in CAT["screens"]]
 if len(routes) != len(set(routes)):
     errors.append("duplicate routes")
 
-src = "\n".join(path.read_text(errors="ignore") for path in (ROOT / "src").rglob("*.tsx"))
-src += "\n".join(path.read_text(errors="ignore") for path in (ROOT / "src").rglob("*.ts") if "generated" not in str(path))
-for word in ("MVP", "prototype", "mockup", "coming soon", "lorem ipsum"):
+def strip_comments(text: str) -> str:
+    """Placeholder words in a comment are not user-facing; drop comments before matching."""
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"(?<![:\"'`])//[^\n]*", "", text)
+
+
+sources = [path for pattern in ("*.tsx", "*.ts") for path in (ROOT / "src").rglob(pattern) if "generated" not in str(path)]
+src = "\n".join(strip_comments(path.read_text(errors="ignore")) for path in sources)
+# "prototype" is deliberately not listed: clickable prototypes are a Design feature,
+# and `.prototype` is a language construct. The words below are placeholder copy.
+for word in (r"\bMVP\b", r"mockup", r"coming soon", r"lorem ipsum"):
     if re.search(word, src, re.I):
-        errors.append(f"user-facing source contains {word}")
+        errors.append(f"user-facing source contains placeholder text matching {word}")
 
 required = [
     "src/domain/finance.ts",
     "src/domain/engine.ts",
     "src/domain/scenarios.ts",
-    "src/editors/studio.tsx",
-    "src/app/screen.tsx",
+    "src/app/ScreenHost.tsx",
+    "src/platform/registry.ts",
+    "src/platform/clock.tsx",
     "src/runtime/db.ts",
 ]
 for rel in required:
     if not (ROOT / rel).exists():
         errors.append(f"missing {rel}")
+
+# The generic renderer was retired. Screens are owned by their application; do not bring it back.
+retired = ["src/app/screen.tsx", "src/app/shell.tsx", "src/views", "src/editors", "src/styles.css"]
+for rel in retired:
+    if (ROOT / rel).exists():
+        errors.append(f"retired path is back: {rel}")
 
 if errors:
     print("\n".join(errors))

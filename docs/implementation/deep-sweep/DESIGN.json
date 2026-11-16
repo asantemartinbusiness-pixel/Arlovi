@@ -1,0 +1,677 @@
+[
+ {
+  "id": "ARL-DESIGN-001",
+  "title": "Design Files",
+  "route": "/o/northline/design/files",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Recent",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Shared",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Brand",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Templates",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "File setup",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "import issues",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "sharing",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Import SVG",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New file",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Duplicate",
+   "Fork from a template",
+   "Archive"
+  ]
+ },
+ {
+  "id": "ARL-DESIGN-002",
+  "title": "Design Canvas",
+  "route": "/o/northline/design/files/nl-designs-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Design",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Prototype",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Inspect",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Comments",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Insert tools",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "fill picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "style inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Zoom to fit",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Insert tools…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Hand tool (H)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pan to the selection",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Drag the selection by…",
+   "Resize…",
+   "Rotate 15°",
+   "Crop the frame to the selection",
+   "Undo"
+  ]
+ },
+ {
+  "id": "ARL-DESIGN-003",
+  "title": "Layers & Pages",
+  "route": "/o/northline/design/files/nl-designs-001/layers",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pages",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Layers",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Assets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Components",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Layer context",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "move-to-page",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "component detach",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Select every editable layer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Clear the selection",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Group",
+   "Lock or unlock",
+   "Rename layer",
+   "Reorder: bring forwards",
+   "Send backwards",
+   "Isolate"
+  ]
+ },
+ {
+  "id": "ARL-DESIGN-004",
+  "title": "Vector Path Editor",
+  "route": "/o/northline/design/files/nl-designs-001/paths",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pen",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Curves",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Boolean",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Offset",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Point inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "path operations",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "stroke editing",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pen tool (P)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Combine options…",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Adjust the point's handles…",
+   "Join the ends",
+   "Add a point",
+   "Subtract the second selected path",
+   "Simplify"
+  ]
+ },
+ {
+  "id": "ARL-DESIGN-005",
+  "title": "Auto Layout & Responsive",
+  "route": "/o/northline/design/files/nl-designs-001/layout",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Layout",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Constraints",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Responsive",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Grid",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Layout inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "constraint conflict",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "breakpoint preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview at each breakpoint",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Apply the layout rules",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Wrap or unwrap the frame",
+   "Set the frame size…",
+   "Reorder: move the child later",
+   "Reverse the frame's children"
+  ]
+ },
+ {
+  "id": "ARL-DESIGN-006",
+  "title": "Components & Variants",
+  "route": "/o/northline/design/files/nl-designs-001/components",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Library",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Local",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Variants",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Usage",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Variant editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "library publish",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "breaking-change diff",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish to the library",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a variant property…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Usage across the file",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Inspect where it is used",
+   "Create a component",
+   "Swap the selected instance…",
+   "Detach the selected instance"
+  ]
+ },
+ {
+  "id": "ARL-DESIGN-007",
+  "title": "Typography & Styles",
+  "route": "/o/northline/design/files/nl-designs-001/styles",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Text",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Colour",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Effects",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Variables",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Font browser",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "gradient editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "style impact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit a colour token…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect contrast",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New text style",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New colour token",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Apply a style to the selection…"
+  ]
+ },
+ {
+  "id": "ARL-DESIGN-008",
+  "title": "Prototype & Interactions",
+  "route": "/o/northline/design/files/nl-designs-001/prototype",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Flow",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Interactions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Share",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Interaction editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "transition options",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "device preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Run the preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Link screens…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Link on the canvas",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish the prototype…",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Set the trigger…"
+  ]
+ },
+ {
+  "id": "ARL-DESIGN-009",
+  "title": "Assets & Export",
+  "route": "/o/northline/design/files/nl-designs-001/assets",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Assets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Symbols",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exports",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Asset picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "export settings",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "license note",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Replace or add an asset…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export settings",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Organise: sort the assets by name",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Batch export",
+   "Crop an asset…"
+  ]
+ },
+ {
+  "id": "ARL-DESIGN-010",
+  "title": "Design Review",
+  "route": "/o/northline/design/files/nl-designs-001/review",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Comments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Reviews",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Diff",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Comment editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "version compare",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "signoff",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve this version",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare versions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Annotate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign the open comments",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

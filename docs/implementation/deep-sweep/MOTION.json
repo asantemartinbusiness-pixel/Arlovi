@@ -1,0 +1,350 @@
+[
+ {
+  "id": "ARL-MOTION-001",
+  "title": "Motion Projects",
+  "route": "/o/northline/motion/projects",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Recent",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Shared",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Templates",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Renders",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Composition setup",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "asset library",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "publish",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Import a file",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create a composition",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Open in the editor",
+   "Duplicate",
+   "Publish as a brand template",
+   "Linked assets"
+  ]
+ },
+ {
+  "id": "ARL-MOTION-002",
+  "title": "Composition Editor",
+  "route": "/o/northline/motion/projects/nl-motions-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Animate",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Design",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Effects",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Keyframe editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "layer inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "motion picker",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Animate mode (auto-key)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set keyframe (K)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Apply a motion preset…",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Layer inspector",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Drag the easing curve",
+   "Undo",
+   "Redo"
+  ]
+ },
+ {
+  "id": "ARL-MOTION-003",
+  "title": "Easing & Timing",
+  "route": "/o/northline/motion/projects/nl-motions-001/easing",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Curves",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Timing",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Presets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Spring",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Curve editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "loop validation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "timing preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Loop on or off",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test for flashing and fast motion",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Loop validation",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Stagger",
+   "Edit easing",
+   "Timing preview"
+  ]
+ },
+ {
+  "id": "ARL-MOTION-004",
+  "title": "Interactive Motion",
+  "route": "/o/northline/motion/projects/nl-motions-001/interactive",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "States",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Triggers",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "State inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "interaction guard",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "device preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test pointer, keyboard and touch",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Bind a trigger",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "State inspector",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Device preview",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Export the interactions",
+   "Remove the trigger"
+  ]
+ },
+ {
+  "id": "ARL-MOTION-005",
+  "title": "Motion Export",
+  "route": "/o/northline/motion/projects/nl-motions-001/export",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Formats",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Presets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Queue",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Export options",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "reduced-motion review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "compatibility",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test the reduced-motion fallback",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Render video or GIF",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export a file",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compatibility matrix",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Publish"
+  ]
+ }
+]

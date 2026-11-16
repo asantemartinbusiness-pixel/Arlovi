@@ -1,0 +1,963 @@
+[
+ {
+  "id": "ARL-COMMERCE-001",
+  "title": "Commerce Overview",
+  "route": "/o/northline/commerce/home",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sales",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Operations",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Insights",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "KPI explanation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "exception list",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "store picker",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New promotion",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect a product",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review orders",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Ask Commerce",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Exceptions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Choose a location",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMERCE-002",
+  "title": "Products",
+  "route": "/o/northline/commerce/products",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Active",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Draft",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Collections",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archived",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Product editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "import mapping",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "bulk preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Bulk publish preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Categorise",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New product",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Duplicate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Archive selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Import from CSV",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMERCE-003",
+  "title": "Product Detail",
+  "route": "/o/northline/commerce/products/nl-products-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Variants",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Media",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pricing",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "SEO",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Variant editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "media picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "margin impact",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "publish",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add variant",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Change price",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit product",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Margin impact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Media",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMERCE-004",
+  "title": "Inventory",
+  "route": "/o/northline/commerce/inventory",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Stock",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Movements",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Locations",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Replenishment",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Stock adjustment",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "transfer approval",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "count reconciliation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Transfer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Stock count",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Adjust stock",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Receive against a PO",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reorder selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open Receiving",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMERCE-005",
+  "title": "Orders",
+  "route": "/o/northline/commerce/orders",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Unfulfilled",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "In transit",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Delivered",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Returns",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Order quick view",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "bulk operation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "refund approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Bulk fulfil",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Filter",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Quick view",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export CSV",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Propose a refund",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMERCE-006",
+  "title": "Order Detail",
+  "route": "/o/northline/commerce/orders/nl-orders-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Fulfilment",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Payments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Returns",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Activity",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Shipping label",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "cancellation impact",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "refund confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Propose a refund",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Fulfil (record handover)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Contact the buyer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Refund state",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Cancel order",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMERCE-007",
+  "title": "Storefront Builder",
+  "route": "/o/northline/commerce/storefront",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pages",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Design",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Content",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Settings",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Theme inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "template picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "publication review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit theme",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Arrange layout",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open the preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publish",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Roll back",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Layout template",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Publication review",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMERCE-008",
+  "title": "Checkout & Payments",
+  "route": "/o/northline/commerce/checkout",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Experience",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Payments",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tax",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Recovery",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Provider setup",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "checkout test",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "policy change review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test checkout",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Preview in the storefront",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Configure checkout",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Deploy policy",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Connect a processor",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Monitor held orders",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMERCE-009",
+  "title": "Fulfilment & Shipping",
+  "route": "/o/northline/commerce/fulfilment",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pick",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pack",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Ship",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Track",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exceptions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Carrier selector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "label preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "delivery exception",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Scan",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Hand off to carrier",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create label",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Choose a carrier",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Label preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Record an exception",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMERCE-010",
+  "title": "Returns & Refunds",
+  "route": "/o/northline/commerce/returns",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Requested",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "In review",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approved",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Completed",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Return inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "restock assessment",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "refund authorization",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assess restocking",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Refund (credit note)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Review and approve",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Message the customer",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMERCE-011",
+  "title": "Promotions & Pricing",
+  "route": "/o/northline/commerce/promotions",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Offers",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Codes",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rules",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Offer builder",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "margin check",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "launch approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Model margin",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "New offer",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Make it live now",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pause selected",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-COMMERCE-012",
+  "title": "Commerce Analytics",
+  "route": "/o/northline/commerce/analytics",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sales",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Products",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Customers",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Operations",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Chart builder",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "KPI inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "report schedule",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Segment customers",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect the source",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare periods",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export CSV",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Build a chart",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Schedule a report",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

@@ -1,0 +1,694 @@
+[
+ {
+  "id": "ARL-IT-001",
+  "title": "IT Operations Home",
+  "route": "/o/northline/it/home",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Health",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Incidents",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Changes",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Capacity",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Service inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "incident create",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "health test",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open an issue (incident)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Run the checks",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect a group",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Acknowledge an incident",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Full diagnostics",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-IT-002",
+  "title": "Incident Queue",
+  "route": "/o/northline/it/incidents",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Active",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Awaiting user",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Resolved",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Postmortems",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Incident detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "severity change",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "escalation rules",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open an incident",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Escalate severity",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Merge with evidence",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Page the owner",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Escalation rules",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Incident detail",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Resolve",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-IT-003",
+  "title": "Incident Detail",
+  "route": "/o/northline/it/incidents/nl-incidents-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Timeline",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Evidence",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Remediation",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Postmortem",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Remediation approval",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "affected work",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "mitigation note",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve the repair",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Acknowledge and take it",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Assign",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Close",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a note",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Change severity",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-IT-004",
+  "title": "System Health",
+  "route": "/o/northline/it/health",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Services",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Workers",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Storage",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Provider status",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Service health detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "monitor rule",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "scale request",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Run the checks",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export a backup",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Drill into the checks",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add a monitor",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Change an alert threshold",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-IT-005",
+  "title": "Logs & Tracing",
+  "route": "/o/northline/it/traces",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Traces",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Logs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Metrics",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sampling",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Trace waterfall",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "redaction rules",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "saved filter",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect an entry",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Filter the log",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Bookmark an entry",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Share with an authorised reader",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Redaction rules",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-IT-006",
+  "title": "Automated Remediation",
+  "route": "/o/northline/it/remediation",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Runbooks",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Proposals",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Runs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Failures",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Runbook editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "remediation impact",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "verify result",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve a proposal",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test the verification runbook",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Execute a runbook",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pause or resume a runbook",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit a runbook",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-IT-007",
+  "title": "Release Management",
+  "route": "/o/northline/it/releases",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Planned",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Staging",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Production",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rollbacks",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Diff review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "release gates",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "rollback confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test a release",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve a release",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Deploy",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Roll back",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Release gates",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-IT-008",
+  "title": "Security Centre",
+  "route": "/o/northline/it/security",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Alerts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Access",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Secrets",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Policy",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Audit",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Security incident",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "session revoke",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "policy simulation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Revoke a connector's access",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Investigate (open a security incident)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Isolate an integration",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export the audit",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Audit trail",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Sessions",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Policy simulation",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-IT-009",
+  "title": "Reliability Reports",
+  "route": "/o/northline/it/reports",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Trends",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Root causes",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Capacity",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Costs",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Report builder",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "incident comparison",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "proposal",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare incidents",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Generate a report",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Propose a fix",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

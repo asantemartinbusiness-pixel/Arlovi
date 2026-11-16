@@ -1,0 +1,5905 @@
+[
+ {
+  "screen": "ARL-AI-001",
+  "title": "Chief of Staff Chat",
+  "route": "/o/:org/ai/chat",
+  "contractActions": [
+   "Send text",
+   "dictate",
+   "attach",
+   "mention record",
+   "open artifact",
+   "create mission"
+  ],
+  "contractOverlays": [
+   "Source selector",
+   "upload review",
+   "message action menu",
+   "task authorization"
+  ],
+  "edge": "Ambiguous target account requires clarification before any external action",
+  "declared": [
+   {
+    "id": "Send text",
+    "label": "Send text",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { __vite_ssr_import_10__.useChatState.getState().requestSend(chiefThread(context)); }"
+   },
+   {
+    "id": "create mission",
+    "label": "Authorise a mission",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"task authorization\""
+   },
+   {
+    "id": "attach",
+    "label": "Attach",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"upload review\""
+   },
+   {
+    "id": "mention record",
+    "label": "Pin records",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Source selector\""
+   },
+   {
+    "id": "dictate",
+    "label": "Dictate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/ai/voice`"
+   },
+   {
+    "id": "open artifact",
+    "label": "Open artifact",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void openLatestArtifact(context)"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AI-002",
+  "title": "Conversation Library",
+  "route": "/o/:org/ai/conversations",
+  "contractActions": [
+   "Open",
+   "rename",
+   "archive",
+   "delete",
+   "search transcript"
+  ],
+  "contractOverlays": [
+   "Thread preview",
+   "delete confirmation",
+   "sharing dialog"
+  ],
+  "edge": "Archived conversations remain subject to legal retention and RBAC",
+  "declared": [
+   {
+    "id": "Open",
+    "label": "Open",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/ai/chat`"
+   },
+   {
+    "id": "search transcript",
+    "label": "Search transcripts",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: __vite_ssr_import_10__.usePanelFlags.getState().set(\"ai.library.search\", true)"
+   },
+   {
+    "id": "rename",
+    "label": "rename",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Thread preview\""
+   },
+   {
+    "id": "archive",
+    "label": "archive",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void archiveConversation(context)"
+   },
+   {
+    "id": "delete",
+    "label": "delete",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"delete confirmation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AI-003",
+  "title": "Specialist Chat",
+  "route": "/o/:org/ai/agents/:id/chat",
+  "contractActions": [
+   "Message specialist",
+   "attach record",
+   "request handoff",
+   "review tool scope"
+  ],
+  "contractOverlays": [
+   "Agent profile drawer",
+   "permission explainer",
+   "mission escalation"
+  ],
+  "edge": "Agent unavailable transfers to authorized coordinator without inventing progress",
+  "declared": [
+   {
+    "id": "Message specialist",
+    "label": "Message specialist",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Conversation\""
+   },
+   {
+    "id": "attach record",
+    "label": "Attach a record",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Agent profile drawer\""
+   },
+   {
+    "id": "request handoff",
+    "label": "request handoff",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"mission escalation\""
+   },
+   {
+    "id": "review tool scope",
+    "label": "review tool scope",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"permission explainer\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AI-004",
+  "title": "Team Room",
+  "route": "/o/:org/ai/rooms/:id",
+  "contractActions": [
+   "Mention participant",
+   "assign task",
+   "pin decision",
+   "host review"
+  ],
+  "contractOverlays": [
+   "Participant selector",
+   "decision recorder",
+   "topic thread"
+  ],
+  "edge": "Do not allow group chat mentions to override external tool policies",
+  "declared": [
+   {
+    "id": "Mention participant",
+    "label": "Mention participant",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { __vite_ssr_import_10__.useChatState.getState().setDraft(threadKey(context.screen.id, context.params.id), \"@\"); __vite_ssr_import_10__.use"
+   },
+   {
+    "id": "pin decision",
+    "label": "Pin a decision",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"decision recorder\""
+   },
+   {
+    "id": "assign task",
+    "label": "assign task",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/project/tasks`"
+   },
+   {
+    "id": "host review",
+    "label": "host review",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Participant selector\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AI-005",
+  "title": "Mission Room",
+  "route": "/o/:org/ai/missions/:id/room",
+  "contractActions": [
+   "Request status",
+   "assign reviewer",
+   "resolve disagreement",
+   "link evidence"
+  ],
+  "contractOverlays": [
+   "Task handoff drawer",
+   "evidence inspector",
+   "review dialog"
+  ],
+  "edge": "Agent loops and circular delegation detected and stopped",
+  "declared": [
+   {
+    "id": "Request status",
+    "label": "Request status",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const thread = threadKey(context.screen.id, context.params.id); __vite_ssr_import_10__.useChatState.getState().setDraft(thread, \"Where is"
+   },
+   {
+    "id": "assign reviewer",
+    "label": "assign reviewer",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Reviews\""
+   },
+   {
+    "id": "link evidence",
+    "label": "link evidence",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"evidence inspector\""
+   },
+   {
+    "id": "resolve disagreement",
+    "label": "resolve disagreement",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Task handoff drawer\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AI-006",
+  "title": "Voice Workspace",
+  "route": "/o/:org/ai/voice",
+  "contractActions": [
+   "Start stop",
+   "mute",
+   "change voice",
+   "view transcript",
+   "correct text"
+  ],
+  "contractOverlays": [
+   "Mic permission",
+   "voice settings",
+   "sensitive-action confirmation"
+  ],
+  "edge": "No autonomous irreversible action based on misheard transcription",
+  "declared": [
+   {
+    "id": "Start stop",
+    "label": "Start or end a session",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void startOrEndVoice(context)"
+   },
+   {
+    "id": "view transcript",
+    "label": "view transcript",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Transcript\""
+   },
+   {
+    "id": "mute",
+    "label": "mute",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void 0"
+   },
+   {
+    "id": "change voice",
+    "label": "change voice",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"voice settings\""
+   },
+   {
+    "id": "correct text",
+    "label": "correct text",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Transcript\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AI-007",
+  "title": "AI Meeting Room",
+  "route": "/o/:org/ai/meetings/:id",
+  "contractActions": [
+   "Invite agent",
+   "request specialist report",
+   "create action",
+   "end meeting"
+  ],
+  "contractOverlays": [
+   "Recording consent",
+   "meeting notes",
+   "follow-up approval"
+  ],
+  "edge": "Participant consent and regional recording restrictions enforced",
+  "declared": [
+   {
+    "id": "Invite agent",
+    "label": "Invite agent",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void inviteAgentToMeeting(context)"
+   },
+   {
+    "id": "request specialist report",
+    "label": "request specialist report",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void requestSpecialistReport(context)"
+   },
+   {
+    "id": "create action",
+    "label": "create action",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"follow-up approval\""
+   },
+   {
+    "id": "end meeting",
+    "label": "end meeting",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void endMeeting(context)"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AI-008",
+  "title": "Research Workspace",
+  "route": "/o/:org/ai/research/:id",
+  "contractActions": [
+   "Refine question",
+   "inspect source",
+   "request independent review",
+   "publish report"
+  ],
+  "contractOverlays": [
+   "Source inspector",
+   "confidence note",
+   "save report"
+  ],
+  "edge": "Missing private data clearly reported; never infer unverifiable figures as facts",
+  "declared": [
+   {
+    "id": "Refine question",
+    "label": "Refine question",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void refineQuestion(context)"
+   },
+   {
+    "id": "request independent review",
+    "label": "request independent review",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void requestReview(context)"
+   },
+   {
+    "id": "inspect source",
+    "label": "inspect source",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Sources\""
+   },
+   {
+    "id": "publish report",
+    "label": "Save report",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"save report\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AI-009",
+  "title": "Context Manager",
+  "route": "/o/:org/ai/context",
+  "contractActions": [
+   "Add remove context",
+   "inspect grants",
+   "redact selection",
+   "switch entity"
+  ],
+  "contractOverlays": [
+   "Context picker",
+   "permission explanation",
+   "sensitive data warning"
+  ],
+  "edge": "Context switch must invalidate cached records from prior organization",
+  "declared": [
+   {
+    "id": "Add remove context",
+    "label": "Add or remove context",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Context picker\""
+   },
+   {
+    "id": "switch entity",
+    "label": "switch entity",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Context picker\""
+   },
+   {
+    "id": "inspect grants",
+    "label": "inspect grants",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"permission explanation\""
+   },
+   {
+    "id": "redact selection",
+    "label": "redact selection",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"sensitive data warning\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AI-010",
+  "title": "Conversation Artifacts",
+  "route": "/o/:org/ai/artifacts/:id",
+  "contractActions": [
+   "Open in native app",
+   "revise with AI",
+   "comment",
+   "share",
+   "export"
+  ],
+  "contractOverlays": [
+   "Version comparison",
+   "share dialog",
+   "export dialog"
+  ],
+  "edge": "External publication requires separate mission scope and verification",
+  "declared": [
+   {
+    "id": "revise with AI",
+    "label": "Compose a revision",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void reviseArtifact(context)"
+   },
+   {
+    "id": "Open in native app",
+    "label": "Open in native app",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/docs/files/${context.params.id}`"
+   },
+   {
+    "id": "comment",
+    "label": "comment",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Comments\""
+   },
+   {
+    "id": "share",
+    "label": "share",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"share dialog\""
+   },
+   {
+    "id": "export",
+    "label": "export",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"export dialog\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BRAIN-001",
+  "title": "Knowledge Home",
+  "route": "/o/:org/brain/home",
+  "contractActions": [
+   "Search knowledge",
+   "review proposal",
+   "inspect missing source",
+   "import"
+  ],
+  "contractOverlays": [
+   "Knowledge inspector",
+   "suggestion approval",
+   "upload"
+  ],
+  "edge": "Unverified claim never promoted to authoritative business fact automatically",
+  "declared": [
+   {
+    "id": "Search knowledge",
+    "label": "Search knowledge",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Knowledge inspector\""
+   },
+   {
+    "id": "import",
+    "label": "Import a source",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"upload\""
+   },
+   {
+    "id": "review proposal",
+    "label": "review proposal",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Opportunities\""
+   },
+   {
+    "id": "inspect missing source",
+    "label": "inspect missing source",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Quality\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BRAIN-002",
+  "title": "Source Library",
+  "route": "/o/:org/brain/sources",
+  "contractActions": [
+   "Upload",
+   "filter",
+   "inspect",
+   "reprocess",
+   "retire source"
+  ],
+  "contractOverlays": [
+   "Upload dialog",
+   "source detail drawer",
+   "retention dialog"
+  ],
+  "edge": "Virus scanning and ingestion isolation precede all content use",
+  "declared": [
+   {
+    "id": "Upload",
+    "label": "Upload",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Upload dialog\""
+   },
+   {
+    "id": "inspect",
+    "label": "inspect",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"source detail drawer\""
+   },
+   {
+    "id": "filter",
+    "label": "filter",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { document.querySelector('input[aria-label^=\"Filter\"]')?.focus(); }"
+   },
+   {
+    "id": "reprocess",
+    "label": "reprocess",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void reprocessSource(context)"
+   },
+   {
+    "id": "retire source",
+    "label": "retire source",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"retention dialog\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BRAIN-003",
+  "title": "Source Detail",
+  "route": "/o/:org/brain/sources/:id",
+  "contractActions": [
+   "Correct extraction",
+   "annotate",
+   "restrict",
+   "reindex",
+   "export"
+  ],
+  "contractOverlays": [
+   "Correction form",
+   "permission editor",
+   "delete request"
+  ],
+  "edge": "Corrections preserve original source and immutable correction history",
+  "declared": [
+   {
+    "id": "Correct extraction",
+    "label": "Correct extraction",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Correction form\""
+   },
+   {
+    "id": "annotate",
+    "label": "annotate",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Correction form\""
+   },
+   {
+    "id": "restrict",
+    "label": "restrict",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"permission editor\""
+   },
+   {
+    "id": "reindex",
+    "label": "reindex",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void reindexSource(context)"
+   },
+   {
+    "id": "export",
+    "label": "export",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void exportSource(context)"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BRAIN-004",
+  "title": "Business Graph",
+  "route": "/o/:org/brain/graph",
+  "contractActions": [
+   "Explore node",
+   "merge candidates",
+   "split record",
+   "filter graph"
+  ],
+  "contractOverlays": [
+   "Entity inspector",
+   "merge preview",
+   "relationship editor"
+  ],
+  "edge": "Uncertain matches require review before irreversible merge",
+  "declared": [
+   {
+    "id": "Explore node",
+    "label": "Explore node",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Entity inspector\""
+   },
+   {
+    "id": "merge candidates",
+    "label": "merge candidates",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Exceptions\""
+   },
+   {
+    "id": "filter graph",
+    "label": "filter graph",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Entities\""
+   },
+   {
+    "id": "split record",
+    "label": "split record",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void 0"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BRAIN-005",
+  "title": "Fact Registry",
+  "route": "/o/:org/brain/facts",
+  "contractActions": [
+   "Approve",
+   "reject",
+   "annotate",
+   "set expiry",
+   "compare facts"
+  ],
+  "contractOverlays": [
+   "Evidence drawer",
+   "verification dialog",
+   "conflict resolver"
+  ],
+  "edge": "Two incompatible facts cannot both be presented as current authoritative",
+  "declared": [
+   {
+    "id": "Approve",
+    "label": "Approve",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"verification dialog\""
+   },
+   {
+    "id": "reject",
+    "label": "reject",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void rejectFact(context)"
+   },
+   {
+    "id": "annotate",
+    "label": "annotate",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Evidence drawer\""
+   },
+   {
+    "id": "set expiry",
+    "label": "set expiry",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"verification dialog\""
+   },
+   {
+    "id": "compare facts",
+    "label": "compare facts",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"conflict resolver\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BRAIN-006",
+  "title": "Knowledge Conflicts",
+  "route": "/o/:org/brain/conflicts",
+  "contractActions": [
+   "Select source of truth",
+   "defer",
+   "request external confirmation"
+  ],
+  "contractOverlays": [
+   "Comparison drawer",
+   "resolution dialog",
+   "escalation"
+  ],
+  "edge": "Financial mismatches require ledger/accounting review, not AI choice",
+  "declared": [
+   {
+    "id": "Select source of truth",
+    "label": "Select source of truth",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"resolution dialog\""
+   },
+   {
+    "id": "defer",
+    "label": "defer",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void deferConflict(context)"
+   },
+   {
+    "id": "request external confirmation",
+    "label": "request external confirmation",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"escalation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BRAIN-007",
+  "title": "Decision Register",
+  "route": "/o/:org/brain/decisions",
+  "contractActions": [
+   "Create decision",
+   "link approval",
+   "inspect rationale",
+   "supersede"
+  ],
+  "contractOverlays": [
+   "Decision draft",
+   "approval detail",
+   "impact review"
+  ],
+  "edge": "Superseded decisions remain visible for audit with status",
+  "declared": [
+   {
+    "id": "Create decision",
+    "label": "Create decision",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Decision draft\""
+   },
+   {
+    "id": "inspect rationale",
+    "label": "inspect rationale",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"approval detail\""
+   },
+   {
+    "id": "link approval",
+    "label": "link approval",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void linkApproval(context)"
+   },
+   {
+    "id": "supersede",
+    "label": "supersede",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"impact review\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BRAIN-008",
+  "title": "Brand Intelligence",
+  "route": "/o/:org/brain/brand",
+  "contractActions": [
+   "Import guide",
+   "edit token",
+   "approve variant",
+   "set usage"
+  ],
+  "contractOverlays": [
+   "Brand rule editor",
+   "asset selector",
+   "impact preview"
+  ],
+  "edge": "Unapproved extraction must not silently overwrite approved design tokens",
+  "declared": [
+   {
+    "id": "Import guide",
+    "label": "Import guide",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void importBrandGuide(context)"
+   },
+   {
+    "id": "approve variant",
+    "label": "approve variant",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"impact preview\""
+   },
+   {
+    "id": "edit token",
+    "label": "edit token",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"impact preview\""
+   },
+   {
+    "id": "set usage",
+    "label": "set usage",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Brand rule editor\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BRAIN-009",
+  "title": "Knowledge Permissions",
+  "route": "/o/:org/brain/permissions",
+  "contractActions": [
+   "Adjust access",
+   "simulate retrieval",
+   "revoke grant",
+   "inspect usage"
+  ],
+  "contractOverlays": [
+   "Grant dialog",
+   "simulation report",
+   "revoke confirmation"
+  ],
+  "edge": "Revocation must invalidate downstream access and cached retrieval where feasible",
+  "declared": [
+   {
+    "id": "Adjust access",
+    "label": "Adjust access",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Grant dialog\""
+   },
+   {
+    "id": "simulate retrieval",
+    "label": "simulate retrieval",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"simulation report\""
+   },
+   {
+    "id": "revoke grant",
+    "label": "revoke grant",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"revoke confirmation\""
+   },
+   {
+    "id": "inspect usage",
+    "label": "inspect usage",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Activity\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-BRAIN-010",
+  "title": "Intake Centre",
+  "route": "/o/:org/brain/intake",
+  "contractActions": [
+   "Upload",
+   "retry safe step",
+   "approve extraction",
+   "route document"
+  ],
+  "contractOverlays": [
+   "File chooser",
+   "import review",
+   "unsupported format error"
+  ],
+  "edge": "Large malformed or adversarial files isolated and reported",
+  "declared": [
+   {
+    "id": "Upload",
+    "label": "Upload",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"File chooser\""
+   },
+   {
+    "id": "approve extraction",
+    "label": "approve extraction",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"import review\""
+   },
+   {
+    "id": "route document",
+    "label": "route document",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"import review\""
+   },
+   {
+    "id": "retry safe step",
+    "label": "retry safe step",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void retrySafeStep(context)"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-TEAM-001",
+  "title": "Workforce Home",
+  "route": "/o/:org/team/home",
+  "contractActions": [
+   "Hire AI employee",
+   "inspect issue",
+   "pause agent",
+   "view department"
+  ],
+  "contractOverlays": [
+   "Agent creation",
+   "quick profile",
+   "cost inspector"
+  ],
+  "edge": "Hidden computation must not be misreported as active human-like presence",
+  "declared": [
+   {
+    "id": "Hire AI employee",
+    "label": "Hire AI employee",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/team/agents/new`"
+   },
+   {
+    "id": "inspect issue",
+    "label": "inspect issue",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"quick profile\""
+   },
+   {
+    "id": "pause agent",
+    "label": "pause agent",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void pauseAgent(context)"
+   },
+   {
+    "id": "view department",
+    "label": "view department",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/team/organization`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-TEAM-002",
+  "title": "AI Employee Directory",
+  "route": "/o/:org/team/agents",
+  "contractActions": [
+   "Find agent",
+   "open profile",
+   "assign work",
+   "clone tested contract"
+  ],
+  "contractOverlays": [
+   "Agent quick view",
+   "assignment",
+   "archive confirmation"
+  ],
+  "edge": "Suspended agent excluded from tool execution and auto delegation",
+  "declared": [
+   {
+    "id": "open profile",
+    "label": "open profile",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/team/agents/${context.selectedId}`"
+   },
+   {
+    "id": "Find agent",
+    "label": "Find agent",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { document.querySelector('input[aria-label^=\"Filter\"]')?.focus(); }"
+   },
+   {
+    "id": "assign work",
+    "label": "assign work",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"assignment\""
+   },
+   {
+    "id": "clone tested contract",
+    "label": "clone tested contract",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void cloneContract(context)"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-TEAM-003",
+  "title": "Agent Profile",
+  "route": "/o/:org/team/agents/:id",
+  "contractActions": [
+   "Edit role",
+   "test",
+   "reassign",
+   "pause",
+   "open chat"
+  ],
+  "contractOverlays": [
+   "Role edit",
+   "permission inspector",
+   "test panel"
+  ],
+  "edge": "Permission change must invalidate stale grants for queued tasks",
+  "declared": [
+   {
+    "id": "Edit role",
+    "label": "Edit role",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Role edit\""
+   },
+   {
+    "id": "test",
+    "label": "test",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"test panel\""
+   },
+   {
+    "id": "open chat",
+    "label": "open chat",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/ai/agents/${context.params.id}/chat`"
+   },
+   {
+    "id": "reassign",
+    "label": "reassign",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"permission inspector\""
+   },
+   {
+    "id": "pause",
+    "label": "pause",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { context.select(context.params.id); void pauseAgent(context); }"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-TEAM-004",
+  "title": "Agent Builder",
+  "route": "/o/:org/team/agents/new",
+  "contractActions": [
+   "Generate contract",
+   "select templates",
+   "configure limits",
+   "test",
+   "activate"
+  ],
+  "contractOverlays": [
+   "Skill picker",
+   "connector grant",
+   "simulation",
+   "publish confirmation"
+  ],
+  "edge": "Agent cannot activate before evaluation and explicit external grants",
+  "declared": [
+   {
+    "id": "activate",
+    "label": "activate",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"publish confirmation\""
+   },
+   {
+    "id": "Generate contract",
+    "label": "Generate contract",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void generateContract(context)"
+   },
+   {
+    "id": "select templates",
+    "label": "select templates",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Skill picker\""
+   },
+   {
+    "id": "configure limits",
+    "label": "configure limits",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Autonomy\""
+   },
+   {
+    "id": "test",
+    "label": "test",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Test\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-TEAM-005",
+  "title": "Organization Chart",
+  "route": "/o/:org/team/organization",
+  "contractActions": [
+   "Reparent agent",
+   "create department",
+   "assign lead",
+   "filter"
+  ],
+  "contractOverlays": [
+   "Employee inspector",
+   "transfer approval",
+   "hierarchy impact"
+  ],
+  "edge": "Cross-entity reporting cannot grant cross-entity data rights",
+  "declared": [
+   {
+    "id": "Reparent agent",
+    "label": "Reparent agent",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"transfer approval\""
+   },
+   {
+    "id": "assign lead",
+    "label": "assign lead",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"hierarchy impact\""
+   },
+   {
+    "id": "create department",
+    "label": "create department",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/hq/departments`"
+   },
+   {
+    "id": "filter",
+    "label": "filter",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Directory\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-TEAM-006",
+  "title": "Skills Library",
+  "route": "/o/:org/team/skills",
+  "contractActions": [
+   "Search",
+   "install",
+   "edit",
+   "deprecate",
+   "compare versions"
+  ],
+  "contractOverlays": [
+   "Skill detail",
+   "install permission",
+   "compatibility test"
+  ],
+  "edge": "Untrusted skill bundles sandboxed and reviewed before runtime",
+  "declared": [
+   {
+    "id": "install",
+    "label": "install",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"install permission\""
+   },
+   {
+    "id": "Search",
+    "label": "Search",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { document.querySelector('input[aria-label^=\"Filter\"]')?.focus(); }"
+   },
+   {
+    "id": "edit",
+    "label": "edit",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Skill detail\""
+   },
+   {
+    "id": "compare versions",
+    "label": "compare versions",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"compatibility test\""
+   },
+   {
+    "id": "deprecate",
+    "label": "deprecate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void deprecateSkill(context)"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-TEAM-007",
+  "title": "Agent Academy",
+  "route": "/o/:org/team/academy",
+  "contractActions": [
+   "Upload SOP",
+   "demonstrate task",
+   "assign course",
+   "test"
+  ],
+  "contractOverlays": [
+   "Training asset upload",
+   "assessment builder",
+   "publishing review"
+  ],
+  "edge": "New knowledge remains proposed until validated and scoped",
+  "declared": [
+   {
+    "id": "Upload SOP",
+    "label": "Upload SOP",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Training asset upload\""
+   },
+   {
+    "id": "demonstrate task",
+    "label": "demonstrate task",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Training asset upload\""
+   },
+   {
+    "id": "assign course",
+    "label": "assign course",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"assessment builder\""
+   },
+   {
+    "id": "test",
+    "label": "test",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/team/evaluations`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-TEAM-008",
+  "title": "Evaluation Lab",
+  "route": "/o/:org/team/evaluations",
+  "contractActions": [
+   "Run evaluation",
+   "compare model",
+   "approve new version",
+   "rollback"
+  ],
+  "contractOverlays": [
+   "Scenario editor",
+   "detailed trace",
+   "promotion approval"
+  ],
+  "edge": "Model updates cannot silently lower required safety score",
+  "declared": [
+   {
+    "id": "Run evaluation",
+    "label": "Run evaluation",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Scenario editor\""
+   },
+   {
+    "id": "approve new version",
+    "label": "approve new version",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"promotion approval\""
+   },
+   {
+    "id": "compare model",
+    "label": "compare model",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void 0"
+   },
+   {
+    "id": "rollback",
+    "label": "rollback",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void runEvaluation(context)"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-TEAM-009",
+  "title": "Agent Performance",
+  "route": "/o/:org/team/performance",
+  "contractActions": [
+   "Compare agents",
+   "inspect failed task",
+   "coach",
+   "adjust resource policy"
+  ],
+  "contractOverlays": [
+   "Metric definition",
+   "incident trace",
+   "performance note"
+  ],
+  "edge": "No fabricated ROI or value-of-human-work estimates",
+  "declared": [
+   {
+    "id": "Compare agents",
+    "label": "Compare agents",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Departments\""
+   },
+   {
+    "id": "inspect failed task",
+    "label": "inspect failed task",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Quality\""
+   },
+   {
+    "id": "coach",
+    "label": "coach",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"performance note\""
+   },
+   {
+    "id": "adjust resource policy",
+    "label": "adjust resource policy",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/team/models`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-TEAM-010",
+  "title": "Model Routing",
+  "route": "/o/:org/team/models",
+  "contractActions": [
+   "Set role model",
+   "test fallback",
+   "restrict data",
+   "inspect spend"
+  ],
+  "contractOverlays": [
+   "Provider setup",
+   "routing simulator",
+   "policy warning"
+  ],
+  "edge": "Provider outage triggers safe fallback only if allowed by data policy",
+  "declared": [
+   {
+    "id": "Set role model",
+    "label": "Set role model",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Provider setup\""
+   },
+   {
+    "id": "test fallback",
+    "label": "test fallback",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"routing simulator\""
+   },
+   {
+    "id": "restrict data",
+    "label": "restrict data",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"policy warning\""
+   },
+   {
+    "id": "inspect spend",
+    "label": "inspect spend",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Budgets\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MISSION-001",
+  "title": "Mission Library",
+  "route": "/o/:org/mission/missions",
+  "contractActions": [
+   "Create mission",
+   "filter",
+   "bulk tag",
+   "open",
+   "duplicate plan"
+  ],
+  "contractOverlays": [
+   "Mission quick view",
+   "create mission",
+   "archive confirmation"
+  ],
+  "edge": "Archived missions remain auditable, not executable",
+  "declared": [
+   {
+    "id": "Create mission",
+    "label": "Create mission",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"create mission\""
+   },
+   {
+    "id": "open",
+    "label": "open",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/mission/missions/${context.selectedId}`"
+   },
+   {
+    "id": "filter",
+    "label": "filter",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { document.querySelector('input[aria-label^=\"Filter\"]')?.focus(); }"
+   },
+   {
+    "id": "duplicate plan",
+    "label": "duplicate plan",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void duplicatePlan(context)"
+   },
+   {
+    "id": "bulk tag",
+    "label": "bulk tag",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { __vite_ssr_import_8__.usePanelFlags.getState().set(\"mission.library.list\", true); context.toast(\"Select rows to tag\", \"Switch to the list"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MISSION-002",
+  "title": "Mission Creation",
+  "route": "/o/:org/mission/missions/new",
+  "contractActions": [
+   "Describe goal",
+   "attach records",
+   "revise plan",
+   "submit for approval"
+  ],
+  "contractOverlays": [
+   "Source picker",
+   "team selector",
+   "risk review",
+   "approval sheet"
+  ],
+  "edge": "Cannot authorize unknown target accounts or unbounded spend",
+  "declared": [
+   {
+    "id": "submit for approval",
+    "label": "submit for approval",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"approval sheet\""
+   },
+   {
+    "id": "Describe goal",
+    "label": "Describe goal",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Goal\""
+   },
+   {
+    "id": "attach records",
+    "label": "attach records",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Context\""
+   },
+   {
+    "id": "revise plan",
+    "label": "revise plan",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Plan\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MISSION-003",
+  "title": "Mission Overview",
+  "route": "/o/:org/mission/missions/:id",
+  "contractActions": [
+   "Pause",
+   "resume",
+   "cancel",
+   "ask status",
+   "approve next step"
+  ],
+  "contractOverlays": [
+   "Status explanation",
+   "pause dialog",
+   "amendment request"
+  ],
+  "edge": "Completed label requires verified criteria, not merely finished agent text",
+  "declared": [
+   {
+    "id": "approve next step",
+    "label": "approve next step",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void approveNextStep(context)"
+   },
+   {
+    "id": "ask status",
+    "label": "ask status",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Status explanation\""
+   },
+   {
+    "id": "Pause",
+    "label": "Pause",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"pause dialog\""
+   },
+   {
+    "id": "resume",
+    "label": "Resume",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void resumeMission(context)"
+   },
+   {
+    "id": "cancel",
+    "label": "Cancel the mission",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"cancel mission\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MISSION-004",
+  "title": "Plan & Dependencies",
+  "route": "/o/:org/mission/missions/:id/plan",
+  "contractActions": [
+   "Drag dependencies",
+   "edit task",
+   "add review",
+   "compare versions"
+  ],
+  "contractOverlays": [
+   "Task inspector",
+   "plan revision",
+   "scope change approval"
+  ],
+  "edge": "Cycle in task graph blocked; published plan version immutable",
+  "declared": [
+   {
+    "id": "Drag dependencies",
+    "label": "Edit dependencies",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Task inspector\""
+   },
+   {
+    "id": "edit task",
+    "label": "edit task",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Task inspector\""
+   },
+   {
+    "id": "add review",
+    "label": "add review",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"scope change approval\""
+   },
+   {
+    "id": "compare versions",
+    "label": "compare versions",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"plan revision\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MISSION-005",
+  "title": "Mission Task Board",
+  "route": "/o/:org/mission/missions/:id/tasks",
+  "contractActions": [
+   "Move card",
+   "delegate",
+   "attach evidence",
+   "reopen task"
+  ],
+  "contractOverlays": [
+   "Task detail",
+   "reassign",
+   "move impact"
+  ],
+  "edge": "Dragging card cannot bypass approval or execute irreversible action",
+  "declared": [
+   {
+    "id": "Move card",
+    "label": "Move card",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"move impact\""
+   },
+   {
+    "id": "delegate",
+    "label": "delegate",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"reassign\""
+   },
+   {
+    "id": "attach evidence",
+    "label": "attach evidence",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Task detail\""
+   },
+   {
+    "id": "reopen task",
+    "label": "reopen task",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void reopenTask(context)"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MISSION-006",
+  "title": "Execution Console",
+  "route": "/o/:org/mission/missions/:id/execution",
+  "contractActions": [
+   "Inspect receipt",
+   "retry safe task",
+   "stop",
+   "continue"
+  ],
+  "contractOverlays": [
+   "Action receipt",
+   "retry confirmation",
+   "execution trace"
+  ],
+  "edge": "Timeout with unknown side effect must reconcile before retry",
+  "declared": [
+   {
+    "id": "continue",
+    "label": "Run the next step",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "runs code: void runNextStep(context)"
+   },
+   {
+    "id": "Inspect receipt",
+    "label": "Inspect receipt",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Action receipt\""
+   },
+   {
+    "id": "retry safe task",
+    "label": "retry safe task",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"retry confirmation\""
+   },
+   {
+    "id": "stop",
+    "label": "stop",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void stopMission(context)"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MISSION-007",
+  "title": "Mission Team Room",
+  "route": "/o/:org/mission/missions/:id/team",
+  "contractActions": [
+   "Message",
+   "mention",
+   "request review",
+   "accept handoff"
+  ],
+  "contractOverlays": [
+   "Agent selector",
+   "handoff view",
+   "decision record"
+  ],
+  "edge": "Repeated circular debate halted and surfaced to coordinator",
+  "declared": [
+   {
+    "id": "Message",
+    "label": "Message",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Discussion\""
+   },
+   {
+    "id": "mention",
+    "label": "mention",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Agent selector\""
+   },
+   {
+    "id": "request review",
+    "label": "request review",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"handoff view\""
+   },
+   {
+    "id": "accept handoff",
+    "label": "accept handoff",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void acceptHandoff(context)"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MISSION-008",
+  "title": "Deliverables Library",
+  "route": "/o/:org/mission/missions/:id/deliverables",
+  "contractActions": [
+   "Open edit",
+   "compare",
+   "approve",
+   "export",
+   "share"
+  ],
+  "contractOverlays": [
+   "Artifact preview",
+   "approval",
+   "version diff",
+   "publish verification"
+  ],
+  "edge": "External published result is not undoable by editing the draft",
+  "declared": [
+   {
+    "id": "Open edit",
+    "label": "Open edit",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Artifact preview\""
+   },
+   {
+    "id": "approve",
+    "label": "approve",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"approval\""
+   },
+   {
+    "id": "compare",
+    "label": "compare",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"version diff\""
+   },
+   {
+    "id": "export",
+    "label": "export",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void exportDeliverable(context)"
+   },
+   {
+    "id": "share",
+    "label": "share",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"publish verification\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MISSION-009",
+  "title": "Mission Budget",
+  "route": "/o/:org/mission/missions/:id/budget",
+  "contractActions": [
+   "Approve adjustment",
+   "inspect cost",
+   "set alert",
+   "export"
+  ],
+  "contractOverlays": [
+   "Budget variance",
+   "limit increase approval",
+   "cost source"
+  ],
+  "edge": "Concurrent reservations atomic; prevent spending same headroom twice",
+  "declared": [
+   {
+    "id": "Approve adjustment",
+    "label": "Approve adjustment",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"limit increase approval\""
+   },
+   {
+    "id": "inspect cost",
+    "label": "inspect cost",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"cost source\""
+   },
+   {
+    "id": "set alert",
+    "label": "set alert",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"budget variance\""
+   },
+   {
+    "id": "export",
+    "label": "export",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void exportBudget(context)"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MISSION-010",
+  "title": "Mission Results",
+  "route": "/o/:org/mission/missions/:id/results",
+  "contractActions": [
+   "View evidence",
+   "issue report",
+   "create follow-up",
+   "close mission"
+  ],
+  "contractOverlays": [
+   "Source inspector",
+   "results approval",
+   "reopen"
+  ],
+  "edge": "No fabricated KPI uplift; causal claims flagged with limitations",
+  "declared": [
+   {
+    "id": "close mission",
+    "label": "close mission",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"results approval\""
+   },
+   {
+    "id": "View evidence",
+    "label": "View evidence",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Evidence\""
+   },
+   {
+    "id": "create follow-up",
+    "label": "create follow-up",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"reopen\""
+   },
+   {
+    "id": "issue report",
+    "label": "issue report",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void exportResults(context)"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-MISSION-011",
+  "title": "Mission Templates",
+  "route": "/o/:org/mission/templates",
+  "contractActions": [
+   "Create from",
+   "edit template",
+   "publish",
+   "simulate"
+  ],
+  "contractOverlays": [
+   "Template editor",
+   "example data",
+   "approval grant"
+  ],
+  "edge": "Templates never carry expired credentials or approvals forward",
+  "declared": [
+   {
+    "id": "Create from",
+    "label": "Create from",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"approval grant\""
+   },
+   {
+    "id": "edit template",
+    "label": "edit template",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Template editor\""
+   },
+   {
+    "id": "simulate",
+    "label": "simulate",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"example data\""
+   },
+   {
+    "id": "publish",
+    "label": "publish",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void publishTemplate(context)"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FIN-001",
+  "title": "Finance Overview",
+  "route": "/o/:org/fin/home",
+  "contractActions": [
+   "Inspect metric",
+   "issue report",
+   "start reconciliation",
+   "ask Finance"
+  ],
+  "contractOverlays": [
+   "Metric drilldown",
+   "reporting-period selector",
+   "correction proposal"
+  ],
+  "edge": "Unknown bank feed clearly marks balance unverified",
+  "declared": [
+   {
+    "id": "Inspect metric",
+    "label": "Inspect a figure",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Metric drilldown\""
+   },
+   {
+    "id": "start reconciliation",
+    "label": "Reconcile",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/fin/reconciliation`"
+   },
+   {
+    "id": "issue report",
+    "label": "Choose a period",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"reporting-period selector\""
+   },
+   {
+    "id": "ask Finance",
+    "label": "Ask Finance",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/ai/chat`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FIN-002",
+  "title": "Chart of Accounts",
+  "route": "/o/:org/fin/accounts",
+  "contractActions": [
+   "Create account",
+   "deactivate",
+   "map category",
+   "export"
+  ],
+  "contractOverlays": [
+   "Account editor",
+   "account history",
+   "deactivation impact"
+  ],
+  "edge": "Cannot delete account with posted journal entries",
+  "declared": [
+   {
+    "id": "Create account",
+    "label": "New account",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Account editor\""
+   },
+   {
+    "id": "deactivate",
+    "label": "Deactivate",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"deactivation impact\""
+   },
+   {
+    "id": "map category",
+    "label": "Categories posting here",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"account history\""
+   },
+   {
+    "id": "export",
+    "label": "Export the chart",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"account history\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FIN-003",
+  "title": "General Ledger",
+  "route": "/o/:org/fin/ledger",
+  "contractActions": [
+   "Post approved journal",
+   "inspect lines",
+   "reverse",
+   "search"
+  ],
+  "contractOverlays": [
+   "Journal form",
+   "balancing validator",
+   "reverse confirmation"
+  ],
+  "edge": "Post rejects unbalanced entries and locked accounting periods",
+  "declared": [
+   {
+    "id": "Post approved journal",
+    "label": "New journal",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Journal form\""
+   },
+   {
+    "id": "inspect lines",
+    "label": "Open the journal",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Journal form\""
+   },
+   {
+    "id": "reverse",
+    "label": "Reverse",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"reverse confirmation\""
+   },
+   {
+    "id": "search",
+    "label": "Search the ledger",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Entries\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FIN-004",
+  "title": "Invoice List",
+  "route": "/o/:org/fin/invoices",
+  "contractActions": [
+   "Create",
+   "filter",
+   "bulk reminders",
+   "export",
+   "open record"
+  ],
+  "contractOverlays": [
+   "New invoice",
+   "bulk action preview",
+   "reminder approval"
+  ],
+  "edge": "Duplicate outbound sends guarded by provider reconciliation",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New invoice",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"New invoice\""
+   },
+   {
+    "id": "open record",
+    "label": "Open",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/fin/invoices/${context.selectedId}`"
+   },
+   {
+    "id": "bulk reminders",
+    "label": "Draft reminders",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"reminder approval\""
+   },
+   {
+    "id": "filter",
+    "label": "Ageing report",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/fin/reports?tab=Statements`"
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"bulk action preview\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FIN-005",
+  "title": "Invoice Detail",
+  "route": "/o/:org/fin/invoices/:id",
+  "contractActions": [
+   "Edit draft",
+   "preview",
+   "approve",
+   "send",
+   "void",
+   "record payment"
+  ],
+  "contractOverlays": [
+   "Line item editor",
+   "email preview",
+   "payment form",
+   "void reason"
+  ],
+  "edge": "Sent invoices become versioned immutable records with correct adjustments",
+  "declared": [
+   {
+    "id": "approve",
+    "label": "Approve and post",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Line item editor\""
+   },
+   {
+    "id": "Edit draft",
+    "label": "Edit the lines",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Line item editor\""
+   },
+   {
+    "id": "preview",
+    "label": "Preview the document",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"email preview\""
+   },
+   {
+    "id": "record payment",
+    "label": "Record a payment",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"payment form\""
+   },
+   {
+    "id": "send",
+    "label": "Draft an email",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"email preview\""
+   },
+   {
+    "id": "void",
+    "label": "Void or credit",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"void reason\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FIN-006",
+  "title": "Bills & Payables",
+  "route": "/o/:org/fin/bills",
+  "contractActions": [
+   "Upload bill",
+   "match supplier",
+   "approve",
+   "schedule payment"
+  ],
+  "contractOverlays": [
+   "Bill capture",
+   "match inspector",
+   "payment authorization"
+  ],
+  "edge": "No AI bank-transfer authorization outside explicit mandate",
+  "declared": [
+   {
+    "id": "Upload bill",
+    "label": "Capture a bill",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Bill capture\""
+   },
+   {
+    "id": "match supplier",
+    "label": "Match",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"match inspector\""
+   },
+   {
+    "id": "approve",
+    "label": "Approve",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"match inspector\""
+   },
+   {
+    "id": "schedule payment",
+    "label": "Record a payment run",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"payment authorization\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FIN-007",
+  "title": "Expenses",
+  "route": "/o/:org/fin/expenses",
+  "contractActions": [
+   "Upload receipt",
+   "assign category",
+   "approve",
+   "reimburse"
+  ],
+  "contractOverlays": [
+   "Receipt capture",
+   "expense detail",
+   "approval chain"
+  ],
+  "edge": "Personal expense visibility and reimbursement limits enforced",
+  "declared": [
+   {
+    "id": "Upload receipt",
+    "label": "New claim",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Receipt capture\""
+   },
+   {
+    "id": "assign category",
+    "label": "Chart of accounts",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/fin/accounts`"
+   },
+   {
+    "id": "approve",
+    "label": "Open the claim",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"expense detail\""
+   },
+   {
+    "id": "reimburse",
+    "label": "Approval chain",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"approval chain\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FIN-008",
+  "title": "Banking & Feeds",
+  "route": "/o/:org/fin/banking",
+  "contractActions": [
+   "Connect account",
+   "import statement",
+   "inspect mismatch",
+   "reconcile"
+  ],
+  "contractOverlays": [
+   "Bank connection",
+   "CSV mapper",
+   "feed incident"
+  ],
+  "edge": "Feed disconnect does not silently mark transactions reconciled",
+  "declared": [
+   {
+    "id": "import statement",
+    "label": "Import a statement",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"CSV mapper\""
+   },
+   {
+    "id": "Connect account",
+    "label": "Connect a bank",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Bank connection\""
+   },
+   {
+    "id": "reconcile",
+    "label": "Reconcile",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/fin/reconciliation`"
+   },
+   {
+    "id": "inspect mismatch",
+    "label": "Feed incidents",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"feed incident\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FIN-009",
+  "title": "Bank Reconciliation",
+  "route": "/o/:org/fin/reconciliation",
+  "contractActions": [
+   "Match",
+   "split",
+   "create adjustment",
+   "confirm statement"
+  ],
+  "contractOverlays": [
+   "Match candidates",
+   "adjustment review",
+   "reconciliation approval"
+  ],
+  "edge": "Final reconciliation requires zero unexplained discrepancy",
+  "declared": [
+   {
+    "id": "confirm statement",
+    "label": "Confirm the statement",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"reconciliation approval\""
+   },
+   {
+    "id": "Match",
+    "label": "Match candidates",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Match candidates\""
+   },
+   {
+    "id": "create adjustment",
+    "label": "Create an adjustment",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"adjustment review\""
+   },
+   {
+    "id": "split",
+    "label": "Split a line",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"adjustment review\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FIN-010",
+  "title": "Budgets & Forecasts",
+  "route": "/o/:org/fin/budgets",
+  "contractActions": [
+   "Edit assumptions",
+   "compare scenarios",
+   "submit budget"
+  ],
+  "contractOverlays": [
+   "Model assumptions",
+   "revision history",
+   "budget approval"
+  ],
+  "edge": "Forecast estimates explicitly separate from posted actuals",
+  "declared": [
+   {
+    "id": "Edit assumptions",
+    "label": "Edit assumptions",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Model assumptions\""
+   },
+   {
+    "id": "submit budget",
+    "label": "Submit a budget",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"budget approval\""
+   },
+   {
+    "id": "compare scenarios",
+    "label": "Compare scenarios",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Scenarios\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FIN-011",
+  "title": "Tax & Compliance",
+  "route": "/o/:org/fin/tax",
+  "contractActions": [
+   "Prepare return",
+   "validate",
+   "review filing",
+   "export"
+  ],
+  "contractOverlays": [
+   "Tax configuration",
+   "return review",
+   "filing authorization"
+  ],
+  "edge": "No unsupported claim of HMRC/compliance certification or legal advice",
+  "declared": [
+   {
+    "id": "Prepare return",
+    "label": "Prepare a return",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"filing authorization\""
+   },
+   {
+    "id": "validate",
+    "label": "Validate",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"return review\""
+   },
+   {
+    "id": "review filing",
+    "label": "Code configuration",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Tax configuration\""
+   },
+   {
+    "id": "export",
+    "label": "Export the figures",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Returns\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FIN-012",
+  "title": "Financial Reports",
+  "route": "/o/:org/fin/reports",
+  "contractActions": [
+   "Build report",
+   "filter",
+   "drill down",
+   "export",
+   "schedule"
+  ],
+  "contractOverlays": [
+   "Report designer",
+   "source note",
+   "schedule"
+  ],
+  "edge": "Unposted data is not silently blended into audited statement",
+  "declared": [
+   {
+    "id": "Build report",
+    "label": "Build a report",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Custom\""
+   },
+   {
+    "id": "drill down",
+    "label": "Drill into an account",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"source note\""
+   },
+   {
+    "id": "filter",
+    "label": "Source note",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"source note\""
+   },
+   {
+    "id": "export",
+    "label": "Report designer",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Report designer\""
+   },
+   {
+    "id": "schedule",
+    "label": "Schedule",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"schedule\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-FIN-013",
+  "title": "Multi-Entity Finance",
+  "route": "/o/:org/fin/entities",
+  "contractActions": [
+   "Create consolidation",
+   "eliminate intercompany",
+   "inspect postings"
+  ],
+  "contractOverlays": [
+   "Entity config",
+   "consolidation preview",
+   "FX sources"
+  ],
+  "edge": "Consolidation avoids double counting and preserves entity boundaries",
+  "declared": [
+   {
+    "id": "Create consolidation",
+    "label": "Prepare a consolidation",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"consolidation preview\""
+   },
+   {
+    "id": "eliminate intercompany",
+    "label": "Intercompany",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Intercompany\""
+   },
+   {
+    "id": "inspect postings",
+    "label": "Inspect postings",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"consolidation preview\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CRM-001",
+  "title": "CRM Overview",
+  "route": "/o/:org/crm/home",
+  "contractActions": [
+   "Open deal",
+   "assign follow-up",
+   "ask Sales",
+   "inspect conversion"
+  ],
+  "contractOverlays": [
+   "Metric drilldown",
+   "new lead",
+   "insight card"
+  ],
+  "edge": "Revenue forecasts labeled as predictions not settled revenue",
+  "declared": [
+   {
+    "id": "Open deal",
+    "label": "Open the pipeline",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/crm/deals`"
+   },
+   {
+    "id": "assign follow-up",
+    "label": "New lead",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"new lead\""
+   },
+   {
+    "id": "inspect conversion",
+    "label": "Inspect a figure",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Metric drilldown\""
+   },
+   {
+    "id": "ask Sales",
+    "label": "Notes worth acting on",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"insight card\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CRM-002",
+  "title": "Contacts",
+  "route": "/o/:org/crm/contacts",
+  "contractActions": [
+   "Create",
+   "merge reviewed",
+   "tag",
+   "export",
+   "open"
+  ],
+  "contractOverlays": [
+   "Contact form",
+   "merge preview",
+   "bulk action confirmation"
+  ],
+  "edge": "Email consent and suppression flags survive deduplication",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New contact",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Contact form\""
+   },
+   {
+    "id": "open",
+    "label": "Open",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/crm/contacts/${context.selectedId}`"
+   },
+   {
+    "id": "merge reviewed",
+    "label": "Review duplicates",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Duplicates\""
+   },
+   {
+    "id": "tag",
+    "label": "Tag a selection",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"bulk action confirmation\""
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"bulk action confirmation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CRM-003",
+  "title": "Contact Profile",
+  "route": "/o/:org/crm/contacts/:id",
+  "contractActions": [
+   "Message",
+   "add note",
+   "schedule",
+   "attach record"
+  ],
+  "contractOverlays": [
+   "Compose message",
+   "activity composer",
+   "customer merge"
+  ],
+  "edge": "Restricted customer notes not shown across unrelated departments",
+  "declared": [
+   {
+    "id": "add note",
+    "label": "Log an activity",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"activity composer\""
+   },
+   {
+    "id": "Message",
+    "label": "Draft a message",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Compose message\""
+   },
+   {
+    "id": "schedule",
+    "label": "Schedule a meeting",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"activity composer\""
+   },
+   {
+    "id": "attach record",
+    "label": "Edit the contact",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Contact form\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CRM-004",
+  "title": "Companies",
+  "route": "/o/:org/crm/companies",
+  "contractActions": [
+   "Create account",
+   "link contact",
+   "search",
+   "export"
+  ],
+  "contractOverlays": [
+   "Account editor",
+   "relationship inspector",
+   "merge preview"
+  ],
+  "edge": "Company merge must preserve all source IDs and conflicts",
+  "declared": [
+   {
+    "id": "Create account",
+    "label": "New account",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Account editor\""
+   },
+   {
+    "id": "link contact",
+    "label": "Relationships",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"relationship inspector\""
+   },
+   {
+    "id": "search",
+    "label": "Merge two accounts",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"merge preview\""
+   },
+   {
+    "id": "export",
+    "label": "Campaign links",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"relationship inspector\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CRM-005",
+  "title": "Leads & Qualification",
+  "route": "/o/:org/crm/leads",
+  "contractActions": [
+   "Assign lead",
+   "qualify",
+   "convert",
+   "bulk route"
+  ],
+  "contractOverlays": [
+   "Qualification inspector",
+   "convert dialog",
+   "routing rules"
+  ],
+  "edge": "Lead routing respects owner availability and consent",
+  "declared": [
+   {
+    "id": "qualify",
+    "label": "Qualify",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Qualification inspector\""
+   },
+   {
+    "id": "convert",
+    "label": "Convert to a deal",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"convert dialog\""
+   },
+   {
+    "id": "Assign lead",
+    "label": "Routing and owners",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"routing rules\""
+   },
+   {
+    "id": "bulk route",
+    "label": "Routing rules",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"routing rules\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CRM-006",
+  "title": "Deals Pipeline",
+  "route": "/o/:org/crm/deals",
+  "contractActions": [
+   "Move stage",
+   "update amount",
+   "assign owner",
+   "create quote"
+  ],
+  "contractOverlays": [
+   "Deal drawer",
+   "stage change validation",
+   "lost reason"
+  ],
+  "edge": "Stage automation requires validation and cannot auto-close restricted deals",
+  "declared": [
+   {
+    "id": "Move stage",
+    "label": "Validate a stage change",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"stage change validation\""
+   },
+   {
+    "id": "update amount",
+    "label": "New deal",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Deal drawer\""
+   },
+   {
+    "id": "create quote",
+    "label": "Build a quote",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/crm/deals/${context.selectedId}?tab=Products`"
+   },
+   {
+    "id": "assign owner",
+    "label": "Close lost",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"lost reason\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CRM-007",
+  "title": "Deal Detail",
+  "route": "/o/:org/crm/deals/:id",
+  "contractActions": [
+   "Update stage",
+   "create proposal",
+   "request approval",
+   "close"
+  ],
+  "contractOverlays": [
+   "Quote builder",
+   "collaborator picker",
+   "closure confirmation"
+  ],
+  "edge": "Deal loss or win writes auditable state and downstream events",
+  "declared": [
+   {
+    "id": "close",
+    "label": "Close the deal",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"closure confirmation\""
+   },
+   {
+    "id": "Update stage",
+    "label": "Pipeline board",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/crm/deals`"
+   },
+   {
+    "id": "create proposal",
+    "label": "Quote builder",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Quote builder\""
+   },
+   {
+    "id": "request approval",
+    "label": "Request an approval",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"collaborator picker\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CRM-008",
+  "title": "Quotes & Proposals",
+  "route": "/o/:org/crm/quotes",
+  "contractActions": [
+   "Create",
+   "duplicate",
+   "edit",
+   "approve",
+   "send"
+  ],
+  "contractOverlays": [
+   "Quote editor",
+   "pricing policy",
+   "send preview"
+  ],
+  "edge": "Expired pricing cannot be sent as currently valid",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New quote",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Quote editor\""
+   },
+   {
+    "id": "edit",
+    "label": "Open",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Quote editor\""
+   },
+   {
+    "id": "send",
+    "label": "Send",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"send preview\""
+   },
+   {
+    "id": "approve",
+    "label": "Pricing policy",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"pricing policy\""
+   },
+   {
+    "id": "duplicate",
+    "label": "Duplicate for re-pricing",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Quote editor\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CRM-009",
+  "title": "Activities & Scheduling",
+  "route": "/o/:org/crm/activities",
+  "contractActions": [
+   "Log call",
+   "schedule meeting",
+   "add reminder",
+   "complete task"
+  ],
+  "contractOverlays": [
+   "Activity entry",
+   "calendar conflict",
+   "meeting composer"
+  ],
+  "edge": "Meeting invite not claimed sent until provider or native calendar confirms",
+  "declared": [
+   {
+    "id": "Log call",
+    "label": "Log an activity",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Activity entry\""
+   },
+   {
+    "id": "schedule meeting",
+    "label": "Schedule a meeting",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"meeting composer\""
+   },
+   {
+    "id": "add reminder",
+    "label": "Check for overlaps",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"calendar conflict\""
+   },
+   {
+    "id": "complete task",
+    "label": "Follow-ups",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Follow-ups\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CRM-010",
+  "title": "Sales Forecasts",
+  "route": "/o/:org/crm/forecasts",
+  "contractActions": [
+   "Adjust assumptions",
+   "drill down",
+   "export",
+   "review"
+  ],
+  "contractOverlays": [
+   "Forecast model",
+   "confidence explanation",
+   "override reason"
+  ],
+  "edge": "Double counting multi-product opportunities prevented",
+  "declared": [
+   {
+    "id": "Adjust assumptions",
+    "label": "Scenarios",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Scenarios\""
+   },
+   {
+    "id": "drill down",
+    "label": "Confidence",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"confidence explanation\""
+   },
+   {
+    "id": "review",
+    "label": "Override a weighting",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"override reason\""
+   },
+   {
+    "id": "export",
+    "label": "Method",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Forecast model\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CRM-011",
+  "title": "Sales Automation",
+  "route": "/o/:org/crm/automation",
+  "contractActions": [
+   "Create rule",
+   "simulate",
+   "activate",
+   "stop"
+  ],
+  "contractOverlays": [
+   "Workflow designer",
+   "test data",
+   "activation approval"
+  ],
+  "edge": "No automated outreach to suppressed/unconsenting contacts",
+  "declared": [
+   {
+    "id": "Create rule",
+    "label": "New rule",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Workflow designer\""
+   },
+   {
+    "id": "simulate",
+    "label": "Simulate",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"test data\""
+   },
+   {
+    "id": "activate",
+    "label": "Activate",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"activation approval\""
+   },
+   {
+    "id": "stop",
+    "label": "Failures",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Failures\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AUTO-001",
+  "title": "Automation Library",
+  "route": "/o/:org/auto/workflows",
+  "contractActions": [
+   "Create",
+   "duplicate",
+   "activate",
+   "pause",
+   "archive"
+  ],
+  "contractOverlays": [
+   "Workflow quick view",
+   "activation review",
+   "archive"
+  ],
+  "edge": "Copy never includes stale credentials or approval grants",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New automation",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Create workflow\""
+   },
+   {
+    "id": "duplicate",
+    "label": "Duplicate",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"duplicate copy\""
+   },
+   {
+    "id": "activate",
+    "label": "Activation review",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"activation review\""
+   },
+   {
+    "id": "pause",
+    "label": "Pause",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.selectedId; if (!id) return; await context.mutate.patch(id, { status: \"paused\" }, { event: \"Automation paused from the"
+   },
+   {
+    "id": "archive",
+    "label": "Archive",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"archive\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AUTO-002",
+  "title": "Visual Workflow Builder",
+  "route": "/o/:org/auto/workflows/:id",
+  "contractActions": [
+   "Drag node",
+   "connect",
+   "configure",
+   "validate",
+   "save"
+  ],
+  "contractOverlays": [
+   "Node picker",
+   "connector grants",
+   "branch editor"
+  ],
+  "edge": "Graph cycles or unbounded loops require limit/validation",
+  "declared": [
+   {
+    "id": "Drag node",
+    "label": "Add node",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Node picker\""
+   },
+   {
+    "id": "connect",
+    "label": "Connect",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"branch editor\""
+   },
+   {
+    "id": "configure",
+    "label": "Configure a node",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"node configuration\""
+   },
+   {
+    "id": "validate",
+    "label": "Validate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const draft = (0,__vite_ssr_import_12__.getDraft)(context.params.id ?? \"\"); if (!draft) { context.toast(\"Nothing to validate\", \"Open an a"
+   },
+   {
+    "id": "save",
+    "label": "Save graph",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const draft = (0,__vite_ssr_import_12__.getDraft)(context.params.id ?? \"\"); if (!draft) return; const saved = await context.mutate.patch("
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AUTO-003",
+  "title": "Trigger Configuration",
+  "route": "/o/:org/auto/workflows/:id/triggers",
+  "contractActions": [
+   "Select trigger",
+   "set timezone",
+   "test",
+   "activate"
+  ],
+  "contractOverlays": [
+   "Webhook setup",
+   "schedule recurrence",
+   "sample inspection"
+  ],
+  "edge": "Duplicate and out-of-order event delivery handled",
+  "declared": [
+   {
+    "id": "Select trigger",
+    "label": "Select trigger",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"trigger selection\""
+   },
+   {
+    "id": "set timezone",
+    "label": "Recurrence",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"schedule recurrence\""
+   },
+   {
+    "id": "test",
+    "label": "Record a test delivery",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Webhook setup\""
+   },
+   {
+    "id": "activate",
+    "label": "Activate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.params.id; if (!id) return; const draft = (0,__vite_ssr_import_12__.getDraft)(id); if (draft) { const errors = (0,__vi"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AUTO-004",
+  "title": "Action & AI Nodes",
+  "route": "/o/:org/auto/workflows/:id/actions",
+  "contractActions": [
+   "Map fields",
+   "add capability",
+   "set retries",
+   "inspect permission"
+  ],
+  "contractOverlays": [
+   "Action parameter",
+   "policy simulation",
+   "variable selector"
+  ],
+  "edge": "High-impact action cannot execute on test data accidentally",
+  "declared": [
+   {
+    "id": "Map fields",
+    "label": "Map fields",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Action parameter\""
+   },
+   {
+    "id": "add capability",
+    "label": "Capability",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"policy simulation\""
+   },
+   {
+    "id": "set retries",
+    "label": "Retries",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Action parameter\""
+   },
+   {
+    "id": "inspect permission",
+    "label": "Inspect permission",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"policy simulation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AUTO-005",
+  "title": "Workflow Testing",
+  "route": "/o/:org/auto/workflows/:id/test",
+  "contractActions": [
+   "Run dry-run",
+   "inspect",
+   "compare",
+   "approve"
+  ],
+  "contractOverlays": [
+   "Fixture editor",
+   "assertion builder",
+   "simulated receipt"
+  ],
+  "edge": "Test mode must not send real email or transfer funds",
+  "declared": [
+   {
+    "id": "Run dry-run",
+    "label": "Fixture",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Fixture editor\""
+   },
+   {
+    "id": "inspect",
+    "label": "Step receipt",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"simulated receipt\""
+   },
+   {
+    "id": "compare",
+    "label": "Compare runs",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"run comparison\""
+   },
+   {
+    "id": "approve",
+    "label": "Assertions",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"assertion builder\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AUTO-006",
+  "title": "Run History",
+  "route": "/o/:org/auto/runs",
+  "contractActions": [
+   "Open trace",
+   "retry safe step",
+   "cancel"
+  ],
+  "contractOverlays": [
+   "Run inspector",
+   "retry safety check",
+   "incident link"
+  ],
+  "edge": "Unknown side effect reconciled before retry",
+  "declared": [
+   {
+    "id": "Open trace",
+    "label": "Open trace",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/auto/runs/${context.selectedId}`"
+   },
+   {
+    "id": "retry safe step",
+    "label": "Retry safely",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"retry safety check\""
+   },
+   {
+    "id": "cancel",
+    "label": "Cancel",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.selectedId; if (!id) return; await context.mutate.patch(id, { status: \"cancelled\", summary: \"Cancelled by hand. The st"
+   },
+   {
+    "id": "incident",
+    "label": "Raise an exception",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"incident link\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AUTO-007",
+  "title": "Workflow Run Detail",
+  "route": "/o/:org/auto/runs/:id",
+  "contractActions": [
+   "Inspect node",
+   "replay safe path",
+   "export"
+  ],
+  "contractOverlays": [
+   "Node trace",
+   "redaction",
+   "replay confirmation"
+  ],
+  "edge": "Sensitive tool payloads redacted from unauthorized viewers",
+  "declared": [
+   {
+    "id": "Inspect node",
+    "label": "Inspect a node",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Node trace\""
+   },
+   {
+    "id": "replay safe path",
+    "label": "Replay",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"replay confirmation\""
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"export run\""
+   },
+   {
+    "id": "redaction",
+    "label": "What is redacted",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"redaction\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AUTO-008",
+  "title": "Schedules & Queues",
+  "route": "/o/:org/auto/schedules",
+  "contractActions": [
+   "Reschedule",
+   "pause",
+   "change concurrency",
+   "inspect"
+  ],
+  "contractOverlays": [
+   "Schedule editor",
+   "queue priority",
+   "impact warning"
+  ],
+  "edge": "Daylight-saving and duplicate schedule firings handled",
+  "declared": [
+   {
+    "id": "Reschedule",
+    "label": "Reschedule",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Schedule editor\""
+   },
+   {
+    "id": "pause",
+    "label": "Pause a schedule",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.selectedId; if (!id) return; await context.mutate.patch(id, { fields: { schedulePaused: true } }, { event: \"Schedule p"
+   },
+   {
+    "id": "change concurrency",
+    "label": "Concurrency",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"queue priority\""
+   },
+   {
+    "id": "inspect",
+    "label": "Impact",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"impact warning\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-AUTO-009",
+  "title": "Automation Exceptions",
+  "route": "/o/:org/auto/exceptions",
+  "contractActions": [
+   "Assign",
+   "retry",
+   "fix connection",
+   "close"
+  ],
+  "contractOverlays": [
+   "Incident detail",
+   "connector reconnect",
+   "resolution record"
+  ],
+  "edge": "No false resolved status while provider unverified",
+  "declared": [
+   {
+    "id": "Assign",
+    "label": "Assign",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"assign exception\""
+   },
+   {
+    "id": "retry",
+    "label": "Retry",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"retry from exception\""
+   },
+   {
+    "id": "fix connection",
+    "label": "Fix the connection",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"connector reconnect\""
+   },
+   {
+    "id": "close",
+    "label": "Record a resolution",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"resolution record\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ANALYTICS-001",
+  "title": "Insights Overview",
+  "route": "/o/:org/analytics/home",
+  "contractActions": [
+   "Ask question",
+   "inspect source",
+   "save view",
+   "delegate investigation"
+  ],
+  "contractOverlays": [
+   "Metric inspector",
+   "insight detail",
+   "data freshness"
+  ],
+  "edge": "Missing datasets shown with connection instructions",
+  "declared": [
+   {
+    "id": "Ask question",
+    "label": "Ask a question",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"AI\""
+   },
+   {
+    "id": "inspect source",
+    "label": "Inspect a figure",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Metric inspector\""
+   },
+   {
+    "id": "save view",
+    "label": "Save this view",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"save view\""
+   },
+   {
+    "id": "delegate investigation",
+    "label": "Delegate an investigation",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"delegate investigation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ANALYTICS-002",
+  "title": "Dashboard Directory",
+  "route": "/o/:org/analytics/dashboards",
+  "contractActions": [
+   "Create",
+   "open",
+   "pin",
+   "share",
+   "archive"
+  ],
+  "contractOverlays": [
+   "Dashboard setup",
+   "sharing",
+   "source dependency"
+  ],
+  "edge": "Sensitive metrics not leaked through thumbnail previews",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "New dashboard",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Dashboard setup\""
+   },
+   {
+    "id": "open",
+    "label": "Open",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/analytics/dashboards/${context.selectedId}`"
+   },
+   {
+    "id": "pin",
+    "label": "Pin",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const record = context.selectedId ? await __vite_ssr_import_4__.db.records.get(context.selectedId) : void 0; if (!record) return; await c"
+   },
+   {
+    "id": "share",
+    "label": "Share",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"sharing\""
+   },
+   {
+    "id": "archive",
+    "label": "Archive",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { if (!context.selectedId) return; await context.mutate.patch(context.selectedId, { status: \"archived\" }, { event: \"Dashboard archived\" });"
+   },
+   {
+    "id": "dependencies",
+    "label": "Source dependencies",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"source dependency\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ANALYTICS-003",
+  "title": "Dashboard Editor",
+  "route": "/o/:org/analytics/dashboards/:id",
+  "contractActions": [
+   "Drag widget",
+   "resize",
+   "set filter",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Widget chooser",
+   "query editor",
+   "share"
+  ],
+  "edge": "Cross-widget filters use consistent semantic types",
+  "declared": [
+   {
+    "id": "Drag widget",
+    "label": "Add a tile",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Widget chooser\""
+   },
+   {
+    "id": "resize",
+    "label": "Sizes",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Style\""
+   },
+   {
+    "id": "set filter",
+    "label": "Filters",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Data\""
+   },
+   {
+    "id": "publish",
+    "label": "Publish",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const record = context.params.id ? await __vite_ssr_import_4__.db.records.get(context.params.id) : void 0; if (!record) return; const til"
+   },
+   {
+    "id": "export",
+    "label": "Export the figures",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "runs code: { const record = context.params.id ? await __vite_ssr_import_4__.db.records.get(context.params.id) : void 0; if (!record) return; const bod"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ANALYTICS-004",
+  "title": "Report Builder",
+  "route": "/o/:org/analytics/reports/:id",
+  "contractActions": [
+   "Create report",
+   "add chart",
+   "cite",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Report block",
+   "schedule",
+   "source inspection"
+  ],
+  "edge": "Report not presented finalized with stale/dropped sources",
+  "declared": [
+   {
+    "id": "Create report",
+    "label": "New report",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"create report\""
+   },
+   {
+    "id": "add chart",
+    "label": "Add a block",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Report block\""
+   },
+   {
+    "id": "cite",
+    "label": "Check the citations",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"source inspection\""
+   },
+   {
+    "id": "publish",
+    "label": "Publish",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const record = context.params.id ? await __vite_ssr_import_4__.db.records.get(context.params.id) : void 0; if (!record || record.collecti"
+   },
+   {
+    "id": "export",
+    "label": "Export the figures",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "runs code: { const record = context.params.id ? await __vite_ssr_import_4__.db.records.get(context.params.id) : void 0; if (!record || record.collecti"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ANALYTICS-005",
+  "title": "Dataset Catalogue",
+  "route": "/o/:org/analytics/datasets",
+  "contractActions": [
+   "Browse",
+   "document",
+   "grant",
+   "refresh",
+   "retire"
+  ],
+  "contractOverlays": [
+   "Dataset details",
+   "grant review",
+   "quality"
+  ],
+  "edge": "Dataset owner and privacy constraints respected",
+  "declared": [
+   {
+    "id": "Browse",
+    "label": "Browse",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Dataset details\""
+   },
+   {
+    "id": "document",
+    "label": "Document",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"document dataset\""
+   },
+   {
+    "id": "grant",
+    "label": "Access",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"grant review\""
+   },
+   {
+    "id": "refresh",
+    "label": "Refresh",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"quality\""
+   },
+   {
+    "id": "retire",
+    "label": "Retire",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const collection = context.selectedId; if (!collection) return; const existing = (await __vite_ssr_import_4__.db.records.where(\"organizat"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ANALYTICS-006",
+  "title": "Metric Definitions",
+  "route": "/o/:org/analytics/metrics",
+  "contractActions": [
+   "Define measure",
+   "test",
+   "approve",
+   "compare"
+  ],
+  "contractOverlays": [
+   "Formula editor",
+   "impact review",
+   "metric QA"
+  ],
+  "edge": "Changing a metric versions historical dashboard meaning",
+  "declared": [
+   {
+    "id": "Define measure",
+    "label": "Define a measure",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Formula editor\""
+   },
+   {
+    "id": "test",
+    "label": "Validation",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Validation\""
+   },
+   {
+    "id": "approve",
+    "label": "Impact review",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"impact review\""
+   },
+   {
+    "id": "compare",
+    "label": "Lineage",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"metric QA\""
+   },
+   {
+    "id": "export",
+    "label": "Export the catalogue",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "runs code: { const rows = (0,__vite_ssr_import_9__.allMeasures)().map((measure) => [measure.name, measure.id, measure.collection, measure.unit, `v${me"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ANALYTICS-007",
+  "title": "Data Modelling",
+  "route": "/o/:org/analytics/models",
+  "contractActions": [
+   "Add relation",
+   "validate",
+   "refresh",
+   "deploy"
+  ],
+  "contractOverlays": [
+   "Join properties",
+   "transform editor",
+   "test"
+  ],
+  "edge": "Fan-out joins cannot inflate totals silently",
+  "declared": [
+   {
+    "id": "Add relation",
+    "label": "Add a relation",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"transform editor\""
+   },
+   {
+    "id": "validate",
+    "label": "Run the tests",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Tests\""
+   },
+   {
+    "id": "refresh",
+    "label": "Join properties",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Join properties\""
+   },
+   {
+    "id": "deploy",
+    "label": "Deploy",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"test\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ANALYTICS-008",
+  "title": "Forecasts & Scenarios",
+  "route": "/o/:org/analytics/forecasts",
+  "contractActions": [
+   "Adjust inputs",
+   "compare",
+   "save",
+   "request review"
+  ],
+  "contractOverlays": [
+   "Assumption inspector",
+   "scenario editor",
+   "confidence note"
+  ],
+  "edge": "Forecast never silently replaces posted actual",
+  "declared": [
+   {
+    "id": "Adjust inputs",
+    "label": "Inputs",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Inputs\""
+   },
+   {
+    "id": "compare",
+    "label": "Scenarios",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Scenarios\""
+   },
+   {
+    "id": "save",
+    "label": "Save a scenario",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"scenario editor\""
+   },
+   {
+    "id": "request review",
+    "label": "Request a review",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { await context.mutate.create({ collection: \"tasks\", title: \"Review the revenue projection\", status: \"ready\", summary: \"The projection is a"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ANALYTICS-009",
+  "title": "Reports & Distribution",
+  "route": "/o/:org/analytics/distribution",
+  "contractActions": [
+   "Schedule",
+   "test",
+   "pause",
+   "resend safely"
+  ],
+  "contractOverlays": [
+   "Recipient preview",
+   "delivery method",
+   "failure detail"
+  ],
+  "edge": "Unauthorized recipients blocked; send deduplication enforced",
+  "declared": [
+   {
+    "id": "Schedule",
+    "label": "Schedule",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"schedule\""
+   },
+   {
+    "id": "test",
+    "label": "Prepare a delivery",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Recipient preview\""
+   },
+   {
+    "id": "pause",
+    "label": "Pause",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const record = context.selectedId ? await __vite_ssr_import_4__.db.records.get(context.selectedId) : void 0; if (!record) return; const p"
+   },
+   {
+    "id": "resend safely",
+    "label": "Resend safely",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const record = context.selectedId ? await __vite_ssr_import_4__.db.records.get(context.selectedId) : void 0; if (!record || record.collec"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-INBOX-001",
+  "title": "Unified Inbox",
+  "route": "/o/:org/inbox/inbox",
+  "contractActions": [
+   "Open record",
+   "mark read",
+   "snooze",
+   "assign",
+   "bulk triage"
+  ],
+  "contractOverlays": [
+   "Notification detail",
+   "snooze picker",
+   "action preview"
+  ],
+  "edge": "Read does not equal approve or resolve",
+  "declared": [
+   {
+    "id": "Open record",
+    "label": "Open record",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: openItem(context, (0,__vite_ssr_import_10__.busItem)(context.selectedId))"
+   },
+   {
+    "id": "mark read",
+    "label": "Mark read",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const item = (0,__vite_ssr_import_10__.busItem)(context.selectedId); if (!item) return; await (0,__vite_ssr_import_10__.writeTriage)(cont"
+   },
+   {
+    "id": "snooze",
+    "label": "Snooze",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"snooze picker\""
+   },
+   {
+    "id": "assign",
+    "label": "Assign",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const item = (0,__vite_ssr_import_10__.busItem)(context.selectedId); if (!item) return; await (0,__vite_ssr_import_10__.writeTriage)(cont"
+   },
+   {
+    "id": "bulk triage",
+    "label": "Bulk triage",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"action preview\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-INBOX-002",
+  "title": "Approvals",
+  "route": "/o/:org/inbox/approvals",
+  "contractActions": [
+   "Review",
+   "approve",
+   "deny",
+   "ask changes",
+   "delegate"
+  ],
+  "contractOverlays": [
+   "Approval review",
+   "step-up auth",
+   "scope diff"
+  ],
+  "edge": "Approval bound to exact action/plan version",
+  "declared": [
+   {
+    "id": "Review",
+    "label": "Review",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Approval review\""
+   },
+   {
+    "id": "approve",
+    "label": "Approve",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"step-up auth\""
+   },
+   {
+    "id": "deny",
+    "label": "Deny",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Approval review\""
+   },
+   {
+    "id": "ask changes",
+    "label": "Ask for changes",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Approval review\""
+   },
+   {
+    "id": "delegate",
+    "label": "Delegate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/inbox/escalations`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-INBOX-003",
+  "title": "Messages Inbox",
+  "route": "/o/:org/inbox/messages",
+  "contractActions": [
+   "Reply",
+   "open thread",
+   "assign",
+   "convert to task"
+  ],
+  "contractOverlays": [
+   "Message inspector",
+   "reassignment",
+   "mute"
+  ],
+  "edge": "Message routing honors restricted channel access",
+  "declared": [
+   {
+    "id": "Reply",
+    "label": "Reply",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Message inspector\""
+   },
+   {
+    "id": "open thread",
+    "label": "Open thread",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/comms/channels`"
+   },
+   {
+    "id": "assign",
+    "label": "Assign",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"reassignment\""
+   },
+   {
+    "id": "convert to task",
+    "label": "Convert to task",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Message inspector\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-INBOX-004",
+  "title": "Notifications Feed",
+  "route": "/o/:org/inbox/notifications",
+  "contractActions": [
+   "Filter",
+   "follow source",
+   "clear read",
+   "open deep-link"
+  ],
+  "contractOverlays": [
+   "Event detail",
+   "grouped items",
+   "preference quick view"
+  ],
+  "edge": "Broken deep-link shows safe record unavailable page",
+  "declared": [
+   {
+    "id": "Filter",
+    "label": "Preferences",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"preference quick view\""
+   },
+   {
+    "id": "follow source",
+    "label": "Follow a source",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"grouped items\""
+   },
+   {
+    "id": "clear read",
+    "label": "Clear read items",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"action preview\""
+   },
+   {
+    "id": "open deep-link",
+    "label": "Open deep link",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: openItem(context, (0,__vite_ssr_import_10__.busItem)(context.selectedId))"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-INBOX-005",
+  "title": "Incident Alerts",
+  "route": "/o/:org/inbox/incidents",
+  "contractActions": [
+   "Acknowledge",
+   "assign",
+   "inspect impact",
+   "escalate"
+  ],
+  "contractOverlays": [
+   "Incident summary",
+   "owner handoff",
+   "emergency pause"
+  ],
+  "edge": "Platform critical alert delivery respects OS authorization",
+  "declared": [
+   {
+    "id": "Acknowledge",
+    "label": "Acknowledge",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Incident summary\""
+   },
+   {
+    "id": "assign",
+    "label": "Hand over",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"owner handoff\""
+   },
+   {
+    "id": "inspect impact",
+    "label": "Inspect impact",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Incident summary\""
+   },
+   {
+    "id": "escalate",
+    "label": "Emergency pause",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"emergency pause\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-INBOX-006",
+  "title": "Notification Preferences",
+  "route": "/o/:org/inbox/settings",
+  "contractActions": [
+   "Toggle",
+   "test preview",
+   "set digest",
+   "mute mission"
+  ],
+  "contractOverlays": [
+   "Delivery test",
+   "quiet-hour rules",
+   "exception explanation"
+  ],
+  "edge": "Security escalation policy independent from casual muting",
+  "declared": [
+   {
+    "id": "Toggle",
+    "label": "Test a channel",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Delivery test\""
+   },
+   {
+    "id": "test preview",
+    "label": "Delivery test",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Delivery test\""
+   },
+   {
+    "id": "set digest",
+    "label": "Digests",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/inbox/digests`"
+   },
+   {
+    "id": "mute mission",
+    "label": "Mute mission updates",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { await context.mutate.create({ collection: \"preferences\", title: \"Mission updates muted\", status: \"active\", summary: \"Routine mission prog"
+   },
+   {
+    "id": "quiet hours",
+    "label": "Add quiet hours",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"quiet-hour rules\""
+   },
+   {
+    "id": "exceptions",
+    "label": "Why some items still arrive",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"exception explanation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-INBOX-007",
+  "title": "Digest Centre",
+  "route": "/o/:org/inbox/digests",
+  "contractActions": [
+   "Schedule",
+   "preview",
+   "export",
+   "send test"
+  ],
+  "contractOverlays": [
+   "Digest editor",
+   "audience",
+   "schedule"
+  ],
+  "edge": "No fabricated action count or stale financial totals",
+  "declared": [
+   {
+    "id": "preview",
+    "label": "Preview",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"digest preview\""
+   },
+   {
+    "id": "Schedule",
+    "label": "Schedule",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"schedule\""
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"digest preview\""
+   },
+   {
+    "id": "send test",
+    "label": "Send a test",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { await context.mutate.log(\"Digest test requested. No mail provider is connected, so the brief was kept as a local draft.\", { type: \"digest"
+   },
+   {
+    "id": "audience",
+    "label": "Audience",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"audience\""
+   },
+   {
+    "id": "new digest",
+    "label": "New digest",
+    "placement": "secondary",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"Digest editor\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-INBOX-008",
+  "title": "Escalations & Delegation",
+  "route": "/o/:org/inbox/escalations",
+  "contractActions": [
+   "Assign backup",
+   "set condition",
+   "simulate",
+   "revoke"
+  ],
+  "contractOverlays": [
+   "Delegation grant",
+   "simulation",
+   "escalation conflict"
+  ],
+  "edge": "Delegated user never exceeds approval authority",
+  "declared": [
+   {
+    "id": "Assign backup",
+    "label": "Assign backup",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Delegation grant\""
+   },
+   {
+    "id": "set condition",
+    "label": "Edit rule",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Delegation grant\""
+   },
+   {
+    "id": "simulate",
+    "label": "Simulate cover",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"simulation\""
+   },
+   {
+    "id": "revoke",
+    "label": "Revoke",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"escalation conflict\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ADMIN-001",
+  "title": "Organization Settings",
+  "route": "/o/:org/admin/organization",
+  "contractActions": [
+   "Edit profile",
+   "configure entity",
+   "verify domain"
+  ],
+  "contractOverlays": [
+   "Identity form",
+   "region change impact",
+   "domain verify"
+  ],
+  "edge": "Org legal identity changes require higher trust checks",
+  "declared": [
+   {
+    "id": "Edit profile",
+    "label": "Edit profile",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Identity form\""
+   },
+   {
+    "id": "configure entity",
+    "label": "Legal entities",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/hq/locations`"
+   },
+   {
+    "id": "verify domain",
+    "label": "Verify a domain",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"domain verify\""
+   },
+   {
+    "id": "business hours",
+    "label": "Set business hours",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"business hours\""
+   },
+   {
+    "id": "region",
+    "label": "Regional impact",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"region change impact\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ADMIN-002",
+  "title": "Members & Invitations",
+  "route": "/o/:org/admin/members",
+  "contractActions": [
+   "Invite",
+   "suspend",
+   "role change",
+   "revoke",
+   "export"
+  ],
+  "contractOverlays": [
+   "Invite wizard",
+   "role impact",
+   "revoke confirmation"
+  ],
+  "edge": "Offboard revokes sessions and relevant grants",
+  "declared": [
+   {
+    "id": "Invite",
+    "label": "Invite",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Invite wizard\""
+   },
+   {
+    "id": "role change",
+    "label": "Change role view",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"role impact\""
+   },
+   {
+    "id": "suspend",
+    "label": "Suspend",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"revoke confirmation\""
+   },
+   {
+    "id": "revoke",
+    "label": "Offboard",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"revoke confirmation\""
+   },
+   {
+    "id": "export",
+    "label": "Export the member list",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Members\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ADMIN-003",
+  "title": "Roles & Permissions",
+  "route": "/o/:org/admin/roles",
+  "contractActions": [
+   "Create role",
+   "compare",
+   "simulate",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Policy editor",
+   "effective rights",
+   "impact review"
+  ],
+  "edge": "Deny precedence and tenant boundaries enforced server-side",
+  "declared": [
+   {
+    "id": "Create role",
+    "label": "Create role",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Policy editor\""
+   },
+   {
+    "id": "compare",
+    "label": "Compare two views",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"effective rights\""
+   },
+   {
+    "id": "simulate",
+    "label": "Try a decision",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"impact review\""
+   },
+   {
+    "id": "publish",
+    "label": "Publish a draft",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"impact review\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ADMIN-004",
+  "title": "Autonomy Centre",
+  "route": "/o/:org/admin/autonomy",
+  "contractActions": [
+   "Set grant",
+   "cap action",
+   "suspend",
+   "test permission"
+  ],
+  "contractOverlays": [
+   "Grant editor",
+   "action simulator",
+   "revoke confirmation"
+  ],
+  "edge": "No unrestricted global autonomy toggle bypasses guardrails",
+  "declared": [
+   {
+    "id": "Set grant",
+    "label": "Set grant",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Grant editor\""
+   },
+   {
+    "id": "test permission",
+    "label": "Test a permission",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"action simulator\""
+   },
+   {
+    "id": "cap action",
+    "label": "Cap an action",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Grant editor\""
+   },
+   {
+    "id": "suspend",
+    "label": "Pause automation",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"revoke confirmation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ADMIN-005",
+  "title": "Budget & AI Usage",
+  "route": "/o/:org/admin/budgets",
+  "contractActions": [
+   "Set quota",
+   "approve increase",
+   "allocate",
+   "inspect"
+  ],
+  "contractOverlays": [
+   "Spend limit",
+   "cost allocation",
+   "budget warning"
+  ],
+  "edge": "Reservations atomic; provider spend lag disclosed",
+  "declared": [
+   {
+    "id": "Set quota",
+    "label": "Set quota",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Spend limit\""
+   },
+   {
+    "id": "inspect",
+    "label": "Inspect headroom",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"budget warning\""
+   },
+   {
+    "id": "allocate",
+    "label": "Allocate to a department",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"cost allocation\""
+   },
+   {
+    "id": "approve increase",
+    "label": "Request an increase",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"budget warning\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ADMIN-006",
+  "title": "Security & Sessions",
+  "route": "/o/:org/admin/security",
+  "contractActions": [
+   "Configure SSO",
+   "revoke",
+   "require MFA",
+   "export"
+  ],
+  "contractOverlays": [
+   "Provider setup",
+   "emergency revoke",
+   "security review"
+  ],
+  "edge": "Sensitive changes require step-up auth and audit",
+  "declared": [
+   {
+    "id": "Configure SSO",
+    "label": "Configure SSO",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Provider setup\""
+   },
+   {
+    "id": "revoke",
+    "label": "Revoke sessions",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"emergency revoke\""
+   },
+   {
+    "id": "require MFA",
+    "label": "Require a second factor",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"security review\""
+   },
+   {
+    "id": "export",
+    "label": "Export sessions",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"security review\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ADMIN-007",
+  "title": "Audit Trail",
+  "route": "/o/:org/admin/audit",
+  "contractActions": [
+   "Filter",
+   "inspect receipt",
+   "export",
+   "retention"
+  ],
+  "contractOverlays": [
+   "Audit detail",
+   "export authorization",
+   "event chain"
+  ],
+  "edge": "Audit records append-only and tamper-resistant",
+  "declared": [
+   {
+    "id": "inspect receipt",
+    "label": "Inspect the receipt",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Audit detail\""
+   },
+   {
+    "id": "Filter",
+    "label": "Filter",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"audit filter\""
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"export authorization\""
+   },
+   {
+    "id": "retention",
+    "label": "Retention",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/admin/privacy`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ADMIN-008",
+  "title": "Privacy & Data Controls",
+  "route": "/o/:org/admin/privacy",
+  "contractActions": [
+   "Review request",
+   "export",
+   "restrict",
+   "delete where lawful"
+  ],
+  "contractOverlays": [
+   "Data request",
+   "deletion impact",
+   "jurisdiction disclaimer"
+  ],
+  "edge": "Legal holds and statutory retention honored",
+  "declared": [
+   {
+    "id": "Review request",
+    "label": "Review request",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Data request\""
+   },
+   {
+    "id": "export",
+    "label": "Export subject data",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Data request\""
+   },
+   {
+    "id": "restrict",
+    "label": "Restrict processing",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Data request\""
+   },
+   {
+    "id": "delete where lawful",
+    "label": "Delete where lawful",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"deletion impact\""
+   },
+   {
+    "id": "jurisdiction",
+    "label": "Limits of this page",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"jurisdiction disclaimer\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ADMIN-009",
+  "title": "Billing & Subscription",
+  "route": "/o/:org/admin/billing",
+  "contractActions": [
+   "Manage subscription",
+   "pay",
+   "download invoice",
+   "update method"
+  ],
+  "contractOverlays": [
+   "Checkout",
+   "cancellation",
+   "billing support"
+  ],
+  "edge": "Payment methods handled by compliant provider",
+  "declared": [
+   {
+    "id": "Manage subscription",
+    "label": "Manage subscription",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Checkout\""
+   },
+   {
+    "id": "pay",
+    "label": "Pay",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"billing support\""
+   },
+   {
+    "id": "download invoice",
+    "label": "Download invoices",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Invoices\""
+   },
+   {
+    "id": "update method",
+    "label": "Payment method",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Payment\""
+   },
+   {
+    "id": "cancel",
+    "label": "Cancel subscription",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"cancellation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ADMIN-010",
+  "title": "Backups & Recovery",
+  "route": "/o/:org/admin/recovery",
+  "contractActions": [
+   "Request backup",
+   "restore test",
+   "export",
+   "archive org"
+  ],
+  "contractOverlays": [
+   "Restore impact",
+   "retention check",
+   "disaster drill"
+  ],
+  "edge": "Restore never overwrites newer changes without approved plan",
+  "declared": [
+   {
+    "id": "Request backup",
+    "label": "Take a snapshot",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"retention check\""
+   },
+   {
+    "id": "restore test",
+    "label": "Rehearse a restore",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Restore impact\""
+   },
+   {
+    "id": "export",
+    "label": "Export everything",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Exports\""
+   },
+   {
+    "id": "archive org",
+    "label": "Recovery drill",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"disaster drill\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ADMIN-011",
+  "title": "Environment & Developer Access",
+  "route": "/o/:org/admin/developer",
+  "contractActions": [
+   "Issue key",
+   "rotate",
+   "revoke",
+   "test webhook"
+  ],
+  "contractOverlays": [
+   "Key creation",
+   "scope limits",
+   "callback tester"
+  ],
+  "edge": "Secrets shown once and not copied into AI context",
+  "declared": [
+   {
+    "id": "Issue key",
+    "label": "Issue key",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Key creation\""
+   },
+   {
+    "id": "test webhook",
+    "label": "Test an endpoint",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"callback tester\""
+   },
+   {
+    "id": "rotate",
+    "label": "Rotate a key",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"scope limits\""
+   },
+   {
+    "id": "revoke",
+    "label": "Revoke a key",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"scope limits\""
+   },
+   {
+    "id": "add webhook",
+    "label": "Add an endpoint",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"webhook form\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ASSET-001",
+  "title": "Asset Library",
+  "route": "/o/:org/asset/assets",
+  "contractActions": [
+   "Upload",
+   "search",
+   "group",
+   "inspect",
+   "replace"
+  ],
+  "contractOverlays": [
+   "Media import",
+   "asset inspector",
+   "rights check"
+  ],
+  "edge": "Expired licence restricts publishing use",
+  "declared": [
+   {
+    "id": "Upload",
+    "label": "Import an image",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Media import\""
+   },
+   {
+    "id": "inspect",
+    "label": "Inspect",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"asset inspector\""
+   },
+   {
+    "id": "search",
+    "label": "Search tips",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: context.toast(\"Searching the library\", \"The search box above filters on name, summary, tag, type and licensor. Grouping sits beside it.\", \""
+   },
+   {
+    "id": "group",
+    "label": "Group by type",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: context.toast(\"Grouping\", \"Use the grouping control in the toolbar: by type, by licence or by first tag.\", \"info\")"
+   },
+   {
+    "id": "replace",
+    "label": "Replace",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"replacement impact\""
+   },
+   {
+    "id": "rights",
+    "label": "Check rights",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"rights check\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ASSET-002",
+  "title": "Asset Detail",
+  "route": "/o/:org/asset/assets/:id",
+  "contractActions": [
+   "Download",
+   "create variant",
+   "update rights",
+   "archive"
+  ],
+  "contractOverlays": [
+   "Variant editor",
+   "rights form",
+   "replacement impact"
+  ],
+  "edge": "Replacing shared asset previews affected live uses",
+  "declared": [
+   {
+    "id": "Download",
+    "label": "Download",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"download\""
+   },
+   {
+    "id": "create variant",
+    "label": "Create a variant",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Variant editor\""
+   },
+   {
+    "id": "update rights",
+    "label": "Update rights",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"rights form\""
+   },
+   {
+    "id": "archive",
+    "label": "Replace or archive",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"replacement impact\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ASSET-003",
+  "title": "Brand Kits",
+  "route": "/o/:org/asset/brands",
+  "contractActions": [
+   "Create brand kit",
+   "apply",
+   "edit",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Token editor",
+   "brand selection",
+   "global impact"
+  ],
+  "edge": "Unapproved upload cannot replace active master brand",
+  "declared": [
+   {
+    "id": "Create brand kit",
+    "label": "Create brand kit",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Token editor\""
+   },
+   {
+    "id": "edit",
+    "label": "Edit tokens",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Token editor\""
+   },
+   {
+    "id": "apply",
+    "label": "Apply to a surface",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"brand selection\""
+   },
+   {
+    "id": "publish",
+    "label": "Publish as master",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"global impact\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ASSET-004",
+  "title": "Media Transformations",
+  "route": "/o/:org/asset/transforms",
+  "contractActions": [
+   "Create preset",
+   "batch export",
+   "compare",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Transform inspector",
+   "rights",
+   "overwrite review"
+  ],
+  "edge": "No destructive overwrite without version and authorisation",
+  "declared": [
+   {
+    "id": "Create preset",
+    "label": "Create preset",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Transform inspector\""
+   },
+   {
+    "id": "batch export",
+    "label": "Batch export",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"overwrite review\""
+   },
+   {
+    "id": "compare",
+    "label": "Compare sources",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Transform inspector\""
+   },
+   {
+    "id": "publish",
+    "label": "Publish preset",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const id = context.selectedId; if (!id) return; const record = await (0,__vite_ssr_import_4__.getRecord)(id); if (!record || record.field"
+   },
+   {
+    "id": "rights",
+    "label": "Source rights",
+    "placement": "overflow",
+    "inContract": false,
+    "suspect": false,
+    "currently": "opens overlay \"rights\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-ASSET-005",
+  "title": "Asset Usage & Governance",
+  "route": "/o/:org/asset/governance",
+  "contractActions": [
+   "Find use",
+   "resolve duplicate",
+   "set retention",
+   "export"
+  ],
+  "contractOverlays": [
+   "Usage inspector",
+   "merge preview",
+   "expiry warning"
+  ],
+  "edge": "Archive respects legal/brand retention constraints",
+  "declared": [
+   {
+    "id": "Find use",
+    "label": "Find use",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Usage inspector\""
+   },
+   {
+    "id": "resolve duplicate",
+    "label": "Resolve duplicates",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Duplicates\""
+   },
+   {
+    "id": "set retention",
+    "label": "Set retention",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"expiry warning\""
+   },
+   {
+    "id": "export",
+    "label": "Export the report",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"governance export\""
+   }
+  ],
+  "missingActions": []
+ }
+]

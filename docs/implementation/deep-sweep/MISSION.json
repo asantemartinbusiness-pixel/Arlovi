@@ -1,0 +1,784 @@
+[
+ {
+  "id": "ARL-MISSION-001",
+  "title": "Mission Library",
+  "route": "/o/northline/mission/missions",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Proposed",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Running",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Waiting",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Completed",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Archived",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Mission quick view",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "create mission",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "archive confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "filter",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create mission",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "bulk tag",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "open",
+   "duplicate plan"
+  ]
+ },
+ {
+  "id": "ARL-MISSION-002",
+  "title": "Mission Creation",
+  "route": "/o/northline/mission/missions/new",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Goal",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Context",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Team",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Plan",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Permissions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Source picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "team selector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "risk review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "approval sheet",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Describe goal",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "attach records",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "revise plan",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "submit for approval"
+  ]
+ },
+ {
+  "id": "ARL-MISSION-003",
+  "title": "Mission Overview",
+  "route": "/o/northline/mission/missions/nl-missions-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Plan",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Team",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Deliverables",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Activity",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Results",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Status explanation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "pause dialog",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "amendment request",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "ask status",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pause",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "approve next step",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Resume",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Cancel the mission",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MISSION-004",
+  "title": "Plan & Dependencies",
+  "route": "/o/northline/mission/missions/nl-missions-001/plan",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Graph",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "List",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Timeline",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Risks",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Task inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "plan revision",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "scope change approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "edit task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "add review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit dependencies",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "compare versions",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MISSION-005",
+  "title": "Mission Task Board",
+  "route": "/o/northline/mission/missions/nl-missions-001/tasks",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Board",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "List",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Assignees",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Task detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "reassign",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "move impact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "delegate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "attach evidence",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Move card",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "reopen task",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MISSION-006",
+  "title": "Execution Console",
+  "route": "/o/northline/mission/missions/nl-missions-001/execution",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Timeline",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Actions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Checkpoints",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Exceptions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Action receipt",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "retry confirmation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "execution trace",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect receipt",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "retry safe task",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Run the next step",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "stop",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MISSION-007",
+  "title": "Mission Team Room",
+  "route": "/o/northline/mission/missions/nl-missions-001/team",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Discussion",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Owners",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Decisions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Reviews",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Agent selector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "handoff view",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "decision record",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "mention",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "request review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Message",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "accept handoff",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MISSION-008",
+  "title": "Deliverables Library",
+  "route": "/o/northline/mission/missions/nl-missions-001/deliverables",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Draft",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Review",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approved",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Published",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Artifact preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "approval",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "version diff",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "publish verification",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "approve",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "compare",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open edit",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "share",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MISSION-009",
+  "title": "Mission Budget",
+  "route": "/o/northline/mission/missions/nl-missions-001/budget",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Summary",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Ledger",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Policies",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Budget variance",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "limit increase approval",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "cost source",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "inspect cost",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "set alert",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve adjustment",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Variance",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "export",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MISSION-010",
+  "title": "Mission Results",
+  "route": "/o/northline/mission/missions/nl-missions-001/results",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Outcomes",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Evidence",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "ROI",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Follow-up",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Source inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "results approval",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "reopen",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "View evidence",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "create follow-up",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "close mission",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "issue report",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-MISSION-011",
+  "title": "Mission Templates",
+  "route": "/o/northline/mission/templates",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Company",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Industry",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "My templates",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Template editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "example data",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "approval grant",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "edit template",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "simulate",
+   "Create from",
+   "publish"
+  ]
+ }
+]

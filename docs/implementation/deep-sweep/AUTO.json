@@ -1,0 +1,632 @@
+[
+ {
+  "id": "ARL-AUTO-001",
+  "title": "Automation Library",
+  "route": "/o/northline/auto/workflows",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Active",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Draft",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Paused",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Failed",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Workflow quick view",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "activation review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "archive",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Duplicate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Activation review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create an automation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pause",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Archive",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-AUTO-002",
+  "title": "Visual Workflow Builder",
+  "route": "/o/northline/auto/workflows/nl-workflows-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Design",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Parameters",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Test",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Node picker",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "connector grants",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "branch editor",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Connect",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Configure a node",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add node",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Validate",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Save graph"
+  ]
+ },
+ {
+  "id": "ARL-AUTO-003",
+  "title": "Trigger Configuration",
+  "route": "/o/northline/auto/workflows/nl-workflows-001/triggers",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Events",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Schedules",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Filters",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tests",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Webhook setup",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "schedule recurrence",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "sample inspection",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Set the time zone",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Record a test delivery",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Select trigger",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Activate",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-AUTO-004",
+  "title": "Action & AI Nodes",
+  "route": "/o/northline/auto/workflows/nl-workflows-001/actions",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Actions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "AI",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Approval",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Control flow",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Action parameter",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "policy simulation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "variable selector",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Capability",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Map fields",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Retries",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect permission",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-AUTO-005",
+  "title": "Workflow Testing",
+  "route": "/o/northline/auto/workflows/nl-workflows-001/test",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Simulation",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Test runs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Assertions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Failures",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Fixture editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "assertion builder",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "simulated receipt",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect a step receipt",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Approve the test result",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Run a dry run",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare runs",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Edit the fixture",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Add an assertion",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-AUTO-006",
+  "title": "Run History",
+  "route": "/o/northline/auto/runs",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Running",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Failed",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Completed",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Waiting",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Run inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "retry safety check",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "incident link",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Retry safely",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open trace",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Cancel",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Raise an exception",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-AUTO-007",
+  "title": "Workflow Run Detail",
+  "route": "/o/northline/auto/runs/nl-workflowRuns-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Timeline",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Inputs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Outputs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Logs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Decisions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Node trace",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "redaction",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "replay confirmation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Replay",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect a node",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "What is redacted",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-AUTO-008",
+  "title": "Schedules & Queues",
+  "route": "/o/northline/auto/schedules",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Calendar",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Queues",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Limits",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "History",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Schedule editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "queue priority",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "impact warning",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Concurrency",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reschedule",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect the impact",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Pause a schedule"
+  ]
+ },
+ {
+  "id": "ARL-AUTO-009",
+  "title": "Automation Exceptions",
+  "route": "/o/northline/auto/exceptions",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "New",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Investigating",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Awaiting user",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Resolved",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Incident detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "connector reconnect",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "resolution record",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Fix the connection",
+    "ok": true
+   }
+  ],
+  "guarded": [
+   "Retry",
+   "Assign",
+   "Close with a resolution"
+  ]
+ }
+]

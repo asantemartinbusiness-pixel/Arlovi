@@ -1,0 +1,248 @@
+{
+ "about": "Per-application sign-off that each contract action performs the action it is named for, rather than routing to a related surface. Recorded from remediation reviews; read by scripts/build_screen_ledger.py.",
+ "applications": {
+  "HQ": {
+   "signedOff": true,
+   "basis": "Orchestrator review, 15 Nov 2026: all 40 contract actions classified; 21 routed actions reimplemented and verified in a browser.",
+   "openItems": []
+  },
+  "MOTION": {
+   "signedOff": true,
+   "basis": "Built to the action standard, 15 Nov 2026: every contract action performs its named operation; exports verified by decoding the files.",
+   "openItems": [
+    "A spring inside a segment is sampled over about 1.1 s of its own time.",
+    "The flash test is a luminance/area heuristic, not a certified analyser."
+   ]
+  },
+  "FIN": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": [
+    "FIN-002 map category: typechecks, not driven to completion in a browser."
+   ]
+  },
+  "CRM": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": [
+    "CRM-008 approve: correctly refused on seeded data with an unresolved tax line; save path not exercised."
+   ]
+  },
+  "ANALYTICS": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": [
+    "ANALYTICS-004 cite and -008 compare: refused on seeded data (stale figures, no saved scenario)."
+   ]
+  },
+  "AUTO": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": [
+    "AUTO-005 approve: the dry-run draft does not survive a reload, so approval was not driven end to end."
+   ]
+  },
+  "MISSION": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB. Resume, cancel and pause fixed by the orchestrator.",
+   "openItems": []
+  },
+  "INBOX": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": []
+  },
+  "ADMIN": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": [
+    "ADMIN-005 approve increase: no pending request in seeded data."
+   ]
+  },
+  "ASSET": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": []
+  },
+  "AI": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB. Dictate and mute changed by the orchestrator from disabled buttons to honest, reachable boundary actions; mute persists as a preference.",
+   "openItems": []
+  },
+  "BRAIN": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB.",
+   "openItems": [
+    "Most dialogs opened clean; principal buttons not all pressed."
+   ]
+  },
+  "TEAM": {
+   "signedOff": true,
+   "basis": "Money-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented; ~130 changed actions clicked in a browser, ~50 save paths checked in IndexedDB. Compare models changed by the orchestrator to an honest, reachable boundary action.",
+   "openItems": [
+    "Most dialogs opened clean; principal buttons not all pressed."
+   ]
+  },
+  "WEB": {
+   "signedOff": true,
+   "basis": "Platform-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented with edge rules enforced in code; every changed action clicked in a browser.",
+   "openItems": [
+    "WEB-004 import: refused on seeded data (only one site shares a component)."
+   ]
+  },
+  "BUILD": {
+   "signedOff": true,
+   "basis": "Platform-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented with edge rules enforced in code; every changed action clicked in a browser.",
+   "openItems": [
+    "BUILD-001 environment configuration is an explanatory panel."
+   ]
+  },
+  "FORMS": {
+   "signedOff": true,
+   "basis": "Platform-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented with edge rules enforced in code; every changed action clicked in a browser.",
+   "openItems": [
+    "FORMS-003 fix and FORMS-006 compare: refused on seeded data (no computable fix; one version answered)."
+   ]
+  },
+  "CONNECT": {
+   "signedOff": true,
+   "basis": "Platform-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented with edge rules enforced in code; every changed action clicked in a browser.",
+   "openItems": [
+    "CONNECT-008 Health report shows fixed counts that match the checks rather than computing them."
+   ]
+  },
+  "IT": {
+   "signedOff": true,
+   "basis": "Platform-group remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented with edge rules enforced in code; every changed action clicked in a browser.",
+   "openItems": [
+    "IT-008 revoke disables a connector and clears its scopes; no user sessions exist to revoke."
+   ]
+  },
+  "MARKET": {
+   "signedOff": true,
+   "basis": "Growth-group remediation review, 15 Nov 2026: every contract action, tab and overlay judged; routed actions reimplemented; class-3 actions clicked in a browser.",
+   "openItems": [
+    "MARKET-003 plan approval and MARKET-006 schedule: only the blocked paths were clicked.",
+    "ask Marketing opens the Chief of Staff chat rather than a Marketing-scoped assistant."
+   ]
+  },
+  "COMMERCE": {
+   "signedOff": true,
+   "basis": "Growth-group remediation review, 15 Nov 2026: every contract action, tab and overlay judged; routed actions reimplemented; class-3 actions clicked in a browser.",
+   "openItems": [
+    "ask Commerce opens the Chief of Staff chat rather than a Commerce-scoped assistant.",
+    "COMMERCE-004 receive and reorder: dialogs opened; saves not driven."
+   ]
+  },
+  "PROC": {
+   "signedOff": true,
+   "basis": "Growth-group remediation review, 15 Nov 2026: every contract action, tab and overlay judged; routed actions reimplemented; class-3 actions clicked in a browser.",
+   "openItems": [
+    "PROC-001 and PROC-004 approve: review opened, approve not pressed.",
+    "PROC-008 approve adjustment: success path needs a second person; only the blocked path was clicked."
+   ]
+  },
+  "BOOK": {
+   "signedOff": true,
+   "basis": "Growth-group remediation review, 15 Nov 2026: every contract action, tab and overlay judged; routed actions reimplemented; class-3 actions clicked in a browser.",
+   "openItems": [
+    "BOOK-003 confirm and send reminder: only the blocked paths were clicked.",
+    "BOOK-004 archive: dialog shown, not executed."
+   ]
+  },
+  "PORTAL": {
+   "signedOff": true,
+   "basis": "Growth-group remediation review, 15 Nov 2026: every contract action, tab and overlay judged; routed actions reimplemented; class-3 actions clicked in a browser.",
+   "openItems": [
+    "PORTAL-002 access test flags INV-1041 for review: a genuine seed inconsistency it is designed to catch.",
+    "PORTAL-004 download: the expired-link branch was not exercised."
+   ]
+  },
+  "VIDEO": {
+   "signedOff": true,
+   "basis": "Studio remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented through one shared editing session per record, so actions are undoable and no longer collide with autosave; changed actions run in a browser.",
+   "openItems": [
+    "VIDEO-007 cancel: not confirmed in a browser; headless WebM rendering saturated the CPU.",
+    "Tabs were audited exhaustively on VIDEO only.",
+    "New forms were not checked at 390px."
+   ]
+  },
+  "DESIGN": {
+   "signedOff": true,
+   "basis": "Studio remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented through one shared editing session per record, so actions are undoable and no longer collide with autosave; changed actions run in a browser.",
+   "openItems": [
+    "Tabs were audited exhaustively on VIDEO only.",
+    "New forms were not checked at 390px."
+   ]
+  },
+  "PRESENT": {
+   "signedOff": true,
+   "basis": "Studio remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented through one shared editing session per record, so actions are undoable and no longer collide with autosave; changed actions run in a browser.",
+   "openItems": [
+    "Tabs were audited exhaustively on VIDEO only.",
+    "New forms were not checked at 390px."
+   ]
+  },
+  "PHOTO": {
+   "signedOff": true,
+   "basis": "Studio remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented through one shared editing session per record, so actions are undoable and no longer collide with autosave; changed actions run in a browser.",
+   "openItems": [
+    "PHOTO-003 select subject: guarded honestly because no model is connected.",
+    "Tabs were audited exhaustively on VIDEO only.",
+    "New forms were not checked at 390px."
+   ]
+  },
+  "LAYOUT": {
+   "signedOff": true,
+   "basis": "Studio remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented through one shared editing session per record, so actions are undoable and no longer collide with autosave; changed actions run in a browser.",
+   "openItems": [
+    "Tabs were audited exhaustively on VIDEO only.",
+    "New forms were not checked at 390px."
+   ]
+  },
+  "SHEETS": {
+   "signedOff": true,
+   "basis": "Studio remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented through one shared editing session per record, so actions are undoable and no longer collide with autosave; changed actions run in a browser.",
+   "openItems": [
+    "Tabs were audited exhaustively on VIDEO only.",
+    "New forms were not checked at 390px."
+   ]
+  },
+  "DOCS": {
+   "signedOff": true,
+   "basis": "Studio remediation review, 15 Nov 2026: every contract action classified; routed actions reimplemented through one shared editing session per record, so actions are undoable and no longer collide with autosave; changed actions run in a browser.",
+   "openItems": [
+    "DOCS-006 request e-sign: left as it was and not re-examined.",
+    "Tabs were audited exhaustively on VIDEO only.",
+    "New forms were not checked at 390px."
+   ]
+  },
+  "COMMS": {
+   "signedOff": true,
+   "basis": "Operations remediation review, 15 Nov 2026: every contract action, overlay and tab judged; routed actions reimplemented; more than 160 action runs in a browser with records and audit events checked.",
+   "openItems": [
+    "COMMS-004 audio message: changed by the orchestrator from a disabled button to an honest, reachable boundary action; no audio service exists."
+   ]
+  },
+  "HR": {
+   "signedOff": true,
+   "basis": "Operations remediation review, 15 Nov 2026: every contract action, overlay and tab judged; routed actions reimplemented; more than 160 action runs in a browser with records and audit events checked.",
+   "openItems": []
+  },
+  "PROJECT": {
+   "signedOff": true,
+   "basis": "Operations remediation review, 15 Nov 2026: every contract action, overlay and tab judged; routed actions reimplemented; more than 160 action runs in a browser with records and audit events checked.",
+   "openItems": []
+  },
+  "CARE": {
+   "signedOff": true,
+   "basis": "Operations remediation review, 15 Nov 2026: every contract action, overlay and tab judged; routed actions reimplemented; more than 160 action runs in a browser with records and audit events checked.",
+   "openItems": []
+  },
+  "LEGAL": {
+   "signedOff": true,
+   "basis": "Operations remediation review, 15 Nov 2026: every contract action, overlay and tab judged; routed actions reimplemented; more than 160 action runs in a browser with records and audit events checked.",
+   "openItems": []
+  }
+ }
+}

@@ -1,0 +1,747 @@
+[
+ {
+  "id": "ARL-CONNECT-001",
+  "title": "Integration Marketplace",
+  "route": "/o/northline/connect/marketplace",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Featured",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Categories",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Installed",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Custom",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Connector preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "install wizard",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "risk summary",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect requirements",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Browse by category",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare connectors",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Install",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Capability registry",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CONNECT-002",
+  "title": "Connector Detail",
+  "route": "/o/northline/connect/marketplace/nl-connectors-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Capabilities",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Permissions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Versions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Help",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Authorization preview",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "scope explanation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "provider limits",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test the connection",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Connect",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "View the documentation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request a capability",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Authorisation preview",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Provider limits",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Scopes explained",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CONNECT-003",
+  "title": "Connection Wizard",
+  "route": "/o/northline/connect/connect/nl-connectors-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Account",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Permissions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Test",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Confirm",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "External OAuth",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "scope review",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "consent status",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Choose the scopes to request",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Authorise",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test the connection",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Cancel and leave it unconnected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Consent record",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CONNECT-004",
+  "title": "Installed Connections",
+  "route": "/o/northline/connect/connections",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Healthy",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Needs action",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Disabled",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Account inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "scope change",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "revoke grant",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reconnect",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Suspend",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Transfer owner",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Scope change",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Revoke",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CONNECT-005",
+  "title": "Connection Detail",
+  "route": "/o/northline/connect/connections/nl-connectors-001",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Capabilities",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Sync",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Activity",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Security",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Permission matrix",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "health run",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "reconnect dialog",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Limit what agents may use",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test this connection",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Rotate the authorisation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Disable",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Revoke",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CONNECT-006",
+  "title": "Capability Registry",
+  "route": "/o/northline/connect/capabilities",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Actions",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Reads",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Webhooks",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Versions",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Capability inspector",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "schema diff",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "version impact",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Compare schemas",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect a schema",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Test against the mock",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Retire an operation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Versions",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CONNECT-007",
+  "title": "Synchronization Centre",
+  "route": "/o/northline/connect/sync",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Jobs",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Conflicts",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Schedules",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Data mapping",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Mapping editor",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "conflict resolver",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "run receipt",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Change a mapping",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Retry a safe sync",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect a conflict",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CONNECT-008",
+  "title": "Connector Health",
+  "route": "/o/northline/connect/health",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Overview",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Outages",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Rate limits",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Deprecations",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Health report",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "reconnect request",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "mitigation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open an incident",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Run the health test",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Contact the owner",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Mitigation",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CONNECT-009",
+  "title": "Custom Connectors",
+  "route": "/o/northline/connect/custom",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Projects",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Editor",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Tests",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Publish",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Secret setup",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "capability validation",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Run the contract tests",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Create an adapter",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Register an operation",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Submit for approval",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Draft in the editor",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ },
+ {
+  "id": "ARL-CONNECT-010",
+  "title": "Action Receipts",
+  "route": "/o/northline/connect/receipts",
+  "checks": [
+   {
+    "kind": "load",
+    "name": "render",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "All",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Confirmed",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Pending",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Failed",
+    "ok": true
+   },
+   {
+    "kind": "tab",
+    "name": "Blocked",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "Receipt detail",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "provider evidence",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "retry review",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Export",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Inspect a receipt",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Reconcile",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Open the mission",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Provider evidence",
+    "ok": true
+   }
+  ],
+  "guarded": []
+ }
+]

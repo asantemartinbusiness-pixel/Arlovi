@@ -1,0 +1,2552 @@
+[
+ {
+  "screen": "ARL-HR-001",
+  "title": "People Overview",
+  "route": "/o/:org/hr/home",
+  "contractActions": [
+   "View employee",
+   "approve request",
+   "start hire",
+   "inspect metric"
+  ],
+  "contractOverlays": [
+   "Staffing alert",
+   "leave approval",
+   "new position"
+  ],
+  "edge": "Sensitive HR metrics aggregated by privacy policy",
+  "declared": [
+   {
+    "id": "approve request",
+    "label": "Approve leave",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"leave approval\""
+   },
+   {
+    "id": "start hire",
+    "label": "Start a hire",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"new position\""
+   },
+   {
+    "id": "View employee",
+    "label": "Employee directory",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/hr/employees`"
+   },
+   {
+    "id": "inspect metric",
+    "label": "Coverage detail",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Staffing alert\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-HR-002",
+  "title": "Employee Directory",
+  "route": "/o/:org/hr/employees",
+  "contractActions": [
+   "Search",
+   "invite",
+   "filter",
+   "open profile"
+  ],
+  "contractOverlays": [
+   "Invite employee",
+   "directory card",
+   "export permissions"
+  ],
+  "edge": "Personal contact details protected against broad AI retrieval",
+  "declared": [
+   {
+    "id": "invite",
+    "label": "Invite someone",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Invite employee\""
+   },
+   {
+    "id": "open profile",
+    "label": "Open profile",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/hr/employees/${context.selectedId}`"
+   },
+   {
+    "id": "Search",
+    "label": "Search the directory",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: focusWithin('input[type=\"search\"]')"
+   },
+   {
+    "id": "filter",
+    "label": "Filter by team",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Teams\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-HR-003",
+  "title": "Employee Profile",
+  "route": "/o/:org/hr/employees/:id",
+  "contractActions": [
+   "Update profile",
+   "request change",
+   "upload document",
+   "offboard"
+  ],
+  "contractOverlays": [
+   "Contract upload",
+   "access request",
+   "offboarding confirmation"
+  ],
+  "edge": "Terminated employee access revoked and queued grants rescinded",
+  "declared": [
+   {
+    "id": "Update profile",
+    "label": "Update profile",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Contract upload\""
+   },
+   {
+    "id": "request change",
+    "label": "Request a change",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"access request\""
+   },
+   {
+    "id": "upload document",
+    "label": "Add a document",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Contract upload\""
+   },
+   {
+    "id": "offboard",
+    "label": "Offboard",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"offboarding confirmation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-HR-004",
+  "title": "Recruitment Pipeline",
+  "route": "/o/:org/hr/recruitment",
+  "contractActions": [
+   "Create role",
+   "review applicant",
+   "schedule",
+   "issue offer"
+  ],
+  "contractOverlays": [
+   "Job spec editor",
+   "candidate profile",
+   "offer approval"
+  ],
+  "edge": "Hiring decisions reserved for accountable humans with bias controls",
+  "declared": [
+   {
+    "id": "Create role",
+    "label": "Create a role",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Job spec editor\""
+   },
+   {
+    "id": "review applicant",
+    "label": "Review a candidate",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"candidate profile\""
+   },
+   {
+    "id": "schedule",
+    "label": "Schedule an interview",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/comms/calendar`"
+   },
+   {
+    "id": "issue offer",
+    "label": "Review an offer",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"offer approval\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-HR-005",
+  "title": "Applicant Profile",
+  "route": "/o/:org/hr/candidates/:id",
+  "contractActions": [
+   "Review",
+   "message",
+   "schedule",
+   "record assessment"
+  ],
+  "contractOverlays": [
+   "Applicant communications",
+   "interviewer scorecard",
+   "rejection preview"
+  ],
+  "edge": "Retention/consent controls on applicant data",
+  "declared": [
+   {
+    "id": "record assessment",
+    "label": "Record a scorecard",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"interviewer scorecard\""
+   },
+   {
+    "id": "Review",
+    "label": "Move stage",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"interviewer scorecard\""
+   },
+   {
+    "id": "message",
+    "label": "Communications",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Applicant communications\""
+   },
+   {
+    "id": "schedule",
+    "label": "Schedule",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/comms/calendar`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-HR-006",
+  "title": "Onboarding Centre",
+  "route": "/o/:org/hr/onboarding",
+  "contractActions": [
+   "Launch checklist",
+   "assign mentor",
+   "grant request",
+   "verify completion"
+  ],
+  "contractOverlays": [
+   "Onboarding template",
+   "IT access",
+   "welcome preview"
+  ],
+  "edge": "Access grant never silently inferred from employment status",
+  "declared": [
+   {
+    "id": "Launch checklist",
+    "label": "Launch a checklist",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Onboarding template\""
+   },
+   {
+    "id": "grant request",
+    "label": "Access requests",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"IT access\""
+   },
+   {
+    "id": "assign mentor",
+    "label": "Assign a mentor",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Onboarding template\""
+   },
+   {
+    "id": "verify completion",
+    "label": "Welcome note",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"welcome preview\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-HR-007",
+  "title": "Leave & Absence",
+  "route": "/o/:org/hr/leave",
+  "contractActions": [
+   "Request leave",
+   "approve",
+   "decline",
+   "adjust balance"
+  ],
+  "contractOverlays": [
+   "Leave form",
+   "policy explanation",
+   "conflict review"
+  ],
+  "edge": "No private health details exposed in team calendars",
+  "declared": [
+   {
+    "id": "Request leave",
+    "label": "Request leave",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Leave form\""
+   },
+   {
+    "id": "approve",
+    "label": "Approvals",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Approvals\""
+   },
+   {
+    "id": "decline",
+    "label": "Decide a request",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"conflict review\""
+   },
+   {
+    "id": "adjust balance",
+    "label": "Adjust a balance",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"policy explanation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-HR-008",
+  "title": "Scheduling & Time",
+  "route": "/o/:org/hr/scheduling",
+  "contractActions": [
+   "Drag shift",
+   "approve hours",
+   "swap",
+   "export"
+  ],
+  "contractOverlays": [
+   "Shift edit",
+   "time correction",
+   "overtime approval"
+  ],
+  "edge": "Time zone and employment rule checks on cross-location shift",
+  "declared": [
+   {
+    "id": "approve hours",
+    "label": "Approve hours",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Timesheets\""
+   },
+   {
+    "id": "Drag shift",
+    "label": "Edit a shift",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Shift edit\""
+   },
+   {
+    "id": "swap",
+    "label": "Overtime approvals",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"overtime approval\""
+   },
+   {
+    "id": "export",
+    "label": "Export the roster",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"time correction\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-HR-009",
+  "title": "Payroll",
+  "route": "/o/:org/hr/payroll",
+  "contractActions": [
+   "Prepare run",
+   "validate",
+   "approve",
+   "export",
+   "reconcile"
+  ],
+  "contractOverlays": [
+   "Payroll review",
+   "exception report",
+   "submission signoff"
+  ],
+  "edge": "Jurisdiction-specific compliance cannot be assumed without validation",
+  "declared": [
+   {
+    "id": "Prepare run",
+    "label": "Prepare a run",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Payroll review\""
+   },
+   {
+    "id": "approve",
+    "label": "Approve",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"submission signoff\""
+   },
+   {
+    "id": "validate",
+    "label": "Exceptions",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"exception report\""
+   },
+   {
+    "id": "export",
+    "label": "Export CSV",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"exception report\""
+   },
+   {
+    "id": "reconcile",
+    "label": "Reconcile to the ledger",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/fin/ledger`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-HR-010",
+  "title": "Performance Reviews",
+  "route": "/o/:org/hr/performance",
+  "contractActions": [
+   "Create review",
+   "assign reviewer",
+   "submit",
+   "acknowledge"
+  ],
+  "contractOverlays": [
+   "Review form",
+   "calibration panel",
+   "confidentiality control"
+  ],
+  "edge": "AI-generated ratings flagged and human review required",
+  "declared": [
+   {
+    "id": "Create review",
+    "label": "Create a review",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Review form\""
+   },
+   {
+    "id": "assign reviewer",
+    "label": "Calibration",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"calibration panel\""
+   },
+   {
+    "id": "submit",
+    "label": "Confidentiality",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"confidentiality control\""
+   },
+   {
+    "id": "acknowledge",
+    "label": "Acknowledge a review",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Review form\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-HR-011",
+  "title": "Learning & Policies",
+  "route": "/o/:org/hr/learning",
+  "contractActions": [
+   "Assign course",
+   "complete module",
+   "acknowledge policy"
+  ],
+  "contractOverlays": [
+   "Course builder",
+   "quiz",
+   "policy publication"
+  ],
+  "edge": "Policy edits versioned, existing acknowledgments preserved",
+  "declared": [
+   {
+    "id": "Assign course",
+    "label": "Build a course",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Course builder\""
+   },
+   {
+    "id": "acknowledge policy",
+    "label": "Policies",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Policies\""
+   },
+   {
+    "id": "complete module",
+    "label": "My learning",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"My learning\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROJECT-001",
+  "title": "Project Portfolio",
+  "route": "/o/:org/project/portfolios",
+  "contractActions": [
+   "Create project",
+   "filter",
+   "inspect health",
+   "portfolio report"
+  ],
+  "contractOverlays": [
+   "Portfolio filter",
+   "initiative detail",
+   "priority change"
+  ],
+  "edge": "Rollups never count duplicated linked tasks twice",
+  "declared": [
+   {
+    "id": "Create project",
+    "label": "Create a project",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "navigates to `/o/${context.org.slug}/project/projects`"
+   },
+   {
+    "id": "filter",
+    "label": "Filter",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Portfolio filter\""
+   },
+   {
+    "id": "inspect health",
+    "label": "Health detail",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"initiative detail\""
+   },
+   {
+    "id": "portfolio report",
+    "label": "Change a priority",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"priority change\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROJECT-002",
+  "title": "Project Directory",
+  "route": "/o/:org/project/projects",
+  "contractActions": [
+   "Create",
+   "pin",
+   "search",
+   "duplicate",
+   "archive"
+  ],
+  "contractOverlays": [
+   "Project template",
+   "archive impact",
+   "quick detail"
+  ],
+  "edge": "Archived project retained in linked audit and mission histories",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "Create a project",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Project template\""
+   },
+   {
+    "id": "duplicate",
+    "label": "Quick detail",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"quick detail\""
+   },
+   {
+    "id": "archive",
+    "label": "Archive",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"archive impact\""
+   },
+   {
+    "id": "pin",
+    "label": "High priority",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Following\""
+   },
+   {
+    "id": "search",
+    "label": "Search projects",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: requestAnimationFrame(() => document.querySelector('input[type=\"search\"]')?.focus())"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROJECT-003",
+  "title": "Project Overview",
+  "route": "/o/:org/project/projects/:id",
+  "contractActions": [
+   "Change status",
+   "assign owner",
+   "request update",
+   "attach file"
+  ],
+  "contractOverlays": [
+   "Milestone editor",
+   "project settings",
+   "status note"
+  ],
+  "edge": "Paused project stops configured automation, not unrelated tasks",
+  "declared": [
+   {
+    "id": "Change status",
+    "label": "Project settings",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"project settings\""
+   },
+   {
+    "id": "request update",
+    "label": "Post an update",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"status note\""
+   },
+   {
+    "id": "assign owner",
+    "label": "Add a milestone",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Milestone editor\""
+   },
+   {
+    "id": "attach file",
+    "label": "Open the board",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/project/projects/${context.params.id}/board`"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROJECT-004",
+  "title": "Task Board",
+  "route": "/o/:org/project/projects/:id/board",
+  "contractActions": [
+   "Drag task",
+   "create",
+   "assign",
+   "bulk move",
+   "filter"
+  ],
+  "contractOverlays": [
+   "Task drawer",
+   "stage rule",
+   "batch action review"
+  ],
+  "edge": "Stage move cannot bypass review or produce unknown side effects",
+  "declared": [
+   {
+    "id": "create",
+    "label": "New task",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Task drawer\""
+   },
+   {
+    "id": "bulk move",
+    "label": "Move Doing to Review",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"batch action review\""
+   },
+   {
+    "id": "Drag task",
+    "label": "Stage rules",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"stage rule\""
+   },
+   {
+    "id": "assign",
+    "label": "Reassign a task",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Assignee picker\""
+   },
+   {
+    "id": "filter",
+    "label": "See the list",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"List\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROJECT-005",
+  "title": "Task Detail",
+  "route": "/o/:org/project/tasks/:id",
+  "contractActions": [
+   "Edit",
+   "comment",
+   "link",
+   "delegate AI",
+   "complete"
+  ],
+  "contractOverlays": [
+   "Assignee picker",
+   "dependency selector",
+   "completion check"
+  ],
+  "edge": "Changing owner preserves attribution and source links",
+  "declared": [
+   {
+    "id": "complete",
+    "label": "Mark complete",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"completion check\""
+   },
+   {
+    "id": "Edit",
+    "label": "Reassign",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Assignee picker\""
+   },
+   {
+    "id": "link",
+    "label": "Link work",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"dependency selector\""
+   },
+   {
+    "id": "comment",
+    "label": "Comment",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Discussion\""
+   },
+   {
+    "id": "delegate AI",
+    "label": "Delegate to an AI employee",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Assignee picker\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROJECT-006",
+  "title": "Timeline & Dependencies",
+  "route": "/o/:org/project/projects/:id/timeline",
+  "contractActions": [
+   "Reschedule",
+   "drag duration",
+   "link task",
+   "compare baseline"
+  ],
+  "contractOverlays": [
+   "Date edit",
+   "conflict review",
+   "dependency graph"
+  ],
+  "edge": "Cycles or impossible dependency dates block publication",
+  "declared": [
+   {
+    "id": "Reschedule",
+    "label": "Edit dates",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Date edit\""
+   },
+   {
+    "id": "link task",
+    "label": "Link work",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"dependency graph\""
+   },
+   {
+    "id": "compare baseline",
+    "label": "Compare to baseline",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Baseline\""
+   },
+   {
+    "id": "drag duration",
+    "label": "Check for conflicts",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"conflict review\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROJECT-007",
+  "title": "Resource Workload",
+  "route": "/o/:org/project/workload",
+  "contractActions": [
+   "Reassign",
+   "adjust estimates",
+   "view capacity"
+  ],
+  "contractOverlays": [
+   "Workload detail",
+   "allocation editor",
+   "over-capacity alert"
+  ],
+  "edge": "Human absence and AI throughput modeled differently",
+  "declared": [
+   {
+    "id": "Reassign",
+    "label": "Reassign",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"allocation editor\""
+   },
+   {
+    "id": "view capacity",
+    "label": "Over capacity",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"over-capacity alert\""
+   },
+   {
+    "id": "adjust estimates",
+    "label": "Adjust an estimate",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"allocation editor\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROJECT-008",
+  "title": "Project Templates",
+  "route": "/o/:org/project/templates",
+  "contractActions": [
+   "Create",
+   "apply",
+   "duplicate",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Template editor",
+   "preview",
+   "revision confirm"
+  ],
+  "edge": "Cloned project does not inherit confidential prior attachments",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "Create a template",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Template editor\""
+   },
+   {
+    "id": "apply",
+    "label": "Apply a template",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"preview\""
+   },
+   {
+    "id": "duplicate",
+    "label": "Edit",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Template editor\""
+   },
+   {
+    "id": "publish",
+    "label": "Publish a revision",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"revision confirm\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROJECT-009",
+  "title": "Goals & OKRs",
+  "route": "/o/:org/project/goals",
+  "contractActions": [
+   "Set target",
+   "report progress",
+   "link project"
+  ],
+  "contractOverlays": [
+   "Metric source",
+   "check-in dialog",
+   "goal revision"
+  ],
+  "edge": "Avoid subjective automated performance evaluation",
+  "declared": [
+   {
+    "id": "report progress",
+    "label": "Report progress",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"check-in dialog\""
+   },
+   {
+    "id": "Set target",
+    "label": "Set a target",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"goal revision\""
+   },
+   {
+    "id": "link project",
+    "label": "Where a number comes from",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Metric source\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-PROJECT-010",
+  "title": "Time & Cost",
+  "route": "/o/:org/project/time",
+  "contractActions": [
+   "Log time",
+   "approve",
+   "edit",
+   "export"
+  ],
+  "contractOverlays": [
+   "Timer",
+   "timesheet correction",
+   "billing link"
+  ],
+  "edge": "AI computation spend is not represented as employee billable hours",
+  "declared": [
+   {
+    "id": "Log time",
+    "label": "Log time",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Timer\""
+   },
+   {
+    "id": "approve",
+    "label": "Approvals",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Approvals\""
+   },
+   {
+    "id": "edit",
+    "label": "Correct an entry",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"timesheet correction\""
+   },
+   {
+    "id": "export",
+    "label": "Billing",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"billing link\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMS-001",
+  "title": "Communications Home",
+  "route": "/o/:org/comms/home",
+  "contractActions": [
+   "Join meeting",
+   "reply",
+   "browse",
+   "ask summary"
+  ],
+  "contractOverlays": [
+   "Compose",
+   "quick switcher",
+   "notification preferences"
+  ],
+  "edge": "Restricted channels not included in AI summaries",
+  "declared": [
+   {
+    "id": "reply",
+    "label": "Compose",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Compose\""
+   },
+   {
+    "id": "browse",
+    "label": "Jump to",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"quick switcher\""
+   },
+   {
+    "id": "Join meeting",
+    "label": "Today's diary",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Calendar\""
+   },
+   {
+    "id": "ask summary",
+    "label": "Notification settings",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"notification preferences\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMS-002",
+  "title": "Channels",
+  "route": "/o/:org/comms/channels",
+  "contractActions": [
+   "Create channel",
+   "join",
+   "mute",
+   "search"
+  ],
+  "contractOverlays": [
+   "Channel creation",
+   "member management",
+   "channel archive"
+  ],
+  "edge": "Private channel messages never leak to wider company search",
+  "declared": [
+   {
+    "id": "Create channel",
+    "label": "Create a channel",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Channel creation\""
+   },
+   {
+    "id": "join",
+    "label": "Members",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"member management\""
+   },
+   {
+    "id": "mute",
+    "label": "Archive a channel",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"channel archive\""
+   },
+   {
+    "id": "search",
+    "label": "Jump to a channel",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Channel creation\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMS-003",
+  "title": "Channel Conversation",
+  "route": "/o/:org/comms/channels/:id",
+  "contractActions": [
+   "Reply",
+   "thread",
+   "mention",
+   "pin",
+   "create task"
+  ],
+  "contractOverlays": [
+   "Thread drawer",
+   "file preview",
+   "moderation report"
+  ],
+  "edge": "Mention does not grant tool or file access",
+  "declared": [
+   {
+    "id": "create task",
+    "label": "Make a task",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Conversation\""
+   },
+   {
+    "id": "thread",
+    "label": "Threads",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Thread drawer\""
+   },
+   {
+    "id": "pin",
+    "label": "Pinned",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Pinned\""
+   },
+   {
+    "id": "Reply",
+    "label": "Files",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"file preview\""
+   },
+   {
+    "id": "mention",
+    "label": "Report a message",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"moderation report\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMS-004",
+  "title": "Direct Messages",
+  "route": "/o/:org/comms/messages",
+  "contractActions": [
+   "Send",
+   "attach",
+   "audio message",
+   "call",
+   "search"
+  ],
+  "contractOverlays": [
+   "Conversation info",
+   "add member",
+   "message actions"
+  ],
+  "edge": "Differentiate AI and human sender unmistakably",
+  "declared": [
+   {
+    "id": "Send",
+    "label": "New conversation",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"add member\""
+   },
+   {
+    "id": "search",
+    "label": "Jump to",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"conversation info\""
+   },
+   {
+    "id": "attach",
+    "label": "Message actions",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"message actions\""
+   },
+   {
+    "id": "audio message",
+    "label": "Audio message",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void 0"
+   },
+   {
+    "id": "call",
+    "label": "Call",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: void 0"
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMS-005",
+  "title": "Email Inbox",
+  "route": "/o/:org/comms/email",
+  "contractActions": [
+   "Compose",
+   "reply",
+   "forward",
+   "label",
+   "archive"
+  ],
+  "contractOverlays": [
+   "Compose window",
+   "send confirmation",
+   "rule editor"
+  ],
+  "edge": "Send requires recipient confirmation for sensitive or bulk cases",
+  "declared": [
+   {
+    "id": "Compose",
+    "label": "Compose",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Compose window\""
+   },
+   {
+    "id": "archive",
+    "label": "Rules",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"rule editor\""
+   },
+   {
+    "id": "reply",
+    "label": "Open a thread",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/comms/email/${context.selectedId}`"
+   },
+   {
+    "id": "forward",
+    "label": "What sending does",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"send confirmation\""
+   },
+   {
+    "id": "label",
+    "label": "Spam",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Spam\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMS-006",
+  "title": "Email Thread",
+  "route": "/o/:org/comms/email/:id",
+  "contractActions": [
+   "Reply",
+   "add CC",
+   "attach",
+   "turn into task",
+   "block sender"
+  ],
+  "contractOverlays": [
+   "Reply editor",
+   "contact inspector",
+   "report phishing"
+  ],
+  "edge": "External email instructions cannot override agent policies",
+  "declared": [
+   {
+    "id": "Reply",
+    "label": "Reply",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Reply editor\""
+   },
+   {
+    "id": "turn into task",
+    "label": "Make a task",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "runs code: { const title = context.screen.title; await context.mutate.create({ collection: \"tasks\", title: `Follow up: ${title}`, status: \"ready\", sum"
+   },
+   {
+    "id": "add CC",
+    "label": "Contact",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"contact inspector\""
+   },
+   {
+    "id": "attach",
+    "label": "Report phishing",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"report phishing\""
+   },
+   {
+    "id": "block sender",
+    "label": "Block the sender",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"report phishing\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMS-007",
+  "title": "Calendar",
+  "route": "/o/:org/comms/calendar",
+  "contractActions": [
+   "Create event",
+   "invite",
+   "move",
+   "reschedule",
+   "find time"
+  ],
+  "contractOverlays": [
+   "Event editor",
+   "conflict inspector",
+   "attendee status"
+  ],
+  "edge": "Provider invite status not assumed accepted",
+  "declared": [
+   {
+    "id": "Create event",
+    "label": "Create an event",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Event editor\""
+   },
+   {
+    "id": "find time",
+    "label": "Check for clashes",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"conflict inspector\""
+   },
+   {
+    "id": "invite",
+    "label": "Attendee status",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"attendee status\""
+   },
+   {
+    "id": "move",
+    "label": "Month view",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Month\""
+   },
+   {
+    "id": "reschedule",
+    "label": "Week view",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Week\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMS-008",
+  "title": "Meeting Room",
+  "route": "/o/:org/comms/meetings/:id",
+  "contractActions": [
+   "Mute",
+   "share",
+   "raise hand",
+   "record consent",
+   "end"
+  ],
+  "contractOverlays": [
+   "Device permissions",
+   "invite",
+   "recording consent"
+  ],
+  "edge": "Recording law and participant permission enforced",
+  "declared": [
+   {
+    "id": "record consent",
+    "label": "Recording and consent",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"recording consent\""
+   },
+   {
+    "id": "end",
+    "label": "End the meeting",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Notes\""
+   },
+   {
+    "id": "Mute",
+    "label": "Device permissions",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Device permissions\""
+   },
+   {
+    "id": "share",
+    "label": "Invite someone",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"invite\""
+   },
+   {
+    "id": "raise hand",
+    "label": "Participants",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Participants\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMS-009",
+  "title": "Calls & Voicemail",
+  "route": "/o/:org/comms/calls",
+  "contractActions": [
+   "Call",
+   "return call",
+   "attach CRM",
+   "play voicemail"
+  ],
+  "contractOverlays": [
+   "Dialer",
+   "recording notice",
+   "call transcript"
+  ],
+  "edge": "Emergency calling capabilities never implied unless provided",
+  "declared": [
+   {
+    "id": "attach CRM",
+    "label": "Open the transcript",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"call transcript\""
+   },
+   {
+    "id": "Call",
+    "label": "Dialer",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Dialer\""
+   },
+   {
+    "id": "return call",
+    "label": "Recording rules",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"recording notice\""
+   },
+   {
+    "id": "play voicemail",
+    "label": "Voicemail",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Voicemail\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMS-010",
+  "title": "Announcements",
+  "route": "/o/:org/comms/announcements",
+  "contractActions": [
+   "Draft",
+   "target audience",
+   "preview",
+   "publish"
+  ],
+  "contractOverlays": [
+   "Audience selector",
+   "post preview",
+   "publish review"
+  ],
+  "edge": "Large distribution and sensitive communications require review",
+  "declared": [
+   {
+    "id": "Draft",
+    "label": "Draft an announcement",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"post preview\""
+   },
+   {
+    "id": "publish",
+    "label": "Publish",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"publish review\""
+   },
+   {
+    "id": "target audience",
+    "label": "Audience",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Audience selector\""
+   },
+   {
+    "id": "preview",
+    "label": "Preview",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"post preview\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-COMMS-011",
+  "title": "Communication Preferences",
+  "route": "/o/:org/comms/preferences",
+  "contractActions": [
+   "Edit signature",
+   "set schedule",
+   "connect mailbox"
+  ],
+  "contractOverlays": [
+   "Signature editor",
+   "account setup",
+   "privacy warning"
+  ],
+  "edge": "Cross-user settings protected by role",
+  "declared": [
+   {
+    "id": "Edit signature",
+    "label": "Edit signature",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Signature editor\""
+   },
+   {
+    "id": "connect mailbox",
+    "label": "Connect a mailbox",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"account setup\""
+   },
+   {
+    "id": "set schedule",
+    "label": "Working hours",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Availability\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CARE-001",
+  "title": "Service Overview",
+  "route": "/o/:org/care/home",
+  "contractActions": [
+   "Open case",
+   "reassign",
+   "inspect metric",
+   "manage staffing"
+  ],
+  "contractOverlays": [
+   "Queue rules",
+   "SLA inspector",
+   "service report"
+  ],
+  "edge": "Sentiment inference not treated as certain customer fact",
+  "declared": [
+   {
+    "id": "Open case",
+    "label": "Open the inbox",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/care/inbox`"
+   },
+   {
+    "id": "inspect metric",
+    "label": "SLA detail",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"SLA inspector\""
+   },
+   {
+    "id": "reassign",
+    "label": "Queue rules",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Queue rules\""
+   },
+   {
+    "id": "manage staffing",
+    "label": "Service report",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"service report\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CARE-002",
+  "title": "Omnichannel Inbox",
+  "route": "/o/:org/care/inbox",
+  "contractActions": [
+   "Respond",
+   "assign",
+   "tag",
+   "escalate",
+   "link record"
+  ],
+  "contractOverlays": [
+   "Customer inspector",
+   "canned reply",
+   "escalation"
+  ],
+  "edge": "No silent automated disclosure of sensitive customer information",
+  "declared": [
+   {
+    "id": "Respond",
+    "label": "Reply",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Response composer\""
+   },
+   {
+    "id": "escalate",
+    "label": "Escalate",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"escalation\""
+   },
+   {
+    "id": "assign",
+    "label": "Route unassigned",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "navigates to `/o/${context.org.slug}/care/tickets`"
+   },
+   {
+    "id": "tag",
+    "label": "Macros",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"canned reply\""
+   },
+   {
+    "id": "link record",
+    "label": "Customer",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Customer inspector\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CARE-003",
+  "title": "Ticket List",
+  "route": "/o/:org/care/tickets",
+  "contractActions": [
+   "Create ticket",
+   "bulk route",
+   "filter",
+   "export"
+  ],
+  "contractOverlays": [
+   "Ticket create",
+   "bulk assignment",
+   "priority change"
+  ],
+  "edge": "Bulk close requires preview, appropriate permissions",
+  "declared": [
+   {
+    "id": "Create ticket",
+    "label": "Create a case",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Ticket create\""
+   },
+   {
+    "id": "bulk route",
+    "label": "Route unassigned",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"bulk assignment\""
+   },
+   {
+    "id": "filter",
+    "label": "Open cases only",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Open\""
+   },
+   {
+    "id": "export",
+    "label": "Export",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"priority change\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CARE-004",
+  "title": "Ticket Detail",
+  "route": "/o/:org/care/tickets/:id",
+  "contractActions": [
+   "Reply",
+   "add note",
+   "reopen",
+   "assign specialist"
+  ],
+  "contractOverlays": [
+   "Response composer",
+   "internal note",
+   "refund request"
+  ],
+  "edge": "Reopening must preserve prior resolution and audit data",
+  "declared": [
+   {
+    "id": "Reply",
+    "label": "Reply",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Response composer\""
+   },
+   {
+    "id": "add note",
+    "label": "Internal note",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"internal note\""
+   },
+   {
+    "id": "reopen",
+    "label": "Reopen",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"internal note\""
+   },
+   {
+    "id": "assign specialist",
+    "label": "Assign a specialist",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"refund request\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CARE-005",
+  "title": "Customer Context",
+  "route": "/o/:org/care/customers/:id",
+  "contractActions": [
+   "Inspect",
+   "schedule",
+   "update permitted field"
+  ],
+  "contractOverlays": [
+   "Customer profile edit",
+   "consent inspector",
+   "identity verification"
+  ],
+  "edge": "Cross-department restricted records redacted",
+  "declared": [
+   {
+    "id": "update permitted field",
+    "label": "Edit",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Customer profile edit\""
+   },
+   {
+    "id": "Inspect",
+    "label": "Consent",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"consent inspector\""
+   },
+   {
+    "id": "schedule",
+    "label": "Verify identity",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"identity verification\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CARE-006",
+  "title": "Knowledge Base",
+  "route": "/o/:org/care/knowledge",
+  "contractActions": [
+   "Write article",
+   "update",
+   "publish",
+   "test answer"
+  ],
+  "contractOverlays": [
+   "Rich editor",
+   "publish review",
+   "relevance test"
+  ],
+  "edge": "Old published instructions not silently overwritten",
+  "declared": [
+   {
+    "id": "Write article",
+    "label": "Write an article",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Rich editor\""
+   },
+   {
+    "id": "publish",
+    "label": "Publish a draft",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"publish review\""
+   },
+   {
+    "id": "update",
+    "label": "Edit",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Rich editor\""
+   },
+   {
+    "id": "test answer",
+    "label": "Test an answer",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"relevance test\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CARE-007",
+  "title": "Macros & Automation",
+  "route": "/o/:org/care/automation",
+  "contractActions": [
+   "Create macro",
+   "simulate",
+   "activate",
+   "review"
+  ],
+  "contractOverlays": [
+   "Macro editor",
+   "audience preview",
+   "escalation rule"
+  ],
+  "edge": "Automated response disabled for prohibited topics",
+  "declared": [
+   {
+    "id": "Create macro",
+    "label": "Create a macro",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Macro editor\""
+   },
+   {
+    "id": "simulate",
+    "label": "Simulate",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"audience preview\""
+   },
+   {
+    "id": "activate",
+    "label": "Edit a macro",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Macro editor\""
+   },
+   {
+    "id": "review",
+    "label": "Escalation rule",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"escalation rule\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CARE-008",
+  "title": "Service SLAs",
+  "route": "/o/:org/care/slas",
+  "contractActions": [
+   "Edit policy",
+   "reassign",
+   "report",
+   "acknowledge"
+  ],
+  "contractOverlays": [
+   "SLA form",
+   "schedule exception",
+   "policy impact"
+  ],
+  "edge": "Clock handles locale, holiday and suspended intervals",
+  "declared": [
+   {
+    "id": "Edit policy",
+    "label": "Edit a policy",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"SLA form\""
+   },
+   {
+    "id": "report",
+    "label": "Breaches",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Breaches\""
+   },
+   {
+    "id": "reassign",
+    "label": "What a change would do",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"policy impact\""
+   },
+   {
+    "id": "acknowledge",
+    "label": "When the clock stops",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"schedule exception\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-CARE-009",
+  "title": "Quality & Satisfaction",
+  "route": "/o/:org/care/quality",
+  "contractActions": [
+   "Review",
+   "annotate",
+   "assign coaching",
+   "export"
+  ],
+  "contractOverlays": [
+   "QA scorecard",
+   "survey builder",
+   "case replay"
+  ],
+  "edge": "Low scores not used to make unreviewed employment decisions",
+  "declared": [
+   {
+    "id": "Review",
+    "label": "Score a case",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"QA scorecard\""
+   },
+   {
+    "id": "annotate",
+    "label": "Replay a case",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"case replay\""
+   },
+   {
+    "id": "assign coaching",
+    "label": "Build a survey",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"survey builder\""
+   },
+   {
+    "id": "export",
+    "label": "Report",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Reports\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-LEGAL-001",
+  "title": "Governance Overview",
+  "route": "/o/:org/legal/home",
+  "contractActions": [
+   "Review item",
+   "assign counsel",
+   "schedule audit",
+   "report"
+  ],
+  "contractOverlays": [
+   "Obligation quick view",
+   "issue create",
+   "risk summary"
+  ],
+  "edge": "Jurisdiction-specific interpretations flagged for legal review",
+  "declared": [
+   {
+    "id": "Review item",
+    "label": "Review an obligation",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Obligation quick view\""
+   },
+   {
+    "id": "report",
+    "label": "Risk summary",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"risk summary\""
+   },
+   {
+    "id": "assign counsel",
+    "label": "Assign counsel",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"assign counsel\""
+   },
+   {
+    "id": "schedule audit",
+    "label": "Schedule an audit",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"schedule audit\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-LEGAL-002",
+  "title": "Contract Library",
+  "route": "/o/:org/legal/contracts",
+  "contractActions": [
+   "Upload",
+   "draft",
+   "assign review",
+   "send for signature"
+  ],
+  "contractOverlays": [
+   "Contract upload",
+   "reviewer picker",
+   "e-sign request"
+  ],
+  "edge": "Contract rights/obligations not autonomously accepted",
+  "declared": [
+   {
+    "id": "Upload",
+    "label": "Add a contract",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Contract upload\""
+   },
+   {
+    "id": "assign review",
+    "label": "Send for review",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"reviewer picker\""
+   },
+   {
+    "id": "send for signature",
+    "label": "Send for signature",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"e-sign request\""
+   },
+   {
+    "id": "draft",
+    "label": "Drafts",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Draft\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-LEGAL-003",
+  "title": "Contract Detail",
+  "route": "/o/:org/legal/contracts/:id",
+  "contractActions": [
+   "Compare",
+   "comment",
+   "request review",
+   "approve legal step"
+  ],
+  "contractOverlays": [
+   "Clause inspector",
+   "redline diff",
+   "sign authorization"
+  ],
+  "edge": "Original signed version immutable",
+  "declared": [
+   {
+    "id": "Compare",
+    "label": "Compare versions",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "switches to tab \"Redline\""
+   },
+   {
+    "id": "request review",
+    "label": "Request a review",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Clause inspector\""
+   },
+   {
+    "id": "approve legal step",
+    "label": "Record a signature",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"sign authorization\""
+   },
+   {
+    "id": "comment",
+    "label": "Flagged clauses",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Clause inspector\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-LEGAL-004",
+  "title": "Policy Register",
+  "route": "/o/:org/legal/policies",
+  "contractActions": [
+   "Create",
+   "revise",
+   "publish",
+   "request acknowledgment"
+  ],
+  "contractOverlays": [
+   "Policy editor",
+   "audience",
+   "publication impact"
+  ],
+  "edge": "Superseded version preserved for historical decisions",
+  "declared": [
+   {
+    "id": "Create",
+    "label": "Create a policy",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Policy editor\""
+   },
+   {
+    "id": "revise",
+    "label": "Revise",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Policy editor\""
+   },
+   {
+    "id": "publish",
+    "label": "What publishing does",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"publication impact\""
+   },
+   {
+    "id": "request acknowledgment",
+    "label": "Who it reaches",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"audience\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-LEGAL-005",
+  "title": "Obligation Calendar",
+  "route": "/o/:org/legal/obligations",
+  "contractActions": [
+   "Assign",
+   "remind",
+   "record evidence",
+   "escalate"
+  ],
+  "contractOverlays": [
+   "Deadline editor",
+   "evidence upload",
+   "escalation"
+  ],
+  "edge": "Relative dates converted with explicit timezone/jurisdiction",
+  "declared": [
+   {
+    "id": "Assign",
+    "label": "Assign an owner",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"escalation\""
+   },
+   {
+    "id": "record evidence",
+    "label": "Record evidence",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"evidence upload\""
+   },
+   {
+    "id": "remind",
+    "label": "Add a deadline",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Deadline editor\""
+   },
+   {
+    "id": "escalate",
+    "label": "What is overdue",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"Overdue\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-LEGAL-006",
+  "title": "Risk Register",
+  "route": "/o/:org/legal/risks",
+  "contractActions": [
+   "Add",
+   "score",
+   "mitigate",
+   "review"
+  ],
+  "contractOverlays": [
+   "Risk form",
+   "score rationale",
+   "control assignment"
+  ],
+  "edge": "AI risk rating not substituted for accountable owner decision",
+  "declared": [
+   {
+    "id": "Add",
+    "label": "Add a risk",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Risk form\""
+   },
+   {
+    "id": "score",
+    "label": "Score a risk",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"score rationale\""
+   },
+   {
+    "id": "mitigate",
+    "label": "Assign a control",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"control assignment\""
+   },
+   {
+    "id": "review",
+    "label": "High risks",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "switches to tab \"High\""
+   }
+  ],
+  "missingActions": []
+ },
+ {
+  "screen": "ARL-LEGAL-007",
+  "title": "Audit & Evidence",
+  "route": "/o/:org/legal/evidence",
+  "contractActions": [
+   "Assemble",
+   "hash",
+   "share",
+   "request legal hold"
+  ],
+  "contractOverlays": [
+   "Evidence detail",
+   "legal hold",
+   "export permissions"
+  ],
+  "edge": "Restricted/retained data follows legal hold and export rules",
+  "declared": [
+   {
+    "id": "Assemble",
+    "label": "Assemble a pack",
+    "placement": "primary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"Evidence detail\""
+   },
+   {
+    "id": "request legal hold",
+    "label": "Legal hold",
+    "placement": "secondary",
+    "inContract": true,
+    "suspect": false,
+    "currently": "opens overlay \"legal hold\""
+   },
+   {
+    "id": "share",
+    "label": "Export rules",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"export permissions\""
+   },
+   {
+    "id": "hash",
+    "label": "Schedule an audit",
+    "placement": "overflow",
+    "inContract": true,
+    "suspect": true,
+    "currently": "opens overlay \"Evidence detail\""
+   }
+  ],
+  "missingActions": []
+ }
+]
