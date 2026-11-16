@@ -150,7 +150,12 @@
   }
   .hq[data-nav-open="true"] .hq-rail, .hq[data-nav-open="true"] .hq-appnav { transform: none; }
   .hq[data-nav-open="true"] .hq-scrim { display: block; position: fixed; inset: var(--header-h) 0 0 0; background: var(--bg-overlay); z-index: 50; }
-  .hq-main { padding-block-end: 64px; }
+  /* The bottom navigation grows with iOS/Android safe areas. Reserve all of
+     that space so the final row of a document/editor cannot sit underneath it. */
+  .hq-main { padding-block-end: calc(64px + env(safe-area-inset-bottom)); }
+  .hq-rail-btn { width: 44px; height: 44px; }
+  .hq-navlink { min-height: 44px; }
+  .hq-orgswitch, .hq-search { min-height: 44px; }
   .hq-bottom {
     display: flex; position: fixed; inset-inline: 0; inset-block-end: 0; z-index: 45;
     background: var(--bg-surface); border-block-start: 1px solid var(--border-default);
@@ -158,7 +163,7 @@
   }
   .hq-bottom a, .hq-bottom button {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-    min-height: 56px; flex: 1; color: var(--fg-muted); text-decoration: none; font-size: 10px; font-weight: 600;
+    min-height: 60px; flex: 1; color: var(--fg-muted); text-decoration: none; font-size: 12px; font-weight: 600;
   }
   .hq-bottom [aria-current="page"] { color: var(--accent); }
   .hq-search { width: auto; }
@@ -170,7 +175,8 @@
 }
 @media (max-height: 640px) {
   .pg-head { padding-block-start: var(--space-3); gap: var(--space-2); }
-  .pg-lede { display: none; }
+  /* Compact windows still need readable context; avoid hiding the description. */
+  .pg-lede { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 }
 
 /* ===================== State of play ===================== */
