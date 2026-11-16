@@ -57,6 +57,9 @@ export function AppShell() {
   const activeScreen = activeMatch?.screen;
   const activeCode = activeScreen?.applicationCode ?? "HQ";
   const appModule = getApp(activeCode);
+  // Headquarters is the parent workspace: its navigation already lives in
+  // the primary sidebar. Only native specialist applications get a second pane.
+  const showAppNav = Boolean(appModule && activeCode !== "HQ");
   const contextSections = appModule?.nav.map((section) => ({
     ...section,
     items: section.items.map((item) => {
@@ -145,7 +148,7 @@ export function AppShell() {
         <Button variant="ghost" size="sm" iconOnly aria-label={navOpen && mobilePanel === "global" ? "Close navigation" : "Open navigation"} className="hq-only-mobile" onClick={() => { setMobilePanel("global"); setNavOpen(navOpen && mobilePanel === "global" ? false : true); }}>
           {navOpen && mobilePanel === "global" ? <X size={18} /> : <MenuIcon size={18} />}
         </Button>
-        {appModule && (
+        {showAppNav && appModule && (
           <Button variant="ghost" size="sm" iconOnly aria-label={`Open ${appModule.short} pages`} className="hq-header-context-toggle hq-only-mobile" onClick={() => { setMobilePanel("app"); setNavOpen(true); }}>
             <PanelLeftOpen size={18} />
           </Button>
@@ -176,9 +179,9 @@ export function AppShell() {
         />
 
         <div className="hq-header-path" aria-label="Current workspace">
-          <span>{areaForApplication(activeCode)}</span>
+          <span>{activeCode === "HQ" ? "Company" : areaForApplication(activeCode)}</span>
           <ChevronRight size={13} aria-hidden="true" />
-          <strong className="ds-truncate">{appModule?.short ?? "Headquarters"}</strong>
+          <strong className="ds-truncate">{activeCode === "HQ" ? activeScreen?.title ?? "Headquarters" : appModule?.short ?? "Headquarters"}</strong>
         </div>
         <span className="ds-grow" />
 
@@ -231,7 +234,7 @@ export function AppShell() {
         </Button>
       </header>
 
-      <div className="hq-frame" data-appnav={appModule ? "true" : "false"} data-context-collapsed={contextCollapsed ? "true" : "false"}>
+      <div className="hq-frame" data-appnav={showAppNav ? "true" : "false"} data-context-collapsed={contextCollapsed ? "true" : "false"}>
         <button type="button" className="hq-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />
 
         <HeadquartersNavigation
@@ -246,7 +249,7 @@ export function AppShell() {
           onBrowse={openLauncher}
         />
 
-        {appModule && (
+        {showAppNav && appModule && (
           <nav className="hq-appnav" aria-label={`${appModule.short} pages`}>
             <div className="hq-appnav-head">
               <div className="hq-appnav-heading">
@@ -297,7 +300,7 @@ export function AppShell() {
         )}
 
         <main className="hq-main" id="main">
-          {appModule && contextCollapsed && (
+          {showAppNav && appModule && contextCollapsed && (
             <div className="hq-context-restore">
               <button type="button" onClick={() => setContextCollapsed(false)} aria-label={`Show ${appModule.short} pages`}>
                 <PanelLeftOpen size={16} /> Show {appModule.short} pages
