@@ -5,7 +5,7 @@ import { Button, Pill, Row } from "@/design-system";
 import { Menu } from "@/design-system/overlays";
 import { ArloviMark, brand, palettes } from "@/app/brand";
 import { NAV_GROUPS, APP_ENTRIES, mobileNavFor } from "@/app/nav";
-import { appEntry, findScreen } from "@/app/catalog";
+import { appEntry, findScreen, screens } from "@/app/catalog";
 import { destinationForOrganization } from "@/app/organizationNavigation";
 import { ScreenHost } from "@/app/ScreenHost";
 import { ScreenErrorBoundary } from "@/app/ErrorBoundary";
