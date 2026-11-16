@@ -261,7 +261,7 @@ export function PortalShell({ portal, active, children }: { portal: Rec; active:
           <>
             <Card eyebrow="WELCOME" prov="human" title={`Hello, ${portal.title}`} subtitle="Everything your project shares with you, in one place.">
               <Properties rows={[
-                { label: "Records shared with you", value: <span className="ds-num">{String(shared.length + portalDocuments(portal, data.documents).length)}</span> },
+                { label: "Records shared with you", value: <span className="ds-num">{String(sharedWithPortal(portal, data).length)}</span> },
                 { label: "Open requests", value: <span className="ds-num">{String(portalMessages(portal, data.messages).filter((message) => message.status === "open").length)}</span> },
                 { label: "Invoices", value: <span className="ds-num">{String(portalInvoices(portal, data.invoices).length)}</span> },
               ]} />
