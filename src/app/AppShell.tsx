@@ -227,7 +227,7 @@ export function AppShell() {
           align="start"
           trigger={
             <button type="button" className="hq-orgswitch" aria-label={`Switch company, current ${org.name}`}>
-              <span className="hq-orgdot" style={{ background: org.accent }}>{org.shortName.slice(0, 1)}</span>
+              <span className="hq-orgdot" aria-hidden="true" style={{ background: org.accent }}>{org.shortName.slice(0, 1)}</span>
               <span className="name ds-truncate">{org.name}</span>
               <ChevronDown size={14} />
             </button>
@@ -250,7 +250,7 @@ export function AppShell() {
         </div>
         <span className="ds-grow" />
 
-        <button ref={searchTrigger} type="button" className="hq-search" onClick={openCommand} aria-label={`Search ${org.shortName}`} aria-keyshortcuts="Control+K Meta+K">
+        <button ref={searchTrigger} type="button" className="hq-search" onClick={openCommand} aria-label={`Search anything in ${org.shortName}`} aria-keyshortcuts="Control+K Meta+K">
           <Search size={15} />
           <span className="ds-grow hq-search-label" style={{ textAlign: "start" }}>Search anything in {org.shortName}</span>
           <kbd className="ds-kbd">{keyboardHint}</kbd>
