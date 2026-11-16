@@ -241,6 +241,10 @@
   .hq-header .hq-header-utils{gap:0}
   .hq-header .hq-header-utils .ds-btn{padding-inline:5px}
 }
+/* Responsive search may collapse to an icon, but its accessible name may not
+   disappear with the visually hidden copy. Higher specificity than the
+   small-screen .hq-search span rule preserves it without changing layout. */
+.hq-header .hq-search > .ds-sr-only{display:block}
 @media(prefers-reduced-motion:reduce){.hq-header .hq-search{transition:none}}
 
 /* The count is display-only: it must never block clicks or touch on its button. */
