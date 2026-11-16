@@ -2,6 +2,7 @@ import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
+import { CompanyOnboarding } from "@/app/CompanyOnboarding";
 import { ClockProvider } from "@/platform/clock";
 import { WorkspaceProvider } from "@/platform/workspace";
 import { ensureSeed } from "@/runtime/db";
@@ -52,6 +53,7 @@ function Boot() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Navigate to="/o/northline/hq/home" replace />} />
+        <Route path="/setup" element={<CompanyOnboarding />} />
         <Route
           path="/o/:org/*"
           element={
