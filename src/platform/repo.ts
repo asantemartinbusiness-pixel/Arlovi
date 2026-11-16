@@ -201,6 +201,36 @@ export async function putMany(records: Rec[], context: WriteContext, events: Omi
           throw new ConflictError(record.id, 0, original.revision);
         }
       }
+      // Also verify source documents read by a cross-app handoff, even if
+      // the source record itself is not changed (e.g. an accepted quote).
+      const written = new Set(records.map((record) => record.id));
+      const readOnlyIds = Object.keys(expectedRevisions).filter((id) => !written.has(id));
+      if (readOnlyIds.length) {
+        const sources = await db.records.bulkGet(readOnlyIds);
+        for (const [index, id] of readOnlyIds.entries()) {
+          const source = sources[index];
+          const expected = expectedRevisions[id];
+          if (!source || source.organizationId !== scopeId || source.revision !== expected) {
+            throw new ConflictError(id, expected, source?.revision ?? -1);
+          }
+        }
+      }
+      // A new draft invoice must not reuse an existing displayed invoice
+      // number, including when another deal was closed in a different tab.
+      if (Object.keys(expectedRevisions).length > 0) {
+        const newInvoices = records.filter((record, index) =>
+          record.collection === "invoices" && !existing[index]);
+        if (newInvoices.length) {
+          const allInvoices = await db.records.where("[organizationId+collection]")
+            .equals([scopeId, "invoices"]).toArray();
+          for (const invoice of newInvoices) {
+            const number = String(invoice.fields.number ?? invoice.title);
+            if (allInvoices.some((row) => String(row.fields.number ?? row.title) === number)) {
+              throw new Error(`Invoice number ${number} was already used. Reopen this deal and retry the handoff.`);
+            }
+          }
+        }
+      }
       await db.records.bulkPut(records);
     }
     if (events.length) {
