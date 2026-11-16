@@ -28,10 +28,18 @@ const GROUPS: { group: string; load: () => Promise<unknown> }[] = [
 ];
 
 let loading: Promise<LoadFailure[]> | null = null;
+let coreLoading: Promise<void> | null = null;
+let complete = false;
+export function applicationsLoading(): boolean { return !complete; }
+/** Load only HQ and its seed contributor to prepare the local workspace. */
+export function loadCoreApplications(): Promise<void> {
+  coreLoading ??= GROUPS[0].load().then(() => undefined);
+  return coreLoading;
+}
 let failures: LoadFailure[] = [];
 
 export function loadApplications(): Promise<LoadFailure[]> {
-  loading ??= Promise.allSettled(GROUPS.map((item) => item.load())).then((results) => {
+  loading ??= Promise.allSettled(GROUPS.map((item, index) => index === 0 ? loadCoreApplications() : item.load())).then((results) => {
     failures = results.flatMap((result, index) => {
       if (result.status === "fulfilled") return [];
       const reason = result.reason as unknown;
@@ -39,6 +47,7 @@ export function loadApplications(): Promise<LoadFailure[]> {
       console.error(`Arlovi: the ${GROUPS[index].group} applications failed to load. ${message}`);
       return [{ group: GROUPS[index].group, message }];
     });
+    complete = true;
     return failures;
   });
   return loading;
