@@ -9,6 +9,7 @@ import { appEntry, findScreen, screens } from "@/app/catalog";
 import { destinationForOrganization } from "@/app/organizationNavigation";
 import { ScreenHost } from "@/app/ScreenHost";
 import { FirstRunGuide } from "@/app/FirstRunGuide";
+import { GuidedTour } from "@/app/GuidedTour";
 import { ScreenErrorBoundary } from "@/app/ErrorBoundary";
 import { applicationLoadFailures } from "@/applications";
 import { CommandPalette } from "@/app/CommandPalette";
@@ -107,6 +108,7 @@ export function AppShell() {
   return (
     <div className="hq" data-nav-open={navOpen ? "true" : "false"}>
       <a className="ds-skip" href="#main">Skip to content</a>
+      <GuidedTour />
 
       <header className="hq-header">
         <Button variant="ghost" size="sm" iconOnly aria-label={navOpen ? "Close navigation" : "Open navigation"} className="hq-only-mobile" onClick={() => setNavOpen(!navOpen)}>
@@ -167,6 +169,7 @@ export function AppShell() {
               group: "Role view (not a security boundary)",
               onSelect: () => ui.setRole(item),
             })),
+            { label: "Take a guided tour", group: "Help", separatorBefore: true, onSelect: () => window.dispatchEvent(new Event("arlovi:start-tour")) },
             { label: `${activePinned ? "Remove" : "Pin"} ${APP_ENTRIES[activeCode]?.short ?? "this app"} ${activePinned ? "from" : "to"} favourites`, group: "Navigation", separatorBefore: true, onSelect: () => { void toggleFavourite(); } },
             ...(org.ownerName ? [{ label: "Review company setup", group: "Navigation", onSelect: () => navigate(`/o/${org.slug}/hq/home?gettingStarted=1`) }] : []),
             { label: ui.theme === "light" ? "Dark appearance" : "Light appearance", group: "Appearance", separatorBefore: true, onSelect: () => ui.setTheme(ui.theme === "light" ? "dark" : "light") },
