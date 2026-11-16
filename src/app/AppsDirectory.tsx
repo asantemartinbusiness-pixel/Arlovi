@@ -217,7 +217,7 @@ export function AppsDirectory() {
           <h2>No applications found</h2>
           <p>Try an application name, a capability such as invoices or documents, or another category.</p>
           <button type="button" onClick={() => {
-            const next = new URLSearchParams(params);
+            const next = new URLSearchParams(window.location.search);
             next.delete("q"); next.delete("category"); setParams(next, { replace: true });
           }}>Show all available applications</button>
         </section>
