@@ -1,5 +1,6 @@
 import { db } from "@/runtime/db";
 import type { Audit, Rec, Snapshot } from "@/domain/types";
+import { journalDate, lockedPeriods, periodOf } from "@/domain/fin-ledger";
 
 /* ------------------------------------------------------------------ *
  * Narrow repository.
@@ -24,6 +25,26 @@ export class ConflictError extends Error {
     this.name = "ConflictError";
   }
 }
+
+/**
+ * All newly posted journals pass the live accounting-period lock from the
+ * database, inside the same transaction that writes the journal.
+ * Reconciliation link metadata may be added to an already-posted journal;
+ * that operation does not post a new ledger entry.
+ */
+async function assertOpenJournalPeriod(record: Rec, previous?: Rec): Promise<void> {
+  if (record.collection !== "journals" || record.status !== "posted") return;
+  const dateChanged = previous && journalDate(previous) !== journalDate(record);
+  if (previous?.status === "posted" && !dateChanged) return;
+  const prefs = await db.records.where("[organizationId+collection]")
+    .equals([record.organizationId, "preferences"]).toArray();
+  const controls = prefs.find((item) => item.fields.kind === "accountingPeriods");
+  const period = periodOf(journalDate(record));
+  if (lockedPeriods(controls).includes(period)) {
+    throw new Error(`Accounting period ${period} is closed. No posted journal was written; choose an open period.`);
+  }
+}
+
 
 /* Last-read copy of every record this tab has seen. Forms seed their state
    once, on first render; reading the record asynchronously meant that render
@@ -131,6 +152,7 @@ export async function patchRecord(id: string, patch: Partial<Rec>, context: Writ
       updatedAt: context.now,
       updatedBy: context.actor,
     };
+    await assertOpenJournalPeriod(next, current);
     await db.records.put(next);
     prime(next);
     if (options.event) {
@@ -154,6 +176,7 @@ export async function putRecord(record: Rec, context: WriteContext, event?: Omit
     if (previous && previous.organizationId !== record.organizationId) {
       throw new OrganizationScopeError(record.id, record.organizationId, previous.organizationId);
     }
+    await assertOpenJournalPeriod(record, previous);
     await db.records.put(record);
     if (event) {
       await db.events.add({
@@ -231,6 +254,9 @@ export async function putMany(records: Rec[], context: WriteContext, events: Omi
           }
         }
       }
+      for (const [index, record] of records.entries()) {
+        await assertOpenJournalPeriod(record, existing[index]);
+      }
       await db.records.bulkPut(records);
     }
     if (events.length) {
@@ -252,6 +278,11 @@ export async function deleteRecord(id: string, context: WriteContext, event?: Om
     if (!current) return;
     if (expectedOrgId && current.organizationId !== expectedOrgId) {
       throw new OrganizationScopeError(id, expectedOrgId, current.organizationId);
+    }
+    // Posted journals remain immutable accounting evidence. Reverse them
+    // through the ledger instead of deleting them from the chart of accounts.
+    if (current.collection === "journals" && current.status === "posted") {
+      throw new Error("A posted journal cannot be deleted. Create a balanced reversal instead.");
     }
     await db.records.delete(id);
     if (event && current) {
