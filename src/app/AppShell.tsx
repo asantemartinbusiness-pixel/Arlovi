@@ -8,6 +8,7 @@ import { NAV_GROUPS, APP_ENTRIES, mobileNavFor } from "@/app/nav";
 import { appEntry, findScreen, screens } from "@/app/catalog";
 import { destinationForOrganization } from "@/app/organizationNavigation";
 import { ScreenHost } from "@/app/ScreenHost";
+import { FirstRunGuide } from "@/app/FirstRunGuide";
 import { ScreenErrorBoundary } from "@/app/ErrorBoundary";
 import { applicationLoadFailures } from "@/applications";
 import { CommandPalette } from "@/app/CommandPalette";
@@ -287,6 +288,7 @@ export function AppShell() {
               )}
             </div>
           )}
+          {org.ownerName && location.pathname === `/o/${org.slug}/hq/home` && <FirstRunGuide />}
           <ScreenErrorBoundary resetKey={location.pathname} label={activeScreen?.title ?? "This screen"}>
             <ScreenHost />
           </ScreenErrorBoundary>
