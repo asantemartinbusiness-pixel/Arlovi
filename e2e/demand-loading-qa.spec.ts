@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { appEntry } from "../src/app/catalog";
+const appRoutes: Record<string, string> = {
+  FIN: "/o/northline/fin/home",
+  DOCS: "/o/northline/docs/files",
+  PROJECT: "/o/northline/project/portfolios",
+  COMMS: "/o/northline/comms/home",
+};
 
 test("all five headquarters areas load in a real Chromium viewport", async ({ page }, testInfo) => {
   const areas = ["home", "company", "spaces", "work", "apps"] as const;
@@ -29,14 +34,14 @@ test("native app is not eagerly requested from an untouched headquarters session
   await page.waitForTimeout(1200);
   expect(requests, "Finance must not be fetched automatically on Home").toHaveLength(0);
 
-  await page.goto(appEntry("FIN","northline"));
+  await page.goto(appRoutes.FIN);
   await expect.poll(() => requests.length, {timeout:30000}).toBeGreaterThan(0);
   await expect(page.getByText(/Finance.*did not load/)).toHaveCount(0);
 });
 
 test("lazy native destinations work after direct navigation and reload", async ({ page }) => {
   for (const code of ["DOCS", "PROJECT", "COMMS"] as const) {
-    await page.goto(appEntry(code, "northline"));
+    await page.goto(appRoutes[code]);
     const expectedName = {DOCS:"Docs",PROJECT:"Projects",COMMS:"Communications"}[code];
     await expect(page.locator(".hq-appnav-head")).toContainText(expectedName, {timeout:30000});
     await expect(page.getByText(/did not load/)).toHaveCount(0);
