@@ -1,3 +1,4 @@
+import { clockIso } from "@/platform/clock";
 import { db } from "@/runtime/db";
 import { AGENT_ASSIGNMENTS, AGENT_RECEIPTS } from "@/platform/agentWork";
 import { capabilityById } from "@/platform/capability";
@@ -104,7 +105,7 @@ export async function recordExecutionRequest(orgId: string, assignmentId: string
     const existing = await db.records.where("[organizationId+collection]").equals([orgId, EXECUTION_REQUESTS]).toArray();
     if (existing.some(r => r.fields.assignmentId === assignmentId && r.status === "blocked"))
       throw new Error("There is already an open execution request for this assignment.");
-    const at = new Date().toISOString();
+    const at = clockIso();
     const request: Rec = {
       id: crypto.randomUUID(), organizationId: orgId, collection: EXECUTION_REQUESTS,
       title: `Execution requested — ${assignment.title}`, status: "blocked",
@@ -124,7 +125,7 @@ export async function dismissExecutionRequest(orgId: string, requestId: string, 
   await db.transaction("rw", [db.records, db.events], async () => {
     const request = requireRow(await db.records.get(requestId), orgId, EXECUTION_REQUESTS);
     if (request.status !== "blocked") throw new Error("Only blocked requests can be dismissed locally.");
-    const at = new Date().toISOString();
+    const at = clockIso();
     await db.records.put(edited(request, "dismissed", actor, at));
     await db.events.add(log(orgId, actor, at, `Blocked execution request dismissed: ${request.title}`, request.id));
   });
