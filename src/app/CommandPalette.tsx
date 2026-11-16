@@ -4,7 +4,9 @@ import { screens } from "@/app/catalog";
 import { APP_ENTRIES } from "@/app/nav";
 import { routeForRecord } from "@/platform/attention";
 import { canOpen } from "@/platform/policy";
-import { useOrgRecords, useWorkspace } from "@/platform/workspace";
+import { useCollections, useOrgRecords, useWorkspace } from "@/platform/workspace";
+import { useNavigationContinuity } from "@/platform/navigationContinuity";
+import { destinationLabel } from "@/app/WorkspaceContinuity";
 
 interface Hit {
   key: string;
@@ -23,6 +25,10 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const { org, role } = useWorkspace();
   const records = useOrgRecords();
+  const spaces = useCollections(["projects", "departments"]);
+  const projects = spaces.projects ?? [];
+  const departments = spaces.departments ?? [];
+  const navigation = useNavigationContinuity(org.id, org.slug);
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
@@ -56,8 +62,24 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         }))
       : [];
 
-    return [...pages, ...rows];
-  }, [query, records, org.slug, role]);
+    const locations: Hit[] = [...new Set([...navigation.pinned, ...navigation.recent.map(item => item.path)])]
+      .filter(path => !q || destinationLabel(path, org.slug, projects, departments).toLowerCase().includes(q))
+      .slice(0, q ? 8 : 6).map(path => ({
+        key: `location-${path}`, group: "Recent & saved",
+        title: destinationLabel(path, org.slug, projects, departments),
+        detail: navigation.pinned.includes(path) ? "Saved location" : "Recently visited", to: path,
+      }));
+    const workspaces: Hit[] = q ? [
+      ...departments.map(record => ({key: `department-${record.id}`, group: "Workspaces", title: record.title, detail: "Department space", to: `/o/${org.slug}/workspace/spaces/department/${record.id}`})),
+      ...projects.map(record => ({key: `project-${record.id}`, group: "Workspaces", title: record.title, detail: "Project space", to: `/o/${org.slug}/workspace/work/project/${record.id}`})),
+    ].filter(item => `${item.title} ${item.detail}`.toLowerCase().includes(q)).slice(0, 8) : [];
+    const used = new Set<string>();
+    return [...locations, ...workspaces, ...pages, ...rows].filter(hit => {
+      if (used.has(hit.to)) return false;
+      used.add(hit.to);
+      return true;
+    });
+  }, [query, records, org.slug, role, navigation, departments, projects]);
 
   useEffect(() => { setIndex(0); }, [query]);
 
