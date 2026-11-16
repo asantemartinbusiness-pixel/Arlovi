@@ -6,10 +6,10 @@ import { CompanyOnboarding } from "@/app/CompanyOnboarding";
 import { orgBySlug, recoverLocalOrganizations } from "@/platform/org";
 import { ClockProvider } from "@/platform/clock";
 import { WorkspaceProvider } from "@/platform/workspace";
-import { ensureSeed } from "@/runtime/db";
+import { ensureSeed, seedLateContributors } from "@/runtime/db";
 import { useUi } from "@/runtime/ui";
 import "@/design-system";
-import { loadApplications } from "@/applications";
+import { loadApplications, loadCoreApplications } from "@/applications";
 
 function WorkspaceEntry({ recoveredSlug }: { recoveredSlug: string | null }) {
   let slug: string | null = null;
@@ -30,10 +30,17 @@ function Boot() {
   useEffect(() => {
     // Applications register first so their fixtures are known to the seeder.
     // A group that fails to load is reported by the shell; the rest still boot.
-    loadApplications()
+    loadCoreApplications()
       .then(() => ensureSeed())
       .then(() => recoverLocalOrganizations())
-      .then((slug) => { setRecoveredSlug(slug); setReady(true); })
+      .then((slug) => {
+        setRecoveredSlug(slug);
+        setReady(true);
+        // Register other app groups and reconcile their fixtures after the
+        // core workspace opens, without overwriting local customer edits.
+        void loadApplications().then(() => seedLateContributors())
+          .catch(error => console.error("Arlovi: optional application loading failed.", error));
+      })
       .catch((error: unknown) => setFailed(error instanceof Error ? error.message : "The workspace could not be opened."));
   }, []);
 
