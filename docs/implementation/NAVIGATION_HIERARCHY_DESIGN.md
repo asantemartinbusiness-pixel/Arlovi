@@ -125,7 +125,18 @@ The launcher is an intentional separate discovery experience, not a scrollable i
 
 Do not put 35 app icons in the header. Avoid redundant badges, theme switchers and duplicate labels on compact displays. The current page heading stays in the page, not repeated as a full second toolbar.
 
-## 6. Visual system
+## 6. Visual system — existing Arlovi tokens are immutable by navigation work
+
+**Critical engineering invariant:** Navigation architecture may change *where* destinations appear but must not invent a second design language. The canonical appearance remains `src/design-system/tokens.css` and the shared components in `src/design-system/`, with the established rules in `src/app/shell.css`.
+
+- Brand values: approved Electric Cobalt, Papaya, Aqua, graphite and warm paper — only through shared tokens.
+- Typography: existing Inter / IBM Plex via `--font-sans`, `--font-display` and `--font-mono`.
+- Controls: reuse existing `hq-navlink`, `hq-navsection`, shared button/modal, border and focus patterns. No large app-launcher hero, new decorative monogram, custom palette or extra badge language.
+- Local CSS may define **container widths, panel visibility, responsive geometry and necessary layout mechanics**. It may not override brand, type, semantic colours, shared radii or global application dimensions. Any global visual-system change requires separate explicit design approval.
+- A matching grid is not visual parity unless the actual screen retains the approved padding, typography, contrast, selection, motion and controls.
+
+## 6a. Structural navigation layout
+
 
 - Primary navigation: **248px** desktop; **68px** intentionally compact desktop.
 - Application context: **232px** full desktop, **216px** mid desktop.
