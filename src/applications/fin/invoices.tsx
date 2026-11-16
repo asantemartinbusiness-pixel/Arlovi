@@ -18,6 +18,7 @@ import { contactOf, openInvoices, outstandingMinor, useFinData } from "./data";
 import type { FinData } from "./data";
 import { Amount, CapabilityNotice, CapabilityPill, OverdueBadge, SourceNote, StatementRow, StatusPill, TaxCodePill, taxRateText } from "./parts";
 import { clockIso } from "@/platform/clock";
+import { prepareInvoiceIssue, prepareInvoiceReceipt } from "./settlement";
 
 /* ------------------------------------------------------------------ *
  * FIN-004 Invoice list and FIN-005 Invoice detail.
@@ -1116,35 +1117,45 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
           disabled={Boolean(blocked) || !context.can("post_journal")}
           title={!context.can("post_journal") ? "Posting needs the Finance or Owner role view" : blocked}
           onClick={async () => {
-            if (!ar) return;
+            if (busy || blocked) return;
             setBusy(true);
-            const lines: JLine[] = [
-              { accountId, debitMinor: amount, creditMinor: 0, memo: `Receipt ${invoice.title}` },
-              { accountId: ar.id, debitMinor: 0, creditMinor: amount, memo: `Receipt ${invoice.title}` },
-            ];
-            const journal = await context.mutate.create({
-              collection: "journals",
-              title: `Receipt ${invoice.title}`,
-              status: "posted",
-              summary: `Local receipt for ${invoice.title} by ${method.toLowerCase()}. No payment provider confirmed it.`,
-              amountMinor: amount,
-              at: `${date}T09:00:00.000Z`,
-              parentId: invoice.id,
-              tags: ["ledger", "receipt"],
-              fields: { date, source: "payment", invoiceId: invoice.id, method },
-              body: { date, memo: `Receipt for ${invoice.title}`, lines },
-            }, `Receipt posted for ${invoice.title}`);
-            const nextPaid = paid + amount;
-            await context.mutate.patch(invoice.id, {
-              status: nextPaid >= totals.grossMinor ? "paid" : "part_paid",
-              fields: { ...invoice.fields, paidMinor: nextPaid, paymentJournalId: journal.id, paidAt: `${date}T09:00:00.000Z` },
-            }, { expectRevision: invoice.revision, event: `Payment of ${context.money(amount)} recorded on ${invoice.title}` });
-            context.toast(
-              nextPaid >= totals.grossMinor ? "Invoice settled" : "Part payment recorded",
-              `${context.money(amount)} posted as a balanced receipt. Outstanding is now ${context.money(totals.grossMinor - nextPaid)}.`,
-            );
-            setBusy(false);
-            close();
+            try {
+              const result = prepareInvoiceReceipt({
+                invoice, grossMinor: totals.grossMinor,
+                amountMinor: amount, accounts: data.accounts,
+                locked: data.locked, cashAccountId: accountId,
+                date, method, actor: context.actor, now,
+              });
+              if (!result.posting) {
+                context.toast("Receipt posting blocked", result.blocked ?? "Review the payment and retry.", "blocked");
+                return;
+              }
+              const prepared = result.posting;
+              await context.mutate.putMany(
+                [prepared.invoice, prepared.journal],
+                [
+                  `Payment of ${context.money(amount)} recorded on ${invoice.title}`,
+                  `Receipt posted for ${invoice.title}`,
+                ],
+                prepared.expectedRevisions,
+                ["update", "create"],
+              );
+              const nextPaid = Number(prepared.invoice.fields.paidMinor ?? 0);
+              context.toast(
+                prepared.invoice.status === "paid" ? "Invoice settled" : "Part payment recorded",
+                `${context.money(amount)} posted as a balanced receipt. Outstanding is now ${context.money(totals.grossMinor - nextPaid)}.`,
+              );
+              close();
+            } catch (error) {
+              context.toast(
+                "Payment was not recorded",
+                error instanceof Error ? error.message : "This invoice changed. Reopen the record and retry.",
+                "failed",
+              );
+            } finally {
+              setBusy(false);
+            }
+          }
           }}
         >
           Post the receipt
@@ -1473,36 +1484,41 @@ export function ApproveInvoice({ context, close }: { context: ScreenContext; clo
         disabled={Boolean(blocked) || !context.can("post_journal")}
         title={!context.can("post_journal") ? "Posting needs the Finance or Owner role view" : blocked}
         onClick={async () => {
+          if (busy || blocked) return;
           setBusy(true);
-          const date = (invoice.at ?? context.now.toISOString()).slice(0, 10);
-          const journal = await context.mutate.create({
-            collection: "journals",
-            title: `Issue ${invoice.title}`,
-            status: "posted",
-            summary: `Receivable raised for ${invoice.title}.`,
-            amountMinor: totals.grossMinor,
-            at: `${date}T09:00:00.000Z`,
-            parentId: invoice.id,
-            tags: ["ledger", "invoice"],
-            fields: { date, source: "invoice", invoiceId: invoice.id, postedBy: context.actor, approvedBy: context.actor },
-            body: { date, memo: invoice.title, lines: posting.lines },
-          }, `Issued ${invoice.title} and posted a balanced journal`);
-          const versions = ((invoice.body as { versions?: unknown[] })?.versions ?? []) as unknown[];
-          await context.mutate.patch(invoice.id, {
-            status: "awaiting_payment",
-            amountMinor: totals.grossMinor,
-            body: {
-              ...(invoice.body as object ?? {}),
-              versions: [...versions, { at: clockIso(), by: context.actor, note: "Issued and posted", grossMinor: totals.grossMinor }],
-            },
-            fields: {
-              ...invoice.fields, journalId: journal.id, netMinor: totals.netMinor, taxMinor: totals.taxMinor,
-              issuedAt: clockIso(), approvedBy: context.actor, approvedAt: clockIso(),
-            },
-          }, { expectRevision: invoice.revision, event: `${invoice.title} approved by ${context.actor} and issued` });
-          setBusy(false);
-          context.toast("Invoice issued", `${context.money(totals.grossMinor)} is on the ledger as a balanced journal. The invoice is now immutable.`);
-          close();
+          try {
+            const result = prepareInvoiceIssue({
+              invoice, totals, lines: posting.lines,
+              accounts: data.accounts, locked: data.locked,
+              actor: context.actor, now: context.now,
+            });
+            if (!result.posting) {
+              context.toast("Invoice posting blocked", result.blocked ?? "Review this invoice before posting.", "blocked");
+              return;
+            }
+            const prepared = result.posting;
+            // Invoice and posted journal become visible together, or neither
+            // does; a stale revision cannot leave an unlinked ledger entry.
+            await context.mutate.putMany(
+              [prepared.invoice, prepared.journal],
+              [
+                `${invoice.title} approved by ${context.actor} and issued`,
+                `Issued ${invoice.title} and posted a balanced journal`,
+              ],
+              prepared.expectedRevisions,
+              ["update", "create"],
+            );
+            context.toast("Invoice issued", `${context.money(totals.grossMinor)} is on the ledger as a balanced journal. The invoice is now immutable.`);
+            close();
+          } catch (error) {
+            context.toast(
+              "Invoice was not issued",
+              error instanceof Error ? error.message : "The record changed. Reopen the invoice and retry.",
+              "failed",
+            );
+          } finally {
+            setBusy(false);
+          }
         }}
       >
         Approve and post {context.money(totals.grossMinor)}
