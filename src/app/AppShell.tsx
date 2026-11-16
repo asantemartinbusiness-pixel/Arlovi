@@ -39,6 +39,7 @@ export function AppShell() {
 
   const isWorkspaceArea = isWorkAreaPath(location.pathname, org.slug);
   const activeArea = currentWorkArea(location.pathname);
+  const coreAreaActive = WORK_AREAS.some(area => location.pathname === workAreaPath(org.slug, area.id) || location.pathname.startsWith(workAreaPath(org.slug, area.id) + "/"));
   const activeScreen = useMemo(() => findScreen(location.pathname)?.screen, [location.pathname]);
   const activeCode = activeScreen?.applicationCode ?? "HQ";
   const appModule = getApp(activeCode);
@@ -106,7 +107,7 @@ export function AppShell() {
   useEffect(() => {
     setNavOpen(false);
     const container = document.querySelector<HTMLElement>(".hq-scroll");
-    container?.scrollTo({ top: 0, behavior: "instant" });
+    if (container) container.scrollTop = 0;
     // A keyboard/screen-reader user needs a reliable focus destination after
     // client-side routing. Skip the focus move for the first shell mount.
     const heading = container?.querySelector<HTMLElement>("h1");
@@ -229,8 +230,8 @@ export function AppShell() {
             {WORK_AREAS.map((area) => {
               const Icon = area.icon;
               return <Link key={area.id} to={workAreaPath(org.slug,area.id)}
-                className="hq-rail-btn" data-active={isWorkspaceArea && activeArea === area.id ? "true" : undefined}
-                aria-current={isWorkspaceArea && activeArea === area.id ? "page" : undefined}
+                className="hq-rail-btn" data-active={isWorkspaceArea && coreAreaActive && activeArea === area.id ? "true" : undefined}
+                aria-current={isWorkspaceArea && coreAreaActive && activeArea === area.id ? "page" : undefined}
                 title={area.label} aria-label={area.label}><Icon size={19} strokeWidth={1.8}/></Link>;
             })}
           </div>
