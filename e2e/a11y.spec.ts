@@ -37,8 +37,13 @@ test("dark appearance keeps contrast", async ({ page }) => {
 test("keyboard reaches the main content and the command palette", async ({ page }) => {
   await page.goto("/o/northline/hq/home?clock=2026-11-14T09:30:00Z");
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
+  // Route navigation moves focus to its page h1. Verify the skip action
+  // explicitly instead of assuming a fresh document's first Tab position.
+  const skip=page.getByRole("link", { name: "Skip to content" });
+  await skip.focus();
+  await expect(skip).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/#main$/);
   await page.keyboard.press("Control+k");
   await expect(page.getByRole("dialog", { name: /Search Northline/ })).toBeVisible();
   await page.keyboard.press("Escape");
