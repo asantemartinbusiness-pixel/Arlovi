@@ -21,6 +21,22 @@ describe("organization navigation", () => {
       .toBe("/o/northline/fin/invoices?tab=Draft");
   });
 
+  it("preserves a company-level area but drops a foreign project ID and tab", () => {
+    expect(destinationForOrganization("/o/northline/workspace/work/project/nl-project-1", "?tab=files&overlay=Edit", "harbor"))
+      .toBe("/o/harbor/workspace/work");
+    expect(destinationForOrganization("/o/northline/workspace/spaces/department/nl-dept", "?tab=people", "harbor"))
+      .toBe("/o/harbor/workspace/spaces");
+    expect(destinationForOrganization("/o/northline/workspace/people", "", "harbor"))
+      .toBe("/o/harbor/workspace/people");
+    expect(destinationForOrganization("/o/northline/workspace/health", "", "harbor"))
+      .toBe("/o/harbor/workspace/health");
+  });
+
+  it("removes organisation-specific modal, record, and tab parameters from native list pages", () => {
+    expect(destinationForOrganization("/o/northline/fin/invoices", "?tab=Draft&overlay=Edit&record=old-id&selected=row-1", "harbor"))
+      .toBe("/o/harbor/fin/invoices?tab=Draft");
+  });
+
   it("falls back safely for unknown routes", () => {
     expect(destinationForOrganization("/broken", "?overlay=Edit", "harbor"))
       .toBe("/o/harbor/workspace/home");
