@@ -213,10 +213,10 @@ export function AppShell() {
         </Link>
 
         <Menu
-          label="Switch organisation"
+          label="Switch company"
           align="start"
           trigger={
-            <button type="button" className="hq-orgswitch">
+            <button type="button" className="hq-orgswitch" aria-label={`Switch company, current ${org.name}`}>
               <span className="hq-orgdot" style={{ background: org.accent }}>{org.shortName.slice(0, 1)}</span>
               <span className="name ds-truncate">{org.name}</span>
               <ChevronDown size={14} />
@@ -225,10 +225,12 @@ export function AppShell() {
           items={[
             ...ORGS.map((item) => ({
               label: item.id === org.id ? `${item.name} · current` : item.name,
-              group: "Organisations",
+              group: "Companies in this browser",
               onSelect: () => navigate(destinationForOrganization(location.pathname, location.search, item.slug)),
             })),
-            { label: "Create another company", group: "Company", separatorBefore: true, onSelect: () => navigate("/setup") },
+            { label: "Companies here are browser-local; cloud access is not connected", group: "Company access", disabled: true, separatorBefore: true },
+            { label: "Company overview", group: "Company access", onSelect: () => navigate(`/o/${org.slug}/workspace/company`) },
+            { label: "Create another company", group: "Company access", onSelect: () => navigate("/setup") },
           ]}
         />
 
