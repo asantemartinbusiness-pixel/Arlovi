@@ -102,11 +102,14 @@ export function AppShell() {
               <ChevronDown size={14} />
             </button>
           }
-          items={ORGS.map((item) => ({
-            label: item.id === org.id ? `${item.name} · current` : item.name,
-            group: "Organisations",
-            onSelect: () => navigate(destinationForOrganization(location.pathname, location.search, item.slug)),
-          }))}
+          items={[
+            ...ORGS.map((item) => ({
+              label: item.id === org.id ? `${item.name} · current` : item.name,
+              group: "Organisations",
+              onSelect: () => navigate(destinationForOrganization(location.pathname, location.search, item.slug)),
+            })),
+            { label: "Create another company", group: "Company", separatorBefore: true, onSelect: () => navigate("/setup") },
+          ]}
         />
 
         <span className="ds-grow" />
