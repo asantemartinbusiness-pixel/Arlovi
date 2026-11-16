@@ -23,6 +23,11 @@ describe("native application sidebar routing", () => {
       .toBe("/o/harbor/mission/missions");
   });
 
+  it("cannot reuse a record identifier across organisation boundaries", () => {
+    const northline = findScreen("/o/northline/mission/missions/nl-mission-123");
+    expect(nativeNavPath(screen("ARL-MISSION-004"), "harbor", northline)).toBeNull();
+  });
+
   it("does not carry a record ID across different applications or collections", () => {
     const mission = findScreen("/o/northline/mission/missions/nl-mission-123");
     expect(nativeNavPath(screen("ARL-AI-003"), "northline", mission)).toBeNull();
