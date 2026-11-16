@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown, Menu as MenuIcon, Moon, Sparkles, Sun, Search, Bell, X } from "lucide-react";
 import { Button, Pill, Row } from "@/design-system";
@@ -13,10 +13,10 @@ import { GuidedTour } from "@/app/GuidedTour";
 import { WORK_AREAS, WorkspaceNavigation, WorkspaceSideNav, currentWorkArea, isWorkAreaPath, workAreaPath } from "@/app/WorkspaceNavigation";
 import { ScreenErrorBoundary } from "@/app/ErrorBoundary";
 import { applicationLoadFailures } from "@/applications";
-import { CommandPalette } from "@/app/CommandPalette";
+const CommandPalette = lazy(() => import("@/app/CommandPalette").then(module => ({ default: module.CommandPalette })));
 import { recordNavigation } from "@/platform/navigationContinuity";
-import { AttentionCentre } from "@/app/AttentionCentre";
-import { AskPanel } from "@/app/AskPanel";
+const AttentionCentre = lazy(() => import("@/app/AttentionCentre").then(module => ({ default: module.AttentionCentre })));
+const AskPanel = lazy(() => import("@/app/AskPanel").then(module => ({ default: module.AskPanel })));
 import { ExecutionTray } from "@/app/ExecutionTray";
 import { getApp } from "@/platform/registry";
 import { canOpen, ROLE_LABELS } from "@/platform/policy";
@@ -339,9 +339,9 @@ export function AppShell() {
         </NavLink>
       </nav>
 
-      {ui.command && <CommandPalette onClose={() => ui.setCommand(false)} />}
-      {ui.notes && <AttentionCentre items={attention} onClose={() => ui.setNotes(false)} />}
-      {ui.ask && <AskPanel onClose={() => ui.setAsk(false)} seed={ui.askSeed} />}
+      {ui.command && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening search…</div>}><CommandPalette onClose={() => ui.setCommand(false)} /></Suspense>}
+      {ui.notes && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening attention centre…</div>}><AttentionCentre items={attention} onClose={() => ui.setNotes(false)} /></Suspense>}
+      {ui.ask && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening assistant…</div>}><AskPanel onClose={() => ui.setAsk(false)} seed={ui.askSeed} /></Suspense>}
 
       <div className="ds-toasts" aria-live="polite" aria-atomic="false">
         {ui.toasts.map((toast) => (
