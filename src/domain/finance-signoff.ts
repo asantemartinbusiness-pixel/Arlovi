@@ -31,8 +31,8 @@ export function reconciliationEvidence(
     statementRevision: recon.statement.record.revision,
     bankAccountId: recon.bankAccountId,
     bankAccountCode: recon.bankAccountCode,
-    journalRevisions: Object.fromEntries(affected.map((item) => [item.id, item.revision]).sort(([a], [b]) => a.localeCompare(b))),
-    lineRevisions: Object.fromEntries(recon.matched.map((item) => [item.id, item.revision]).sort(([a], [b]) => a.localeCompare(b))),
+    journalRevisions: Object.fromEntries(affected.map((item): [string, number] => [item.id, item.revision]).sort(([a], [b]) => a.localeCompare(b))),
+    lineRevisions: Object.fromEntries(recon.matched.map((item): [string, number] => [item.id, item.revision]).sort(([a], [b]) => a.localeCompare(b))),
     closingMinor: recon.statementClosingMinor,
     ledgerMinor: recon.ledgerMinor,
   };
