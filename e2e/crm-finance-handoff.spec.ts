@@ -3,7 +3,8 @@ import { expect, test } from "@playwright/test";
 test("a stale deal revision never leaves an orphan draft invoice in Finance", async ({page}) => {
   await page.goto("/o/northline/crm/deals/nl-deals-721");
   const outcome = await page.evaluate(async () => {
-    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts") as typeof import("../src/platform/repo");
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
     const original = await repo.getRecordInOrg("org-northline", "nl-deals-721");
     if (!original) throw new Error("Pike deal fixture unavailable");
     const ctx = { actor: "Browser QA", now: "2026-11-14T09:30:00Z", screenId: "qa-crm-handoff" };
