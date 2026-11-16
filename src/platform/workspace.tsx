@@ -1,6 +1,6 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import type { Audit, Rec, Role } from "@/domain/types";
 import { db } from "@/runtime/db";
 import { useUi } from "@/runtime/ui";
@@ -44,7 +44,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const params = useParams();
   const clock = useClock();
   const role = useUi((state) => state.role);
-  const org = orgBySlug(params.org) ?? ORGS[0];
+  const matchedOrg = orgBySlug(params.org);
+  const org = matchedOrg ?? ORGS[0];
   const now = clock.now();
   const nowIso = now.toISOString();
   const actor = ACTOR_BY_ROLE[role];
@@ -63,6 +64,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     relative: (input) => formatRelative(input, new Date(nowIso), org.locale),
   }), [org, role, actor, nowIso]);
 
+  if (!matchedOrg) {
+    return (
+      <main role="alert" style={{ maxWidth: 600, margin: "10vh auto", padding: 32 }}>
+        <h1>Organization not found</h1>
+        <p>This workspace address does not belong to an available organization. No company records have been opened.</p>
+        <Link to="/o/northline/hq/home">Return to the available workspace</Link>
+      </main>
+    );
+  }
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }
 
