@@ -16,6 +16,8 @@ import type { FinData } from "./data";
 import { AccountLabel, Amount, CapabilityNotice, CapabilityPill, SourceNote, StatementRow } from "./parts";
 import { wallMs } from "@/platform/clock";
 import { commitStatementMatch, commitStatementUnmatch } from "./reconciliationLinks";
+import { reconciliationEvidence, reconciliationSignoffBlocker, reconciliationSignoffIsCurrent } from "@/domain/finance-signoff";
+import { newRecord } from "@/platform/repo";
 
 /* ---------------------------- FIN-008 ---------------------------- */
 
@@ -291,6 +293,9 @@ export function CsvMapper({ context, close }: { context: ScreenContext; close: (
   const [dateColumn, setDateColumn] = useState(0);
   const [descriptionColumn, setDescriptionColumn] = useState(1);
   const [amountColumn, setAmountColumn] = useState(2);
+  const [filename, setFilename] = useState("Pasted CSV statement");
+  const [openingBalance, setOpeningBalance] = useState("");
+  const [closingBalance, setClosingBalance] = useState("");
   const [busy, setBusy] = useState(false);
 
   const parsed = useMemo(() => {
@@ -316,11 +321,19 @@ export function CsvMapper({ context, close }: { context: ScreenContext; close: (
   const existing = data.bankLines.filter(isStatementLine);
   const duplicates = good.filter((row) => existing.some((line) =>
     (line.at ?? "").slice(0, 10) === row.date && Number(line.amountMinor ?? 0) === row.amountMinor));
+  const balancesValid = openingBalance.trim() !== "" && closingBalance.trim() !== ""
+    && Number.isSafeInteger(Number(openingBalance))
+    && Number.isSafeInteger(Number(closingBalance));
+  const accountValid = cashAccounts(data).some((account) => accountCode(account) === code);
+  const fromDate = [...good].map((row) => row.date).sort()[0];
+  const toDate = [...good].map((row) => row.date).sort().at(-1);
 
   return (
     <Stack gap={4}>
       <Notice tone="info" title="This import runs entirely in the browser">
-        Paste the CSV your bank gave you. Nothing is uploaded; the rows become statement lines in this workspace, all unmatched.
+        Paste the CSV and enter the opening and closing balances from the actual statement. Nothing
+        is uploaded or verified by a bank. The statement header and its unmatched lines are saved together; without
+        real balances, no reconciliation can be confirmed.
       </Notice>
       <Field label="CSV rows" hint="Comma separated. Amounts in minor units, negative for money out.">
         <TextArea aria-label="CSV rows" value={text} rows={6} onChange={(event) => setText(event.target.value)} style={{ fontFamily: "var(--font-mono, monospace)" }} />
@@ -340,6 +353,18 @@ export function CsvMapper({ context, close }: { context: ScreenContext; close: (
         <Field label="Amount column"><TextInput aria-label="Amount column" align="end" inputMode="numeric" value={String(amountColumn)} onChange={(event) => setAmountColumn(Number(event.target.value.replace(/\D/g, "")) || 0)} /></Field>
       </Row>
 
+      <Row gap={3} wrap>
+        <Field label="Statement reference" required>
+          <TextInput aria-label="Statement reference" value={filename} onChange={(event) => setFilename(event.target.value)} placeholder="e.g. bank-account-Nov-2026.csv" required />
+        </Field>
+        <Field label="Opening balance (minor units)" required hint="Use the actual statement amount in pennies/cents; negative if overdrawn.">
+          <TextInput aria-label="Opening balance (minor units)" value={openingBalance} onChange={(event) => setOpeningBalance(event.target.value)} placeholder="e.g. 250000" required />
+        </Field>
+        <Field label="Closing balance (minor units)" required>
+          <TextInput aria-label="Closing balance (minor units)" value={closingBalance} onChange={(event) => setClosingBalance(event.target.value)} placeholder="e.g. 321500" required />
+        </Field>
+      </Row>
+      {!balancesValid && <Notice tone="warning" title="Statement balances are required">Enter both balances as whole minor units. Arlovi will not infer them from imported rows or the ledger.</Notice>}
       {parsed.length > 0 && (
         <DataGrid
           rows={parsed}
@@ -363,32 +388,59 @@ export function CsvMapper({ context, close }: { context: ScreenContext; close: (
         <Button
           variant="primary"
           busy={busy}
-          disabled={good.length === 0}
+          disabled={good.length === 0 || !balancesValid || !filename.trim() || !accountValid || busy}
           onClick={async () => {
+            if (!balancesValid || !filename.trim() || !accountValid || !fromDate || !toDate) return;
             setBusy(true);
-            const batch = `import-${now.getTime().toString(36)}`;
-            for (const row of good) {
-              const isDuplicate = duplicates.includes(row);
-              await context.mutate.create({
+            try {
+              const batch = `import-${crypto.randomUUID()}`;
+              const ctx = { actor: context.actor, now: context.now.toISOString() };
+              const header = newRecord({
+                organizationId: context.org.id,
+                currency: context.org.currency,
+                collection: "bankTransactions",
+                title: filename.trim(),
+                status: "imported",
+                summary: "Statement metadata and balances manually entered from a CSV. No bank provider verification.",
+                amountMinor: Number(closingBalance),
+                at: context.now.toISOString(),
+                fields: {
+                  kind: "statement", source: "manual-csv", bankAccountCode: code,
+                  importBatch: batch, filename: filename.trim(),
+                  openingMinor: Number(openingBalance), closingMinor: Number(closingBalance),
+                  from: fromDate, to: toDate, verification: "manual_local",
+                },
+              }, ctx);
+              const lines = good.map((row) => newRecord({
+                organizationId: context.org.id,
+                currency: context.org.currency,
                 collection: "bankTransactions",
                 title: row.description || "Statement line",
                 status: "unmatched",
-                summary: `Imported by hand from a CSV on ${context.date(now)}.`,
+                summary: `Manually imported with ${filename.trim()}.`,
                 amountMinor: row.amountMinor,
                 at: `${row.date}T00:00:00.000Z`,
                 fields: {
-                  matched: false,
-                  source: "statement-import",
-                  bankAccountCode: code,
-                  importBatch: batch,
+                  matched: false, source: "statement-import",
+                  bankAccountCode: code, importBatch: batch, statementId: header.id,
                   reference: row.description,
-                  ...(isDuplicate ? { possibleDuplicate: true } : {}),
+                  ...(duplicates.includes(row) ? { possibleDuplicate: true } : {}),
                 },
-              }, `Statement line imported: ${row.description}`);
+              }, ctx));
+              await context.mutate.putMany(
+                [header, ...lines],
+                [`Statement ${filename.trim()} imported with entered balances`,
+                  ...lines.map((row) => `Statement line imported: ${row.title}`)],
+                {},
+                ["create", ...lines.map(() => "create" as const)],
+              );
+              context.toast("Statement imported", `${good.length} unmatched lines and their manually entered opening/closing balances saved atomically. ${bad.length} rows skipped. Nothing was reconciled.`);
+              close();
+            } catch (error) {
+              context.toast("Import not completed", error instanceof Error ? error.message : "Review the statement and retry.", "failed");
+            } finally {
+              setBusy(false);
             }
-            context.toast("Statement imported", `${good.length} lines added, all unmatched. ${bad.length} rows were skipped. Nothing has been reconciled.`);
-            setBusy(false);
-            close();
           }}
         >
           Import {good.length} line{good.length === 1 ? "" : "s"}
