@@ -51,6 +51,19 @@ export function reconciliationSignoffBlocker(input: {
   if (!Number.isSafeInteger(recon.statementClosingMinor) || !Number.isSafeInteger(recon.ledgerMinor)) {
     return "The bank statement and ledger balances must be valid whole-penny amounts.";
   }
+  const opening = Number(recon.statement.openingMinor);
+  const imported = [
+    ...recon.matched,
+    ...recon.suggested.map((entry) => entry.line),
+    ...recon.needsPosting,
+  ];
+  const movement = imported.reduce((sum, line) => sum + Number(line.amountMinor ?? 0), 0);
+  if (!Number.isSafeInteger(opening) || imported.some((line) => !Number.isSafeInteger(line.amountMinor))) {
+    return "Opening balance and every imported statement amount must be valid whole-penny values.";
+  }
+  if (opening + movement !== recon.statementClosingMinor) {
+    return "The entered statement opening balance plus imported movements does not equal its closing balance. Review missing, duplicate or incorrect CSV rows.";
+  }
   if (bankLines.some((item) =>
     item.organizationId === statement.organizationId
     && item.fields.kind === "reconciliation"
