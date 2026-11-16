@@ -37,7 +37,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const hits = useMemo<Hit[]>(() => {
     const q = query.trim().toLowerCase();
     const pages: Hit[] = screens
-      .filter((screen) => canOpen(role, screen.applicationCode) && !/:id\\b|:slug\\b/.test(screen.route))
+      .filter((screen) => canOpen(role, screen.applicationCode) && !screen.route.includes(":id") && !screen.route.includes(":slug"))
       .filter((screen) => !q || `${screen.title} ${screen.applicationName} ${screen.purpose}`.toLowerCase().includes(q))
       .slice(0, q ? 8 : 6)
       .map((screen) => ({
