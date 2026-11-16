@@ -129,6 +129,9 @@ async function sweepScreen(page: Page, screen: Contract, errors: ReturnType<type
   for (const overlay of screen.overlays) {
     await load(page, `${base}?${CLOCK}&overlay=${encodeURIComponent(overlay)}`);
     const dialog = page.getByRole("dialog").first();
+    /* A deep link opens its overlay from an effect; under load that can take
+       longer than the fixed settle above, so wait for it before judging. */
+    await dialog.waitFor({ state: "visible", timeout: 3000 }).catch(() => undefined);
     const visible = await dialog.isVisible().catch(() => false);
     const text = visible ? await dialog.innerText().catch(() => "") : "";
     const overlayErrors = errors.take();

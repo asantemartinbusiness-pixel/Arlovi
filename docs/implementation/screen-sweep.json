@@ -1552,7 +1552,7 @@
     "route": "/o/northline/design/files/nl-designs-001/paths?clock=2026-11-14T09:30:00Z",
     "app": "DESIGN",
     "heading": "Vector Path Editor",
-    "tabsFound": 4,
+    "tabsFound": 0,
     "tabsRequired": 4,
     "errors": []
   },
@@ -1624,7 +1624,7 @@
     "route": "/o/northline/photo/photos/nl-photos-001?clock=2026-11-14T09:30:00Z",
     "app": "PHOTO",
     "heading": "Raster Editor",
-    "tabsFound": 4,
+    "tabsFound": 0,
     "tabsRequired": 4,
     "errors": []
   },
@@ -1687,7 +1687,7 @@
     "route": "/o/northline/layout/publications/nl-publications-001?clock=2026-11-14T09:30:00Z",
     "app": "LAYOUT",
     "heading": "Publication Editor",
-    "tabsFound": 4,
+    "tabsFound": 0,
     "tabsRequired": 4,
     "errors": []
   },
@@ -1732,7 +1732,7 @@
     "route": "/o/northline/video/projects/nl-videos-001?clock=2026-11-14T09:30:00Z",
     "app": "VIDEO",
     "heading": "Video Timeline",
-    "tabsFound": 5,
+    "tabsFound": 0,
     "tabsRequired": 5,
     "errors": []
   },
@@ -1822,7 +1822,7 @@
     "route": "/o/northline/motion/projects/nl-motions-001/interactive?clock=2026-11-14T09:30:00Z",
     "app": "MOTION",
     "heading": "Interactive Motion",
-    "tabsFound": 4,
+    "tabsFound": 0,
     "tabsRequired": 4,
     "errors": []
   },
@@ -1831,7 +1831,7 @@
     "route": "/o/northline/motion/projects/nl-motions-001/export?clock=2026-11-14T09:30:00Z",
     "app": "MOTION",
     "heading": "Motion Export",
-    "tabsFound": 4,
+    "tabsFound": 0,
     "tabsRequired": 4,
     "errors": []
   },
@@ -1858,7 +1858,7 @@
     "route": "/o/northline/web/sites/nl-sites-001/builder?clock=2026-11-14T09:30:00Z",
     "app": "WEB",
     "heading": "Visual Page Builder",
-    "tabsFound": 4,
+    "tabsFound": 0,
     "tabsRequired": 4,
     "errors": []
   },
@@ -2038,7 +2038,7 @@
     "route": "/o/northline/forms/forms/nl-forms-001?clock=2026-11-14T09:30:00Z",
     "app": "FORMS",
     "heading": "Visual Form Builder",
-    "tabsFound": 5,
+    "tabsFound": 0,
     "tabsRequired": 5,
     "errors": []
   },
