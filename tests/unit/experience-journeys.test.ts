@@ -23,7 +23,7 @@ describe("organization navigation", () => {
 
   it("falls back safely for unknown routes", () => {
     expect(destinationForOrganization("/broken", "?overlay=Edit", "harbor"))
-      .toBe("/o/harbor/hq/home");
+      .toBe("/o/harbor/workspace/home");
   });
 });
 
