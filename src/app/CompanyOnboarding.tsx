@@ -185,7 +185,7 @@ export function CompanyOnboarding() {
       registerLocalOrganization(profile);
       try { localStorage.setItem("arlovi-last-workspace", profile.slug); } catch { /* optional browser navigation preference */ }
       try { localStorage.removeItem(KEY); localStorage.removeItem(STEP_KEY); } catch { /* storage may be disabled */ }
-      navigate("/o/" + profile.slug + "/hq/home", { replace: true });
+      navigate("/o/" + profile.slug + "/workspace/home", { replace: true });
     } catch (cause) {
       if (persisted) {
         await db.transaction("rw", [db.records, db.events], async () => {
