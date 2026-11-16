@@ -117,7 +117,7 @@ export function AppShell() {
         <Button variant="ghost" size="sm" iconOnly aria-label={navOpen ? "Close navigation" : "Open navigation"} className="hq-only-mobile" onClick={() => setNavOpen(!navOpen)}>
           {navOpen ? <X size={18} /> : <MenuIcon size={18} />}
         </Button>
-        <Link to={`/o/${org.slug}/hq/home`} className="hq-brand" aria-label={`${brand.name} home`}>
+        <Link to={workAreaPath(org.slug,"home")} className="hq-brand" aria-label={`${brand.name} home`}>
           <ArloviMark size={26} />
           <strong className="hq-hide-sm" style={{ fontSize: "var(--text-md)", letterSpacing: "-0.03em" }}>{brand.name}</strong>
         </Link>
