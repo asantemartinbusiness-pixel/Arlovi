@@ -16,10 +16,10 @@ let count = 0;
 for (const [group, apps] of Object.entries(groups)) {
   if (!registry.includes(`group: "${group}"`)) throw new Error(`Missing native application group: ${group}`);
   for (const app of apps) {
-    const seed = `src/domain/seeds/${app}.ts`;
-    const native = `src/applications/${app}/index.tsx`;
-    if (!existsSync(seed)) throw new Error(`Missing seed module: ${seed}`);
-    if (!existsSync(native)) throw new Error(`Missing native module: ${native}`);
+    const seed = [`src/domain/seeds/${app}.ts`,`src/domain/seeds/${app}.tsx`].find(existsSync);
+    const native = [`src/applications/${app}/index.tsx`,`src/applications/${app}/index.ts`].find(existsSync);
+    if (!seed) throw new Error(`Missing seed module: ${app}`);
+    if (!native) throw new Error(`Missing native module: ${app}`);
     if (!registry.includes(`import("@/domain/seeds/${app}")`))
       throw new Error(`Missing seed import for ${app} in ${group}`);
     if (!registry.includes(`import("./${app}/index")`))
