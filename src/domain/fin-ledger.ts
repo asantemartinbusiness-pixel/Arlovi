@@ -518,6 +518,9 @@ export function reconcile(input: {
   if (account) {
     for (const journal of input.journals) {
       if (journal.status !== "posted") continue;
+      // Bank closing balances are as-of the statement date, not today's
+      // balance. Newer legitimate postings must not rewrite old statements.
+      if (statement?.to && journalDate(journal) > statement.to) continue;
       for (const entry of journalLines(journal)) {
         if (entry.accountId === account.id) ledgerMinor += entry.debitMinor - entry.creditMinor;
       }
