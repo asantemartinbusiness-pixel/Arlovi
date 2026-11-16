@@ -12,7 +12,7 @@ import { FirstRunGuide } from "@/app/FirstRunGuide";
 import { GuidedTour } from "@/app/GuidedTour";
 import { WORK_AREAS, WorkspaceNavigation, WorkspaceSideNav, currentWorkArea, isWorkAreaPath, workAreaPath } from "@/app/WorkspaceNavigation";
 import { ScreenErrorBoundary } from "@/app/ErrorBoundary";
-import { applicationLoadFailures } from "@/applications";
+import { applicationLoadFailures, loadNativeApplication, prefetchNativeApplication } from "@/applications";
 const CommandPalette = lazy(() => import("@/app/CommandPalette").then(module => ({ default: module.CommandPalette })));
 import { recordNavigation } from "@/platform/navigationContinuity";
 const AttentionCentre = lazy(() => import("@/app/AttentionCentre").then(module => ({ default: module.AttentionCentre })));
@@ -44,6 +44,23 @@ export function AppShell() {
   const activeScreen = useMemo(() => findScreen(location.pathname)?.screen, [location.pathname]);
   const activeCode = activeScreen?.applicationCode ?? "HQ";
   const appModule = getApp(activeCode);
+
+  // Load the actual destination before any unrelated native application.
+  useEffect(() => {
+    if(!activeScreen) return;
+    void loadNativeApplication(activeScreen.applicationCode).catch(() => undefined);
+  }, [activeScreen?.applicationCode]);
+
+  // A concrete hover or keyboard-focus hint is enough to prefetch the next
+  // native application. This does not request all app groups on startup.
+  function prefetchLinkedApplication(target: EventTarget | null) {
+    if(!(target instanceof Element)) return;
+    const link = target.closest("a[href]");
+    if(!(link instanceof HTMLAnchorElement)) return;
+    const match = findScreen(link.pathname);
+    if(match && match.screen.applicationCode !== activeScreen?.applicationCode)
+      prefetchNativeApplication(match.screen.applicationCode);
+  }
 
   const data = useCollections(["notifications", "invoices", "bills", "tasks", "missions", "deals", "leaveRequests", "expenses", "organizations", "preferences"]);
   const attention = useMemo(() => applyAttentionReceipts(filterForRole(buildAttention({
@@ -138,7 +155,7 @@ export function AppShell() {
   }, [org.slug]);
 
   return (
-    <div className="hq" data-nav-open={navOpen ? "true" : "false"}>
+    <div className="hq" data-nav-open={navOpen ? "true" : "false"} onPointerOver={event => prefetchLinkedApplication(event.target)} onFocusCapture={event => prefetchLinkedApplication(event.target)}>
       <a className="ds-skip" href="#main">Skip to content</a>
       <GuidedTour />
 
