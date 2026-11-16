@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, Menu as MenuIcon, Moon, Sparkles, Sun, Search, Bell, X } from "lucide-react";
+import { ChevronDown, Menu as MenuIcon, Sparkles, Search, Bell, Inbox, X, UserRound } from "lucide-react";
 import { Button, Pill, Row } from "@/design-system";
 import { Menu } from "@/design-system/overlays";
 import { ArloviMark, brand, palettes } from "@/app/brand";
@@ -19,11 +19,12 @@ import { IntentPrefetchController } from "@/app/nativePrefetch";
 const AttentionCentre = lazy(() => import("@/app/AttentionCentre").then(module => ({ default: module.AttentionCentre })));
 const AskPanel = lazy(() => import("@/app/AskPanel").then(module => ({ default: module.AskPanel })));
 import { ExecutionTray } from "@/app/ExecutionTray";
+import { HeaderContextBar } from "@/app/HeaderContextBar";
 import { getApp, useApplicationRegistryRevision } from "@/platform/registry";
 import { canOpen, ROLE_LABELS } from "@/platform/policy";
 import { ORGS } from "@/platform/org";
 import { useCollections, useWorkspace, useMutations } from "@/platform/workspace";
-import { buildAttention, filterForRole, attentionCounts } from "@/platform/attention";
+import { buildAttention, filterForRole } from "@/platform/attention";
 import { applyAttentionReceipts } from "@/platform/attentionReceipts";
 import { useUi } from "@/runtime/ui";
 import type { Role } from "@/domain/types";
@@ -37,6 +38,8 @@ export function AppShell() {
   const { org, role, now } = useWorkspace();
   const mutate = useMutations();
   const [navOpen, setNavOpen] = useState(false);
+  const [attentionView, setAttentionView] = useState<"for-you" | "approvals" | "updates">("for-you");
+  const searchTrigger = useRef<HTMLButtonElement>(null);
   const keyboardHint = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.userAgent) ? "⌘K" : "Ctrl+K";
 
   const isWorkspaceArea = isWorkAreaPath(location.pathname, org.slug);
@@ -100,7 +103,15 @@ export function AppShell() {
     orgSlug: org.slug,
     now,
   }), role), ui.attentionReceipts, org.id, role), [data, org.slug, org.id, now, role, ui.attentionReceipts]);
-  const counts = attentionCounts(attention);
+  const contextVisible = isWorkspaceArea && ["project","department"].includes(location.pathname.split("/")[5]);
+  const decisions = attention.filter(item => !item.resolved && !item.read && ["approval","assignment","interruption"].includes(item.kind)).length;
+  const updates = attention.filter(item => !item.resolved && !item.read && ["update","mention","system","overdue"].includes(item.kind)).length;
+  function openCommand() { ui.setAsk(false); ui.setNotes(false); ui.setCommand(true); }
+  function openAsk() { ui.setCommand(false); ui.setNotes(false); ui.setAsk(true); }
+  function openAttention(view: "for-you" | "approvals" | "updates") {
+    if (ui.notes && attentionView === view) {ui.setNotes(false);return;}
+    setAttentionView(view);ui.setCommand(false);ui.setAsk(false);ui.setNotes(true);
+  }
   const favourites = useMemo(() => {
     const pinned = new Set(data.preferences.filter((pref) => pref.fields.pinned === true).map((pref) => String(pref.fields.app)));
     return NAV_GROUPS.flatMap((group) => group.apps).filter((app) => pinned.has(app.short) && canOpen(role, app.code));
@@ -129,12 +140,12 @@ export function AppShell() {
       const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        ui.setCommand(true);
+        openCommand();
         return;
       }
       if (!typing && event.key === "/" && !event.metaKey && !event.ctrlKey) {
         event.preventDefault();
-        ui.setCommand(true);
+        openCommand();
       }
     }
     const online = () => ui.setOffline(false);
@@ -173,6 +184,8 @@ export function AppShell() {
     return () => window.removeEventListener("keydown", onEscape);
   }, [navOpen]);
 
+  useEffect(() => {ui.setCommand(false);ui.setAsk(false);ui.setNotes(false);}, [org.id]);
+
   useEffect(() => {
     recordNavigation(org.id, org.slug, location.pathname);
   }, [org.id, org.slug, location.pathname]);
@@ -182,7 +195,7 @@ export function AppShell() {
   }, [org.slug]);
 
   return (
-    <div className="hq" data-nav-open={navOpen ? "true" : "false"}
+    <div className="hq" data-context={contextVisible ? "true" : "false"} data-nav-open={navOpen ? "true" : "false"}
       onPointerOver={event => { if (event.pointerType !== "touch") prefetchLinkedApplication(event.target); }}
       onPointerOut={event => cancelPrefetchOnExit(event.target, event.relatedTarget)}
       onFocusCapture={event => prefetchLinkedApplication(event.target, 100)}
@@ -200,10 +213,10 @@ export function AppShell() {
         </Link>
 
         <Menu
-          label="Switch organisation"
+          label="Switch company"
           align="start"
           trigger={
-            <button type="button" className="hq-orgswitch">
+            <button type="button" className="hq-orgswitch" aria-label={`Switch company, current ${org.name}`}>
               <span className="hq-orgdot" style={{ background: org.accent }}>{org.shortName.slice(0, 1)}</span>
               <span className="name ds-truncate">{org.name}</span>
               <ChevronDown size={14} />
@@ -212,38 +225,54 @@ export function AppShell() {
           items={[
             ...ORGS.map((item) => ({
               label: item.id === org.id ? `${item.name} · current` : item.name,
-              group: "Organisations",
+              group: "Companies in this browser",
               onSelect: () => navigate(destinationForOrganization(location.pathname, location.search, item.slug)),
             })),
-            { label: "Create another company", group: "Company", separatorBefore: true, onSelect: () => navigate("/setup") },
+            { label: "Companies here are browser-local; cloud access is not connected", group: "Company access", disabled: true, separatorBefore: true },
+            { label: "Company overview", group: "Company access", onSelect: () => navigate(`/o/${org.slug}/workspace/company`) },
+            { label: "Create another company", group: "Company access", onSelect: () => navigate("/setup") },
           ]}
         />
 
+        <div className="hq-header-context-inline" aria-label="Current area">
+          <span className="hq-header-divider" aria-hidden="true"/>
+          <span className="hq-header-area">{isWorkspaceArea ? WORK_AREAS.find(item => item.id === activeArea)?.label : appModule?.short ?? activeScreen?.applicationName ?? "Workspace"}</span>
+        </div>
         <span className="ds-grow" />
 
-        <button type="button" className="hq-search" onClick={() => ui.setCommand(true)} aria-label={`Search ${org.shortName}`} aria-keyshortcuts="Control+K Meta+K">
+        <button ref={searchTrigger} type="button" className="hq-search" onClick={openCommand} aria-label={`Search ${org.shortName}`} aria-keyshortcuts="Control+K Meta+K">
           <Search size={15} />
-          <span className="ds-grow" style={{ textAlign: "start" }}>Search {org.shortName}</span>
+          <span className="ds-grow hq-search-label" style={{ textAlign: "start" }}>Search anything in {org.shortName}</span>
           <kbd className="ds-kbd">{keyboardHint}</kbd>
         </button>
 
-        <Button variant="primary" size="sm" icon={<Sparkles size={15} />} aria-label={brand.ask} onClick={() => ui.setAsk(true)}>
+        <Button variant="primary" size="sm" icon={<Sparkles size={15} />} aria-label={brand.ask} onClick={openAsk}>
           <span className="hq-hide-sm">{brand.ask}</span>
         </Button>
 
-        <div className="hq-bell">
-          <Button variant="ghost" size="sm" iconOnly aria-label={`Attention centre, ${counts.unread} unread`} onClick={() => ui.setNotes(!ui.notes)}>
-            <Bell size={17} />
-          </Button>
-          {counts.unread > 0 && <span className="hq-bell-count" aria-hidden="true">{counts.unread > 99 ? "99+" : counts.unread}</span>}
+        <div className="hq-header-utils" role="group" aria-label="Inbox and notifications">
+          <div className="hq-bell">
+            <Button variant="ghost" size="sm" iconOnly aria-label={`Inbox and decisions, ${decisions} awaiting action`} aria-expanded={ui.notes && attentionView === "approvals"} onClick={() => openAttention("approvals")}>
+              <Inbox size={17}/>
+            </Button>
+            {decisions > 0 && <span className="hq-bell-count" aria-hidden="true">{decisions > 99 ? "99+" : decisions}</span>}
+          </div>
+          <div className="hq-bell">
+            <Button variant="ghost" size="sm" iconOnly aria-label={`Notifications, ${updates} unread updates`} aria-expanded={ui.notes && attentionView === "updates"} onClick={() => openAttention("updates")}>
+              <Bell size={17}/>
+            </Button>
+            {updates > 0 && <span className="hq-bell-count" aria-hidden="true">{updates > 99 ? "99+" : updates}</span>}
+          </div>
         </div>
 
         <Menu
-          label="Workspace settings"
-          trigger={<Button variant="ghost" size="sm" iconOnly aria-label={`Account and view settings. Role ${ROLE_LABELS[role]}`}>
-            <span className="hq-orgdot" style={{ background: "var(--accent)", width: 24, height: 24 }}>{ROLE_LABELS[role].slice(0, 1)}</span>
+          label="Account and preferences"
+          trigger={<Button variant="ghost" size="sm" iconOnly aria-label={`Profile and preferences. Local role view ${ROLE_LABELS[role]}`}>
+            <span className="hq-profile-avatar"><UserRound size={15} aria-hidden="true"/></span>
           </Button>}
           items={[
+            {label: `${org.ownerName ?? "Local workspace profile"} · ${org.name}`, group:"Account (browser-local)", disabled:true},
+            {label:"Account & data readiness",group:"Account",onSelect:()=>navigate(`/o/${org.slug}/workspace/account`)},
             ...(["owner", "finance", "sales", "people", "member", "client"] as Role[]).map((item) => ({
               label: item === role ? `${ROLE_LABELS[item]} · current view` : ROLE_LABELS[item],
               group: "Role view (not a security boundary)",
@@ -266,10 +295,9 @@ export function AppShell() {
           ]}
         />
 
-        <Button variant="ghost" size="sm" iconOnly className="hq-hide-xs" aria-label={ui.theme === "light" ? "Use dark appearance" : "Use light appearance"} onClick={() => ui.setTheme(ui.theme === "light" ? "dark" : "light")}>
-          {ui.theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
-        </Button>
+
       </header>
+      {contextVisible && <HeaderContextBar />}
 
       <div className="hq-frame" data-appnav={isWorkspaceArea || appModule ? "true" : "false"}>
         <button type="button" className="hq-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />
@@ -388,8 +416,8 @@ export function AppShell() {
         </NavLink>
       </nav>
 
-      {ui.command && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening search…</div>}><CommandPalette onClose={() => ui.setCommand(false)} /></Suspense>}
-      {ui.notes && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening attention centre…</div>}><AttentionCentre items={attention} onClose={() => ui.setNotes(false)} /></Suspense>}
+      {ui.command && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening search…</div>}><CommandPalette onClose={() => {ui.setCommand(false);searchTrigger.current?.focus();}} /></Suspense>}
+      {ui.notes && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening attention centre…</div>}><AttentionCentre key={attentionView} initialView={attentionView} items={attention} onClose={() => ui.setNotes(false)} /></Suspense>}
       {ui.ask && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening assistant…</div>}><AskPanel onClose={() => ui.setAsk(false)} seed={ui.askSeed} /></Suspense>}
 
       <div className="ds-toasts" aria-live="polite" aria-atomic="false">

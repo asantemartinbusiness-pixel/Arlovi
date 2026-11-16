@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { findScreen } from "@/app/catalog";
+import { workspaceDestination } from "@/app/workspaceSidebarModel";
 import { Send, Sparkles } from "lucide-react";
 import { Button, Drawer, Notice, Pill, TextArea } from "@/design-system";
 import { brand } from "@/app/brand";
@@ -23,6 +25,8 @@ interface Turn {
  */
 export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const context = workspaceDestination(location.pathname)?.title ?? findScreen(location.pathname)?.screen.applicationName ?? "Workspace";
   const { org, now, relative } = useWorkspace();
   const records = useOrgRecords();
   const [prompt, setPrompt] = useState(seed);
@@ -59,7 +63,7 @@ export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string 
       open
       onOpenChange={(next) => { if (!next) onClose(); }}
       title={<span className="ds-row ds-gap-2"><Sparkles size={18} /> {brand.ask}</span>}
-      subtitle={`Reading ${org.name} only`}
+      subtitle={`${org.name} · ${context} · local assistant`}
       width={480}
       footer={
         <form
@@ -84,7 +88,7 @@ export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string 
     >
       <div className="ds-stack ds-gap-4">
         <Notice tone="warning" title="No language model is connected">
-          {capability?.localEquivalent} Answers below are composed from records in this workspace and name what they read.
+          {capability?.localEquivalent} You are viewing {context}. Responses are composed from local {org.name} records, not from an AI model. They name the records used when available.
         </Notice>
 
         {turns.length === 0 && (

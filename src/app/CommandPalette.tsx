@@ -32,6 +32,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const hits = useMemo<Hit[]>(() => {
     const q = query.trim().toLowerCase();
@@ -73,8 +74,16 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       ...departments.map(record => ({key: `department-${record.id}`, group: "Workspaces", title: record.title, detail: "Department space", to: `/o/${org.slug}/workspace/spaces/department/${record.id}`})),
       ...projects.map(record => ({key: `project-${record.id}`, group: "Workspaces", title: record.title, detail: "Project space", to: `/o/${org.slug}/workspace/work/project/${record.id}`})),
     ].filter(item => `${item.title} ${item.detail}`.toLowerCase().includes(q)).slice(0, 8) : [];
+    const actions: Hit[] = [
+      {key:"action-home",group:"Quick destinations",title:"Go to Home",detail:"Workspace",to:`/o/${org.slug}/workspace/home`},
+      {key:"action-company",group:"Quick destinations",title:"Company headquarters",detail:"Company",to:`/o/${org.slug}/workspace/company`},
+      {key:"action-work",group:"Quick destinations",title:"Open work and projects",detail:"Work",to:`/o/${org.slug}/workspace/work`},
+      {key:"action-files",group:"Quick destinations",title:"Open files and resources",detail:"Resources",to:`/o/${org.slug}/workspace/resources`},
+      {key:"action-people",group:"Quick destinations",title:"Find people and collaboration",detail:"Company",to:`/o/${org.slug}/workspace/people`},
+      {key:"action-account",group:"Quick destinations",title:"Account and data settings",detail:"Preferences",to:`/o/${org.slug}/workspace/account`},
+    ].filter(hit=>!q || (hit.title+" "+hit.detail).toLowerCase().includes(q)).slice(0,q?6:4);
     const used = new Set<string>();
-    return [...locations, ...workspaces, ...pages, ...rows].filter(hit => {
+    return [...actions, ...locations, ...workspaces, ...pages, ...rows].filter(hit => {
       if (used.has(hit.to)) return false;
       used.add(hit.to);
       return true;
@@ -82,6 +91,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   }, [query, records, org.slug, role, navigation, departments, projects]);
 
   useEffect(() => { setIndex(0); }, [query]);
+  useEffect(() => { inputRef.current?.focus(); }, []);
 
   useEffect(() => {
     listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
@@ -101,17 +111,19 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         <input
           className="hq-palette-input"
           autoFocus
+          ref={inputRef}
           type="text"
           role="combobox"
           aria-expanded="true"
           aria-controls="palette-list"
           aria-activedescendant={hits[index]?.key}
-          aria-label={`Search screens and records in ${org.name}`}
+          aria-label={`Search screens, records and actions in ${org.name}`}
           placeholder={`Search screens and records in ${org.name}`}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Escape") { event.preventDefault(); onClose(); }
+            if (event.key === "Tab") { event.preventDefault(); setIndex(value => hits.length ? (value + (event.shiftKey ? -1 : 1) + hits.length) % hits.length : 0); }
             if (event.key === "ArrowDown") { event.preventDefault(); setIndex((value) => Math.min(value + 1, hits.length - 1)); }
             if (event.key === "ArrowUp") { event.preventDefault(); setIndex((value) => Math.max(value - 1, 0)); }
             if (event.key === "Enter") { event.preventDefault(); go(hits[index]); }

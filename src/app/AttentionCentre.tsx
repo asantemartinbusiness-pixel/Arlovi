@@ -4,6 +4,7 @@ import { Button, Drawer, Pill, Segmented, Empty } from "@/design-system";
 import { attentionCounts, PRIORITY_LABEL, PRIORITY_TONE, type AttentionItem } from "@/platform/attention";
 import { useMutations, useWorkspace } from "@/platform/workspace";
 import { attentionReceiptKey } from "@/platform/attentionReceipts";
+import { appEntry } from "@/app/catalog";
 import { useUi } from "@/runtime/ui";
 
 type View = "for-you" | "approvals" | "updates" | "resolved";
@@ -13,18 +14,19 @@ type View = "for-you" | "approvals" | "updates" | "resolved";
  * with priority, grouping, and read / acknowledged / resolved kept apart.
  * Marking an item read never approves the thing it points at.
  */
-export function AttentionCentre({ items, onClose }: { items: AttentionItem[]; onClose: () => void }) {
+export function AttentionCentre({ items, onClose, initialView = "for-you" }: { items: AttentionItem[]; onClose: () => void; initialView?: "for-you" | "approvals" | "updates" }) {
   const navigate = useNavigate();
   const { org, role, relative } = useWorkspace();
   const setReceipt = useUi((state) => state.setAttentionReceipt);
   const mutate = useMutations();
-  const [view, setView] = useState<View>("for-you");
+  const [view, setView] = useState<View>(initialView);
   const counts = attentionCounts(items);
+  const pendingDecisions = items.filter(item=>!item.resolved && ["approval","assignment","interruption"].includes(item.kind)).length;
 
   const shown = useMemo(() => {
     const live = items.filter((item) => !item.resolved);
-    if (view === "approvals") return live.filter((item) => item.kind === "approval");
-    if (view === "updates") return live.filter((item) => item.kind === "update" || item.kind === "mention" || item.kind === "system");
+    if (view === "approvals") return live.filter((item) => item.kind === "approval" || item.kind === "assignment" || item.kind === "interruption");
+    if (view === "updates") return live.filter((item) => item.kind === "update" || item.kind === "mention" || item.kind === "system" || item.kind === "overdue");
     if (view === "resolved") return items.filter((item) => item.resolved);
     return live;
   }, [items, view]);
@@ -56,10 +58,10 @@ export function AttentionCentre({ items, onClose }: { items: AttentionItem[]; on
     <Drawer
       open
       onOpenChange={(next) => { if (!next) onClose(); }}
-      title="Attention"
-      subtitle={`${org.name} · ${counts.unread} unread, ${counts.approvals} awaiting a decision`}
+      title={view === "approvals" ? "Inbox & decisions" : view === "updates" ? "Notifications" : "Attention"}
+      subtitle={`${org.name} · ${counts.unread} unread · ${pendingDecisions} actionable items`}
       width={440}
-      footer={<span className="ds-subtle">Reading an item does not approve it. Decisions are taken on the record.</span>}
+      footer={<div className="ds-row ds-gap-2" style={{width:"100%",justifyContent:"space-between",alignItems:"center"}}><span className="ds-subtle">Reading is not approval.</span><Button size="sm" variant="secondary" onClick={()=>{navigate(appEntry("INBOX",org.slug));onClose();}}>Open full Inbox</Button></div>}
     >
       <div className="ds-stack ds-gap-4">
         <Segmented
@@ -68,7 +70,7 @@ export function AttentionCentre({ items, onClose }: { items: AttentionItem[]; on
           onChange={setView}
           options={[
             { value: "for-you", label: `For you (${counts.total})` },
-            { value: "approvals", label: `Approvals (${counts.approvals})` },
+            { value: "approvals", label: "Decisions & assignments" },
             { value: "updates", label: "Updates" },
             { value: "resolved", label: "Resolved" },
           ]}
