@@ -18,7 +18,7 @@ import { recordNavigation } from "@/platform/navigationContinuity";
 const AttentionCentre = lazy(() => import("@/app/AttentionCentre").then(module => ({ default: module.AttentionCentre })));
 const AskPanel = lazy(() => import("@/app/AskPanel").then(module => ({ default: module.AskPanel })));
 import { ExecutionTray } from "@/app/ExecutionTray";
-import { getApp } from "@/platform/registry";
+import { getApp, useApplicationRegistryRevision } from "@/platform/registry";
 import { canOpen, ROLE_LABELS } from "@/platform/policy";
 import { ORGS } from "@/platform/org";
 import { useCollections, useWorkspace, useMutations } from "@/platform/workspace";
@@ -29,6 +29,7 @@ import type { Role } from "@/domain/types";
 import "@/app/shell.css";
 
 export function AppShell() {
+  useApplicationRegistryRevision();
   const ui = useUi();
   const location = useLocation();
   const navigate = useNavigate();

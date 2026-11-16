@@ -9,6 +9,8 @@
  * recorded and the rest of headquarters keeps working.
  */
 
+import { notifyApplicationRegistry } from "@/platform/registry";
+
 export interface LoadFailure {
   group: string;
   message: string;
@@ -21,17 +23,37 @@ const GROUPS: { group: string; load: () => Promise<unknown> }[] = [
   { group: "Automation", load: () => import("./t2b_automation") },
   { group: "Finance and CRM", load: () => import("./t3a_money") },
   { group: "People and operations", load: () => import("./t3b_people") },
-  { group: "Growth", load: () => import("./t4_growth") },
+  { group: "Growth", load: () => Promise.all([
+    import("@/domain/seeds/market"), import("./market/index"),
+    import("@/domain/seeds/commerce"), import("./commerce/index"),
+    import("@/domain/seeds/book"), import("./book/index"),
+    import("@/domain/seeds/proc"), import("./proc/index"),
+    import("@/domain/seeds/portal"), import("./portal/index"),
+  ]) },
   { group: "Documents", load: () => import("./t5a_documents") },
-  { group: "Visual tools", load: () => import("./t5b_visual") },
+  { group: "Visual tools", load: () => Promise.all([
+    import("@/domain/seeds/design"), import("./design/index"),
+    import("@/domain/seeds/photo"), import("./photo/index"),
+    import("@/domain/seeds/layout"), import("./layout/index"),
+    import("@/domain/seeds/video"), import("./video/index"),
+    import("@/domain/seeds/motion"), import("./motion/index"),
+  ]) },
   { group: "Platform", load: () => import("./t6_platform") },
 ];
 
 let loading: Promise<LoadFailure[]> | null = null;
+let coreLoading: Promise<void> | null = null;
+let complete = false;
+export function applicationsLoading(): boolean { return !complete; }
+/** Load only HQ and its seed contributor to prepare the local workspace. */
+export function loadCoreApplications(): Promise<void> {
+  coreLoading ??= GROUPS[0].load().then(() => undefined);
+  return coreLoading;
+}
 let failures: LoadFailure[] = [];
 
 export function loadApplications(): Promise<LoadFailure[]> {
-  loading ??= Promise.allSettled(GROUPS.map((item) => item.load())).then((results) => {
+  loading ??= Promise.allSettled(GROUPS.map((item, index) => index === 0 ? loadCoreApplications() : item.load())).then((results) => {
     failures = results.flatMap((result, index) => {
       if (result.status === "fulfilled") return [];
       const reason = result.reason as unknown;
@@ -39,6 +61,8 @@ export function loadApplications(): Promise<LoadFailure[]> {
       console.error(`Arlovi: the ${GROUPS[index].group} applications failed to load. ${message}`);
       return [{ group: GROUPS[index].group, message }];
     });
+    complete = true;
+    notifyApplicationRegistry();
     return failures;
   });
   return loading;
