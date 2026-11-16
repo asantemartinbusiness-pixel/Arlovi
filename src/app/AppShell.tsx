@@ -5,7 +5,8 @@ import { Button, Pill, Row } from "@/design-system";
 import { Menu } from "@/design-system/overlays";
 import { ArloviMark, brand, palettes } from "@/app/brand";
 import { NAV_GROUPS, APP_ENTRIES, mobileNavFor } from "@/app/nav";
-import { appEntry, screens } from "@/app/catalog";
+import { appEntry, findScreen } from "@/app/catalog";
+import { destinationForOrganization } from "@/app/organizationNavigation";
 import { ScreenHost } from "@/app/ScreenHost";
 import { ScreenErrorBoundary } from "@/app/ErrorBoundary";
 import { applicationLoadFailures } from "@/applications";
@@ -18,6 +19,7 @@ import { canOpen, ROLE_LABELS } from "@/platform/policy";
 import { ORGS } from "@/platform/org";
 import { useCollections, useWorkspace, useMutations } from "@/platform/workspace";
 import { buildAttention, filterForRole, attentionCounts } from "@/platform/attention";
+import { applyAttentionReceipts } from "@/platform/attentionReceipts";
 import { useUi } from "@/runtime/ui";
 import type { Role } from "@/domain/types";
 import "@/app/shell.css";
@@ -30,16 +32,12 @@ export function AppShell() {
   const mutate = useMutations();
   const [navOpen, setNavOpen] = useState(false);
 
-  const activeScreen = useMemo(() => {
-    const parts = location.pathname.split("/").filter(Boolean);
-    const segment = parts[2];
-    return screens.find((screen) => screen.route.split("/")[3] === segment);
-  }, [location.pathname]);
+  const activeScreen = useMemo(() => findScreen(location.pathname)?.screen, [location.pathname]);
   const activeCode = activeScreen?.applicationCode ?? "HQ";
   const appModule = getApp(activeCode);
 
   const data = useCollections(["notifications", "invoices", "bills", "tasks", "missions", "deals", "leaveRequests", "expenses", "organizations"]);
-  const attention = useMemo(() => filterForRole(buildAttention({
+  const attention = useMemo(() => applyAttentionReceipts(filterForRole(buildAttention({
     notifications: data.notifications,
     invoices: data.invoices,
     bills: data.bills,
@@ -48,7 +46,7 @@ export function AppShell() {
     approvals: [...data.invoices, ...data.bills, ...data.expenses, ...data.deals, ...data.leaveRequests, ...data.missions],
     orgSlug: org.slug,
     now,
-  }), role), [data, org.slug, now, role]);
+  }), role), ui.attentionReceipts, org.id, role), [data, org.slug, org.id, now, role, ui.attentionReceipts]);
   const counts = attentionCounts(attention);
 
   const paused = data.organizations.find((record) => record.id === org.id)?.fields.executionPaused === true;
@@ -107,11 +105,7 @@ export function AppShell() {
           items={ORGS.map((item) => ({
             label: item.id === org.id ? `${item.name} · current` : item.name,
             group: "Organisations",
-            onSelect: () => {
-              const parts = location.pathname.split("/");
-              parts[2] = item.slug;
-              navigate(parts.join("/"));
-            },
+            onSelect: () => navigate(destinationForOrganization(location.pathname, location.search, item.slug)),
           }))}
         />
 
