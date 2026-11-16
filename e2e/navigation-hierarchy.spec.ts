@@ -10,7 +10,8 @@ test("headquarters navigation prioritises places and keeps the 35 tools in a rea
   await expect(nav).toBeVisible();
   expect(await nav.evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThanOrEqual(240);
   expect(await nav.evaluate((element) => element.getBoundingClientRect().width)).toBeLessThanOrEqual(260);
-  expect(await page.getByRole("navigation", { name: "Headquarters pages" }).evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThanOrEqual(220);
+  await expect(page.getByRole("navigation", { name: "Headquarters pages" })).toHaveCount(0);
+  await expect(page.locator(".hq-frame")).toHaveAttribute("data-appnav", "false");
   mkdirSync(EVIDENCE, { recursive: true });
   await page.screenshot({ path: snapshot("desktop-headquarters"), animations: "disabled" });
   for (const name of ["Home", "My Workspace", "Inbox", "Company Overview", "Departments", "Mission Control", "Intelligence", "Studio"]) {
@@ -31,7 +32,9 @@ test("headquarters navigation prioritises places and keeps the 35 tools in a rea
   await launcher.getByRole("link", { name: /Finance/ }).click();
   await expect(page).toHaveURL(/\/o\/northline\/fin\//);
   await expect(launcher).toHaveCount(0);
-  await expect(page.getByRole("navigation", { name: "Finance pages" })).toBeVisible();
+  const financeNav = page.getByRole("navigation", { name: "Finance pages" });
+  await expect(financeNav).toBeVisible();
+  expect(await financeNav.evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThanOrEqual(220);
   await page.screenshot({ path: snapshot("desktop-finance"), animations: "disabled" });
 });
 
