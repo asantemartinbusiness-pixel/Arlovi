@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, Menu as MenuIcon, Sparkles, Search, Bell, Inbox, X, UserRound } from "lucide-react";
+import { ArrowLeft, ChevronDown, Menu as MenuIcon, Sparkles, Search, Bell, Inbox, X, UserRound } from "lucide-react";
 import { Button, Pill, Row } from "@/design-system";
 import { Menu } from "@/design-system/overlays";
 import { ArloviMark, brand, palettes } from "@/app/brand";
@@ -341,6 +341,9 @@ export function AppShell() {
         {!isWorkspaceArea && appModule && (
           <nav className="hq-appnav" aria-label={`${appModule.short} navigation`}>
             <div className="hq-appnav-head">
+              <Link className="hq-appnav-back" to={workAreaPath(org.slug, "apps")}>
+                <ArrowLeft size={14} aria-hidden="true"/> All applications
+              </Link>
               <Row gap={2}>
                 <appModule.icon size={18} strokeWidth={1.9} />
                 <h2 className="ds-grow ds-truncate">{appModule.short}</h2>
@@ -367,7 +370,9 @@ export function AppShell() {
                         {content}
                       </NavLink>
                     ) : (
-                      <span key={item.screenId} className="hq-navlink" aria-disabled="true"
+                      <span key={item.screenId} className="hq-navlink" role="link"
+                        tabIndex={0} aria-disabled="true"
+                        aria-label={item.label + ": open a record in " + appModule.short + " first"}
                         title="Open a record in this application to access this view">
                         {content}
                       </span>
@@ -375,6 +380,10 @@ export function AppShell() {
                   })}
                 </div>
               ))}
+              {!activeMatch?.params.id && appModule.nav.some(section => section.items.some(item => {
+                const target = screens.find(screen => screen.id === item.screenId);
+                return target && /:id\b/.test(target.route);
+              })) && <p className="hq-appnav-help">Open a record from this app to access its detail views.</p>}
             </div>
           </nav>
         )}
