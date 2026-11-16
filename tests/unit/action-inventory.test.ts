@@ -1,5 +1,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { beforeAll, it } from "vitest";
+import { beforeAll, it, vi } from "vitest";
+
+// App contract inventory must load every module, but does not need an
+// IndexedDB fixture write in the pure Node test environment.
+vi.mock("@/runtime/db", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/runtime/db")>();
+  return { ...actual, seedLateContributors: vi.fn(async () => undefined) };
+});
 import { loadApplications } from "@/applications";
 import { getApp } from "@/platform/registry";
 
