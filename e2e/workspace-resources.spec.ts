@@ -71,6 +71,6 @@ test("linking a document to a project does not replace its original owner or pro
       req.onsuccess=()=>{resolve(req.result?.fields??null);db.close();};
       req.onerror=()=>reject(req.error);
     };
-  }),documentId);
+  }),documentId!);
   expect(after).toEqual(before);
 });
