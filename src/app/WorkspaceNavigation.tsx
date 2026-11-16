@@ -1,8 +1,9 @@
 import { useMemo, useState, type ComponentType } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { ArrowRight, Building2, CalendarDays, CheckSquare, ChevronRight, FolderKanban, Grid2X2, Home, Inbox, Layers, Megaphone, Plus, Search, Users } from "lucide-react";
+import { ArrowRight, Building2, CalendarDays, CheckSquare, ChevronRight, FolderKanban, Grid2X2, Home, Inbox, Layers, Megaphone, Plus, Search, Users, Clock3 } from "lucide-react";
 import { APP_ENTRIES, NAV_GROUPS } from "@/app/nav";
 import { ContextualCreate } from "@/app/ContextualCreate";
+import { WorkspaceContinuity } from "@/app/WorkspaceContinuity";
 import { TaskApprovalBoard } from "@/app/TaskApprovalBoard";
 import { AgentWorkBoard } from "@/app/AgentWorkBoard";
 import { appEntry } from "@/app/catalog";
@@ -72,6 +73,7 @@ export function WorkspaceSideNav() {
   return <nav className="hq-appnav ws-sidebar" aria-label={headings[area] + " navigation"}>
     <div className="hq-appnav-head"><h2>{headings[area]}</h2><p>{WORK_AREAS.find(item=>item.id===area)?.description}</p></div>
     <div className="hq-appnav-body">{WORK_AREAS.map(item => <NavLink key={item.id} className="hq-navlink" to={workAreaPath(org.slug,item.id)}><item.icon size={16}/>{item.label}</NavLink>)}
+      <NavLink className="hq-navlink" to={`/o/${org.slug}/workspace/recent`}><Clock3 size={16}/>Recent & saved</NavLink>
       <div className="hq-navsection">TOOLS</div>
       <NavLink className="hq-navlink" to={appEntry("INBOX",org.slug)}><Inbox size={16}/>Inbox</NavLink>
       <NavLink className="hq-navlink" to={appEntry("PROJECT",org.slug)}><CheckSquare size={16}/>Projects</NavLink>
@@ -98,10 +100,12 @@ export function WorkspaceNavigation() {
   const pinned = new Set(preferences.filter(p => p.fields.pinned === true).map(p => String(p.fields.app)));
   const appGroups = useMemo(() => NAV_GROUPS.map(group => ({ ...group, apps: group.apps.filter(app => canOpen(role, app.code) && (`${app.short} ${group.label}`).toLowerCase().includes(query.toLowerCase())) })).filter(group => group.apps.length), [role, query]);
 
+  if (path[4] === "recent") return <div className="ws-content"><header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / CONTINUE WORKING</span><h1>Recent and saved work</h1><p>Return to the applications and workspaces you have opened in this organisation.</p></header><WorkspaceContinuity /></div>;
   if (detailKind) return detail ? <SpaceDetail key={detail.id} record={detail} kind={detailKind} all={data} slug={org.slug}/> : <div className="ws-content"><h1>Space not found</h1><p>This space is not available in this organisation.</p><Link to={workAreaPath(org.slug,area)}>Back to {headings[area]}</Link></div>;
   return <div className="ws-content">
     <header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / {headings[area].toUpperCase()}</span><h1>{area === "home" ? "Your day, in one place." : headings[area]}</h1><p>{WORK_AREAS.find(item => item.id === area)?.description}. Everything here belongs to the active organisation.</p>{area !== "apps" && <div className="ws-page-actions"><ContextualCreate label="Create new"/></div>}</header>
     {area === "home" && <div className="ws-stack">
+      <WorkspaceContinuity compact />
       <div className="ws-stat-grid"><div><small>My assigned tasks</small><strong>{tasks.filter(t => t.ownerName === actor || t.fields.assignee === actor).length}</strong></div><div><small>Active projects</small><strong>{projects.filter(p => !["completed","archived","cancelled"].includes(p.status)).length}</strong></div><div><small>Open missions</small><strong>{missions.filter(m => !["completed","cancelled"].includes(m.status)).length}</strong></div></div>
       <WorkList title="Assigned work" records={tasks.filter(t=> t.ownerName === actor || t.fields.assignee === actor).slice(0,10)} slug={org.slug} fallback="No tasks currently assigned to this view." />
       <WorkList title="Recently updated documents" records={[...docs].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)).slice(0,6)} slug={org.slug} fallback="No documents in this workspace yet." />
