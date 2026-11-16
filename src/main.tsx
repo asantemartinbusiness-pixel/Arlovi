@@ -15,7 +15,7 @@ function WorkspaceEntry({ recoveredSlug }: { recoveredSlug: string | null }) {
   let slug: string | null = null;
   try { slug = localStorage.getItem("arlovi-last-workspace"); } catch { /* browser privacy settings */ }
   const preferred = slug && orgBySlug(slug) ? slug : recoveredSlug;
-  const target = preferred && orgBySlug(preferred) ? `/o/${preferred}/hq/home` : "/setup";
+  const target = preferred && orgBySlug(preferred) ? `/o/${preferred}/workspace/home` : "/setup";
   return <Navigate to={target} replace />;
 }
 
