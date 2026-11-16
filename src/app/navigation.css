@@ -311,6 +311,10 @@
   .hq-launcher-footer span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 }
 @media (max-width:359px) {
+  /* All global actions remain reachable on a genuine 320px handset. */
+  .hq-header { gap:3px; }
+  .hq-orgswitch > svg:last-child { display:none; }
+  .hq-header > .ds-btn[data-variant="primary"] { width:var(--control-h-sm); padding:0; }
   .hq-launcher-grid { grid-template-columns:1fr; }
 }
 @media (prefers-reduced-motion:reduce) {
