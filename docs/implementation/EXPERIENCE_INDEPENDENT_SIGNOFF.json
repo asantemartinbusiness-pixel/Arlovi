@@ -1,0 +1,6650 @@
+{
+  "version": 1,
+  "generatedFrom": "src/generated/catalog.json",
+  "baseline": {
+    "applications": 35,
+    "screens": 316,
+    "tabs": 1323,
+    "actions": 1328,
+    "overlays": 956
+  },
+  "meaning": "These axes are separate from the original route coverage and require independent evidence.",
+  "screens": [
+    {
+      "id": "ARL-HQ-001",
+      "app": "HQ",
+      "workstream": "WS1",
+      "route": "/o/:org/hq/home",
+      "contract": {
+        "tabs": 3,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HQ-002",
+      "app": "HQ",
+      "workstream": "WS1",
+      "route": "/o/:org/hq/my-work",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HQ-003",
+      "app": "HQ",
+      "workstream": "WS1",
+      "route": "/o/:org/hq/company",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HQ-004",
+      "app": "HQ",
+      "workstream": "WS1",
+      "route": "/o/:org/hq/departments",
+      "contract": {
+        "tabs": 3,
+        "actions": 4,
+        "overlays": 2
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HQ-005",
+      "app": "HQ",
+      "workstream": "WS1",
+      "route": "/o/:org/hq/departments/:id",
+      "contract": {
+        "tabs": 6,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HQ-006",
+      "app": "HQ",
+      "workstream": "WS1",
+      "route": "/o/:org/hq/organization",
+      "contract": {
+        "tabs": 3,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HQ-007",
+      "app": "HQ",
+      "workstream": "WS1",
+      "route": "/o/:org/hq/goals",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HQ-008",
+      "app": "HQ",
+      "workstream": "WS1",
+      "route": "/o/:org/hq/locations",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HQ-009",
+      "app": "HQ",
+      "workstream": "WS1",
+      "route": "/o/:org/hq/timeline",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HQ-010",
+      "app": "HQ",
+      "workstream": "WS1",
+      "route": "/o/:org/hq/directory",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 2
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AI-001",
+      "app": "AI",
+      "workstream": "WS2",
+      "route": "/o/:org/ai/chat",
+      "contract": {
+        "tabs": 3,
+        "actions": 6,
+        "overlays": 4
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AI-002",
+      "app": "AI",
+      "workstream": "WS2",
+      "route": "/o/:org/ai/conversations",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AI-003",
+      "app": "AI",
+      "workstream": "WS2",
+      "route": "/o/:org/ai/agents/:id/chat",
+      "contract": {
+        "tabs": 3,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AI-004",
+      "app": "AI",
+      "workstream": "WS2",
+      "route": "/o/:org/ai/rooms/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AI-005",
+      "app": "AI",
+      "workstream": "WS2",
+      "route": "/o/:org/ai/missions/:id/room",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AI-006",
+      "app": "AI",
+      "workstream": "WS2",
+      "route": "/o/:org/ai/voice",
+      "contract": {
+        "tabs": 3,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AI-007",
+      "app": "AI",
+      "workstream": "WS2",
+      "route": "/o/:org/ai/meetings/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AI-008",
+      "app": "AI",
+      "workstream": "WS2",
+      "route": "/o/:org/ai/research/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AI-009",
+      "app": "AI",
+      "workstream": "WS2",
+      "route": "/o/:org/ai/context",
+      "contract": {
+        "tabs": 3,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AI-010",
+      "app": "AI",
+      "workstream": "WS2",
+      "route": "/o/:org/ai/artifacts/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BRAIN-001",
+      "app": "BRAIN",
+      "workstream": "WS2",
+      "route": "/o/:org/brain/home",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BRAIN-002",
+      "app": "BRAIN",
+      "workstream": "WS2",
+      "route": "/o/:org/brain/sources",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BRAIN-003",
+      "app": "BRAIN",
+      "workstream": "WS2",
+      "route": "/o/:org/brain/sources/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BRAIN-004",
+      "app": "BRAIN",
+      "workstream": "WS2",
+      "route": "/o/:org/brain/graph",
+      "contract": {
+        "tabs": 3,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BRAIN-005",
+      "app": "BRAIN",
+      "workstream": "WS2",
+      "route": "/o/:org/brain/facts",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BRAIN-006",
+      "app": "BRAIN",
+      "workstream": "WS2",
+      "route": "/o/:org/brain/conflicts",
+      "contract": {
+        "tabs": 3,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BRAIN-007",
+      "app": "BRAIN",
+      "workstream": "WS2",
+      "route": "/o/:org/brain/decisions",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BRAIN-008",
+      "app": "BRAIN",
+      "workstream": "WS2",
+      "route": "/o/:org/brain/brand",
+      "contract": {
+        "tabs": 6,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BRAIN-009",
+      "app": "BRAIN",
+      "workstream": "WS2",
+      "route": "/o/:org/brain/permissions",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BRAIN-010",
+      "app": "BRAIN",
+      "workstream": "WS2",
+      "route": "/o/:org/brain/intake",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-TEAM-001",
+      "app": "TEAM",
+      "workstream": "WS2",
+      "route": "/o/:org/team/home",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-TEAM-002",
+      "app": "TEAM",
+      "workstream": "WS2",
+      "route": "/o/:org/team/agents",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-TEAM-003",
+      "app": "TEAM",
+      "workstream": "WS2",
+      "route": "/o/:org/team/agents/:id",
+      "contract": {
+        "tabs": 6,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-TEAM-004",
+      "app": "TEAM",
+      "workstream": "WS2",
+      "route": "/o/:org/team/agents/new",
+      "contract": {
+        "tabs": 6,
+        "actions": 5,
+        "overlays": 4
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-TEAM-005",
+      "app": "TEAM",
+      "workstream": "WS2",
+      "route": "/o/:org/team/organization",
+      "contract": {
+        "tabs": 3,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-TEAM-006",
+      "app": "TEAM",
+      "workstream": "WS2",
+      "route": "/o/:org/team/skills",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-TEAM-007",
+      "app": "TEAM",
+      "workstream": "WS2",
+      "route": "/o/:org/team/academy",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-TEAM-008",
+      "app": "TEAM",
+      "workstream": "WS2",
+      "route": "/o/:org/team/evaluations",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-TEAM-009",
+      "app": "TEAM",
+      "workstream": "WS2",
+      "route": "/o/:org/team/performance",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-TEAM-010",
+      "app": "TEAM",
+      "workstream": "WS2",
+      "route": "/o/:org/team/models",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MISSION-001",
+      "app": "MISSION",
+      "workstream": "WS2",
+      "route": "/o/:org/mission/missions",
+      "contract": {
+        "tabs": 6,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MISSION-002",
+      "app": "MISSION",
+      "workstream": "WS2",
+      "route": "/o/:org/mission/missions/new",
+      "contract": {
+        "tabs": 6,
+        "actions": 4,
+        "overlays": 4
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MISSION-003",
+      "app": "MISSION",
+      "workstream": "WS2",
+      "route": "/o/:org/mission/missions/:id",
+      "contract": {
+        "tabs": 6,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MISSION-004",
+      "app": "MISSION",
+      "workstream": "WS2",
+      "route": "/o/:org/mission/missions/:id/plan",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MISSION-005",
+      "app": "MISSION",
+      "workstream": "WS2",
+      "route": "/o/:org/mission/missions/:id/tasks",
+      "contract": {
+        "tabs": 3,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MISSION-006",
+      "app": "MISSION",
+      "workstream": "WS2",
+      "route": "/o/:org/mission/missions/:id/execution",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MISSION-007",
+      "app": "MISSION",
+      "workstream": "WS2",
+      "route": "/o/:org/mission/missions/:id/team",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MISSION-008",
+      "app": "MISSION",
+      "workstream": "WS2",
+      "route": "/o/:org/mission/missions/:id/deliverables",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 4
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MISSION-009",
+      "app": "MISSION",
+      "workstream": "WS2",
+      "route": "/o/:org/mission/missions/:id/budget",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MISSION-010",
+      "app": "MISSION",
+      "workstream": "WS2",
+      "route": "/o/:org/mission/missions/:id/results",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MISSION-011",
+      "app": "MISSION",
+      "workstream": "WS2",
+      "route": "/o/:org/mission/templates",
+      "contract": {
+        "tabs": 3,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FIN-001",
+      "app": "FIN",
+      "workstream": "WS3",
+      "route": "/o/:org/fin/home",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FIN-002",
+      "app": "FIN",
+      "workstream": "WS3",
+      "route": "/o/:org/fin/accounts",
+      "contract": {
+        "tabs": 6,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FIN-003",
+      "app": "FIN",
+      "workstream": "WS3",
+      "route": "/o/:org/fin/ledger",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FIN-004",
+      "app": "FIN",
+      "workstream": "WS3",
+      "route": "/o/:org/fin/invoices",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FIN-005",
+      "app": "FIN",
+      "workstream": "WS3",
+      "route": "/o/:org/fin/invoices/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 6,
+        "overlays": 4
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FIN-006",
+      "app": "FIN",
+      "workstream": "WS3",
+      "route": "/o/:org/fin/bills",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FIN-007",
+      "app": "FIN",
+      "workstream": "WS3",
+      "route": "/o/:org/fin/expenses",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FIN-008",
+      "app": "FIN",
+      "workstream": "WS3",
+      "route": "/o/:org/fin/banking",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FIN-009",
+      "app": "FIN",
+      "workstream": "WS3",
+      "route": "/o/:org/fin/reconciliation",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FIN-010",
+      "app": "FIN",
+      "workstream": "WS3",
+      "route": "/o/:org/fin/budgets",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FIN-011",
+      "app": "FIN",
+      "workstream": "WS3",
+      "route": "/o/:org/fin/tax",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FIN-012",
+      "app": "FIN",
+      "workstream": "WS3",
+      "route": "/o/:org/fin/reports",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FIN-013",
+      "app": "FIN",
+      "workstream": "WS3",
+      "route": "/o/:org/fin/entities",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CRM-001",
+      "app": "CRM",
+      "workstream": "WS3",
+      "route": "/o/:org/crm/home",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CRM-002",
+      "app": "CRM",
+      "workstream": "WS3",
+      "route": "/o/:org/crm/contacts",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CRM-003",
+      "app": "CRM",
+      "workstream": "WS3",
+      "route": "/o/:org/crm/contacts/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CRM-004",
+      "app": "CRM",
+      "workstream": "WS3",
+      "route": "/o/:org/crm/companies",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CRM-005",
+      "app": "CRM",
+      "workstream": "WS3",
+      "route": "/o/:org/crm/leads",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CRM-006",
+      "app": "CRM",
+      "workstream": "WS3",
+      "route": "/o/:org/crm/deals",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CRM-007",
+      "app": "CRM",
+      "workstream": "WS3",
+      "route": "/o/:org/crm/deals/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CRM-008",
+      "app": "CRM",
+      "workstream": "WS3",
+      "route": "/o/:org/crm/quotes",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CRM-009",
+      "app": "CRM",
+      "workstream": "WS3",
+      "route": "/o/:org/crm/activities",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CRM-010",
+      "app": "CRM",
+      "workstream": "WS3",
+      "route": "/o/:org/crm/forecasts",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CRM-011",
+      "app": "CRM",
+      "workstream": "WS3",
+      "route": "/o/:org/crm/automation",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HR-001",
+      "app": "HR",
+      "workstream": "WS3",
+      "route": "/o/:org/hr/home",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HR-002",
+      "app": "HR",
+      "workstream": "WS3",
+      "route": "/o/:org/hr/employees",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HR-003",
+      "app": "HR",
+      "workstream": "WS3",
+      "route": "/o/:org/hr/employees/:id",
+      "contract": {
+        "tabs": 6,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HR-004",
+      "app": "HR",
+      "workstream": "WS3",
+      "route": "/o/:org/hr/recruitment",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HR-005",
+      "app": "HR",
+      "workstream": "WS3",
+      "route": "/o/:org/hr/candidates/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HR-006",
+      "app": "HR",
+      "workstream": "WS3",
+      "route": "/o/:org/hr/onboarding",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HR-007",
+      "app": "HR",
+      "workstream": "WS3",
+      "route": "/o/:org/hr/leave",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HR-008",
+      "app": "HR",
+      "workstream": "WS3",
+      "route": "/o/:org/hr/scheduling",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HR-009",
+      "app": "HR",
+      "workstream": "WS3",
+      "route": "/o/:org/hr/payroll",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HR-010",
+      "app": "HR",
+      "workstream": "WS3",
+      "route": "/o/:org/hr/performance",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-HR-011",
+      "app": "HR",
+      "workstream": "WS3",
+      "route": "/o/:org/hr/learning",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROJECT-001",
+      "app": "PROJECT",
+      "workstream": "WS3",
+      "route": "/o/:org/project/portfolios",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROJECT-002",
+      "app": "PROJECT",
+      "workstream": "WS3",
+      "route": "/o/:org/project/projects",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROJECT-003",
+      "app": "PROJECT",
+      "workstream": "WS3",
+      "route": "/o/:org/project/projects/:id",
+      "contract": {
+        "tabs": 6,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROJECT-004",
+      "app": "PROJECT",
+      "workstream": "WS3",
+      "route": "/o/:org/project/projects/:id/board",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROJECT-005",
+      "app": "PROJECT",
+      "workstream": "WS3",
+      "route": "/o/:org/project/tasks/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROJECT-006",
+      "app": "PROJECT",
+      "workstream": "WS3",
+      "route": "/o/:org/project/projects/:id/timeline",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROJECT-007",
+      "app": "PROJECT",
+      "workstream": "WS3",
+      "route": "/o/:org/project/workload",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROJECT-008",
+      "app": "PROJECT",
+      "workstream": "WS3",
+      "route": "/o/:org/project/templates",
+      "contract": {
+        "tabs": 3,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROJECT-009",
+      "app": "PROJECT",
+      "workstream": "WS3",
+      "route": "/o/:org/project/goals",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROJECT-010",
+      "app": "PROJECT",
+      "workstream": "WS3",
+      "route": "/o/:org/project/time",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMS-001",
+      "app": "COMMS",
+      "workstream": "WS3",
+      "route": "/o/:org/comms/home",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMS-002",
+      "app": "COMMS",
+      "workstream": "WS3",
+      "route": "/o/:org/comms/channels",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMS-003",
+      "app": "COMMS",
+      "workstream": "WS3",
+      "route": "/o/:org/comms/channels/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMS-004",
+      "app": "COMMS",
+      "workstream": "WS3",
+      "route": "/o/:org/comms/messages",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMS-005",
+      "app": "COMMS",
+      "workstream": "WS3",
+      "route": "/o/:org/comms/email",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMS-006",
+      "app": "COMMS",
+      "workstream": "WS3",
+      "route": "/o/:org/comms/email/:id",
+      "contract": {
+        "tabs": 3,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMS-007",
+      "app": "COMMS",
+      "workstream": "WS3",
+      "route": "/o/:org/comms/calendar",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMS-008",
+      "app": "COMMS",
+      "workstream": "WS3",
+      "route": "/o/:org/comms/meetings/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMS-009",
+      "app": "COMMS",
+      "workstream": "WS3",
+      "route": "/o/:org/comms/calls",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMS-010",
+      "app": "COMMS",
+      "workstream": "WS3",
+      "route": "/o/:org/comms/announcements",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMS-011",
+      "app": "COMMS",
+      "workstream": "WS3",
+      "route": "/o/:org/comms/preferences",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CARE-001",
+      "app": "CARE",
+      "workstream": "WS3",
+      "route": "/o/:org/care/home",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CARE-002",
+      "app": "CARE",
+      "workstream": "WS3",
+      "route": "/o/:org/care/inbox",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CARE-003",
+      "app": "CARE",
+      "workstream": "WS3",
+      "route": "/o/:org/care/tickets",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CARE-004",
+      "app": "CARE",
+      "workstream": "WS3",
+      "route": "/o/:org/care/tickets/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CARE-005",
+      "app": "CARE",
+      "workstream": "WS3",
+      "route": "/o/:org/care/customers/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CARE-006",
+      "app": "CARE",
+      "workstream": "WS3",
+      "route": "/o/:org/care/knowledge",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CARE-007",
+      "app": "CARE",
+      "workstream": "WS3",
+      "route": "/o/:org/care/automation",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CARE-008",
+      "app": "CARE",
+      "workstream": "WS3",
+      "route": "/o/:org/care/slas",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CARE-009",
+      "app": "CARE",
+      "workstream": "WS3",
+      "route": "/o/:org/care/quality",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MARKET-001",
+      "app": "MARKET",
+      "workstream": "WS4",
+      "route": "/o/:org/market/home",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MARKET-002",
+      "app": "MARKET",
+      "workstream": "WS4",
+      "route": "/o/:org/market/campaigns",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MARKET-003",
+      "app": "MARKET",
+      "workstream": "WS4",
+      "route": "/o/:org/market/campaigns/:id",
+      "contract": {
+        "tabs": 6,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MARKET-004",
+      "app": "MARKET",
+      "workstream": "WS4",
+      "route": "/o/:org/market/calendar",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MARKET-005",
+      "app": "MARKET",
+      "workstream": "WS4",
+      "route": "/o/:org/market/social",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MARKET-006",
+      "app": "MARKET",
+      "workstream": "WS4",
+      "route": "/o/:org/market/email",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MARKET-007",
+      "app": "MARKET",
+      "workstream": "WS4",
+      "route": "/o/:org/market/audiences",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MARKET-008",
+      "app": "MARKET",
+      "workstream": "WS4",
+      "route": "/o/:org/market/ads",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MARKET-009",
+      "app": "MARKET",
+      "workstream": "WS4",
+      "route": "/o/:org/market/seo",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MARKET-010",
+      "app": "MARKET",
+      "workstream": "WS4",
+      "route": "/o/:org/market/pages",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MARKET-011",
+      "app": "MARKET",
+      "workstream": "WS4",
+      "route": "/o/:org/market/analytics",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MARKET-012",
+      "app": "MARKET",
+      "workstream": "WS4",
+      "route": "/o/:org/market/templates",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMERCE-001",
+      "app": "COMMERCE",
+      "workstream": "WS4",
+      "route": "/o/:org/commerce/home",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMERCE-002",
+      "app": "COMMERCE",
+      "workstream": "WS4",
+      "route": "/o/:org/commerce/products",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMERCE-003",
+      "app": "COMMERCE",
+      "workstream": "WS4",
+      "route": "/o/:org/commerce/products/:id",
+      "contract": {
+        "tabs": 6,
+        "actions": 4,
+        "overlays": 4
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMERCE-004",
+      "app": "COMMERCE",
+      "workstream": "WS4",
+      "route": "/o/:org/commerce/inventory",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMERCE-005",
+      "app": "COMMERCE",
+      "workstream": "WS4",
+      "route": "/o/:org/commerce/orders",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMERCE-006",
+      "app": "COMMERCE",
+      "workstream": "WS4",
+      "route": "/o/:org/commerce/orders/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMERCE-007",
+      "app": "COMMERCE",
+      "workstream": "WS4",
+      "route": "/o/:org/commerce/storefront",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMERCE-008",
+      "app": "COMMERCE",
+      "workstream": "WS4",
+      "route": "/o/:org/commerce/checkout",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMERCE-009",
+      "app": "COMMERCE",
+      "workstream": "WS4",
+      "route": "/o/:org/commerce/fulfilment",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMERCE-010",
+      "app": "COMMERCE",
+      "workstream": "WS4",
+      "route": "/o/:org/commerce/returns",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMERCE-011",
+      "app": "COMMERCE",
+      "workstream": "WS4",
+      "route": "/o/:org/commerce/promotions",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-COMMERCE-012",
+      "app": "COMMERCE",
+      "workstream": "WS4",
+      "route": "/o/:org/commerce/analytics",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BOOK-001",
+      "app": "BOOK",
+      "workstream": "WS4",
+      "route": "/o/:org/book/home",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BOOK-002",
+      "app": "BOOK",
+      "workstream": "WS4",
+      "route": "/o/:org/book/calendar",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BOOK-003",
+      "app": "BOOK",
+      "workstream": "WS4",
+      "route": "/o/:org/book/bookings/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BOOK-004",
+      "app": "BOOK",
+      "workstream": "WS4",
+      "route": "/o/:org/book/services",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BOOK-005",
+      "app": "BOOK",
+      "workstream": "WS4",
+      "route": "/o/:org/book/resources",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BOOK-006",
+      "app": "BOOK",
+      "workstream": "WS4",
+      "route": "/o/:org/book/public/:slug",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BOOK-007",
+      "app": "BOOK",
+      "workstream": "WS4",
+      "route": "/o/:org/book/reminders",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BOOK-008",
+      "app": "BOOK",
+      "workstream": "WS4",
+      "route": "/o/:org/book/reports",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DOCS-001",
+      "app": "DOCS",
+      "workstream": "WS5",
+      "route": "/o/:org/docs/files",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 4
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DOCS-002",
+      "app": "DOCS",
+      "workstream": "WS5",
+      "route": "/o/:org/docs/documents/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 6,
+        "overlays": 5
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DOCS-003",
+      "app": "DOCS",
+      "workstream": "WS5",
+      "route": "/o/:org/docs/documents/:id/outline",
+      "contract": {
+        "tabs": 3,
+        "actions": 4,
+        "overlays": 2
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DOCS-004",
+      "app": "DOCS",
+      "workstream": "WS5",
+      "route": "/o/:org/docs/documents/:id/review",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DOCS-005",
+      "app": "DOCS",
+      "workstream": "WS5",
+      "route": "/o/:org/docs/templates",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DOCS-006",
+      "app": "DOCS",
+      "workstream": "WS5",
+      "route": "/o/:org/docs/documents/:id/publish",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DOCS-007",
+      "app": "DOCS",
+      "workstream": "WS5",
+      "route": "/o/:org/docs/documents/:id/insights",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-SHEETS-001",
+      "app": "SHEETS",
+      "workstream": "WS5",
+      "route": "/o/:org/sheets/workbooks",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-SHEETS-002",
+      "app": "SHEETS",
+      "workstream": "WS5",
+      "route": "/o/:org/sheets/workbooks/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 7,
+        "overlays": 4
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-SHEETS-003",
+      "app": "SHEETS",
+      "workstream": "WS5",
+      "route": "/o/:org/sheets/workbooks/:id/formulas",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-SHEETS-004",
+      "app": "SHEETS",
+      "workstream": "WS5",
+      "route": "/o/:org/sheets/workbooks/:id/tables",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-SHEETS-005",
+      "app": "SHEETS",
+      "workstream": "WS5",
+      "route": "/o/:org/sheets/workbooks/:id/charts",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-SHEETS-006",
+      "app": "SHEETS",
+      "workstream": "WS5",
+      "route": "/o/:org/sheets/workbooks/:id/io",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-SHEETS-007",
+      "app": "SHEETS",
+      "workstream": "WS5",
+      "route": "/o/:org/sheets/workbooks/:id/collab",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PRESENT-001",
+      "app": "PRESENT",
+      "workstream": "WS5",
+      "route": "/o/:org/present/decks",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PRESENT-002",
+      "app": "PRESENT",
+      "workstream": "WS5",
+      "route": "/o/:org/present/decks/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 6,
+        "overlays": 4
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PRESENT-003",
+      "app": "PRESENT",
+      "workstream": "WS5",
+      "route": "/o/:org/present/decks/:id/theme",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PRESENT-004",
+      "app": "PRESENT",
+      "workstream": "WS5",
+      "route": "/o/:org/present/decks/:id/data",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PRESENT-005",
+      "app": "PRESENT",
+      "workstream": "WS5",
+      "route": "/o/:org/present/decks/:id/animation",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PRESENT-006",
+      "app": "PRESENT",
+      "workstream": "WS5",
+      "route": "/o/:org/present/decks/:id/present",
+      "contract": {
+        "tabs": 3,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PRESENT-007",
+      "app": "PRESENT",
+      "workstream": "WS5",
+      "route": "/o/:org/present/decks/:id/review",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DESIGN-001",
+      "app": "DESIGN",
+      "workstream": "WS5",
+      "route": "/o/:org/design/files",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DESIGN-002",
+      "app": "DESIGN",
+      "workstream": "WS5",
+      "route": "/o/:org/design/files/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 8,
+        "overlays": 4
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DESIGN-003",
+      "app": "DESIGN",
+      "workstream": "WS5",
+      "route": "/o/:org/design/files/:id/layers",
+      "contract": {
+        "tabs": 4,
+        "actions": 6,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DESIGN-004",
+      "app": "DESIGN",
+      "workstream": "WS5",
+      "route": "/o/:org/design/files/:id/paths",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DESIGN-005",
+      "app": "DESIGN",
+      "workstream": "WS5",
+      "route": "/o/:org/design/files/:id/layout",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DESIGN-006",
+      "app": "DESIGN",
+      "workstream": "WS5",
+      "route": "/o/:org/design/files/:id/components",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DESIGN-007",
+      "app": "DESIGN",
+      "workstream": "WS5",
+      "route": "/o/:org/design/files/:id/styles",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DESIGN-008",
+      "app": "DESIGN",
+      "workstream": "WS5",
+      "route": "/o/:org/design/files/:id/prototype",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DESIGN-009",
+      "app": "DESIGN",
+      "workstream": "WS5",
+      "route": "/o/:org/design/files/:id/assets",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-DESIGN-010",
+      "app": "DESIGN",
+      "workstream": "WS5",
+      "route": "/o/:org/design/files/:id/review",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PHOTO-001",
+      "app": "PHOTO",
+      "workstream": "WS5",
+      "route": "/o/:org/photo/photos",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PHOTO-002",
+      "app": "PHOTO",
+      "workstream": "WS5",
+      "route": "/o/:org/photo/photos/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 6,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PHOTO-003",
+      "app": "PHOTO",
+      "workstream": "WS5",
+      "route": "/o/:org/photo/photos/:id/masks",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PHOTO-004",
+      "app": "PHOTO",
+      "workstream": "WS5",
+      "route": "/o/:org/photo/photos/:id/adjust",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PHOTO-005",
+      "app": "PHOTO",
+      "workstream": "WS5",
+      "route": "/o/:org/photo/photos/:id/layers",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PHOTO-006",
+      "app": "PHOTO",
+      "workstream": "WS5",
+      "route": "/o/:org/photo/batch",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PHOTO-007",
+      "app": "PHOTO",
+      "workstream": "WS5",
+      "route": "/o/:org/photo/photos/:id/export",
+      "contract": {
+        "tabs": 3,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-LAYOUT-001",
+      "app": "LAYOUT",
+      "workstream": "WS5",
+      "route": "/o/:org/layout/publications",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-LAYOUT-002",
+      "app": "LAYOUT",
+      "workstream": "WS5",
+      "route": "/o/:org/layout/publications/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-LAYOUT-003",
+      "app": "LAYOUT",
+      "workstream": "WS5",
+      "route": "/o/:org/layout/publications/:id/masters",
+      "contract": {
+        "tabs": 3,
+        "actions": 4,
+        "overlays": 2
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-LAYOUT-004",
+      "app": "LAYOUT",
+      "workstream": "WS5",
+      "route": "/o/:org/layout/publications/:id/typography",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-LAYOUT-005",
+      "app": "LAYOUT",
+      "workstream": "WS5",
+      "route": "/o/:org/layout/publications/:id/preflight",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-VIDEO-001",
+      "app": "VIDEO",
+      "workstream": "WS5",
+      "route": "/o/:org/video/projects",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-VIDEO-002",
+      "app": "VIDEO",
+      "workstream": "WS5",
+      "route": "/o/:org/video/projects/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 6,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-VIDEO-003",
+      "app": "VIDEO",
+      "workstream": "WS5",
+      "route": "/o/:org/video/projects/:id/media",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-VIDEO-004",
+      "app": "VIDEO",
+      "workstream": "WS5",
+      "route": "/o/:org/video/projects/:id/audio",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-VIDEO-005",
+      "app": "VIDEO",
+      "workstream": "WS5",
+      "route": "/o/:org/video/projects/:id/captions",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-VIDEO-006",
+      "app": "VIDEO",
+      "workstream": "WS5",
+      "route": "/o/:org/video/projects/:id/effects",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-VIDEO-007",
+      "app": "VIDEO",
+      "workstream": "WS5",
+      "route": "/o/:org/video/projects/:id/export",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-VIDEO-008",
+      "app": "VIDEO",
+      "workstream": "WS5",
+      "route": "/o/:org/video/projects/:id/review",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MOTION-001",
+      "app": "MOTION",
+      "workstream": "WS5",
+      "route": "/o/:org/motion/projects",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MOTION-002",
+      "app": "MOTION",
+      "workstream": "WS5",
+      "route": "/o/:org/motion/projects/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MOTION-003",
+      "app": "MOTION",
+      "workstream": "WS5",
+      "route": "/o/:org/motion/projects/:id/easing",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MOTION-004",
+      "app": "MOTION",
+      "workstream": "WS5",
+      "route": "/o/:org/motion/projects/:id/interactive",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-MOTION-005",
+      "app": "MOTION",
+      "workstream": "WS5",
+      "route": "/o/:org/motion/projects/:id/export",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-WEB-001",
+      "app": "WEB",
+      "workstream": "WS6",
+      "route": "/o/:org/web/sites",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-WEB-002",
+      "app": "WEB",
+      "workstream": "WS6",
+      "route": "/o/:org/web/sites/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-WEB-003",
+      "app": "WEB",
+      "workstream": "WS6",
+      "route": "/o/:org/web/sites/:id/builder",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-WEB-004",
+      "app": "WEB",
+      "workstream": "WS6",
+      "route": "/o/:org/web/sites/:id/components",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-WEB-005",
+      "app": "WEB",
+      "workstream": "WS6",
+      "route": "/o/:org/web/sites/:id/cms",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-WEB-006",
+      "app": "WEB",
+      "workstream": "WS6",
+      "route": "/o/:org/web/sites/:id/navigation",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-WEB-007",
+      "app": "WEB",
+      "workstream": "WS6",
+      "route": "/o/:org/web/sites/:id/forms",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-WEB-008",
+      "app": "WEB",
+      "workstream": "WS6",
+      "route": "/o/:org/web/sites/:id/quality",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-WEB-009",
+      "app": "WEB",
+      "workstream": "WS6",
+      "route": "/o/:org/web/sites/:id/deploy",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-WEB-010",
+      "app": "WEB",
+      "workstream": "WS6",
+      "route": "/o/:org/web/sites/:id/analytics",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BUILD-001",
+      "app": "BUILD",
+      "workstream": "WS6",
+      "route": "/o/:org/build/projects",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BUILD-002",
+      "app": "BUILD",
+      "workstream": "WS6",
+      "route": "/o/:org/build/projects/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BUILD-003",
+      "app": "BUILD",
+      "workstream": "WS6",
+      "route": "/o/:org/build/projects/:id/builder",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BUILD-004",
+      "app": "BUILD",
+      "workstream": "WS6",
+      "route": "/o/:org/build/projects/:id/code",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BUILD-005",
+      "app": "BUILD",
+      "workstream": "WS6",
+      "route": "/o/:org/build/projects/:id/database",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BUILD-006",
+      "app": "BUILD",
+      "workstream": "WS6",
+      "route": "/o/:org/build/projects/:id/api",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BUILD-007",
+      "app": "BUILD",
+      "workstream": "WS6",
+      "route": "/o/:org/build/projects/:id/auth",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BUILD-008",
+      "app": "BUILD",
+      "workstream": "WS6",
+      "route": "/o/:org/build/projects/:id/tests",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BUILD-009",
+      "app": "BUILD",
+      "workstream": "WS6",
+      "route": "/o/:org/build/projects/:id/deploy",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BUILD-010",
+      "app": "BUILD",
+      "workstream": "WS6",
+      "route": "/o/:org/build/projects/:id/integrations",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-BUILD-011",
+      "app": "BUILD",
+      "workstream": "WS6",
+      "route": "/o/:org/build/projects/:id/monitor",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FORMS-001",
+      "app": "FORMS",
+      "workstream": "WS6",
+      "route": "/o/:org/forms/forms",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FORMS-002",
+      "app": "FORMS",
+      "workstream": "WS6",
+      "route": "/o/:org/forms/forms/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FORMS-003",
+      "app": "FORMS",
+      "workstream": "WS6",
+      "route": "/o/:org/forms/forms/:id/logic",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FORMS-004",
+      "app": "FORMS",
+      "workstream": "WS6",
+      "route": "/o/:org/forms/forms/:id/submissions",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FORMS-005",
+      "app": "FORMS",
+      "workstream": "WS6",
+      "route": "/o/:org/forms/forms/:id/publish",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-FORMS-006",
+      "app": "FORMS",
+      "workstream": "WS6",
+      "route": "/o/:org/forms/forms/:id/analytics",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AUTO-001",
+      "app": "AUTO",
+      "workstream": "WS2",
+      "route": "/o/:org/auto/workflows",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AUTO-002",
+      "app": "AUTO",
+      "workstream": "WS2",
+      "route": "/o/:org/auto/workflows/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AUTO-003",
+      "app": "AUTO",
+      "workstream": "WS2",
+      "route": "/o/:org/auto/workflows/:id/triggers",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AUTO-004",
+      "app": "AUTO",
+      "workstream": "WS2",
+      "route": "/o/:org/auto/workflows/:id/actions",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AUTO-005",
+      "app": "AUTO",
+      "workstream": "WS2",
+      "route": "/o/:org/auto/workflows/:id/test",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AUTO-006",
+      "app": "AUTO",
+      "workstream": "WS2",
+      "route": "/o/:org/auto/runs",
+      "contract": {
+        "tabs": 5,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AUTO-007",
+      "app": "AUTO",
+      "workstream": "WS2",
+      "route": "/o/:org/auto/runs/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AUTO-008",
+      "app": "AUTO",
+      "workstream": "WS2",
+      "route": "/o/:org/auto/schedules",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-AUTO-009",
+      "app": "AUTO",
+      "workstream": "WS2",
+      "route": "/o/:org/auto/exceptions",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ANALYTICS-001",
+      "app": "ANALYTICS",
+      "workstream": "WS2",
+      "route": "/o/:org/analytics/home",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ANALYTICS-002",
+      "app": "ANALYTICS",
+      "workstream": "WS2",
+      "route": "/o/:org/analytics/dashboards",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ANALYTICS-003",
+      "app": "ANALYTICS",
+      "workstream": "WS2",
+      "route": "/o/:org/analytics/dashboards/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ANALYTICS-004",
+      "app": "ANALYTICS",
+      "workstream": "WS2",
+      "route": "/o/:org/analytics/reports/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ANALYTICS-005",
+      "app": "ANALYTICS",
+      "workstream": "WS2",
+      "route": "/o/:org/analytics/datasets",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ANALYTICS-006",
+      "app": "ANALYTICS",
+      "workstream": "WS2",
+      "route": "/o/:org/analytics/metrics",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ANALYTICS-007",
+      "app": "ANALYTICS",
+      "workstream": "WS2",
+      "route": "/o/:org/analytics/models",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ANALYTICS-008",
+      "app": "ANALYTICS",
+      "workstream": "WS2",
+      "route": "/o/:org/analytics/forecasts",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ANALYTICS-009",
+      "app": "ANALYTICS",
+      "workstream": "WS2",
+      "route": "/o/:org/analytics/distribution",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROC-001",
+      "app": "PROC",
+      "workstream": "WS4",
+      "route": "/o/:org/proc/home",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROC-002",
+      "app": "PROC",
+      "workstream": "WS4",
+      "route": "/o/:org/proc/suppliers",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROC-003",
+      "app": "PROC",
+      "workstream": "WS4",
+      "route": "/o/:org/proc/suppliers/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROC-004",
+      "app": "PROC",
+      "workstream": "WS4",
+      "route": "/o/:org/proc/requisitions",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROC-005",
+      "app": "PROC",
+      "workstream": "WS4",
+      "route": "/o/:org/proc/orders",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROC-006",
+      "app": "PROC",
+      "workstream": "WS4",
+      "route": "/o/:org/proc/warehouses",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROC-007",
+      "app": "PROC",
+      "workstream": "WS4",
+      "route": "/o/:org/proc/receiving",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROC-008",
+      "app": "PROC",
+      "workstream": "WS4",
+      "route": "/o/:org/proc/movements",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROC-009",
+      "app": "PROC",
+      "workstream": "WS4",
+      "route": "/o/:org/proc/replenishment",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PROC-010",
+      "app": "PROC",
+      "workstream": "WS4",
+      "route": "/o/:org/proc/reports",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CONNECT-001",
+      "app": "CONNECT",
+      "workstream": "WS6",
+      "route": "/o/:org/connect/marketplace",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CONNECT-002",
+      "app": "CONNECT",
+      "workstream": "WS6",
+      "route": "/o/:org/connect/marketplace/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CONNECT-003",
+      "app": "CONNECT",
+      "workstream": "WS6",
+      "route": "/o/:org/connect/connect/:id",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CONNECT-004",
+      "app": "CONNECT",
+      "workstream": "WS6",
+      "route": "/o/:org/connect/connections",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CONNECT-005",
+      "app": "CONNECT",
+      "workstream": "WS6",
+      "route": "/o/:org/connect/connections/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CONNECT-006",
+      "app": "CONNECT",
+      "workstream": "WS6",
+      "route": "/o/:org/connect/capabilities",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CONNECT-007",
+      "app": "CONNECT",
+      "workstream": "WS6",
+      "route": "/o/:org/connect/sync",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CONNECT-008",
+      "app": "CONNECT",
+      "workstream": "WS6",
+      "route": "/o/:org/connect/health",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CONNECT-009",
+      "app": "CONNECT",
+      "workstream": "WS6",
+      "route": "/o/:org/connect/custom",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-CONNECT-010",
+      "app": "CONNECT",
+      "workstream": "WS6",
+      "route": "/o/:org/connect/receipts",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-IT-001",
+      "app": "IT",
+      "workstream": "WS6",
+      "route": "/o/:org/it/home",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-IT-002",
+      "app": "IT",
+      "workstream": "WS6",
+      "route": "/o/:org/it/incidents",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-IT-003",
+      "app": "IT",
+      "workstream": "WS6",
+      "route": "/o/:org/it/incidents/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-IT-004",
+      "app": "IT",
+      "workstream": "WS6",
+      "route": "/o/:org/it/health",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-IT-005",
+      "app": "IT",
+      "workstream": "WS6",
+      "route": "/o/:org/it/traces",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-IT-006",
+      "app": "IT",
+      "workstream": "WS6",
+      "route": "/o/:org/it/remediation",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-IT-007",
+      "app": "IT",
+      "workstream": "WS6",
+      "route": "/o/:org/it/releases",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-IT-008",
+      "app": "IT",
+      "workstream": "WS6",
+      "route": "/o/:org/it/security",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-IT-009",
+      "app": "IT",
+      "workstream": "WS6",
+      "route": "/o/:org/it/reports",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-INBOX-001",
+      "app": "INBOX",
+      "workstream": "WS1",
+      "route": "/o/:org/inbox/inbox",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-INBOX-002",
+      "app": "INBOX",
+      "workstream": "WS1",
+      "route": "/o/:org/inbox/approvals",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-INBOX-003",
+      "app": "INBOX",
+      "workstream": "WS1",
+      "route": "/o/:org/inbox/messages",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-INBOX-004",
+      "app": "INBOX",
+      "workstream": "WS1",
+      "route": "/o/:org/inbox/notifications",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-INBOX-005",
+      "app": "INBOX",
+      "workstream": "WS1",
+      "route": "/o/:org/inbox/incidents",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-INBOX-006",
+      "app": "INBOX",
+      "workstream": "WS1",
+      "route": "/o/:org/inbox/settings",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-INBOX-007",
+      "app": "INBOX",
+      "workstream": "WS1",
+      "route": "/o/:org/inbox/digests",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-INBOX-008",
+      "app": "INBOX",
+      "workstream": "WS1",
+      "route": "/o/:org/inbox/escalations",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ADMIN-001",
+      "app": "ADMIN",
+      "workstream": "WS1",
+      "route": "/o/:org/admin/organization",
+      "contract": {
+        "tabs": 4,
+        "actions": 3,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ADMIN-002",
+      "app": "ADMIN",
+      "workstream": "WS1",
+      "route": "/o/:org/admin/members",
+      "contract": {
+        "tabs": 4,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ADMIN-003",
+      "app": "ADMIN",
+      "workstream": "WS1",
+      "route": "/o/:org/admin/roles",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ADMIN-004",
+      "app": "ADMIN",
+      "workstream": "WS1",
+      "route": "/o/:org/admin/autonomy",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ADMIN-005",
+      "app": "ADMIN",
+      "workstream": "WS1",
+      "route": "/o/:org/admin/budgets",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ADMIN-006",
+      "app": "ADMIN",
+      "workstream": "WS1",
+      "route": "/o/:org/admin/security",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ADMIN-007",
+      "app": "ADMIN",
+      "workstream": "WS1",
+      "route": "/o/:org/admin/audit",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ADMIN-008",
+      "app": "ADMIN",
+      "workstream": "WS1",
+      "route": "/o/:org/admin/privacy",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ADMIN-009",
+      "app": "ADMIN",
+      "workstream": "WS1",
+      "route": "/o/:org/admin/billing",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ADMIN-010",
+      "app": "ADMIN",
+      "workstream": "WS1",
+      "route": "/o/:org/admin/recovery",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ADMIN-011",
+      "app": "ADMIN",
+      "workstream": "WS1",
+      "route": "/o/:org/admin/developer",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-LEGAL-001",
+      "app": "LEGAL",
+      "workstream": "WS3",
+      "route": "/o/:org/legal/home",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-LEGAL-002",
+      "app": "LEGAL",
+      "workstream": "WS3",
+      "route": "/o/:org/legal/contracts",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-LEGAL-003",
+      "app": "LEGAL",
+      "workstream": "WS3",
+      "route": "/o/:org/legal/contracts/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-LEGAL-004",
+      "app": "LEGAL",
+      "workstream": "WS3",
+      "route": "/o/:org/legal/policies",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-LEGAL-005",
+      "app": "LEGAL",
+      "workstream": "WS3",
+      "route": "/o/:org/legal/obligations",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-LEGAL-006",
+      "app": "LEGAL",
+      "workstream": "WS3",
+      "route": "/o/:org/legal/risks",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-LEGAL-007",
+      "app": "LEGAL",
+      "workstream": "WS3",
+      "route": "/o/:org/legal/evidence",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PORTAL-001",
+      "app": "PORTAL",
+      "workstream": "WS4",
+      "route": "/o/:org/portal/portals",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PORTAL-002",
+      "app": "PORTAL",
+      "workstream": "WS4",
+      "route": "/o/:org/portal/portals/:id/builder",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PORTAL-003",
+      "app": "PORTAL",
+      "workstream": "WS4",
+      "route": "/o/:org/portal/portals/:id/dashboard",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PORTAL-004",
+      "app": "PORTAL",
+      "workstream": "WS4",
+      "route": "/o/:org/portal/portals/:id/files",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PORTAL-005",
+      "app": "PORTAL",
+      "workstream": "WS4",
+      "route": "/o/:org/portal/portals/:id/messages",
+      "contract": {
+        "tabs": 3,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PORTAL-006",
+      "app": "PORTAL",
+      "workstream": "WS4",
+      "route": "/o/:org/portal/portals/:id/billing",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-PORTAL-007",
+      "app": "PORTAL",
+      "workstream": "WS4",
+      "route": "/o/:org/portal/portals/:id/admin",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ASSET-001",
+      "app": "ASSET",
+      "workstream": "WS1",
+      "route": "/o/:org/asset/assets",
+      "contract": {
+        "tabs": 5,
+        "actions": 5,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ASSET-002",
+      "app": "ASSET",
+      "workstream": "WS1",
+      "route": "/o/:org/asset/assets/:id",
+      "contract": {
+        "tabs": 5,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ASSET-003",
+      "app": "ASSET",
+      "workstream": "WS1",
+      "route": "/o/:org/asset/brands",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ASSET-004",
+      "app": "ASSET",
+      "workstream": "WS1",
+      "route": "/o/:org/asset/transforms",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    },
+    {
+      "id": "ARL-ASSET-005",
+      "app": "ASSET",
+      "workstream": "WS1",
+      "route": "/o/:org/asset/governance",
+      "contract": {
+        "tabs": 4,
+        "actions": 4,
+        "overlays": 3
+      },
+      "acceptance": {
+        "visual": "awaiting",
+        "formAndActionEffects": "awaiting",
+        "keyboard": "awaiting",
+        "responsive": "awaiting",
+        "accessibility": "awaiting",
+        "independentSignoff": "awaiting"
+      },
+      "notes": [],
+      "evidenceUrls": []
+    }
+  ]
+}
