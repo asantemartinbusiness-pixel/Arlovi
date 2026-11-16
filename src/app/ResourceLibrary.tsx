@@ -12,6 +12,7 @@ type Scope = { type: "project" | "department"; id: string; title: string } | nul
 type FolderRecord = Rec;
 const CLOSED = new Set(["archived", "deleted"]);
 export const RESOURCE_FOLDERS = "resourceFolders";
+export const RESOURCE_LINKS = "resourceLinks";
 export function belongsToResourceScope(record: Rec, scope: Scope): boolean {
   if (!scope) return true;
   return scope.type === "project"
@@ -35,7 +36,7 @@ export function ResourceLibrary({ scope = null }: { scope?: Scope }) {
   const { org } = useWorkspace();
   const mutate = useMutations("workspace-resource-library");
   const toast = useToast();
-  const { documents = [], resourceFolders: folders = [], projects = [], departments = [] } = useCollections(["documents", RESOURCE_FOLDERS, "projects", "departments"]);
+  const { documents = [], resourceFolders: folders = [], resourceLinks: links = [], projects = [], departments = [] } = useCollections(["documents", RESOURCE_FOLDERS, RESOURCE_LINKS, "projects", "departments"]);
   const [folderId,setFolderId] = useState<string | null>(null);
   const [query,setQuery] = useState("");
   const [newFolder,setNewFolder] = useState("");
@@ -46,7 +47,8 @@ export function ResourceLibrary({ scope = null }: { scope?: Scope }) {
   const [attachId,setAttachId] = useState("");
   const [showAttach,setShowAttach] = useState(false);
   const scopedFolders = folders.filter(f=>!CLOSED.has(f.status)&&belongsToResourceScope(f,scope));
-  const scopedDocs = documents.filter(d=>!CLOSED.has(d.status)&&belongsToResourceScope(d,scope));
+  const linkedIds = new Set(scope ? links.filter(link=>link.status==="active"&&link.fields.scopeId===scope.id&&link.fields.scopeType===scope.type).map(link=>String(link.fields.resourceId)) : []);
+  const scopedDocs = documents.filter(d=>!CLOSED.has(d.status)&&(belongsToResourceScope(d,scope)||linkedIds.has(d.id)));
   const currentFolder = scopedFolders.find(f=>f.id===folderId);
   const activeFolderId = currentFolder?.id ?? null;
   const q = query.trim().toLocaleLowerCase();
@@ -55,7 +57,7 @@ export function ResourceLibrary({ scope = null }: { scope?: Scope }) {
   const visibleDocs = scopedDocs.filter(d=>
     (q ? (d.title+" "+d.summary).toLowerCase().includes(q) : (d.fields.resourceFolderId||"")===(activeFolderId??"")));
   const selected = scopedDocs.find(d=>d.id===selectedId);
-  const selectable = scope ? documents.filter(d=>!CLOSED.has(d.status)&&!belongsToResourceScope(d,scope)) : [];
+  const selectable = scope ? documents.filter(d=>!CLOSED.has(d.status)&&!belongsToResourceScope(d,scope)&&!linkedIds.has(d.id)) : [];
   const names = new Map<string,string>([
     ...projects.map(p=>[p.id,p.title] as [string,string]),
     ...departments.map(d=>[d.id,d.title] as [string,string]),
@@ -103,22 +105,22 @@ export function ResourceLibrary({ scope = null }: { scope?: Scope }) {
     const doc=selectable.find(d=>d.id===attachId);
     if(!doc){setError("Select an existing document.");return;}
     await perform(async()=>{
-      await patchDocument(doc,{[scope.type==="project"?"projectId":"departmentId"]:scope.id},`Linked document to ${scope.title}`);
+      await mutate.create({collection:RESOURCE_LINKS,title:`${doc.title} in ${scope.title}`,status:"active",summary:"Reference to an existing document; does not alter the original ownership.",fields:{resourceId:doc.id,scopeId:scope.id,scopeType:scope.type,source:"workspace-resources"}},`Linked ${doc.title} to ${scope.title}`);
       setAttachId("");setShowAttach(false);setSelectedId(doc.id);
     },"Document linked");
   }
   async function unlink(doc:Rec) {
     if(!scope)return;
+    const reference=links.find(link=>link.status==="active"&&link.fields.resourceId===doc.id&&link.fields.scopeId===scope.id&&link.fields.scopeType===scope.type);
+    if(!reference) {setError("This document belongs directly to the workspace; unlinking must be managed in its source application.");return;}
     await perform(async()=>{
-      const nextFields={...doc.fields};
-      delete nextFields[scope.type==="project"?"projectId":"departmentId"];
-      if(scope.type==="project" && doc.parentId===scope.id)throw new Error("This document's parent is the project. Change its parent in the source application before unlinking.");
-      const updated=await mutate.patch(doc.id,{fields:nextFields},{expectRevision:doc.revision,replaceFields:true,event:`Unlinked document from ${scope.title}`});
-      if(!updated)throw new Error("Document changed while unlinking.");
+      const updated=await mutate.patch(reference.id,{status:"archived"},{expectRevision:reference.revision,event:`Unlinked ${doc.title} from ${scope.title}`});
+      if(!updated)throw new Error("The linked reference changed. Refresh and try again.");
       setSelectedId(null);
     },"Document unlinked");
   }
   async function move(doc:Rec,nextFolder:string) {
+    if(scope && !belongsToResourceScope(doc,scope)) {setError("A linked document can be organised in its owning workspace; opening it here does not change its original folder.");return;}
     if(nextFolder) {
       const folder=scopedFolders.find(f=>f.id===nextFolder);
       if(!folder||!canMoveToFolder(doc,folder,org.id,scope)) {setError("That folder is unavailable for this document.");return;}
@@ -145,8 +147,8 @@ export function ResourceLibrary({ scope = null }: { scope?: Scope }) {
       </div>
       {selected&&<aside className="rs-preview" aria-label="Document preview"><div className="rs-preview-head"><h3>{selected.title}</h3><button type="button" onClick={()=>setSelectedId(null)} aria-label="Close document preview"><X size={17}/></button></div><p className="rs-summary">{selected.summary||"Document"}</p><dl><div><dt>Owner</dt><dd>{selected.ownerName}</dd></div><div><dt>Modified</dt><dd>{new Date(selected.updatedAt).toLocaleString()}</dd></div><div><dt>Version</dt><dd>Revision {selected.revision}</dd></div><div><dt>Space</dt><dd>{String(names.get(String(selected.fields.projectId||selected.fields.departmentId))||"Company")}</dd></div></dl>
         <div className="rs-preview-text"><h4>Content preview</h4><p>{textPreview(selected)||"This document is empty."}</p></div>
-        <label className="rs-move">Folder<select aria-label="Move document to folder" value={String(selected.fields.resourceFolderId||"")} onChange={e=>void move(selected,e.target.value)} disabled={busy}><option value="">Unfiled</option>{scopedFolders.map(f=><option key={f.id} value={f.id}>{f.title}</option>)}</select></label>
-        <div className="rs-preview-actions">{routeForRecord(selected,org.slug)&&<Link to={routeForRecord(selected,org.slug)!}>Open in Docs</Link>}{scope&&<button type="button" onClick={()=>void unlink(selected)} disabled={busy}><Unlink2 size={15}/> Unlink from space</button>}</div>
+        <label className="rs-move">Folder<select aria-label="Move document to folder" value={String(selected.fields.resourceFolderId||"")} onChange={e=>void move(selected,e.target.value)} disabled={busy||(Boolean(scope)&&!belongsToResourceScope(selected,scope))}><option value="">Unfiled</option>{scopedFolders.map(f=><option key={f.id} value={f.id}>{f.title}</option>)}</select></label>
+        <div className="rs-preview-actions">{routeForRecord(selected,org.slug)&&<Link to={routeForRecord(selected,org.slug)!}>Open in Docs</Link>}{scope&&<button type="button" onClick={()=>void unlink(selected)} disabled={busy||!links.some(l=>l.status==="active"&&l.fields.resourceId===selected.id&&l.fields.scopeId===scope.id&&l.fields.scopeType===scope.type)}><Unlink2 size={15}/> Unlink from space</button>}</div>
         <details className="rs-history"><summary><Clock3 size={15}/> Version history ({selected.history.length})</summary><div>{selected.history.length?selected.history.slice(0,25).map((snapshot:Snapshot,index)=><div key={snapshot.at+"-"+index} className="rs-version"><strong>Revision {Math.max(1,selected.revision-index-1)}</strong><small>{new Date(snapshot.at).toLocaleString()}</small><p>{snapshot.summary||snapshot.title}</p></div>):<p>No previous versions recorded.</p>}</div></details>
         <p className="rs-info">Version history shows stored snapshots. Restoring older versions and secure sharing require additional safeguards.</p>
       </aside>}
