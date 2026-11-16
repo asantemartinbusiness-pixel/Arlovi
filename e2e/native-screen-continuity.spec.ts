@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 /** Uses the actual off-canvas navigation on small screens, never force-clicks
  * invisible sidebar controls. */
@@ -54,4 +55,20 @@ test("company-scoped app breadcrumb cannot change companies or invent a record I
   await crumb.click();
   await expect(page).toHaveURL(/\/o\/harbor\/crm\/home$/);
   await expect(page.getByText(/This screen is not built yet/)).toHaveCount(0);
+});
+
+test("native-app header control labels match visible text for screen readers", async ({ page }) => {
+  await page.goto("/o/northline/fin/home");
+  await expect(page.locator(".hq-header")).toBeVisible();
+  const search = page.locator(".hq-search");
+  await expect(search).toHaveAttribute("aria-label", "Search anything in Northline");
+  await expect(page.locator(".hq-orgdot")).toHaveAttribute("aria-hidden", "true");
+  const results = await new AxeBuilder({ page })
+    .include(".hq-header")
+    .withRules(["label-content-name-mismatch"])
+    .analyze();
+  expect(results.violations.map(issue => ({
+    rule: issue.id,
+    elements: issue.nodes.map(node => node.html.slice(0, 140)),
+  }))).toEqual([]);
 });
