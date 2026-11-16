@@ -9,9 +9,21 @@ test("a company can be created with departments, AI drafts and a mission", async
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("textbox", { name: "Company overview" }).fill("Independent creative and operations studio.");
   await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Introduce your company to Arlovi." })).toBeVisible();
+  await page.getByRole("textbox", { name: "Company knowledge" }).fill("We value transparent service and accessible design.");
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Organize your headquarters." })).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Bring your people into the plan." })).toBeVisible();
+  await page.getByRole("textbox", { name: "Colleagues" }).fill("Sam Rivera");
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Plan your AI workforce." })).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Design your everyday workspace." })).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Give your team a place to work." })).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Decide how your AI team works." })).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("textbox", { name: "First mission" }).fill("Plan next-quarter client growth.");
   await page.getByRole("button", { name: "Enter headquarters" }).click();
@@ -30,7 +42,7 @@ test("a company can be created with departments, AI drafts and a mission", async
         const orgId = all.find((record) => record.fields.slug === companySlug && record.collection === "organizations")?.id;
         const records = all.filter((record) => record.organizationId === orgId);
         const out: Record<string, number> = {};
-        for (const name of ["organizations", "departments", "agents", "missions", "sources"]) out[name] = records.filter((r) => r.collection === name).length;
+        for (const name of ["organizations", "departments", "agents", "missions", "sources", "channels", "policies", "preferences"]) out[name] = records.filter((r) => r.collection === name).length;
         resolve(out);
         database.close();
       };
@@ -41,8 +53,13 @@ test("a company can be created with departments, AI drafts and a mission", async
   expect(counts.departments).toBeGreaterThan(0);
   expect(counts.agents).toBeGreaterThan(0);
   expect(counts.missions).toBe(1);
-  expect(counts.sources).toBe(1);
+  expect(counts.sources).toBe(2);
+  expect(counts.channels).toBeGreaterThan(0);
+  expect(counts.policies).toBe(1);
+  expect(counts.preferences).toBeGreaterThan(0);
 
   await page.reload();
   await expect(page.locator(".hq-orgswitch")).toContainText(slug);
+  await page.goto("/");
+  await expect(page).toHaveURL(new RegExp("/o/" + slug + "/hq/home"));
 });
