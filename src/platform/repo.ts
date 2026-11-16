@@ -1,6 +1,7 @@
 import { db } from "@/runtime/db";
 import type { Audit, Rec, Snapshot } from "@/domain/types";
 import { journalDate, lockedPeriods, periodOf } from "@/domain/fin-ledger";
+import { validateBankReconciliation } from "@/domain/finance-signoff";
 
 /* ------------------------------------------------------------------ *
  * Narrow repository.
@@ -269,6 +270,64 @@ export async function putMany(records: Rec[], context: WriteContext, events: Omi
         screenId: event.screenId ?? context.screenId,
       })));
     }
+  });
+}
+
+/**
+ * The entire confirmation is revalidated inside one IndexedDB transaction.
+ * The browser-local signoff cannot be saved from an outdated React render:
+ * ledger, statement, matched lines, reciprocal links and duplicate confirmations
+ * are inspected together with the final confirmation write.
+ */
+export async function confirmBankReconciliation(
+  organizationId: string,
+  bankAccountCode: string,
+  expectedStatementId: string,
+  note: string,
+  context: WriteContext,
+): Promise<Rec> {
+  return db.transaction("rw", [db.records, db.events], async () => {
+    const records = await db.records.where("organizationId").equals(organizationId).toArray();
+    const { recon, evidence } = validateBankReconciliation({
+      organizationId, bankAccountCode, expectedStatementId, records,
+    });
+    const record = newRecord({
+      organizationId,
+      collection: "bankTransactions",
+      currency: records.find((item) => item.collection === "accounts")?.currency ?? "GBP",
+      title: `Reconciliation ${context.now.slice(0, 10)} · ${bankAccountCode}`,
+      status: "confirmed",
+      summary: note.trim() || "Local statement signoff with complete reciprocal ledger evidence.",
+      amountMinor: recon.statementClosingMinor ?? 0,
+      at: context.now,
+      fields: {
+        kind: "reconciliation",
+        statementId: evidence.statementId,
+        bankAccountCode,
+        closingMinor: evidence.closingMinor,
+        ledgerMinor: evidence.ledgerMinor,
+        differenceMinor: 0,
+        confirmedBy: context.actor,
+        confirmedAt: context.now,
+        journalCount: Object.keys(evidence.journalRevisions).length,
+        matchedCount: Object.keys(evidence.lineRevisions).length,
+        verification: "manual_local",
+      },
+      body: { evidence },
+    }, context);
+    await db.records.add(record);
+    await db.events.add({
+      id: crypto.randomUUID(),
+      organizationId,
+      at: context.now,
+      actor: context.actor,
+      type: "create",
+      message: `Statement ${expectedStatementId} manually reconciled against account ${bankAccountCode} by ${context.actor}`,
+      entityId: record.id,
+      screenId: context.screenId,
+    });
+    prime(record);
+    return record;
   });
 }
 
