@@ -53,6 +53,10 @@ describe("reconciliation signoff source evidence",()=>{
     expect(()=>check(records.map(row=>row.id===journal.id
       ? {...journal,organizationId:"org-harbor"}:row))).toThrow(/reciprocal/);
   });
+  it("rejects a CSV whose opening balance plus movements does not reach its entered closing balance",()=>{
+    const invalid={...statement,fields:{...statement.fields,openingMinor:1000}};
+    expect(()=>check(records.map(row=>row.id===statement.id?invalid:row))).toThrow(/opening balance plus imported movements/);
+  });
   it("rejects duplicate confirmations of the same statement",()=>{
     const confirmation=rec("confirmation-1","bankTransactions",{kind:"reconciliation",statementId:statement.id},"confirmed");
     expect(()=>check([...records,confirmation])).toThrow(/already been signed off/);
