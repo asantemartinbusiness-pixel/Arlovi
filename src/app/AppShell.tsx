@@ -103,7 +103,29 @@ export function AppShell() {
     };
   }, [ui]);
 
-  useEffect(() => { setNavOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    setNavOpen(false);
+    const container = document.querySelector<HTMLElement>(".hq-scroll");
+    container?.scrollTo({ top: 0, behavior: "instant" });
+    // A keyboard/screen-reader user needs a reliable focus destination after
+    // client-side routing. Skip the focus move for the first shell mount.
+    const heading = container?.querySelector<HTMLElement>("h1");
+    if (heading) {
+      heading.setAttribute("tabindex", "-1");
+      heading.focus({ preventScroll: true });
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      setNavOpen(false);
+    };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [navOpen]);
 
   useEffect(() => {
     recordNavigation(org.id, org.slug, location.pathname);
