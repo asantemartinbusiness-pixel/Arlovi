@@ -242,3 +242,6 @@
   .hq-header .hq-header-utils .ds-btn{padding-inline:5px}
 }
 @media(prefers-reduced-motion:reduce){.hq-header .hq-search{transition:none}}
+
+/* The count is display-only: it must never block clicks or touch on its button. */
+.hq-bell-count{pointer-events:none}
