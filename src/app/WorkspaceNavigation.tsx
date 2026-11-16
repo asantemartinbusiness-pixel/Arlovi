@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentType } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { ArrowRight, Building2, CalendarDays, CheckSquare, ChevronRight, FolderKanban, Grid2X2, Home, Inbox, Layers, Megaphone, Plus, Search, Users } from "lucide-react";
 import { APP_ENTRIES, NAV_GROUPS } from "@/app/nav";
@@ -35,7 +35,7 @@ const headings: Record<WorkArea, string> = {
 const collections = ["departments", "members", "projects", "missions", "tasks", "documents", "channels", "preferences", "objectives", "agents"];
 const empty: Rec[] = [];
 
-function RowLink({ to, title, detail, icon: Icon = ChevronRight }: { to: string; title: string; detail?: string; icon?: typeof ChevronRight }) {
+function RowLink({ to, title, detail, icon: Icon = ChevronRight }: { to: string; title: string; detail?: string; icon?: ComponentType<{ size?: number; strokeWidth?: number; className?: string }> }) {
   return <Link className="ws-entry" to={to}><Icon size={18} aria-hidden="true" /><span className="ws-entry-text"><strong>{title}</strong>{detail && <small>{detail}</small>}</span><ArrowRight size={15} className="ws-entry-arrow" aria-hidden="true" /></Link>;
 }
 function WorkList({ title, records, slug, fallback }: { title: string; records: Rec[]; slug: string; fallback: string }) {
