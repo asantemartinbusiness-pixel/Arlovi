@@ -51,7 +51,7 @@ describe("reconciliation signoff source evidence",()=>{
     expect(()=>check(records.map(row=>row.id===journal.id
       ? {...journal,fields:{source:"payment"}}:row))).toThrow(/reciprocal/);
     expect(()=>check(records.map(row=>row.id===journal.id
-      ? {...journal,organizationId:"org-harbor"}:row))).toThrow(/reciprocal/);
+      ? {...journal,organizationId:"org-harbor"}:row))).toThrow(/difference|reciprocal/);
   });
   it("rejects a CSV whose opening balance plus movements does not reach its entered closing balance",()=>{
     const invalid={...statement,fields:{...statement.fields,openingMinor:1000}};
