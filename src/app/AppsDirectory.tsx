@@ -133,7 +133,10 @@ export function AppsDirectory() {
   }, [navigation.recent, org.slug, available]);
 
   function setFilter(key: "category" | "q", value: string) {
-    const next = new URLSearchParams(params);
+    // Read the latest browser URL, not a render's captured searchParams.
+    // Fast clear-search -> choose-category interactions can otherwise restore
+    // the previous query and show a misleading empty directory.
+    const next = new URLSearchParams(window.location.search);
     if (value && !(key === "category" && value === "All")) next.set(key, value);
     else next.delete(key);
     setParams(next, { replace: true });
