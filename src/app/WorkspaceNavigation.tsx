@@ -74,8 +74,11 @@ export function WorkspaceSideNav() {
   const { org } = useWorkspace();
   const location = useLocation();
   const area = currentWorkArea(location.pathname);
-  return <nav className="hq-appnav ws-sidebar" aria-label={headings[area] + " navigation"}>
-    <div className="hq-appnav-head"><h2>{headings[area]}</h2><p>{WORK_AREAS.find(item=>item.id===area)?.description}</p></div>
+  const extra: Record<string,{ title:string;description:string }> = {recent:{title:"Recent & saved",description:"Return to your work"},resources:{title:"Files & resources",description:"Company documents and folders"},people:{title:"People & collaboration",description:"Company directory and team spaces"},account:{title:"Account & data",description:"Identity and data readiness"},health:{title:"Workspace health",description:"Diagnostics and recovery"}};
+  const section = extra[location.pathname.split("/")[4]];
+  const headerTitle = section?.title ?? headings[area];
+  return <nav className="hq-appnav ws-sidebar" aria-label={headerTitle + " navigation"}>
+    <div className="hq-appnav-head"><h2>{headerTitle}</h2><p>{section?.description ?? WORK_AREAS.find(item=>item.id===area)?.description}</p></div>
     <div className="hq-appnav-body">{WORK_AREAS.map(item => <NavLink key={item.id} className="hq-navlink" to={workAreaPath(org.slug,item.id)}><item.icon size={16}/>{item.label}</NavLink>)}
       <NavLink className="hq-navlink" to={`/o/${org.slug}/workspace/recent`}><Clock3 size={16}/>Recent & saved</NavLink>
       <NavLink className="hq-navlink" to={`/o/${org.slug}/workspace/resources`}><FolderKanban size={16}/>Files & resources</NavLink>
