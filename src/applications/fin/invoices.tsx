@@ -1536,6 +1536,7 @@ export function ApproveInvoice({ context, close }: { context: ScreenContext; clo
             );
           } finally {
             setBusy(false);
+          }
         }}
       >
         Approve and post {context.money(totals.grossMinor)}
