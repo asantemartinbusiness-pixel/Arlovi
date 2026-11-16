@@ -27,7 +27,7 @@ export function CompanyPeople({ scope = null }: { scope?: Scope }) {
   const { org } = useWorkspace();
   const mutate = useMutations("workspace-people");
   const toast = useToast();
-  const { members = [], departments = [], projects = [], spaceMemberships = [], workspaceInvitationDrafts: invitations = [] } = useCollections([
+  const { members = [], spaceMemberships = [], workspaceInvitationDrafts: invitations = [] } = useCollections([
     "members","departments","projects",MEMBERSHIP_COLLECTION,INVITATION_COLLECTION,
   ]);
   const [query,setQuery] = useState("");
@@ -47,10 +47,6 @@ export function CompanyPeople({ scope = null }: { scope?: Scope }) {
   const eligible = scope ? available.filter(r=>!assignedIds.has(r.id)) : [];
   const matches = available.filter(member=>[member.title,member.summary,getEmail(member)].join(" ").toLowerCase().includes(query.toLowerCase().trim()));
   const sorted = [...matches].sort((a,b)=>a.title.localeCompare(b.title));
-  const getScopeName = (row: Rec) => {
-    const id = row.fields.scopeId;
-    return [...departments,...projects].find(r=>r.id===id)?.title ?? "Workspace";
-  };
   async function perform(fn:()=>Promise<void>,label:string) {
     if(busy)return;
     setBusy(true);setError("");
@@ -71,7 +67,7 @@ export function CompanyPeople({ scope = null }: { scope?: Scope }) {
       setPerson("");setShowMembership(false);
     },"Workspace membership recorded");
   }
-  async function setLevel(record:Rec,value:Access) {
+  async function updateAccess(record:Rec,value:Access) {
     await perform(async()=>{
       const updated=await mutate.patch(record.id,{fields:{accessLevel:value},summary:`Planned ${value} access; not an authenticated grant.`},{expectRevision:record.revision,event:`Membership access plan updated to ${value}`});
       if(!updated)throw new Error("Membership changed in another window.");
@@ -127,7 +123,7 @@ export function CompanyPeople({ scope = null }: { scope?: Scope }) {
       <button type="submit" disabled={busy||!inviteName.trim()||!inviteEmail.trim()}>Save unsent draft</button><button type="button" onClick={()=>setShowInvite(false)} aria-label="Close invitation form"><X size={16}/></button>
     </form>}
     {scope&&<div className="cp-section"><h3>Workspace membership plan <span>{assignments.length}</span></h3>
-      {assignments.length?<div className="cp-list">{assignments.map(row=><div className="cp-row" key={row.id}><div className="cp-avatar" aria-hidden="true">{row.title.slice(0,1).toUpperCase()}</div><div className="cp-person"><strong>{row.title}</strong><small>{available.find(p=>p.id===row.fields.memberId)?getEmail(available.find(p=>p.id===row.fields.memberId)!):"Company record unavailable"}</small></div><label className="cp-access">Planned access<select aria-label={`Planned access for ${row.title}`} value={String(row.fields.accessLevel||"viewer")} onChange={e=>void setLevel(row,e.target.value as Access)} disabled={busy}>{ACCESS.map(a=><option key={a} value={a}>{a}</option>)}</select></label><button type="button" className="cp-icon-btn" onClick={()=>void removeMember(row)} disabled={busy} aria-label={`Remove ${row.title} from workspace plan`}><X size={16}/></button></div>)}</div>:<p className="cp-empty">No people have been associated with this workspace yet.</p>}
+      {assignments.length?<div className="cp-list">{assignments.map(row=><div className="cp-row" key={row.id}><div className="cp-avatar" aria-hidden="true">{row.title.slice(0,1).toUpperCase()}</div><div className="cp-person"><strong>{row.title}</strong><small>{available.find(p=>p.id===row.fields.memberId)?getEmail(available.find(p=>p.id===row.fields.memberId)!):"Company record unavailable"}</small></div><label className="cp-access">Planned access<select aria-label={`Planned access for ${row.title}`} value={String(row.fields.accessLevel||"viewer")} onChange={e=>void updateAccess(row,e.target.value as Access)} disabled={busy}>{ACCESS.map(a=><option key={a} value={a}>{a}</option>)}</select></label><button type="button" className="cp-icon-btn" onClick={()=>void removeMember(row)} disabled={busy} aria-label={`Remove ${row.title} from workspace plan`}><X size={16}/></button></div>)}</div>:<p className="cp-empty">No people have been associated with this workspace yet.</p>}
     </div>}
     <div className="cp-section"><div className="cp-title"><h3>{scope?"Company members":"People in this company"} <span>{sorted.length}</span></h3><label className="cp-search"><Search size={15}/><input aria-label="Search company people" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search people"/></label></div>
       {sorted.length?<div className="cp-list">{sorted.map(member=><div className="cp-row" key={member.id}><div className="cp-avatar" aria-hidden="true">{member.title.slice(0,1).toUpperCase()}</div><div className="cp-person"><strong>{member.title}</strong><small>{getEmail(member)||member.summary||"Company member"}</small></div><span className="cp-status">{member.status.replace(/_/g," ")}</span>{scope&&assignedIds.has(member.id)&&<span className="cp-status"><Check size={13}/> Associated</span>}</div>)}</div>:<p className="cp-empty">No company people match your search.</p>}
