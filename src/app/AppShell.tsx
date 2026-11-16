@@ -4,7 +4,7 @@ import { ChevronDown, Menu as MenuIcon, Moon, Sparkles, Sun, Search, Bell, X } f
 import { Button, Pill, Row } from "@/design-system";
 import { Menu } from "@/design-system/overlays";
 import { ArloviMark, brand, palettes } from "@/app/brand";
-import { NAV_GROUPS, APP_ENTRIES, mobileNavFor } from "@/app/nav";
+import { NAV_GROUPS, APP_ENTRIES } from "@/app/nav";
 import { appEntry, findScreen, screens } from "@/app/catalog";
 import { destinationForOrganization } from "@/app/organizationNavigation";
 import { ScreenHost } from "@/app/ScreenHost";
