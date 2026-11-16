@@ -57,7 +57,7 @@ export function AppLauncher({ orgSlug, orgName, role, initialGroup, favourites, 
     ...group,
     apps: group.apps.filter((app) =>
       (category === ALL || category === group.label)
-      && (!query.trim() || \`\${app.short} \${group.label}\`.toLowerCase().includes(query.trim().toLowerCase())),
+      && (!query.trim() || `${app.short} ${group.label}`.toLowerCase().includes(query.trim().toLowerCase())),
     ),
   })).filter((group) => group.apps.length > 0);
 
