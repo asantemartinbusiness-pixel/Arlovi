@@ -54,3 +54,14 @@
 .ws-side-back a:hover{color:var(--fg-default)}
 .ws-side-footnote{padding:var(--space-3) var(--space-2);color:var(--fg-muted);font-size:var(--text-xs);line-height:1.5;border-top:1px solid var(--border-subtle)}
 @media(max-width:699px){.ws-sidebar .hq-navlink{min-height:44px}}
+
+
+/* Compact navigation for all 35 native tools, not an arbitrary four per group. */
+.ws-side-app-groups{display:flex;flex-direction:column;gap:0;min-width:0}
+.ws-side-app-group{border-top:1px solid var(--border-subtle);min-width:0}
+.ws-side-app-group summary{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);padding:var(--space-2);min-height:40px;cursor:pointer;color:var(--fg-muted);font:500 var(--text-xs) var(--font-sans);list-style:none}
+.ws-side-app-group summary::-webkit-details-marker{display:none}
+.ws-side-app-group summary:hover,.ws-side-app-group[open] summary{color:var(--fg-default)}
+.ws-side-app-group summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ws-side-app-group summary span{font-variant-numeric:tabular-nums;color:var(--fg-subtle)}
+.ws-side-app-group .ws-side-group{padding:0 0 var(--space-3) var(--space-2)}
