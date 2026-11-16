@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { MoreHorizontal } from "lucide-react";
 import { Breadcrumbs, Button, Drawer, Menu, Modal, Notice, Tabs, TabPanel } from "@/design-system";
 import { appEntry, findScreen, type ScreenInfo } from "@/app/catalog";
+import { runNativeScreenAction } from "@/app/screenActions";
 import { APP_ENTRIES } from "@/app/nav";
 import { getApp, useApplicationRegistryRevision, type ActionDef, type ScreenContext, type ScreenDef } from "@/platform/registry";
 import { can as roleCan, canOpen, ROLE_LABELS } from "@/platform/policy";
@@ -33,7 +34,6 @@ export function ScreenHost() {
     return record.organizationId === workspace.org.id ? "allowed" as const : "foreign" as const;
   }, [routeId, workspace.org.id]);
 
-  const [tab, setTabState] = useState<string>("");
   const [selectedId, setSelectedId] = useState<string | undefined>(match?.params.id);
   const [overlay, setOverlay] = useState<{ id: string; payload?: unknown } | null>(null);
 
@@ -52,18 +52,22 @@ export function ScreenHost() {
   const def: ScreenDef | undefined = screen && app ? app.screens[screen.id] : undefined;
 
   const tabIds = useMemo(() => {
-    if (def?.tabs?.length) return def.tabs.map((item) => item.id);
+    if (def?.tabs?.length) return def.tabs
+      .filter((item) => !item.capability || roleCan(workspace.role, item.capability))
+      .map((item) => item.id);
     return screen?.tabs ?? [];
-  }, [def, screen]);
+  }, [def, screen, workspace.role]);
 
-  const activeTab = tabIds.includes(tabParam ?? "") ? (tabParam as string) : (tab && tabIds.includes(tab) ? tab : tabIds[0] ?? "");
+  // The URL is the only tab state. A tab from another native screen must not
+  // silently carry over when the destination has no ?tab= parameter.
+  const activeTab = tabIds.includes(tabParam ?? "") ? (tabParam as string) : tabIds[0] ?? "";
 
   const setTab = useCallback((next: string) => {
-    setTabState(next);
+    if (!tabIds.includes(next)) return;
     const params = new URLSearchParams(location.search);
     params.set("tab", next);
     navigate(`${location.pathname}?${params.toString()}`, { replace: true });
-  }, [location.pathname, location.search, navigate]);
+  }, [location.pathname, location.search, navigate, tabIds]);
 
   const context = useMemo<ScreenContext | null>(() => {
     if (!screen) return null;
@@ -227,7 +231,7 @@ export function ScreenHost() {
             group: action.group,
             tone: action.tone,
             disabled: Boolean(action.guard?.(context)),
-            onSelect: () => { void action.run(context); },
+            onSelect: () => { void runNativeScreenAction(action, context); },
           }))}
         />
       )}
@@ -258,7 +262,7 @@ export function ScreenHost() {
         <Breadcrumbs
           items={[
             { label: workspace.org.shortName, to: `/o/${workspace.org.slug}/hq/home` },
-            { label: APP_ENTRIES[screen.applicationCode]?.short ?? screen.applicationName, to: context.path(screen.route.split("/").slice(0, 4).join("/") + (screen.route.split("/").length > 4 ? "" : "")) },
+            { label: APP_ENTRIES[screen.applicationCode]?.short ?? screen.applicationName, to: appEntry(screen.applicationCode, workspace.org.slug) },
             { label: title },
           ]}
         />
@@ -417,11 +421,8 @@ function ActionButton({ action, context, variant }: { action: ActionDef; context
       title={blocked}
       onClick={async () => {
         setBusy(true);
-        try { await action.run(context); }
-        catch (error) {
-          console.error(`Arlovi action failed: ${action.id}`, error);
-          context.toast("Action could not be completed", error instanceof Error ? error.message : "An unexpected error occurred. No success has been confirmed.", "failed");
-        } finally { setBusy(false); }
+        try { await runNativeScreenAction(action, context); }
+        finally { setBusy(false); }
       }}
     >
       {action.label ?? action.id}
