@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, Menu as MenuIcon, Moon, Sparkles, Sun, Search, Bell, X } from "lucide-react";
-import { Button, Pill, Row } from "@/design-system";
+import { ChevronDown, ChevronLeft, ChevronRight, Menu as MenuIcon, Moon, Sparkles, Sun, Search, Bell, X, Home, BriefcaseBusiness, Inbox, WandSparkles, LayoutGrid, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Button, Pill } from "@/design-system";
 import { Menu } from "@/design-system/overlays";
 import { ArloviMark, brand, palettes } from "@/app/brand";
-import { NAV_GROUPS, APP_ENTRIES, mobileNavFor } from "@/app/nav";
+import { NAV_GROUPS, APP_ENTRIES } from "@/app/nav";
 import { appEntry, findScreen, screens } from "@/app/catalog";
+import { HeadquartersNavigation } from "@/app/HeadquartersNavigation";
+import { AppLauncher } from "@/app/AppLauncher";
+import { areaForApplication, contextualScreenPath } from "@/app/navigationModel";
 import { destinationForOrganization } from "@/app/organizationNavigation";
 import { ScreenHost } from "@/app/ScreenHost";
 import { FirstRunGuide } from "@/app/FirstRunGuide";
@@ -24,6 +27,7 @@ import { applyAttentionReceipts } from "@/platform/attentionReceipts";
 import { useUi } from "@/runtime/ui";
 import type { Role } from "@/domain/types";
 import "@/app/shell.css";
+import "@/app/navigation.css";
 
 export function AppShell() {
   const ui = useUi();
@@ -32,11 +36,35 @@ export function AppShell() {
   const { org, role, now } = useWorkspace();
   const mutate = useMutations();
   const [navOpen, setNavOpen] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<"global" | "app">("global");
+  const [launcherOpen, setLauncherOpen] = useState(false);
+  const [launcherGroup, setLauncherGroup] = useState<string | undefined>();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem("arlovi-headquarters-sidebar-collapsed") === "true"; } catch { return false; }
+  });
+  const [contextCollapsed, setContextCollapsed] = useState(() => {
+    try { return localStorage.getItem("arlovi-app-pages-collapsed") === "true"; } catch { return false; }
+  });
+  const closeLauncher = useCallback(() => setLauncherOpen(false), []);
+  const openLauncher = useCallback((group?: string) => {
+    setLauncherGroup(group);
+    setLauncherOpen(true);
+    setNavOpen(false);
+  }, []);
   const keyboardHint = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.userAgent) ? "⌘K" : "Ctrl+K";
 
-  const activeScreen = useMemo(() => findScreen(location.pathname)?.screen, [location.pathname]);
+  const activeMatch = useMemo(() => findScreen(location.pathname), [location.pathname]);
+  const activeScreen = activeMatch?.screen;
   const activeCode = activeScreen?.applicationCode ?? "HQ";
   const appModule = getApp(activeCode);
+  const contextSections = appModule?.nav.map((section) => ({
+    ...section,
+    items: section.items.map((item) => {
+      const screen = screens.find((candidate) => candidate.id === item.screenId);
+      const href = screen ? contextualScreenPath(screen, org.slug, activeMatch?.params.id, activeMatch?.params.slug) : null;
+      return href ? { ...item, href } : null;
+    }).filter((item): item is NonNullable<typeof item> => item !== null),
+  })).filter((section) => section.items.length > 0) ?? [];
 
   const data = useCollections(["notifications", "invoices", "bills", "tasks", "missions", "deals", "leaveRequests", "expenses", "organizations", "preferences"]);
   const attention = useMemo(() => applyAttentionReceipts(filterForRole(buildAttention({
@@ -54,7 +82,6 @@ export function AppShell() {
     const pinned = new Set(data.preferences.filter((pref) => pref.fields.pinned === true).map((pref) => String(pref.fields.app)));
     return NAV_GROUPS.flatMap((group) => group.apps).filter((app) => pinned.has(app.short) && canOpen(role, app.code));
   }, [data.preferences, role]);
-  const railGroups = favourites.length ? [{ label: "Favourites", apps: favourites }, ...NAV_GROUPS] : NAV_GROUPS;
   const activePreference = data.preferences.find((item) => item.fields.app === APP_ENTRIES[activeCode]?.short);
   const activePinned = activePreference?.fields.pinned === true;
 
@@ -99,19 +126,30 @@ export function AppShell() {
   }, [ui]);
 
   useEffect(() => { setNavOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    try { localStorage.setItem("arlovi-headquarters-sidebar-collapsed", String(sidebarCollapsed)); } catch { /* preference is optional */ }
+  }, [sidebarCollapsed]);
+  useEffect(() => {
+    try { localStorage.setItem("arlovi-app-pages-collapsed", String(contextCollapsed)); } catch { /* preference is optional */ }
+  }, [contextCollapsed]);
 
   useEffect(() => {
     try { localStorage.setItem("arlovi-last-workspace", org.slug); } catch { /* optional local preference */ }
   }, [org.slug]);
 
   return (
-    <div className="hq" data-nav-open={navOpen ? "true" : "false"}>
+    <div className="hq" data-nav-open={navOpen ? "true" : "false"} data-mobile-panel={mobilePanel} data-sidebar-collapsed={sidebarCollapsed ? "true" : "false"}>
       <a className="ds-skip" href="#main">Skip to content</a>
 
       <header className="hq-header">
-        <Button variant="ghost" size="sm" iconOnly aria-label={navOpen ? "Close navigation" : "Open navigation"} className="hq-only-mobile" onClick={() => setNavOpen(!navOpen)}>
-          {navOpen ? <X size={18} /> : <MenuIcon size={18} />}
+        <Button variant="ghost" size="sm" iconOnly aria-label={navOpen && mobilePanel === "global" ? "Close navigation" : "Open navigation"} className="hq-only-mobile" onClick={() => { setMobilePanel("global"); setNavOpen(navOpen && mobilePanel === "global" ? false : true); }}>
+          {navOpen && mobilePanel === "global" ? <X size={18} /> : <MenuIcon size={18} />}
         </Button>
+        {appModule && (
+          <Button variant="ghost" size="sm" iconOnly aria-label={`Open ${appModule.short} pages`} className="hq-header-context-toggle hq-only-mobile" onClick={() => { setMobilePanel("app"); setNavOpen(true); }}>
+            <PanelLeftOpen size={18} />
+          </Button>
+        )}
         <Link to={`/o/${org.slug}/hq/home`} className="hq-brand" aria-label={`${brand.name} home`}>
           <ArloviMark size={26} />
           <strong className="hq-hide-sm" style={{ fontSize: "var(--text-md)", letterSpacing: "-0.03em" }}>{brand.name}</strong>
@@ -137,6 +175,11 @@ export function AppShell() {
           ]}
         />
 
+        <div className="hq-header-path" aria-label="Current workspace">
+          <span>{areaForApplication(activeCode)}</span>
+          <ChevronRight size={13} aria-hidden="true" />
+          <strong className="ds-truncate">{appModule?.short ?? "Headquarters"}</strong>
+        </div>
         <span className="ds-grow" />
 
         <button type="button" className="hq-search" onClick={() => ui.setCommand(true)} aria-label={`Search ${org.shortName}`} aria-keyshortcuts="Control+K Meta+K">
@@ -188,73 +231,80 @@ export function AppShell() {
         </Button>
       </header>
 
-      <div className="hq-frame" data-appnav={appModule ? "true" : "false"}>
+      <div className="hq-frame" data-appnav={appModule ? "true" : "false"} data-context-collapsed={contextCollapsed ? "true" : "false"}>
         <button type="button" className="hq-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />
 
-        <nav className="hq-rail" aria-label="Applications">
-          {railGroups.map((group, index) => {
-            const apps = group.apps.filter((app) => canOpen(role, app.code));
-            if (apps.length === 0) return null;
-            return (
-              <div className="hq-rail-group" key={group.label}>
-                {index > 0 && <span className="hq-rail-rule" aria-hidden="true" />}
-                <span className="ds-sr-only">{group.label}</span>
-                {apps.map((app) => {
-                  const Icon = app.icon;
-                  return (
-                    <Link
-                      key={app.code}
-                      to={appEntry(app.code, org.slug)}
-                      className="hq-rail-btn"
-                      data-active={app.code === activeCode ? "true" : undefined}
-                      title={app.short}
-                      aria-label={app.short}
-                      aria-current={app.code === activeCode ? "true" : undefined}
-                    >
-                      <Icon size={19} strokeWidth={1.8} />
-                    </Link>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </nav>
+        <HeadquartersNavigation
+          orgSlug={org.slug}
+          orgName={org.name}
+          role={role}
+          activeCode={activeCode}
+          pathname={location.pathname}
+          favourites={favourites}
+          collapsed={sidebarCollapsed}
+          onCollapse={() => setSidebarCollapsed((value) => !value)}
+          onBrowse={openLauncher}
+        />
 
         {appModule && (
-          <nav className="hq-appnav" aria-label={`${appModule.short} navigation`}>
+          <nav className="hq-appnav" aria-label={`${appModule.short} pages`}>
             <div className="hq-appnav-head">
-              <Row gap={2}>
-                <appModule.icon size={18} strokeWidth={1.9} />
-                <h2 className="ds-grow ds-truncate">{appModule.short}</h2>
-              </Row>
+              <div className="hq-appnav-heading">
+                <button
+                  type="button"
+                  className="hq-appnav-ctrl hq-appnav-back"
+                  aria-label="Back to headquarters navigation"
+                  title="Back to headquarters navigation"
+                  onClick={() => { setMobilePanel("global"); setNavOpen(true); }}
+                ><ChevronLeft size={17} /></button>
+                <appModule.icon size={19} strokeWidth={1.75} aria-hidden="true" />
+                <div className="hq-appnav-identity">
+                  <strong>{appModule.short}</strong>
+                  <small>In this workspace</small>
+                </div>
+                <button
+                  type="button"
+                  className="hq-appnav-ctrl hq-appnav-collapse"
+                  title="Hide this application's pages"
+                  aria-label={`Collapse ${appModule.short} pages`}
+                  onClick={() => { setContextCollapsed(true); setNavOpen(false); }}
+                ><PanelLeftClose size={17} /></button>
+              </div>
               <p>{appModule.purpose}</p>
             </div>
             <div className="hq-appnav-body">
-              {appModule.nav.map((section) => (
-                <div key={section.label ?? "root"}>
+              <NavLink className="hq-appnav-home" to={appEntry(activeCode, org.slug)} end>
+                <Home size={15} aria-hidden="true" />
+                <span>Workspace home</span>
+              </NavLink>
+              {contextSections.map((section) => (
+                <div key={section.label ?? "root"} className="hq-appnav-rest">
                   {section.label && <div className="hq-navsection">{section.label}</div>}
                   {section.items.map((item) => {
-                    const target = screens.find((screen) => screen.id === item.screenId);
-                    if (!target) return null;
-                    const to = target.route
-                      .replace(":org", org.slug)
-                      .replace(":id", target.sampleId)
-                      .replace(":slug", "showroom-consult");
                     const ItemIcon = item.icon;
                     return (
-                      <NavLink key={item.screenId} to={to} end className="hq-navlink">
-                        {ItemIcon && <ItemIcon size={15} />}
+                      <NavLink key={item.screenId} to={item.href} end className="hq-navlink">
+                        {ItemIcon && <ItemIcon size={15} aria-hidden="true" />}
                         <span className="ds-truncate">{item.label}</span>
                       </NavLink>
                     );
                   })}
                 </div>
               ))}
+              {contextSections.length === 0 && <p className="hq-sidebar-empty">Open a file or record to see its editing tools and related pages.</p>}
             </div>
           </nav>
         )}
 
         <main className="hq-main" id="main">
+          {appModule && contextCollapsed && (
+            <div className="hq-context-restore">
+              <button type="button" onClick={() => setContextCollapsed(false)} aria-label={`Show ${appModule.short} pages`}>
+                <PanelLeftOpen size={16} /> Show {appModule.short} pages
+              </button>
+              <span className="ds-subtle">Workspace navigation is collapsed to give your work more room.</span>
+            </div>
+          )}
           {/* The page scrolls here, above the tray, so the tray never covers content. */}
           <div className="hq-scroll">
           {applicationLoadFailures().length > 0 && (
@@ -300,21 +350,35 @@ export function AppShell() {
       </div>
 
       <nav className="hq-bottom" aria-label="Primary">
-        {mobileNavFor(activeCode).map((item) => {
-          const entry = APP_ENTRIES[item.code];
-          const Icon = entry?.icon ?? Sparkles;
+        {([
+          { label: "Home", to: `/o/${org.slug}/hq/home`, code: "HQ", icon: Home },
+          { label: "My work", to: `/o/${org.slug}/hq/my-work`, code: "HQ", icon: BriefcaseBusiness },
+          { label: "Inbox", to: appEntry("INBOX", org.slug), code: "INBOX", icon: Inbox },
+          { label: "Studio", to: appEntry("DESIGN", org.slug), code: "DESIGN", icon: WandSparkles },
+        ] as const).filter((item) => canOpen(role, item.code)).map((item) => {
+          const Icon = item.icon;
           return (
-            <NavLink key={item.code} to={appEntry(item.code, org.slug)}>
-              <Icon size={19} strokeWidth={1.8} />
+            <NavLink key={item.label} to={item.to} end>
+              <Icon size={19} strokeWidth={1.8} aria-hidden="true" />
               <span>{item.label}</span>
             </NavLink>
           );
         })}
-        <button type="button" onClick={() => setNavOpen(true)}>
-          <MenuIcon size={19} />
-          <span>All apps</span>
+        <button type="button" aria-label="Browse all applications" onClick={() => openLauncher()}>
+          <LayoutGrid size={19} strokeWidth={1.8} aria-hidden="true" />
+          <span>Apps</span>
         </button>
       </nav>
+      {launcherOpen && (
+        <AppLauncher
+          orgSlug={org.slug}
+          orgName={org.name}
+          role={role}
+          initialGroup={launcherGroup}
+          favourites={favourites}
+          onClose={closeLauncher}
+        />
+      )}
 
       {ui.command && <CommandPalette onClose={() => ui.setCommand(false)} />}
       {ui.notes && <AttentionCentre items={attention} onClose={() => ui.setNotes(false)} />}
