@@ -24,7 +24,7 @@ import { getApp, useApplicationRegistryRevision } from "@/platform/registry";
 import { canOpen, ROLE_LABELS } from "@/platform/policy";
 import { ORGS } from "@/platform/org";
 import { useCollections, useWorkspace, useMutations } from "@/platform/workspace";
-import { buildAttention, filterForRole } from "@/platform/attention";
+import { buildAttention, filterForRole, headerAttentionCounts } from "@/platform/attention";
 import { applyAttentionReceipts } from "@/platform/attentionReceipts";
 import { useUi } from "@/runtime/ui";
 import type { Role } from "@/domain/types";
@@ -92,7 +92,7 @@ export function AppShell() {
     prefetchController.cancel();
   }
 
-  const data = useCollections(["notifications", "invoices", "bills", "tasks", "missions", "deals", "leaveRequests", "expenses", "organizations", "preferences"]);
+  const data = useCollections(["notifications", "invoices", "bills", "tasks", "missions", "deals", "leaveRequests", "expenses", "workflowApprovals", "organizations", "preferences"]);
   const attention = useMemo(() => applyAttentionReceipts(filterForRole(buildAttention({
     notifications: data.notifications,
     invoices: data.invoices,
@@ -100,12 +100,12 @@ export function AppShell() {
     tasks: data.tasks,
     missions: data.missions,
     approvals: [...data.invoices, ...data.bills, ...data.expenses, ...data.deals, ...data.leaveRequests, ...data.missions],
+    workflowApprovals: data.workflowApprovals,
     orgSlug: org.slug,
     now,
   }), role), ui.attentionReceipts, org.id, role), [data, org.slug, org.id, now, role, ui.attentionReceipts]);
   const contextVisible = isWorkspaceArea && ["project","department"].includes(location.pathname.split("/")[5]);
-  const decisions = attention.filter(item => !item.resolved && !item.read && ["approval","assignment","interruption"].includes(item.kind)).length;
-  const updates = attention.filter(item => !item.resolved && !item.read && ["update","mention","system","overdue"].includes(item.kind)).length;
+  const {decisions, unreadUpdates: updates} = headerAttentionCounts(attention);
   function openCommand() { ui.setAsk(false); ui.setNotes(false); ui.setCommand(true); }
   function openAsk() { ui.setCommand(false); ui.setNotes(false); ui.setAsk(true); }
   function openAttention(view: "for-you" | "approvals" | "updates") {
