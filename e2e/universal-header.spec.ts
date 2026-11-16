@@ -5,7 +5,7 @@ test("universal header exposes company, search, assistant, decisions, updates an
   const header=page.locator(".hq-header");
   await expect(header).toBeVisible();
   await expect(header.getByRole("button",{name:/Switch company, current Northline Atelier/})).toBeVisible();
-  await expect(header.getByRole("button",{name:/Search Northline/})).toBeVisible();
+  await expect(header.getByRole("button",{name:/Search anything in Northline/})).toBeVisible();
   await expect(header.getByRole("button",{name:"Ask Arlovi"})).toBeVisible();
   await expect(header.getByRole("button",{name:/Inbox and decisions/})).toBeVisible();
   await expect(header.getByRole("button",{name:/Notifications/})).toBeVisible();
