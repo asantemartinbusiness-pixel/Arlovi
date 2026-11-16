@@ -413,7 +413,11 @@ function ActionButton({ action, context, variant }: { action: ActionDef; context
       title={blocked}
       onClick={async () => {
         setBusy(true);
-        try { await action.run(context); } finally { setBusy(false); }
+        try { await action.run(context); }
+        catch (error) {
+          console.error(`Arlovi action failed: ${action.id}`, error);
+          context.toast("Action could not be completed", error instanceof Error ? error.message : "An unexpected error occurred. No success has been confirmed.", "danger");
+        } finally { setBusy(false); }
       }}
     >
       {action.label ?? action.id}
