@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Rec } from "@/domain/types";
 import type { DocumentTotals } from "@/domain/fin-invoice";
 import type { JLine } from "@/domain/fin-ledger";
+import { reconcile, matchCandidates } from "@/domain/fin-ledger";
 
 vi.mock("@/platform/repo", () => ({
   newRecord: (input: Record<string, unknown>, context: {actor:string; now:string}) => ({
@@ -122,5 +123,41 @@ describe("atomic invoice settlement and CRM-visible status", () => {
   it("paid legacy invoice status has zero receivable regardless of absent allocation", () => {
     expect(outstandingMinor({...issued,status:"paid",fields:{}})).toBe(0);
     expect(outstandingMinor({...issued,status:"void",fields:{}})).toBe(0);
+  });
+});
+
+describe("bank reconciliation consumes posted Finance receipts without auto-matching", () => {
+  it("offers an exact receipt journal as a candidate, but requires an explicit statement match", () => {
+    const outcome = prepareInvoiceReceipt({
+      invoice:issued, grossMinor:12000, amountMinor:5000, accounts,
+      locked:[], cashAccountId:cash.id, date:"2026-11-14",
+      method:"Bank transfer", actor:"Maya", now,
+    });
+    const receipt = outcome.posting!.journal;
+    const statement = {
+      ...rec("statement-1","bankTransactions","imported",{
+        kind:"statement", bankAccountCode:"1000", closingMinor:5000,
+        filename:"manual-statement.csv",
+      }), at:now.toISOString(),
+    };
+    const bankLine = {
+      ...rec("bank-line-1","bankTransactions","unmatched",{
+        kind:"line", bankAccountCode:"1000", reference:"Receipt invoice-1",
+      }), at:now.toISOString(), amountMinor:5000,
+    };
+    const candidates = matchCandidates(bankLine,[receipt],cash.id);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].journal.id).toBe(receipt.id);
+    const unresolved = reconcile({accounts,journals:[receipt],lines:[statement,bankLine],bankAccountCode:"1000"});
+    expect(unresolved.suggested[0].candidates[0].journal.id).toBe(receipt.id);
+    expect(unresolved.complete).toBe(false);
+    expect(unresolved.blockedReason).toMatch(/still open/);
+    const matched = reconcile({
+      accounts,journals:[receipt],
+      lines:[statement,{...bankLine,fields:{...bankLine.fields,matched:true,matchedJournalId:receipt.id}}],
+      bankAccountCode:"1000",
+    });
+    expect(matched.complete).toBe(true);
+    expect(matched.matched).toHaveLength(1);
   });
 });
