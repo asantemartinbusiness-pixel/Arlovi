@@ -233,7 +233,7 @@ export function InvoiceOverview({ context }: { context: ScreenContext }) {
   const { org } = useWorkspace();
   if (!invoice) return <Empty title="No invoice selected" />;
   const status = statusFor(invoice, customer);
-  const paid = Number(invoice.fields.paidMinor ?? 0);
+  const paid = invoice.status === "paid" ? totals.grossMinor : Math.max(0, Number(invoice.fields.paidMinor ?? 0));
   const journal = data.journals.find((item) => item.id === String(invoice.fields.journalId ?? ""));
 
   return (
