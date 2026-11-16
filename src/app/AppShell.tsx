@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronLeft, ChevronRight, Menu as MenuIcon, Moon, Sparkles, Sun, Search, Bell, X, Home, BriefcaseBusiness, Inbox, WandSparkles, LayoutGrid, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Button, Pill } from "@/design-system";
