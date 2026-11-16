@@ -15,7 +15,7 @@ export const EXECUTION_REQUESTS = "agentExecutionRequests";
 export type PreflightCode =
   | "ASSIGNMENT_CLOSED" | "TASK_MISSING" | "TASK_CLOSED"
   | "AGENT_MISSING" | "AGENT_INACTIVE" | "SOURCE_BRIEF_MISSING"
-  | "SOURCE_STALE" | "BUDGET_MISSING" | "BUDGET_EXCEEDED"
+  | "SOURCE_STALE" | "BUDGET_MISSING" | "COST_UNVERIFIABLE"
   | "AUTH_NOT_CONFIGURED" | "PROVIDER_NOT_CONNECTED"
   | "WORKER_NOT_CONFIGURED" | "DUPLICATE_REQUEST";
 export interface Gate { code: PreflightCode; detail: string; }
@@ -81,7 +81,7 @@ export async function preflightAssignment(orgId: string, assignmentId: string): 
   if (!agent || !Number.isFinite(Number(agent.fields.spendCapMinor)) || Number(agent.fields.spendCapMinor) <= 0)
     gates.push({ code: "BUDGET_MISSING", detail: "A positive spending ceiling must be approved for this AI employee." });
   // Cost remains unknown until server-side model pricing and metering exist.
-  gates.push({ code: "BUDGET_EXCEEDED", detail: "Provider cost cannot yet be estimated or reserved safely." });
+  gates.push({ code: "COST_UNVERIFIABLE", detail: "Provider cost cannot yet be estimated or reserved safely." });
   if (requests.some(r => r.fields.assignmentId === assignmentId && r.status === "blocked"))
     gates.push({ code: "DUPLICATE_REQUEST", detail: "An execution request already exists. Review or cancel it first." });
   gates.push({ code: "AUTH_NOT_CONFIGURED", detail: "There is no verified server-side organisation membership or authenticated caller." });
