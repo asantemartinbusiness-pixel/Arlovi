@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ExecutionControl } from "@/app/ExecutionControl";
 import { Bot, ClipboardList, FileSearch, Link2Off, PauseCircle, ShieldAlert } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCollection, useToast, useWorkspace } from "@/platform/workspace";
@@ -69,6 +70,7 @@ export function AgentWorkBoard({ scope = null }: { scope?: Scope }) {
         <div className="ws-agent-details"><strong>{task?.title ?? assignment.title}</strong>
           <small>Assigned to {assignment.fields.agentName} · Not executing</small>
           {related.length>0 && <div className="ws-agent-receipts">{related.slice(0,3).map(receipt=><details key={receipt.id}><summary><FileSearch size={14}/> {receipt.title}</summary><p>{receipt.summary}</p><ul>{((receipt.body as { documents?: {id:string;title:string}[] } | undefined)?.documents ?? []).map(doc=><li key={doc.id}>{doc.title}</li>)}</ul></details>)}</div>}
+          <ExecutionControl assignmentId={assignment.id}/>
         </div>
         <div className="ws-agent-actions">
           {task && routeForRecord(task,org.slug) && <Link to={routeForRecord(task,org.slug)!}>Open task</Link>}
