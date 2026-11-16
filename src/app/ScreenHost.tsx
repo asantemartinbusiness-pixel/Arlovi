@@ -4,14 +4,15 @@ import { MoreHorizontal } from "lucide-react";
 import { Breadcrumbs, Button, Drawer, Menu, Modal, Notice, Tabs, TabPanel } from "@/design-system";
 import { appEntry, findScreen, type ScreenInfo } from "@/app/catalog";
 import { APP_ENTRIES } from "@/app/nav";
-import { getApp, type ActionDef, type ScreenContext, type ScreenDef } from "@/platform/registry";
+import { getApp, useApplicationRegistryRevision, type ActionDef, type ScreenContext, type ScreenDef } from "@/platform/registry";
 import { can as roleCan, canOpen, ROLE_LABELS } from "@/platform/policy";
 import { useMutations, useToast, useWorkspace } from "@/platform/workspace";
 import { getRecord, getRecordInOrg, knownRecord } from "@/platform/repo";
 import { useLiveQuery } from "dexie-react-hooks";
-import { applicationLoadFailures } from "@/applications";
+import { applicationLoadFailures, applicationsLoading } from "@/applications";
 
 export function ScreenHost() {
+  useApplicationRegistryRevision();
   const location = useLocation();
   const navigate = useNavigate();
   const workspace = useWorkspace();
@@ -161,6 +162,7 @@ export function ScreenHost() {
   }
 
   if (!app) {
+    if (applicationsLoading()) return <div className="pg" role="status" aria-busy="true"><div className="pg-head"><h1>Opening {screen.applicationName}…</h1></div><div className="pg-body"><span className="ds-spinner" aria-hidden="true"/> Loading the native application module.</div></div>;
     const failed = applicationLoadFailures();
     if (failed.length > 0) {
       return (
