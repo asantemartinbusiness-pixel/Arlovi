@@ -52,7 +52,11 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       ? records
         .filter((record) => `${record.title} ${record.summary} ${record.status}`.toLowerCase().includes(q))
         .map((record) => ({ record, to: routeForRecord(record, org.slug) }))
-        .filter((item): item is { record: typeof records[number]; to: string } => Boolean(item.to))
+        .filter((item): item is { record: typeof records[number]; to: string } => {
+          if (!item.to) return false;
+          const destination = findScreen(item.to)?.screen;
+          return !destination || canOpen(role, destination.applicationCode);
+        })
         .slice(0, 10)
         .map(({ record, to }) => ({
           key: `rec-${record.id}`,
