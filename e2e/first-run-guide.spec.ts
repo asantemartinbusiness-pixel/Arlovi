@@ -9,7 +9,7 @@ test("new company headquarters has an actionable, truthful and dismissible setup
     await page.getByRole("button", { name: "Continue" }).click();
   }
   await page.getByRole("button", { name: "Enter headquarters" }).click();
-  await expect(page).toHaveURL(new RegExp("/o/" + slug + "/hq/home"));
+  await expect(page).toHaveURL(new RegExp("/o/" + slug + "/workspace/home"));
 
   const guide = page.getByRole("region", { name: "Your company getting started" });
   await expect(guide).toBeVisible();
@@ -19,14 +19,14 @@ test("new company headquarters has an actionable, truthful and dismissible setup
 
   await guide.getByRole("link", { name: /Open Brain/ }).click();
   await expect(page).toHaveURL(new RegExp("/o/" + slug + "/brain/"));
-  await page.goto("/o/" + slug + "/hq/home");
+  await page.goto("/o/" + slug + "/workspace/home");
   await guide.getByRole("button", { name: "Dismiss getting-started guidance" }).click();
   await expect(guide).toHaveCount(0);
   await page.reload();
   await expect(guide).toHaveCount(0);
-  await page.goto("/o/" + slug + "/hq/home?gettingStarted=1");
+  await page.goto("/o/" + slug + "/workspace/home?gettingStarted=1");
   await expect(guide).toBeVisible();
   await guide.getByRole("button", { name: "Dismiss getting-started guidance" }).click();
   await expect(guide).toHaveCount(0);
-  await expect(page).toHaveURL(new RegExp("/o/" + slug + "/hq/home$"));
+  await expect(page).toHaveURL(new RegExp("/o/" + slug + "/workspace/home$"));
 });
