@@ -23,7 +23,7 @@ function LocationRow({ item, saved, label, onToggle, onRemove }: { item: Navigat
   return <div className="ws-continuity-item">
     <Link className="ws-continuity-destination" to={item.path}>
       <span className="ws-continuity-name">{label}</span>
-      <span className="ws-continuity-meta">{new Date(item.visitedAt).toLocaleDateString()}</span>
+      <span className="ws-continuity-meta">{saved ? "Saved" : new Date(item.visitedAt).toLocaleDateString()}</span>
     </Link>
     <button type="button" className="ws-continuity-action" onClick={onToggle} aria-label={saved ? `Unsave ${label}` : `Save ${label}`} title={saved ? "Remove saved location" : "Save location"}>{saved ? <BookmarkCheck size={17}/> : <Bookmark size={17}/>}</button>
     {onRemove && <button type="button" className="ws-continuity-action" onClick={onRemove} aria-label={`Remove ${label} from recent`} title="Remove from recent"><Trash2 size={16}/></button>}
