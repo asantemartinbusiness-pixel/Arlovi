@@ -45,7 +45,7 @@ export function workspaceArea(code: string): string {
 }
 
 function linkTo(item: LinkDef, orgSlug: string): string {
-  return item.path ? \`/o/\${orgSlug}/\${item.path}\` : appEntry(item.app ?? "HQ", orgSlug);
+  return item.path ? `/o/${orgSlug}/${item.path}` : appEntry(item.app ?? "HQ", orgSlug);
 }
 
 export function primaryDestinations(slug: string): { label: string; href: string }[] {
@@ -98,7 +98,7 @@ export function HeadquartersNavigation({
               const destination = linkTo(item, orgSlug);
               const exact = pathname === destination;
               const isArea = Boolean(item.area && workspaceArea(activeCode) === item.area);
-              const active = exact || (item.app && !item.area && activeCode === item.app && !pathname.startsWith(\`/o/\${orgSlug}/hq/\`)) || isArea;
+              const active = exact || (item.app && !item.area && activeCode === item.app && !pathname.startsWith(`/o/${orgSlug}/hq/`)) || isArea;
               return (
                 <NavLink
                   key={item.id}
