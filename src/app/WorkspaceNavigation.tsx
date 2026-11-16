@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { Activity, ArrowRight, Building2, CalendarDays, CheckSquare, ChevronRight, FileText, FolderKanban, Grid2X2, Home, Inbox, Layers, Megaphone, Plus, Search, Users } from "lucide-react";
+import { ArrowRight, Building2, CalendarDays, CheckSquare, ChevronRight, FolderKanban, Grid2X2, Home, Inbox, Layers, Megaphone, Plus, Search, Users } from "lucide-react";
 import { APP_ENTRIES, NAV_GROUPS } from "@/app/nav";
 import { appEntry } from "@/app/catalog";
 import { routeForRecord } from "@/platform/attention";
