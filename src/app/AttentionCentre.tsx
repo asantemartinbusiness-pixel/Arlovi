@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Drawer, Pill, Segmented, Empty } from "@/design-system";
-import { attentionCounts, PRIORITY_LABEL, PRIORITY_TONE, type AttentionItem } from "@/platform/attention";
+import { attentionCounts, headerAttentionCounts, isDecisionItem, isNotificationItem, PRIORITY_LABEL, PRIORITY_TONE, type AttentionItem } from "@/platform/attention";
 import { useMutations, useWorkspace } from "@/platform/workspace";
 import { attentionReceiptKey } from "@/platform/attentionReceipts";
 import { appEntry } from "@/app/catalog";
@@ -21,12 +21,12 @@ export function AttentionCentre({ items, onClose, initialView = "for-you" }: { i
   const mutate = useMutations();
   const [view, setView] = useState<View>(initialView);
   const counts = attentionCounts(items);
-  const pendingDecisions = items.filter(item=>!item.resolved && ["approval","assignment","interruption"].includes(item.kind)).length;
+  const pendingDecisions = headerAttentionCounts(items).decisions;
 
   const shown = useMemo(() => {
     const live = items.filter((item) => !item.resolved);
-    if (view === "approvals") return live.filter((item) => item.kind === "approval" || item.kind === "assignment" || item.kind === "interruption");
-    if (view === "updates") return live.filter((item) => item.kind === "update" || item.kind === "mention" || item.kind === "system" || item.kind === "overdue");
+    if (view === "approvals") return live.filter(isDecisionItem);
+    if (view === "updates") return live.filter(isNotificationItem);
     if (view === "resolved") return items.filter((item) => item.resolved);
     return live;
   }, [items, view]);
@@ -89,6 +89,7 @@ export function AttentionCentre({ items, onClose, initialView = "for-you" }: { i
             </h3>
             {groupItems.map((item) => {
               const read = item.read;
+              const actionable = isDecisionItem(item);
               return (
                 <article
                   key={item.id}
@@ -105,10 +106,11 @@ export function AttentionCentre({ items, onClose, initialView = "for-you" }: { i
                   <div className="ds-row ds-gap-2" style={{ marginBlockStart: "var(--space-3)" }}>
                     {item.route && (
                       <Button size="sm" variant="secondary" onClick={() => { navigate(item.route!); onClose(); }}>
-                        {item.kind === "approval" ? "Review on the record" : "Open"}
+                        {item.kind === "approval" ? "Review request" : "Open"}
                       </Button>
                     )}
                     {!read && <Button size="sm" variant="ghost" onClick={() => { void markRead(item); }}>Mark read</Button>}
+                    {actionable && read && <span className="ds-subtle" style={{alignSelf:"center"}}>Still requires action</span>}
                     {!item.acknowledged && <Button size="sm" variant="ghost" onClick={() => acknowledge(item)}>Acknowledge</Button>}
                   </div>
                 </article>
