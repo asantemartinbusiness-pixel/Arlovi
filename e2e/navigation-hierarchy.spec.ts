@@ -1,12 +1,20 @@
 import { expect, test } from "@playwright/test";
+import { mkdirSync } from "node:fs";
+const EVIDENCE = "qa/navigation-evidence";
+const snapshot = (name: string) => `${EVIDENCE}/${name}.png`;
 
 test("headquarters navigation prioritises places and keeps the 35 tools in a real launcher", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await page.goto("/o/northline/hq/home");
   const nav = page.getByRole("navigation", { name: "Headquarters navigation" });
   await expect(nav).toBeVisible();
+  expect(await nav.evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThanOrEqual(240);
+  expect(await nav.evaluate((element) => element.getBoundingClientRect().width)).toBeLessThanOrEqual(260);
+  expect(await page.getByRole("navigation", { name: "Headquarters pages" }).evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThanOrEqual(220);
+  mkdirSync(EVIDENCE, { recursive: true });
+  await page.screenshot({ path: snapshot("desktop-headquarters"), animations: "disabled" });
   for (const name of ["Home", "My Workspace", "Inbox", "Company Overview", "Departments", "Mission Control", "Intelligence", "Studio"]) {
-    await expect(nav.getByRole("link", { name, exact: true })).toBeVisible();
+    await expect(nav.getByRole("link", { name, exact: true }).first()).toBeVisible();
   }
   const visibleDestinations = await nav.getByRole("link").count();
   expect(visibleDestinations).toBeLessThan(25);
@@ -14,6 +22,7 @@ test("headquarters navigation prioritises places and keeps the 35 tools in a rea
   const launcher = page.getByRole("dialog", { name: "Your complete workspace." });
   await expect(launcher).toBeVisible();
   await expect(launcher.locator(".hq-launcher-app")).toHaveCount(35);
+  await page.screenshot({ path: snapshot("desktop-application-launcher"), animations: "disabled" });
   await launcher.getByRole("button", { name: /^Studio\s/ }).click();
   await expect(launcher.locator(".hq-launcher-app")).toHaveCount(8);
   await launcher.getByRole("button", { name: /^All applications/ }).click();
@@ -23,6 +32,7 @@ test("headquarters navigation prioritises places and keeps the 35 tools in a rea
   await expect(page).toHaveURL(/\/o\/northline\/fin\//);
   await expect(launcher).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "Finance pages" })).toBeVisible();
+  await page.screenshot({ path: snapshot("desktop-finance"), animations: "disabled" });
 });
 
 test("primary hierarchy and contextual workspace behave as separate levels", async ({ page }) => {
@@ -59,6 +69,8 @@ test("mobile navigation is a compact hierarchy, not a scrolling icon wall", asyn
   await page.goto("/o/northline/hq/home");
   const bottom = page.getByRole("navigation", { name: "Primary" });
   await expect(bottom).toBeVisible();
+  mkdirSync(EVIDENCE, { recursive: true });
+  await page.screenshot({ path: snapshot("mobile-headquarters"), animations: "disabled" });
   for (const label of ["Home", "My work", "Inbox", "Studio"]) {
     await expect(bottom.getByRole("link", { name: label, exact: true })).toBeVisible();
   }
@@ -70,6 +82,7 @@ test("mobile navigation is a compact hierarchy, not a scrolling icon wall", asyn
   await page.getByRole("button", { name: "Open navigation" }).click();
   const nav = page.getByRole("navigation", { name: "Headquarters navigation" });
   await expect(nav).toBeVisible();
+  await page.screenshot({ path: snapshot("mobile-headquarters-drawer"), animations: "disabled" });
   await nav.getByRole("link", { name: "Departments" }).click();
   await expect(page).toHaveURL(/\/hq\/departments/);
   await expect(page.locator(".hq")).toHaveAttribute("data-nav-open", "false");
@@ -77,6 +90,7 @@ test("mobile navigation is a compact hierarchy, not a scrolling icon wall", asyn
   await bottom.getByRole("link", { name: "Studio" }).click();
   await page.getByRole("button", { name: "Open Design pages" }).click();
   await expect(page.getByRole("navigation", { name: "Design pages" })).toBeVisible();
+  await page.screenshot({ path: snapshot("mobile-design-pages"), animations: "disabled" });
   await page.getByRole("button", { name: "Back to headquarters navigation" }).click();
   await expect(nav).toBeVisible();
 });
