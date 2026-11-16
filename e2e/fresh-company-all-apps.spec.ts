@@ -26,7 +26,7 @@ test("every native app opens safely for a genuinely new company", async ({ page 
     await page.getByRole("button", { name: "Continue" }).click();
   }
   await page.getByRole("button", { name: "Enter headquarters" }).click();
-  await expect(page).toHaveURL(new RegExp("/o/" + slug + "/hq/home"));
+  await expect(page).toHaveURL(new RegExp("/o/" + slug + "/workspace/home"));
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const failures: string[] = [];
