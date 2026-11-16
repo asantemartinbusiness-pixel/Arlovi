@@ -3,12 +3,20 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
 import { CompanyOnboarding } from "@/app/CompanyOnboarding";
+import { orgBySlug } from "@/platform/org";
 import { ClockProvider } from "@/platform/clock";
 import { WorkspaceProvider } from "@/platform/workspace";
 import { ensureSeed } from "@/runtime/db";
 import { useUi } from "@/runtime/ui";
 import "@/design-system";
 import { loadApplications } from "@/applications";
+
+function WorkspaceEntry() {
+  let slug: string | null = null;
+  try { slug = localStorage.getItem("arlovi-last-workspace"); } catch { /* browser privacy settings */ }
+  const target = slug && orgBySlug(slug) ? `/o/${slug}/hq/home` : "/setup";
+  return <Navigate to={target} replace />;
+}
 
 function Boot() {
   const [ready, setReady] = useState(false);
@@ -52,7 +60,7 @@ function Boot() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/setup" replace />} />
+        <Route path="/" element={<WorkspaceEntry />} />
         <Route path="/setup" element={<CompanyOnboarding />} />
         <Route
           path="/o/:org/*"
@@ -64,7 +72,7 @@ function Boot() {
             </ClockProvider>
           }
         />
-        <Route path="*" element={<Navigate to="/o/northline/hq/home" replace />} />
+        <Route path="*" element={<WorkspaceEntry />} />
       </Routes>
     </BrowserRouter>
   );
