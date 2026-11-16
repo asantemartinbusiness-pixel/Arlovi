@@ -26,7 +26,7 @@ export function AttentionCentre({ items, onClose, initialView = "for-you" }: { i
   const shown = useMemo(() => {
     const live = items.filter((item) => !item.resolved);
     if (view === "approvals") return live.filter((item) => item.kind === "approval" || item.kind === "assignment" || item.kind === "interruption");
-    if (view === "updates") return live.filter((item) => item.kind === "update" || item.kind === "mention" || item.kind === "system");
+    if (view === "updates") return live.filter((item) => item.kind === "update" || item.kind === "mention" || item.kind === "system" || item.kind === "overdue");
     if (view === "resolved") return items.filter((item) => item.resolved);
     return live;
   }, [items, view]);
