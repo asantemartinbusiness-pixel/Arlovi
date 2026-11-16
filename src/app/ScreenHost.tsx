@@ -9,7 +9,7 @@ import { can as roleCan, canOpen, ROLE_LABELS } from "@/platform/policy";
 import { useMutations, useToast, useWorkspace } from "@/platform/workspace";
 import { getRecord, getRecordInOrg, knownRecord } from "@/platform/repo";
 import { useLiveQuery } from "dexie-react-hooks";
-import { applicationLoadFailures, applicationsLoading } from "@/applications";
+import { applicationLoadFailures, applicationStatus, loadNativeApplication } from "@/applications";
 
 export function ScreenHost() {
   useApplicationRegistryRevision();
@@ -162,16 +162,18 @@ export function ScreenHost() {
   }
 
   if (!app) {
-    if (applicationsLoading()) return <div className="pg" role="status" aria-busy="true"><div className="pg-head"><h1>Opening {screen.applicationName}…</h1></div><div className="pg-body"><span className="ds-spinner" aria-hidden="true"/> Loading the native application module.</div></div>;
-    const failed = applicationLoadFailures();
-    if (failed.length > 0) {
+    const status = applicationStatus(screen.applicationCode);
+    if (status === "idle" || status === "loading") return <div className="pg" role="status" aria-busy="true"><div className="pg-head"><h1>Opening {screen.applicationName}…</h1></div><div className="pg-body"><span className="ds-spinner" aria-hidden="true"/> Loading this native application.</div></div>;
+    const failed = applicationLoadFailures().filter(failure => failure.group.startsWith(screen.applicationName + " / ") || failure.group.endsWith(" / " + screen.applicationCode.toLowerCase()));
+    if (status === "failed") {
       return (
         <div className="pg">
           <div className="pg-head"><h1>{screen.title}</h1></div>
           <div className="pg-body">
             <Notice tone="danger" title={`${screen.applicationName} did not load`}>
-              Its application module failed to load ({failed.map((failure) => failure.group).join(", ")}). Other applications are working normally.
+              Its application module failed to load ({failed.map((failure) => failure.group).join(", ") || screen.applicationName}). Other applications remain available.
             </Notice>
+            <Button variant="secondary" onClick={() => {void loadNativeApplication(screen.applicationCode).catch(() => undefined);}}>Retry loading application</Button>
           </div>
         </div>
       );
