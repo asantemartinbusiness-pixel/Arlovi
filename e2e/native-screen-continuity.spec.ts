@@ -61,7 +61,7 @@ test("native-app header control labels match visible text for screen readers", a
   await page.goto("/o/northline/fin/home");
   await expect(page.locator(".hq-header")).toBeVisible();
   const search = page.locator(".hq-search");
-  await expect(search).toHaveAttribute("aria-label", "Search anything in Northline");
+  await expect(search).toHaveAttribute("aria-label", /Search anything in Northline (Ctrl\+K|⌘K)/);
   await expect(page.locator(".hq-orgdot")).toHaveAttribute("aria-hidden", "true");
   const results = await new AxeBuilder({ page })
     .include(".hq-header")
