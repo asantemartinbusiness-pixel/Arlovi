@@ -43,11 +43,11 @@ export function WorkspaceContinuity({ compact = false }: { compact?: boolean }) 
     <div className="ws-continuity-heading"><h2><Clock3 size={18}/> {compact ? "Pick up where you left off" : "Recent and saved work"}</h2>
       {!compact && available.length > 0 && <button className="ws-continuity-clear" type="button" onClick={() => clearRecentNavigation(org.id,org.slug)}>Clear recent</button>}
     </div>
-    {pinnedItems.length > 0 && <div className="ws-continuity-list" aria-label="Saved places">
+    {pinnedItems.length > 0 && <section className="ws-continuity-list" aria-label="Saved places">
       <div className="ws-continuity-group">SAVED PLACES</div>
       {pinnedItems.slice(0,compact?4:24).map(item=><LocationRow key={item.path} item={item} saved label={destinationLabel(item.path,org.slug,projects,departments)} onToggle={() => toggle(item.path)}/>)}
     </div>}
-    {sorted.length > 0 ? <div className="ws-continuity-list" aria-label="Recently visited">
+    {sorted.length > 0 ? <section className="ws-continuity-list" aria-label="Recently visited">
       <div className="ws-continuity-group">RECENTLY VISITED</div>
       {sorted.map(item=><LocationRow key={item.path} item={item} saved={pinned.includes(item.path)}
         label={destinationLabel(item.path,org.slug,projects,departments)}
