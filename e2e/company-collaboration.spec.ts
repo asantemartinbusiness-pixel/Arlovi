@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("company people shows existing directory and saves a clearly unsent invitation draft", async ({ page }) => {
   await page.goto("/o/northline/workspace/people");
-  await expect(page.getByRole("heading",{name:"People & collaboration"})).toBeVisible();
+  await expect(page.getByRole("heading",{level:1,name:"People & collaboration"})).toBeVisible();
   await expect(page.getByText("Local collaboration planning")).toBeVisible();
   const draftEmail = `invite-${Date.now()}@example.test`;
   await page.getByRole("button",{name:"Prepare invitation"}).click();
