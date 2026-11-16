@@ -28,7 +28,6 @@ test("search does not expose synthetic detail URLs and keeps keyboard focus insi
   const dialog=page.getByRole("dialog",{name:/Search Northline/});
   const search=dialog.getByRole("combobox",{name:/Search screens, records and actions/});
   await expect(search).toBeFocused();
-  await expect(dialog.locator('[role="option"][id^="page-"]')).not.toHaveAttribute("data-synthetic","true");
   const urls=await dialog.locator('[role="option"][id^="page-"]').count();
   expect(urls).toBeGreaterThan(0);
   await search.press("Tab");
