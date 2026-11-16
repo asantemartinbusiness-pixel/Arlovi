@@ -207,6 +207,12 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
           {quote?.title} has been accepted. Duplicate it to re-price, which keeps the accepted version on the record.
         </Notice>
       )}
+      {quote && ["approved", "sent"].includes(quote.status) && (
+        <Notice tone="warning" title="Editing creates a new draft version">
+          Changing this quote clears prior approval, delivery and customer acceptance from the new version.
+          The earlier version's actions remain in the audit trail. It must be approved and accepted again.
+        </Notice>
+      )}
       {expired && !locked && (
         <Notice tone="danger" title="This quote has expired">
           It expired on {context.date(quote?.dueAt)}. It cannot be sent as currently valid. Duplicate it to re-price at today's rates and terms.
