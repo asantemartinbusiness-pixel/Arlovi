@@ -68,9 +68,8 @@ export function AppLauncher({ orgSlug, orgName, role, initialGroup, favourites, 
       <div className="hq-launcher" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="hq-launcher-title">
         <header className="hq-launcher-header">
           <div className="hq-launcher-intro">
-            <span className="hq-launcher-eyebrow"><LayoutGrid size={13} /> ARLOVI APPLICATIONS</span>
-            <h2 id="hq-launcher-title">Your complete workspace.</h2>
-            <p>One company. {total} native applications available in your current role. Choose the tool for the work you need to do.</p>
+            <h2 id="hq-launcher-title"><LayoutGrid size={20} strokeWidth={1.8} aria-hidden="true" /> Applications</h2>
+            <p>{total} native applications available in {orgName}. Choose the workspace you need.</p>
           </div>
           <button type="button" className="hq-launcher-close" onClick={onClose} aria-label="Close applications">
             <X size={19} />
