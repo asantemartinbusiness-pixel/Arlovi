@@ -4,6 +4,7 @@ import { Button, Drawer, Pill, Segmented, Empty } from "@/design-system";
 import { attentionCounts, PRIORITY_LABEL, PRIORITY_TONE, type AttentionItem } from "@/platform/attention";
 import { useMutations, useWorkspace } from "@/platform/workspace";
 import { attentionReceiptKey } from "@/platform/attentionReceipts";
+import { appEntry } from "@/app/catalog";
 import { useUi } from "@/runtime/ui";
 
 type View = "for-you" | "approvals" | "updates" | "resolved";
@@ -20,6 +21,7 @@ export function AttentionCentre({ items, onClose, initialView = "for-you" }: { i
   const mutate = useMutations();
   const [view, setView] = useState<View>(initialView);
   const counts = attentionCounts(items);
+  const pendingDecisions = items.filter(item=>!item.resolved && ["approval","assignment","interruption"].includes(item.kind)).length;
 
   const shown = useMemo(() => {
     const live = items.filter((item) => !item.resolved);
@@ -57,9 +59,9 @@ export function AttentionCentre({ items, onClose, initialView = "for-you" }: { i
       open
       onOpenChange={(next) => { if (!next) onClose(); }}
       title={view === "approvals" ? "Inbox & decisions" : view === "updates" ? "Notifications" : "Attention"}
-      subtitle={`${org.name} · ${counts.unread} unread, ${counts.approvals} awaiting a decision`}
+      subtitle={`${org.name} · ${counts.unread} unread · ${pendingDecisions} actionable items`}
       width={440}
-      footer={<span className="ds-subtle">Reading an item does not approve it. Decisions are taken on the record.</span>}
+      footer={<div className="ds-row ds-gap-2" style={{width:"100%",justifyContent:"space-between",alignItems:"center"}}><span className="ds-subtle">Reading is not approval.</span><Button size="sm" variant="secondary" onClick={()=>{navigate(appEntry("INBOX",org.slug));onClose();}}>Open full Inbox</Button></div>}
     >
       <div className="ds-stack ds-gap-4">
         <Segmented
