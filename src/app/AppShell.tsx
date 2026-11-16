@@ -10,6 +10,7 @@ import { destinationForOrganization } from "@/app/organizationNavigation";
 import { ScreenHost } from "@/app/ScreenHost";
 import { FirstRunGuide } from "@/app/FirstRunGuide";
 import { GuidedTour } from "@/app/GuidedTour";
+import { WORK_AREAS, WorkspaceNavigation, WorkspaceSideNav, currentWorkArea, isWorkAreaPath, workAreaPath } from "@/app/WorkspaceNavigation";
 import { ScreenErrorBoundary } from "@/app/ErrorBoundary";
 import { applicationLoadFailures } from "@/applications";
 import { CommandPalette } from "@/app/CommandPalette";
@@ -35,6 +36,8 @@ export function AppShell() {
   const [navOpen, setNavOpen] = useState(false);
   const keyboardHint = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.userAgent) ? "⌘K" : "Ctrl+K";
 
+  const isWorkspaceArea = isWorkAreaPath(location.pathname, org.slug);
+  const activeArea = currentWorkArea(location.pathname);
   const activeScreen = useMemo(() => findScreen(location.pathname)?.screen, [location.pathname]);
   const activeCode = activeScreen?.applicationCode ?? "HQ";
   const appModule = getApp(activeCode);
@@ -55,7 +58,7 @@ export function AppShell() {
     const pinned = new Set(data.preferences.filter((pref) => pref.fields.pinned === true).map((pref) => String(pref.fields.app)));
     return NAV_GROUPS.flatMap((group) => group.apps).filter((app) => pinned.has(app.short) && canOpen(role, app.code));
   }, [data.preferences, role]);
-  const railGroups = favourites.length ? [{ label: "Favourites", apps: favourites }, ...NAV_GROUPS] : NAV_GROUPS;
+
   const activePreference = data.preferences.find((item) => item.fields.app === APP_ENTRIES[activeCode]?.short);
   const activePinned = activePreference?.fields.pinned === true;
 
@@ -191,39 +194,33 @@ export function AppShell() {
         </Button>
       </header>
 
-      <div className="hq-frame" data-appnav={appModule ? "true" : "false"}>
+      <div className="hq-frame" data-appnav={isWorkspaceArea || appModule ? "true" : "false"}>
         <button type="button" className="hq-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />
 
-        <nav className="hq-rail" aria-label="Applications">
-          {railGroups.map((group, index) => {
-            const apps = group.apps.filter((app) => canOpen(role, app.code));
-            if (apps.length === 0) return null;
-            return (
-              <div className="hq-rail-group" key={group.label}>
-                {index > 0 && <span className="hq-rail-rule" aria-hidden="true" />}
-                <span className="ds-sr-only">{group.label}</span>
-                {apps.map((app) => {
-                  const Icon = app.icon;
-                  return (
-                    <Link
-                      key={app.code}
-                      to={appEntry(app.code, org.slug)}
-                      className="hq-rail-btn"
-                      data-active={app.code === activeCode ? "true" : undefined}
-                      title={app.short}
-                      aria-label={app.short}
-                      aria-current={app.code === activeCode ? "true" : undefined}
-                    >
-                      <Icon size={19} strokeWidth={1.8} />
-                    </Link>
-                  );
-                })}
-              </div>
-            );
-          })}
+        <nav className="hq-rail" aria-label="Primary navigation">
+          <div className="hq-rail-group ws-primary-group">
+            {WORK_AREAS.map((area) => {
+              const Icon = area.icon;
+              return <Link key={area.id} to={workAreaPath(org.slug,area.id)}
+                className="hq-rail-btn" data-active={isWorkspaceArea && activeArea === area.id ? "true" : undefined}
+                aria-current={isWorkspaceArea && activeArea === area.id ? "page" : undefined}
+                title={area.label} aria-label={area.label}><Icon size={19} strokeWidth={1.8}/></Link>;
+            })}
+          </div>
+          <span className="hq-rail-rule" aria-hidden="true"/>
+          <div className="hq-rail-group">
+            {favourites.slice(0,8).map(app => {
+              const Icon = app.icon;
+              return <Link key={app.code} to={appEntry(app.code,org.slug)}
+                className="hq-rail-btn" data-active={!isWorkspaceArea && activeCode === app.code ? "true" : undefined}
+                aria-current={!isWorkspaceArea && activeCode === app.code ? "page" : undefined}
+                title={app.short} aria-label={app.short}><Icon size={19} strokeWidth={1.8}/></Link>;
+            })}
+          </div>
         </nav>
 
-        {appModule && (
+        {isWorkspaceArea && <WorkspaceSideNav />}
+        {!isWorkspaceArea && appModule && (
           <nav className="hq-appnav" aria-label={`${appModule.short} navigation`}>
             <div className="hq-appnav-head">
               <Row gap={2}>
@@ -293,9 +290,9 @@ export function AppShell() {
               )}
             </div>
           )}
-          {org.ownerName && location.pathname === `/o/${org.slug}/hq/home` && <FirstRunGuide />}
-          <ScreenErrorBoundary resetKey={location.pathname} label={activeScreen?.title ?? "This screen"}>
-            <ScreenHost />
+          {org.ownerName && (location.pathname === `/o/${org.slug}/hq/home` || location.pathname === workAreaPath(org.slug,"home")) && <FirstRunGuide />}
+          <ScreenErrorBoundary resetKey={location.pathname} label={isWorkspaceArea ? "Workspace" : activeScreen?.title ?? "This screen"}>
+            {isWorkspaceArea ? <WorkspaceNavigation /> : <ScreenHost />}
           </ScreenErrorBoundary>
           </div>
           <ExecutionTray missions={data.missions} />
@@ -303,20 +300,15 @@ export function AppShell() {
       </div>
 
       <nav className="hq-bottom" aria-label="Primary">
-        {mobileNavFor(activeCode).map((item) => {
-          const entry = APP_ENTRIES[item.code];
-          const Icon = entry?.icon ?? Sparkles;
-          return (
-            <NavLink key={item.code} to={appEntry(item.code, org.slug)}>
-              <Icon size={19} strokeWidth={1.8} />
-              <span>{item.label}</span>
-            </NavLink>
-          );
+        {WORK_AREAS.slice(0,4).map(area => {
+          const Icon = area.icon;
+          return <NavLink key={area.id} to={workAreaPath(org.slug,area.id)} aria-label={area.label}>
+            <Icon size={19} strokeWidth={1.8}/><span>{area.label}</span>
+          </NavLink>;
         })}
-        <button type="button" onClick={() => setNavOpen(true)}>
-          <MenuIcon size={19} />
-          <span>All apps</span>
-        </button>
+        <NavLink to={workAreaPath(org.slug,"apps")} aria-label="Apps">
+          <MenuIcon size={19}/><span>Apps</span>
+        </NavLink>
       </nav>
 
       {ui.command && <CommandPalette onClose={() => ui.setCommand(false)} />}
