@@ -80,3 +80,16 @@ export async function decideTaskApproval(orgId: string, requestId: string, actor
     await db.events.add(event(orgId, actor, at, `Task completion ${decision}: ${task.title}`, request.id));
   });
 }
+
+/** Withdraw a pending request, including when its bound task revision is stale. */
+export async function withdrawTaskApproval(orgId: string, requestId: string, actor: string): Promise<void> {
+  await db.transaction("rw", [db.records, db.events], async () => {
+    const request = await db.records.get(requestId);
+    if (!request || request.organizationId !== orgId || request.collection !== COLLECTION)
+      throw new ApprovalConflict("Request not found in this company.");
+    if (request.status !== "awaiting_approval") throw new ApprovalConflict("This request is already closed.");
+    const at = new Date().toISOString();
+    await db.records.put(updated(request, { status: "withdrawn", fields: { decidedBy: actor, decisionAt: at } }, actor, at));
+    await db.events.add(event(orgId, actor, at, `Task completion request withdrawn: ${request.title}`, request.id));
+  });
+}
