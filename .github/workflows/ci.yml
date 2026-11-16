@@ -25,3 +25,10 @@ jobs:
       - run: npx playwright install --with-deps chromium
       # The e2e command already discovers accessibility specs and runs them.
       - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: navigation-ux-${{ github.run_id }}
+          path: qa/navigation-evidence/
+          if-no-files-found: ignore
+          retention-days: 14
