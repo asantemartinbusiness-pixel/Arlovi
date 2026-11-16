@@ -437,7 +437,9 @@ export function statementSummaries(lines: Rec[]): StatementSummary[] {
 }
 
 export function isStatementLine(record: Rec): boolean {
-  return record.collection === "bankTransactions" && record.fields.kind !== "statement";
+  return record.collection === "bankTransactions"
+    && record.fields.kind !== "statement"
+    && record.fields.kind !== "reconciliation";
 }
 
 export interface MatchCandidate {
