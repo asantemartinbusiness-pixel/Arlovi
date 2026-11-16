@@ -102,34 +102,50 @@ export function listedPortals(portals: Rec[]): Rec[] {
   return portals.filter((item) => !replaced.has(item.id));
 }
 
-/** Documents attached to a portal, which are shared by their own field. */
+/** Canonical portal and legacy route stub identify the same scoped space. */
+function portalIdentityIds(portal: Rec | undefined): Set<string> {
+  if (!portal) return new Set();
+  const ids = [portal.id];
+  const alias = portal.fields.canonicalFor;
+  if (typeof alias === "string" && alias) ids.push(alias);
+  return new Set(ids);
+}
+
+/** Documents attached to this portal, including only its explicit route alias. */
 export function portalDocuments(portal: Rec | undefined, documents: Rec[]): Rec[] {
   if (!portal) return [];
-  return documents.filter((document) => String(document.fields.portalId ?? "") === portal.id);
+  const ids = portalIdentityIds(portal);
+  return documents.filter((document) => document.organizationId === portal.organizationId
+    && ids.has(String(document.fields.portalId ?? "")));
 }
 
 export function portalMessages(portal: Rec | undefined, messages: Rec[]): Rec[] {
   if (!portal) return [];
+  const ids = portalIdentityIds(portal);
   return messages
-    .filter((message) => String(message.fields.portalId ?? "") === portal.id && message.fields.internalOnly !== true)
+    .filter((message) => message.organizationId === portal.organizationId
+      && ids.has(String(message.fields.portalId ?? ""))
+      && message.fields.internalOnly !== true)
     .sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
 }
 
 export function portalInvoices(portal: Rec | undefined, invoices: Rec[]): Rec[] {
   if (!portal) return [];
-  return invoices.filter((invoice) => String(invoice.fields.portalId ?? "") === portal.id);
+  const ids = portalIdentityIds(portal);
+  return invoices.filter((invoice) => invoice.organizationId === portal.organizationId
+    && ids.has(String(invoice.fields.portalId ?? "")));
 }
 
 /** The portal a client role view is allowed to see, and nothing else. */
 export function portalForRole(role: Role, portals: Rec[], actor: string, contacts: Rec[]): Rec | undefined {
   if (role !== "client") return undefined;
   const contact = contacts.find((item) => item.title === actor);
-  const own = contact ? portals.find((portal) => String(portal.fields.contactId) === contact.id) : undefined;
-  const resolved = own ? resolvePortal(own.id, portals) : undefined;
-  if (resolved && resolved.status === "live") return resolved;
-  const listed = listedPortals(portals);
-  return listed.find((portal) => contact && String(portal.fields.contactId) === contact.id && portal.status === "live")
-    ?? listed.find((portal) => portal.status === "live");
+  if (!contact) return undefined;
+  const own = listedPortals(portals).find((portal) =>
+    portal.organizationId === contact.organizationId
+    && String(portal.fields.contactId) === contact.id
+    && portal.status === "live");
+  return own ? resolvePortal(own.id, portals) : undefined;
 }
 
 export function statusTone(status: string): "success" | "warning" | "danger" | "info" | "neutral" {
