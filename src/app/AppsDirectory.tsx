@@ -66,7 +66,7 @@ function ApplicationCard({
 }) {
   const Icon = app.icon;
   return <article className="apps-directory-card">
-    <Link className="apps-directory-open" to={appEntry(app.code, slug)} aria-label={"Open " + app.short}>
+    <Link className="apps-directory-open" to={appEntry(app.code, slug)} aria-label={app.short}>
       <span className="apps-directory-icon"><Icon size={20} strokeWidth={1.8} aria-hidden="true" /></span>
       <span className="apps-directory-copy">
         <strong>{app.short}</strong>
@@ -85,7 +85,7 @@ function ApplicationCard({
 function AppShortcut({ app, slug }: { app: DirectoryApp; slug: string }) {
   const Icon = app.icon;
   return <Link className="apps-directory-shortcut" to={appEntry(app.code, slug)}
-    aria-label={"Open " + app.short}>
+    aria-label={app.short}>
     <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
     <span>{app.short}</span>
     <ArrowUpRight size={14} aria-hidden="true" />
@@ -132,7 +132,7 @@ export function AppsDirectory() {
 
   function setFilter(key: "category" | "q", value: string) {
     const next = new URLSearchParams(params);
-    if (value && value !== "All") next.set(key, value);
+    if (value && !(key === "category" && value === "All")) next.set(key, value);
     else next.delete(key);
     setParams(next, { replace: true });
   }
@@ -166,7 +166,7 @@ export function AppsDirectory() {
       <label className="ws-app-search">
         <Search size={18} aria-hidden="true" />
         <span className="ds-sr-only">Find an application</span>
-        <input type="search" aria-label="Find an application" value={query}
+        <input type="text" aria-label="Find an application" value={query}
           onChange={event => setFilter("q", event.target.value)}
           placeholder="Search applications, teams or capabilities" />
         {query && <button className="apps-directory-clear" type="button" onClick={() => setFilter("q", "")}
