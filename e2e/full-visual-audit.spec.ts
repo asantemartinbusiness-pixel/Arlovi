@@ -14,7 +14,6 @@ const VIEWPORTS = (process.env.VISUAL_VIEWPORTS ?? "390x844,1440x900").split(","
 const OUT = resolve(process.env.VISUAL_OUT ?? "qa/visual-audit");
 const apps = [...new Set(catalog.screens.map((screen) => screen.applicationCode))]
   .filter((code) => ONLY.length === 0 || ONLY.includes(code));
-test.skip(process.env.VISUAL_SWEEP !== "1", "Opt in with VISUAL_SWEEP=1 npm run test:visual");
 
 async function capture(page: Page, screen: Contract, width: number, height: number) {
   const target = screen.route.replace(":org", "northline").replace(":id", screen.sampleId).replace(":slug", "showroom-consult");
@@ -47,6 +46,7 @@ async function capture(page: Page, screen: Contract, width: number, height: numb
 
 for (const app of apps) {
   test("capture complete screen and viewport evidence for " + app, async ({ browser }) => {
+    test.skip(process.env.VISUAL_SWEEP !== "1", "Opt in with VISUAL_SWEEP=1 npm run test:visual");
     const screens = catalog.screens.filter((screen) => screen.applicationCode === app);
     test.setTimeout(Math.max(120_000, screens.length * VIEWPORTS.length * 30_000));
     const context = await browser.newContext({ reducedMotion: "reduce" });
