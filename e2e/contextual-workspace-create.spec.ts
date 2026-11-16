@@ -37,5 +37,5 @@ test("creating a project from Work opens its authoritative project space", async
   await page.getByRole("textbox", { name: "Name" }).fill("Workspace delivery plan");
   await page.getByRole("button", { name: "Create project" }).click();
   await expect(page).toHaveURL(/\/o\/northline\/workspace\/work\/project\//);
-  await expect(page.getByRole("heading", { name: "Workspace delivery plan" })).toBeVisible();
+  await expect(page.getByRole("heading", { level:1, name: "Workspace delivery plan" })).toBeVisible();
 });
