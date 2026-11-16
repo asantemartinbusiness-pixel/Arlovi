@@ -57,7 +57,7 @@ export function sharedRecords(portal: Rec | undefined, data: ReturnType<typeof u
   const out: { collection: string; record: Rec }[] = [];
   for (const scope of shared) {
     for (const id of scope.ids) {
-      const record = (pools[scope.collection] ?? []).find((item) => item.id === id);
+      const record = (pools[scope.collection] ?? []).find((item) => item.id === id && item.organizationId === portal?.organizationId);
       if (record) out.push({ collection: scope.collection, record });
     }
   }
