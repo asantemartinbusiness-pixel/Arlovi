@@ -22,6 +22,7 @@ import {
   DealProducts, DealTeam, RequestApproval,
 } from "./deal";
 import { PricingPolicy, QuoteEditor, QuotesList, QuotesStrip, SendPreview } from "./quotes";
+import { RecordCustomerAcceptance } from "./acceptance";
 import {
   ActivationApproval, ActivityEntry, ActivityHistory, AllActivity, AutomationStrip, CalendarConflict,
   ConfidenceExplanation, FailuresTab, FollowUps, ForecastCurrent, ForecastHistory, ForecastMethodology, ForecastModel,
@@ -283,6 +284,7 @@ export const crmApp = registerApp({
         { id: "edit", label: "Edit", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select a quote first"), run: (context) => context.openOverlay("Quote editor", { id: context.selectedId }) },
         { id: "send", label: "Send", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select a quote first"), run: (context) => context.openOverlay("send preview", { id: context.selectedId }) },
         { id: "approve", label: "Approve", placement: "secondary", capability: "edit_pipeline", guard: (context) => (context.selectedId ? undefined : "Select a quote first"), run: (context) => context.openOverlay("approve quote") },
+        { id: "customer acceptance", label: "Record customer acceptance", placement: "overflow", capability: "edit_pipeline", guard: (context) => (context.selectedId ? undefined : "Select a sent quote first"), run: (context) => context.openOverlay("customer acceptance") },
         { id: "duplicate", label: "Duplicate for re-pricing", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a quote first"), run: (context) => context.openOverlay("duplicate quote") },
         { id: "pricing policy", label: "Pricing policy", placement: "overflow", run: (context) => context.openOverlay("pricing policy") },
       ],
@@ -292,6 +294,7 @@ export const crmApp = registerApp({
         { id: "send preview", kind: "modal", title: "Send a quote", width: 660, render: ({ close, ...context }) => <SendPreview context={context} close={close} /> },
         { id: "approve quote", kind: "modal", title: "Approve a quote", width: 580, render: ({ close, ...context }) => <ApproveQuote context={context} close={close} /> },
         { id: "duplicate quote", kind: "modal", title: "Duplicate for re-pricing", width: 520, render: ({ close, ...context }) => <DuplicateQuote context={context} close={close} /> },
+        { id: "customer acceptance", kind: "modal", title: "Record customer acceptance", width: 620, render: ({ close, ...context }) => <RecordCustomerAcceptance context={context} close={close} /> },
       ],
     },
 
