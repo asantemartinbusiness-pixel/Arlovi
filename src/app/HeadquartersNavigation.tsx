@@ -1,7 +1,7 @@
 import { Link, NavLink } from "react-router-dom";
 import {
-  ArrowUpRight, Boxes, BriefcaseBusiness, Building2, ChevronLeft,
-  ChevronRight, Command, Home, Inbox, LayoutGrid, Rocket, Settings2, Sparkles,
+  ArrowUpRight, Boxes, BriefcaseBusiness, Building2, CalendarClock, ChevronLeft,
+  ChevronRight, Command, Headphones, Home, Inbox, LayoutGrid, LifeBuoy, Rocket, Settings2, Sparkles,
   UsersRound, WandSparkles,
 } from "lucide-react";
 import { appEntry } from "@/app/catalog";
@@ -39,6 +39,19 @@ const PRIMARY: { label: string; links: LinkDef[] }[] = [
 
 export const PRIMARY_NAV_SECTIONS = PRIMARY;
 
+const CLIENT_PRIMARY: typeof PRIMARY = [{ label: "CLIENT SPACE", links: [
+  { id: "client-portal", label: "Client Portal", icon: LifeBuoy, app: "PORTAL" },
+  { id: "bookings", label: "Bookings", icon: CalendarClock, app: "BOOK" },
+  { id: "support", label: "Customer Care", icon: Headphones, app: "CARE" },
+] }];
+
+export function visiblePrimaryGroups(role: Role) {
+  return (role === "client" ? CLIENT_PRIMARY : PRIMARY).map((section) => ({
+    ...section,
+    links: section.links.filter((entry) => entry.path ? canOpen(role, "HQ") : !entry.app || canOpen(role, entry.app)),
+  })).filter((section) => section.links.length > 0);
+}
+
 /** The native suite has a complete catalogue; the sidebar deliberately does not show all 35 apps. */
 export function workspaceArea(code: string): string {
   return NAV_GROUPS.find((group) => group.apps.some((app) => app.code === code))?.label ?? "Headquarters";
@@ -70,10 +83,7 @@ interface Props {
 export function HeadquartersNavigation({
   orgSlug, orgName, role, activeCode, pathname, favourites, collapsed, onCollapse, onBrowse,
 }: Props) {
-  const visibleGroups = PRIMARY.map((section) => ({
-    ...section,
-    links: section.links.filter((entry) => !entry.app || canOpen(role, entry.app)),
-  })).filter((section) => section.links.length > 0);
+  const visibleGroups = visiblePrimaryGroups(role);
   const allowedFavs = favourites.filter((item) => canOpen(role, item.code)).slice(0, 5);
 
   return (
