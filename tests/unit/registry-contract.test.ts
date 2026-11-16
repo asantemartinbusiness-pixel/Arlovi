@@ -1,5 +1,12 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+
+// Registry contracts test module registration, not IndexedDB migrations.
+// Preserve the actual database module while bypassing its browser-only seed write.
+vi.mock("@/runtime/db", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/runtime/db")>();
+  return { ...actual, seedLateContributors: vi.fn(async () => undefined) };
+});
 import { loadApplications } from "@/applications";
 import { allApps, getApp } from "@/platform/registry";
 

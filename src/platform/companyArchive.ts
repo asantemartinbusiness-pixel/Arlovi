@@ -1,3 +1,4 @@
+import { clockIso } from "@/platform/clock";
 import { db } from "@/runtime/db";
 import type { Audit, Rec } from "@/domain/types";
 
@@ -65,7 +66,7 @@ export async function createCompanyArchive(org: { id: string; slug: string; name
   const payload: ArchivePayload = {
     format:ARCHIVE_FORMAT,
     organization:{id:org.id,slug:org.slug,name:org.name},
-    generatedAt:new Date().toISOString(),
+    generatedAt:clockIso(),
     records:records.sort((a,b)=>a.id.localeCompare(b.id)),
     events:events.sort((a,b)=>a.id.localeCompare(b.id)),
   };

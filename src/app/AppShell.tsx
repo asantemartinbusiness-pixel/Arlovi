@@ -14,7 +14,8 @@ import { WORK_AREAS, WorkspaceNavigation, WorkspaceSideNav, currentWorkArea, isW
 import { ScreenErrorBoundary } from "@/app/ErrorBoundary";
 import { applicationLoadFailures, loadNativeApplication, prefetchNativeApplication } from "@/applications";
 const CommandPalette = lazy(() => import("@/app/CommandPalette").then(module => ({ default: module.CommandPalette })));
-import { recordNavigation } from "@/platform/navigationContinuity";
+import { recordNavigation, readNavigation } from "@/platform/navigationContinuity";
+import { IntentPrefetchController } from "@/app/nativePrefetch";
 const AttentionCentre = lazy(() => import("@/app/AttentionCentre").then(module => ({ default: module.AttentionCentre })));
 const AskPanel = lazy(() => import("@/app/AskPanel").then(module => ({ default: module.AskPanel })));
 import { ExecutionTray } from "@/app/ExecutionTray";
@@ -50,15 +51,42 @@ export function AppShell() {
     void loadNativeApplication(activeScreen.applicationCode).catch(() => undefined);
   }, [activeScreen?.applicationCode]);
 
-  // A concrete hover or keyboard-focus hint is enough to prefetch the next
-  // native application. This does not request all app groups on startup.
-  function prefetchLinkedApplication(target: EventTarget | null) {
-    if(!(target instanceof Element)) return;
+  // Demand-loading the active route above always takes priority. Speculative
+  // navigation hints are deliberately delayed, cancellable and connection-aware.
+  const prefetchController = useMemo(
+    () => new IntentPrefetchController(prefetchNativeApplication), [org.id],
+  );
+  useEffect(() => () => prefetchController.dispose(), [prefetchController]);
+  useEffect(() => {
+    prefetchController.cancel();
+    // One actual recently visited native app is a useful low-priority prediction
+    // from Home. No broad directory scans, no automatic background fan-out.
+    if (location.pathname !== workAreaPath(org.slug, "home")) return;
+    const recent = readNavigation(org.id, org.slug).recent;
+    const candidate = recent
+      .map(item => findScreen(item.path)?.screen)
+      .find(screen => screen && screen.applicationCode !== "HQ" && canOpen(role, screen.applicationCode));
+    if (candidate) prefetchController.schedule(candidate.applicationCode, 5000);
+    return () => prefetchController.cancel();
+  }, [location.pathname, org.id, org.slug, role, prefetchController]);
+
+  function linkedApplicationCode(target: EventTarget | null): string | null {
+    if (!(target instanceof Element)) return null;
     const link = target.closest("a[href]");
-    if(!(link instanceof HTMLAnchorElement)) return;
-    const match = findScreen(link.pathname);
-    if(match && match.screen.applicationCode !== activeScreen?.applicationCode)
-      prefetchNativeApplication(match.screen.applicationCode);
+    if (!(link instanceof HTMLAnchorElement) || !link.pathname.startsWith(`/o/${org.slug}/`)) return null;
+    const screen = findScreen(link.pathname)?.screen;
+    if (!screen || screen.applicationCode === activeScreen?.applicationCode || !canOpen(role, screen.applicationCode)) return null;
+    return screen.applicationCode;
+  }
+  function prefetchLinkedApplication(target: EventTarget | null, delay = 180) {
+    const code = linkedApplicationCode(target);
+    if (code) prefetchController.schedule(code, delay);
+  }
+  function cancelPrefetchOnExit(target: EventTarget | null, next: EventTarget | null) {
+    if (!(target instanceof Element)) return;
+    const link = target.closest("a[href]");
+    if (link && next instanceof Node && link.contains(next)) return;
+    prefetchController.cancel();
   }
 
   const data = useCollections(["notifications", "invoices", "bills", "tasks", "missions", "deals", "leaveRequests", "expenses", "organizations", "preferences"]);
@@ -154,7 +182,11 @@ export function AppShell() {
   }, [org.slug]);
 
   return (
-    <div className="hq" data-nav-open={navOpen ? "true" : "false"} onPointerOver={event => prefetchLinkedApplication(event.target)} onFocusCapture={event => prefetchLinkedApplication(event.target)}>
+    <div className="hq" data-nav-open={navOpen ? "true" : "false"}
+      onPointerOver={event => { if (event.pointerType !== "touch") prefetchLinkedApplication(event.target); }}
+      onPointerOut={event => cancelPrefetchOnExit(event.target, event.relatedTarget)}
+      onFocusCapture={event => prefetchLinkedApplication(event.target, 100)}
+      onBlurCapture={event => cancelPrefetchOnExit(event.target, event.relatedTarget)}>
       <a className="ds-skip" href="#main">Skip to content</a>
       <GuidedTour />
 

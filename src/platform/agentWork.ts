@@ -1,3 +1,4 @@
+import { clockIso } from "@/platform/clock";
 import { db } from "@/runtime/db";
 import { capabilityById } from "@/platform/capability";
 import type { Audit, Rec, Snapshot } from "@/domain/types";
@@ -63,7 +64,7 @@ export async function assignAgentToTask(orgId: string, taskId: string, agentId: 
     const assignments = await db.records.where("[organizationId+collection]").equals([orgId, AGENT_ASSIGNMENTS]).toArray();
     if (assignments.some(row => row.fields.taskId === task.id && row.status === "awaiting_provider"))
       throw new AgentWorkError("This task already has a pending AI assignment. Cancel it before reassigning.");
-    const at = new Date().toISOString();
+    const at = clockIso();
     const capability = capabilityById("model.inference");
     const assignment = fresh({
       orgId, actor, at, collection: AGENT_ASSIGNMENTS,
@@ -103,7 +104,7 @@ export async function prepareAgentBrief(orgId: string, assignmentId: string, act
       (task.fields.projectId && row.fields.projectId === task.fields.projectId) ||
       (task.fields.departmentId && row.fields.departmentId === task.fields.departmentId)
     )).slice(0, 20);
-    const at = new Date().toISOString();
+    const at = clockIso();
     const brief = {
       task: { id: task.id, revision: task.revision, title: task.title, status: task.status, summary: task.summary },
       agent: { id: agent.id, revision: agent.revision, name: agent.title, status: agent.status },
@@ -130,7 +131,7 @@ export async function cancelAgentAssignment(orgId: string, assignmentId: string,
   await db.transaction("rw", [db.records, db.events], async () => {
     const assignment = currentOrgRow(await db.records.get(assignmentId), orgId, AGENT_ASSIGNMENTS);
     if (assignment.status !== "awaiting_provider") throw new AgentWorkError("Assignment already closed.");
-    const at = new Date().toISOString();
+    const at = clockIso();
     const task = await db.records.get(String(assignment.fields.taskId));
     await db.records.put(update(assignment, { status: "cancelled" }, actor, at));
     if (task && task.organizationId === orgId && task.collection === "tasks" && task.fields.aiAssignmentId === assignment.id)
