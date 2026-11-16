@@ -14,6 +14,19 @@ test("a posted cash journal can be matched exactly, without a second ledger post
     const receivable = accounts.find((row) => String(row.fields.code) === "1100");
     if (!bank || !receivable) throw new Error("Expected cash and receivables accounts");
     const ctx = {actor:"Browser QA",now:"2026-11-14T09:30:00.000Z",screenId:"qa-reconcile"};
+    const batch = "qa-statement-" + crypto.randomUUID();
+    const statement = repo.newRecord({
+      organizationId:org,collection:"bankTransactions",currency:"GBP",
+      title:"QA matching statement",status:"imported",
+      summary:"Manually recorded statement details for a scoped matching test.",
+      at:ctx.now,amountMinor:12345,
+      fields:{
+        kind:"statement",source:"manual-csv",bankAccountCode:"1000",
+        importBatch:batch,filename:"QA matching statement",
+        from:"2026-11-14",to:"2026-11-14",
+        openingMinor:0,closingMinor:12345,
+      },
+    },ctx);
     const journal = repo.newRecord({
       organizationId:org,collection:"journals",currency:"GBP",title:"QA exact-match receipt",
       status:"posted",summary:"Locally recorded bank receipt for matching.",
@@ -28,9 +41,12 @@ test("a posted cash journal can be matched exactly, without a second ledger post
       organizationId:org,collection:"bankTransactions",currency:"GBP",title:"QA exact-match bank line",
       status:"unmatched",summary:"Imported statement line not yet verified.",
       amountMinor:12345,at:"2026-11-14T00:00:00.000Z",
-      fields:{matched:false,source:"statement-import",bankAccountCode:"1000",reference:"QA exact-match receipt"},
+      fields:{
+        matched:false,source:"statement-import",bankAccountCode:"1000",
+        importBatch:batch,statementId:statement.id,reference:"QA exact-match receipt",
+      },
     },ctx);
-    await repo.putMany([journal,bankLine],ctx,[],org);
+    await repo.putMany([statement,journal,bankLine],ctx,[],org);
     return {journalId:journal.id,lineId:bankLine.id};
   });
 
