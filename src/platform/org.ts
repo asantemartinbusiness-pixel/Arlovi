@@ -1,4 +1,5 @@
 import { ORG_HARBOR, ORG_NORTHLINE } from "@/domain/types";
+import { db } from "@/runtime/db";
 
 export interface OrgProfile {
   id: string;
@@ -91,4 +92,49 @@ export function orgBySlug(slug: string | undefined): OrgProfile | undefined {
 
 export function orgById(id: string | undefined): OrgProfile | undefined {
   return ORGS.find((org) => org.id === id);
+}
+
+/**
+ * Reconstruct the browser-local company catalogue from durable workspace records.
+ * localStorage is only a convenience index; the IndexedDB organization record is
+ * authoritative. This repairs lost catalogue / last-workspace keys on startup
+ * without creating a duplicate tenant or replaying onboarding.
+ */
+export async function recoverLocalOrganizations(): Promise<string | null> {
+  const saved = await db.records.where("collection").equals("organizations").toArray();
+  const local = saved
+    .filter((record) => record.id.startsWith("org-") && typeof record.fields.slug === "string")
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const recovered: OrgProfile[] = [];
+  for (const record of local) {
+    const slug = String(record.fields.slug);
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) continue;
+    const profile: OrgProfile = {
+      id: record.id, slug, name: record.title,
+      shortName: record.title.trim().split(" ")[0] || record.title,
+      ownerName: record.ownerName,
+      currency: record.currency,
+      locale: String(record.fields.locale || "en-GB"),
+      timezone: String(record.fields.timezone || "Europe/London"),
+      jurisdiction: String(record.fields.jurisdiction || "GB"),
+      accent: String(record.fields.brandAccent || "#234fe8"),
+    };
+    if (ORGS.some((org) => org.slug === slug && org.id !== record.id)) continue;
+    if (!ORGS.some((org) => org.id === record.id)) ORGS.push(profile);
+    recovered.push(profile);
+  }
+  // A last-workspace pointer can go stale independently of stored organization records.
+  let selected: string | null = null;
+  try { selected = localStorage.getItem("arlovi-last-workspace"); } catch { /* optional index */ }
+  if (!selected || !orgBySlug(selected)) {
+    selected = recovered[0]?.slug ?? null;
+  }
+  try {
+    const existing = loadLocalOrganizations();
+    const byId = new Map(existing.map((org) => [org.id, org]));
+    for (const profile of recovered) byId.set(profile.id, profile);
+    localStorage.setItem(LOCAL_ORGS_KEY, JSON.stringify([...byId.values()]));
+    if (selected) localStorage.setItem("arlovi-last-workspace", selected);
+  } catch { /* IndexedDB remains authoritative even if localStorage is unavailable */ }
+  return selected;
 }
