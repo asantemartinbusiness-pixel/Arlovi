@@ -15,6 +15,7 @@ import { useFinData } from "./data";
 import type { FinData } from "./data";
 import { AccountLabel, Amount, CapabilityNotice, CapabilityPill, SourceNote, StatementRow } from "./parts";
 import { wallMs } from "@/platform/clock";
+import { commitStatementMatch, commitStatementUnmatch } from "./reconciliationLinks";
 
 /* ---------------------------- FIN-008 ---------------------------- */
 
@@ -519,15 +520,14 @@ export function ToReconcile({ context }: { context: ScreenContext }) {
                         busy={busy === line.id}
                         onClick={async () => {
                           setBusy(line.id);
-                          await context.mutate.patch(line.id, {
-                            status: "matched",
-                            fields: { ...line.fields, matched: true, journalId: candidate.journal.id, matchedBy: context.actor },
-                          }, { expectRevision: line.revision, event: `Statement line ${line.title} matched to ${candidate.journal.title}` });
-                          await context.mutate.patch(candidate.journal.id, {
-                            fields: { ...candidate.journal.fields, bankLineId: line.id },
-                          }, { event: `${candidate.journal.title} linked to a statement line` });
-                          context.toast("Matched", `${line.title} is linked to ${candidate.journal.title}. The ledger balance did not change, because the journal was already posted.`);
-                          setBusy(undefined);
+                          try {
+                            await commitStatementMatch(context, line, candidate.journal, recon.bankAccountId);
+                            context.toast("Matched", `${line.title} is linked to ${candidate.journal.title}. The posted ledger balance has not changed.`);
+                          } catch (error) {
+                            context.toast("The match was not saved", error instanceof Error ? error.message : "Reload and retry.", "failed");
+                          } finally {
+                            setBusy(undefined);
+                          }
                         }}
                       >
                         Match
@@ -582,17 +582,13 @@ export function MatchedLines({ context }: { context: ScreenContext }) {
         { key: "amount", header: "Amount", align: "end", cell: (row) => <Amount minor={row.amountMinor} context={context} /> },
         { key: "unmatch", header: "", cell: (row) => (
           <Button size="sm" variant="ghost" onClick={async () => {
-            const journalId = String(row.fields.journalId ?? "");
-            const fields: Record<string, string | number | boolean> = { ...row.fields, matched: false };
-            delete fields.journalId;
-            await context.mutate.patch(row.id, { status: "unmatched", fields }, { replaceFields: true, event: `Statement line ${row.title} unmatched` });
-            const journal = data.journals.find((item) => item.id === journalId);
-            if (journal) {
-              const journalFields: Record<string, string | number | boolean> = { ...journal.fields };
-              delete journalFields.bankLineId;
-              await context.mutate.patch(journal.id, { fields: journalFields }, { replaceFields: true, event: `${journal.title} unlinked from a statement line` });
+            const journal = data.journals.find((item) => item.id === String(row.fields.journalId ?? ""));
+            try {
+              await commitStatementUnmatch(context, row, journal);
+              context.toast("Unmatched", "Both links have been removed. No posted ledger entry was changed.");
+            } catch (error) {
+              context.toast("The match could not be removed", error instanceof Error ? error.message : "Reload and retry.", "failed");
             }
-            context.toast("Unmatched", "The link is removed. No ledger entry was changed.");
           }}>Unmatch</Button>
         ) },
       ]}
@@ -724,14 +720,15 @@ export function MatchCandidatesOverlay({ context, close }: { context: ScreenCont
                 busy={busy}
                 onClick={async () => {
                   setBusy(true);
-                  await context.mutate.patch(line.id, {
-                    status: "matched",
-                    fields: { ...line.fields, matched: true, journalId: candidate.journal.id, matchedBy: context.actor },
-                  }, { expectRevision: line.revision, event: `Statement line ${line.title} matched to ${candidate.journal.title}` });
-                  await context.mutate.patch(candidate.journal.id, { fields: { ...candidate.journal.fields, bankLineId: line.id } }, { event: `${candidate.journal.title} linked to a statement line` });
-                  context.toast("Matched", `${line.title} is linked to ${candidate.journal.title}.`);
-                  setBusy(false);
-                  close();
+                  try {
+                    await commitStatementMatch(context, line, candidate.journal, recon.bankAccountId);
+                    context.toast("Matched", `${line.title} is linked to ${candidate.journal.title} without changing the ledger balance.`);
+                    close();
+                  } catch (error) {
+                    context.toast("The match was not saved", error instanceof Error ? error.message : "Reload and retry.", "failed");
+                  } finally {
+                    setBusy(false);
+                  }
                 }}
               >
                 Match
