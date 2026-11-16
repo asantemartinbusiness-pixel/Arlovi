@@ -1,4 +1,4 @@
-import { appEntry, findScreen, screens } from "@/app/catalog";
+import { findScreen, screens } from "@/app/catalog";
 
 /**
  * Preserve only destinations that are safe when moving between browser-local
