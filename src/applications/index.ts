@@ -9,6 +9,8 @@
  * recorded and the rest of headquarters keeps working.
  */
 
+import { notifyApplicationRegistry } from "@/platform/registry";
+
 export interface LoadFailure {
   group: string;
   message: string;
@@ -48,6 +50,7 @@ export function loadApplications(): Promise<LoadFailure[]> {
       return [{ group: GROUPS[index].group, message }];
     });
     complete = true;
+    notifyApplicationRegistry();
     return failures;
   });
   return loading;
