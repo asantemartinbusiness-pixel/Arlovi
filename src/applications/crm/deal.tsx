@@ -647,6 +647,7 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
                   [deal.id]: deal.revision,
                   ...(latest ? { [latest.id]: latest.revision } : {}),
                 },
+                invoice ? ["update", "create"] : ["update"],
               );
               context.toast(
                 "Deal closed won",
