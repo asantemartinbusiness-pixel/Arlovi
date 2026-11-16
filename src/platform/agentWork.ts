@@ -99,7 +99,7 @@ export async function prepareAgentBrief(orgId: string, assignmentId: string, act
       throw new AgentWorkError("The task no longer references this assignment.");
     const related = await db.records.where("organizationId").equals(orgId).toArray();
     const docs = related.filter(row => row.collection === "documents" && (
-      row.parentId === task.parentId ||
+      (Boolean(task.parentId) && row.parentId === task.parentId) ||
       (task.fields.projectId && row.fields.projectId === task.fields.projectId) ||
       (task.fields.departmentId && row.fields.departmentId === task.fields.departmentId)
     )).slice(0, 20);
