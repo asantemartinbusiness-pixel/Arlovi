@@ -74,8 +74,13 @@ describe("manual reconciliation has a two-sided, revision-checked link", () => {
     expect(prepareStatementUnmatch({line:matchedLine,journal:undefined,actor:"Maya",now}).blocked)
       .toMatch(/verified/);
     expect(prepareStatementUnmatch({
-      line:matchedLine,journal:{...matchedJournal,fields:{}},actor:"Maya",now,
+      line:matchedLine,journal:{...matchedJournal,fields:{bankLineId:"another-statement"}},actor:"Maya",now,
     }).blocked).toMatch(/no longer linked/);
+    // A legacy one-sided line may be unlinked so its reciprocal link can be
+    // safely repaired, but a journal owned by another line is never cleared.
+    expect(prepareStatementUnmatch({
+      line:matchedLine,journal:{...matchedJournal,fields:{}},actor:"Maya",now,
+    }).prepared?.records[0].status).toBe("unmatched");
   });
   it("does not mistake a confirmed reconciliation summary for an unmatched statement line", () => {
     expect(isStatementLine(rec("confirmation-1","bankTransactions","confirmed",{kind:"reconciliation"})))
