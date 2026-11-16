@@ -32,7 +32,7 @@ export class ScreenErrorBoundary extends Component<{ children: ReactNode; resetK
             title={`${this.props.label} stopped while rendering`}
             actions={<Button size="sm" variant="secondary" onClick={() => this.setState({ error: null })}>Try again</Button>}
           >
-            {this.state.error.message || "An unexpected error occurred."} The rest of the workspace is unaffected, and no record was changed by this failure.
+            {this.state.error.message || "An unexpected error occurred."} The rest of the workspace remains available. If an action was in progress, check its status before trying again.
           </Notice>
         </div>
       </div>

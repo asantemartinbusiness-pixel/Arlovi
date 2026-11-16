@@ -1,12 +1,13 @@
 import { useMemo, useState, type ComponentType } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { ArrowRight, Building2, CalendarDays, CheckSquare, ChevronRight, FolderKanban, Grid2X2, Home, Inbox, Layers, Megaphone, Plus, Search, Users, Clock3, LockKeyhole } from "lucide-react";
+import { ArrowRight, Building2, CalendarDays, CheckSquare, ChevronRight, FolderKanban, Grid2X2, Home, Inbox, Layers, Megaphone, Plus, Search, Users, Clock3, LockKeyhole, Activity } from "lucide-react";
 import { APP_ENTRIES, NAV_GROUPS } from "@/app/nav";
 import { ContextualCreate } from "@/app/ContextualCreate";
 import { WorkspaceContinuity } from "@/app/WorkspaceContinuity";
 import { ResourceLibrary } from "@/app/ResourceLibrary";
 import { CompanyPeople } from "@/app/CompanyPeople";
 import { AccountCloud } from "@/app/AccountCloud";
+import { WorkspaceHealth } from "@/app/WorkspaceHealth";
 import { TaskApprovalBoard } from "@/app/TaskApprovalBoard";
 import { AgentWorkBoard } from "@/app/AgentWorkBoard";
 import { appEntry } from "@/app/catalog";
@@ -73,13 +74,17 @@ export function WorkspaceSideNav() {
   const { org } = useWorkspace();
   const location = useLocation();
   const area = currentWorkArea(location.pathname);
-  return <nav className="hq-appnav ws-sidebar" aria-label={headings[area] + " navigation"}>
-    <div className="hq-appnav-head"><h2>{headings[area]}</h2><p>{WORK_AREAS.find(item=>item.id===area)?.description}</p></div>
+  const extra: Record<string,{ title:string;description:string }> = {recent:{title:"Recent & saved",description:"Return to your work"},resources:{title:"Files & resources",description:"Company documents and folders"},people:{title:"People & collaboration",description:"Company directory and team spaces"},account:{title:"Account & data",description:"Identity and data readiness"},health:{title:"Workspace health",description:"Diagnostics and recovery"}};
+  const section = extra[location.pathname.split("/")[4]];
+  const headerTitle = section?.title ?? headings[area];
+  return <nav className="hq-appnav ws-sidebar" aria-label={headerTitle + " navigation"}>
+    <div className="hq-appnav-head"><h2>{headerTitle}</h2><p>{section?.description ?? WORK_AREAS.find(item=>item.id===area)?.description}</p></div>
     <div className="hq-appnav-body">{WORK_AREAS.map(item => <NavLink key={item.id} className="hq-navlink" to={workAreaPath(org.slug,item.id)}><item.icon size={16}/>{item.label}</NavLink>)}
       <NavLink className="hq-navlink" to={`/o/${org.slug}/workspace/recent`}><Clock3 size={16}/>Recent & saved</NavLink>
       <NavLink className="hq-navlink" to={`/o/${org.slug}/workspace/resources`}><FolderKanban size={16}/>Files & resources</NavLink>
       <NavLink className="hq-navlink" to={`/o/${org.slug}/workspace/people`}><Users size={16}/>People & collaboration</NavLink>
       <NavLink className="hq-navlink" to={`/o/${org.slug}/workspace/account`}><LockKeyhole size={16}/>Account & data</NavLink>
+      <NavLink className="hq-navlink" to={`/o/${org.slug}/workspace/health`}><Activity size={16}/>Workspace health</NavLink>
       <div className="hq-navsection">TOOLS</div>
       <NavLink className="hq-navlink" to={appEntry("INBOX",org.slug)}><Inbox size={16}/>Inbox</NavLink>
       <NavLink className="hq-navlink" to={appEntry("PROJECT",org.slug)}><CheckSquare size={16}/>Projects</NavLink>
@@ -106,6 +111,7 @@ export function WorkspaceNavigation() {
   const pinned = new Set(preferences.filter(p => p.fields.pinned === true).map(p => String(p.fields.app)));
   const appGroups = useMemo(() => NAV_GROUPS.map(group => ({ ...group, apps: group.apps.filter(app => canOpen(role, app.code) && (`${app.short} ${group.label}`).toLowerCase().includes(query.toLowerCase())) })).filter(group => group.apps.length), [role, query]);
 
+  if (path[4] === "health") return <div className="ws-content"><header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / WORKSPACE OPERATIONS</span><h1>Workspace health</h1><p>Read-only checks for your company records, applications and browser storage.</p></header><WorkspaceHealth/></div>;
   if (path[4] === "account") return <div className="ws-content"><header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / DATA & IDENTITY</span><h1>Account & data readiness</h1><p>Understand local data, export a secure handoff archive, and see what is required for cloud accounts and synchronisation.</p></header><AccountCloud/></div>;
   if (path[4] === "people") return <div className="ws-content"><header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / COLLABORATION</span><h1>People & collaboration</h1><p>Manage the company directory and prepare workspace membership and invitations without claiming to grant account access.</p></header><CompanyPeople/></div>;
   if (path[4] === "resources") return <div className="ws-content"><header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / SHARED RESOURCES</span><h1>Files & resources</h1><p>Organise company documents into folders, preview content, and connect resources to projects and departments.</p><div className="ws-page-actions"><ContextualCreate label="Create document"/></div></header><ResourceLibrary/></div>;
@@ -121,7 +127,7 @@ export function WorkspaceNavigation() {
       <RowLink to={`/o/${org.slug}/workspace/resources`} title="Files & resources" detail="Browse company documents, folders and linked resources" icon={FolderKanban}/>
       <div className="ws-shortcuts"><RowLink to={appEntry("INBOX",org.slug)} title="Inbox and approvals" icon={Inbox} /><RowLink to={appEntry("BOOK",org.slug)} title="Calendar and bookings" icon={CalendarDays} /></div>
     </div>}
-    {area === "company" && <div className="ws-stack"><div className="ws-stat-grid"><div><small>Departments</small><strong>{departments.length}</strong></div><div><small>People records</small><strong>{members.length}</strong></div><div><small>Active missions</small><strong>{missions.filter(m=>m.status==="running").length}</strong></div></div><WorkList title="Company objectives" records={(data.objectives ?? empty).slice(0,8)} slug={org.slug} fallback="No company objectives recorded."/><div className="ws-shortcuts"><RowLink to={appEntry("HQ",org.slug)} title="Executive headquarters" icon={Building2}/><RowLink to={appEntry("BRAIN",org.slug)} title="Company Brain" icon={Layers}/><RowLink to={appEntry("ADMIN",org.slug)} title="Company administration" icon={Users}/><RowLink to={`/o/${org.slug}/workspace/people`} title="People & collaboration" icon={Users}/><RowLink to={`/o/${org.slug}/workspace/account`} title="Account & data readiness" icon={LockKeyhole}/></div></div>}
+    {area === "company" && <div className="ws-stack"><div className="ws-stat-grid"><div><small>Departments</small><strong>{departments.length}</strong></div><div><small>People records</small><strong>{members.length}</strong></div><div><small>Active missions</small><strong>{missions.filter(m=>m.status==="running").length}</strong></div></div><WorkList title="Company objectives" records={(data.objectives ?? empty).slice(0,8)} slug={org.slug} fallback="No company objectives recorded."/><div className="ws-shortcuts"><RowLink to={appEntry("HQ",org.slug)} title="Executive headquarters" icon={Building2}/><RowLink to={appEntry("BRAIN",org.slug)} title="Company Brain" icon={Layers}/><RowLink to={appEntry("ADMIN",org.slug)} title="Company administration" icon={Users}/><RowLink to={`/o/${org.slug}/workspace/people`} title="People & collaboration" icon={Users}/><RowLink to={`/o/${org.slug}/workspace/account`} title="Account & data readiness" icon={LockKeyhole}/><RowLink to={`/o/${org.slug}/workspace/health`} title="Workspace health" icon={Activity}/></div></div>}
     {area === "spaces" && <div className="ws-stack"><section className="ws-section"><h2>Departments</h2><p className="ws-muted">Open a department's shared work, contributors, files and conversations.</p><div className="ws-entry-list">{departments.length ? departments.map(record => <RowLink key={record.id} to={`${workAreaPath(org.slug,"spaces")}/department/${record.id}`} title={record.title} detail={record.summary || record.status} icon={Megaphone}/>) : <p className="ws-empty">No departments in this organisation yet.</p>}</div></section><RowLink title="Manage departments and colleagues" to={appEntry("HQ",org.slug)} icon={Plus}/></div>}
     {area === "work" && <div className="ws-stack"><section className="ws-section"><h2>Projects</h2><div className="ws-entry-list">{projects.length ? projects.map(record => <RowLink key={record.id} to={`${workAreaPath(org.slug,"work")}/project/${record.id}`} title={record.title} detail={record.status.replace(/_/g," ")} icon={FolderKanban}/>) : <p className="ws-empty">No projects have been created in this company yet.</p>}</div></section><AgentWorkBoard/><TaskApprovalBoard/><WorkList title="Missions" records={missions.slice(0,12)} slug={org.slug} fallback="No mission records yet."/><div className="ws-shortcuts"><RowLink title="Project management" to={appEntry("PROJECT",org.slug)}/><RowLink title="Mission Control" to={appEntry("MISSION",org.slug)}/><RowLink title="Automation" to={appEntry("AUTO",org.slug)}/></div></div>}
     {area === "apps" && <div className="ws-stack"><label className="ws-app-search"><Search size={18}/><span className="ds-sr-only">Find an application</span><input aria-label="Find an application" value={query} onChange={event => setQuery(event.target.value)} placeholder="Find an application or category"/></label>{pinned.size>0 && <section className="ws-section"><h2>Pinned applications</h2><div className="ws-app-grid">{NAV_GROUPS.flatMap(g=>g.apps).filter(a=>pinned.has(a.short)&&canOpen(role,a.code)).map(app=><RowLink key={app.code} title={app.short} to={appEntry(app.code,org.slug)} icon={app.icon}/>)}</div></section>}{appGroups.map(group=><section className="ws-section" key={group.label}><h2>{group.label}</h2><div className="ws-app-grid">{group.apps.map(app=><RowLink key={app.code} title={app.short} to={appEntry(app.code,org.slug)} icon={APP_ENTRIES[app.code].icon}/>)}</div></section>)}{appGroups.length===0 && <p className="ws-empty">No applications match your search.</p>}</div>}
