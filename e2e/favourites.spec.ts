@@ -5,10 +5,10 @@ test("favourite apps are independently pinned, unpinned and restored on reload",
   const settings = page.getByRole("button", { name: /Account and view settings/ });
   await settings.click();
   await page.getByRole("menuitem", { name: "Pin Finance to favourites" }).click();
-  await expect(page.locator(".hq-rail-group").first().getByRole("link", { name: "Finance" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Favourite applications" }).getByRole("link", { name: "Finance" })).toBeVisible();
   await page.reload();
-  await expect(page.locator(".hq-rail-group").first().getByRole("link", { name: "Finance" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Favourite applications" }).getByRole("link", { name: "Finance" })).toBeVisible();
   await settings.click();
   await page.getByRole("menuitem", { name: "Remove Finance from favourites" }).click();
-  await expect(page.locator(".hq-rail-group").first().getByRole("link", { name: "Finance" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Favourite applications" }).getByRole("link", { name: "Finance" })).toHaveCount(0);
 });
