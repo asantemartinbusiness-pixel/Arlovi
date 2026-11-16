@@ -9,7 +9,7 @@ for (const width of [320, 360, 390, 768, 1024, 1366, 1920]) {
     expect(horizontal).toBeLessThanOrEqual(1);
 
     if (width < 1024) {
-      const bottom = page.getByRole("navigation", { name: "Primary" });
+      const bottom = page.locator(".hq-bottom");
       await expect(bottom).toBeVisible();
       for (const target of await bottom.locator("a, button").all()) {
         const box = await target.boundingBox();
@@ -21,14 +21,15 @@ for (const width of [320, 360, 390, 768, 1024, 1366, 1920]) {
       await page.getByRole("button", { name: "Close navigation" }).last().click();
       await expect(page.locator(".hq")).toHaveAttribute("data-nav-open", "false");
     } else {
-      await expect(page.getByRole("navigation", { name: "Applications" })).toBeVisible();
-      await expect(page.getByRole("navigation", { name: "Primary" })).toBeHidden();
+      await expect(page.locator(".hq-appnav")).toBeVisible();
+      await expect(page.locator(".hq-bottom")).toBeHidden();
     }
   });
 }
 
 test("the search shortcut opens the same command palette as the header control", async ({ page }) => {
   await page.goto("/o/northline/hq/home");
+  await expect(page.locator(".hq-search")).toBeVisible();
   await page.keyboard.press("Control+k");
   await expect(page.getByRole("dialog").first()).toBeVisible();
   await page.keyboard.press("Escape");
