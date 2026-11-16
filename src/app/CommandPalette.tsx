@@ -108,7 +108,10 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
     if (event.key !== "Tab") return;
     const dialog = event.currentTarget;
-    const focusable = [inputRef.current, ...Array.from(dialog.querySelectorAll<HTMLButtonElement>('button:not([disabled])'))].filter((element): element is HTMLElement => Boolean(element));
+    const focusable: HTMLElement[] = [
+      ...(inputRef.current ? [inputRef.current] : []),
+      ...Array.from(dialog.querySelectorAll<HTMLButtonElement>('button:not([disabled])')),
+    ];
     if (!focusable.length) {event.preventDefault();return;}
     const current = focusable.indexOf(document.activeElement as HTMLElement);
     if (event.shiftKey && (current <= 0)) {event.preventDefault();focusable[focusable.length - 1].focus();}
