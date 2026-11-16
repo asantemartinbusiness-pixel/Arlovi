@@ -62,7 +62,7 @@ export function ensureSeed(): Promise<void> {
         await db.meta.put({ id: "seed", value: SEED_VERSION });
       });
     }
-    await topUpContributors();
+    await seedLateContributors();
   })();
   return opening;
 }
@@ -73,6 +73,13 @@ export function ensureSeed(): Promise<void> {
  * still seeded. Only missing ids are added, so nothing a person has edited is
  * ever overwritten, and a later file reusing an id cannot fail the whole batch.
  */
+let topUpInFlight: Promise<void> | null = null;
+/** Reconcile fixtures registered after initial bootstrap; never replace user edits. */
+export function seedLateContributors(): Promise<void> {
+  if (topUpInFlight) return topUpInFlight;
+  topUpInFlight = topUpContributors().finally(() => { topUpInFlight = null; });
+  return topUpInFlight;
+}
 async function topUpContributors(): Promise<void> {
   for (const contributor of collectSeedsByContributor(SEED_NOW)) {
     const key = `seed:${contributor.key}`;
