@@ -7,6 +7,7 @@ import { canOpen } from "@/platform/policy";
 import { useCollections, useOrgRecords, useWorkspace } from "@/platform/workspace";
 import { useNavigationContinuity } from "@/platform/navigationContinuity";
 import { destinationLabel } from "@/app/WorkspaceContinuity";
+import { rankSearchHits } from "@/app/searchRanking";
 
 interface Hit {
   key: string;
@@ -14,6 +15,7 @@ interface Hit {
   title: string;
   detail: string;
   to: string;
+  searchText?: string;
 }
 
 /**
@@ -36,51 +38,50 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
 
   const hits = useMemo<Hit[]>(() => {
     const q = query.trim().toLowerCase();
-    const pages: Hit[] = screens
+    const pages: Hit[] = rankSearchHits(q, screens
       .filter((screen) => canOpen(role, screen.applicationCode) && !screen.route.includes(":id") && !screen.route.includes(":slug"))
-      .filter((screen) => !q || `${screen.title} ${screen.applicationName} ${screen.purpose}`.toLowerCase().includes(q))
-      .slice(0, q ? 8 : 6)
       .map((screen) => ({
         key: `page-${screen.id}`,
         group: "Screens",
         title: screen.title,
         detail: APP_ENTRIES[screen.applicationCode]?.short ?? screen.applicationName,
+        searchText: screen.purpose,
         to: screen.route.replace(":org", org.slug),
-      }));
+      }))).slice(0, q ? 8 : 6);
 
     const rows: Hit[] = q
-      ? records
-        .filter((record) => `${record.title} ${record.summary} ${record.status}`.toLowerCase().includes(q))
+      ? rankSearchHits(q, records
         .map((record) => ({ record, to: routeForRecord(record, org.slug) }))
         .filter((item): item is { record: typeof records[number]; to: string } => {
           if (!item.to) return false;
           const destination = findScreen(item.to)?.screen;
-          return !destination || canOpen(role, destination.applicationCode);
+          // Search must not expose routes outside the native screen register.
+          return Boolean(destination && canOpen(role, destination.applicationCode));
         })
-        .slice(0, 10)
         .map(({ record, to }) => ({
           key: `rec-${record.id}`,
           group: "Records",
           title: record.title,
           detail: `${record.collection} · ${record.status.replace(/_/g, " ")}`,
+          searchText: record.summary,
           to,
-        }))
+        }))).slice(0, 10)
       : [];
 
-    const locations: Hit[] = [...new Set([...navigation.pinned, ...navigation.recent.map(item => item.path)])]
+    const locations: Hit[] = rankSearchHits(q, [...new Set([...navigation.pinned, ...navigation.recent.map(item => item.path)])]
       .filter(path => {
         const matched = findScreen(path)?.screen;
-        return (!matched || canOpen(role, matched.applicationCode)) && (!q || destinationLabel(path, org.slug, projects, departments).toLowerCase().includes(q));
+        return !matched || canOpen(role, matched.applicationCode);
       })
-      .slice(0, q ? 8 : 6).map(path => ({
+      .map(path => ({
         key: `location-${path}`, group: "Recent & saved",
         title: destinationLabel(path, org.slug, projects, departments),
         detail: navigation.pinned.includes(path) ? "Saved location" : "Recently visited", to: path,
-      }));
-    const workspaces: Hit[] = q ? [
+      }))).slice(0, q ? 8 : 6);
+    const workspaces: Hit[] = q ? rankSearchHits(q, [
       ...departments.map(record => ({key: `department-${record.id}`, group: "Workspaces", title: record.title, detail: "Department space", to: `/o/${org.slug}/workspace/spaces/department/${record.id}`})),
       ...projects.map(record => ({key: `project-${record.id}`, group: "Workspaces", title: record.title, detail: "Project space", to: `/o/${org.slug}/workspace/work/project/${record.id}`})),
-    ].filter(item => `${item.title} ${item.detail}`.toLowerCase().includes(q)).slice(0, 8) : [];
+    ]).slice(0, 8) : [];
     const actions: Hit[] = [
       {key:"action-home",group:"Quick destinations",title:"Go to Home",detail:"Workspace",to:`/o/${org.slug}/workspace/home`},
       {key:"action-company",group:"Quick destinations",title:"Company headquarters",detail:"Company",to:`/o/${org.slug}/workspace/company`},
@@ -88,13 +89,21 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       {key:"action-files",group:"Quick destinations",title:"Open files and resources",detail:"Resources",to:`/o/${org.slug}/workspace/resources`},
       {key:"action-people",group:"Quick destinations",title:"Find people and collaboration",detail:"Company",to:`/o/${org.slug}/workspace/people`},
       {key:"action-account",group:"Quick destinations",title:"Account and data settings",detail:"Preferences",to:`/o/${org.slug}/workspace/account`},
-    ].filter(hit=>!q || (hit.title+" "+hit.detail).toLowerCase().includes(q)).slice(0,q?6:4);
+    ];
+    const matchingActions = rankSearchHits(q, actions).slice(0, q ? 6 : 4);
     const used = new Set<string>();
-    return [...actions, ...locations, ...workspaces, ...pages, ...rows].filter(hit => {
-      if (used.has(hit.to)) return false;
-      used.add(hit.to);
-      return true;
-    });
+    const destinations = [...matchingActions, ...locations, ...workspaces, ...pages, ...rows]
+      .filter(hit => {
+        if (used.has(hit.to)) return false;
+        used.add(hit.to);
+        return true;
+      });
+    if (!q) return destinations;
+    // Keep results grouped for a readable command surface, but order the groups
+    // by their strongest match and each group's results by actual relevance.
+    const ranked = rankSearchHits(q, destinations);
+    const groupOrder = [...new Set(ranked.map(hit => hit.group))];
+    return groupOrder.flatMap(group => ranked.filter(hit => hit.group === group));
   }, [query, records, org.slug, role, navigation, departments, projects]);
 
   useEffect(() => { setIndex(0); }, [query]);
@@ -144,9 +153,9 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Escape") { event.preventDefault(); onClose(); }
-            if (event.key === "ArrowDown") { event.preventDefault(); setIndex((value) => Math.min(value + 1, hits.length - 1)); }
-            if (event.key === "ArrowUp") { event.preventDefault(); setIndex((value) => Math.max(value - 1, 0)); }
-            if (event.key === "Enter") { event.preventDefault(); go(hits[Math.min(index, hits.length - 1)]); }
+            if (event.key === "ArrowDown") { event.preventDefault(); setIndex((value) => hits.length ? Math.min(value + 1, hits.length - 1) : 0); }
+            if (event.key === "ArrowUp") { event.preventDefault(); setIndex((value) => hits.length ? Math.max(value - 1, 0) : 0); }
+            if (event.key === "Enter") { event.preventDefault(); go(hits.length ? hits[Math.min(Math.max(index, 0), hits.length - 1)] : undefined); }
           }}
         />
         <div className="hq-palette-list" id="palette-list" role="listbox" aria-label="Results" ref={listRef}>
