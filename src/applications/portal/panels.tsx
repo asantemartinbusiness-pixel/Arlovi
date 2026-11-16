@@ -29,7 +29,9 @@ export function usePortal(context: ScreenContext): { portal: Rec | undefined; lo
     const mine = portalForRole(role, data.portals, actor, data.contacts);
     return { portal: mine, locked: true };
   }
-  return { portal: fromRoute ?? listedPortals(data.portals)[0], locked: false };
+  // A named portal route must never silently substitute the first portal when
+  // its record is absent. Only the directory itself may choose a default.
+  return { portal: context.params.id ? fromRoute : listedPortals(data.portals)[0], locked: false };
 }
 
 export function ClientOnlyNotice({ context }: { context: ScreenContext }) {
@@ -37,7 +39,7 @@ export function ClientOnlyNotice({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <Notice tone="warning" title="This view only opens portal content">
-        {actor} is signed in with the client role. Portal administration, the builder and the access log belong to {org.shortName}, so this view goes to the portal itself instead.
+        {actor} is viewing the browser-local client perspective. Portal administration, the builder and the access log belong to {org.shortName}. This does not authenticate anyone or grant access to a hosted client portal.
         Role views shape what this interface offers; they are not an account security boundary.
       </Notice>
       <Button variant="primary" onClick={() => context.navigate(`/o/${org.slug}/portal/portals/${context.params.id ?? ""}/dashboard`)}>
