@@ -150,6 +150,7 @@ export interface Mutations {
   patch: (id: string, patch: Partial<Rec>, options?: Omit<repo.PatchOptions, "event" | "expectedOrganizationId"> & { event?: string }) => Promise<Rec | null>;
   remove: (id: string, event?: string) => Promise<void>;
   putMany: (records: Rec[], messages?: string[], expectedRevisions?: Record<string, number>, eventTypes?: ("create" | "update")[]) => Promise<void>;
+  confirmReconciliation: (bankAccountCode: string, statementId: string, note: string) => Promise<Rec>;
   log: (message: string, options?: { entityId?: string; type?: string; capability?: Audit["capability"] }) => Promise<void>;
 }
 
@@ -217,6 +218,10 @@ export function useMutations(screenId?: string): Mutations {
         org.id,
         expectedRevisions,
       );
+    },
+    async confirmReconciliation(bankAccountCode, statementId, note) {
+      const ctx = context();
+      return repo.confirmBankReconciliation(org.id, bankAccountCode, statementId, note, ctx);
     },
     async log(message, options) {
       const ctx = context();
