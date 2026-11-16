@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { CheckCircle2, Clock3, RotateCcw, ShieldCheck, XCircle } from "lucide-react";
 import { useCollection, useToast, useWorkspace } from "@/platform/workspace";
-import { decideTaskApproval, requestTaskCompletion } from "@/platform/taskApprovals";
+import { decideTaskApproval, requestTaskCompletion, withdrawTaskApproval } from "@/platform/taskApprovals";
 import type { Rec } from "@/domain/types";
 import { routeForRecord } from "@/platform/attention";
 import { Link } from "react-router-dom";
@@ -47,6 +47,12 @@ export function TaskApprovalBoard({ scope = null }: { scope?: Scope }) {
     catch (e) {setError(e instanceof Error?e.message:"Unable to resolve approval.");}
     finally {setBusyId(null);}
   }
+  async function withdraw(request: Rec) {
+    setBusyId(request.id); setError("");
+    try { await withdrawTaskApproval(org.id,request.id,actor);toast("Request withdrawn", "You can request a fresh review when ready.", "info"); }
+    catch (e) {setError(e instanceof Error ? e.message : "Unable to withdraw review.");}
+    finally {setBusyId(null);}
+  }
   return <section className="ws-section ws-approvals" aria-label="Task completion approvals">
     <div className="ws-approval-intro"><div><h2>Task approvals</h2><p>Review completion before changing a task's final status. Every decision is recorded.</p></div><ShieldCheck size={22} aria-hidden="true"/></div>
     {error && <p role="alert" className="ws-approval-error">{error}</p>}
@@ -60,6 +66,7 @@ export function TaskApprovalBoard({ scope = null }: { scope?: Scope }) {
           {role==="owner" ? <div className="ws-approval-actions">
             <button type="button" disabled={Boolean(busyId)||stale} onClick={()=>{void decide(request,"approved");}}><CheckCircle2 size={15}/> Approve</button>
             <button type="button" disabled={Boolean(busyId)||stale} onClick={()=>{void decide(request,"rejected");}}><XCircle size={15}/> Decline</button>
+            <button type="button" disabled={Boolean(busyId)} onClick={()=>{void withdraw(request);}}>Withdraw</button>
           </div> : <span className="ws-approval-muted">Awaiting owner review</span>}
         </div>;
       })}
