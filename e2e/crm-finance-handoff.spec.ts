@@ -44,3 +44,54 @@ test("native CRM deal cannot silently accept an unaccepted quote during closure"
   await expect(page.getByRole("row", {name: /Q-126/})).toBeVisible();
   await expect(page.getByRole("row", {name: /Q-126/})).toContainText("REVIEW", {ignoreCase: true});
 });
+
+test("accepted quote evidence flows through a won CRM deal into the real Finance draft", async ({page}) => {
+  test.setTimeout(120_000);
+  const runAction = async (label: string) => {
+    const bar = page.locator(".pg-actions");
+    const direct = bar.getByRole("button", {name: label, exact: true});
+    if (await direct.isVisible().catch(() => false)) {
+      await direct.click();
+      return;
+    }
+    await bar.getByRole("button", {name: "More actions"}).click();
+    await page.getByRole("menuitem", {name: label, exact: true}).click();
+  };
+
+  await page.goto("/o/northline/crm/quotes?tab=Review");
+  await expect(page.getByRole("row", {name: /Q-126/})).toBeVisible();
+  await page.getByRole("row", {name: /Q-126/}).getByText("Q-126", {exact: true}).click();
+  await runAction("Approve");
+  await page.getByRole("dialog").getByRole("button", {name: "Approve the quote"}).click();
+  await expect(page.getByRole("row", {name: /Q-126/})).toContainText("APPROVED", {ignoreCase: true});
+
+  await page.getByRole("row", {name: /Q-126/}).getByText("Q-126", {exact: true}).click();
+  await runAction("Send");
+  await page.getByRole("dialog").getByRole("button", {name: "Issue and queue the message"}).click();
+  await page.getByRole("tab", {name: "Sent"}).click();
+  await expect(page.getByRole("row", {name: /Q-126/})).toBeVisible();
+  await page.getByRole("row", {name: /Q-126/}).getByText("Q-126", {exact: true}).click();
+  await runAction("Record customer acceptance");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("No email, signature platform or external customer identity has been verified");
+  await dialog.getByLabel("Accepted by").fill("Marcus Pike");
+  await dialog.getByLabel("Acceptance reference").fill("Signed order confirmation Q-126 received by the team");
+  await dialog.getByRole("button", {name: "Record customer acceptance"}).click();
+  await expect(dialog).toHaveCount(0);
+
+  await page.goto("/o/northline/crm/quotes?tab=Accepted");
+  await expect(page.getByRole("row", {name: /Q-126/})).toBeVisible();
+  await page.goto("/o/northline/crm/deals/nl-deals-721");
+  await runAction("Close the deal");
+  await expect(page.getByRole("dialog")).toContainText("Q-126 (accepted)");
+  await page.getByRole("dialog").getByRole("button", {name: "Close won"}).click();
+  await expect(page).toHaveURL(/\/o\/northline\/fin\/invoices\/[0-9a-f-]{36}$/);
+  await expect(page.locator("#main")).toContainText("Not posted to Finance");
+  const invoiceUrl = page.url();
+  await page.reload();
+  await expect(page).toHaveURL(invoiceUrl);
+  await expect(page.locator("#main")).toContainText("Not posted to Finance");
+  await page.goto("/o/northline/crm/deals/nl-deals-721");
+  await expect(page.locator("#main")).toContainText("CLOSED WON");
+  await expect(page.locator("#main")).toContainText("Invoiced");
+});
