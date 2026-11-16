@@ -195,14 +195,25 @@ test("WF-05 Sales-to-cash: lead, quote approval, won deal, posted invoice, recei
   await page.getByRole("tab", { name: "Sent" }).click();
   await expect(main(page).getByRole("row", { name: /Q-126/ })).toContainText("SENT", { ignoreCase: true });
 
-  // Customer acceptance and close: the won deal raises a draft invoice priced from the accepted quote version.
+  // The customer acceptance step is separate from internal deal closure: it
+  // records external evidence locally, without claiming the mail provider verified it.
+  await pick(page, /Q-126/, "Q-126");
+  await action(page, "Record customer acceptance");
+  await expect(dialog(page).getByText(/No email, signature platform or external customer identity has been verified/)).toBeVisible();
+  await dialog(page).getByLabel("Accepted by").fill("Marcus Pike");
+  await dialog(page).getByLabel("Acceptance reference").fill("Signed quote Q-126, received 14 November");
+  await dialog(page).getByRole("button", { name: "Record customer acceptance" }).click();
+  await expect(dialog(page)).toHaveCount(0);
+  await open(page, "/crm/quotes?tab=Accepted", "Quotes & Proposals");
+  await expect(main(page).getByRole("row", { name: /Q-126/ })).toBeVisible();
+  // Closing won writes the deal and draft invoice together, atomically.
   await open(page, "/crm/deals/nl-deals-721", "Deal");
   await action(page, "Close the deal");
-  await expect(dialog(page).getByText(/Q-126 \(sent\)/)).toBeVisible();
+  await expect(dialog(page).getByText(/Q-126 \(accepted\)/)).toBeVisible();
   await expect(dialog(page).getByText("£12,456.00")).toBeVisible();
   await dialog(page).getByRole("button", { name: "Close won" }).click();
   await expect(page).toHaveURL(/\/fin\/invoices\/[0-9a-f-]{36}/);
-  await expect(main(page).getByText("Raised from the won deal Pike trade account.")).toBeVisible();
+  await expect(main(page).getByText("Drafted from the won deal Pike trade account. Not posted to Finance.")).toBeVisible();
   const number = (await main(page).getByText(/^INV-\d+$/).first().textContent())?.trim() ?? "";
   expect(number).toMatch(/^INV-\d{4}$/);
   await expect(main(page).getByText("£10,380.00 net + £2,076.00 tax")).toBeVisible();
