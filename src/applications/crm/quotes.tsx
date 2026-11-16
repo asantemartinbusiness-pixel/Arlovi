@@ -16,6 +16,7 @@ import { contactById, openQuoteValueMinor, quotesOfDeal, useCrmData } from "./da
 import type { CrmData } from "./data";
 import { CapabilityNotice, CapabilityPill, Money, QuoteStatusPill, isExpired } from "./parts";
 import { clockIso } from "@/platform/clock";
+import { duplicateQuoteBody, fieldsForQuoteDuplicate, freshQuoteVersionFields } from "./quoteEvidence";
 
 /* ---------------------------- CRM-008 ---------------------------- *
  * Quotes priced through the same tax engine as an invoice: one resolved code
@@ -120,8 +121,8 @@ export function QuotesList({ context, tab }: { context: ScreenContext; tab: stri
                   at: now.toISOString(),
                   dueAt: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
                   parentId: quote.parentId,
-                  fields: { ...quote.fields, number, version: Number(quote.fields.version ?? 1) + 1, copiedFrom: quote.id },
-                  body: quote.body,
+                  fields: { ...fieldsForQuoteDuplicate(quote), number, version: 1, copiedFrom: quote.id },
+                  body: duplicateQuoteBody(quote),
                 }, `Quote ${number} created by duplicating ${quote.title}`);
               }
               context.toast("Duplicated", `${selected.length} new draft${selected.length === 1 ? "" : "s"}. Prices are copied and will be re-resolved for tax at today's date when edited.`);
@@ -340,15 +341,21 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
             if (contactId) fields.contactId = contactId;
             if (overPolicy) fields.discountApproval = `Needs owner approval: ${(discountBpMax / 100).toFixed(1)}% exceeds the 10% ceiling.`;
             if (quote) {
-              await context.mutate.patch(quote.id, {
+              const saved = await context.mutate.patch(quote.id, {
                 title: `${number.trim()} ${quote.summary.split(".")[0]}`,
+                status: "draft",
                 amountMinor: totals.grossMinor,
                 dueAt: `${expires}T00:00:00.000Z`,
                 parentId: dealId || undefined,
                 body: { ...(quote.body as object ?? {}), ...writeLines(lines) },
-                fields: { ...quote.fields, ...fields },
-              }, { expectRevision: quote.revision, event: `Quote ${number.trim()} edited to version ${Number(quote.fields.version ?? 0) + 1}` });
-              context.toast("Quote saved", `Version ${Number(quote.fields.version ?? 0) + 1} at ${context.money(totals.grossMinor)} across ${totals.byCode.length} tax ${totals.byCode.length === 1 ? "code" : "codes"}.`);
+                fields: freshQuoteVersionFields({ ...quote.fields, ...fields }, lines),
+              }, {
+                replaceFields: true,
+                expectRevision: quote.revision,
+                event: `Quote ${number.trim()} repriced to version ${Number(quote.fields.version ?? 0) + 1}; prior approval and acceptance do not carry forward`,
+              });
+              if (!saved) { setBusy(false); return; }
+              context.toast("Quote saved as a draft", `Version ${Number(quote.fields.version ?? 0) + 1} at ${context.money(totals.grossMinor)} needs its own approval and customer acceptance. Any earlier evidence remains in the audit, not on the new version.`);
             } else {
               const created = await context.mutate.create({
                 collection: "quotes",
