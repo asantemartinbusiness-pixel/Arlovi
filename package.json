@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit --pretty false && vite build && node scripts/report-bundle.mjs",
+    "build": "node scripts/verify-native-chunks.mjs && tsc --noEmit --pretty false && vite build && node scripts/report-bundle.mjs",
     "preview": "vite preview",
     "lint": "eslint src tests e2e",
     "typecheck": "tsc --noEmit --pretty false",

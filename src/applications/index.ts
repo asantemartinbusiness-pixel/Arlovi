@@ -18,11 +18,32 @@ export interface LoadFailure {
 
 const GROUPS: { group: string; load: () => Promise<unknown> }[] = [
   { group: "Headquarters", load: () => Promise.all([import("@/domain/seeds/hq"), import("./hq/index")]) },
-  { group: "Workplace", load: () => import("./t1_workplace") },
-  { group: "Intelligence", load: () => import("./t2_intelligence") },
-  { group: "Automation", load: () => import("./t2b_automation") },
-  { group: "Finance and CRM", load: () => import("./t3a_money") },
-  { group: "People and operations", load: () => import("./t3b_people") },
+  { group: "Workplace", load: () => Promise.all([
+    import("@/domain/seeds/inbox"), import("./inbox/index"),
+    import("@/domain/seeds/admin"), import("./admin/index"),
+    import("@/domain/seeds/asset"), import("./asset/index"),
+  ]) },
+  { group: "Intelligence", load: () => Promise.all([
+    import("@/domain/seeds/ai"), import("./ai/index"),
+    import("@/domain/seeds/brain"), import("./brain/index"),
+    import("@/domain/seeds/team"), import("./team/index"),
+    import("@/domain/seeds/mission"), import("./mission/index"),
+  ]) },
+  { group: "Automation", load: () => Promise.all([
+    import("@/domain/seeds/auto"), import("./auto/index"),
+    import("@/domain/seeds/analytics"), import("./analytics/index"),
+  ]) },
+  { group: "Finance and CRM", load: () => Promise.all([
+    import("@/domain/seeds/fin"), import("./fin/index"),
+    import("@/domain/seeds/crm"), import("./crm/index"),
+  ]) },
+  { group: "People and operations", load: () => Promise.all([
+    import("@/domain/seeds/hr"), import("./hr/index"),
+    import("@/domain/seeds/project"), import("./project/index"),
+    import("@/domain/seeds/comms"), import("./comms/index"),
+    import("@/domain/seeds/care"), import("./care/index"),
+    import("@/domain/seeds/legal"), import("./legal/index"),
+  ]) },
   { group: "Growth", load: () => Promise.all([
     import("@/domain/seeds/market"), import("./market/index"),
     import("@/domain/seeds/commerce"), import("./commerce/index"),
@@ -30,7 +51,11 @@ const GROUPS: { group: string; load: () => Promise<unknown> }[] = [
     import("@/domain/seeds/proc"), import("./proc/index"),
     import("@/domain/seeds/portal"), import("./portal/index"),
   ]) },
-  { group: "Documents", load: () => import("./t5a_documents") },
+  { group: "Documents", load: () => Promise.all([
+    import("@/domain/seeds/docs"), import("./docs/index"),
+    import("@/domain/seeds/sheets"), import("./sheets/index"),
+    import("@/domain/seeds/present"), import("./present/index"),
+  ]) },
   { group: "Visual tools", load: () => Promise.all([
     import("@/domain/seeds/design"), import("./design/index"),
     import("@/domain/seeds/photo"), import("./photo/index"),
@@ -38,7 +63,13 @@ const GROUPS: { group: string; load: () => Promise<unknown> }[] = [
     import("@/domain/seeds/video"), import("./video/index"),
     import("@/domain/seeds/motion"), import("./motion/index"),
   ]) },
-  { group: "Platform", load: () => import("./t6_platform") },
+  { group: "Platform", load: () => Promise.all([
+    import("@/domain/seeds/web"), import("./web/index"),
+    import("@/domain/seeds/forms"), import("./forms/index"),
+    import("@/domain/seeds/build"), import("./build/index"),
+    import("@/domain/seeds/connect"), import("./connect/index"),
+    import("@/domain/seeds/it"), import("./it/index"),
+  ]) },
 ];
 
 let loading: Promise<LoadFailure[]> | null = null;
