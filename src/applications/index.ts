@@ -1,104 +1,113 @@
 /**
- * Application registry. Each module registers its own screens, tabs, actions
- * and overlays. Loading this file wires every native application into the
- * shell; nothing here renders a shared page for another application.
- *
- * Each workstream loads independently. With one static import graph, a single
- * broken module failed the whole graph at link time and blanked every
- * application at once. Loading each group on its own means a failure is
- * recorded and the rest of headquarters keeps working.
+ * Demand-based native application loader. Each screen and seed module is
+ * imported only when its application is visited or intentionally prefetched.
+ * The core HQ remains the only hard startup dependency.
  */
-
 import { notifyApplicationRegistry } from "@/platform/registry";
+import { seedLateContributors } from "@/runtime/db";
 
-export interface LoadFailure {
-  group: string;
-  message: string;
+export interface LoadFailure { group: string; message: string; }
+export type ApplicationLoadStatus = "idle" | "loading" | "ready" | "failed";
+interface NativeLoader { group: string; load: () => Promise<unknown>; }
+const HQ: NativeLoader = {
+  group: "Headquarters",
+  load: () => Promise.all([import("@/domain/seeds/hq"),import("./hq/index")]),
+};
+const NATIVE: Record<string, NativeLoader> = {
+  INBOX: { group: "Workplace / inbox", load: () => Promise.all([import("@/domain/seeds/inbox"),import("./inbox/index")]) },
+  ADMIN: { group: "Workplace / admin", load: () => Promise.all([import("@/domain/seeds/admin"),import("./admin/index")]) },
+  ASSET: { group: "Workplace / asset", load: () => Promise.all([import("@/domain/seeds/asset"),import("./asset/index")]) },
+  AI: { group: "Intelligence / ai", load: () => Promise.all([import("@/domain/seeds/ai"),import("./ai/index")]) },
+  BRAIN: { group: "Intelligence / brain", load: () => Promise.all([import("@/domain/seeds/brain"),import("./brain/index")]) },
+  TEAM: { group: "Intelligence / team", load: () => Promise.all([import("@/domain/seeds/team"),import("./team/index")]) },
+  MISSION: { group: "Intelligence / mission", load: () => Promise.all([import("@/domain/seeds/mission"),import("./mission/index")]) },
+  AUTO: { group: "Automation / auto", load: () => Promise.all([import("@/domain/seeds/auto"),import("./auto/index")]) },
+  ANALYTICS: { group: "Automation / analytics", load: () => Promise.all([import("@/domain/seeds/analytics"),import("./analytics/index")]) },
+  FIN: { group: "Finance and CRM / fin", load: () => Promise.all([import("@/domain/seeds/fin"),import("./fin/index")]) },
+  CRM: { group: "Finance and CRM / crm", load: () => Promise.all([import("@/domain/seeds/crm"),import("./crm/index")]) },
+  HR: { group: "People and operations / hr", load: () => Promise.all([import("@/domain/seeds/hr"),import("./hr/index")]) },
+  PROJECT: { group: "People and operations / project", load: () => Promise.all([import("@/domain/seeds/project"),import("./project/index")]) },
+  COMMS: { group: "People and operations / comms", load: () => Promise.all([import("@/domain/seeds/comms"),import("./comms/index")]) },
+  CARE: { group: "People and operations / care", load: () => Promise.all([import("@/domain/seeds/care"),import("./care/index")]) },
+  LEGAL: { group: "People and operations / legal", load: () => Promise.all([import("@/domain/seeds/legal"),import("./legal/index")]) },
+  MARKET: { group: "Growth / market", load: () => Promise.all([import("@/domain/seeds/market"),import("./market/index")]) },
+  COMMERCE: { group: "Growth / commerce", load: () => Promise.all([import("@/domain/seeds/commerce"),import("./commerce/index")]) },
+  BOOK: { group: "Growth / book", load: () => Promise.all([import("@/domain/seeds/book"),import("./book/index")]) },
+  PROC: { group: "Growth / proc", load: () => Promise.all([import("@/domain/seeds/proc"),import("./proc/index")]) },
+  PORTAL: { group: "Growth / portal", load: () => Promise.all([import("@/domain/seeds/portal"),import("./portal/index")]) },
+  DOCS: { group: "Documents / docs", load: () => Promise.all([import("@/domain/seeds/docs"),import("./docs/index")]) },
+  SHEETS: { group: "Documents / sheets", load: () => Promise.all([import("@/domain/seeds/sheets"),import("./sheets/index")]) },
+  PRESENT: { group: "Documents / present", load: () => Promise.all([import("@/domain/seeds/present"),import("./present/index")]) },
+  DESIGN: { group: "Visual tools / design", load: () => Promise.all([import("@/domain/seeds/design"),import("./design/index")]) },
+  PHOTO: { group: "Visual tools / photo", load: () => Promise.all([import("@/domain/seeds/photo"),import("./photo/index")]) },
+  LAYOUT: { group: "Visual tools / layout", load: () => Promise.all([import("@/domain/seeds/layout"),import("./layout/index")]) },
+  VIDEO: { group: "Visual tools / video", load: () => Promise.all([import("@/domain/seeds/video"),import("./video/index")]) },
+  MOTION: { group: "Visual tools / motion", load: () => Promise.all([import("@/domain/seeds/motion"),import("./motion/index")]) },
+  WEB: { group: "Platform / web", load: () => Promise.all([import("@/domain/seeds/web"),import("./web/index")]) },
+  FORMS: { group: "Platform / forms", load: () => Promise.all([import("@/domain/seeds/forms"),import("./forms/index")]) },
+  BUILD: { group: "Platform / build", load: () => Promise.all([import("@/domain/seeds/build"),import("./build/index")]) },
+  CONNECT: { group: "Platform / connect", load: () => Promise.all([import("@/domain/seeds/connect"),import("./connect/index")]) },
+  IT: { group: "Platform / it", load: () => Promise.all([import("@/domain/seeds/it"),import("./it/index")]) },
+};
+const states = new Map<string, ApplicationLoadStatus>();
+const pending = new Map<string, Promise<void>>();
+const failures = new Map<string, LoadFailure>();
+let core: Promise<void> | null = null;
+
+function mark(code: string, state: ApplicationLoadStatus): void {
+  states.set(code, state);
+  notifyApplicationRegistry();
 }
-
-const GROUPS: { group: string; load: () => Promise<unknown> }[] = [
-  { group: "Headquarters", load: () => Promise.all([import("@/domain/seeds/hq"), import("./hq/index")]) },
-  { group: "Workplace", load: () => Promise.all([
-    import("@/domain/seeds/inbox"), import("./inbox/index"),
-    import("@/domain/seeds/admin"), import("./admin/index"),
-    import("@/domain/seeds/asset"), import("./asset/index"),
-  ]) },
-  { group: "Intelligence", load: () => Promise.all([
-    import("@/domain/seeds/ai"), import("./ai/index"),
-    import("@/domain/seeds/brain"), import("./brain/index"),
-    import("@/domain/seeds/team"), import("./team/index"),
-    import("@/domain/seeds/mission"), import("./mission/index"),
-  ]) },
-  { group: "Automation", load: () => Promise.all([
-    import("@/domain/seeds/auto"), import("./auto/index"),
-    import("@/domain/seeds/analytics"), import("./analytics/index"),
-  ]) },
-  { group: "Finance and CRM", load: () => Promise.all([
-    import("@/domain/seeds/fin"), import("./fin/index"),
-    import("@/domain/seeds/crm"), import("./crm/index"),
-  ]) },
-  { group: "People and operations", load: () => Promise.all([
-    import("@/domain/seeds/hr"), import("./hr/index"),
-    import("@/domain/seeds/project"), import("./project/index"),
-    import("@/domain/seeds/comms"), import("./comms/index"),
-    import("@/domain/seeds/care"), import("./care/index"),
-    import("@/domain/seeds/legal"), import("./legal/index"),
-  ]) },
-  { group: "Growth", load: () => Promise.all([
-    import("@/domain/seeds/market"), import("./market/index"),
-    import("@/domain/seeds/commerce"), import("./commerce/index"),
-    import("@/domain/seeds/book"), import("./book/index"),
-    import("@/domain/seeds/proc"), import("./proc/index"),
-    import("@/domain/seeds/portal"), import("./portal/index"),
-  ]) },
-  { group: "Documents", load: () => Promise.all([
-    import("@/domain/seeds/docs"), import("./docs/index"),
-    import("@/domain/seeds/sheets"), import("./sheets/index"),
-    import("@/domain/seeds/present"), import("./present/index"),
-  ]) },
-  { group: "Visual tools", load: () => Promise.all([
-    import("@/domain/seeds/design"), import("./design/index"),
-    import("@/domain/seeds/photo"), import("./photo/index"),
-    import("@/domain/seeds/layout"), import("./layout/index"),
-    import("@/domain/seeds/video"), import("./video/index"),
-    import("@/domain/seeds/motion"), import("./motion/index"),
-  ]) },
-  { group: "Platform", load: () => Promise.all([
-    import("@/domain/seeds/web"), import("./web/index"),
-    import("@/domain/seeds/forms"), import("./forms/index"),
-    import("@/domain/seeds/build"), import("./build/index"),
-    import("@/domain/seeds/connect"), import("./connect/index"),
-    import("@/domain/seeds/it"), import("./it/index"),
-  ]) },
-];
-
-let loading: Promise<LoadFailure[]> | null = null;
-let coreLoading: Promise<void> | null = null;
-let complete = false;
-export function applicationsLoading(): boolean { return !complete; }
-/** Load only HQ and its seed contributor to prepare the local workspace. */
-export function loadCoreApplications(): Promise<void> {
-  coreLoading ??= GROUPS[0].load().then(() => undefined);
-  return coreLoading;
+export function applicationStatus(code: string): ApplicationLoadStatus {
+  if(code === "HQ") return states.get("HQ") ?? "idle";
+  return states.get(code) ?? "idle";
 }
-let failures: LoadFailure[] = [];
-
-export function loadApplications(): Promise<LoadFailure[]> {
-  loading ??= Promise.allSettled(GROUPS.map((item, index) => index === 0 ? loadCoreApplications() : item.load())).then((results) => {
-    failures = results.flatMap((result, index) => {
-      if (result.status === "fulfilled") return [];
-      const reason = result.reason as unknown;
-      const message = reason instanceof Error ? reason.message : String(reason);
-      console.error(`Arlovi: the ${GROUPS[index].group} applications failed to load. ${message}`);
-      return [{ group: GROUPS[index].group, message }];
-    });
-    complete = true;
-    notifyApplicationRegistry();
-    return failures;
-  });
-  return loading;
+/** Kept for existing callers; it now describes only ongoing explicit loads. */
+export function applicationsLoading(): boolean {
+  return [...states.values()].some(state => state === "loading");
 }
-
 export function applicationLoadFailures(): LoadFailure[] {
-  return failures;
+  return [...failures.values()];
 }
+export function loadCoreApplications(): Promise<void> {
+  if(core) return core;
+  mark("HQ","loading");
+  core = HQ.load().then(() => {mark("HQ","ready");}).catch(error => {
+    mark("HQ","failed");
+    failures.set("HQ",{group:HQ.group,message:error instanceof Error?error.message:String(error)});
+    throw error;
+  });
+  return core;
+}
+/** Reuse the same promise for navigation, prefetch, and repeated visits. */
+export function loadNativeApplication(code: string): Promise<void> {
+  if(code === "HQ") return loadCoreApplications();
+  const entry = NATIVE[code];
+  if(!entry) return Promise.reject(new Error(`Unregistered native application: ${code}`));
+  const existing = pending.get(code);
+  if(existing) return existing;
+  mark(code,"loading");
+  const task = entry.load()
+    .then(async () => { await seedLateContributors(); failures.delete(code); mark(code,"ready"); })
+    .catch(error => {
+      const message = error instanceof Error?error.message:String(error);
+      failures.set(code,{group:entry.group,message});
+      console.error(`Arlovi: ${entry.group} failed to load.`,error);
+      mark(code,"failed");
+      pending.delete(code); // Retrying explicitly is allowed after a network failure.
+      throw error;
+    });
+  pending.set(code,task);
+  return task;
+}
+/** Prefetch only on a concrete user navigation hint, not automatically on boot. */
+export function prefetchNativeApplication(code: string): void {
+  if(code === "HQ" || !NATIVE[code] || states.get(code) === "ready")return;
+  void loadNativeApplication(code).catch(() => undefined);
+}
+/** Opt-in full registry loading for diagnostics and deliberate compatibility tests. */
+export async function loadApplications(): Promise<LoadFailure[]> {
+  await Promise.allSettled([loadCoreApplications(),...Object.keys(NATIVE).map(code=>loadNativeApplication(code))]);
+  return applicationLoadFailures();
+}
+export const NATIVE_APPLICATION_CODES: readonly string[] = Object.keys(NATIVE);
