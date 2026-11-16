@@ -90,19 +90,18 @@ export function HeadquartersNavigation({
     <nav className="hq-sidebar" aria-label="Headquarters navigation">
       <div className="hq-sidebar-top">
         <div className="hq-sidebar-identity">
-          <span className="hq-sidebar-monogram" aria-hidden="true">{orgName.slice(0, 1)}</span>
+          <Building2 size={18} strokeWidth={1.8} aria-hidden="true" />
           <span className="hq-sidebar-identity-copy">
-            <strong className="ds-truncate">{orgName}</strong>
-            <small>Company headquarters</small>
+            <strong>Headquarters</strong>
+            <small className="ds-truncate">{orgName}</small>
           </span>
         </div>
-        <span className="hq-sidebar-kicker">WORKSPACE NAVIGATION</span>
       </div>
 
       <div className="hq-sidebar-scroll">
         {visibleGroups.map((section) => (
           <section key={section.label} className="hq-sidebar-section" aria-label={section.label}>
-            <h2 className="hq-sidebar-group-label">{section.label}</h2>
+            <h2 className="hq-navsection hq-sidebar-group-label">{section.label}</h2>
             {section.links.map((item) => {
               const Icon = item.icon;
               const destination = linkTo(item, orgSlug);
@@ -118,13 +117,13 @@ export function HeadquartersNavigation({
                   end={!item.app}
                   aria-label={item.label}
                   aria-current={active ? "page" : undefined}
-                  className="hq-sidebar-link"
+                  className="hq-navlink hq-sidebar-link"
                   data-active={active ? "true" : undefined}
                   title={collapsed ? item.label : undefined}
                 >
                   <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
                   <span className="hq-sidebar-link-label">{item.label}</span>
-                  {active && <span className="hq-sidebar-active-dot" aria-hidden="true" />}
+                  {active && <span className="ds-sr-only">Current workspace</span>}
                 </NavLink>
               );
             })}
@@ -133,7 +132,7 @@ export function HeadquartersNavigation({
 
         <section className="hq-sidebar-section hq-sidebar-favourites" aria-label="Favourite applications">
           <div className="hq-sidebar-section-head">
-            <h2 className="hq-sidebar-group-label">PINNED APPLICATIONS</h2>
+            <h2 className="hq-navsection hq-sidebar-group-label">PINNED APPLICATIONS</h2>
             {allowedFavs.length > 0 && <span className="hq-sidebar-count">{allowedFavs.length}</span>}
           </div>
           {allowedFavs.length ? allowedFavs.map((app) => {
@@ -142,7 +141,7 @@ export function HeadquartersNavigation({
               <Link
                 key={app.code}
                 to={appEntry(app.code, orgSlug)}
-                className="hq-sidebar-link hq-sidebar-fav"
+                className="hq-navlink hq-sidebar-link hq-sidebar-fav"
                 title={app.short}
                 aria-label={app.short}
                 data-active={activeCode === app.code ? "true" : undefined}
@@ -159,7 +158,7 @@ export function HeadquartersNavigation({
       </div>
 
       <div className="hq-sidebar-bottom">
-        <button type="button" className="hq-sidebar-launcher" onClick={() => onBrowse()} aria-label="Browse all applications">
+        <button type="button" className="hq-navlink hq-sidebar-launcher" onClick={() => onBrowse()} aria-label="Browse all applications">
           <LayoutGrid size={18} strokeWidth={1.75} />
           <span className="hq-sidebar-link-label">All applications</span>
           <span className="hq-sidebar-count hq-sidebar-app-count">35</span>
@@ -167,7 +166,7 @@ export function HeadquartersNavigation({
         {canOpen(role, "ADMIN") && (
           <NavLink
             to={appEntry("ADMIN", orgSlug)}
-            className="hq-sidebar-link"
+            className="hq-navlink hq-sidebar-link"
             aria-label="Administration"
             title={collapsed ? "Administration" : undefined}
             data-active={activeCode === "ADMIN" ? "true" : undefined}
@@ -176,7 +175,7 @@ export function HeadquartersNavigation({
             <span className="hq-sidebar-link-label">Administration</span>
           </NavLink>
         )}
-        <button type="button" className="hq-sidebar-collapse" onClick={onCollapse} aria-label={collapsed ? "Expand headquarters sidebar" : "Collapse headquarters sidebar"}>
+        <button type="button" className="hq-navlink hq-sidebar-collapse" onClick={onCollapse} aria-label={collapsed ? "Expand headquarters sidebar" : "Collapse headquarters sidebar"}>
           {collapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
           <span className="hq-sidebar-link-label">{collapsed ? "Expand navigation" : "Collapse sidebar"}</span>
           <Command className="hq-sidebar-collapse-ornament" size={14} aria-hidden="true" />
