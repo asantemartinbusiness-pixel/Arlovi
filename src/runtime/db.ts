@@ -73,12 +73,15 @@ export function ensureSeed(): Promise<void> {
  * still seeded. Only missing ids are added, so nothing a person has edited is
  * ever overwritten, and a later file reusing an id cannot fail the whole batch.
  */
-let topUpInFlight: Promise<void> | null = null;
-/** Reconcile fixtures registered after initial bootstrap; never replace user edits. */
+let seedTail: Promise<void> = Promise.resolve();
+/**
+ * Serialize late fixture reconciliation: concurrent application imports must
+ * not cause a newly registered contributor to be missed while another seed
+ * transaction is still running.
+ */
 export function seedLateContributors(): Promise<void> {
-  if (topUpInFlight) return topUpInFlight;
-  topUpInFlight = topUpContributors().finally(() => { topUpInFlight = null; });
-  return topUpInFlight;
+  seedTail = seedTail.catch(() => undefined).then(() => topUpContributors());
+  return seedTail;
 }
 async function topUpContributors(): Promise<void> {
   for (const contributor of collectSeedsByContributor(SEED_NOW)) {
