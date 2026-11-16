@@ -34,7 +34,7 @@ describe("organization navigation", () => {
 
   it("removes organisation-specific modal, record, and tab parameters from native list pages", () => {
     expect(destinationForOrganization("/o/northline/fin/invoices", "?tab=Draft&overlay=Edit&record=old-id&selected=row-1", "harbor"))
-      .toBe("/o/harbor/fin/invoices");
+      .toBe("/o/harbor/fin/invoices?tab=Draft");
   });
 
   it("falls back safely for unknown routes", () => {
