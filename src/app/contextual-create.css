@@ -1,0 +1,18 @@
+/* Contextual create deliberately inherits Arlovi's approved surface, ink and accent tokens. */
+.ws-create-trigger{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 16px;border:1px solid var(--border-strong);border-radius:var(--radius-pill);background:var(--fg-strong);color:var(--bg-surface);font:500 var(--text-sm) var(--font-sans);cursor:pointer}
+.ws-create-trigger:hover{opacity:.87}.ws-create-trigger:focus-visible,.ws-create-close:focus-visible,.ws-create-actions button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.ws-create-overlay{position:fixed;inset:0;z-index:140;display:flex;align-items:center;justify-content:center;padding:16px;background:var(--bg-overlay);overflow:auto}
+.ws-create-dialog{width:min(540px,100%);max-height:min(92dvh,800px);overflow:auto;background:var(--bg-surface);border:1px solid var(--border-default);border-radius:var(--radius-lg);box-shadow:0 20px 60px rgba(0,0,0,.17);padding:var(--space-6);color:var(--fg-default)}
+.ws-create-heading{display:flex;align-items:start;justify-content:space-between;gap:var(--space-4);margin-bottom:var(--space-6)}.ws-create-heading h2{font:500 var(--text-xl) var(--font-display);letter-spacing:-.025em;margin-top:6px}
+.ws-create-eyebrow{font-size:var(--text-xs);letter-spacing:.08em;color:var(--fg-muted)}.ws-create-close{border:0;background:transparent;color:var(--fg-muted);padding:6px;cursor:pointer}
+.ws-create-dialog form{display:flex;flex-direction:column;gap:var(--space-4)}.ws-create-types{border:0;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}.ws-create-types legend{font-size:var(--text-sm);font-weight:500;margin-bottom:8px}
+.ws-create-types label{display:flex;align-items:center;gap:8px;border:1px solid var(--border-default);padding:10px 12px;border-radius:var(--radius-pill);font-size:var(--text-sm);cursor:pointer}
+.ws-create-types label:has(input:checked){background:var(--selected-bg);color:var(--selected-fg);border-color:var(--border-strong)}.ws-create-types input{accent-color:var(--accent)}
+.ws-create-field{display:flex;flex-direction:column;gap:7px;font-size:var(--text-sm);font-weight:500}.ws-create-field small{color:var(--fg-muted);font-weight:400}
+.ws-create-field input,.ws-create-field textarea{font:400 var(--text-md) var(--font-sans);color:var(--fg-default);background:var(--bg-surface);border:1px solid var(--border-strong);border-radius:var(--radius-md);padding:12px;min-width:0;width:100%}
+.ws-create-field input:focus-visible,.ws-create-field textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.ws-create-field textarea{resize:vertical}
+.ws-create-scope{color:var(--fg-muted);font-size:var(--text-sm);line-height:1.5}.ws-create-error{color:var(--danger);font-size:var(--text-sm)}
+.ws-create-actions{display:flex;justify-content:end;gap:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--border-subtle)}
+.ws-create-actions button{border:1px solid var(--border-strong);border-radius:var(--radius-pill);background:var(--bg-surface);color:var(--fg-default);padding:10px 16px;min-height:44px;cursor:pointer}
+.ws-create-actions button[type=submit]{background:var(--fg-strong);color:var(--bg-surface)}.ws-create-actions button:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:599px){.ws-create-overlay{align-items:flex-end;padding:0}.ws-create-dialog{width:100%;border-radius:var(--radius-lg) var(--radius-lg) 0 0;padding:var(--space-5);padding-bottom:calc(var(--space-5) + env(safe-area-inset-bottom));max-height:94dvh}}
