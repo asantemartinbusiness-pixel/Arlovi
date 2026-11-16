@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import { useSyncExternalStore, type ComponentType, type ReactNode } from "react";
 import type { ScreenInfo } from "@/app/catalog";
 import type { Rec, Role } from "@/domain/types";
 import type { Capability } from "./policy";
@@ -125,9 +125,25 @@ export interface AppModule {
 }
 
 const REGISTRY = new Map<string, AppModule>();
+const listeners = new Set<() => void>();
+let revision = 0;
+/** React-safe external store: late native app registration refreshes routed screens. */
+export function notifyApplicationRegistry(): void {
+  revision += 1;
+  for (const listener of listeners) listener();
+}
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
+function getRevision(): number { return revision; }
+export function useApplicationRegistryRevision(): number {
+  return useSyncExternalStore(subscribe, getRevision, getRevision);
+}
 
 export function registerApp(module: AppModule): AppModule {
   REGISTRY.set(module.code, module);
+  notifyApplicationRegistry();
   return module;
 }
 
