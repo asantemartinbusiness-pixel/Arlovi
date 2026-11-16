@@ -79,6 +79,8 @@ Company and application navigation each scroll independently; the work surface r
 
 **BOTTOM ACTIONS** — *All applications* opens the complete searchable catalogue; *Administration* opens the actual organization controls; *Collapse sidebar* toggles desktop density. All are real controls.
 
+**Client-facing role:** the global sidebar becomes *Client Portal, Bookings, Customer Care*; its mobile bar mirrors those relevant destinations. A client must never be directed into restricted Headquarters pages simply because their link lacked an application code. These are frontend visibility views only, not backend authorization.
+
 ### LEVEL 2 · Application-owned local navigation
 
 Only the selected application owns this sidebar. For example:
