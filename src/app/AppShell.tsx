@@ -289,7 +289,10 @@ export function AppShell() {
               onSelect: () => chooseRoleView(item),
             })),
             { label: "Take a guided tour", group: "Help", separatorBefore: true, onSelect: () => window.dispatchEvent(new Event("arlovi:start-tour")) },
-            { label: `${activePinned ? "Remove" : "Pin"} ${APP_ENTRIES[activeCode]?.short ?? "this app"} ${activePinned ? "from" : "to"} favourites`, group: "Navigation", separatorBefore: true, onSelect: () => { void toggleFavourite(); } },
+            ...(activeScreen && APP_ENTRIES[activeCode] ? [{
+              label: `${activePinned ? "Remove" : "Pin"} ${APP_ENTRIES[activeCode].short} ${activePinned ? "from" : "to"} favourites`,
+              group: "Navigation", separatorBefore: true, onSelect: () => { void toggleFavourite(); },
+            }] : []),
             ...(org.ownerName ? [{ label: "Review company setup", group: "Navigation", onSelect: () => navigate(`/o/${org.slug}/hq/home?gettingStarted=1`) }] : []),
             { label: ui.theme === "light" ? "Dark appearance" : "Light appearance", group: "Appearance", separatorBefore: true, onSelect: () => ui.setTheme(ui.theme === "light" ? "dark" : "light") },
             ...(["comfortable", "balanced", "compact"] as const).map((item) => ({
