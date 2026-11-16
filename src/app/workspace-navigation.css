@@ -36,3 +36,21 @@
 
 /* Specialist panels defer independently; retain current workspace geometry. */
 .ws-deferred-loading{display:flex;align-items:center;gap:var(--space-3);min-height:96px;color:var(--fg-muted);font-size:var(--text-sm)}
+
+/* Contextual secondary navigation. Reuse approved colours and typography. */
+.ws-sidebar .hq-appnav-head{padding-block:var(--space-4);min-width:0}
+.ws-sidebar .hq-appnav-head h2{font-size:var(--text-lg);font-weight:500;line-height:1.2;letter-spacing:-.025em;overflow-wrap:break-word}
+.ws-sidebar .hq-appnav-head p{line-height:1.5;margin-top:6px}
+.ws-sidebar .hq-appnav-body{gap:var(--space-2);padding-block:var(--space-3) var(--space-6)}
+.ws-side-group{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ws-side-group+.ws-side-group{border-top:1px solid var(--border-subtle);padding-top:var(--space-2)}
+.ws-side-group .hq-navsection{padding-block:var(--space-2);margin-bottom:2px}
+.ws-sidebar .hq-navlink{min-height:40px;min-width:0;gap:var(--space-3)}
+.ws-sidebar .hq-navlink.ws-side-selected,
+.ws-sidebar .hq-navlink[aria-current=page]{background:var(--selected-bg);color:var(--selected-fg);font-weight:500}
+.ws-sidebar .hq-navlink:focus-visible,.ws-side-back a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ws-side-back{padding:var(--space-1) var(--space-2)}
+.ws-side-back a{display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:var(--fg-muted);font-size:var(--text-xs);min-height:34px}
+.ws-side-back a:hover{color:var(--fg-default)}
+.ws-side-footnote{padding:var(--space-3) var(--space-2);color:var(--fg-muted);font-size:var(--text-xs);line-height:1.5;border-top:1px solid var(--border-subtle)}
+@media(max-width:699px){.ws-sidebar .hq-navlink{min-height:44px}}

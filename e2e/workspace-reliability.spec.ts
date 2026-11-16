@@ -17,7 +17,7 @@ test("workspace auxiliary sections use correct contextual sidebar title",async({
   for(const [path,title] of [["health","Workspace health"],["resources","Files & resources"],["people","People & collaboration"],["account","Account & data"],["recent","Recent & saved"]]) {
     await page.goto(`/o/northline/workspace/${path}`);
     await expect(page.getByRole("navigation",{name:`${title} navigation`})).toBeVisible();
-    await expect(page.locator('.hq-rail-btn[data-active="true"]')).toHaveCount(0);
+    await expect(page.locator('.hq-rail-btn[data-active="true"]')).toHaveCount(1);
   }
 });
 

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState, type ComponentType, type ReactNode } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
-import { ArrowRight, Building2, CalendarDays, CheckSquare, ChevronRight, FolderKanban, Grid2X2, Home, Inbox, Layers, Megaphone, Plus, Search, Users, Clock3, LockKeyhole, Activity } from "lucide-react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { ArrowRight, Building2, CalendarDays, ChevronRight, FolderKanban, Grid2X2, Home, Inbox, Layers, Megaphone, Plus, Search, Users, LockKeyhole, Activity } from "lucide-react";
 import { APP_ENTRIES, NAV_GROUPS } from "@/app/nav";
 import { ContextualCreate } from "@/app/ContextualCreate";
 const WorkspaceContinuity = lazy(() => import("@/app/WorkspaceContinuity").then(module => ({ default: module.WorkspaceContinuity })));
@@ -16,6 +16,8 @@ import { canOpen } from "@/platform/policy";
 import { useCollections, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import "./workspace-navigation.css";
+import { workspacePrimaryArea } from "@/app/workspaceSidebarModel";
+export { WorkspaceSideNav } from "@/app/WorkspaceSideNav";
 
 /** Each specialist surface loads independently, preserving navigation while awaiting its code. */
 function DeferredPanel({ children }: { children: ReactNode }) {
@@ -39,7 +41,7 @@ export function isWorkAreaPath(pathname: string, slug: string): boolean {
 }
 export function currentWorkArea(pathname: string): WorkArea {
   const part = pathname.split("/")[4];
-  return WORK_AREAS.find((area) => area.id === part)?.id ?? "home";
+  return workspacePrimaryArea(pathname) ?? WORK_AREAS.find((area) => area.id === part)?.id ?? "home";
 }
 const headings: Record<WorkArea, string> = {
   home: "My Workspace", company: "Company Headquarters",
@@ -55,14 +57,21 @@ function WorkList({ title, records, slug, fallback }: { title: string; records: 
   return <section className="ws-section"><h2>{title}</h2>{records.length ? <div className="ws-entry-list">{records.map(record => <RowLink key={record.id} title={record.title} detail={`${record.status.replace(/_/g, " ")} · ${record.ownerName}`} to={routeForRecord(record, slug) ?? workAreaPath(slug, "work")} />)}</div> : <p className="ws-empty">{fallback}</p>}</section>;
 }
 function SpaceDetail({ record, kind, all, slug }: { record: Rec; kind: "department" | "project"; all: Record<string, Rec[]>; slug: string }) {
-  const [tab, setTab] = useState("overview");
+  const [params, setParams] = useSearchParams();
+  const requestedTab = params.get("tab") ?? "overview";
   const linked = (group: string) => (all[group] ?? empty).filter(item => item.parentId === record.id || item.fields.departmentId === record.id || item.fields.projectId === record.id);
   const tasks = linked("tasks"), projects = linked("projects"), docs = linked("documents"), agents = linked("agents"), channels = linked("channels");
   const tabs = ["overview", "work", "ai workforce", "approvals", "people", "files", "conversations", "activity"];
+  const tab = tabs.includes(requestedTab) ? requestedTab : "overview";
+  const changeTab = (next: string) => {
+    const updated = new URLSearchParams(params);
+    if (next === "overview") updated.delete("tab"); else updated.set("tab",next);
+    setParams(updated);
+  };
   return <div className="ws-content">
     <Link className="ws-back" to={workAreaPath(slug, kind === "department" ? "spaces" : "work")}>← {kind === "department" ? "Spaces" : "Work"}</Link>
     <header className="ws-page-head"><span className="ws-eyebrow">{kind === "department" ? "DEPARTMENT SPACE" : "PROJECT SPACE"}</span><h1>{record.title}</h1><p>{record.summary || "A shared place for this work and the people involved."}</p><div className="ws-page-actions"><ContextualCreate scope={{ type: kind, id: record.id, title: record.title }} label="Create in this space"/></div></header>
-    <nav className="ws-tabs" aria-label={record.title + " sections"}>{tabs.map(t => <button key={t} type="button" onClick={() => setTab(t)} aria-current={tab === t ? "page" : undefined}>{t.charAt(0).toUpperCase()+t.slice(1)}</button>)}</nav>
+    <nav className="ws-tabs" aria-label={record.title + " sections"}>{tabs.map(t => <button key={t} type="button" onClick={() => changeTab(t)} aria-current={tab === t ? "page" : undefined}>{t.charAt(0).toUpperCase()+t.slice(1)}</button>)}</nav>
     {tab === "overview" && <div className="ws-stack"><div className="ws-stat-grid"><div><small>Status</small><strong>{record.status.replace(/_/g," ")}</strong></div><div><small>Responsible</small><strong>{record.ownerName}</strong></div><div><small>Linked tasks</small><strong>{tasks.length}</strong></div></div>{kind === "department" && <section className="ws-section"><h2>Department projects</h2>{projects.length ? <div className="ws-entry-list">{projects.map(project => <RowLink key={project.id} to={`${workAreaPath(slug, "work")}/project/${project.id}`} title={project.title} detail={project.status} icon={FolderKanban}/>)}</div> : <p className="ws-empty">No projects linked to this department yet.</p>}</section>}<WorkList title="Related work" records={tasks.slice(0,8)} slug={slug} fallback="No tasks are linked to this space yet." /><WorkList title="Documents" records={docs.slice(0,6)} slug={slug} fallback="No linked documents yet." /></div>}
     {tab === "work" && <div className="ws-stack">{kind === "department" && <section className="ws-section"><h2>Projects</h2>{projects.length ? <div className="ws-entry-list">{projects.map(project => <RowLink key={project.id} to={`${workAreaPath(slug, "work")}/project/${project.id}`} title={project.title} icon={FolderKanban}/>)}</div> : <p className="ws-empty">No department projects yet.</p>}</section>}<WorkList title="Tasks in this space" records={tasks} slug={slug} fallback="No tasks linked to this space yet. Use Create in this space to add one." /></div>}
     {tab === "ai workforce" && <DeferredPanel><AgentWorkBoard scope={{type:kind,id:record.id}}/></DeferredPanel>}
@@ -74,29 +83,6 @@ function SpaceDetail({ record, kind, all, slug }: { record: Rec; kind: "departme
   </div>;
 }
 
-/** Contextual sidebar for the selected destination. */
-export function WorkspaceSideNav() {
-  const { org } = useWorkspace();
-  const location = useLocation();
-  const area = currentWorkArea(location.pathname);
-  const extra: Record<string,{ title:string;description:string }> = {recent:{title:"Recent & saved",description:"Return to your work"},resources:{title:"Files & resources",description:"Company documents and folders"},people:{title:"People & collaboration",description:"Company directory and team spaces"},account:{title:"Account & data",description:"Identity and data readiness"},health:{title:"Workspace health",description:"Diagnostics and recovery"}};
-  const section = extra[location.pathname.split("/")[4]];
-  const headerTitle = section?.title ?? headings[area];
-  return <nav className="hq-appnav ws-sidebar" aria-label={headerTitle + " navigation"}>
-    <div className="hq-appnav-head"><h2>{headerTitle}</h2><p>{section?.description ?? WORK_AREAS.find(item=>item.id===area)?.description}</p></div>
-    <div className="hq-appnav-body">{WORK_AREAS.map(item => <NavLink key={item.id} className="hq-navlink" to={workAreaPath(org.slug,item.id)}><item.icon size={16}/>{item.label}</NavLink>)}
-      <NavLink className="hq-navlink" to={`/o/${org.slug}/workspace/recent`}><Clock3 size={16}/>Recent & saved</NavLink>
-      <NavLink className="hq-navlink" to={`/o/${org.slug}/workspace/resources`}><FolderKanban size={16}/>Files & resources</NavLink>
-      <NavLink className="hq-navlink" to={`/o/${org.slug}/workspace/people`}><Users size={16}/>People & collaboration</NavLink>
-      <NavLink className="hq-navlink" to={`/o/${org.slug}/workspace/account`}><LockKeyhole size={16}/>Account & data</NavLink>
-      <NavLink className="hq-navlink" to={`/o/${org.slug}/workspace/health`}><Activity size={16}/>Workspace health</NavLink>
-      <div className="hq-navsection">TOOLS</div>
-      <NavLink className="hq-navlink" to={appEntry("INBOX",org.slug)}><Inbox size={16}/>Inbox</NavLink>
-      <NavLink className="hq-navlink" to={appEntry("PROJECT",org.slug)}><CheckSquare size={16}/>Projects</NavLink>
-      <NavLink className="hq-navlink" to={appEntry("COMMS",org.slug)}><Users size={16}/>Communications</NavLink>
-    </div>
-  </nav>;
-}
 export function WorkspaceNavigation() {
   const { org, role, actor } = useWorkspace();
   const location = useLocation();
