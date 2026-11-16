@@ -2,6 +2,7 @@ import { useMemo, useState, type ComponentType } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { ArrowRight, Building2, CalendarDays, CheckSquare, ChevronRight, FolderKanban, Grid2X2, Home, Inbox, Layers, Megaphone, Plus, Search, Users } from "lucide-react";
 import { APP_ENTRIES, NAV_GROUPS } from "@/app/nav";
+import { ContextualCreate } from "@/app/ContextualCreate";
 import { appEntry } from "@/app/catalog";
 import { routeForRecord } from "@/platform/attention";
 import { canOpen } from "@/platform/policy";
@@ -48,7 +49,7 @@ function SpaceDetail({ record, kind, all, slug }: { record: Rec; kind: "departme
   const tabs = ["overview", "work", "people", "files", "conversations", "activity"];
   return <div className="ws-content">
     <Link className="ws-back" to={workAreaPath(slug, kind === "department" ? "spaces" : "work")}>← {kind === "department" ? "Spaces" : "Work"}</Link>
-    <header className="ws-page-head"><span className="ws-eyebrow">{kind === "department" ? "DEPARTMENT SPACE" : "PROJECT SPACE"}</span><h1>{record.title}</h1><p>{record.summary || "A shared place for this work and the people involved."}</p></header>
+    <header className="ws-page-head"><span className="ws-eyebrow">{kind === "department" ? "DEPARTMENT SPACE" : "PROJECT SPACE"}</span><h1>{record.title}</h1><p>{record.summary || "A shared place for this work and the people involved."}</p><div className="ws-page-actions"><ContextualCreate scope={{ type: kind, id: record.id, title: record.title }} label="Create in this space"/></div></header>
     <nav className="ws-tabs" aria-label={record.title + " sections"}>{tabs.map(t => <button key={t} type="button" onClick={() => setTab(t)} aria-current={tab === t ? "page" : undefined}>{t.charAt(0).toUpperCase()+t.slice(1)}</button>)}</nav>
     {tab === "overview" && <div className="ws-stack"><div className="ws-stat-grid"><div><small>Status</small><strong>{record.status.replace(/_/g," ")}</strong></div><div><small>Responsible</small><strong>{record.ownerName}</strong></div><div><small>Linked tasks</small><strong>{tasks.length}</strong></div></div><WorkList title="Related work" records={tasks.slice(0,8)} slug={slug} fallback="No tasks are linked to this space yet." /><WorkList title="Documents" records={docs.slice(0,6)} slug={slug} fallback="No linked documents yet." /></div>}
     {tab === "work" && <WorkList title="Tasks in this space" records={tasks} slug={slug} fallback="No tasks linked to this space yet. Create work from Projects and link it to this space." />}
@@ -95,7 +96,7 @@ export function WorkspaceNavigation() {
 
   if (detailKind) return detail ? <SpaceDetail key={detail.id} record={detail} kind={detailKind} all={data} slug={org.slug}/> : <div className="ws-content"><h1>Space not found</h1><p>This space is not available in this organisation.</p><Link to={workAreaPath(org.slug,area)}>Back to {headings[area]}</Link></div>;
   return <div className="ws-content">
-    <header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / {headings[area].toUpperCase()}</span><h1>{area === "home" ? "Your day, in one place." : headings[area]}</h1><p>{WORK_AREAS.find(item => item.id === area)?.description}. Everything here belongs to the active organisation.</p></header>
+    <header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / {headings[area].toUpperCase()}</span><h1>{area === "home" ? "Your day, in one place." : headings[area]}</h1><p>{WORK_AREAS.find(item => item.id === area)?.description}. Everything here belongs to the active organisation.</p>{area !== "apps" && <div className="ws-page-actions"><ContextualCreate label="Create new"/></div>}</header>
     {area === "home" && <div className="ws-stack">
       <div className="ws-stat-grid"><div><small>My assigned tasks</small><strong>{tasks.filter(t => t.ownerName === actor || t.fields.assignee === actor).length}</strong></div><div><small>Active projects</small><strong>{projects.filter(p => !["completed","archived","cancelled"].includes(p.status)).length}</strong></div><div><small>Open missions</small><strong>{missions.filter(m => !["completed","cancelled"].includes(m.status)).length}</strong></div></div>
       <WorkList title="Assigned work" records={tasks.filter(t=> t.ownerName === actor || t.fields.assignee === actor).slice(0,10)} slug={org.slug} fallback="No tasks currently assigned to this view." />
