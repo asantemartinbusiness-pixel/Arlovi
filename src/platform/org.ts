@@ -5,6 +5,8 @@ export interface OrgProfile {
   slug: string;
   name: string;
   shortName: string;
+  /** Owner of a browser-local company; never inferred from another tenant's users. */
+  ownerName?: string;
   currency: string;
   locale: string;
   timezone: string;
@@ -55,6 +57,7 @@ function loadLocalOrganizations(): OrgProfile[] {
       return typeof item.id === "string" && item.id.startsWith("org-")
         && typeof item.slug === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(item.slug)
         && typeof item.name === "string" && item.name.length >= 2
+        && (item.ownerName === undefined || typeof item.ownerName === "string")
         && typeof item.currency === "string" && typeof item.locale === "string"
         && typeof item.timezone === "string" && typeof item.jurisdiction === "string"
         && typeof item.accent === "string";
