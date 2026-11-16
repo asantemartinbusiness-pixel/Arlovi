@@ -1,0 +1,14 @@
+/* Approval workflow surfaces inherit Arlovi workspace design tokens. */
+.ws-approvals{border-top:1px solid var(--border-default);padding-top:var(--space-5)}
+.ws-approval-intro{display:flex;justify-content:space-between;align-items:center;gap:var(--space-3)}
+.ws-approval-intro p,.ws-approval-muted{font-size:var(--text-sm);color:var(--fg-muted);line-height:1.45}
+.ws-approval-block{border:1px solid var(--border-default);background:var(--bg-surface);border-radius:var(--radius-lg);overflow:hidden}
+.ws-approval-block h3{display:flex;align-items:center;gap:8px;padding:var(--space-3) var(--space-4);font-size:var(--text-sm);font-weight:500;border-bottom:1px solid var(--border-subtle)}
+.ws-approval-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border-subtle)}
+.ws-approval-row:last-child{border:0}.ws-approval-label{display:flex;flex-direction:column;gap:5px;flex:1;min-width:140px}
+.ws-approval-label strong{font-size:var(--text-sm);font-weight:500}.ws-approval-label small{font-size:var(--text-xs);color:var(--fg-muted)}
+.ws-approval-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.ws-approval-actions button,.ws-approval-actions a{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:7px 12px;color:var(--fg-default);border:1px solid var(--border-strong);background:var(--bg-surface);border-radius:var(--radius-pill);font:500 var(--text-xs) var(--font-sans);text-decoration:none;cursor:pointer}
+.ws-approval-actions button:hover,.ws-approval-actions a:hover{background:var(--bg-hover)}
+.ws-approval-actions button:disabled{opacity:.5;cursor:not-allowed}.ws-approval-actions button:focus-visible,.ws-approval-actions a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ws-approval-error{color:var(--danger);font-size:var(--text-sm)}
+@media(max-width:599px){.ws-approval-row{align-items:stretch}.ws-approval-actions{width:100%}.ws-approval-actions button,.ws-approval-actions a{flex:1;justify-content:center;min-height:44px}}
