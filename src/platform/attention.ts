@@ -55,6 +55,7 @@ export interface AttentionInput {
   tasks: Rec[];
   missions: Rec[];
   approvals: Rec[];
+  workflowApprovals?: Rec[];
   orgSlug: string;
   now: Date;
 }
@@ -104,6 +105,27 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
       resolved: false,
       sourceId: record.id,
       group: "Approvals",
+    });
+  }
+
+  // Task-completion reviews belong to the same decision inbox as financial
+  // approvals. Reading or acknowledging them must never close the request.
+  // Their actual decision action stays inside the scoped task-approval board.
+  for (const request of input.workflowApprovals ?? []) {
+    if (request.collection !== "workflowApprovals" || request.status !== "awaiting_approval") continue;
+    const projectId = typeof request.fields.projectId === "string" ? request.fields.projectId : null;
+    const departmentId = typeof request.fields.departmentId === "string" ? request.fields.departmentId : null;
+    const route = projectId
+      ? `/o/${orgSlug}/workspace/work/project/${encodeURIComponent(projectId)}?tab=approvals`
+      : departmentId
+        ? `/o/${orgSlug}/workspace/spaces/department/${encodeURIComponent(departmentId)}?tab=approvals`
+        : `/o/${orgSlug}/workspace/work`;
+    items.push({
+      id: `task-approval-${request.id}`, kind: "approval", priority: "P2",
+      title: request.title, body: request.summary || "Task completion is waiting for human review.",
+      route, entityId: request.id, at: request.updatedAt,
+      audience: ["owner"], read: false, acknowledged: false, resolved: false,
+      sourceId: request.id, group: "Task completion approvals",
     });
   }
 
@@ -232,5 +254,19 @@ export function attentionCounts(items: AttentionItem[]) {
     unread: items.filter((item) => !item.read && !item.resolved).length,
     approvals: items.filter((item) => item.kind === "approval" && !item.resolved).length,
     urgent: items.filter((item) => (item.priority === "P0" || item.priority === "P1") && !item.resolved).length,
+  };
+}
+
+/** Action counts are state-driven. An item remains actionable when read. */
+export function isDecisionItem(item: AttentionItem): boolean {
+  return !item.resolved && (item.kind === "approval" || item.kind === "assignment" || item.kind === "interruption");
+}
+export function isNotificationItem(item: AttentionItem): boolean {
+  return !item.resolved && (item.kind === "update" || item.kind === "mention" || item.kind === "system" || item.kind === "overdue");
+}
+export function headerAttentionCounts(items: AttentionItem[]): { decisions: number; unreadUpdates: number } {
+  return {
+    decisions: items.filter(isDecisionItem).length,
+    unreadUpdates: items.filter(item => isNotificationItem(item) && !item.read).length,
   };
 }
