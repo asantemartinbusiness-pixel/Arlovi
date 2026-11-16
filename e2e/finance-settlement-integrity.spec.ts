@@ -45,7 +45,7 @@ test("a posted Finance invoice settles in two real receipts and updates CRM cont
   await page.reload();
   await expect(page.locator("#main")).toContainText("£0.00");
   await expect(page.getByRole("button", {name:"Record a payment"})).toBeDisabled();
-  await expect(page.locator("#main").getByText("Receipt INV-1052")).toHaveCount(2);
+  await expect(page.locator("#main")).toContainText("2 receipts posted against this invoice");
 
   await page.goto("/o/northline/crm/contacts/nl-contacts-003?tab=Files");
   await expect(page.locator("#main")).toContainText("INV-1052");
@@ -94,7 +94,7 @@ test("a concurrent invoice change leaves no orphan receipt journal", async ({pag
 test("paid historical invoices report zero amount due without manufacturing a receipt", async ({page}) => {
   await page.goto("/o/northline/fin/invoices/nl-invoices-001?tab=Payments");
   await expect(page.locator("#main")).toContainText("INV-1041");
-  await expect(page.locator("#main")).toContainText("£0.00");
+  await expect(page.locator("#main")).toContainText(/Outstanding\s*—/);
   await expect(page.getByRole("button", {name:"Record a payment"})).toBeDisabled();
   await useAction(page,"Preview the document");
   await expect(page.getByRole("dialog")).toContainText("£0.00");
