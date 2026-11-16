@@ -23,6 +23,7 @@ test("company switcher preserves safe context and cannot imply authenticated mem
 
 test("global search and native quick destinations are keyboard usable",async({page})=>{
   await page.goto("/o/northline/workspace/home");
+  await expect(page.locator(".hq-header")).toBeVisible();
   await page.keyboard.press("Control+k");
   await expect(page.getByRole("dialog",{name:/Search Northline Atelier/})).toBeVisible();
   await page.getByRole("combobox",{name:/Search screens, records and actions/}).fill("files and resources");
@@ -67,6 +68,7 @@ test("nested project context row persists across page refresh",async({page})=>{
 
 test("header fits within the viewport without horizontal page overflow",async({page})=>{
   await page.goto("/o/northline/workspace/home");
+  await expect(page.locator(".hq-header")).toBeVisible();
   const geometry=await page.evaluate(()=>{
     const header=document.querySelector(".hq-header")!.getBoundingClientRect();
     const buttons=[...document.querySelectorAll(".hq-header button")].map(node=>node.getBoundingClientRect());
