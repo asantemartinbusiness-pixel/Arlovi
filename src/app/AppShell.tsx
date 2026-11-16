@@ -370,9 +370,7 @@ export function AppShell() {
                         {content}
                       </NavLink>
                     ) : (
-                      <span key={item.screenId} className="hq-navlink" role="link"
-                        tabIndex={0} aria-disabled="true"
-                        aria-label={item.label + ": open a record in " + appModule.short + " first"}
+                      <span key={item.screenId} className="hq-navlink" aria-disabled="true"
                         title="Open a record in this application to access this view">
                         {content}
                       </span>
