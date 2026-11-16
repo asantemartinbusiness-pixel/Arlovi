@@ -129,10 +129,10 @@ async function sweepScreen(page: Page, screen: Contract, errors: ReturnType<type
   for (const overlay of screen.overlays) {
     await load(page, `${base}?${CLOCK}&overlay=${encodeURIComponent(overlay)}`);
     const dialog = page.getByRole("dialog").first();
-    /* A deep link opens its overlay from an effect; under load that can take
-       longer than the fixed settle above, so wait for it before judging. */
-    await dialog.waitFor({ state: "visible", timeout: 3000 }).catch(() => undefined);
-    const visible = await dialog.isVisible().catch(() => false);
+    // The modal is state-derived and some schedule pages perform a costly
+    // recurrence forecast. Wait for a real dialog rather than taking a 120 ms
+    // snapshot and incorrectly recording an asynchronous open as missing.
+    const visible = await dialog.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false);
     const text = visible ? await dialog.innerText().catch(() => "") : "";
     const overlayErrors = errors.take();
     const ok = visible && !NOT_BUILT.test(text) && overlayErrors.length === 0;

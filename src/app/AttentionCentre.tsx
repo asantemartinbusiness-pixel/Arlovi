@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Button, Drawer, Pill, Segmented, Empty } from "@/design-system";
 import { attentionCounts, PRIORITY_LABEL, PRIORITY_TONE, type AttentionItem } from "@/platform/attention";
 import { useMutations, useWorkspace } from "@/platform/workspace";
+import { attentionReceiptKey } from "@/platform/attentionReceipts";
+import { useUi } from "@/runtime/ui";
 
 type View = "for-you" | "approvals" | "updates" | "resolved";
 
@@ -13,10 +15,10 @@ type View = "for-you" | "approvals" | "updates" | "resolved";
  */
 export function AttentionCentre({ items, onClose }: { items: AttentionItem[]; onClose: () => void }) {
   const navigate = useNavigate();
-  const { org, relative } = useWorkspace();
+  const { org, role, relative } = useWorkspace();
+  const setReceipt = useUi((state) => state.setAttentionReceipt);
   const mutate = useMutations();
   const [view, setView] = useState<View>("for-you");
-  const [acked, setAcked] = useState<Set<string>>(new Set());
   const counts = attentionCounts(items);
 
   const shown = useMemo(() => {
@@ -38,14 +40,16 @@ export function AttentionCentre({ items, onClose }: { items: AttentionItem[]; on
   }, [shown]);
 
   async function markRead(item: AttentionItem) {
-    if (!item.sourceId || !item.sourceId.startsWith("nl-") && !item.id.startsWith("ha-")) {
-      setAcked((current) => new Set(current).add(item.id));
-    }
-    if (item.kind === "update" && item.sourceId) {
+    // A generated alert is not the backing invoice, mission or approval record.
+    setReceipt(attentionReceiptKey(org.id, role, item.id), { read: true });
+    if (item.kind === "update" && item.sourceId === item.id) {
       await mutate.patch(item.sourceId, { fields: { read: true } }, { skipHistory: true });
-    } else {
-      setAcked((current) => new Set(current).add(item.id));
     }
+  }
+
+  function acknowledge(item: AttentionItem) {
+    // Acknowledgement is not authorization, approval or resolution.
+    setReceipt(attentionReceiptKey(org.id, role, item.id), { read: true, acknowledged: true });
   }
 
   return (
@@ -82,7 +86,7 @@ export function AttentionCentre({ items, onClose }: { items: AttentionItem[]; on
               {group} · {groupItems.length}
             </h3>
             {groupItems.map((item) => {
-              const read = item.read || acked.has(item.id);
+              const read = item.read;
               return (
                 <article
                   key={item.id}
@@ -102,7 +106,8 @@ export function AttentionCentre({ items, onClose }: { items: AttentionItem[]; on
                         {item.kind === "approval" ? "Review on the record" : "Open"}
                       </Button>
                     )}
-                    {!read && <Button size="sm" variant="ghost" onClick={() => markRead(item)}>Mark read</Button>}
+                    {!read && <Button size="sm" variant="ghost" onClick={() => { void markRead(item); }}>Mark read</Button>}
+                    {!item.acknowledged && <Button size="sm" variant="ghost" onClick={() => acknowledge(item)}>Acknowledge</Button>}
                   </div>
                 </article>
               );

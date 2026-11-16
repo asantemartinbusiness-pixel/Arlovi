@@ -17,10 +17,10 @@ function DataTableFallback({ caption, series, format }: { caption: string; serie
   return (
     <table className="ds-sr-only">
       <caption>{caption}</caption>
-      <thead><tr><th scope="col">Period</th>{series.map((item, si) => <th key={`${item.name}-${si}`} scope="col">{item.name}</th>)}</tr></thead>
+      <thead><tr><th scope="col">Period</th>{series.map((item, seriesIndex) => <th key={`${item.name}-${seriesIndex}`} scope="col">{item.name}</th>)}</tr></thead>
       <tbody>
         {labels.map((label, index) => (
-          <tr key={`${label}-${index}`}><th scope="row">{label}</th>{series.map((item, si) => <td key={`${item.name}-${si}`}>{format(item.points[index]?.value ?? 0)}</td>)}</tr>
+          <tr key={`${label}-${index}`}><th scope="row">{label}</th>{series.map((item, seriesIndex) => <td key={`${item.name}-${seriesIndex}`}>{format(item.points[index]?.value ?? 0)}</td>)}</tr>
         ))}
       </tbody>
     </table>

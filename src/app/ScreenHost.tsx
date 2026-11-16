@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { useLocation, useNavigate } from "react-router-dom";
 import { MoreHorizontal } from "lucide-react";
 import { Breadcrumbs, Button, Drawer, Menu, Modal, Notice, Tabs, TabPanel } from "@/design-system";
-import { findScreen, type ScreenInfo } from "@/app/catalog";
+import { appEntry, findScreen, type ScreenInfo } from "@/app/catalog";
 import { APP_ENTRIES } from "@/app/nav";
 import { getApp, type ActionDef, type ScreenContext, type ScreenDef } from "@/platform/registry";
 import { can as roleCan, canOpen, ROLE_LABELS } from "@/platform/policy";
 import { useMutations, useToast, useWorkspace } from "@/platform/workspace";
-import { getRecord, knownRecord } from "@/platform/repo";
+import { getRecord, getRecordInOrg, knownRecord } from "@/platform/repo";
 import { useLiveQuery } from "dexie-react-hooks";
 import { applicationLoadFailures } from "@/applications";
 
@@ -23,10 +23,13 @@ export function ScreenHost() {
      Ids are global, so a record from another organisation is refused here
      before any screen renders or offers an action on it. */
   const routeId = match?.params.id;
-  const foreign = useLiveQuery(async () => {
-    if (!routeId) return false;
+  const recordAccess = useLiveQuery(async () => {
+    if (!routeId) return "not_applicable" as const;
+    // Resolve the record before mounting any page-specific editor or inspector.
+    // Missing IDs must never silently show the first record in a list.
     const record = await getRecord(routeId);
-    return Boolean(record && record.organizationId !== workspace.org.id);
+    if (!record) return "missing" as const;
+    return record.organizationId === workspace.org.id ? "allowed" as const : "foreign" as const;
   }, [routeId, workspace.org.id]);
 
   const [tab, setTabState] = useState<string>("");
@@ -102,7 +105,32 @@ export function ScreenHost() {
     );
   }
 
-  if (foreign) {
+  if (routeId && recordAccess === undefined) {
+    return (
+      <div className="pg" role="status" aria-busy="true">
+        <div className="pg-head"><h1>Checking record access…</h1></div>
+        <div className="pg-body"><p>Confirming this record belongs to {workspace.org.name}.</p></div>
+      </div>
+    );
+  }
+
+  if (recordAccess === "missing") {
+    return (
+      <div className="pg">
+        <div className="pg-head"><h1>Record not found</h1></div>
+        <div className="pg-body">
+          <Notice tone="warning" title="This record is unavailable">
+            The record may have been deleted, or its link may be incorrect. No other record was substituted.
+          </Notice>
+          <Button variant="secondary" onClick={() => navigate(appEntry(screen.applicationCode, workspace.org.slug))}>
+            Return to {screen.applicationName}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (recordAccess === "foreign") {
     return (
       <div className="pg">
         <div className="pg-head"><h1>Not in {workspace.org.name}</h1></div>
@@ -324,7 +352,7 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
   const overlayContext = { ...ctx, close: onClose };
   const payloadId = (ctx.overlayPayload as { id?: unknown } | undefined)?.id;
   const ids = [typeof payloadId === "string" ? payloadId : undefined, ctx.selectedId, ctx.params.id].filter((id): id is string => Boolean(id));
-  const body = <PrimedOverlayBody ids={ids} render={() => found.render(overlayContext)} />;
+  const body = <PrimedOverlayBody ids={ids} orgId={ctx.org.id} render={() => found.render(overlayContext)} />;
   const overlayTitle = typeof found.title === "function" ? found.title(ctx) : found.title ?? found.id;
   if (found.kind === "drawer") {
     return (
@@ -355,12 +383,15 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
  * render. Most opens are already primed by the list they came from; a deep
  * link waits for one indexed read.
  */
-function PrimedOverlayBody({ ids, render }: { ids: string[]; render: () => ReactNode }) {
+function PrimedOverlayBody({ ids, orgId, render }: { ids: string[]; orgId: string; render: () => ReactNode }) {
   const key = ids.join("|");
   const ready = useLiveQuery(async () => {
-    await Promise.all(ids.map((id) => getRecord(id)));
+    await Promise.all(ids.map((id) => getRecordInOrg(orgId, id)));
     return true;
-  }, [key], ids.every((id) => knownRecord(id) !== undefined) || ids.length === 0);
+  }, [key, orgId], ids.every((id) => {
+    const cached = knownRecord(id);
+    return cached !== undefined && cached.organizationId === orgId;
+  }) || ids.length === 0);
   if (!ready) return <div className="ds-muted" role="status">Loading…</div>;
   return <OverlayBody render={render} />;
 }

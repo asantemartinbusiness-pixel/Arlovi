@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { PaletteId } from "@/brand";
 import type { Role } from "@/domain/types";
+import type { AttentionReceipt } from "@/platform/attentionReceipts";
 
 export interface Toast {
   id: string;
@@ -23,6 +24,8 @@ interface UiState {
   tool: string;
   offline: boolean;
   toasts: Toast[];
+  attentionReceipts: Record<string, AttentionReceipt>;
+  setAttentionReceipt: (key: string, update: AttentionReceipt) => void;
   setRole: (role: Role) => void;
   setTheme: (theme: "light" | "dark") => void;
   setDensity: (density: UiState["density"]) => void;
@@ -38,8 +41,16 @@ interface UiState {
   dismissToast: (id: string) => void;
 }
 
-const stored = typeof localStorage === "undefined" ? null : localStorage.getItem("arlovi-ui");
-const initial = stored ? (JSON.parse(stored) as Partial<UiState>) : {};
+function storedUi(): Partial<UiState> {
+  try {
+    const stored = typeof localStorage === "undefined" ? null : localStorage.getItem("arlovi-ui");
+    return stored ? (JSON.parse(stored) as Partial<UiState>) : {};
+  } catch {
+    // Corrupted or blocked browser storage should not prevent the application from booting.
+    return {};
+  }
+}
+const initial = storedUi();
 
 export const useUi = create<UiState>((set) => ({
   role: initial.role ?? "owner",
@@ -55,6 +66,13 @@ export const useUi = create<UiState>((set) => ({
   tool: "select",
   offline: typeof navigator !== "undefined" ? !navigator.onLine : false,
   toasts: [],
+  attentionReceipts: initial.attentionReceipts ?? {},
+  setAttentionReceipt: (key, update) => set((state) => ({
+    attentionReceipts: {
+      ...state.attentionReceipts,
+      [key]: { ...state.attentionReceipts[key], ...update },
+    },
+  })),
   setRole: (role) => set({ role }),
   setTheme: (theme) => set({ theme }),
   setDensity: (density) => set({ density }),
@@ -72,7 +90,9 @@ export const useUi = create<UiState>((set) => ({
 }));
 
 useUi.subscribe((state) => {
-  localStorage.setItem(
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(
     "arlovi-ui",
     JSON.stringify({
       role: state.role,
@@ -80,6 +100,10 @@ useUi.subscribe((state) => {
       density: state.density,
       palette: state.palette,
       collapsed: state.collapsed,
+      attentionReceipts: state.attentionReceipts,
     }),
-  );
+    );
+  } catch {
+    // Storage may be unavailable in privacy-constrained browsers.
+  }
 });

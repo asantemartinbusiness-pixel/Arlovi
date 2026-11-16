@@ -17,7 +17,8 @@
     "catalog": "python3 scripts/build_catalog.py",
     "ledger": "python3 scripts/build_screen_ledger.py",
     "test:journeys": "playwright test e2e/workflows.spec.ts",
-    "test:sweep": "playwright test e2e/deep.spec.ts --workers=4"
+    "test:sweep": "playwright test e2e/deep.spec.ts --workers=4",
+    "test:visual": "playwright test e2e/full-visual-audit.spec.ts --workers=4"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
