@@ -56,6 +56,7 @@ export function SchedulesAndQueues({ context }: { context: ScreenContext }) {
   // Date objects built during render change identity on every render.
   // The primitive timestamp keeps the expensive recurring-firing forecast cached.
   const monthStartMs = startOfMonth(context.now).getTime();
+  const monthStart = new Date(monthStartMs);
   const firings = useMemo(
     () => firingsFor(active, addDays(new Date(monthStartMs), -1), 34, context.org.timezone),
     [active, monthStartMs, context.org.timezone],
