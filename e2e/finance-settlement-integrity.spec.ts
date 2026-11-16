@@ -47,7 +47,7 @@ test("a posted Finance invoice settles in two real receipts and updates CRM cont
   await expect(page.getByRole("button", {name:"Record a payment"})).toBeDisabled();
   await expect(page.locator("#main")).toContainText("2 receipts posted against this invoice");
 
-  await page.goto("/o/northline/crm/contacts/nl-contacts-003?tab=Files");
+  await page.goto("/o/northline/crm/contacts/nl-contacts-003?tab=Service");
   await expect(page.locator("#main")).toContainText("INV-1052");
   await expect(page.locator("#main")).toContainText("paid", {ignoreCase: true});
   await page.goto("/o/northline/fin/ledger?tab=Journals");
