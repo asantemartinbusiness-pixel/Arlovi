@@ -241,7 +241,7 @@
 
 /* The only breakpoint variants are geometric. The visual theme never changes. */
 @media (min-width:1024px) and (max-width:1439px) {
-  :root { --primary-nav-w:226px; --appnav-w:216px; }
+  .hq { --primary-nav-w:226px; }
 }
 @media (min-width:1024px) and (max-width:1199px) {
   .hq { --current-primary-w:var(--primary-nav-compact-w); }
