@@ -40,7 +40,9 @@ export function findDirectoryApps(apps: DirectoryApp[], query: string, group = "
   const matches = apps.filter(app => {
     if (group !== "All" && app.group !== group) return false;
     const haystack = normalize([app.short, app.name, app.group, app.purpose, app.entities].join(" "));
-    return tokens.every(token => haystack.includes(token));
+    return tokens.every(token => haystack.includes(token)
+      || (token.length > 4 && token.endsWith("ies") && haystack.includes(token.slice(0, -3) + "y"))
+      || (token.length > 4 && token.endsWith("s") && haystack.includes(token.slice(0, -1))));
   });
   if (!tokens.length) return matches;
   return [...matches].sort((a, b) => {
