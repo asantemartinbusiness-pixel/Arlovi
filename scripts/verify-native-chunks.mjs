@@ -14,7 +14,7 @@ const groups = {
 };
 let count = 0;
 for (const [group, apps] of Object.entries(groups)) {
-  if (!registry.includes(`group: "${group}"`)) throw new Error(`Missing native application group: ${group}`);
+  if (!apps.every(app => registry.includes(`group: "${group} / ${app}"`))) throw new Error(`Missing native application mapping in ${group}`);
   for (const app of apps) {
     const seed = [`src/domain/seeds/${app}.ts`,`src/domain/seeds/${app}.tsx`].find(existsSync);
     const native = [`src/applications/${app}/index.tsx`,`src/applications/${app}/index.ts`].find(existsSync);
