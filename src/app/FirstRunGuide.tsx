@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowUpRight, Check, Circle, X } from "lucide-react";
 import { Button, Pill } from "@/design-system";
 import { appEntry } from "@/app/catalog";
@@ -13,11 +13,12 @@ import "./first-run.css";
 export function FirstRunGuide() {
   const { org } = useWorkspace();
   const location = useLocation();
+  const navigate = useNavigate();
   const mutations = useMutations();
   const records = useCollections(["organizations", "members", "sources", "agents", "missions", "preferences"]);
   const preference = records.preferences.find((item) => item.fields.kind === "getting_started");
   const force = new URLSearchParams(location.search).get("gettingStarted") === "1";
-  if (!org.ownerName || (preference?.fields.dismissed === true && !force)) return null;
+  if (!org.ownerName || !records.organizations.some((record) => record.id === org.id) || (preference?.fields.dismissed === true && !force)) return null;
 
   const humanTeam = records.members.filter((member) => member.fields.kind === "human" && member.fields.role !== "owner");
   const reviewableKnowledge = records.sources.filter((source) => source.status === "indexed" || source.status === "verified");
@@ -72,6 +73,11 @@ export function FirstRunGuide() {
         fields: { kind: "getting_started", dismissed: true },
         summary: "Keep this local onboarding guide hidden unless explicitly reopened.",
       }, "Getting-started guidance dismissed");
+    }
+    if (force) {
+      const params = new URLSearchParams(location.search);
+      params.delete("gettingStarted");
+      navigate({ pathname: location.pathname, search: params.toString() ? `?${params.toString()}` : "" }, { replace: true });
     }
   }
 

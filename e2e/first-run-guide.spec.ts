@@ -26,4 +26,7 @@ test("new company headquarters has an actionable, truthful and dismissible setup
   await expect(guide).toHaveCount(0);
   await page.goto("/o/" + slug + "/hq/home?gettingStarted=1");
   await expect(guide).toBeVisible();
+  await guide.getByRole("button", { name: "Dismiss getting-started guidance" }).click();
+  await expect(guide).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp("/o/" + slug + "/hq/home$"));
 });
