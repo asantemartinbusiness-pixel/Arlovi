@@ -91,15 +91,18 @@ export function portalUsers(portal: Rec | undefined): PortalUser[] {
  */
 export function resolvePortal(id: string | undefined, portals: Rec[]): Rec | undefined {
   if (!id) return undefined;
-  const full = portals.find((item) => String(item.fields.canonicalFor ?? "") === id);
-  if (full) return full;
-  return portals.find((item) => item.id === id);
+  const direct = portals.find((item) => item.id === id);
+  const full = portals.find((item) => String(item.fields.canonicalFor ?? "") === id
+    && (!direct || item.organizationId === direct.organizationId));
+  return full ?? direct;
 }
 
-/** Portals as screens list them: a stub that has a full definition is not listed twice. */
+/** Hide only a stub replaced by a canonical portal in the SAME organisation. */
 export function listedPortals(portals: Rec[]): Rec[] {
-  const replaced = new Set(portals.map((item) => String(item.fields.canonicalFor ?? "")).filter(Boolean));
-  return portals.filter((item) => !replaced.has(item.id));
+  const replaced = new Set(portals
+    .filter((item) => typeof item.fields.canonicalFor === "string" && item.fields.canonicalFor)
+    .map((item) => item.organizationId + ":" + String(item.fields.canonicalFor)));
+  return portals.filter((item) => !replaced.has(item.organizationId + ":" + item.id));
 }
 
 /** Canonical portal and legacy route stub identify the same scoped space. */
