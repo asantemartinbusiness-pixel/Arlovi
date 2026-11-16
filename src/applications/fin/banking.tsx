@@ -699,6 +699,8 @@ export function ReconciliationHistory({ context }: { context: ScreenContext }) {
   const data = useFinData();
   const confirmations = data.bankLines.filter((line) => line.fields.kind === "reconciliation");
   const statements = statementSummaries(data.bankLines);
+  const current = useReconciliation("1000");
+  const currentEvidence = reconciliationEvidence(current, data.journals);
   return (
     <Stack gap={4}>
       {confirmations.length === 0 ? (
@@ -717,6 +719,11 @@ export function ReconciliationHistory({ context }: { context: ScreenContext }) {
             { key: "closing", header: "Statement closing", align: "end", cell: (row) => <Amount minor={Number(row.fields.closingMinor ?? 0)} context={context} /> },
             { key: "ledger", header: "Ledger", align: "end", cell: (row) => <Amount minor={Number(row.fields.ledgerMinor ?? 0)} context={context} /> },
             { key: "difference", header: "Difference", align: "end", cell: (row) => <Amount minor={Number(row.fields.differenceMinor ?? 0)} context={context} bold /> },
+            { key: "evidence", header: "Evidence", cell: (row) => {
+              const sameAccount = String(row.fields.bankAccountCode ?? "") === current.bankAccountCode;
+              const stillCurrent = sameAccount && current.complete && reconciliationSignoffIsCurrent(row, currentEvidence);
+              return <Pill tone={stillCurrent ? "success" : "warning"} dot>{stillCurrent ? "Current" : "Superseded / unverified"}</Pill>;
+            } },
           ]}
         />
       )}
@@ -935,8 +942,12 @@ export function AdjustmentReview({ context, close }: { context: ScreenContext; c
 
 export function ReconciliationApproval({ context, close }: { context: ScreenContext; close: () => void }) {
   const recon = useReconciliation("1000");
+  const data = useFinData();
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const blocked = reconciliationSignoffBlocker({
+    recon, accounts: data.accounts, journals: data.journals, bankLines: data.bankLines,
+  });
 
   return (
     <Stack gap={4}>
@@ -944,49 +955,49 @@ export function ReconciliationApproval({ context, close }: { context: ScreenCont
         context={context}
         rows={[
           { label: "Statement closing", minor: recon.statementClosingMinor },
-          { label: "Ledger balance", minor: recon.ledgerMinor },
+          { label: "Ledger at statement end", minor: recon.ledgerMinor },
           { label: "Difference", minor: recon.differenceMinor, bold: true },
-          { label: "Explained by open lines", minor: recon.needsPostingMinor },
+          { label: "Open lines without journals", minor: recon.needsPostingMinor },
           { label: "Unexplained", minor: recon.unexplainedMinor, bold: true },
         ]}
       />
-      {recon.complete ? (
-        <Notice tone="success" title="Nothing is unexplained">
-          Every statement line is matched to a posted journal and the balances agree. Confirming records who reconciled and what the figures were.
-        </Notice>
-      ) : (
-        <Notice tone="danger" title="This reconciliation cannot be confirmed">{recon.blockedReason}</Notice>
+      {recon.statement && (
+        <Properties rows={[
+          { label: "Statement", value: recon.statement.filename },
+          { label: "Period ends", value: context.date(recon.statement.to) },
+          { label: "Evidence", value: "Manually imported, locally checked; no bank provider verification" },
+        ]} />
       )}
-      <Field label="Note" hint="Kept on the reconciliation record.">
+      {blocked ? (
+        <Notice tone="danger" title="This reconciliation cannot be confirmed">{blocked}</Notice>
+      ) : (
+        <Notice tone="success" title="Local ledger evidence is complete">
+          Every imported line for this statement is linked reciprocally to an exact-value posted journal.
+          The balance at the statement end date agrees. The database checks all source revisions again
+          when you confirm, and keeps the evidence snapshot for later review.
+        </Notice>
+      )}
+      <Field label="Note" hint="Retained in the locally confirmed reconciliation record.">
         <TextArea aria-label="Note" value={note} rows={3} onChange={(event) => setNote(event.target.value)} />
       </Field>
       <Row gap={2}>
         <Button
           variant="primary"
           busy={busy}
-          disabled={!recon.complete}
-          title={recon.blockedReason}
+          disabled={Boolean(blocked) || !context.can("post_journal")}
+          title={!context.can("post_journal") ? "Finance or Owner role view required" : blocked}
           onClick={async () => {
+            if (busy || blocked || !recon.statement) return;
             setBusy(true);
-            await context.mutate.create({
-              collection: "bankTransactions",
-              title: `Reconciliation ${context.date(context.now)} · ${recon.bankAccountCode}`,
-              status: "confirmed",
-              summary: note || "Reconciliation confirmed with no unexplained difference.",
-              amountMinor: recon.statementClosingMinor ?? 0,
-              at: context.now.toISOString(),
-              fields: {
-                kind: "reconciliation",
-                bankAccountCode: recon.bankAccountCode,
-                closingMinor: recon.statementClosingMinor ?? 0,
-                ledgerMinor: recon.ledgerMinor,
-                differenceMinor: recon.differenceMinor ?? 0,
-                confirmedBy: context.actor,
-              },
-            }, `Reconciliation confirmed for ${recon.bankAccountCode}`);
-            context.toast("Reconciliation confirmed", "It is recorded with the balances it was tied to. It is a local record, not a bank confirmation.");
-            setBusy(false);
-            close();
+            try {
+              await context.mutate.confirmReconciliation(recon.bankAccountCode, recon.statement.record.id, note);
+              context.toast("Statement signed off locally", "The account, statement and ledger evidence were rechecked and recorded atomically. No bank provider confirmed this reconciliation.");
+              close();
+            } catch (error) {
+              context.toast("Reconciliation not confirmed", error instanceof Error ? error.message : "Records changed. Reopen and review.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Confirm the statement
