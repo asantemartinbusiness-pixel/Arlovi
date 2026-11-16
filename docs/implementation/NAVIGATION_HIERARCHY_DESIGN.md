@@ -40,6 +40,8 @@ Arlovi is a *digital company headquarters*, not a navigation bar for 35 unrelate
 └────────────────┴─────────────────┴───────────────────────────────────┘
 ```
 
+**When the user is on Home, My Workspace, Company Overview or other Headquarters pages, do not show an additional application sidebar.** The primary company navigator already owns that hierarchy; a second panel would waste horizontal space and duplicate Home/Company/Departments links. The contextual panel appears only inside a native specialist application.
+
 A real document or design editor is allowed to consume the entire remaining work surface, optionally collapsing the active-app sidebar. Never shrink a professional canvas to accommodate multiple unnecessary navigation rails.
 
 ### Intermediate desktop · 1024–1439px
