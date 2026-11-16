@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { useLocation, useNavigate } from "react-router-dom";
 import { MoreHorizontal } from "lucide-react";
 import { Breadcrumbs, Button, Drawer, Menu, Modal, Notice, Tabs, TabPanel } from "@/design-system";
-import { findScreen, type ScreenInfo } from "@/app/catalog";
+import { appEntry, findScreen, type ScreenInfo } from "@/app/catalog";
 import { APP_ENTRIES } from "@/app/nav";
 import { getApp, type ActionDef, type ScreenContext, type ScreenDef } from "@/platform/registry";
 import { can as roleCan, canOpen, ROLE_LABELS } from "@/platform/policy";
@@ -23,12 +23,13 @@ export function ScreenHost() {
      Ids are global, so a record from another organisation is refused here
      before any screen renders or offers an action on it. */
   const routeId = match?.params.id;
-  const foreign = useLiveQuery(async () => {
-    if (!routeId) return false;
-    // Resolve before any screen-specific body or editor mounts. Only the
-    // foreign-record flag reaches the view; no foreign data is rendered.
+  const recordAccess = useLiveQuery(async () => {
+    if (!routeId) return "not_applicable" as const;
+    // Resolve the record before mounting any page-specific editor or inspector.
+    // Missing IDs must never silently show the first record in a list.
     const record = await getRecord(routeId);
-    return Boolean(record && record.organizationId !== workspace.org.id);
+    if (!record) return "missing" as const;
+    return record.organizationId === workspace.org.id ? "allowed" as const : "foreign" as const;
   }, [routeId, workspace.org.id]);
 
   const [tab, setTabState] = useState<string>("");
@@ -104,7 +105,7 @@ export function ScreenHost() {
     );
   }
 
-  if (routeId && foreign === undefined) {
+  if (routeId && recordAccess === undefined) {
     return (
       <div className="pg" role="status" aria-busy="true">
         <div className="pg-head"><h1>Checking record access…</h1></div>
@@ -113,7 +114,23 @@ export function ScreenHost() {
     );
   }
 
-  if (foreign) {
+  if (recordAccess === "missing") {
+    return (
+      <div className="pg">
+        <div className="pg-head"><h1>Record not found</h1></div>
+        <div className="pg-body">
+          <Notice tone="warning" title="This record is unavailable">
+            The record may have been deleted, or its link may be incorrect. No other record was substituted.
+          </Notice>
+          <Button variant="secondary" onClick={() => navigate(appEntry(screen.applicationCode, workspace.org.slug))}>
+            Return to {screen.applicationName}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (recordAccess === "foreign") {
     return (
       <div className="pg">
         <div className="pg-head"><h1>Not in {workspace.org.name}</h1></div>
