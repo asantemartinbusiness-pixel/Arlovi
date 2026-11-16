@@ -286,7 +286,6 @@ export function BankConnection({ context, close }: { context: ScreenContext; clo
 /** A real CSV importer: paste or type rows, map the columns, see what will be created. */
 export function CsvMapper({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useFinData();
-  const { now } = useWorkspace();
   const payload = context.overlayPayload as { code?: string } | undefined;
   const [text, setText] = useState("date,description,amount\n2026-11-14,Card · brass polish,-4850\n2026-11-14,Faster payment · Pike Lighting,126000");
   const [code, setCode] = useState(payload?.code ?? "1000");
