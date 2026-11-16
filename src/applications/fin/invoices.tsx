@@ -186,7 +186,10 @@ export function useInvoice(context: ScreenContext): { invoice?: Rec; data: FinDa
   const data = useFinData();
   const { org, now } = useWorkspace();
   const fromRoute = useRecord(context.params.id);
-  const invoice = fromRoute ?? data.invoices.find((item) => item.id === context.selectedId) ?? data.invoices[0];
+  // An unknown or wrong-collection detail URL never substitutes another invoice.
+  const invoice = context.params.id
+    ? (fromRoute?.collection === "invoices" ? fromRoute : undefined)
+    : data.invoices.find((item) => item.id === context.selectedId) ?? data.invoices[0];
   const customer = contactOf(data, invoice);
   const totals = invoiceTotals(data, invoice, org.jurisdiction, now);
   return { invoice, data, totals, customer };
@@ -270,7 +273,7 @@ export function InvoiceOverview({ context }: { context: ScreenContext }) {
             { label: "Tax", minor: totals.taxMinor },
             { label: "Gross", minor: totals.grossMinor, bold: true },
             { label: "Paid", minor: paid },
-            { label: "Outstanding", minor: totals.grossMinor - paid, bold: true },
+            { label: "Outstanding", minor: outstandingMinor(invoice), bold: true },
           ]}
         />
       </Card>
@@ -656,9 +659,15 @@ export function InvoicePayments({ context }: { context: ScreenContext }) {
   const receipts = data.journals.filter((journal) =>
     String(journal.fields.invoiceId ?? "") === invoice.id && journal.fields.source === "payment");
   const legacy = data.journals.filter((journal) => journal.id === String(invoice.fields.paymentJournalId ?? ""));
-  const all = [...new Map([...receipts, ...legacy].map((journal) => [journal.id, journal])).values()];
-  const paid = Number(invoice.fields.paidMinor ?? 0);
-  const outstanding = totals.grossMinor - paid;
+  const all = [...new Map([...receipts, ...legacy]
+    .filter((journal) => journal.status === "posted")
+    .map((journal) => [journal.id, journal])).values()];
+  const outstanding = outstandingMinor(invoice);
+  const recordedPaid = Number(invoice.fields.paidMinor ?? 0);
+  const paid = invoice.status === "paid"
+    ? totals.grossMinor
+    : Math.min(totals.grossMinor, Math.max(0, recordedPaid));
+  const unlinkedHistoricPayment = invoice.status === "paid" && all.length === 0;
 
   return (
     <Grid>
@@ -692,6 +701,12 @@ export function InvoicePayments({ context }: { context: ScreenContext }) {
               { label: "Outstanding", minor: outstanding, bold: true },
             ]}
           />
+          {unlinkedHistoricPayment && (
+            <Notice tone="warning" title="Paid status has no linked posted receipt">
+              This historical invoice is marked paid, but no receipt journal is linked to it.
+              Its zero outstanding amount follows the recorded status; verify the ledger before reconciliation.
+            </Notice>
+          )}
           <CapabilityNotice id="payment.capture" />
           <Button
             variant="primary"
@@ -702,7 +717,7 @@ export function InvoicePayments({ context }: { context: ScreenContext }) {
             Record a payment
           </Button>
           {paid > 0 && outstanding > 0 && <Pill tone="info" dot>Part paid</Pill>}
-          <SourceNote>Settlement is computed from posted receipt journals, not from a bank feed. The figure moves only when a journal is posted.</SourceNote>
+          <SourceNote>Current receipts update the invoice allocation and post a journal together. Historical paid records without a linked journal are flagged for ledger review; no bank feed is connected.</SourceNote>
         </Stack>
       </Card>
       <Card prov="human" span={12} title="Receivables ageing for this customer" subtitle="Every open invoice on the same contact">
@@ -1013,7 +1028,7 @@ export function DocumentPreview({ context }: { context: ScreenContext }) {
           <div className="ds-grow" />
           <div style={{ textAlign: "end" }}>
             <span className="ds-stat-label">Amount due</span>
-            <div className="ds-stat-value">{context.money(totals.grossMinor - Number(invoice.fields.paidMinor ?? 0))}</div>
+            <div className="ds-stat-value">{context.money(outstandingMinor(invoice))}</div>
           </div>
         </Row>
         <hr className="ds-divider" />
