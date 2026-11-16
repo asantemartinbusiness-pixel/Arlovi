@@ -32,6 +32,7 @@ export function AppShell() {
   const { org, role, now } = useWorkspace();
   const mutate = useMutations();
   const [navOpen, setNavOpen] = useState(false);
+  const keyboardHint = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.userAgent) ? "⌘K" : "Ctrl+K";
 
   const activeScreen = useMemo(() => findScreen(location.pathname)?.screen, [location.pathname]);
   const activeCode = activeScreen?.applicationCode ?? "HQ";
@@ -141,7 +142,7 @@ export function AppShell() {
         <button type="button" className="hq-search" onClick={() => ui.setCommand(true)} aria-label={`Search ${org.shortName}`} aria-keyshortcuts="Control+K Meta+K">
           <Search size={15} />
           <span className="ds-grow" style={{ textAlign: "start" }}>Search {org.shortName}</span>
-          <kbd className="ds-kbd">⌘K</kbd>
+          <kbd className="ds-kbd">{keyboardHint}</kbd>
         </button>
 
         <Button variant="primary" size="sm" icon={<Sparkles size={15} />} aria-label={brand.ask} onClick={() => ui.setAsk(true)}>
@@ -167,6 +168,7 @@ export function AppShell() {
               onSelect: () => ui.setRole(item),
             })),
             { label: `${activePinned ? "Remove" : "Pin"} ${APP_ENTRIES[activeCode]?.short ?? "this app"} ${activePinned ? "from" : "to"} favourites`, group: "Navigation", separatorBefore: true, onSelect: () => { void toggleFavourite(); } },
+            ...(org.ownerName ? [{ label: "Review company setup", group: "Navigation", onSelect: () => navigate(`/o/${org.slug}/hq/home?gettingStarted=1`) }] : []),
             { label: ui.theme === "light" ? "Dark appearance" : "Light appearance", group: "Appearance", separatorBefore: true, onSelect: () => ui.setTheme(ui.theme === "light" ? "dark" : "light") },
             ...(["comfortable", "balanced", "compact"] as const).map((item) => ({
               label: item === ui.density ? `Density: ${item} · current` : `Density: ${item}`,
