@@ -53,10 +53,12 @@ export function SchedulesAndQueues({ context }: { context: ScreenContext }) {
   const workflows = useCollection("workflows");
   const runs = useCollection("workflowRuns");
   const active = useMemo(() => workflows.filter((workflow) => workflow.status === "active"), [workflows]);
-  const monthStart = startOfMonth(context.now);
+  // Date objects built during render change identity on every render.
+  // The primitive timestamp keeps the expensive recurring-firing forecast cached.
+  const monthStartMs = startOfMonth(context.now).getTime();
   const firings = useMemo(
-    () => firingsFor(active, addDays(monthStart, -1), 34, context.org.timezone),
-    [active, monthStart, context.org.timezone],
+    () => firingsFor(active, addDays(new Date(monthStartMs), -1), 34, context.org.timezone),
+    [active, monthStartMs, context.org.timezone],
   );
 
   if (workflows.length === 0) {
@@ -368,8 +370,9 @@ export function QueuePriority({ context, close }: { context: ScreenContext; clos
 export function ImpactWarning({ context }: { context: ScreenContext }) {
   const workflows = useCollection("workflows");
   const runs = useCollection("workflowRuns");
-  const active = workflows.filter((workflow) => workflow.status === "active");
-  const firings = firingsFor(active, context.now, 7, context.org.timezone);
+  const active = useMemo(() => workflows.filter((workflow) => workflow.status === "active"), [workflows]);
+  const at = context.now.getTime();
+  const firings = useMemo(() => firingsFor(active, new Date(at), 7, context.org.timezone), [active, at, context.org.timezone]);
   const waiting = runs.filter((run) => ["waiting_approval", "blocked"].includes(run.status));
   const providerSteps = active.flatMap((workflow) => readGraph(workflow).nodes.filter((node) => node.config?.kind === "provider.call").map((node) => ({ workflow, node })));
 
