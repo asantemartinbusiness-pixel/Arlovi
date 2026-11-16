@@ -36,3 +36,41 @@ test("resource inspector previews the existing document and its revision",async(
   await expect(page.getByRole("combobox",{name:"Move document to folder"})).toBeVisible();
   void row;
 });
+
+test("linking a document to a project does not replace its original owner or project",async({page})=>{
+  await page.goto("/o/northline/workspace/work");
+  const project=page.locator('.ws-entry-list a[href*="/project/"]').first();
+  await expect(project).toBeVisible();
+  await project.click();
+  await page.getByRole("button",{name:"Files",exact:true}).click();
+  await page.getByRole("button",{name:"Link document"}).click();
+  const select=page.getByRole("combobox",{name:"Existing document to link"});
+  const option=select.locator("option:not([value=''])").first();
+  test.skip(await option.count()===0,"Requires a company document not already in the project");
+  const documentId=await option.getAttribute("value");
+  expect(documentId).not.toBeNull();
+  const before=await page.evaluate(async(id)=>new Promise<Record<string,unknown>|null>((resolve,reject)=>{
+    const open=indexedDB.open("arlovi-workspace");
+    open.onerror=()=>reject(open.error);
+    open.onsuccess=()=>{
+      const db=open.result;
+      const req=db.transaction("records").objectStore("records").get(id);
+      req.onsuccess=()=>{resolve(req.result?.fields??null);db.close();};
+      req.onerror=()=>reject(req.error);
+    };
+  }),documentId);
+  await select.selectOption(documentId!);
+  await page.getByRole("button",{name:/Link to/}).click();
+  await expect(page.getByRole("complementary",{name:"Document preview"})).toBeVisible();
+  const after=await page.evaluate(async(id)=>new Promise<Record<string,unknown>|null>((resolve,reject)=>{
+    const open=indexedDB.open("arlovi-workspace");
+    open.onerror=()=>reject(open.error);
+    open.onsuccess=()=>{
+      const db=open.result;
+      const req=db.transaction("records").objectStore("records").get(id);
+      req.onsuccess=()=>{resolve(req.result?.fields??null);db.close();};
+      req.onerror=()=>reject(req.error);
+    };
+  }),documentId);
+  expect(after).toEqual(before);
+});
