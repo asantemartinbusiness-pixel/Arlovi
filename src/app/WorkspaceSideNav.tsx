@@ -1,8 +1,8 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
-  Activity, BookOpen, Building2, CalendarDays, CheckSquare2, Clock3, FileText,
+  Activity, Building2, CalendarDays, CheckSquare2, Clock3, FileText,
   FolderKanban, Grid2X2, Home, Inbox, Layers, LockKeyhole, MessageSquare,
-  Rocket, Search, Settings2, Users, Workflow,
+  Rocket, Settings2, Users, Workflow,
 } from "lucide-react";
 import { appEntry } from "@/app/catalog";
 import { NAV_GROUPS } from "@/app/nav";
