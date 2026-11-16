@@ -48,8 +48,11 @@ export function screenPath(screen: ScreenInfo, slug: string, id?: string): strin
 }
 
 export function appEntry(code: string, slug: string): string {
-  const screen = screens.find((item) => item.applicationCode === code);
-  return screen ? screenPath(screen, slug) : `/o/${slug}/hq/home`;
+  // App entry routes are stable lists/home screens, never synthetic sample records.
+  // This matters when the same tool is launched for different companies.
+  const screen = screens.find((item) => item.applicationCode === code
+    && !/:id\b|:slug\b/.test(item.route));
+  return screen ? screen.route.replace(":org", slug) : `/o/${slug}/workspace/apps`;
 }
 
 /**
