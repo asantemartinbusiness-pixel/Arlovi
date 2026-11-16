@@ -4,7 +4,7 @@ import {
   Button, Card, DataGrid, Empty, Field, Grid, MoneyInput, Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
-import { useWorkspace } from "@/platform/workspace";
+
 import { CAPABILITY_LABELS, PROVIDER_CAPABILITIES } from "@/platform/capability";
 import type { Rec } from "@/domain/types";
 import { touch } from "@/domain/types";
