@@ -69,7 +69,7 @@ export function WorkspaceHealth() {
     <div className="wh-stat-grid">
       <div><Database size={18}/><strong>{inventory?.recordCount ?? "—"}</strong><span>Company records</span></div>
       <div><ShieldCheck size={18}/><strong>{inventory?.auditCount ?? "—"}</strong><span>Local audit events</span></div>
-      <div><HardDrive size={18}/><strong>{storage ? size(storage.used) : "Unavailable"}</strong><span>Browser storage used (all origins' local data)</span></div>
+      <div><HardDrive size={18}/><strong>{storage ? size(storage.used) : "Unavailable"}</strong><span>Browser storage used by this site</span></div>
       <div>{online?<Wifi size={18}/>:<WifiOff size={18}/>}<strong>{online?"Online":"Offline"}</strong><span>Browser network status</span></div>
     </div>
     {error&&<p className="wh-error" role="alert">{error}</p>}
