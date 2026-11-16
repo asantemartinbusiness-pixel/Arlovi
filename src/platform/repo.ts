@@ -170,7 +170,7 @@ export async function putRecord(record: Rec, context: WriteContext, event?: Omit
   });
 }
 
-export async function putMany(records: Rec[], context: WriteContext, events: Omit<Audit, "id" | "at" | "actor" | "organizationId">[] = [], expectedOrgId?: string): Promise<void> {
+export async function putMany(records: Rec[], context: WriteContext, events: Omit<Audit, "id" | "at" | "actor" | "organizationId">[] = [], expectedOrgId?: string, expectedRevisions: Record<string, number> = {}): Promise<void> {
   if (records.length === 0 && events.length === 0) return;
   const scopeId = expectedOrgId ?? records[0]?.organizationId;
   if (!scopeId) throw new Error("Bulk audit events require an organization scope.");
@@ -183,6 +183,20 @@ export async function putMany(records: Rec[], context: WriteContext, events: Omi
       for (const original of existing) {
         if (original && original.organizationId !== scopeId) {
           throw new OrganizationScopeError(original.id, scopeId, original.organizationId);
+        }
+      }
+      // Compare-and-swap *inside* the same transaction that writes the records.
+      // A stale deal cannot write a new invoice and then fail its own update.
+      // New records must not overwrite an existing ID.
+      for (const [index, record] of records.entries()) {
+        const original = existing[index];
+        const expected = expectedRevisions[record.id];
+        if (expected !== undefined) {
+          if (!original || original.revision !== expected) {
+            throw new ConflictError(record.id, expected, original?.revision ?? -1);
+          }
+        } else if (original && record.revision === 1) {
+          throw new ConflictError(record.id, 0, original.revision);
         }
       }
       await db.records.bulkPut(records);
