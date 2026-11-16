@@ -4,6 +4,7 @@ import { ArrowRight, Building2, CalendarDays, CheckSquare, ChevronRight, FolderK
 import { APP_ENTRIES, NAV_GROUPS } from "@/app/nav";
 import { ContextualCreate } from "@/app/ContextualCreate";
 import { WorkspaceContinuity } from "@/app/WorkspaceContinuity";
+import { ResourceLibrary } from "@/app/ResourceLibrary";
 import { TaskApprovalBoard } from "@/app/TaskApprovalBoard";
 import { AgentWorkBoard } from "@/app/AgentWorkBoard";
 import { appEntry } from "@/app/catalog";
@@ -59,7 +60,7 @@ function SpaceDetail({ record, kind, all, slug }: { record: Rec; kind: "departme
     {tab === "ai workforce" && <AgentWorkBoard scope={{type:kind,id:record.id}}/>}
     {tab === "approvals" && <TaskApprovalBoard scope={{type: kind, id: record.id}}/>}
     {tab === "people" && <div className="ws-stack"><WorkList title="AI collaborators" records={agents} slug={slug} fallback="No AI collaborators linked." /><p className="ws-note">People and invitations are managed in the native People and Administration applications. Space membership is not a security boundary until server-backed access policies are configured.</p><RowLink title="Open people" to={appEntry("HR", slug)} /></div>}
-    {tab === "files" && <WorkList title="Linked documents" records={docs} slug={slug} fallback="No files linked to this space." />}
+    {tab === "files" && <ResourceLibrary scope={{type:kind,id:record.id,title:record.title}}/>}
     {tab === "conversations" && <div className="ws-stack"><WorkList title="Linked channels" records={channels} slug={slug} fallback="No channels linked to this space." /><RowLink title="Open Communications" to={appEntry("COMMS",slug)} /></div>}
     {tab === "activity" && <div className="ws-stack"><p className="ws-note">Record last updated {new Date(record.updatedAt).toLocaleDateString()}. For the full audit history, open the source record.</p><RowLink title={"Open "+kind+" record"} to={routeForRecord(record,slug) ?? workAreaPath(slug,kind==="department"?"spaces":"work")} /></div>}
   </div>;
@@ -74,6 +75,7 @@ export function WorkspaceSideNav() {
     <div className="hq-appnav-head"><h2>{headings[area]}</h2><p>{WORK_AREAS.find(item=>item.id===area)?.description}</p></div>
     <div className="hq-appnav-body">{WORK_AREAS.map(item => <NavLink key={item.id} className="hq-navlink" to={workAreaPath(org.slug,item.id)}><item.icon size={16}/>{item.label}</NavLink>)}
       <NavLink className="hq-navlink" to={`/o/${org.slug}/workspace/recent`}><Clock3 size={16}/>Recent & saved</NavLink>
+      <NavLink className="hq-navlink" to={`/o/${org.slug}/workspace/resources`}><FolderKanban size={16}/>Files & resources</NavLink>
       <div className="hq-navsection">TOOLS</div>
       <NavLink className="hq-navlink" to={appEntry("INBOX",org.slug)}><Inbox size={16}/>Inbox</NavLink>
       <NavLink className="hq-navlink" to={appEntry("PROJECT",org.slug)}><CheckSquare size={16}/>Projects</NavLink>
@@ -100,6 +102,7 @@ export function WorkspaceNavigation() {
   const pinned = new Set(preferences.filter(p => p.fields.pinned === true).map(p => String(p.fields.app)));
   const appGroups = useMemo(() => NAV_GROUPS.map(group => ({ ...group, apps: group.apps.filter(app => canOpen(role, app.code) && (`${app.short} ${group.label}`).toLowerCase().includes(query.toLowerCase())) })).filter(group => group.apps.length), [role, query]);
 
+  if (path[4] === "resources") return <div className="ws-content"><header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / SHARED RESOURCES</span><h1>Files & resources</h1><p>Organise company documents into folders, preview content, and connect resources to projects and departments.</p><div className="ws-page-actions"><ContextualCreate label="Create document"/></div></header><ResourceLibrary/></div>;
   if (path[4] === "recent") return <div className="ws-content"><header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / CONTINUE WORKING</span><h1>Recent and saved work</h1><p>Return to the applications and workspaces you have opened in this organisation.</p></header><WorkspaceContinuity /></div>;
   if (detailKind) return detail ? <SpaceDetail key={detail.id} record={detail} kind={detailKind} all={data} slug={org.slug}/> : <div className="ws-content"><h1>Space not found</h1><p>This space is not available in this organisation.</p><Link to={workAreaPath(org.slug,area)}>Back to {headings[area]}</Link></div>;
   return <div className="ws-content">
@@ -109,6 +112,7 @@ export function WorkspaceNavigation() {
       <div className="ws-stat-grid"><div><small>My assigned tasks</small><strong>{tasks.filter(t => t.ownerName === actor || t.fields.assignee === actor).length}</strong></div><div><small>Active projects</small><strong>{projects.filter(p => !["completed","archived","cancelled"].includes(p.status)).length}</strong></div><div><small>Open missions</small><strong>{missions.filter(m => !["completed","cancelled"].includes(m.status)).length}</strong></div></div>
       <WorkList title="Assigned work" records={tasks.filter(t=> t.ownerName === actor || t.fields.assignee === actor).slice(0,10)} slug={org.slug} fallback="No tasks currently assigned to this view." />
       <WorkList title="Recently updated documents" records={[...docs].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)).slice(0,6)} slug={org.slug} fallback="No documents in this workspace yet." />
+      <RowLink to={`/o/${org.slug}/workspace/resources`} title="Files & resources" detail="Browse company documents, folders and linked resources" icon={FolderKanban}/>
       <div className="ws-shortcuts"><RowLink to={appEntry("INBOX",org.slug)} title="Inbox and approvals" icon={Inbox} /><RowLink to={appEntry("BOOK",org.slug)} title="Calendar and bookings" icon={CalendarDays} /></div>
     </div>}
     {area === "company" && <div className="ws-stack"><div className="ws-stat-grid"><div><small>Departments</small><strong>{departments.length}</strong></div><div><small>People records</small><strong>{members.length}</strong></div><div><small>Active missions</small><strong>{missions.filter(m=>m.status==="running").length}</strong></div></div><WorkList title="Company objectives" records={(data.objectives ?? empty).slice(0,8)} slug={org.slug} fallback="No company objectives recorded."/><div className="ws-shortcuts"><RowLink to={appEntry("HQ",org.slug)} title="Executive headquarters" icon={Building2}/><RowLink to={appEntry("BRAIN",org.slug)} title="Company Brain" icon={Layers}/><RowLink to={appEntry("ADMIN",org.slug)} title="Company administration" icon={Users}/></div></div>}
