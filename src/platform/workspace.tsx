@@ -1,6 +1,6 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import type { Audit, Rec, Role } from "@/domain/types";
 import { db } from "@/runtime/db";
 import { useUi } from "@/runtime/ui";
@@ -44,10 +44,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const params = useParams();
   const clock = useClock();
   const role = useUi((state) => state.role);
-  const org = orgBySlug(params.org) ?? ORGS[0];
+  const matchedOrg = orgBySlug(params.org);
+  const org = matchedOrg ?? ORGS[0];
   const now = clock.now();
   const nowIso = now.toISOString();
-  const actor = ACTOR_BY_ROLE[role];
+  // Local companies must never inherit a seeded company's identity.
+  // Unassigned role views use the company's owner as the acting local reviewer.
+  const actor = org.ownerName ?? ACTOR_BY_ROLE[role];
 
   const value = useMemo<WorkspaceValue>(() => ({
     org,
@@ -63,6 +66,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     relative: (input) => formatRelative(input, new Date(nowIso), org.locale),
   }), [org, role, actor, nowIso]);
 
+  if (!matchedOrg) {
+    return (
+      <main role="alert" style={{ maxWidth: 600, margin: "10vh auto", padding: 32 }}>
+        <h1>Organization not found</h1>
+        <p>This workspace address does not belong to an available organization. No company records have been opened.</p>
+        <Link to="/o/northline/hq/home">Return to the available workspace</Link>
+      </main>
+    );
+  }
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }
 
@@ -135,7 +147,7 @@ export function useOrgRecords(): Rec[] {
 
 export interface Mutations {
   create: (input: Omit<repo.NewRecordInput, "organizationId" | "currency"> & { currency?: string }, event?: string) => Promise<Rec>;
-  patch: (id: string, patch: Partial<Rec>, options?: Omit<repo.PatchOptions, "event"> & { event?: string }) => Promise<Rec | null>;
+  patch: (id: string, patch: Partial<Rec>, options?: Omit<repo.PatchOptions, "event" | "expectedOrganizationId"> & { event?: string }) => Promise<Rec | null>;
   remove: (id: string, event?: string) => Promise<void>;
   putMany: (records: Rec[], messages?: string[]) => Promise<void>;
   log: (message: string, options?: { entityId?: string; type?: string; capability?: Audit["capability"] }) => Promise<void>;
@@ -159,9 +171,14 @@ export function useMutations(screenId?: string): Mutations {
       try {
         return await repo.patchRecord(id, patch, ctx, {
           ...options,
+          expectedOrganizationId: org.id,
           event: options?.event ? { type: "update", message: options.event } : undefined,
         });
       } catch (error) {
+        if (error instanceof repo.OrganizationScopeError) {
+          pushToast({ title: "Action blocked", body: "This record belongs to a different organization.", tone: "blocked" });
+          return null;
+        }
         if (error instanceof repo.ConflictError) {
           pushToast({
             title: "This record changed elsewhere",
@@ -175,11 +192,19 @@ export function useMutations(screenId?: string): Mutations {
     },
     async remove(id, event) {
       const ctx = context();
-      await repo.deleteRecord(id, ctx, event ? { type: "delete", message: event } : undefined);
+      try {
+        await repo.deleteRecord(id, ctx, event ? { type: "delete", message: event } : undefined, org.id);
+      } catch (error) {
+        if (error instanceof repo.OrganizationScopeError) {
+          pushToast({ title: "Action blocked", body: "This record belongs to a different organization.", tone: "blocked" });
+          return;
+        }
+        throw error;
+      }
     },
     async putMany(records, messages = []) {
       const ctx = context();
-      await repo.putMany(records, ctx, messages.map((message) => ({ type: "update", message })));
+      await repo.putMany(records, ctx, messages.map((message) => ({ type: "update", message })), org.id);
     },
     async log(message, options) {
       const ctx = context();

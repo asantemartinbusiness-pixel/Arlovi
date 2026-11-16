@@ -796,8 +796,10 @@ export function DataRequestOverlay({ context, close }: { context: ScreenContext;
             try {
               const header = "collection,id,title,status,summary,updated\n";
               const body = matching.map((record) => [record.collection, record.id, record.title, record.status, record.summary, record.updatedAt].map(quote).join(",")).join("\n");
+              // Persist the audit receipt before initiating a browser download,
+              // so a navigation cannot lose the evidence of preparation.
+              await context.mutate.patch(request.id, { fields: { exportPreparedAt: context.now.toISOString(), exportPreparedBy: context.actor } }, { event: `Subject data export prepared for ${subject} (${matching.length} records)` });
               download(`${context.org.slug}-${subject.replace(/\W+/g, "-").toLowerCase()}-data.csv`, header + body);
-              await context.mutate.patch(request.id, { fields: { ...request.fields, exportedAt: context.now.toISOString(), exportedBy: context.actor } }, { event: `Subject data exported for ${subject} (${matching.length} records)` });
               context.toast("Copy prepared", `${matching.length} records downloaded as CSV, and the request records that it happened.`);
             } finally { setBusy(false); }
           }}

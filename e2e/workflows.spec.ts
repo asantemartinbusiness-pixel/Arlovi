@@ -1294,6 +1294,8 @@ test("WF-19 Sensitive data deletion/export: legal hold refuses erasure, export s
   await action(page, "Export subject data");
   await expect.soft(dialog(page).getByText(new RegExp(`^${registerSam} across`)), `DEFECT: /admin/privacy Requests — the register says Sam Okafor's access request covers ${registerSam} records; 'Export subject data' matches 0, so the export would be empty`).toBeVisible();
   await dialog(page).getByRole("button", { name: "Export their data" }).click();
+  // Wait for the actual local audit write, not just the download-button click.
+  await expect(page.getByText("Copy prepared", { exact: true })).toBeVisible();
   // Downstream connectors are not reached; the evidence is the audit entry.
   await open(page, "/admin/audit", "Audit Trail");
   await main(page).getByRole("searchbox").first().fill("Sam Okafor");

@@ -17,10 +17,10 @@ function DataTableFallback({ caption, series, format }: { caption: string; serie
   return (
     <table className="ds-sr-only">
       <caption>{caption}</caption>
-      <thead><tr><th scope="col">Period</th>{series.map((item) => <th key={item.name} scope="col">{item.name}</th>)}</tr></thead>
+      <thead><tr><th scope="col">Period</th>{series.map((item, seriesIndex) => <th key={`${item.name}-${seriesIndex}`} scope="col">{item.name}</th>)}</tr></thead>
       <tbody>
         {labels.map((label, index) => (
-          <tr key={label}><th scope="row">{label}</th>{series.map((item) => <td key={item.name}>{format(item.points[index]?.value ?? 0)}</td>)}</tr>
+          <tr key={`${label}-${index}`}><th scope="row">{label}</th>{series.map((item, seriesIndex) => <td key={`${item.name}-${seriesIndex}`}>{format(item.points[index]?.value ?? 0)}</td>)}</tr>
         ))}
       </tbody>
     </table>
@@ -54,7 +54,7 @@ export function BarChart({
         {labels.map((label, index) => {
           let stackY = padT + plotH;
           return (
-            <g key={label}>
+            <g key={`${label}-${index}`}>
               {series.map((item, si) => {
                 const value = item.points[index]?.value ?? 0;
                 const h = Math.max(0, (value / max) * plotH);
@@ -62,7 +62,7 @@ export function BarChart({
                   ? padL + slot * index + slot / 2 - barW / 2
                   : padL + slot * index + slot / 2 - (barW * series.length) / 2 + barW * si;
                 const y = stacked ? (stackY -= h) : padT + plotH - h;
-                return <rect key={item.name} x={x} y={y} width={barW} height={h} rx={3} fill={item.color ?? SERIES_VARS[si % SERIES_VARS.length]} />;
+                return <rect key={`${item.name}-${si}`} x={x} y={y} width={barW} height={h} rx={3} fill={item.color ?? SERIES_VARS[si % SERIES_VARS.length]} />;
               })}
               <text className="ds-axis" x={padL + slot * index + slot / 2} y={height - 8} textAnchor="middle">{label}</text>
             </g>
@@ -73,7 +73,7 @@ export function BarChart({
       {series.length > 1 && (
         <div className="ds-chart-legend">
           {series.map((item, index) => (
-            <span key={item.name}><i className="ds-swatch" style={{ background: item.color ?? SERIES_VARS[index % SERIES_VARS.length] }} />{item.name}</span>
+            <span key={`${item.name}-${index}`}><i className="ds-swatch" style={{ background: item.color ?? SERIES_VARS[index % SERIES_VARS.length] }} />{item.name}</span>
           ))}
         </div>
       )}
@@ -105,10 +105,10 @@ export function LineChart({
           const color = item.color ?? SERIES_VARS[si % SERIES_VARS.length];
           const d = item.points.map((point, index) => `${index === 0 ? "M" : "L"} ${padL + step * index} ${padT + plotH - (point.value / max) * plotH}`).join(" ");
           return (
-            <g key={item.name}>
+            <g key={`${item.name}-${si}`}>
               <path d={d} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
               {item.points.map((point, index) => (
-                <circle key={point.label} cx={padL + step * index} cy={padT + plotH - (point.value / max) * plotH} r={3} fill={color}>
+                <circle key={`${point.label}-${index}`} cx={padL + step * index} cy={padT + plotH - (point.value / max) * plotH} r={3} fill={color}>
                   <title>{`${item.name} · ${point.label} · ${format(point.value)}`}</title>
                 </circle>
               ))}
@@ -116,14 +116,14 @@ export function LineChart({
           );
         })}
         {labels.map((label, index) => (
-          <text key={label} className="ds-axis" x={padL + step * index} y={height - 8} textAnchor="middle">{label}</text>
+          <text key={`${label}-${index}`} className="ds-axis" x={padL + step * index} y={height - 8} textAnchor="middle">{label}</text>
         ))}
       </svg>
       <DataTableFallback caption={title} series={series} format={format} />
       {series.length > 1 && (
         <div className="ds-chart-legend">
           {series.map((item, index) => (
-            <span key={item.name}><i className="ds-swatch" style={{ background: item.color ?? SERIES_VARS[index % SERIES_VARS.length] }} />{item.name}</span>
+            <span key={`${item.name}-${index}`}><i className="ds-swatch" style={{ background: item.color ?? SERIES_VARS[index % SERIES_VARS.length] }} />{item.name}</span>
           ))}
         </div>
       )}
@@ -148,7 +148,7 @@ export function DonutChart({ points, title, format = (value) => String(value), s
             const dash = fraction * circumference;
             const element = (
               <circle
-                key={point.label}
+                key={`${point.label}-${index}`}
                 cx={size / 2} cy={size / 2} r={radius} fill="none"
                 stroke={SERIES_VARS[index % SERIES_VARS.length]} strokeWidth={18}
                 strokeDasharray={`${dash} ${circumference - dash}`} strokeDashoffset={-offset}
@@ -161,7 +161,7 @@ export function DonutChart({ points, title, format = (value) => String(value), s
       </svg>
       <div className="ds-stack ds-gap-2">
         {points.map((point, index) => (
-          <span key={point.label} className="ds-row ds-gap-2" style={{ fontSize: "var(--text-sm)" }}>
+          <span key={`${point.label}-${index}`} className="ds-row ds-gap-2" style={{ fontSize: "var(--text-sm)" }}>
             <i className="ds-swatch" style={{ background: SERIES_VARS[index % SERIES_VARS.length] }} />
             <span className="ds-grow">{point.label}</span>
             <strong className="ds-num">{format(point.value)}</strong>

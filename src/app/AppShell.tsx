@@ -5,8 +5,10 @@ import { Button, Pill, Row } from "@/design-system";
 import { Menu } from "@/design-system/overlays";
 import { ArloviMark, brand, palettes } from "@/app/brand";
 import { NAV_GROUPS, APP_ENTRIES, mobileNavFor } from "@/app/nav";
-import { appEntry, screens } from "@/app/catalog";
+import { appEntry, findScreen, screens } from "@/app/catalog";
+import { destinationForOrganization } from "@/app/organizationNavigation";
 import { ScreenHost } from "@/app/ScreenHost";
+import { FirstRunGuide } from "@/app/FirstRunGuide";
 import { ScreenErrorBoundary } from "@/app/ErrorBoundary";
 import { applicationLoadFailures } from "@/applications";
 import { CommandPalette } from "@/app/CommandPalette";
@@ -18,6 +20,7 @@ import { canOpen, ROLE_LABELS } from "@/platform/policy";
 import { ORGS } from "@/platform/org";
 import { useCollections, useWorkspace, useMutations } from "@/platform/workspace";
 import { buildAttention, filterForRole, attentionCounts } from "@/platform/attention";
+import { applyAttentionReceipts } from "@/platform/attentionReceipts";
 import { useUi } from "@/runtime/ui";
 import type { Role } from "@/domain/types";
 import "@/app/shell.css";
@@ -29,17 +32,14 @@ export function AppShell() {
   const { org, role, now } = useWorkspace();
   const mutate = useMutations();
   const [navOpen, setNavOpen] = useState(false);
+  const keyboardHint = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.userAgent) ? "⌘K" : "Ctrl+K";
 
-  const activeScreen = useMemo(() => {
-    const parts = location.pathname.split("/").filter(Boolean);
-    const segment = parts[2];
-    return screens.find((screen) => screen.route.split("/")[3] === segment);
-  }, [location.pathname]);
+  const activeScreen = useMemo(() => findScreen(location.pathname)?.screen, [location.pathname]);
   const activeCode = activeScreen?.applicationCode ?? "HQ";
   const appModule = getApp(activeCode);
 
-  const data = useCollections(["notifications", "invoices", "bills", "tasks", "missions", "deals", "leaveRequests", "expenses", "organizations"]);
-  const attention = useMemo(() => filterForRole(buildAttention({
+  const data = useCollections(["notifications", "invoices", "bills", "tasks", "missions", "deals", "leaveRequests", "expenses", "organizations", "preferences"]);
+  const attention = useMemo(() => applyAttentionReceipts(filterForRole(buildAttention({
     notifications: data.notifications,
     invoices: data.invoices,
     bills: data.bills,
@@ -48,8 +48,27 @@ export function AppShell() {
     approvals: [...data.invoices, ...data.bills, ...data.expenses, ...data.deals, ...data.leaveRequests, ...data.missions],
     orgSlug: org.slug,
     now,
-  }), role), [data, org.slug, now, role]);
+  }), role), ui.attentionReceipts, org.id, role), [data, org.slug, org.id, now, role, ui.attentionReceipts]);
   const counts = attentionCounts(attention);
+  const favourites = useMemo(() => {
+    const pinned = new Set(data.preferences.filter((pref) => pref.fields.pinned === true).map((pref) => String(pref.fields.app)));
+    return NAV_GROUPS.flatMap((group) => group.apps).filter((app) => pinned.has(app.short) && canOpen(role, app.code));
+  }, [data.preferences, role]);
+  const railGroups = favourites.length ? [{ label: "Favourites", apps: favourites }, ...NAV_GROUPS] : NAV_GROUPS;
+  const activePreference = data.preferences.find((item) => item.fields.app === APP_ENTRIES[activeCode]?.short);
+  const activePinned = activePreference?.fields.pinned === true;
+
+  async function toggleFavourite() {
+    const app = APP_ENTRIES[activeCode];
+    if (!app) return;
+    if (activePreference) {
+      await mutate.patch(activePreference.id, { fields: { pinned: !activePinned } }, { event: `${app.short} ${activePinned ? "removed from" : "added to"} favourites` });
+    } else {
+      await mutate.create({ collection: "preferences", title: `App preference: ${app.short}`, status: "active",
+        fields: { app: app.short, pinned: true, mode: "native_local" },
+        summary: "Application is pinned in the local navigation." }, `${app.short} added to favourites`);
+    }
+  }
 
   const paused = data.organizations.find((record) => record.id === org.id)?.fields.executionPaused === true;
 
@@ -81,6 +100,10 @@ export function AppShell() {
 
   useEffect(() => { setNavOpen(false); }, [location.pathname]);
 
+  useEffect(() => {
+    try { localStorage.setItem("arlovi-last-workspace", org.slug); } catch { /* optional local preference */ }
+  }, [org.slug]);
+
   return (
     <div className="hq" data-nav-open={navOpen ? "true" : "false"}>
       <a className="ds-skip" href="#main">Skip to content</a>
@@ -104,15 +127,14 @@ export function AppShell() {
               <ChevronDown size={14} />
             </button>
           }
-          items={ORGS.map((item) => ({
-            label: item.id === org.id ? `${item.name} · current` : item.name,
-            group: "Organisations",
-            onSelect: () => {
-              const parts = location.pathname.split("/");
-              parts[2] = item.slug;
-              navigate(parts.join("/"));
-            },
-          }))}
+          items={[
+            ...ORGS.map((item) => ({
+              label: item.id === org.id ? `${item.name} · current` : item.name,
+              group: "Organisations",
+              onSelect: () => navigate(destinationForOrganization(location.pathname, location.search, item.slug)),
+            })),
+            { label: "Create another company", group: "Company", separatorBefore: true, onSelect: () => navigate("/setup") },
+          ]}
         />
 
         <span className="ds-grow" />
@@ -120,7 +142,7 @@ export function AppShell() {
         <button type="button" className="hq-search" onClick={() => ui.setCommand(true)} aria-label={`Search ${org.shortName}`} aria-keyshortcuts="Control+K Meta+K">
           <Search size={15} />
           <span className="ds-grow" style={{ textAlign: "start" }}>Search {org.shortName}</span>
-          <kbd className="ds-kbd">⌘K</kbd>
+          <kbd className="ds-kbd">{keyboardHint}</kbd>
         </button>
 
         <Button variant="primary" size="sm" icon={<Sparkles size={15} />} aria-label={brand.ask} onClick={() => ui.setAsk(true)}>
@@ -145,6 +167,8 @@ export function AppShell() {
               group: "Role view (not a security boundary)",
               onSelect: () => ui.setRole(item),
             })),
+            { label: `${activePinned ? "Remove" : "Pin"} ${APP_ENTRIES[activeCode]?.short ?? "this app"} ${activePinned ? "from" : "to"} favourites`, group: "Navigation", separatorBefore: true, onSelect: () => { void toggleFavourite(); } },
+            ...(org.ownerName ? [{ label: "Review company setup", group: "Navigation", onSelect: () => navigate(`/o/${org.slug}/hq/home?gettingStarted=1`) }] : []),
             { label: ui.theme === "light" ? "Dark appearance" : "Light appearance", group: "Appearance", separatorBefore: true, onSelect: () => ui.setTheme(ui.theme === "light" ? "dark" : "light") },
             ...(["comfortable", "balanced", "compact"] as const).map((item) => ({
               label: item === ui.density ? `Density: ${item} · current` : `Density: ${item}`,
@@ -168,7 +192,7 @@ export function AppShell() {
         <button type="button" className="hq-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />
 
         <nav className="hq-rail" aria-label="Applications">
-          {NAV_GROUPS.map((group, index) => {
+          {railGroups.map((group, index) => {
             const apps = group.apps.filter((app) => canOpen(role, app.code));
             if (apps.length === 0) return null;
             return (
@@ -266,6 +290,7 @@ export function AppShell() {
               )}
             </div>
           )}
+          {org.ownerName && location.pathname === `/o/${org.slug}/hq/home` && <FirstRunGuide />}
           <ScreenErrorBoundary resetKey={location.pathname} label={activeScreen?.title ?? "This screen"}>
             <ScreenHost />
           </ScreenErrorBoundary>
