@@ -33,7 +33,7 @@ export function destinationForOrganization(pathname: string, search: string, tar
 
   const nextPath = pathname.replace(/^\/o\/[^/]+(?=\/|$)/, `/o/${targetSlug}`);
   const query = new URLSearchParams(search);
-  for (const key of ["overlay", "selected", "record", "id", "tab", "modal", "drawer"]) query.delete(key);
+  for (const key of ["overlay", "selected", "record", "id", "modal", "drawer"]) query.delete(key);
   const suffix = query.toString();
   return suffix ? `${nextPath}?${suffix}` : nextPath;
 }
