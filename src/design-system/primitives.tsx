@@ -158,11 +158,66 @@ export function StatRow({ children }: { children: ReactNode }) {
   return <div className="ds-statrow">{children}</div>;
 }
 
+/* ---------------- Sculpture ----------------
+   A small glossy rounded object with two ink marks: the friendly counterpoint
+   to an otherwise architectural grid. Decorative; always aria-hidden. */
+const SCULPT_HUES = [
+  { base: "#ffc9ff", edge: "#e79de7" },
+  { base: "#b5e9ca", edge: "#84c9a0" },
+  { base: "#c9c3ff", edge: "#9b92ee" },
+  { base: "#b9d3ff", edge: "#86aaee" },
+  { base: "#ffcdae", edge: "#eba27a" },
+];
+
+export function Sculpture({ seed = "", size = 72 }: { seed?: string; size?: number }) {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  const hue = SCULPT_HUES[hash % SCULPT_HUES.length];
+  const id = `sc-${hash.toString(36)}`;
+  const flip = hash % 2 === 0;
+  return (
+    <svg width={size} height={size} viewBox="0 0 80 80" aria-hidden="true" focusable="false" className="ds-sculpture">
+      <defs>
+        <radialGradient id={id} cx="32%" cy="28%" r="80%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.55" />
+          <stop offset="35%" stopColor={hue.base} />
+          <stop offset="100%" stopColor={hue.edge} />
+        </radialGradient>
+        <filter id={`${id}-b`} x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.6" /></filter>
+      </defs>
+      <ellipse cx="40" cy="70" rx="23" ry="4.5" fill="#0d0d0d" opacity="0.16" filter={`url(#${id}-b)`} />
+      <g transform={flip ? "translate(80 0) scale(-1 1)" : undefined}>
+        <circle cx="29" cy="44" r="20" fill={`url(#${id})`} />
+        <circle cx="48" cy="38" r="17" fill={`url(#${id})`} />
+        <ellipse cx="22" cy="33" rx="6.5" ry="3.6" fill="#fff" opacity="0.4" transform="rotate(-28 22 33)" />
+        <ellipse cx="34" cy="43" rx="2.1" ry="3.4" fill="#0d0d0d" />
+        <ellipse cx="45" cy="41" rx="2.1" ry="3.4" fill="#0d0d0d" />
+      </g>
+    </svg>
+  );
+}
+
+/** A thin pink route with circular nodes: connective tissue between chapters.
+ *  The path stretches with the width; nodes are HTML so they stay round. */
+export function RoutingLine({ nodes }: { nodes: { icon: ReactNode; label: string }[] }) {
+  const spots = [{ x: 6, y: 23 }, { x: 50, y: 73 }, { x: 94, y: 23 }];
+  return (
+    <div className="ds-routing" aria-hidden="true">
+      <svg viewBox="0 0 1000 96" preserveAspectRatio="none" focusable="false">
+        <path d="M0 22 H330 C370 22 370 70 410 70 H590 C630 70 630 22 670 22 H1000" fill="none" stroke="var(--blush-edge)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+      </svg>
+      {nodes.slice(0, spots.length).map((node, i) => (
+        <span key={node.label} className="ds-routing-node" style={{ left: `${spots[i].x}%`, top: `${spots[i].y}%` }}>{node.icon}</span>
+      ))}
+    </div>
+  );
+}
+
 /* ---------------- Empty / loading ---------------- */
 export function Empty({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="ds-empty">
-      {icon && <div className="ds-empty-icon" aria-hidden="true">{icon}</div>}
+      {icon && <div className="ds-empty-icon" aria-hidden="true"><Sculpture seed={title} size={80} /></div>}
       <h3>{title}</h3>
       {children && <p className="ds-prose">{children}</p>}
       {action}

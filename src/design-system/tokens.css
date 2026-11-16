@@ -1,13 +1,13 @@
 /* ==========================================================================
-   Arlovi design tokens
+   Arlovi design tokens — "Connected work" system
 
-   Brand (approved, fixed): Electric Cobalt #234FE8 · Papaya #FFAE7C · Aqua #36C5BA
-   Neutrals: warm paper and graphite, not blue-grey. On a warm ground cobalt
-   reads as ink rather than as a default interface blue, and papaya and aqua
-   become annotation colours, which is the role the brand direction gives them.
+   Light-first and architectural: white and near-black carry the page, thin
+   grotesk type carries the confidence, capsules carry the actions. Colour
+   belongs to the things doing the work — blush marks what is selected, and
+   cobalt, papaya and aqua stay with data, people and agents.
 
-   Materials: an element that asserts a fact carries a provenance edge —
-   posted, human, agent or unknown. That is the one signature device.
+   Signature (kept from the original system): an element that asserts a fact
+   carries a provenance edge — posted, human, agent or unknown.
    ========================================================================== */
 
 :root {
@@ -39,37 +39,53 @@
   --aqua-600: #0d7c76;
   --aqua-700: #10625e;
 
-  /* ---- Warm neutral axis ---- */
+  /* ---- Neutral axis (true neutrals; names kept for existing references) ---- */
   --paper-0: #ffffff;
-  --paper-25: #fcfbf9;
-  --paper-50: #f6f4f0;
-  --paper-100: #edeae4;
-  --paper-200: #e0dcd4;
-  --paper-300: #cac5ba;
-  --paper-400: #9c978c;
-  --graphite-500: #6f6b64;
-  --graphite-600: #54514b;
-  --graphite-700: #3c3a35;
-  --graphite-800: #282724;
-  --graphite-900: #1a1917;
+  --paper-25: #fafafa;
+  --paper-50: #fafafa;
+  --paper-100: #f3f3f3;
+  --paper-200: #e7e7e7;
+  --paper-300: #cfcfcf;
+  --paper-400: #9a9a9a;
+  --graphite-500: #6e6e6e;
+  --graphite-600: #565656;
+  --graphite-700: #3d3d3d;
+  --graphite-800: #1f1f1f;
+  --graphite-900: #0d0d0d;
+
+  /* ---- Blush: the one selection colour ---- */
+  --blush: #ffc9ff;
+  --blush-soft: #fff0ff;
+  --blush-edge: #f0a6f0;
+  --mint: #b5e9ca;
+  --mint-ink: #004232;
 
   /* ---- Surfaces ---- */
-  --bg-canvas: var(--paper-50);
+  --bg-canvas: var(--paper-25);
   --bg-surface: var(--paper-0);
   --bg-raised: var(--paper-0);
   --bg-sunken: var(--paper-100);
   --bg-inset: var(--paper-25);
-  --bg-overlay: rgb(26 25 23 / 46%);
-  --bg-hover: rgb(26 25 23 / 4%);
-  --bg-selected: rgb(35 79 232 / 7%);
+  --bg-overlay: rgb(13 13 13 / 52%);
+  --bg-hover: #f3f3f3;
+  --bg-selected: var(--blush-soft);
+  --bg-stage: #0d0d0d;
+
+  /* ---- Actions: ink capsules; blush when selected ---- */
+  --action-bg: #0d0d0d;
+  --action-fg: #ffffff;
+  --action-hover-bg: #3d3d3d;
+  --selected-bg: var(--blush);
+  --selected-fg: #0d0d0d;
 
   /* ---- Text ---- */
-  --fg-default: var(--graphite-800);
+  --fg-default: #0d0d0d;
   --fg-strong: var(--graphite-900);
   --fg-muted: var(--graphite-600);
   --fg-subtle: var(--graphite-500);
   --fg-on-accent: #ffffff;
   --fg-link: var(--cobalt-600);
+  --fg-on-stage: #ffffff;
 
   /* ---- Lines ---- */
   --border-subtle: var(--paper-100);
@@ -85,9 +101,9 @@
   --accent-border: var(--cobalt-200);
 
   /* ---- Status (semantic, independent of brand hue) ---- */
-  --success: #0b6b43;
-  --success-soft: #e6f3ec;
-  --success-border: #a8d6bf;
+  --success: #004232;
+  --success-soft: #b5e9ca;
+  --success-border: #b5e9ca;
   --warning: #8a5a00;
   --warning-soft: #fbf1df;
   --warning-border: #e8cd9c;
@@ -101,7 +117,7 @@
   --neutral-fg: var(--graphite-600);
 
   /* ---- Provenance materials: the signature device ---- */
-  --mat-posted: var(--graphite-900);
+  --mat-posted: #0d0d0d;
   --mat-human: var(--cobalt-500);
   --mat-agent: var(--aqua-500);
   --mat-unknown: var(--warning);
@@ -117,11 +133,12 @@
   --series-7: #8d8577;
   --series-8: #9b7b1f;
 
-  /* ---- Elevation: hairlines, not clouds ---- */
-  --shadow-1: 0 1px 1px rgb(26 25 23 / 4%);
-  --shadow-2: 0 2px 6px -2px rgb(26 25 23 / 10%), 0 1px 2px rgb(26 25 23 / 5%);
-  --shadow-3: 0 18px 44px -14px rgb(26 25 23 / 26%), 0 2px 6px rgb(26 25 23 / 7%);
-  --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--cobalt-400);
+  /* ---- Elevation: outlines do the work; only floating layers cast a shadow ---- */
+  --shadow-1: none;
+  --shadow-2: 0 4px 16px -6px rgb(13 13 13 / 14%);
+  --shadow-3: 0 24px 56px -16px rgb(13 13 13 / 30%), 0 2px 8px rgb(13 13 13 / 8%);
+  --shadow-panel: 0 6px 24px -10px rgb(13 13 13 / 20%), 0 1px 3px rgb(13 13 13 / 8%);
+  --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px #4786ff;
 
   /* ---- Geometry (4px scale) ---- */
   --space-0: 0px;
@@ -137,47 +154,49 @@
   --space-10: 64px;
 
   --radius-xs: 3px;
-  --radius-sm: 5px;
-  --radius-md: 7px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
+  --radius-sm: 4px;    /* fields, tiles */
+  --radius-md: 8px;    /* feature cards */
+  --radius-lg: 8px;    /* cards */
+  --radius-xl: 16px;   /* media, dialogs */
+  --radius-band: 20px; /* chapter bands */
+  --radius-pill: 100px;
   --radius-full: 999px;
 
   /* ---- Shell anatomy ---- */
-  --header-h: 60px;
+  --header-h: 68px;
   --rail-w: 64px;
   --appnav-w: 232px;
   --inspector-w: 336px;
   --toolbar-h: 52px;
   --statusbar-h: 30px;
   --page-pad: 32px;
-  --control-h: 38px;
+  --control-h: 40px;
   --control-h-sm: 30px;
   --control-h-lg: 46px;
 
   /* ---- Type ----
-     Display  IBM Plex Sans Condensed — drawn for the relationship between
-              people and machines, which is what this product is about.
-     Data     IBM Plex Mono — ledger figures, codes, identifiers, timestamps.
-     Body     Inter — the right face for dense interface text at 13–15px.     */
-  --font-display: "IBM Plex Sans Condensed", "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "Inter", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+     One grotesk, three weights of attitude. Light (300) carries every large
+     statement; regular and medium carry labels; IBM Plex Mono keeps ledger
+     figures, codes and timestamps honest. TWK Lausanne when licensed. */
+  --font-display: "TWK Lausanne", "Inter", "Helvetica Neue", Helvetica, ui-sans-serif, sans-serif;
+  --font-sans: "TWK Lausanne", "Inter", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
 
-  --text-2xs: 10.5px;
+  --text-2xs: 11px;
   --text-xs: 12px;
-  --text-sm: 13px;
-  --text-base: 14.5px;
+  --text-sm: 13.5px;
+  --text-base: 15px;
   --text-md: 16px;
-  --text-lg: 19px;
-  --text-xl: 23px;
-  --text-2xl: 28px;
-  --text-3xl: 34px;
+  --text-lg: 20px;
+  --text-xl: 26px;
+  --text-2xl: 30px;
+  --text-3xl: 40px;
+  --text-display: 54px;
   --leading-tight: 1.1;
   --leading-normal: 1.5;
-  --tracking-tight: -0.005em;
-  --tracking-tighter: -0.012em;
-  --tracking-label: 0.07em;
+  --tracking-tight: -0.01em;
+  --tracking-tighter: -0.02em;
+  --tracking-label: 0.04em;
 
   /* ---- Motion ---- */
   --dur-hover: 110ms;
@@ -187,77 +206,85 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* ---- Signature gradients: machine surfaces only ---- */
-  --grad-intelligence: linear-gradient(135deg, #10203f 0%, #0d7c76 58%, #64d8ce 100%);
+  /* ---- Machine surfaces: the dark connected stage ---- */
+  --grad-intelligence: #0d0d0d;
   --grad-horizon: linear-gradient(118deg, #1b359b 0%, #234fe8 46%, #ffae7c 100%);
   --grad-ember: linear-gradient(118deg, #8c3e18 0%, #de6c28 52%, #ffcdae 100%);
+  --dot-field: radial-gradient(rgb(255 255 255 / 16%) 1px, transparent 1.2px);
   --hatch-agent: repeating-linear-gradient(135deg, var(--aqua-500) 0 1.5px, transparent 1.5px 4px);
 
   color-scheme: light;
 }
 
+/* Dark: the near-black stage. The primary action inverts to a white capsule. */
 :root[data-theme="dark"] {
-  --bg-canvas: #141311;
-  --bg-surface: #1c1b19;
-  --bg-raised: #232220;
-  --bg-sunken: #100f0e;
-  --bg-inset: #1f1e1c;
-  --bg-overlay: rgb(8 8 7 / 68%);
-  --bg-hover: rgb(255 250 240 / 6%);
-  --bg-selected: rgb(110 139 245 / 16%);
+  --bg-canvas: #0d0d0d;
+  --bg-surface: #161616;
+  --bg-raised: #1c1c1c;
+  --bg-sunken: #0a0a0a;
+  --bg-inset: #131313;
+  --bg-overlay: rgb(0 0 0 / 70%);
+  --bg-hover: rgb(255 255 255 / 7%);
+  --bg-selected: rgb(255 201 255 / 14%);
+  --bg-stage: #000000;
 
-  --fg-default: #ece8e1;
-  --fg-strong: #fbf8f3;
-  --fg-muted: #aaa49a;
-  --fg-subtle: #8d877d;
+  --action-bg: #ffffff;
+  --action-fg: #0d0d0d;
+  --action-hover-bg: #f3f3f3;
+  --selected-bg: #ffc9ff;
+  --selected-fg: #0d0d0d;
+
+  --fg-default: #f3f3f3;
+  --fg-strong: #ffffff;
+  --fg-muted: #b8b8b8;
+  --fg-subtle: #9c9c9c;
   --fg-link: #93a7ec;
 
-  --border-subtle: #2a2825;
-  --border-default: #37342f;
-  --border-strong: #4a463f;
+  --border-subtle: #262626;
+  --border-default: #3a3a3a;
+  --border-strong: #565656;
 
-  --accent: #5f7ff1;
-  --accent-hover: #7b95f5;
-  --accent-active: #9aadf8;
-  /* The dark accent is light, so a filled control carries dark text. */
-  --fg-on-accent: #10121c;
-  --accent-soft: rgb(95 127 241 / 15%);
+  --accent: #6e8bf5;
+  --accent-hover: #8aa2f7;
+  --accent-active: #a6b8f9;
+  --fg-on-accent: #0d0d0d;
+  --accent-soft: rgb(110 139 245 / 16%);
   --accent-soft-fg: #b4c3fb;
   --accent-border: #3b4a86;
 
-  --success: #5dc795;
-  --success-soft: rgb(93 199 149 / 13%);
-  --success-border: rgb(93 199 149 / 32%);
-  --warning: #e0b36a;
-  --warning-soft: rgb(224 179 106 / 13%);
-  --warning-border: rgb(224 179 106 / 32%);
-  --danger: #f08a7c;
-  --danger-soft: rgb(240 138 124 / 13%);
-  --danger-border: rgb(240 138 124 / 32%);
+  --success: #b5e9ca;
+  --success-soft: rgb(181 233 202 / 14%);
+  --success-border: rgb(181 233 202 / 32%);
+  --warning: #e8c27a;
+  --warning-soft: rgb(232 194 122 / 13%);
+  --warning-border: rgb(232 194 122 / 32%);
+  --danger: #f59a8d;
+  --danger-soft: rgb(245 154 141 / 13%);
+  --danger-border: rgb(245 154 141 / 32%);
   --info: #93a7ec;
   --info-soft: rgb(147 167 236 / 13%);
   --info-border: rgb(147 167 236 / 30%);
-  --neutral-soft: #272522;
-  --neutral-fg: #aaa49a;
+  --neutral-soft: #242424;
+  --neutral-fg: #b8b8b8;
 
-  --mat-posted: #fbf8f3;
-  --mat-human: #5f7ff1;
+  --mat-posted: #ffffff;
+  --mat-human: #6e8bf5;
   --mat-agent: #36c5ba;
-  --mat-unknown: #e0b36a;
+  --mat-unknown: #e8c27a;
 
   --series-1: #7b95f5;
   --series-2: #36c5ba;
   --series-3: #f0a06a;
   --series-4: #a08ff0;
-  --series-5: #5dc795;
-  --series-6: #e78fae;
-  --series-7: #a39c90;
+  --series-5: #b5e9ca;
+  --series-6: #ffc9ff;
+  --series-7: #a8a8a8;
   --series-8: #d9b45e;
 
-  --shadow-1: 0 1px 1px rgb(0 0 0 / 28%);
-  --shadow-2: 0 2px 8px -2px rgb(0 0 0 / 44%);
-  --shadow-3: 0 20px 48px -14px rgb(0 0 0 / 62%);
-  --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px #8ba3f8;
+  --shadow-2: 0 4px 16px -6px rgb(0 0 0 / 60%);
+  --shadow-3: 0 24px 56px -16px rgb(0 0 0 / 75%);
+  --shadow-panel: 0 6px 24px -10px rgb(0 0 0 / 70%);
+  --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px #4786ff;
   --hatch-agent: repeating-linear-gradient(135deg, #36c5ba 0 1.5px, transparent 1.5px 4px);
 
   color-scheme: dark;
@@ -294,8 +321,8 @@
 :root[data-palette="teal"][data-theme="dark"],
 :root[data-palette="berry"][data-theme="dark"],
 :root[data-palette="carbon"][data-theme="dark"] {
-  --accent-soft: rgb(255 250 240 / 9%);
-  --accent-soft-fg: #ece8e1;
+  --accent-soft: rgb(255 255 255 / 9%);
+  --accent-soft-fg: #f3f3f3;
 }
 
 :root[data-density="compact"] {
