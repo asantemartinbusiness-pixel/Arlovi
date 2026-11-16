@@ -1,3 +1,4 @@
+import { clockIso } from "@/platform/clock";
 import { useEffect, useState } from "react";
 
 export interface NavigationItem {
@@ -46,7 +47,7 @@ export function recordNavigation(orgId: string, slug: string, pathname: string):
   const current = readNavigation(orgId, slug);
   if (current.recent[0]?.path === pathname) return;
   commit(orgId, { ...current, recent: [
-    { path: pathname, visitedAt: new Date().toISOString() },
+    { path: pathname, visitedAt: clockIso() },
     ...current.recent.filter(item => item.path !== pathname),
   ].slice(0, MAX_RECENT) });
 }
