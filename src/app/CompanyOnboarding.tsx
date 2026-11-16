@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArloviMark } from "@/app/brand";
 import { db } from "@/runtime/db";
+import { clockIso } from "@/platform/clock";
 import type { Audit, Rec } from "@/domain/types";
 import { isOrganizationSlugAvailable, registerLocalOrganization, type OrgProfile } from "@/platform/org";
 import "./onboarding.css";
@@ -89,7 +90,7 @@ export function CompanyOnboarding() {
     const issue = validate(0) || validate(2);
     if (issue) { setError(issue); setStep(issue.includes("department") ? 2 : 0); return; }
     setBusy(true); setError("");
-    const now = new Date().toISOString();
+    const now = clockIso();
     const orgId = "org-" + crypto.randomUUID();
     const profile: OrgProfile = {
       id: orgId, slug: setup.slug, name: setup.company.trim(), shortName: setup.company.trim().split(" ")[0],
@@ -191,7 +192,7 @@ export function CompanyOnboarding() {
                 }} placeholder="Your company name"/>
               </label>
               <label className="onb-field">Company address
-                <span className="onb-hint">ar​lovi / o / {setup.slug || "your-company"}</span>
+                <span className="onb-hint">arlovi / o / {setup.slug || "your-company"}</span>
                 <input required aria-label="Company address" value={setup.slug} onChange={(e)=>change("slug",slugify(e.target.value))} placeholder="your-company"/>
               </label>
               <label className="onb-field">Your name
