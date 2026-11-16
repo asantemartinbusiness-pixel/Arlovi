@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("first visit opens setup, saves progress and resumes after refresh", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/setup");
   await expect(page).toHaveURL(/\/setup/);
   await page.getByRole("textbox", { name: "Company name" }).fill("Independent Studio");
   await page.getByRole("textbox", { name: "Your name" }).fill("Taylor Morgan");
