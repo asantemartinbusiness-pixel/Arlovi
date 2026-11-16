@@ -96,7 +96,7 @@ test.describe("organisation scoping", () => {
     await page.keyboard.press("Escape");
 
     await page.getByRole("button", { name: /Ask Arlovi/ }).first().click();
-    await expect(page.getByText("Reading Harbor Supply only")).toBeVisible();
+    await expect(page.getByText(/Responses are composed from local Harbor Supply records, not from an AI model/)).toBeVisible();
   });
 });
 
