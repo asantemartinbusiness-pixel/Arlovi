@@ -94,6 +94,7 @@ export function CompanyOnboarding() {
     const orgId = "org-" + crypto.randomUUID();
     const profile: OrgProfile = {
       id: orgId, slug: setup.slug, name: setup.company.trim(), shortName: setup.company.trim().split(" ")[0],
+      ownerName: setup.owner.trim(),
       currency: setup.currency, locale: TERRITORIES[setup.territory].locale,
       timezone: setup.timezone, jurisdiction: setup.territory,
       accent: setup.accent,
@@ -141,6 +142,7 @@ export function CompanyOnboarding() {
       });
       persisted = true;
       registerLocalOrganization(profile);
+      try { localStorage.setItem("arlovi-last-workspace", profile.slug); } catch { /* optional browser navigation preference */ }
       try { localStorage.removeItem(KEY); } catch { /* no sensitive data should be kept in this draft */ }
       navigate("/o/" + profile.slug + "/hq/home", { replace: true });
     } catch (cause) {
