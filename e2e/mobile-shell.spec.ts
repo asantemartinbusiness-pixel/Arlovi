@@ -21,7 +21,7 @@ for (const width of [320, 360, 390, 768, 1024, 1366, 1920]) {
       await page.getByRole("button", { name: "Close navigation" }).last().click();
       await expect(page.locator(".hq")).toHaveAttribute("data-nav-open", "false");
     } else {
-      await expect(page.getByRole("navigation", { name: "Applications" })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "Headquarters navigation" })).toBeVisible();
       await expect(page.getByRole("navigation", { name: "Primary" })).toBeHidden();
     }
   });
