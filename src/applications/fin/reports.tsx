@@ -15,6 +15,7 @@ import {
 import type { AccountType, TrialRow } from "@/domain/fin-ledger";
 import { openInvoices, outstandingMinor, useFinData } from "./data";
 import { Amount, LedgerHealth, SourceNote, StatementRow } from "./parts";
+import { statementCsv } from "./statementExport";
 
 /* ---------------------------- FIN-012 ---------------------------- */
 
@@ -42,9 +43,13 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
   }, [wanted, wantedPeriod]);
 
   const scoped = trialForRange(data.accounts, data.journals, org.id, period === "all" ? undefined : { period });
-  const rows = period === "all" ? data.trialRows : scoped.rows;
-  const pl = profitAndLoss(rows);
-  const bs = balanceSheet(data.trialRows);
+  // P&L is movement INSIDE the selected month; the trial balance and balance
+  // sheet are the cumulative position THROUGH that month's end.
+  const cumulative = trialForRange(data.accounts, data.journals, org.id,
+    period === "all" ? undefined : { to: `${period}-31` });
+  const rows = period === "all" ? data.trialRows : cumulative.rows;
+  const pl = profitAndLoss(period === "all" ? rows : scoped.rows);
+  const bs = balanceSheet(rows);
   const flow = cashFlow(data.accounts, data.journals, period === "all" ? undefined : { from: `${period}-01`, to: `${period}-31` });
   const open = openInvoices(data.invoices);
 
@@ -64,7 +69,14 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
           </Select>
         </Field>
         <span className="ds-grow" />
-        <Button variant="secondary" icon={<FileDown size={15} />} onClick={() => exportStatement(context, statement, rows, period)}>Export</Button>
+        <Button variant="secondary" icon={<FileDown size={15} />} onClick={() => {
+          const csv = statementCsv({
+            statement, period, pl, bs, flow, trialRows: rows, invoices: data.invoices,
+          });
+          const scope = statement === "aged" ? "live" : period;
+          downloadFile(`${org.slug}-${statement}-${scope}.csv`, csv, "text/csv");
+          context.toast("Statement exported", `${STATEMENT_LABEL[statement]} exported from posted/local records as ${scope === "live" ? "the live receivables position" : scope}. No external filing occurred.`);
+        }}>Export</Button>
       </Row>
 
       <LedgerHealth
@@ -78,7 +90,7 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
         {period === "all"
           ? `Every posted journal in this workspace: ${data.postedCount} entries.`
           : `${scoped.journalCount} posted journals dated inside ${periodLabel(period, org.locale)}.`}
-        {" "}{data.draftJournals.length} draft{data.draftJournals.length === 1 ? "" : "s"} and every forecast are excluded. The balance sheet is always cumulative, because a balance is not a period figure.
+        {" "}{data.draftJournals.length} draft{data.draftJournals.length === 1 ? "" : "s"} and every forecast are excluded. The selected month shows P&L movements and the cumulative trial balance/balance sheet at month-end. Receivables ageing remains live.
       </Notice>
 
       {statement === "pl" && (
@@ -113,7 +125,7 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
 
       {statement === "bs" && (
         <Grid>
-          <Card prov="posted" eyebrow="BALANCE SHEET" span={6} title="Balance sheet" subtitle={`At ${context.date(now)}, cumulative`}>
+          <Card prov="posted" eyebrow="BALANCE SHEET" span={6} title="Balance sheet" subtitle={period === "all" ? "All posted journals, cumulative" : `At end of ${periodLabel(period, org.locale)}, cumulative`}>
             <StatementRow
               context={context}
               rows={[
@@ -200,6 +212,12 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
         />
       )}
 
+      {statement === "aged" && period !== "all" && (
+        <Notice tone="warning" title="Receivables ageing is a live position">
+          The selected historic month does not reconstruct past invoice allocations. This view and its CSV
+          show invoices outstanding now; choose P&L, balance sheet or cash flow for a historic period.
+        </Notice>
+      )}
       {statement === "aged" && (
         <Grid>
           <Card prov="posted" span={5} title="Receivables ageing" subtitle={`${open.length} open invoices at ${context.date(now)}`}>
