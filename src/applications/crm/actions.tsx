@@ -11,6 +11,7 @@ import { companyById, contactById, contactOfDeal, useCrmData } from "./data";
 import type { CrmData } from "./data";
 import { CapabilityNotice, ConsentPill, Money, StagePill, isExpired } from "./parts";
 import { quoteTotals } from "./quotes";
+import { duplicateQuoteBody, fieldsForQuoteDuplicate } from "./quoteEvidence";
 import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
@@ -521,10 +522,11 @@ export function DuplicateQuote({ context, close }: { context: ScreenContext; clo
           disabled={!number.trim() || taken}
           onClick={async () => {
             setBusy(true);
-            const fields: Record<string, string | number | boolean> = { ...quote.fields, number: number.trim(), version: 1, duplicatedFrom: quote.id };
-            for (const key of ["approvedBy", "approvedAt", "approvedVersion", "approvedGrossMinor", "sentAt", "sentBy", "delivery", "acceptedAt", "discountApproval"]) delete fields[key];
-            const body = { ...(quote.body as Record<string, unknown> ?? {}) };
-            delete body.sends;
+            const fields: Record<string, string | number | boolean> = {
+              ...fieldsForQuoteDuplicate(quote),
+              number: number.trim(), version: 1, duplicatedFrom: quote.id,
+            };
+            const body = duplicateQuoteBody(quote);
             const created = await context.mutate.create({
               collection: "quotes",
               title: `${number.trim()} ${quote.title.replace(/^\S+\s*/, "")}`,
