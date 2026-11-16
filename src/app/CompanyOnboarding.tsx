@@ -28,6 +28,7 @@ interface Setup {
   goal: string;
 }
 const KEY = "arlovi-company-setup-draft-v1";
+const STEP_KEY = "arlovi-company-setup-step-v1";
 const STEPS = ["Company", "Identity", "Knowledge", "Departments", "People", "Intelligence", "Applications", "Collaboration", "Authority", "Launch"];
 const DEFAULT: Setup = {
   company: "", slug: "", owner: "", territory: "GB", currency: "GBP",
@@ -71,12 +72,17 @@ function slugify(value: string): string {
 export function CompanyOnboarding() {
   const navigate = useNavigate();
   const [setup, setSetup] = useState<Setup>(restored);
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => {
+    try { return Math.min(9, Math.max(0, Number(localStorage.getItem(STEP_KEY)) || 0)); } catch { return 0; }
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
     try { localStorage.setItem(KEY, JSON.stringify(setup)); } catch { /* browser restrictions will be checked at finish */ }
   }, [setup]);
+  useEffect(() => {
+    try { localStorage.setItem(STEP_KEY, String(step)); } catch { /* resumable when storage is available */ }
+  }, [step]);
 
   function change<K extends keyof Setup>(key: K, value: Setup[K]) {
     setSetup((current) => ({ ...current, [key]: value }));
@@ -174,7 +180,7 @@ export function CompanyOnboarding() {
       persisted = true;
       registerLocalOrganization(profile);
       try { localStorage.setItem("arlovi-last-workspace", profile.slug); } catch { /* optional browser navigation preference */ }
-      try { localStorage.removeItem(KEY); } catch { /* no sensitive data should be kept in this draft */ }
+      try { localStorage.removeItem(KEY); localStorage.removeItem(STEP_KEY); } catch { /* storage may be disabled */ }
       navigate("/o/" + profile.slug + "/hq/home", { replace: true });
     } catch (cause) {
       if (persisted) {
@@ -263,7 +269,15 @@ export function CompanyOnboarding() {
               <div className="onb-note">Brand rules, typography, logos, assets and advanced customization remain editable inside Arlovi.</div>
             </>}
             {step === 2 && <>
-              <div className="onb-caption">03 / DEPARTMENTS</div><h2>Organize your headquarters.</h2>
+              <div className="onb-caption">03 / KNOWLEDGE</div><h2>Introduce your company to Arlovi.</h2>
+              <p>Store your founding context as a source awaiting human review. Arlovi will not treat this text as verified company knowledge until approved in Company Brain.</p>
+              <label className="onb-field">Company knowledge and operating instructions
+                <textarea rows={6} aria-label="Company knowledge" value={setup.knowledgeNotes} onChange={(e)=>change("knowledgeNotes",e.target.value)} placeholder="Products, services, audiences, policies, priorities, company history, or anything your teams should understand." />
+              </label>
+              <div className="onb-note">Importing external documents, websites and cloud drives requires a connected provider. Your written notes are saved locally for review.</div>
+            </>}
+            {step === 3 && <>
+              <div className="onb-caption">04 / DEPARTMENTS</div><h2>Organize your headquarters.</h2>
               <p>Choose the teams you want shown in your company structure. All 35 native applications remain available.</p>
               <div className="onb-options">
                 {DEPARTMENTS.map(name=><label key={name} className="onb-option">
@@ -272,8 +286,16 @@ export function CompanyOnboarding() {
                 </label>)}
               </div>
             </>}
-            {step === 3 && <>
-              <div className="onb-caption">04 / INTELLIGENCE</div><h2>Plan your AI workforce.</h2>
+            {step === 4 && <>
+              <div className="onb-caption">05 / PEOPLE</div><h2>Bring your people into the plan.</h2>
+              <p>Create a local invitation draft for each colleague. Invitations will not be sent until email and account services are connected and authorized.</p>
+              <label className="onb-field">Colleagues (one name or email per line)
+                <textarea rows={6} aria-label="Colleagues" value={setup.colleagues} onChange={(e)=>change("colleagues",e.target.value)} placeholder={"Jordan Smith\nPriya Patel\nteam@example.com"}/>
+              </label>
+              <div className="onb-note">People appear as pending invitation drafts in the company directory. No access is granted or message delivered by this step.</div>
+            </>}
+            {step === 5 && <>
+              <div className="onb-caption">06 / INTELLIGENCE</div><h2>Plan your AI workforce.</h2>
               <p>Create initial specialist employee profiles. They remain drafts with no execution authority until configured and approved.</p>
               <div className="onb-options">
                 {AGENTS.map(name=><label key={name} className="onb-option">
@@ -283,14 +305,50 @@ export function CompanyOnboarding() {
               </div>
               <div className="onb-note">AI employees are clearly differentiated from human staff. No real model execution or automated outreach is claimed.</div>
             </>}
-            {step === 4 && <>
-              <div className="onb-caption">05 / LAUNCH</div><h2>Your headquarters is ready to create.</h2>
+            {step === 6 && <>
+              <div className="onb-caption">07 / APPLICATIONS</div><h2>Design your everyday workspace.</h2>
+              <p>All 35 native applications are included. Pin the ones your company will use most frequently; the complete suite remains accessible.</p>
+              <div className="onb-options">
+                {APPS.map(name=><label key={name} className="onb-option">
+                  <input type="checkbox" checked={setup.preferredApps.includes(name)} onChange={()=>toggle("preferredApps",name)}/><span>{name}</span>
+                </label>)}
+              </div>
+              <div className="onb-note">Third-party connections remain optional and cannot be activated without their providers.</div>
+            </>}
+            {step === 7 && <>
+              <div className="onb-caption">08 / COLLABORATION</div><h2>Give your team a place to work.</h2>
+              <p>Set up internal collaboration spaces and a local executive briefing preference.</p>
+              <div className="onb-options">
+                {CHANNELS.map(name=><label key={name} className="onb-option">
+                  <input type="checkbox" checked={setup.teamChannels.includes(name)} onChange={()=>toggle("teamChannels",name)}/><span>{name}</span>
+                </label>)}
+              </div>
+              <label className="onb-option" style={{ marginTop: 20 }}><input type="checkbox" checked={setup.dailyBriefing} onChange={(e)=>change("dailyBriefing",e.target.checked)}/><span>Prepare a local daily executive briefing</span></label>
+              <div className="onb-note">These channels are private records in this browser. Real-time multiplayer communication, email and mobile notifications require connected services.</div>
+            </>}
+            {step === 8 && <>
+              <div className="onb-caption">09 / AUTHORITY</div><h2>Decide how your AI team works.</h2>
+              <p>Arlovi starts with external execution disabled. Human approvals, spend controls and the emergency pause remain available in Administration.</p>
+              <fieldset className="onb-colors"><legend>Default supervision policy</legend>
+                <div className="onb-options">
+                  <label className="onb-option"><input type="radio" name="approval-mode" checked={setup.approvalMode==="review_all"} onChange={()=>change("approvalMode","review_all")}/><span>Review every AI action</span></label>
+                  <label className="onb-option"><input type="radio" name="approval-mode" checked={setup.approvalMode==="supervised_drafts"} onChange={()=>change("approvalMode","supervised_drafts")}/><span>Allow local drafts, review consequential actions</span></label>
+                </div>
+              </fieldset>
+              <div className="onb-note">No AI model has been connected. Neither policy permits unapproved payment, sending, publishing, external requests or autonomous execution.</div>
+            </>}
+            {step === 9 && <>
+              <div className="onb-caption">10 / LAUNCH</div><h2>Your headquarters is ready to create.</h2>
               <p>Review the foundations. Your work remains editable throughout Arlovi.</p>
               <dl className="onb-review">
                 <div><dt>Company</dt><dd>{setup.company}</dd></div>
                 <div><dt>Region</dt><dd>{TERRITORIES[setup.territory].label} · {setup.currency}</dd></div>
                 <div><dt>Departments</dt><dd>{setup.departments.join(", ")}</dd></div>
                 <div><dt>AI employee drafts</dt><dd>{setup.agents.join(", ") || "None"}</dd></div>
+                <div><dt>Colleagues to invite</dt><dd>{setup.colleagues.split("\n").filter((item)=>item.trim()).length} local draft(s)</dd></div>
+                <div><dt>Favourite applications</dt><dd>{setup.preferredApps.length} of 35 pinned</dd></div>
+                <div><dt>Collaboration rooms</dt><dd>{setup.teamChannels.join(", ") || "None"}</dd></div>
+                <div><dt>AI autonomy</dt><dd>{setup.approvalMode==="review_all"?"Human review for all actions":"Supervised local drafts"}</dd></div>
               </dl>
               <label className="onb-field">Your first mission
                 <textarea aria-label="First mission" value={setup.goal} rows={3} onChange={(e)=>change("goal",e.target.value)}
