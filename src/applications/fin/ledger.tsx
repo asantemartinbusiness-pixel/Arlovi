@@ -490,7 +490,7 @@ export function LedgerPeriods({ context }: { context: ScreenContext }) {
       context.toast("No period record", "This workspace has no accounting-period record to write to.", "failed");
       return;
     }
-    if (!/^\\d{4}-\\d{2}$/.test(period) || (lock && lockedPeriods(record).includes(period))
+    if (!/^\d{4}-\d{2}$/.test(period) || (lock && lockedPeriods(record).includes(period))
       || (!lock && !lockedPeriods(record).includes(period))) return;
     setBusy(period);
     try {
