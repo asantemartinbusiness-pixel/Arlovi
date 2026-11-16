@@ -1,3 +1,4 @@
+import { clockIso } from "@/platform/clock";
 import { db } from "@/runtime/db";
 import type { Audit, Rec, Snapshot } from "@/domain/types";
 
@@ -40,7 +41,7 @@ export async function requestTaskCompletion(orgId: string, taskId: string, actor
     if (["completed", "cancelled", "archived"].includes(task.status)) throw new ApprovalConflict("This task is already closed.");
     const existing = await db.records.where("[organizationId+collection]").equals([orgId, COLLECTION]).toArray();
     if (existing.some(req => req.fields.taskId === task.id && req.status === "awaiting_approval")) throw new ApprovalConflict("An approval is already pending for this task.");
-    const at = new Date().toISOString();
+    const at = clockIso();
     const request: Rec = {
       id: crypto.randomUUID(), organizationId: orgId, collection: COLLECTION,
       title: `Complete: ${task.title}`, status: "awaiting_approval",
@@ -72,7 +73,7 @@ export async function decideTaskApproval(orgId: string, requestId: string, actor
     if (!task || task.organizationId !== orgId || task.collection !== "tasks") throw new ApprovalConflict("The linked task cannot be accessed.");
     if (task.revision !== Number(request.fields.taskRevision)) throw new ApprovalConflict("Task changed since the request. Review the task and request approval again.");
     if (["completed", "cancelled", "archived"].includes(task.status)) throw new ApprovalConflict("This task was already closed.");
-    const at = new Date().toISOString();
+    const at = clockIso();
     await db.records.put(updated(request, { status: decision, fields: { decidedBy: actor, decisionAt: at } }, actor, at));
     if (decision === "approved") {
       await db.records.put(updated(task, { status: "completed", fields: { stage: "completed", completionApprovalId: request.id } }, actor, at));
@@ -88,7 +89,7 @@ export async function withdrawTaskApproval(orgId: string, requestId: string, act
     if (!request || request.organizationId !== orgId || request.collection !== COLLECTION)
       throw new ApprovalConflict("Request not found in this company.");
     if (request.status !== "awaiting_approval") throw new ApprovalConflict("This request is already closed.");
-    const at = new Date().toISOString();
+    const at = clockIso();
     await db.records.put(updated(request, { status: "withdrawn", fields: { decidedBy: actor, decisionAt: at } }, actor, at));
     await db.events.add(event(orgId, actor, at, `Task completion request withdrawn: ${request.title}`, request.id));
   });
