@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Plus, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useMutations, useToast, useWorkspace } from "@/platform/workspace";
+import { emptyDoc } from "@/applications/docs/model";
 import type { Rec } from "@/domain/types";
 import "./contextual-create.css";
 
@@ -50,8 +51,9 @@ export function ContextualCreate({
     setBusy(true); setError("");
     const definition = kinds.find(item => item.id === kind)!;
     try {
-      const scopeFields = scope?.type === "department" ? { departmentId: scope.id } :
-        scope?.type === "project" ? { projectId: scope.id } : {};
+      const scopeFields: Record<string, string | number | boolean> = {};
+      if (scope?.type === "department") scopeFields.departmentId = scope.id;
+      if (scope?.type === "project") scopeFields.projectId = scope.id;
       const record = await mutate.create({
         collection: definition.collection,
         title: name.trim(),
@@ -64,7 +66,7 @@ export function ContextualCreate({
           ...(kind === "task" ? { stage: "backlog", assignee: actor, priority: "normal", kind: "task" } : {}),
           ...(kind === "project" ? { health: "on_track", priority: "normal" } : {}),
         },
-        ...(kind === "document" ? { body: { type: "doc", content: [] } } : {}),
+        ...(kind === "document" ? { body: emptyDoc() } : {}),
       }, `${definition.label} created${scope ? ` in ${scope.title}` : ""}: ${name.trim()}`);
       setOpen(false); setName(""); setDescription("");
       toast(definition.label + " created", scope ? `Linked to ${scope.title}.` : `Created in ${org.name}.`);
