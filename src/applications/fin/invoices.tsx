@@ -1155,7 +1155,6 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
             } finally {
               setBusy(false);
             }
-          }
           }}
         >
           Post the receipt
@@ -1518,7 +1517,6 @@ export function ApproveInvoice({ context, close }: { context: ScreenContext; clo
             );
           } finally {
             setBusy(false);
-          }
         }}
       >
         Approve and post {context.money(totals.grossMinor)}
