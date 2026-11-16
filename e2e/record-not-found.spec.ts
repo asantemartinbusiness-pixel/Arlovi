@@ -4,7 +4,7 @@ test("a missing detail record displays a truthful missing-record state, not anot
   await page.goto("/o/northline/fin/invoices/nonexistent-record-id-992448");
   await expect(page.getByRole("heading", { name: "Record not found" })).toBeVisible();
   await expect(page.getByText("No other record was substituted.")).toBeVisible();
-  await page.getByRole("button", { name: "Return to Finance" }).click();
+  await page.getByRole("button", { name: /^Return to Finance/ }).click();
   await expect(page).toHaveURL(/\/o\/northline\/fin\//);
 });
 
