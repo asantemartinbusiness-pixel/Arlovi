@@ -98,7 +98,9 @@ export function HeadquartersNavigation({
               const destination = linkTo(item, orgSlug);
               const exact = pathname === destination;
               const isArea = Boolean(item.area && workspaceArea(activeCode) === item.area);
-              const active = exact || (item.app && !item.area && activeCode === item.app && !pathname.startsWith(`/o/${orgSlug}/hq/`)) || isArea;
+              const inDepartment = item.id === "departments" && pathname.startsWith(`/o/${orgSlug}/hq/departments/`);
+              const inCompany = item.id === "company" && ["organization", "goals", "locations", "timeline", "directory"].some((section) => pathname.startsWith(`/o/${orgSlug}/hq/${section}`));
+              const active = exact || inDepartment || inCompany || (item.app && !item.area && activeCode === item.app && !pathname.startsWith(`/o/${orgSlug}/hq/`)) || isArea;
               return (
                 <NavLink
                   key={item.id}
