@@ -172,15 +172,15 @@ export function CompanyOnboarding() {
           <p className="onb-scope">This setup creates a working browser-local company. Team invitations, cloud sync, live AI models and external services require future connections.</p>
         </aside>
         <section className="onb-form" aria-label="Company setup">
-          <div className="onb-progress" role="list" aria-label="Setup steps">
+          <nav className="onb-progress" aria-label="Company setup steps">
             {STEPS.map((label, index) => (
-              <button role="listitem" type="button" key={label} disabled={index > step}
+              <button type="button" key={label} disabled={index > step}
                 className={index === step ? "onb-step current" : "onb-step"} aria-current={index === step ? "step" : undefined}
                 onClick={() => { setStep(index); setError(""); }}>
                 <span>{String(index + 1).padStart(2,"0")}</span>{label}
               </button>
             ))}
-          </div>
+          </nav>
           <div className="onb-stepbody">
             {step === 0 && <>
               <div className="onb-caption">01 / COMPANY</div><h2>Start with your business.</h2>
@@ -203,6 +203,16 @@ export function CompanyOnboarding() {
                   setSetup(v=>({...v,territory,currency:regional.currency,timezone:regional.timezone}));
                 }}>
                   {Object.entries(TERRITORIES).map(([code,value])=><option key={code} value={code}>{value.label}</option>)}
+                </select>
+              </label>
+              <label className="onb-field">Operating currency
+                <select aria-label="Operating currency" value={setup.currency} onChange={(e)=>change("currency",e.target.value)}>
+                  {["GBP","USD","EUR","CAD","AUD","XCD"].map(code=><option key={code} value={code}>{code}</option>)}
+                </select>
+              </label>
+              <label className="onb-field">Company timezone
+                <select aria-label="Company timezone" value={setup.timezone} onChange={(e)=>change("timezone",e.target.value)}>
+                  {[setup.timezone,"UTC","Europe/London","Europe/Paris","America/Tortola","America/New_York","America/Los_Angeles","Asia/Singapore"].filter((entry,index,all)=>all.indexOf(entry)===index).map(zone=><option key={zone} value={zone}>{zone}</option>)}
                 </select>
               </label>
             </>}
