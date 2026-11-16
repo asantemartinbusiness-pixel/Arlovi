@@ -13,17 +13,17 @@ type View = "for-you" | "approvals" | "updates" | "resolved";
  * with priority, grouping, and read / acknowledged / resolved kept apart.
  * Marking an item read never approves the thing it points at.
  */
-export function AttentionCentre({ items, onClose }: { items: AttentionItem[]; onClose: () => void }) {
+export function AttentionCentre({ items, onClose, initialView = "for-you" }: { items: AttentionItem[]; onClose: () => void; initialView?: "for-you" | "approvals" | "updates" }) {
   const navigate = useNavigate();
   const { org, role, relative } = useWorkspace();
   const setReceipt = useUi((state) => state.setAttentionReceipt);
   const mutate = useMutations();
-  const [view, setView] = useState<View>("for-you");
+  const [view, setView] = useState<View>(initialView);
   const counts = attentionCounts(items);
 
   const shown = useMemo(() => {
     const live = items.filter((item) => !item.resolved);
-    if (view === "approvals") return live.filter((item) => item.kind === "approval");
+    if (view === "approvals") return live.filter((item) => item.kind === "approval" || item.kind === "assignment" || item.kind === "interruption");
     if (view === "updates") return live.filter((item) => item.kind === "update" || item.kind === "mention" || item.kind === "system");
     if (view === "resolved") return items.filter((item) => item.resolved);
     return live;
@@ -56,7 +56,7 @@ export function AttentionCentre({ items, onClose }: { items: AttentionItem[]; on
     <Drawer
       open
       onOpenChange={(next) => { if (!next) onClose(); }}
-      title="Attention"
+      title={view === "approvals" ? "Inbox & decisions" : view === "updates" ? "Notifications" : "Attention"}
       subtitle={`${org.name} · ${counts.unread} unread, ${counts.approvals} awaiting a decision`}
       width={440}
       footer={<span className="ds-subtle">Reading an item does not approve it. Decisions are taken on the record.</span>}
@@ -68,7 +68,7 @@ export function AttentionCentre({ items, onClose }: { items: AttentionItem[]; on
           onChange={setView}
           options={[
             { value: "for-you", label: `For you (${counts.total})` },
-            { value: "approvals", label: `Approvals (${counts.approvals})` },
+            { value: "approvals", label: "Decisions & assignments" },
             { value: "updates", label: "Updates" },
             { value: "resolved", label: "Resolved" },
           ]}
