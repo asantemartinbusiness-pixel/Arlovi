@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronLeft, ChevronRight, Menu as MenuIcon, Moon, Sparkles, Sun, Search, Bell, X, Home, BriefcaseBusiness, Inbox, WandSparkles, LayoutGrid, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Menu as MenuIcon, Moon, Sparkles, Sun, Search, Bell, X, Home, BriefcaseBusiness, Inbox, WandSparkles, LayoutGrid, PanelLeftClose, PanelLeftOpen, LifeBuoy, CalendarClock, Headphones } from "lucide-react";
 import { Button, Pill } from "@/design-system";
 import { Menu } from "@/design-system/overlays";
 import { ArloviMark, brand, palettes } from "@/app/brand";
@@ -353,12 +353,16 @@ export function AppShell() {
       </div>
 
       <nav className="hq-bottom" aria-label="Primary">
-        {([
+        {(role === "client" ? [
+          { label: "Portal", to: appEntry("PORTAL", org.slug), code: "PORTAL", icon: LifeBuoy },
+          { label: "Bookings", to: appEntry("BOOK", org.slug), code: "BOOK", icon: CalendarClock },
+          { label: "Support", to: appEntry("CARE", org.slug), code: "CARE", icon: Headphones },
+        ] : [
           { label: "Home", to: `/o/${org.slug}/hq/home`, code: "HQ", icon: Home },
           { label: "My work", to: `/o/${org.slug}/hq/my-work`, code: "HQ", icon: BriefcaseBusiness },
           { label: "Inbox", to: appEntry("INBOX", org.slug), code: "INBOX", icon: Inbox },
           { label: "Studio", to: appEntry("DESIGN", org.slug), code: "DESIGN", icon: WandSparkles },
-        ] as const).filter((item) => canOpen(role, item.code)).map((item) => {
+        ]).filter((item) => canOpen(role, item.code)).map((item) => {
           const Icon = item.icon;
           return (
             <NavLink key={item.label} to={item.to} end>
