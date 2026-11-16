@@ -58,7 +58,7 @@ test("linking a document to a project does not replace its original owner or pro
       req.onsuccess=()=>{resolve(req.result?.fields??null);db.close();};
       req.onerror=()=>reject(req.error);
     };
-  }),documentId);
+  }),documentId!);
   await select.selectOption(documentId!);
   await page.getByRole("button",{name:/Link to/}).click();
   await expect(page.getByRole("complementary",{name:"Document preview"})).toBeVisible();
