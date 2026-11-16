@@ -62,8 +62,8 @@ export function nativeNavPath(
   slug: string,
   current: ReturnType<typeof findScreen>,
 ): string | null {
-  const needsId = /:id\\b/.test(target.route);
-  const needsSlug = /:slug\\b/.test(target.route);
+  const needsId = /:id\b/.test(target.route);
+  const needsSlug = /:slug\b/.test(target.route);
   if (!needsId && !needsSlug) return target.route.replace(":org", slug);
   if (!current || current.screen.applicationCode !== target.applicationCode ||
       current.screen.collection !== target.collection) return null;
