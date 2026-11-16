@@ -35,16 +35,25 @@ export function usePortal(context: ScreenContext): { portal: Rec | undefined; lo
 }
 
 export function ClientOnlyNotice({ context }: { context: ScreenContext }) {
-  const { actor, org } = useWorkspace();
+  const { actor, org, role } = useWorkspace();
+  const data = usePortalData();
+  const portal = portalForRole(role, data.portals, actor, data.contacts);
   return (
     <Stack gap={4}>
       <Notice tone="warning" title="This view only opens portal content">
-        {actor} is viewing the browser-local client perspective. Portal administration, the builder and the access log belong to {org.shortName}. This does not authenticate anyone or grant access to a hosted client portal.
-        Role views shape what this interface offers; they are not an account security boundary.
+        {actor} is viewing the browser-local client perspective. Portal administration,
+        the builder and the access log belong to {org.shortName}. This does not authenticate
+        anyone or grant access to a hosted client portal. Role views are not an account security boundary.
       </Notice>
-      <Button variant="primary" onClick={() => context.navigate(`/o/${org.slug}/portal/portals/${context.params.id ?? ""}/dashboard`)}>
-        Open your portal
-      </Button>
+      {portal ? (
+        <Button variant="primary" onClick={() => context.navigate(`/o/${org.slug}/portal/portals/${portal.id}/dashboard`)}>
+          Open matching portal
+        </Button>
+      ) : (
+        <Notice tone="info" title="No matching client portal">
+          This local view has no matching client contact, so no other client&apos;s portal is substituted.
+        </Notice>
+      )}
     </Stack>
   );
 }
