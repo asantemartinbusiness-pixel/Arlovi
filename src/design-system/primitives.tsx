@@ -322,8 +322,8 @@ export function Tool({
 export function Properties({ rows }: { rows: { label: string; value: ReactNode }[] }) {
   return (
     <dl className="ds-props">
-      {rows.map((row) => (
-        <div key={row.label} style={{ display: "contents" }}>
+      {rows.map((row, index) => (
+        <div key={`${row.label}-${index}`} style={{ display: "contents" }}>
           <dt>{row.label}</dt>
           <dd>{row.value}</dd>
         </div>
