@@ -48,7 +48,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const org = matchedOrg ?? ORGS[0];
   const now = clock.now();
   const nowIso = now.toISOString();
-  const actor = ACTOR_BY_ROLE[role];
+  // Local companies must never inherit a seeded company's identity.
+  // Unassigned role views use the company's owner as the acting local reviewer.
+  const actor = org.ownerName ?? ACTOR_BY_ROLE[role];
 
   const value = useMemo<WorkspaceValue>(() => ({
     org,
