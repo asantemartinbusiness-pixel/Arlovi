@@ -79,6 +79,10 @@ export function AppShell() {
 
   useEffect(() => { setNavOpen(false); }, [location.pathname]);
 
+  useEffect(() => {
+    try { localStorage.setItem("arlovi-last-workspace", org.slug); } catch { /* optional local preference */ }
+  }, [org.slug]);
+
   return (
     <div className="hq" data-nav-open={navOpen ? "true" : "false"}>
       <a className="ds-skip" href="#main">Skip to content</a>
