@@ -7,7 +7,7 @@ export interface Clock {
 
 /** Deterministic clock for tests: ?clock=2026-11-14T09:30:00Z freezes time. */
 function frozenFromLocation(): Date | null {
-  if (typeof window === "undefined") return null;
+  if (typeof window === "undefined" || !window.location) return null;
   const raw = new URLSearchParams(window.location.search).get("clock");
   if (!raw) return null;
   const parsed = new Date(raw);
@@ -43,7 +43,7 @@ function stampFloor(): number {
 /* Written once when the page goes away, not on every stamp: a reload under a
    frozen clock then continues the sequence instead of restarting it. */
 function armPersistence(): void {
-  if (persistArmed || typeof window === "undefined") return;
+  if (persistArmed || typeof window === "undefined" || typeof window.addEventListener !== "function") return;
   persistArmed = true;
   window.addEventListener("pagehide", () => {
     try {
