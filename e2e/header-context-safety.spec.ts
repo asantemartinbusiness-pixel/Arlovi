@@ -56,7 +56,8 @@ test("native sidebar disables detail-only links until a real company record is o
   const nav = page.getByRole("navigation", {name: "Missions navigation"});
   await expect(nav).toBeVisible();
   await expect(nav.locator('[aria-disabled="true"]', {hasText: "Task board"})).toBeVisible();
-  await expect(nav.locator('a[href*="/mission/missions/"]')).toHaveCount(0);
+  await expect(nav.getByRole("link", {name: "Task board", exact: true})).toHaveCount(0);
+  await expect(nav.getByRole("link", {name: "Plan", exact: true})).toHaveCount(0);
   await expect(nav.getByRole("link", {name: "Mission library"})).toBeVisible();
 });
 
@@ -65,15 +66,26 @@ test("native sidebar follows the active mission record between detail screens", 
   const id = await page.evaluate(async () => {
     const path = "/src/platform/repo.ts";
     const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
-    return (await repo.listByCollection("org-northline", "missions"))[0]?.id;
+    const existing = (await repo.listByCollection("org-northline", "missions"))[0];
+    if (existing) return existing.id;
+    // A browser-local test fixture makes record continuity deterministic even
+    // when this company has no starter missions. It never reaches a server.
+    const context = {actor: "Browser QA", now: new Date().toISOString()};
+    const fixture = repo.newRecord({
+      organizationId: "org-northline", collection: "missions",
+      title: "Browser navigation fixture", status: "proposed",
+      ownerName: "Browser QA", currency: "GBP",
+      fields: { objective: "Verify native detail navigation" },
+    }, context);
+    await repo.putRecord(fixture, context);
+    return fixture.id;
   });
-  test.skip(!id, "No Northline mission has been seeded");
-  await page.goto(`/o/northline/mission/missions/${encodeURIComponent(id!)}`);
+  await page.goto(`/o/northline/mission/missions/${encodeURIComponent(id)}`);
   const nav = page.getByRole("navigation", {name: "Missions navigation"});
   const plan = nav.getByRole("link", {name: "Plan", exact: true});
-  await expect(plan).toHaveAttribute("href", `/o/northline/mission/missions/${encodeURIComponent(id!)}/plan`);
+  await expect(plan).toHaveAttribute("href", `/o/northline/mission/missions/${encodeURIComponent(id)}/plan`);
   await plan.click();
-  await expect(page).toHaveURL(new RegExp(`/mission/missions/${encodeURIComponent(id!)}/plan$`));
+  await expect(page).toHaveURL(new RegExp(`/mission/missions/${encodeURIComponent(id)}/plan$`));
 });
 
 test("switching a local role view never strands the user on a hidden native application", async ({page}) => {
