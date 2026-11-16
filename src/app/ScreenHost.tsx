@@ -7,7 +7,7 @@ import { APP_ENTRIES } from "@/app/nav";
 import { getApp, type ActionDef, type ScreenContext, type ScreenDef } from "@/platform/registry";
 import { can as roleCan, canOpen, ROLE_LABELS } from "@/platform/policy";
 import { useMutations, useToast, useWorkspace } from "@/platform/workspace";
-import { getRecordInOrg, knownRecord } from "@/platform/repo";
+import { getRecord, getRecordInOrg, knownRecord } from "@/platform/repo";
 import { useLiveQuery } from "dexie-react-hooks";
 import { applicationLoadFailures } from "@/applications";
 
@@ -25,11 +25,10 @@ export function ScreenHost() {
   const routeId = match?.params.id;
   const foreign = useLiveQuery(async () => {
     if (!routeId) return false;
-    const record = await getRecordInOrg(workspace.org.id, routeId);
-    // Only a scoped read is allowed to resolve a detail route. Distinguish a
-    // truly missing record from an unscoped reference by checking the id through
-    // the same transaction-safe repository path below.
-    return record ? false : true;
+    // Resolve before any screen-specific body or editor mounts. Only the
+    // foreign-record flag reaches the view; no foreign data is rendered.
+    const record = await getRecord(routeId);
+    return Boolean(record && record.organizationId !== workspace.org.id);
   }, [routeId, workspace.org.id]);
 
   const [tab, setTabState] = useState<string>("");
