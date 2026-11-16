@@ -62,4 +62,15 @@ test("a company can be created with departments, AI drafts and a mission", async
   await expect(page.locator(".hq-orgswitch")).toContainText(slug);
   await page.goto("/");
   await expect(page).toHaveURL(new RegExp("/o/" + slug + "/hq/home"));
+
+  // Recover IndexedDB company even after the localStorage catalogue disappears.
+  await page.evaluate(() => {
+    localStorage.removeItem("arlovi-last-workspace");
+    localStorage.removeItem("arlovi-local-organizations-v1");
+  });
+  await page.goto("/");
+  await expect(page).toHaveURL(new RegExp("/o/" + slug + "/hq/home"));
+  await expect(page.locator(".hq-orgswitch")).toContainText(slug);
+  const catalogue = await page.evaluate(() => localStorage.getItem("arlovi-local-organizations-v1"));
+  expect(catalogue).toContain(slug);
 });
