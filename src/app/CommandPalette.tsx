@@ -98,7 +98,12 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         used.add(hit.to);
         return true;
       });
-    return q ? rankSearchHits(q, destinations) : destinations;
+    if (!q) return destinations;
+    // Keep results grouped for a readable command surface, but order the groups
+    // by their strongest match and each group's results by actual relevance.
+    const ranked = rankSearchHits(q, destinations);
+    const groupOrder = [...new Set(ranked.map(hit => hit.group))];
+    return groupOrder.flatMap(group => ranked.filter(hit => hit.group === group));
   }, [query, records, org.slug, role, navigation, departments, projects]);
 
   useEffect(() => { setIndex(0); }, [query]);
