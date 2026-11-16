@@ -31,7 +31,7 @@ describe("the native application directory", () => {
   it("searches a capability and product description rather than only the short app name", () => {
     expect(findDirectoryApps(DIRECTORY_APPS, "invoices").some(app => app.code === "FIN")).toBe(true);
     expect(findDirectoryApps(DIRECTORY_APPS, "image editing").some(app => app.code === "PHOTO")).toBe(true);
-    expect(findDirectoryApps(DIRECTORY_APPS, "workflow approval").some(app => app.code === "MISSION")).toBe(true);
+    expect(findDirectoryApps(DIRECTORY_APPS, "mission approval").some(app => app.code === "MISSION")).toBe(true);
   });
 
   it("supports multi-word search, category boundaries and stable exact-name ranking", () => {
