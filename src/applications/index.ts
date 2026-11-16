@@ -101,9 +101,9 @@ export function loadNativeApplication(code: string): Promise<void> {
   return task;
 }
 /** Prefetch only on a concrete user navigation hint, not automatically on boot. */
-export function prefetchNativeApplication(code: string): void {
-  if(code === "HQ" || !NATIVE[code] || states.get(code) === "ready")return;
-  void loadNativeApplication(code).catch(() => undefined);
+export function prefetchNativeApplication(code: string): Promise<void> {
+  if(code === "HQ" || !NATIVE[code] || states.get(code) === "ready") return Promise.resolve();
+  return loadNativeApplication(code);
 }
 /** Opt-in full registry loading for diagnostics and deliberate compatibility tests. */
 export async function loadApplications(): Promise<LoadFailure[]> {
