@@ -4,7 +4,7 @@ import { ArloviMark } from "@/app/brand";
 import { db } from "@/runtime/db";
 import { clockIso } from "@/platform/clock";
 import type { Audit, Rec } from "@/domain/types";
-import { isOrganizationSlugAvailable, registerLocalOrganization, type OrgProfile } from "@/platform/org";
+import { isOrganizationSlugAvailable, orgBySlug, registerLocalOrganization, type OrgProfile } from "@/platform/org";
 import "./onboarding.css";
 
 type Territory = "GB" | "US" | "VG" | "OTHER";
@@ -71,6 +71,10 @@ function slugify(value: string): string {
 
 export function CompanyOnboarding() {
   const navigate = useNavigate();
+  const previousSlug = (() => {
+    try { return localStorage.getItem("arlovi-last-workspace"); } catch { return null; }
+  })();
+  const previous = previousSlug ? orgBySlug(previousSlug) : undefined;
   const [setup, setSetup] = useState<Setup>(restored);
   const [step, setStep] = useState(() => {
     try { return Math.min(9, Math.max(0, Number(localStorage.getItem(STEP_KEY)) || 0)); } catch { return 0; }
@@ -196,9 +200,9 @@ export function CompanyOnboarding() {
   return (
     <main className="onb" id="main">
       <header className="onb-top">
-        <Link className="onb-logo" to="/o/northline/hq/home" aria-label="Arlovi home"><ArloviMark size={34}/><strong>arlovi.</strong></Link>
+        <Link className="onb-logo" to="/" aria-label="Arlovi home"><ArloviMark size={34}/><strong>arlovi.</strong></Link>
         <span className="onb-topnote">Company headquarters setup</span>
-        <Link to="/o/northline/hq/home">Return to workspace</Link>
+        {previous && <Link to={"/o/" + previous.slug + "/hq/home"}>Return to {previous.shortName}</Link>}
       </header>
       <div className="onb-layout">
         <aside className="onb-intro">
