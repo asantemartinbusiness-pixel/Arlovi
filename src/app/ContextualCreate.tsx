@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Plus, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { routeForRecord } from "@/platform/attention";
 import { useMutations, useToast, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import "./contextual-create.css";
