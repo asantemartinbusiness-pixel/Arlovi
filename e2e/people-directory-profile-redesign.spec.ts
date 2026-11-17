@@ -9,11 +9,11 @@ test("People Overview has distinct interactive Overview, My team, HR tasks and T
     ["Trends", "Understand the shape of the team."],
   ];
   for (const [tab, heading] of tabs) {
-    await page.goto(`/o/northline/hr/overview?tab=${encodeURIComponent(tab)}`);
+    await page.goto(`/o/northline/hr/home?tab=${encodeURIComponent(tab)}`);
     await expect(main.getByRole("heading", { name: heading })).toBeVisible();
     if (tab !== "Overview") await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
   }
-  await page.goto("/o/northline/hr/overview?tab=HR%20tasks");
+  await page.goto("/o/northline/hr/home?tab=HR%20tasks");
   await main.getByRole("button", { name: "Leave approval", exact: true }).click();
   await expect(main.getByRole("button", { name: "Leave approval", exact: true }))
     .toHaveAttribute("aria-pressed", "true");
