@@ -137,37 +137,76 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
 }
 
 function AccessRequest({ context, close }: { context: ScreenContext; close: () => void }) {
+  const [grant, setGrant] = useState("Finance ledger (read)");
+  const [reason, setReason] = useState("");
+  const [approver, setApprover] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const fromRoute = useRecord(context.params.id);
   const employee = scopedDetailRecord(fromRoute, context.org.id, "employees");
+  const people = useCollections(["employees", "tasks"]);
+  const reviewers = people.employees.filter((row) => row.status === "active" && row.id !== employee?.id);
   if (!employee) return <Empty title="Employee unavailable">Open a valid employee record before requesting access.</Empty>;
+  if (employee.status === "alumni") return <Empty title="Former employee">New access requests cannot be opened for an offboarded employee.</Empty>;
+  const sameRequest = people.tasks.some((task) =>
+    task.fields.employeeId === employee.id && task.fields.group === "IT access"
+    && task.fields.grant === grant && !["done", "rescinded", "cancelled"].includes(task.status));
   return (
-    <form
-      id="hr-access"
-      className="ds-stack ds-gap-4"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        const form = new FormData(event.currentTarget);
+    <form id="hr-access" className="ds-stack ds-gap-4" onSubmit={async (event) => {
+      event.preventDefault();
+      if (saving || !context.can("edit_people") || reason.trim().length < 10 || !approver || sameRequest) return;
+      setSaving(true);
+      setError("");
+      try {
         await context.mutate.create({
           collection: "tasks",
-          title: `Access: ${String(form.get("grant") ?? "")}`,
+          title: `Access: ${grant}`,
           status: "waiting",
-          summary: `Requested by ${context.actor} for ${employee.title}. ${String(form.get("reason") ?? "")}`,
-          fields: { kind: "onboarding", employeeId: employee.id, stage: "waiting", assignee: "Maya Chen", group: "IT access" },
+          summary: `Requested by ${context.actor} for ${employee.title}. Reason: ${reason.trim()}`,
+          fields: { kind: "onboarding", employeeId: employee.id, stage: "waiting",
+            assignee: approver, grant, group: "IT access", externalProvisioning: "not_verified",
+            requestedBy: context.actor, requestedAt: clockIso() },
           parentId: employee.id,
-        }, `Access requested: ${String(form.get("grant") ?? "")}`);
-        context.toast("Access requested", "It is waiting for a named approver, not granted.");
+        }, `Access request for ${grant} recorded by ${context.actor}; not provisioned`);
+        context.toast("Access review requested", "A local request was saved for the named reviewer. No account or permission was granted.");
         close();
-      }}
-    >
-      <Field label="Grant" required>
-        <Select name="grant" required>
-          {["Finance ledger (read)", "Customer care queue", "Workshop door code", "Compliance toolkit", "Payroll"].map((grant) => <option key={grant}>{grant}</option>)}
-        </Select>
-      </Field>
-      <Field label="Why it is needed" required><TextArea name="reason" rows={3} required /></Field>
-      <Notice tone="warning" title="Access is never inferred">
-        Employment status does not grant anything on its own. This request waits for a named approver and is recorded either way.
-      </Notice>
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "The request could not be saved.");
+      } finally {
+        setSaving(false);
+      }
+    }}>
+      <PeopleDialogLead eyebrow="PEOPLE / ACCESS GOVERNANCE" title="Request an access review"
+        description="Specify the exact access, its business reason and the human responsible for review."
+        status={<Pill tone="warning">Not provisioned</Pill>} />
+      <PeopleDialogSection step="01" title="Person and access scope">
+        <Properties rows={[{ label: "Employee", value: employee.title }, { label: "Status", value: employee.status }]} />
+        <Field label="Requested access" required>
+          <Select value={grant} onChange={(event) => setGrant(event.target.value)}>
+            {["Finance ledger (read)", "Customer care queue", "Workshop door code", "Compliance toolkit", "Payroll"].map((item) => <option key={item}>{item}</option>)}
+          </Select>
+        </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Reason and accountable reviewer">
+        <Field label="Business reason" required hint="At least 10 characters.">
+          <TextArea rows={3} value={reason} onChange={(event) => setReason(event.target.value)} required />
+        </Field>
+        <Field label="Responsible reviewer" required>
+          <Select value={approver} onChange={(event) => setApprover(event.target.value)} required>
+            <option value="">Choose an active employee</option>
+            {reviewers.map((row) => <option key={row.id} value={row.title}>{row.title}</option>)}
+          </Select>
+        </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Request checks and external boundary">
+        {sameRequest && <Notice tone="danger" title="Existing request">An unresolved request for this access already exists for the employee.</Notice>}
+        {reviewers.length === 0 && <Notice tone="warning" title="No reviewer available">An active reviewer must be recorded before requesting access.</Notice>}
+        <Notice tone="info" title="No connected identity provider">Saving creates a local review task. A completed review will not provision access or prove the external grant happened.</Notice>
+        {error && <Notice tone="danger" title="Request not saved">{error}</Notice>}
+        <Row gap={2}><Button variant="ghost" onClick={close} disabled={saving}>Cancel</Button><span className="ds-grow" />
+          <Button variant="primary" submit disabled={saving || !context.can("edit_people") || !approver || reason.trim().length < 10 || sameRequest}>{saving ? "Saving…" : "Request review"}</Button>
+        </Row>
+      </PeopleDialogSection>
     </form>
   );
 }
