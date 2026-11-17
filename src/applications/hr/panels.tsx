@@ -1536,12 +1536,21 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
   }
 
   const days = rosterWeekDays(now, org.timezone, weekOffset);
+  const visibleDays = focusedDay && days.includes(focusedDay) ? [focusedDay] : days;
   const rosterWeek = roster.filter((shift) =>
     days.some((day) => rosterShiftsForDay([shift], String(shift.fields.employeeId ?? ""), day, org.timezone).length > 0));
   const scheduledIds = new Set(rosterWeek.map((shift) => String(shift.fields.employeeId ?? "")));
   const people = data.employees
     .filter((employee) => scheduledIds.has(employee.id) || (showEveryone && !["alumni", "terminated"].includes(employee.status)))
     .sort((a, b) => a.title.localeCompare(b.title));
+  const assignedHours = rosterWeek.reduce((sum, shift) => {
+    const amount = Number(shift.fields.hours);
+    return sum + (Number.isFinite(amount) && amount > 0 ? amount : 0);
+  }, 0);
+  const unlinkedCount = rosterWeek.filter((shift) =>
+    !data.employees.some((person) => person.id === shift.fields.employeeId)).length;
+  const overtimeCount = rosterWeek.filter((shift) => shift.fields.overtime === true
+    && shift.fields.overtimeApproved !== true).length;
   const dayShifts = (employee: Rec, day: string) => rosterShiftsForDay(rosterWeek, employee.id, day, org.timezone);
   const dayAway = (employee: Rec, day: string) => employeeOnLeave(data.leaveRequests, employee.id, day, org.timezone);
   const shiftButton = (shift: Rec, day: string) => {
@@ -1565,34 +1574,64 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
 
   return (
     <Stack gap={4}>
-      <Row gap={2} wrap>
+      <OpsHeader
+        eyebrow="People / Scheduling / Roster"
+        title="The week, completely in view."
+        description="A clearer staffing picture with every shift, every person and every overnight assignment. Focus on a day or keep the full week in view."
+        actions={<>
+          <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/scheduling?tab=Availability`)}>Team availability</Button>
+          <Button variant="primary" onClick={() => context.navigate(`/o/${org.slug}/hr/scheduling?tab=Timesheets`)}>Review timesheets</Button>
+        </>}
+        note={`Times shown in ${org.timezone}; the saved records retain their UTC timestamps.`}
+      />
+      <OpsMetrics label="Week staffing summary">
+        <OpsMetric label="Scheduled shifts" value={rosterWeek.length} detail="Including overnight assignments" />
+        <OpsMetric label="Assigned people" value={scheduledIds.size} detail="Employees with at least one shift" />
+        <OpsMetric label="Rostered hours" value={assignedHours.toFixed(1)} detail="Entered shift durations" />
+        <OpsMetric label="Needs attention" value={overtimeCount + unlinkedCount}
+          detail={`${overtimeCount} overtime reviews · ${unlinkedCount} missing employee links`}
+          emphasis={overtimeCount + unlinkedCount ? "attention" : "neutral"} />
+      </OpsMetrics>
+      <div className="ops-toolbar hr-roster-toolbar">
         <Button size="sm" variant="secondary" onClick={() => setWeekOffset((value) => value - 1)}>Previous week</Button>
-        <strong className="ds-grow">{rosterDateLabel(days[0])} – {rosterDateLabel(days[6])}</strong>
+        <strong className="ops-toolbar-heading">{rosterDateLabel(days[0])} – {rosterDateLabel(days[6])}</strong>
         <Button size="sm" variant="ghost" onClick={() => setWeekOffset(0)}>This week</Button>
         <Button size="sm" variant="secondary" onClick={() => setWeekOffset((value) => value + 1)}>Next week</Button>
         <Button size="sm" variant="secondary" onClick={() => setShowEveryone((value) => !value)}>
           {showEveryone ? "Scheduled people" : "Show everyone"}
         </Button>
-      </Row>
-      <p className="ds-subtle">
-        {rosterWeek.length} shift{rosterWeek.length === 1 ? "" : "s"} across {scheduledIds.size} assigned
-        employee{scheduledIds.size === 1 ? "" : "s"}. Times are displayed for {org.timezone};
-        UTC timestamps are preserved on each record.
-      </p>
-      {people.length === 0 ? (
-        <Empty title="No shifts this week" icon={<CalendarDays size={20} />}>
-          Change week or show everyone to review the team's availability.
-        </Empty>
-      ) : (
-        <>
-          <div className="ds-grid-wrap hr-roster-table">
+      </div>
+      <div className="hr-roster-weekdays" role="group" aria-label="Focus staffing day">
+        <button type="button" className="hr-roster-day-summary" data-active={visibleDays.length === 7}
+          aria-pressed={visibleDays.length === 7} onClick={() => setFocusedDay(null)}>
+          <span>Scope</span><strong>Full week</strong><small>7 days</small>
+        </button>
+        {days.map((day) => {
+          const coverage = dailyCoverage(rosterWeek, data.employees, day, org.timezone);
+          return (
+            <button type="button" key={day} className="hr-roster-day-summary"
+              aria-pressed={visibleDays.length === 1 && visibleDays[0] === day}
+              data-active={visibleDays.length === 1 && visibleDays[0] === day}
+              onClick={() => setFocusedDay((current) => current === day ? null : day)}>
+              <span>{rosterDateLabel(day)}</span>
+              <strong>{coverage.people} people</strong>
+              <small>{coverage.shifts} shift{coverage.shifts === 1 ? "" : "s"}</small>
+            </button>
+          );
+        })}
+      </div>
+      <div className="hr-roster-section-heading">
+        <h3 className="ops-section-title">{visibleDays.length === 1 ? rosterDateLabel(visibleDays[0]) : "Weekly assignment grid"}</h3>
+        <span className="ops-toolbar-note">Select any shift to change its person, place, time or Project.</span>
+      </div>
+            <div className="ds-grid-wrap hr-roster-table">
             <div className="ds-grid-scroll">
               <table className="ds-table">
                 <caption className="ds-sr-only">Roster beginning {rosterDateLabel(days[0])} in {org.timezone}. Each cell lists all shifts for the day.</caption>
                 <thead>
                   <tr>
                     <th scope="col">Person</th>
-                    {days.map((day) => {
+                    {visibleDays.map((day) => {
                       const count = dailyCoverage(rosterWeek, data.employees, day, org.timezone);
                       return <th key={day} scope="col">
                         <span>{rosterDateLabel(day)}</span>
@@ -1607,7 +1646,7 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
                       <th scope="row" style={{ textAlign: "start", padding: "var(--space-2) var(--space-3)" }}>
                         <Row gap={2}><Avatar name={person.title} size="sm" />{person.title}</Row>
                       </th>
-                      {days.map((day) => {
+                      {visibleDays.map((day) => {
                         const shifts = dayShifts(person, day);
                         const away = dayAway(person, day);
                         return (
@@ -1628,7 +1667,7 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
           </div>
           <div className="hr-roster-cards">
             {people.map((person) => {
-              const scheduled = days.filter((day) => dayShifts(person, day).length > 0 || dayAway(person, day));
+              const scheduled = visibleDays.filter((day) => dayShifts(person, day).length > 0 || dayAway(person, day));
               return (
                 <Card key={person.id} title={<Row gap={2}><Avatar name={person.title} size="sm" />{person.title}</Row>}
                   subtitle={String(person.fields.title ?? "Employee")}>
