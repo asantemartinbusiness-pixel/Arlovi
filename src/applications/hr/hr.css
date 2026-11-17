@@ -210,3 +210,37 @@
   .hr-directory-search { flex-basis: 100%; max-width: none; }
   .hr-directory-card { align-items: flex-start; }
 }
+
+/* Recruitment, onboarding and leave — app-owned surfaces, no global token changes. */
+.hr-hiring-stage-filters {
+  display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center;
+  padding: var(--space-2) 0;
+}
+.hr-hiring-pipeline {
+  display: flex; gap: var(--space-3); align-items: stretch; overflow-x: auto; overscroll-behavior-inline: contain;
+  scroll-snap-type: x proximity; padding-block-end: var(--space-3);
+}
+.hr-hiring-stage { flex: 1 0 230px; min-width: 0; scroll-snap-align: start; }
+.hr-hiring-stage .ds-card-body { min-height: 160px; }
+.hr-hiring-stage .ds-record-card { display: flex; flex-direction: column; gap: var(--space-2); width: 100%; text-align: start; }
+.hr-hiring-stage .ds-record-card + .ds-record-card { margin-block-start: var(--space-2); }
+.hr-onboarding-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); align-items: start; }
+.hr-onboarding-step-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.hr-onboarding-step {
+  display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: center;
+  padding: var(--space-3); border: 1px solid var(--border-default);
+  background: var(--bg-inset); border-radius: var(--radius-md);
+}
+.hr-onboarding-step-meta { flex: 1 1 130px; min-width: 0; display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+.hr-onboarding-step-meta span { color: var(--fg-muted); font-size: var(--text-xs); }
+.hr-leave-decision-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); align-items: start; }
+.hr-hiring-pipeline:focus-visible, .hr-hiring-stage-filters button:focus-visible { outline-offset: 2px; }
+@media (max-width: 980px) {
+  .hr-onboarding-grid, .hr-leave-decision-grid { grid-template-columns: minmax(0, 1fr); }
+  .hr-hiring-stage { flex-basis: 245px; }
+}
+@media (max-width: 620px) {
+  .hr-hiring-stage { flex-basis: min(85vw, 270px); }
+  .hr-hiring-pipeline { margin-inline-end: calc(-1 * var(--space-3)); }
+  .hr-onboarding-step-meta { justify-content: flex-start; }
+}
