@@ -2,6 +2,7 @@ import { db } from "@/runtime/db";
 import type { Audit, Rec, Snapshot } from "@/domain/types";
 import { journalDate, lockedPeriods, periodOf } from "@/domain/fin-ledger";
 import { validateBankReconciliation } from "@/domain/finance-signoff";
+import { assertRosterIntegrity } from "@/domain/scheduling";
 
 /* ------------------------------------------------------------------ *
  * Narrow repository.
@@ -46,6 +47,27 @@ async function assertOpenJournalPeriod(record: Rec, previous?: Rec): Promise<voi
   }
 }
 
+
+/** Only scheduling changes need a new roster conflict check. Approving an
+ * already-recorded overtime note must not retroactively rewrite the roster. */
+function rosterChanged(next: Rec, previous?: Rec): boolean {
+  if (next.collection !== "shifts" || next.fields.kind !== "shift") return false;
+  if (!previous) return true;
+  return next.startAt !== previous.startAt || next.endAt !== previous.endAt
+    || next.status !== previous.status || next.fields.employeeId !== previous.fields.employeeId
+    || next.fields.hours !== previous.fields.hours || next.fields.projectId !== previous.fields.projectId;
+}
+
+async function validateRosterWrites(scopeId: string, proposed: Rec[]): Promise<void> {
+  if (!proposed.length) return;
+  const [roster, employees, approvedLeave, projects] = await Promise.all([
+    db.records.where("[organizationId+collection]").equals([scopeId, "shifts"]).toArray(),
+    db.records.where("[organizationId+collection]").equals([scopeId, "employees"]).toArray(),
+    db.records.where("[organizationId+collection]").equals([scopeId, "leaveRequests"]).toArray(),
+    db.records.where("[organizationId+collection]").equals([scopeId, "projects"]).toArray(),
+  ]);
+  assertRosterIntegrity({ organizationId: scopeId, changes: proposed, roster, employees, approvedLeave, projects });
+}
 
 /* Last-read copy of every record this tab has seen. Forms seed their state
    once, on first render; reading the record asynchronously meant that render
@@ -154,6 +176,7 @@ export async function patchRecord(id: string, patch: Partial<Rec>, context: Writ
       updatedBy: context.actor,
     };
     await assertOpenJournalPeriod(next, current);
+    if (rosterChanged(next, current)) await validateRosterWrites(current.organizationId, [next]);
     await db.records.put(next);
     prime(next);
     if (options.event) {
@@ -286,6 +309,8 @@ export async function putMany(records: Rec[], context: WriteContext, events: Omi
       for (const [index, record] of records.entries()) {
         await assertOpenJournalPeriod(record, existing[index]);
       }
+      const proposedShifts = records.filter((record, index) => rosterChanged(record, existing[index]));
+      await validateRosterWrites(scopeId, proposedShifts);
       await db.records.bulkPut(records);
     }
     if (events.length) {
