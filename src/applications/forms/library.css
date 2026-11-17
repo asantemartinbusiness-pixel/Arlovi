@@ -1,0 +1,8 @@
+/* Forms library — uses approved Arlovi colour, type and spacing tokens. */
+.t6-directory-intro{padding:var(--space-4);border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--bg-surface)}
+.t6-directory-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-2)}
+.t6-directory-metrics>div{min-width:0;padding:var(--space-4);border:1px solid var(--border-default);border-radius:var(--radius-md);display:flex;flex-direction:column;gap:var(--space-2)}
+.t6-directory-metrics span{font-size:var(--text-sm);color:var(--fg-muted)}
+.t6-directory-metrics strong{font-size:clamp(1.3rem,2.3vw,2rem);font-variant-numeric:tabular-nums;letter-spacing:-.035em;line-height:1.2}
+@media(max-width:900px){.t6-directory-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.t6-directory-intro,.t6-directory-metrics>div{padding:var(--space-3)}}
