@@ -11,6 +11,7 @@ import { scopedDetailRecord } from "@/platform/recordScope";
 import { planHireApplicant, planLeaveDecision } from "./decisions";
 import { newRecord } from "@/platform/repo";
 import { planShiftSwap, planTimesheetApprovals } from "./workforce";
+import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
 export { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 import { Boundary, askFirst, boundaryText, logBoundary, pickRecord, recordOf } from "./opsKit";
 
@@ -790,48 +791,113 @@ export async function exportRun(context: ScreenContext, runs: Rec[], employees: 
 }
 
 export function ReconcileRun({ context, close }: { context: ScreenContext; close: () => void }) {
-  const data = useCollections(["payrollRuns", "employees", "journals", "accounts"]);
-  const run = data.payrollRuns.find((row) => row.status === "draft") ?? data.payrollRuns[0];
+  const data = useCollections(["payrollRuns", "journals", "accounts"]);
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const [journalId, setJournalId] = useState("");
+  const [checked, setChecked] = useState(false);
+  const [error, setError] = useState("");
+  const wantedId = payload?.id ?? context.selectedId;
+  const run = wantedId
+    ? data.payrollRuns.find((row) => row.id === wantedId && row.organizationId === context.org.id)
+    : data.payrollRuns.find((row) => row.status === "draft");
   const wages = data.accounts.find((row) => String(row.fields.code ?? "") === "6300");
-  const journals = data.journals
+  const candidates = data.journals
     .filter((row) => row.status === "posted")
     .map((row) => {
-      const body = row.body as { lines?: { accountId: string; debitMinor: number }[] } | undefined;
-      const debit = (body?.lines ?? []).filter((line) => wages && line.accountId === wages.id).reduce((sum, line) => sum + line.debitMinor, 0);
+      const journal = row.body as { lines?: { accountId: string; debitMinor: number }[] } | undefined;
+      const debit = (journal?.lines ?? [])
+        .filter((line) => wages && line.accountId === wages.id)
+        .reduce((sum, line) => sum + Number(line.debitMinor || 0), 0);
       return { row, debit };
     })
-    .filter((item) => item.debit > 0)
-    .sort((a, b) => String(b.row.at).localeCompare(String(a.row.at)));
-  const latest = journals[0];
-  const gross = computePayroll(data.employees).reduce((sum, line) => sum + line.grossMinor, 0);
-  if (!context.can("view_payroll")) return <RoleViewNote what="Payroll reconciliation" />;
-  if (!run) return <Empty title="No payroll run" />;
-  const difference = latest ? gross - latest.debit : undefined;
+    .filter((entry) => Number.isFinite(entry.debit) && entry.debit > 0)
+    .sort((left, right) => String(right.row.at ?? right.row.createdAt).localeCompare(String(left.row.at ?? left.row.createdAt)));
+  const chosen = candidates.find((entry) => entry.row.id === journalId);
+  const recorded = run?.fields.grossMinor ?? run?.amountMinor;
+  const gross = Number(recorded);
+  const validGross = recorded !== undefined && Number.isFinite(gross) && gross >= 0;
+  const difference = validGross && chosen ? gross - chosen.debit : undefined;
+  const canReview = context.can("view_payroll");
+  if (!canReview) return <RoleViewNote what="Payroll reconciliation" />;
+  if (!run) return <Empty title={wantedId ? "Selected payroll run unavailable" : "No draft payroll run"}>
+    Open the correct company run to compare against a real posted wages journal.
+  </Empty>;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Run", value: run.title },
-        { label: "Run gross", value: context.money(gross) },
-        { label: "Ledger wages account", value: wages ? `${String(wages.fields.code)} ${wages.title}` : "Not found in the chart of accounts" },
-        { label: "Latest posted wages journal", value: latest ? `${latest.row.title} · ${context.money(latest.debit)}` : "Unavailable — no posted wages journal" },
-        { label: "Difference", value: difference === undefined ? "Unavailable" : <Pill tone={difference === 0 ? "success" : "warning"}>{context.money(difference)}</Pill> },
-      ]} />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Close</Button>
-        <Button variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/fin/ledger`)}>Open the ledger</Button>
+      <PeopleDialogLead eyebrow="PEOPLE / PAYROLL / FINANCE HANDOFF" title="Compare a saved payroll run with the ledger"
+        description="Choose the posted wages journal deliberately. A numerical comparison is not proof that payments or statutory filings occurred."
+        status={<Pill tone="neutral">Evidence review</Pill>} />
+      <PeopleDialogSection step="01" title="Source payroll run" description="Use the gross figure saved on this run, not current salary estimates.">
+        <Properties rows={[
+          { label: "Run", value: run.title },
+          { label: "Period", value: String(run.fields.period || "Not recorded") },
+          { label: "Saved gross", value: validGross ? context.money(gross) : "Not recorded" },
+          { label: "Payroll status", value: run.status },
+          { label: "Wages ledger account", value: wages ? `${String(wages.fields.code)} · ${wages.title}`
+            : "No wages account found" },
+        ]} />
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Select the posted wages journal"
+        description="No journal is selected automatically. Verify its period, source and account before comparing.">
+        <Field label="Posted wages journal" required>
+          <Select value={journalId} onChange={(event) => {
+            setJournalId(event.target.value); setChecked(false); setError("");
+          }}>
+            <option value="">Choose a posted wages journal</option>
+            {candidates.map((entry) => <option key={entry.row.id} value={entry.row.id}>
+              {entry.row.title} · {context.date(entry.row.at)} · {context.money(entry.debit)}
+            </option>)}
+          </Select>
+        </Field>
+        {chosen && <Properties rows={[
+          { label: "Selected journal", value: chosen.row.title },
+          { label: "Journal date", value: context.date(chosen.row.at) },
+          { label: "Posted wages debit", value: context.money(chosen.debit) },
+          { label: "Saved run minus posted journal", value: difference === undefined ? "Cannot calculate"
+            : context.money(difference) },
+        ]} />}
+        {!wages && <Notice tone="warning" title="No wages account found">
+          A matching posted journal cannot be verified until the chart of accounts includes the expected wages account.
+        </Notice>}
+        {difference !== undefined && difference !== 0 && <Notice tone="warning" title="Amounts do not match">
+          A difference is recorded as an unresolved discrepancy, not a successful reconciliation.
+        </Notice>}
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Record the comparison"
+        description="The evidence link and difference are saved to the payroll run; the ledger itself is not posted or changed.">
+        <Checkbox checked={checked} disabled={!chosen || !validGross}
+          onChange={(event) => setChecked(event.target.checked)}
+          label="I checked this journal belongs to the selected payroll period and reviewed any difference" />
+        <Notice tone="info" title="No automatic reconciliation or payment">
+          This saves an auditable local comparison. It does not reconcile bank payments, create a journal, or certify payroll compliance.
+        </Notice>
+        {error && <Notice tone="danger" title="Comparison not saved">{error}</Notice>}
+      </PeopleDialogSection>
+      <Row gap={2} wrap>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+        <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/ledger`)}>Open ledger</Button>
         <span className="ds-grow" />
-        <Button
-          variant="primary"
-          disabled={!latest}
+        <Button variant="primary" disabled={!chosen || difference === undefined || !checked}
           onClick={async () => {
-            if (!latest || difference === undefined) return;
-            await context.mutate.patch(run.id, { fields: { ...run.fields, reconciledBy: context.actor, reconciledAt: clockIso(), ledgerJournalId: latest.row.id, ledgerMinor: latest.debit, differenceMinor: difference } }, { expectRevision: run.revision, event: `${run.title} reconciled to ${latest.row.title} by ${context.actor}; difference ${context.money(difference)}` });
-            context.toast("Reconciliation recorded", `Difference of ${context.money(difference)} recorded on the run.`);
-            close();
-          }}
-        >
-          Record the reconciliation
-        </Button>
+            if (!chosen || difference === undefined || !checked) return;
+            setError("");
+            try {
+              const saved = await context.mutate.patch(run.id, {
+                fields: {
+                  ...run.fields, reconciledBy: context.actor, reconciledAt: clockIso(),
+                  ledgerJournalId: chosen.row.id, ledgerMinor: chosen.debit, differenceMinor: difference,
+                  reconciliationStatus: difference === 0 ? "matched" : "discrepancy",
+                },
+              }, { expectRevision: run.revision,
+                event: `${run.title} compared with posted journal ${chosen.row.title} by ${context.actor}; difference ${context.money(difference)}` });
+              if (!saved) { setError("The payroll run changed. Reopen it before saving the comparison."); return; }
+              context.toast(difference === 0 ? "Amounts matched locally" : "Discrepancy recorded",
+                `The comparison to ${chosen.row.title} was recorded; no accounting entry or bank payment was created.`);
+              close();
+            } catch (reason) {
+              setError(reason instanceof Error ? reason.message : "The comparison could not be recorded.");
+            }
+          }}>Record comparison</Button>
       </Row>
     </Stack>
   );
