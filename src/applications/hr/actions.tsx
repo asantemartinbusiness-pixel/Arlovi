@@ -8,6 +8,7 @@ import { computePayroll } from "./panels";
 import { RoleViewNote, leaveBalance } from "./kit";
 import { recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 import { scopedDetailRecord } from "@/platform/recordScope";
+import { planHireApplicant, planLeaveDecision } from "./decisions";
 export { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 import { Boundary, askFirst, boundaryText, logBoundary, pickRecord, recordOf } from "./opsKit";
 
@@ -216,13 +217,17 @@ export function StageDecision({ context, close }: { context: ScreenContext; clos
   const employees = useCollection("employees");
   const [stage, setStage] = useState("");
   const [reason, setReason] = useState("");
+  const [acceptanceEvidence, setAcceptanceEvidence] = useState("");
   if (!applicant) return <Empty title="Candidate unavailable">Open a valid candidate record before recording a hiring decision.</Empty>;
   const scored = applicant.fields.rating !== undefined && Number(applicant.fields.rating) > 0;
   const needsScore = (stage === "offer" || stage === "rejected") && !scored;
   const offerIssued = applicant.fields.offerIssuedBy !== undefined && String(applicant.fields.offerIssuedBy) !== "";
   const needsOffer = stage === "hired" && !offerIssued;
-  const email = String(applicant.fields.email ?? "").toLowerCase();
-  const existing = employees.find((row) => row.title === applicant.title || (email !== "" && String(row.fields.email ?? "").toLowerCase() === email));
+  const email = String(applicant.fields.email ?? "").trim().toLowerCase();
+  const matching = employees.filter((row) =>
+    row.fields.applicantId === applicant.id ||
+    (email !== "" && String(row.fields.email ?? "").trim().toLowerCase() === email));
+  const existing = matching.length === 1 ? matching[0] : undefined;
   return (
     <form
       id="hr-stage"
@@ -232,23 +237,22 @@ export function StageDecision({ context, close }: { context: ScreenContext; clos
         if (!stage || !reason.trim() || needsScore || needsOffer) return;
         const at = context.now.toISOString();
         if (stage === "hired") {
-          let employeeId = existing?.id;
-          if (!existing) {
-            const created = await context.mutate.create({
-              collection: "employees",
-              title: applicant.title,
-              status: "probation",
-              summary: `Hired from an accepted offer recorded by ${context.actor}. Any invitation is a local draft.`,
-              startAt: String(applicant.fields.startDate ?? "") || undefined,
-              fields: {
-                kind: "human", title: String(applicant.fields.role ?? ""), employment: String(applicant.fields.employment ?? "full-time"),
-                email: String(applicant.fields.email ?? ""), manager: context.actor, office: "Clerkenwell studio",
-                leaveAllowance: 25, leaveTaken: 0, salaryMinor: 0, pensionPct: 5, phone: "Not shared", applicantId: applicant.id,
-              },
-            }, `Employee record created for ${applicant.title} from an accepted offer`);
-            employeeId = created.id;
+          try {
+            const plan = planHireApplicant({
+              organizationId: context.org.id, currency: context.org.currency,
+              actor: context.actor, now: at,
+            }, applicant, employees, reason, acceptanceEvidence);
+            await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+            context.toast("Hiring recorded", existing
+              ? "The accepted application is linked to the existing employee record. No invitation was sent."
+              : "The accepted application and new employee were saved together. No invitation was sent.");
+            close();
+          } catch (error) {
+            context.toast("Hiring not recorded", error instanceof Error ? error.message : "The records changed. Reload and try again.", "blocked");
           }
-          await context.mutate.patch(applicant.id, {
+          return;
+        }
+        await context.mutate.patch(applicant.id, {
             status: "hired",
             fields: { stage: "hired", offerAcceptedAt: at, offerAcceptedRecordedBy: context.actor, employeeId: employeeId ?? "", decidedBy: context.actor, decisionReason: reason.trim(), decidedAt: at },
           }, { expectRevision: applicant.revision, event: `${applicant.title} accepted the offer; hired, recorded by ${context.actor}: ${reason.trim()}` });
@@ -284,11 +288,19 @@ export function StageDecision({ context, close }: { context: ScreenContext; clos
       {needsScore && <Notice tone="danger" title="A scorecard comes first">An offer or a rejection needs a recorded scorecard so the decision rests on evidence.</Notice>}
       {needsOffer && <Notice tone="danger" title="No offer has been issued">A candidate is hired only after an issued offer is accepted. Issue the offer from Recruitment first.</Notice>}
       {stage === "hired" && !needsOffer && (
-        <Notice tone="info" title="Recording the candidate's acceptance">
-          {existing
-            ? `${applicant.title} already has an employee record; it is linked rather than duplicated.`
-            : `This records that ${applicant.title} accepted the offer and creates their employee record in the directory. No invitation or contract is sent.`}
-        </Notice>
+        <Stack gap={2}>
+          <Field label="Evidence that the candidate accepted" required hint="Record how the acceptance was confirmed, for example a dated reply or a signed offer kept separately. No message or contract is sent.">
+            <TextArea rows={3} value={acceptanceEvidence} onChange={(event) => setAcceptanceEvidence(event.target.value)} required />
+          </Field>
+          <Notice tone="info" title="Manual evidence is required">
+            {matching.length > 1
+              ? "Multiple employees match this candidate. Resolve the duplicate before hiring."
+              : existing
+                ? "The matching employee will be linked only if its identity is consistent."
+                : "The applicant and new employee are created together in a single revision-checked local transaction."}
+            This records the evidence supplied by a person; Arlovi does not independently verify acceptance.
+          </Notice>
+        </Stack>
       )}
       <Notice tone="info" title="A person decides">Nothing ranks or moves candidates automatically. The decision is attributed to {context.actor}.</Notice>
     </form>
@@ -433,19 +445,24 @@ async function leaveRequestFor(context: ScreenContext, verb: string, then: (requ
 export function approveLeave(context: ScreenContext): Promise<void> {
   return leaveRequestFor(context, "Approve", (request) => {
     const who = String(request.fields.employeeName ?? request.ownerName);
-    const days = Number(request.fields.days ?? 1);
     askFirst(context, {
       title: "Approve leave",
       body: `${who} is booked away ${context.date(request.startAt)} – ${context.date(request.endAt)}. The request and the balance both change, and the approval is recorded against ${context.actor}.`,
       confirm: "Approve leave",
       run: async () => {
-        const { getRecord } = await import("@/platform/repo");
-        await context.mutate.patch(request.id, { status: "approved", fields: { ...request.fields, decidedBy: context.actor, decidedAt: clockIso() } }, { expectRevision: request.revision, event: `Leave approved for ${who} by ${context.actor}` });
-        const employee = await getRecord(String(request.fields.employeeId ?? ""));
-        if (employee && String(request.fields.type ?? "annual") === "annual") {
-          await context.mutate.patch(employee.id, { fields: { ...employee.fields, leaveTaken: Number(employee.fields.leaveTaken ?? 0) + days } }, { expectRevision: employee.revision, event: "Leave balance updated after approval" });
+        try {
+          const { getRecordInOrg } = await import("@/platform/repo");
+          const employeeId = String(request.fields.employeeId ?? "");
+          const employee = employeeId ? await getRecordInOrg(context.org.id, employeeId) : undefined;
+          const plan = planLeaveDecision({
+            organizationId: context.org.id, currency: context.org.currency,
+            actor: context.actor, now: clockIso(),
+          }, request, employee, "approved");
+          await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+          context.toast("Leave approved", `${who}'s request and any annual balance change were saved together.`);
+        } catch (error) {
+          context.toast("Leave not approved", error instanceof Error ? error.message : "Reload this request before deciding.", "blocked");
         }
-        context.toast("Leave approved", `${who}'s request is approved by ${context.actor}.`);
       },
     });
   });
@@ -460,8 +477,16 @@ export function declineLeave(context: ScreenContext): Promise<void> {
       confirm: "Decline the request",
       tone: "danger",
       run: async () => {
-        await context.mutate.patch(request.id, { status: "declined", fields: { ...request.fields, decidedBy: context.actor, decidedAt: clockIso() } }, { expectRevision: request.revision, event: `Leave declined for ${who} by ${context.actor}` });
-        context.toast("Leave declined", `Recorded against the request, decided by ${context.actor}.`);
+        try {
+          const plan = planLeaveDecision({
+            organizationId: context.org.id, currency: context.org.currency,
+            actor: context.actor, now: clockIso(),
+          }, request, undefined, "declined");
+          await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+          context.toast("Leave declined", `Recorded against the request, decided by ${context.actor}.`);
+        } catch (error) {
+          context.toast("Leave not declined", error instanceof Error ? error.message : "Reload this request before deciding.", "blocked");
+        }
       },
     });
   });
