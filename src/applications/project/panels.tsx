@@ -365,7 +365,7 @@ export function ProjectOverview({ context, lens }: { context: ScreenContext; len
   const late = tasks.filter((task) => task.endAt && new Date(task.endAt) < now && stageOf(task) !== "done");
   return (
     <Grid>
-      <Card span={7} eyebrow="PROJECT" prov="human" title="Summary" subtitle={project.summary} actions={<Pill tone={HEALTH_TONE[String(project.fields.health)] ?? "neutral"} dot>{healthLabel(project.fields.health)}</Pill>}>
+      <Card span={7} eyebrow="PROJECT" prov="human" title={project.title} subtitle={project.summary} actions={<Pill tone={HEALTH_TONE[String(project.fields.health)] ?? "neutral"} dot>{healthLabel(project.fields.health)}</Pill>}>
         <Stack gap={3}>
           <Properties rows={[
             { label: "Owner", value: project.ownerName },
