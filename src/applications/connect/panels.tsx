@@ -932,15 +932,64 @@ export function CapabilityInspector({ context }: { context: ScreenContext }) {
 export function SyncCentre({ context, lens }: { context: ScreenContext; lens: "Jobs" | "Conflicts" | "Schedules" | "Data mapping" }) {
   const records = useCollection("connectors");
   const conflicts = useCollection("conflicts");
+  const [conflictQuery, setConflictQuery] = useState("");
+  const [conflictScope, setConflictScope] = useState<"all" | "open">("open");
+  const visibleConflicts = conflicts.filter(conflict => {
+    if (conflictScope === "open" && conflict.status !== "open") return false;
+    const needle = conflictQuery.trim().toLocaleLowerCase();
+    return !needle || [conflict.title, conflict.summary, conflict.status, conflict.ownerName]
+      .join(" ").toLocaleLowerCase().includes(needle);
+  });
+  const overview = <section className="connect-sync-overview" aria-label="Synchronisation overview">
+    <div className="connect-sync-head">
+      <div>
+        <span className="connect-eyebrow">INTEGRATIONS / SYNCHRONISATION</span>
+        <h2>Understand every movement of data.</h2>
+        <p>Review potential sources, conflicts, schedules and field mappings. No provider ingestion or background jobs are running.</p>
+      </div>
+      <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>Connection records</Button>
+    </div>
+    <div className="connect-sync-metrics" aria-label="Synchronisation status summary">
+      <div><span>Connected sources</span><strong>0</strong></div>
+      <div><span>Ingestion jobs</span><strong>0</strong></div>
+      <div><span>Local conflicts</span><strong>{conflicts.length}</strong></div>
+      <div><span>Active schedules</span><strong>0</strong></div>
+    </div>
+    <nav className="connect-sync-nav" aria-label="Synchronisation work areas">
+      {(["Jobs", "Conflicts", "Schedules", "Data mapping"] as const).map(name =>
+        <button key={name} type="button" aria-current={lens === name ? "true" : undefined}
+          onClick={() => context.setTab(name)}>{name}</button>)}
+    </nav>
+  </section>;
 
   if (lens === "Conflicts") {
     return (
       <Stack gap={4}>
-        {conflicts.length === 0 ? (
-          <Empty title="No conflicts" icon={<RefreshCcw size={20} />}>A conflict happens when two sources disagree about one record. With one source there is nothing to disagree with.</Empty>
+        {overview}
+        <div className="connect-connections-toolbar">
+          <label className="connect-connections-search">
+            <Search size={17} aria-hidden="true" />
+            <span className="ds-sr-only">Search sync conflicts</span>
+            <input type="search" aria-label="Search sync conflicts" value={conflictQuery}
+              placeholder="Search conflicts, owners and records"
+              onChange={event => setConflictQuery(event.target.value)} />
+            {conflictQuery && <button type="button" aria-label="Clear conflict search" onClick={() => setConflictQuery("")}>
+              <X size={15} aria-hidden="true" /></button>}
+          </label>
+          <div className="connect-conflict-filters" role="group" aria-label="Conflict status filter">
+            <button type="button" aria-pressed={conflictScope === "open"} onClick={() => setConflictScope("open")}>Open</button>
+            <button type="button" aria-pressed={conflictScope === "all"} onClick={() => setConflictScope("all")}>All</button>
+          </div>
+        </div>
+        {visibleConflicts.length === 0 ? (
+          <Empty title={conflictQuery.trim() ? "No conflicts match this search" : "No conflicts in this view"} icon={<RefreshCcw size={20} />}
+            action={conflictQuery.trim() ? <Button variant="secondary" onClick={() => setConflictQuery("")}>Clear search</Button> : undefined}>
+            {conflictQuery.trim() ? "Search by title, owner or status." :
+              "A conflict requires two sources that disagree on a record. No provider sync is running."}
+          </Empty>
         ) : (
           <DataGrid
-            rows={conflicts}
+            rows={visibleConflicts}
             rowId={(row) => row.id}
             label="Conflicts"
             columns={[
@@ -960,18 +1009,22 @@ export function SyncCentre({ context, lens }: { context: ScreenContext; lens: "J
 
   if (lens === "Schedules") {
     return (
-      <Grid>
-        <Card span={7} eyebrow="SCHEDULES" prov="unknown" title="Nothing is scheduled" subtitle="A schedule without a source would only produce empty runs">
-          <Stack gap={3}>
-            <Properties rows={[
-              { label: "Jobs scheduled", value: <span className="ds-num">0</span> },
-              { label: "Next run", value: <Pill tone="warning">none</Pill> },
-              { label: "Cadence", value: "Would follow the provider's rate limit, not a round number" },
-            ]} />
-            <Checkbox label="Run an ingestion when a connection becomes healthy" defaultChecked />
-            <Checkbox label="Pause the schedule after three consecutive failures" defaultChecked />
-          </Stack>
-        </Card>
+      <Stack gap={4}>
+        {overview}
+        <Grid>
+          <Card span={7} eyebrow="SCHEDULES" prov="unknown" title="Nothing is scheduled" subtitle="A schedule without a connected source would only produce empty runs">
+            <Stack gap={3}>
+              <Properties rows={[
+                { label: "Jobs scheduled", value: <span className="ds-num">0</span> },
+                { label: "Next run", value: <Pill tone="warning">none</Pill> },
+                { label: "Cadence", value: "Not configured — depends on provider rate limits" },
+              ]} />
+              <Notice tone="info" title="Planned safeguards, not enabled settings">
+                Future schedules will require a verified connection, pause after repeated failures and preserve provider cursors. None of those policies is active while there is no ingestion service.
+              </Notice>
+              <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/health`)}>Check connector readiness</Button>
+            </Stack>
+          </Card>
         <Card span={5} eyebrow="RATE LIMITS" prov="unknown" title="What a schedule would respect">
           <ul className="ds-prose">
             {CONNECTOR_ENTRIES.filter((entry) => entry.limits.length).slice(0, 4).map((entry) => (
@@ -979,13 +1032,15 @@ export function SyncCentre({ context, lens }: { context: ScreenContext; lens: "J
             ))}
           </ul>
         </Card>
-      </Grid>
+        </Grid>
+      </Stack>
     );
   }
 
   if (lens === "Data mapping") {
     return (
       <Stack gap={4}>
+        {overview}
         <Notice tone="info" title="A mapping is written before a sync, not after">
           Each row below says which workspace collection a capability's records would land in, and what makes two records the same thing.
         </Notice>
@@ -1020,6 +1075,7 @@ export function SyncCentre({ context, lens }: { context: ScreenContext; lens: "J
 
   return (
     <Stack gap={4}>
+      {overview}
       <StatRow>
         <Stat label="Jobs" value="0" prov="posted" meta="No ingestion has been defined" />
         <Stat label="Records ingested" value="0" prov="posted" meta="Counted, and genuinely nought" />
