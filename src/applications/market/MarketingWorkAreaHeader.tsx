@@ -35,7 +35,15 @@ const WORKSPACES: Record<MarketingArea, { label: string; description: string; ne
 export function MarketingWorkAreaHeader({ context, area }: { context: ScreenContext; area: MarketingArea }) {
   const data = useMarketData();
   const details = WORKSPACES[area];
-  const counts = marketAreaCounts(area, data);
+  // The collection hook returns a keyed record; declare the required
+  // collections explicitly so work-area counts are type-safe and resilient.
+  const counts = marketAreaCounts(area, {
+    socialPosts: data.socialPosts ?? [],
+    campaigns: data.campaigns ?? [],
+    audiences: data.audiences ?? [],
+    contacts: data.contacts ?? [],
+    templates: data.templates ?? [],
+  });
   return <section className="t4-workarea-head" aria-label={context.screen.title + " workspace summary"}>
     <div className="t4-workarea-head-main">
       <span className="t4-workarea-eyebrow">MARKETING / {area.toUpperCase()}</span>
