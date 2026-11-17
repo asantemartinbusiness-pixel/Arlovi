@@ -15,6 +15,7 @@ import {
   type AudienceBody, type CampaignBody, type ChannelPlan, type PostBody, type SiteBody,
 } from "./data";
 import { attributionFilter, PageChecksCard, useAttributionFilter } from "./actions";
+import { CampaignLibraryWorkspace } from "./CampaignLibraryWorkspace";
 
 /* ====================================================================== *
  * MARKET panels. Each tab in the approved contract renders its own panel.
@@ -253,72 +254,7 @@ export function MarketingOverview({ context, lens }: { context: ScreenContext; l
 /* ---------------------------- MARKET-002 ---------------------------- */
 
 export function CampaignLibrary({ context, state }: { context: ScreenContext; state: string }) {
-  const data = useMarketData();
-  const { org } = useWorkspace();
-  const map: Record<string, string[]> = { All: [], Draft: ["draft"], Approval: ["approval", "approved"], Active: ["active"], Completed: ["completed", "archived"] };
-  const wanted = map[state] ?? [];
-  const rows = wanted.length === 0 ? data.campaigns : data.campaigns.filter((campaign) => wanted.includes(campaign.status));
-
-  if (rows.length === 0) {
-    return (
-      <Empty title={`No ${state.toLowerCase()} campaigns`} icon={<Megaphone size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("campaign wizard")}>Create campaign</Button>}>
-        A campaign holds its objective, audience, channel plan and budget in one record.
-      </Empty>
-    );
-  }
-
-  return (
-    <DataGrid
-      rows={rows}
-      rowId={(row) => row.id}
-      label={`${state} campaigns`}
-      selectedId={context.selectedId}
-      onSelect={(id) => context.select(id)}
-      onOpen={(id) => context.navigate(`/o/${org.slug}/market/campaigns/${id}`)}
-      columns={[
-        { key: "title", header: "Campaign", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary} ${String(row.fields.objective ?? "")}` },
-        { key: "owner", header: "Owner", cell: (row) => row.ownerName, sortValue: (row) => row.ownerName, hideBelow: 900 },
-        { key: "objective", header: "Objective", cell: (row) => String(row.fields.objective ?? "—"), filterValue: (row) => String(row.fields.objective ?? "") },
-        { key: "channel", header: "Channels", cell: (row) => (
-          <Row gap={1} wrap>
-            {(bodyOf<CampaignBody>(row, {}).channels ?? []).map((channel) => <Pill key={channel.network}>{networkOf(channel.network).label}</Pill>)}
-          </Row>
-        ) },
-        { key: "budget", header: "Budget", align: "end", cell: (row) => context.money(Number(row.fields.budgetMinor ?? 0)), sortValue: (row) => Number(row.fields.budgetMinor ?? 0) },
-        { key: "spent", header: "Committed", align: "end", cell: (row) => context.money(Number(row.fields.spentMinor ?? 0)), sortValue: (row) => Number(row.fields.spentMinor ?? 0) },
-        { key: "window", header: "Window", cell: (row) => `${context.date(row.startAt)} – ${context.date(row.endAt)}`, sortValue: (row) => row.startAt ?? "", hideBelow: 1200 },
-        { key: "status", header: "Status", cell: (row) => <Pill tone={toneForStatus(row.status)} dot>{row.status === "approval" ? "Awaiting approval" : row.status}</Pill> },
-        { key: "delivery", header: "Delivery", cell: (row) => <Pill tone="warning">{String(row.fields.delivery) === "not_connected" ? "No provider" : String(row.fields.delivery)}</Pill>, hideBelow: 1200 },
-      ]}
-      bulkActions={[
-        {
-          label: "Duplicate as draft",
-          onRun: (selected) => selected.forEach(async (campaign) => {
-            const body = bodyOf<CampaignBody>(campaign, {});
-            await context.mutate.create({
-              collection: "campaigns",
-              title: `${campaign.title} (copy)`,
-              status: "draft",
-              summary: campaign.summary,
-              amountMinor: Number(campaign.fields.budgetMinor ?? 0),
-              fields: { ...campaign.fields, spentMinor: 0, approval: "draft", delivery: "not_connected" },
-              body: { ...body, channels: (body.channels ?? []).map((channel) => ({ ...channel, spentMinor: 0, impressions: 0, clicks: 0, conversions: 0, revenueMinor: 0 })) },
-            }, `Campaign ${campaign.title} duplicated as a draft`);
-            context.toast("Duplicated as draft", "Spend, results and any approval were reset. No external spend authorisation was copied.");
-          }),
-        },
-        {
-          label: "Archive",
-          tone: "danger",
-          disabled: (selected) => selected.some((campaign) => campaign.status === "active"),
-          onRun: (selected) => selected.forEach((campaign) => {
-            void context.mutate.patch(campaign.id, { status: "archived" }, { expectRevision: campaign.revision, event: `Campaign ${campaign.title} archived` });
-          }),
-        },
-      ]}
-      summary={<span>{rows.length} of {data.campaigns.length} campaigns</span>}
-    />
-  );
+  return <CampaignLibraryWorkspace context={context} state={state} />;
 }
 
 /* ---------------------------- MARKET-003 ---------------------------- */
@@ -326,7 +262,7 @@ export function CampaignLibrary({ context, state }: { context: ScreenContext; st
 export function CampaignDetail({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useMarketData();
   const { org, now } = useWorkspace();
-  const campaign = useRecord(context.params.id) ?? data.campaigns[0];
+  const campaign = useRecord(context.params.id) ?? data.campaigns.find((item) => item.id === context.params.id);
   const body = bodyOf<CampaignBody>(campaign, {});
   const channels = body.channels ?? [];
   const totals = channelTotals(channels);

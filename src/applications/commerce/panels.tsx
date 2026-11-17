@@ -319,7 +319,7 @@ export function Products({ context, state }: { context: ScreenContext; state: st
 export function ProductDetail({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useCommerceData();
   const { org, now } = useWorkspace();
-  const product = useRecord(context.params.id) ?? data.products[0];
+  const product = useRecord(context.params.id) ?? data.products.find((item) => item.id === context.params.id);
   const body = bodyOf<ProductBody>(product, {});
   if (!product) return <Empty title="Product not found" />;
   const variants = body.variants ?? [];
@@ -633,7 +633,7 @@ export function Orders({ context, state }: { context: ScreenContext; state: stri
 export function OrderDetail({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useCommerceData();
   const { org } = useWorkspace();
-  const order = useRecord(context.params.id) ?? data.orders[0];
+  const order = useRecord(context.params.id) ?? data.orders.find((item) => item.id === context.params.id);
   const body = bodyOf<OrderBody>(order, {});
   const contact = data.contacts.find((item) => item.id === String(order?.fields.contactId ?? ""));
   if (!order) return <Empty title="Order not found" />;

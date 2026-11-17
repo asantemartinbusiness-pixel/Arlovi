@@ -310,7 +310,7 @@ export function BookingCalendar({ context, lens }: { context: ScreenContext; len
 export function BookingDetail({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useBookData();
   const { org, now } = useWorkspace();
-  const booking = useRecord(context.params.id) ?? data.bookings[0];
+  const booking = useRecord(context.params.id) ?? data.bookings.find((item) => item.id === context.params.id);
   const service = serviceOf(data, booking);
   const resource = resourceOf(data, booking);
   const contact = data.contacts.find((item) => item.id === String(booking?.fields.contactId ?? ""));
