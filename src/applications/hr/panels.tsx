@@ -746,6 +746,29 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
             {!employee.fields.skills && <span className="ds-subtle">No skills recorded.</span>}
           </Row>
         </Card>
+        <Card span={12} eyebrow="RECORD HISTORY" title="Employment record history"
+          subtitle={employee.history.length ? `${employee.history.length} previous recorded version${employee.history.length === 1 ? "" : "s"}` : "No earlier revisions"}>
+          <Stack gap={3}>
+            <Notice tone="info" title="Previous versions, not a verified employment audit">
+              This shows locally saved record snapshots. It is not a substitute for signed contracts or an independently verified audit trail.
+            </Notice>
+            {employee.history.length === 0 ? <p className="ds-subtle">No previous employee record versions have been saved.</p> : (
+              <div className="hr-employee-history">
+                {employee.history.slice(0, 10).map((snapshot, index) => (
+                  <div key={`${snapshot.at}-${index}`} className="hr-employee-history-item">
+                    <Row gap={2} wrap>
+                      <strong className="ds-grow">Previous version {employee.revision - index - 1}</strong>
+                      <span className="ds-subtle">{context.date(snapshot.at)}</span>
+                      <Pill tone="neutral">{snapshot.status}</Pill>
+                    </Row>
+                    <p className="ds-subtle">{snapshot.summary || "No summary was recorded for this version."}</p>
+                  </div>
+                ))}
+                {employee.history.length > 10 && <p className="ds-subtle">{employee.history.length - 10} earlier snapshots are not expanded here.</p>}
+              </div>
+            )}
+          </Stack>
+        </Card>
       </Grid>
     );
   }
