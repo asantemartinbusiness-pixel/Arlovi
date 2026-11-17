@@ -1,0 +1,102 @@
+import { expect, test } from "@playwright/test";
+
+test("Performance has distinct Cycles, My reviews, Team and Templates screens", async ({ page }) => {
+  const main = page.locator("#main");
+  for (const [tab, heading] of [
+    ["Cycles", "Every review cycle, accounted for."],
+    ["My reviews", "Your reviews and decisions."],
+    ["Team", "The team review ledger."],
+    ["Templates", "Structure before judgement."],
+  ]) {
+    await page.goto(`/o/northline/hr/performance?tab=${encodeURIComponent(tab)}`);
+    await expect(main.getByRole("heading", { name: heading })).toBeVisible();
+    if (tab !== "Team" || await main.locator(".ops-metrics").count() > 0) {
+      await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
+    }
+  }
+  await page.goto("/o/northline/hr/performance?tab=My%20reviews");
+  const filter = main.getByRole("button", { name: "Outstanding", exact: true });
+  await filter.click();
+  await expect(filter).toHaveAttribute("aria-pressed", "true");
+  const search = main.getByRole("textbox", { name: "Search performance reviews" });
+  await search.fill("qa-no-review-39402");
+  await expect(main).toContainText("No reviews match these filters");
+  await search.clear();
+  await main.getByRole("button", { name: "All", exact: true }).click();
+  await expect(main.getByRole("button", { name: "All", exact: true })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("Learning & Policies presents four pages with live search and real required-only filters", async ({ page }) => {
+  const main = page.locator("#main");
+  for (const [tab, heading] of [
+    ["Courses", "Learning people can actually follow."],
+    ["Policies", "Policies that can be read and acknowledged."],
+    ["Compliance", "Requirements, evidence and outstanding work."],
+    ["My learning", "Your learning record, in context."],
+  ]) {
+    await page.goto(`/o/northline/hr/learning?tab=${encodeURIComponent(tab)}`);
+    await expect(main.getByRole("heading", { name: heading })).toBeVisible();
+    await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
+  }
+  await page.goto("/o/northline/hr/learning?tab=Courses");
+  const required = main.getByRole("button", { name: "Required only", exact: true });
+  await required.click();
+  await expect(required).toHaveAttribute("aria-pressed", "true");
+  const search = main.getByRole("textbox", { name: "Search learning and policies" });
+  await search.fill("qa-no-course-93921");
+  await expect(main).toContainText("No courses match the filters");
+  await search.clear();
+  await page.goto("/o/northline/hr/learning?tab=Compliance");
+  await expect(main).toContainText("Aggregate totals do not establish individual compliance");
+});
+
+test("Payroll separates runs, salary inputs, human approvals and illustrative payslips", async ({ page }) => {
+  const main = page.locator("#main");
+  for (const [tab, heading] of [
+    ["Runs", "A controlled view of payroll runs."],
+    ["Inputs", "Know what every pay calculation uses."],
+    ["Approvals", "Decisions before any external submission."],
+    ["Payslips", "Illustrative pay, not issued payslips."],
+  ]) {
+    await page.goto(`/o/northline/hr/payroll?tab=${encodeURIComponent(tab)}`);
+    if (await main.getByRole("heading", { name: "Payroll is restricted." }).count()) {
+      await expect(main).toContainText("restricted");
+      continue;
+    }
+    await expect(main.getByRole("heading", { name: heading })).toBeVisible();
+    await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
+    await expect(main).toContainText("These are estimates, not verified payroll");
+  }
+  await page.goto("/o/northline/hr/payroll?tab=Runs");
+  if (await main.getByRole("heading", { name: "Payroll is restricted." }).count()) return;
+  const state = main.getByRole("group", { name: "Filter payroll run states" });
+  await state.getByRole("button", { name: "Draft", exact: true }).click();
+  await expect(state.getByRole("button", { name: "Draft", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await state.getByRole("button", { name: "Approved", exact: true }).click();
+  await expect(state.getByRole("button", { name: "Approved", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.goto("/o/northline/hr/payroll?tab=Payslips");
+  await expect(main).toContainText("These are not issued payslips");
+});
+
+test("Missing employee salary remains a missing input, not a computed zero payslip", async ({ page }) => {
+  await page.goto("/o/northline/hr/payroll?tab=Inputs");
+  const main = page.locator("#main");
+  if (await main.getByRole("heading", { name: "Payroll is restricted." }).count()) return;
+  await page.evaluate(async () => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const missing = repo.newRecord({
+      organizationId: "org-northline", collection: "employees", currency: "GBP",
+      title: "QA No Salary Defined", status: "active",
+      fields: { employment: "full-time", title: "Analyst" },
+    }, ctx);
+    await repo.putMany([missing], ctx, [], "org-northline");
+  });
+  await page.reload();
+  await expect(main).toContainText("QA No Salary Defined");
+  const missingRecord = main.getByText("QA No Salary Defined");
+  await expect(missingRecord).toBeVisible();
+  await expect(main).toContainText("Salary missing or invalid");
+  await expect(main).toContainText("Excluded from all illustrative payroll calculations");
+});
