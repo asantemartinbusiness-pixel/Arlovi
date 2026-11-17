@@ -42,11 +42,11 @@ test("Finance reviews approved Project time without creating an invoice or ledge
 
   const isMobile = await page.evaluate(() => window.matchMedia("(max-width: 767px)").matches);
   if (isMobile) {
-    const card = main.locator(".ds-record-card").filter({ hasText: "Ready for Finance review" }).first();
-    await card.getByRole("button", { name: "Open", exact: true }).click();
+    const card = main.locator("button.ds-record-card").filter({ hasText: "Ready for Finance review" }).first();
+    await card.click();
   } else {
-    const row = main.getByRole("row", { name: /Ready for Finance review/ });
-    await row.getByRole("button", { name: `Open row ${ids.entry}` }).click();
+    const row = main.getByRole("row", { name: /Ready for Finance review/ }).filter({ hasText: "QA Finance Time Employee" });
+    await row.click();
   }
   const drawer = page.getByRole("dialog", { name: "Review billable time input" });
   await expect(drawer).toContainText("QA Finance Time Project");
@@ -97,8 +97,8 @@ test("Finance cannot mark unpriced time as reviewed for invoicing", async ({ pag
   const main = page.locator("#main");
   const isMobile = await page.evaluate(() => window.matchMedia("(max-width: 767px)").matches);
   if (isMobile) {
-    const card = main.locator(".ds-record-card").filter({ hasText: "QA Unpriced Employee" }).first();
-    await card.getByRole("button", { name: "Open", exact: true }).click();
+    const card = main.locator("button.ds-record-card").filter({ hasText: "QA Unpriced Employee" }).first();
+    await card.click();
   } else {
     await main.getByRole("row", { name: /QA Unpriced Employee/ }).click();
   }
