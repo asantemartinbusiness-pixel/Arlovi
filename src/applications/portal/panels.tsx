@@ -90,9 +90,9 @@ export function PortalDirectory({ context, audience }: { context: ScreenContext;
             actions={<Pill tone={statusTone(portal.status)} dot>{portal.status}</Pill>}
             footer={<>
               <Button size="sm" variant={context.selectedId === portal.id ? "primary" : "secondary"} aria-pressed={context.selectedId === portal.id} onClick={() => context.select(context.selectedId === portal.id ? undefined : portal.id)}>{context.selectedId === portal.id ? "Selected" : "Select"}</Button>
-              <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/portal/portals/${portal.id}/dashboard`)}>Preview</Button>
-              <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/portal/portals/${portal.id}/builder`)}>Builder</Button>
-              <Button size="sm" variant="ghost" onClick={() => { context.select(portal.id); context.openOverlay("access setup", { id: portal.id }); }}>Access</Button>
+              <Button size="sm" variant="ghost" aria-label={`Open internal preview for ${portal.title}`} onClick={() => context.navigate(`/o/${org.slug}/portal/portals/${portal.id}/dashboard`)}>Preview</Button>
+              <Button size="sm" variant="ghost" aria-label={`Edit portal ${portal.title}`} onClick={() => context.navigate(`/o/${org.slug}/portal/portals/${portal.id}/builder`)}>Builder</Button>
+              <Button size="sm" variant="ghost" aria-label={`Manage access for ${portal.title}`} onClick={() => { context.select(portal.id); context.openOverlay("access setup", { id: portal.id }); }}>Access</Button>
             </>}
           >
             <Stack gap={3}>
@@ -109,7 +109,7 @@ export function PortalDirectory({ context, audience }: { context: ScreenContext;
                 { label: "Last visit", value: visit.known ? context.relative(String(portal.fields.lastVisitAt)) : "Never opened" },
                 { label: "Inherits internal access", value: portal.fields.inheritsInternalAccess === true ? <Pill tone="danger">Yes</Pill> : <Pill tone="success">No</Pill> },
               ]} />
-              {portal.status === "suspended" && <Notice tone="danger" title="Suspended">Links no longer resolve for this portal's users.</Notice>}
+              {portal.status === "suspended" && <Notice tone="danger" title="Suspended">This local portal is marked suspended. External access is not connected.</Notice>}
             </Stack>
           </Card>
         );
