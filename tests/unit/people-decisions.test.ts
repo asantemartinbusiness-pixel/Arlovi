@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Rec } from "@/domain/types";
 import {
-  planHireApplicant, planLeaveDecision, leaveRequestDays,
+  planHireApplicant, planLeaveDecision, planOnboardingLaunch, leaveRequestDays,
   type PeopleDecisionContext,
 } from "@/applications/hr/decisions";
 
@@ -112,5 +112,39 @@ describe("atomic recruitment-to-employee handoff", () => {
     const hired = applicant();
     hired.status = "hired";
     expect(() => planHireApplicant(ctx, hired, [], "Approved", "Accepted")).toThrow(/already hired/);
+  });
+});
+
+describe("single-transaction onboarding checklists", () => {
+  const starter = () => row("employees", "employee-starter", "probation", { employment: "full-time" });
+  const mentor = () => row("employees", "employee-mentor", "active", { email: "mentor@example.test" });
+
+  it("creates all six tasks and an employee launch marker in one guarded plan", () => {
+    const plan = planOnboardingLaunch(ctx, starter(), mentor(), []);
+    expect(plan.records).toHaveLength(7);
+    expect(plan.records[0].fields.mentorId).toBe("employee-mentor");
+    expect(plan.records[0].fields.onboardingLaunchedAt).toBe(ctx.now);
+    expect(plan.records[0].revision).toBe(4);
+    expect(plan.records.slice(1).every((task) => task.collection === "tasks" &&
+      task.parentId === "employee-starter" && task.fields.employeeId === "employee-starter")).toBe(true);
+    expect(plan.eventTypes).toEqual(["update", ...Array(6).fill("create")]);
+    expect(plan.expectedRevisions).toEqual({ "employee-starter": 3, "employee-mentor": 3 });
+    const access = plan.records.find((task) => task.fields.group === "IT access");
+    expect(access?.status).toBe("waiting");
+    expect(access?.title).not.toContain("granted");
+  });
+
+  it("rejects relaunch, self-mentoring and foreign mentors without any records", () => {
+    const begun = starter();
+    begun.fields.onboardingLaunchedAt = ctx.now;
+    expect(() => planOnboardingLaunch(ctx, begun, mentor(), [])).toThrow(/already has/);
+    const existing = row("tasks", "onboard-task", "ready", { kind: "onboarding", employeeId: "employee-starter" });
+    expect(() => planOnboardingLaunch(ctx, starter(), mentor(), [existing])).toThrow(/already has/);
+    const self = starter();
+    self.status = "active";
+    expect(() => planOnboardingLaunch(ctx, self, self, [])).toThrow(/other than/);
+    const otherOrg = mentor();
+    otherOrg.organizationId = "org-harbor";
+    expect(() => planOnboardingLaunch(ctx, starter(), otherOrg, [])).toThrow(/another company/);
   });
 });
