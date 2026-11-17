@@ -246,10 +246,40 @@ export function RiskSummary({ context }: { context: ScreenContext }) {
  * ARL-CONNECT-002 — Connector Detail
  * ================================================================ */
 
-export function ConnectorDetail({ context, lens }: { context: ScreenContext; lens: "Overview" | "Capabilities" | "Permissions" | "Versions" | "Help" }) {
-  const { entry } = useConnector(context);
-  if (!entry) return <Empty title="No connector" icon={<Plug size={20} />} />;
+type ConnectorLens = "Overview" | "Capabilities" | "Permissions" | "Versions" | "Help";
 
+export function ConnectorDetail({ context, lens }: { context: ScreenContext; lens: ConnectorLens }) {
+  const { entry } = useConnector(context);
+  if (!entry) return <Empty title="No connector" icon={<Plug size={20} />}>
+    This connector does not exist in the catalogue or this company's connection records.
+  </Empty>;
+  return <Stack gap={4}>
+    <section className="connect-connector-overview" aria-label="Connector details overview">
+      <div className="connect-connector-head">
+        <div>
+          <span className="connect-eyebrow">INTEGRATIONS / ${entry.category.toUpperCase()}</span>
+          <h2>{entry.capability.label}</h2>
+          <p>{entry.capability.provider} · {entry.capability.note}</p>
+        </div>
+        <StateCell entry={entry} />
+      </div>
+      <div className="connect-connector-metrics" aria-label="Connector scope summary">
+        <div><span>Read permissions</span><strong>{entry.scopes.filter(scope => scope.kind === "read").length}</strong></div>
+        <div><span>Proposed write permissions</span><strong>{entry.scopes.filter(scope => scope.kind === "write").length}</strong></div>
+        <div><span>Operations</span><strong>{entry.operations.length}</strong></div>
+        <div><span>External grants</span><strong>0</strong></div>
+      </div>
+      <div className="connect-connector-actions">
+        <Button size="sm" variant="secondary" onClick={() => context.setTab("Permissions")}>Review permissions</Button>
+        <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/connect/marketplace`)}>All integrations</Button>
+        <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connect/${entry.capability.id}`)}>Connection requirements</Button>
+      </div>
+    </section>
+    <ConnectorDetailBody context={context} lens={lens} entry={entry} />
+  </Stack>;
+}
+
+function ConnectorDetailBody({ context, lens, entry }: { context: ScreenContext; lens: ConnectorLens; entry: ConnectorEntry }) {
   if (lens === "Capabilities") {
     return (
       <Stack gap={4}>
@@ -395,6 +425,20 @@ export function ConnectionWizard({ context, lens }: { context: ScreenContext; le
 
   return (
     <Stack gap={5}>
+      <section className="connect-connector-overview" aria-label="Connector authorisation overview">
+        <div className="connect-connector-head">
+          <div>
+            <span className="connect-eyebrow">INTEGRATIONS / AUTHORISATION PREVIEW</span>
+            <h2>{entry.capability.label}</h2>
+            <p>Review the account, permission requests and verification requirements. A provider redirect and callback are not available in this browser.</p>
+          </div>
+          <StateCell entry={entry} />
+        </div>
+        <div className="connect-connector-actions">
+          <Button size="sm" variant="secondary" onClick={() => context.setTab("Permissions")}>Review scopes</Button>
+          <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/connect/marketplace/${entry.capability.id}`)}>Connector details</Button>
+        </div>
+      </section>
       <ul className="t6-steps">
         {steps.slice(0, 4).map((step) => (
           <li key={step.id} className="t6-step" data-state={step.state}>
