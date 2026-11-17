@@ -407,3 +407,21 @@
 @media (max-width: 640px) {
   .hr-profile-workflow-strip { align-items: stretch; flex-direction: column; }
 }
+
+/* Employee record history stays intentionally metadata-only; no sensitive snapshots exposed. */
+.hr-employee-history {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.hr-employee-history-item {
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-inset);
+}
+.hr-employee-history-item p { margin: var(--space-2) 0 0; line-height: 1.5; }
+@media (max-width: 760px) {
+  .hr-employee-history { grid-template-columns: minmax(0, 1fr); }
+}
