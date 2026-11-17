@@ -24,13 +24,14 @@ import {
 
 export function useConnector(context: ScreenContext): { records: Rec[]; record?: Rec; entry?: ConnectorEntry } {
   const records = useCollection("connectors");
-  const routed = records.find((item) => item.id === context.params.id);
-  const record = routed ?? records[0];
+  const routeId = context.params.id;
+  // An explicit connection URL never substitutes another connector's record.
+  const record = routeId ? records.find(item => item.id === routeId) : records[0];
   const entry = useMemo(() => {
-    const byRoute = entryById(context.params.id ?? "");
+    const byRoute = entryById(routeId ?? "");
     if (byRoute) return byRoute;
-    return record ? entryForRecord(record.fields) ?? CONNECTOR_ENTRIES[0] : CONNECTOR_ENTRIES[0];
-  }, [context.params.id, record]);
+    return record ? entryForRecord(record.fields) : undefined;
+  }, [routeId, record]);
   return { records, record, entry };
 }
 
@@ -609,61 +610,88 @@ export function ConsentStatus({ context }: { context: ScreenContext }) {
 export function Connections({ context, lens }: { context: ScreenContext; lens: "All" | "Healthy" | "Needs action" | "Disabled" }) {
   const records = useCollection("connectors");
   const { org } = useWorkspace();
-  const rows = records.filter((record) => {
+  const [search, setSearch] = useState("");
+  const active = records.filter(record => record.status !== "disabled");
+  const rows = records.filter(record => {
     if (lens === "Healthy") return false;
-    if (lens === "Disabled") return record.status === "disabled";
-    if (lens === "Needs action") return record.status !== "disabled";
-    return true;
+    if (lens === "Disabled" && record.status !== "disabled") return false;
+    if (lens === "Needs action" && record.status === "disabled") return false;
+    const entry = entryForRecord(record.fields);
+    const needle = search.trim().toLocaleLowerCase();
+    return !needle || [record.title, record.summary, record.ownerName, record.status,
+      entry?.capability.label ?? "", entry?.capability.provider ?? ""]
+      .join(" ").toLocaleLowerCase().includes(needle);
   });
+  const overview = <section className="connect-connections-overview" aria-label="Connection management overview">
+    <div className="connect-connections-head">
+      <div>
+        <span className="connect-eyebrow">INTEGRATIONS / CONNECTIONS</span>
+        <h2>Know what is connected — and what isn't.</h2>
+        <p>Manage local connector requests, inspect access requirements and see their recorded state without implying an external grant exists.</p>
+      </div>
+      <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/connect/marketplace`)}>Browse integrations</Button>
+    </div>
+    <div className="connect-connections-metrics" aria-label="Connection status summary">
+      <div><span>Connector records</span><strong>{records.length}</strong></div>
+      <div><span>Pending setup</span><strong>{active.length}</strong></div>
+      <div><span>Disabled</span><strong>{records.length - active.length}</strong></div>
+      <div><span>Verified connections</span><strong>0</strong></div>
+    </div>
+  </section>;
 
-  if (lens === "Healthy") {
-    return (
-      <Empty title="No connection is healthy" icon={<ShieldCheck size={20} />}>
-        A connection is healthy when a grant exists and one read has succeeded. Neither has happened for any provider, so this tab is empty rather than optimistic.
-      </Empty>
-    );
-  }
-
-  if (rows.length === 0) {
-    return <Empty title={`Nothing ${lens.toLowerCase()}`} icon={<Plug size={20} />}>Connector records are kept in this workspace with the state the capability register reports.</Empty>;
-  }
-
-  return (
-    <Stack gap={4}>
-      <DataGrid
-        rows={rows}
-        rowId={(row) => row.id}
-        label="Connections"
-        rowTone={(row) => (row.status === "disabled" ? undefined : "warning")}
+  return <Stack gap={4}>
+    {overview}
+    {lens !== "Healthy" && <div className="connect-connections-toolbar">
+      <label className="connect-connections-search">
+        <Search size={17} aria-hidden="true" />
+        <span className="ds-sr-only">Find a connection</span>
+        <input type="search" aria-label="Find a connection" value={search}
+          onChange={event => setSearch(event.target.value)}
+          placeholder="Search requests, owners and providers" />
+        {search && <button type="button" aria-label="Clear connection search" onClick={() => setSearch("")}>
+          <X size={15} aria-hidden="true" />
+        </button>}
+      </label>
+      <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/connect/receipts`)}>Action receipts</Button>
+    </div>}
+    {lens === "Healthy" ? <Empty title="No connection is healthy" icon={<ShieldCheck size={20} />}>
+      A verified provider grant and a successful read are required before a connection can appear here. Neither is available.
+    </Empty> : rows.length === 0 ? <Empty
+      title={search.trim() ? "No connections match your search" : lens === "All" ? "No connection requests yet" : `No ${lens.toLowerCase()} connections`}
+      icon={<Plug size={20} />}
+      action={<Button variant="secondary" onClick={() => search.trim() ? setSearch("") : context.navigate(`/o/${org.slug}/connect/marketplace`)}>
+        {search.trim() ? "Clear search" : "Browse integrations"}
+      </Button>}>
+      {search.trim() ? "Try a connector name, provider, owner or request status." : "Connection records are created when a setup or install request is recorded."}
+    </Empty> : <>
+      <div className="connect-results-header" role="status"><span><strong>{rows.length}</strong> {rows.length === 1 ? "record" : "records"} shown</span><span>No provider tokens or grants stored here</span></div>
+      <DataGrid rows={rows} rowId={row => row.id} label="Connections"
+        rowTone={row => row.status === "disabled" ? undefined : "warning"}
         columns={[
-          { key: "title", header: "Connection", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
+          { key: "title", header: "Connection", primary: true, cell: row => row.title, sortValue: row => row.title, filterValue: row => `${row.title} ${row.summary}` },
           { key: "account", header: "Account", cell: () => <span className="ds-subtle">None linked</span> },
-          { key: "owner", header: "Owner", cell: (row) => row.ownerName },
-          {
-            key: "scopes", header: "Scopes granted", align: "end", cell: (row) => {
-              const entry = entryForRecord(row.fields);
-              return <span className="ds-num">0 of {entry?.scopes.length ?? 0}</span>;
-            },
-          },
+          { key: "owner", header: "Owner", cell: row => row.ownerName },
+          { key: "scopes", header: "Scopes granted", align: "end", cell: row => {
+            const entry = entryForRecord(row.fields);
+            return <span className="ds-num">0 of {entry?.scopes.length ?? 0}</span>;
+          } },
           { key: "expiry", header: "Expiry", cell: () => <span className="ds-subtle">No grant to expire</span> },
-          {
-            key: "state", header: "State", cell: (row) => {
-              const entry = entryForRecord(row.fields);
-              return entry ? <StateCell entry={entry} /> : <Pill tone="warning" dot>{String(row.fields.capability ?? row.status).replace(/_/g, " ")}</Pill>;
-            },
-          },
-          { key: "local", header: "Done here instead", cell: (row) => row.summary },
+          { key: "state", header: "State", cell: row => {
+            const entry = entryForRecord(row.fields);
+            return entry ? <StateCell entry={entry} /> :
+              <Pill tone="warning" dot>{String(row.fields.capability ?? row.status).replace(/_/g, " ")}</Pill>;
+          } },
+          { key: "local", header: "Local alternative", cell: row => row.summary },
         ]}
-        onOpen={(id) => context.navigate(`/o/${org.slug}/connect/connections/${id}`)}
-        onSelect={(id) => context.select(id)}
-        selectedId={context.selectedId}
-        summary={<span>Usage is not shown because no call has been made. A zero would be true but a usage column implies a history that does not exist.</span>}
+        onOpen={id => context.navigate(`/o/${org.slug}/connect/connections/${id}`)}
+        onSelect={id => context.select(id)} selectedId={context.selectedId}
+        summary={<span>Usage and provider latency are unavailable because no external calls have been made. A request is not an installed integration.</span>}
       />
-      <Notice tone="warning" title="Revocation would have nothing to revoke">
-        There is no cached grant, no token and no queued call, so suspending a connection here only changes a label. The screen says so rather than offering a reassuring button.
+      <Notice tone="warning" title="No external grant exists to revoke">
+        Disabling a connector record only updates local workspace state. It does not revoke a provider token or contact an account.
       </Notice>
-    </Stack>
-  );
+    </>}
+  </Stack>;
 }
 
 /* ================================================================ *
