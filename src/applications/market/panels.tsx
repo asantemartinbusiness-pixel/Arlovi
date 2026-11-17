@@ -16,6 +16,7 @@ import {
 } from "./data";
 import { attributionFilter, PageChecksCard, useAttributionFilter } from "./actions";
 import { CampaignLibraryWorkspace } from "./CampaignLibraryWorkspace";
+import { AudienceSegmentsLibrary } from "./AudienceSegmentsLibrary";
 
 /* ====================================================================== *
  * MARKET panels. Each tab in the approved contract renders its own panel.
@@ -866,44 +867,7 @@ export function AudienceSegments({ context, lens }: { context: ScreenContext; le
     );
   }
 
-  return data.audiences.length === 0
-    ? <Empty title="No segments" icon={<Users size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Segment builder")}>Build a segment</Button>} />
-    : (
-      <Grid>
-        {data.audiences.map((audience) => {
-          const result = evaluateSegment(audience, data.contacts, now);
-          const body = bodyOf<AudienceBody>(audience, {});
-          return (
-            <Card key={audience.id} span={6} title={audience.title} subtitle={audience.summary}
-              actions={<Pill tone={result.members.length === 0 ? "warning" : "success"}>{result.members.length} eligible</Pill>}
-              footer={<>
-                <Button size="sm" variant={context.selectedId === audience.id ? "primary" : "secondary"} aria-pressed={context.selectedId === audience.id} onClick={() => context.select(context.selectedId === audience.id ? undefined : audience.id)}>{context.selectedId === audience.id ? "Selected" : "Select"}</Button>
-                <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Segment builder", { id: audience.id })}>Edit rules</Button>
-                <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Audience preview", { id: audience.id })}>Preview members</Button>
-                <span className="ds-grow" />
-                <span className="ds-subtle">Counted {context.relative(audience.updatedAt)}</span>
-              </>}>
-              <Stack gap={3}>
-                <Stack gap={1}>
-                  {(body.rules ?? []).map((rule, index) => (
-                    <code key={`${rule.field}-${index}`} style={{ fontSize: "var(--text-xs)" }}>{rule.field} {rule.op} {rule.value}</code>
-                  ))}
-                  {(body.rules ?? []).length === 0 && <span className="ds-subtle">No rules: this segment matches nobody.</span>}
-                </Stack>
-                <Properties rows={[
-                  { label: "Eligible", value: <strong>{result.members.length}</strong> },
-                  { label: "Held back", value: `${result.excluded.length} (${(body.exclusions ?? []).join(", ") || "no exclusions"})` },
-                  { label: "Counted from", value: `${data.contacts.length} contact records in this workspace` },
-                ]} />
-                {(body.exclusions ?? []).includes("suppressed")
-                  ? null
-                  : <Notice tone="danger" title="This segment does not exclude suppressed contacts">Add the exclusion before any send is approved.</Notice>}
-              </Stack>
-            </Card>
-          );
-        })}
-      </Grid>
-    );
+  return <AudienceSegmentsLibrary context={context} />;
 }
 
 /* ---------------------------- MARKET-008 ---------------------------- */
