@@ -2469,7 +2469,7 @@ export function Payroll({ context, lens }: { context: ScreenContext; lens: "Runs
       {metrics}
       {warning}
       {search("Payroll run register")}
-      <div className="ops-toolbar" aria-label="Filter payroll run states">
+      <div className="ops-toolbar" role="group" aria-label="Filter payroll run states">
         <strong className="ops-toolbar-heading">Run status</strong>
         {(["all", "draft", "approved"] as const).map((option) => <Button key={option}
           size="sm" aria-pressed={state === option} variant={state === option ? "secondary" : "ghost"}
@@ -3148,10 +3148,20 @@ export function CandidateProfileOverlay({ context }: { context: ScreenContext })
 export function PayrollReview({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const data = useCollections(["payrollRuns", "employees"]);
-  const run = data.payrollRuns.find((row) => row.id === payload?.id) ?? data.payrollRuns[0];
-  const lines = computePayroll(data.employees);
-  if (!run) return <Empty title="No payroll run" />;
+  const wantedId = payload?.id ?? context.selectedId;
+  const run = wantedId
+    ? data.payrollRuns.find((row) => row.id === wantedId && row.organizationId === context.org.id)
+    : data.payrollRuns[0];
   if (!context.can("view_payroll")) return <RoleViewNote what="Payroll detail" />;
+  if (!run) return <Empty title={wantedId ? "Selected payroll run unavailable" : "No payroll run"}>
+    Open a payroll run from this company. A missing selection never falls back to an unrelated record.
+  </Empty>;
+  const eligible = data.employees.filter((employee) => employee.status !== "alumni"
+    && employee.fields.employment !== "contractor");
+  const salaryKnown = (employee: Rec) => employee.fields.salaryMinor !== undefined
+    && Number.isFinite(Number(employee.fields.salaryMinor)) && Number(employee.fields.salaryMinor) >= 0;
+  const missing = eligible.filter((employee) => !salaryKnown(employee));
+  const lines = computePayroll(eligible.filter(salaryKnown));
   return (
     <Stack gap={4}>
       <Properties rows={[
@@ -3159,8 +3169,10 @@ export function PayrollReview({ context }: { context: ScreenContext }) {
         { label: "Period", value: String(run.fields.period ?? "") },
         { label: "Status", value: <Pill tone={run.status === "approved" ? "success" : "warning"}>{run.status}</Pill> },
         { label: "People", value: String(lines.length) },
-        { label: "Gross", value: context.money(lines.reduce((sum, line) => sum + line.grossMinor, 0)) },
-        { label: "Net", value: context.money(lines.reduce((sum, line) => sum + line.netMinor, 0)) },
+        { label: "Current salary estimate gross", value: context.money(lines.reduce((sum, line) => sum + line.grossMinor, 0)) },
+        { label: "Current salary estimate net", value: context.money(lines.reduce((sum, line) => sum + line.netMinor, 0)) },
+        { label: "Recorded run amount", value: run.amountMinor === undefined ? "Not recorded" : context.money(run.amountMinor) },
+        { label: "Missing salary inputs", value: String(missing.length) },
       ]} />
       <DataGrid
         rows={lines}
@@ -3173,9 +3185,10 @@ export function PayrollReview({ context }: { context: ScreenContext }) {
           { key: "net", header: "Net", align: "end", cell: (row) => <span className="ds-num">{context.money(row.netMinor)}</span> },
         ]}
       />
-      <Notice tone="warning" title="Jurisdiction rules are not applied">
-        Deductions use one illustrative rate. Nothing here validates against {context.org.jurisdiction} thresholds, codes or reliefs,
-        and no submission is made to any authority.
+      <Notice tone="warning" title="Current estimates, not a run-specific payslip or filing">
+        The figures above use current salaries on employee records, excluding {missing.length} people with absent or invalid salary
+        inputs. They do not reconstruct this run's historical approved amounts. Deductions are illustrative, do not apply the
+        current rules for {context.org.jurisdiction}, and make no external payment or authority submission.
       </Notice>
     </Stack>
   );
