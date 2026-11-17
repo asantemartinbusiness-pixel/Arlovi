@@ -261,6 +261,25 @@ export function AppOverview({ context, lens }: { context: ScreenContext; lens: "
   if (lens === "Overview") {
     return (
       <Stack gap={5}>
+        <section className="t6-build-library-overview" aria-label="Build project health overview">
+          <Row gap={3} wrap>
+            <div className="ds-grow" style={{ minWidth: 220 }}>
+              <span className="ds-subtle">BUILD / PROJECT OVERVIEW</span>
+              <h2>{record.title}</h2>
+              <p className="ds-subtle">Your application model, screen architecture, validation findings and delivery state in one workspace.</p>
+            </div>
+            <Row gap={2} wrap>
+              <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/builder`)}>Open builder</Button>
+              <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>Run through checks</Button>
+            </Row>
+          </Row>
+          <div className="t6-build-library-metrics" aria-label="Project readiness summary">
+            <div><span>Screens</span><strong>{model.screens.length}</strong></div>
+            <div><span>Components</span><strong>{model.screens.reduce((count, screen) => count + screen.components.length, 0)}</strong></div>
+            <div><span>Checks failing</span><strong>{totals.fail}</strong></div>
+            <div><span>Checks to review</span><strong>{totals.warn}</strong></div>
+          </div>
+        </section>
         <StatRow>
           <Stat prov="posted" label="Entities" value={String(model.entities.length)} meta={`${model.entities.reduce((sum, entity) => sum + entity.fields.length, 0)} fields`} />
           <Stat prov="posted" label="Screens" value={String(model.screens.length)} meta={`${model.screens.reduce((sum, screen) => sum + screen.components.length, 0)} components`} />
