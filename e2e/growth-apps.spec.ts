@@ -55,3 +55,19 @@ for (const width of [390, 820, 1440]) {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 }
+
+test("Growth detail URLs never show a different record when the requested ID is missing", async ({ page }) => {
+  const paths = [
+    "/market/campaigns/missing-growth-campaign",
+    "/commerce/products/missing-growth-product",
+    "/commerce/orders/missing-growth-order",
+    "/book/bookings/missing-growth-booking",
+    "/proc/suppliers/missing-growth-supplier",
+    "/portal/portals/missing-growth-portal/dashboard",
+  ];
+  for (const path of paths) {
+    await page.goto(`/o/northline${path}`);
+    await expect(page.getByRole("heading", { name: "Record not found" })).toBeVisible();
+    await expect(page.getByText("No other record was substituted.", { exact: false })).toBeVisible();
+  }
+});
