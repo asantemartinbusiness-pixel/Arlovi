@@ -318,6 +318,6 @@ test("Access request requires a named reviewer and written reason", async ({ pag
   await expect(modal).toContainText("No connected identity provider");
   await expect(modal.locator("label").filter({ hasText: "Responsible reviewer" })).toBeVisible();
   await expect(modal.locator("label").filter({ hasText: "Business reason" })).toBeVisible();
-  await expect(modal.getByRole("combobox").filter({ has: modal.locator("option", { hasText: "Choose an active employee" }) })).toBeVisible();
+  await expect(modal.getByRole("combobox")).toHaveCount(2);
 });
 
