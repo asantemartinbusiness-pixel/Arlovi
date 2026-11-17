@@ -168,7 +168,7 @@ test("Email campaigns can be filtered by lifecycle without implying mail deliver
   await expect(group.getByRole("status")).toContainText("no mail provider connected");
   await expect(page.getByText("Email preparation is local")).toBeVisible();
   await group.getByRole("button", { name: "All", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Build email communications" })).toHaveCount(0);
+  await expect(group.getByRole("button", { name: "All", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("Audience Segments allows searchable compact rules and filter recovery", async ({ page }) => {
