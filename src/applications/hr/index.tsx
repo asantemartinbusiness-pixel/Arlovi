@@ -15,7 +15,7 @@ import { kitOverlays, needsSelection } from "./opsKit";
 import {
   AssignCourse, AssignReviewer, ApplicantMessage, BalanceAdjust, DirectoryFilter, MentorAssign, MetricDetail,
   ProfileEditor, ReconcileRun, ScheduleInterview, StageDecision, TimeCorrection, acknowledgePolicy, acknowledgeReview,
-  approveHours, approveLeave, completeModule, declineLeave, exportRun, prepareRun, rescindQueuedGrants, submitReview,
+  approveHours, approveLeave, completeModule, declineLeave, exportRun, prepareRun, payrollSalaryGaps, rescindQueuedGrants, submitReview,
   swapShift, validateRun, verifyCompletion, viewEmployee,
 } from "./actions";
 import { listByCollection } from "@/platform/repo";
@@ -907,11 +907,11 @@ function ExportHours({ context }: { context: ScreenContext }) {
 
 function PayrollExceptions({ context }: { context: ScreenContext }) {
   const data = useCollections(["employees", "shifts"]);
-  const lines = computePayroll(data.employees);
-  const noSalary = lines.filter((line) => line.grossMinor === 0);
+  const noSalary = payrollSalaryGaps(data.employees);
   const unapproved = data.shifts.filter((shift) => shift.fields.kind === "time" && shift.fields.approved !== true);
   const rows = [
-    ...noSalary.map((line) => ({ id: line.employeeId, issue: "No salary recorded", detail: `${line.name} has no pay on the employee record, so the run would pay nothing.` })),
+    ...noSalary.map((employee) => ({ id: employee.id, issue: "Salary missing or invalid",
+      detail: `${employee.title} has no verified salary input. They cannot be included in a complete payroll run.` })),
     ...unapproved.map((entry) => ({ id: entry.id, issue: "Hours not approved", detail: `${String(entry.fields.employeeName ?? "")} has ${String(entry.fields.hours ?? 0)} unapproved hours.` })),
   ];
   return (
@@ -939,14 +939,28 @@ function PayrollExceptions({ context }: { context: ScreenContext }) {
 
 function PayrollSignoff({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCollections(["payrollRuns", "employees"]);
-  const run = data.payrollRuns.find((row) => row.status === "draft") ?? data.payrollRuns[0];
-  const lines = computePayroll(data.employees);
-  if (!run) return <Empty title="No run to approve" />;
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const wantedId = payload?.id ?? context.selectedId;
+  const run = wantedId
+    ? data.payrollRuns.find((row) => row.id === wantedId && row.organizationId === context.org.id && row.status === "draft")
+    : data.payrollRuns.find((row) => row.status === "draft");
+  const gaps = payrollSalaryGaps(data.employees);
+  if (!context.can("view_payroll")) return <RoleViewNote what="Payroll approval" />;
+  if (!run) return <Empty title={wantedId ? "Selected draft run unavailable" : "No draft run to approve"}>
+    Open the actual draft from this company's payroll register; approved or missing runs cannot be re-signed.
+  </Empty>;
+  const recordedGross = run.fields.grossMinor;
   return (
     <Stack gap={4}>
       <p className="ds-prose">
-        Approving {run.title} records that {context.actor} checked {lines.length} people and {context.money(lines.reduce((sum, line) => sum + line.grossMinor, 0))} of gross pay.
+        This records that {context.actor} reviewed {run.title}, for period {String(run.fields.period || "not recorded")}.
+        The saved gross is {recordedGross === undefined ? "not recorded" : context.money(Number(recordedGross))},
+        not a recalculation of the current employee roster.
       </p>
+      {gaps.length > 0 && <Notice tone="danger" title="Salary inputs missing — approval blocked">
+        {gaps.length} current employee{gaps.length === 1 ? "" : "s"} have missing or invalid salary inputs.
+        Review those source records and reconcile this run before signing off.
+      </Notice>}
       <Properties rows={[
         { label: "Filed with an authority", value: <Pill tone="warning">No connection</Pill> },
         { label: "Bank file sent", value: <Pill tone="warning">No connection</Pill> },
@@ -958,11 +972,19 @@ function PayrollSignoff({ context, close }: { context: ScreenContext; close: () 
         <span className="ds-grow" />
         <Button
           variant="primary"
+          disabled={gaps.length > 0}
           onClick={async () => {
+            if (gaps.length > 0 || !context.can("view_payroll")) return;
             const confirmed = document.querySelector<HTMLInputElement>("#payroll-confirm")?.checked;
             if (!confirmed) { context.toast("Not approved", "Tick the confirmation first.", "blocked"); return; }
-            await context.mutate.patch(run.id, { status: "approved", fields: { ...run.fields, approvedBy: context.actor } }, { expectRevision: run.revision, event: `Payroll run ${run.title} approved by ${context.actor}` });
-            context.toast("Run approved", "The record changed. Nothing was filed and nothing was paid.");
+            const saved = await context.mutate.patch(run.id, { status: "approved",
+              fields: { ...run.fields, approvedBy: context.actor, approvedAt: clockIso() } },
+              { expectRevision: run.revision, event: `Payroll run ${run.title} locally approved by ${context.actor}` });
+            if (!saved) {
+              context.toast("Approval not saved", "The draft changed. Reload it before deciding.", "blocked");
+              return;
+            }
+            context.toast("Local approval recorded", "The run changed. Nothing was filed, issued or paid.");
             close();
           }}
         >
