@@ -18,6 +18,7 @@ import {
 import { PageView } from "./render";
 import { ThemeEditor } from "./builder";
 import { saveSite, useWebUi } from "./state";
+import { SiteLibrary } from "./siteLibrary";
 
 /* ---------------------------------------------------------------- *
  * Shared site resolution
@@ -26,7 +27,11 @@ import { saveSite, useWebUi } from "./state";
 export function useSiteRecord(context: ScreenContext) {
   const sites = useCollection("sites");
   const routed = useRecord(context.params.id);
-  const record = routed?.collection === "sites" ? routed : sites[0];
+  // A detail URL never silently substitutes another site's content.
+  const record = context.params.id
+    ? routed?.collection === "sites" && routed.organizationId === context.org.id
+      ? routed : sites.find(site => site.id === context.params.id)
+    : sites.find(site => site.status !== "archived") ?? sites[0];
   const forms = useCollection("forms");
   const site = useMemo(() => readSite(record), [record]);
   const formNames = useMemo(() => Object.fromEntries(forms.map((form) => [form.id, form.title])), [forms]);
@@ -62,71 +67,7 @@ export function SiteStatusStrip({ context }: { context: ScreenContext }) {
  * ================================================================ */
 
 export function SiteDirectory({ context, scope }: { context: ScreenContext; scope: "All" | "Draft" | "Published" | "Archived" }) {
-  const sites = useCollection("sites");
-  const { org } = useWorkspace();
-  const rows = sites.filter((record) => {
-    const site = readSite(record);
-    const exported = site.deployments.some((entry) => entry.state === "exported");
-    if (scope === "Archived") return record.status === "archived";
-    if (record.status === "archived") return false;
-    if (scope === "Published") return exported;
-    if (scope === "Draft") return !exported;
-    return true;
-  });
-
-  if (rows.length === 0) {
-    return (
-      <Empty
-        title={scope === "All" ? "No sites yet" : `No ${scope.toLowerCase()} sites`}
-        icon={<Globe size={20} />}
-        action={<Button variant="primary" onClick={() => context.openOverlay("Site setup")}>Create a site</Button>}
-      >
-        A site is a structural document in this workspace: pages, blocks, a theme and an export. Publishing to a host is a separate, unconnected step.
-      </Empty>
-    );
-  }
-
-  return (
-    <DataGrid
-      rows={rows}
-      rowId={(row) => row.id}
-      label="Sites"
-      columns={[
-        { key: "title", header: "Site", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
-        { key: "pages", header: "Pages", align: "end", cell: (row) => String(readSite(row).pages.length), sortValue: (row) => readSite(row).pages.length },
-        {
-          key: "environment", header: "Environment", cell: (row) => {
-            const site = readSite(row);
-            const last = [...site.deployments].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""))[0];
-            return <Pill tone="neutral">{last ? last.environment : "none"}</Pill>;
-          },
-        },
-        {
-          key: "domain", header: "Domain", cell: (row) => {
-            const site = readSite(row);
-            const domain = site.domains.find((item) => item.primary) ?? site.domains[0];
-            if (!domain) return <span className="ds-subtle">Not attached</span>;
-            return <Row gap={2}><span className="ds-truncate">{domain.host}</span>{!domain.verified && <Pill tone="warning">Unverified</Pill>}</Row>;
-          },
-        },
-        { key: "visits", header: "Visits", align: "end", cell: () => <span className="ds-subtle">Unavailable</span> },
-        {
-          key: "publication", header: "Publication", cell: (row) => {
-            const state = liveState(row, readSite(row));
-            return <Pill tone={state.tone === "neutral" ? "neutral" : state.tone} dot>{state.label}</Pill>;
-          },
-        },
-        { key: "owner", header: "Owner", cell: (row) => row.ownerName, sortValue: (row) => row.ownerName },
-      ]}
-      onOpen={(id) => context.navigate(`/o/${org.slug}/web/sites/${id}`)}
-      onSelect={(id) => context.select(id)}
-      selectedId={context.selectedId}
-      summary={<span>Visit counts are blank because no analytics source is connected. Nothing is shown as live without a verified domain and a recorded health check.</span>}
-      bulkActions={[
-        { label: "Archive", tone: "danger", onRun: (selected) => selected.forEach((row) => void context.mutate.patch(row.id, { status: "archived" }, { event: `Site ${row.title} archived` })) },
-      ]}
-    />
-  );
+  return <SiteLibrary context={context} scope={scope} />;
 }
 
 /* ================================================================ *
@@ -151,6 +92,32 @@ export function SiteDashboard({ context, lens }: { context: ScreenContext; lens:
   if (lens === "Overview") {
     return (
       <Stack gap={5}>
+        <section className="web-site-workspace" aria-label="Website working area">
+          <div className="web-site-workspace-head">
+            <div>
+              <span className="web-library-eyebrow">WEBSITES / SITE WORKSPACE</span>
+              <h2>{record.title}</h2>
+              <p>Continue editing, review quality and prepare a release without leaving this site.</p>
+            </div>
+            <div className="web-site-workspace-actions">
+              <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/builder`)}>Edit website</Button>
+              <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/quality`)}>Quality checks</Button>
+            </div>
+          </div>
+          <nav className="web-site-workflow" aria-label="Site work areas">
+            {([
+              ["Pages", "Edit layout and content", "builder"],
+              ["Content", "Collections and entries", "cms"],
+              ["Navigation", "Menus and redirects", "navigation"],
+              ["Publishing", "Domains and exports", "deploy"],
+            ] as const).map(([label, detail, route]) => (
+              <button type="button" key={route}
+                onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/${route}`)}>
+                <strong>{label}</strong><span>{detail}</span>
+              </button>
+            ))}
+          </nav>
+        </section>
         <StatRow>
           <Stat prov="posted" label="Pages" value={String(site.pages.length)} meta={`${site.pages.reduce((sum, page) => sum + page.blocks.length, 0)} blocks`} />
           <Stat prov="posted" label="Export size" value={`${(exportBytes(site) / 1024).toFixed(1)} kB`} meta="Measured by generating every page" />

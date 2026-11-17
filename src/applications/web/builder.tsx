@@ -33,7 +33,11 @@ const PALETTE_ICONS: Record<BlockType, React.ReactNode> = {
 export function useSite(context: ScreenContext): { record?: Rec; site: SiteModel; forms: Rec[]; formNames: Record<string, string> } {
   const sites = useCollection("sites");
   const routed = useRecord(context.params.id);
-  const record = routed?.collection === "sites" ? routed : sites[0];
+  // Explicit site URLs must never fall back to a different company's site.
+  const record = context.params.id
+    ? routed?.collection === "sites" && routed.organizationId === context.org.id
+      ? routed : sites.find(site => site.id === context.params.id)
+    : sites.find(site => site.status !== "archived") ?? sites[0];
   const forms = useCollection("forms");
   const site = useMemo(() => readSite(record), [record]);
   const formNames = useMemo(() => Object.fromEntries(forms.map((form) => [form.id, form.title])), [forms]);
@@ -259,6 +263,18 @@ export function PageBuilder({ context }: { context: ScreenContext }) {
 
   return (
     <div className="t6-shell">
+      <section className="web-editor-overview" aria-label="Website editor overview">
+        <div className="web-editor-overview-primary">
+          <span className="web-library-eyebrow">WEBSITES / PAGE EDITOR</span>
+          <strong>{record.title} <span aria-hidden="true">/</span> {page.name}</strong>
+          <p>{page.path} · {page.blocks.length} {page.blocks.length === 1 ? "block" : "blocks"} · {BREAKPOINTS[breakpoint].label} preview</p>
+        </div>
+        <div className="web-editor-overview-actions">
+          <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/navigation`)}>Navigation</Button>
+          <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/quality`)}>Quality</Button>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/deploy`)}>Publishing</Button>
+        </div>
+      </section>
       <div className="t6-shell-bar">
         <Toolbar label="Page builder">
           <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}`)}>Site dashboard</Button>
