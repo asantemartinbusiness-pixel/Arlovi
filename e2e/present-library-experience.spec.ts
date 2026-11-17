@@ -107,3 +107,24 @@ test("An unknown presentation URL never opens a different deck", async ({ page }
   await expect(page.locator("#main")).toContainText("No deck is open");
   await expect(page.locator("#main").getByLabel("Active slide context")).toHaveCount(0);
 });
+
+test("Review approval records do not imply identity verification or publish automatically", async ({ page }) => {
+  await page.goto("/o/northline/present/decks");
+  const id = await page.evaluate(async () => {
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "decks", currency: "GBP",
+      title: "QA Approval Identity Disclosure", status: "draft", fields: {},
+    }, ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  });
+  await page.goto(`/o/northline/present/decks/${id}/review?tab=Publish`);
+  const main = page.locator("#main");
+  await main.getByRole("button", { name: "Record an approval" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Local review record, not verified approval");
+  await expect(dialog.getByRole("checkbox", { name: "I understand this is a local, unverified review record" })).not.toBeChecked();
+});
