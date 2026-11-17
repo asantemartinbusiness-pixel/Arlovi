@@ -2573,14 +2573,14 @@ function RestoreConfirmation({ context, close }: { context: ScreenContext; close
   const record = useWorkbook(context);
   const editor = useWorkbookEditor(context, record);
   const payload = context.overlayPayload as { snapshotId?: string } | undefined;
+  const [confirmed, setConfirmed] = useState(false);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   if (!record) return <Empty title="No workbook is open" />;
   const index = Number(payload?.snapshotId?.split("-").pop() ?? -1);
   const snapshot = record.history[index];
   if (!snapshot) return <Empty title="Version not found" />;
   const stored = readWorkbook(snapshot.body);
-  const [confirmed, setConfirmed] = useState(false);
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
   const nowCells = editor.workbook.sheets.reduce((total, sheet) => total + Object.keys(sheet.cells).length, 0);
   const thenCells = stored.sheets.reduce((total, sheet) => total + Object.keys(sheet.cells).length, 0);
   return (
