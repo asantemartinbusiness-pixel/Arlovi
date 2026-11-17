@@ -1431,7 +1431,7 @@ export function LeaveCalendar({ context, month, onPickDay }: { context: ScreenCo
               data-outside={outside ? "true" : undefined}
               data-today={today ? "true" : undefined}
               data-weekend={weekend ? "true" : undefined}
-              aria-label={`${context.date(day, { weekday: "long", day: "numeric", month: "long" })}, ${onLeave.length} away`}
+              aria-label={`${context.date(day, { weekday: "long", day: "numeric", month: "long" })}, ${onLeave.length} recorded leave requests`}
               onClick={() => onPickDay?.(day)}
             >
               <span className="hr-cal-num">{day.getDate()}</span>
@@ -1542,7 +1542,7 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
       <Stack gap={4}>
         {header}
         {metrics}
-        <div className="ops-toolbar" aria-label="Filter leave approvals">
+        <div className="ops-toolbar" role="group" aria-label="Filter leave approvals">
           <strong className="ops-toolbar-heading">Requests awaiting decision</strong>
           {(["all", "annual", "other"] as const).map((filter) => <Button key={filter} size="sm"
             variant={approvalView === filter ? "secondary" : "ghost"} aria-pressed={approvalView === filter}
