@@ -169,7 +169,7 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
     const list = tab === "Recent"
       ? [...decks].filter((record) => record.status !== "archived").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       : tab === "Shared"
-        ? decks.filter((record) => String(record.fields.sharedWith ?? "").trim().length > 0 && record.status !== "archived")
+        ? decks.filter((record) => record.status !== "archived" && (String(record.fields.sharedWith ?? "").trim().length > 0 || readDeck(record.body).exports.some((entry) => Boolean(entry.scope) && !entry.revokedAt)))
         : tab === "Templates"
           ? decks.filter((record) => record.fields.isTemplate === true)
           : decks.filter((record) => record.status === "archived");
@@ -188,7 +188,7 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
       <div className="pr-library-heading">
         <div><span className="pr-library-eyebrow">PRESENT / DECK LIBRARY</span>
           <h2>{tab === "Shared" ? "Recorded sharing." : tab === "Templates" ? "Reusable presentations." : tab === "Archived" ? "Presentation archive." : "Presentations in progress."}</h2>
-          <p>{tab === "Shared" ? "Only decks with an explicitly recorded sharing list appear here. Public or workspace access is not implied." : "Find and present the right deck with its source, review state and design context visible."}</p>
+          <p>{tab === "Shared" ? "Decks with a locally recorded sharing list or active sharing-intent entry appear here. These records do not grant public or workspace access." : "Find and present the right deck with its source, review state and design context visible."}</p>
         </div>
         <Button variant="primary" onClick={() => context.openOverlay("new deck")}>New presentation</Button>
       </div>
