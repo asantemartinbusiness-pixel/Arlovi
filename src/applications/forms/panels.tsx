@@ -264,10 +264,30 @@ export function LogicScreen({ context, lens }: { context: ScreenContext; lens: "
   if (!record) return <NoForm />;
   const issues = logicIssues(model);
   const answerable = model.fields.filter((field) => !STRUCTURAL.includes(field.type));
+  const blockingIssues = issues.filter((issue) => issue.level === "fail").length;
+  const workflowOverview = (
+    <section className="t6-workflow-overview" aria-label="Conditional logic overview">
+      <Row gap={3} wrap>
+        <div className="ds-grow" style={{ minWidth: 220 }}>
+          <span className="ds-subtle">FORMS / CONDITIONAL LOGIC</span>
+          <h2 style={{ margin: "var(--space-2) 0", fontSize: "clamp(1.2rem, 2vw, 1.65rem)", letterSpacing: "-.03em" }}>Make every path understandable.</h2>
+          <p className="ds-subtle" style={{ margin: 0 }}>Rules decide which questions appear and which answers are required. Validate every branch before collecting responses.</p>
+        </div>
+        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}`)}>Back to builder</Button>
+      </Row>
+      <div className="t6-directory-metrics">
+        <div><span>Rules</span><strong>{model.logic.length}</strong></div>
+        <div><span>Answerable fields</span><strong>{answerable.length}</strong></div>
+        <div><span>Blocking issues</span><strong>{blockingIssues}</strong></div>
+        <div><span>Warnings</span><strong>{issues.length - blockingIssues}</strong></div>
+      </div>
+    </section>
+  );
 
   if (lens === "Rules") {
     return (
       <Stack gap={4}>
+        {workflowOverview}
         <Row gap={2} wrap>
           <Button variant="primary" onClick={() => context.openOverlay("Rule editor")}>New rule</Button>
           <Button variant="secondary" onClick={() => context.openOverlay("invalid path")}>Check the branches</Button>
