@@ -18,7 +18,7 @@ for (const width of [320, 360, 390, 768, 1024, 1366, 1920]) {
       const open = page.getByRole("button", { name: "Open navigation" });
       await open.click();
       await expect(page.locator(".hq")).toHaveAttribute("data-nav-open", "true");
-      await page.getByRole("button", { name: "Close navigation" }).last().click();
+      await page.getByRole("button", { name: "Close navigation" }).first().click();
       await expect(page.locator(".hq")).toHaveAttribute("data-nav-open", "false");
     } else {
       await expect(page.locator(".hq-appnav")).toBeVisible();
