@@ -178,12 +178,6 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
     return needle ? list.filter((record) => `${record.title} ${record.summary} ${record.tags.join(" ")}`.toLowerCase().includes(needle)) : list;
   }, [decks, tab, query]);
 
-  if (rows.length === 0 && tab !== "Shared" && !query.trim()) {
-    return <Empty title={`No ${tab.toLowerCase()} decks`} icon={<Presentation size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("new deck")}>New deck</Button>}>
-      {tab === "Templates" ? "Mark a deck as a template to reuse its masters and theme." : "Create a deck, or import one."}
-    </Empty>;
-  }
-
   return (
     <Stack gap={4}>
       <div className="pr-library-heading">
@@ -199,7 +193,16 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
         <div><span>Archived</span><strong>{decks.filter((record) => record.status === "archived").length}</strong></div>
       </div>
       <Field label="Find a presentation"><TextInput type="search" aria-label="Find a presentation" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, summary or tags" /></Field>
-      {rows.length === 0 ? <Empty title="No presentations match this view" action={<Button variant="secondary" onClick={() => setQuery("")}>Clear search</Button>}>Try another search or create a presentation.</Empty> : (
+      {rows.length === 0 ? <Empty title={query.trim() ? "No presentations match this search" : `No ${tab.toLowerCase()} presentations`} icon={<Presentation size={20} />}
+        action={query.trim()
+          ? <Button variant="secondary" onClick={() => setQuery("")}>Clear search</Button>
+          : <Button variant="primary" onClick={() => context.openOverlay("new deck")}>Create presentation</Button>}>
+        {query.trim() ? "Try a different title, summary or tag." : tab === "Shared"
+          ? "No active sharing-intent entries are recorded. Sharing here is local, not a public link."
+          : tab === "Templates" ? "Create a presentation and mark it as a template to reuse its layouts and theme."
+          : tab === "Archived" ? "Archived presentations will appear here when there are any."
+          : "Create a presentation or import an outline to start."}
+      </Empty> : (
     <Grid>
       {rows.map((record) => {
         const deck = readDeck(record.body);
