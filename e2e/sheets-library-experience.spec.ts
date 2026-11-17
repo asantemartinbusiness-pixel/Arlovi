@@ -38,3 +38,40 @@ test("Formula audit shows calculated workbook health and a return route to the g
   await main.getByRole("button", { name: "Back to grid" }).click();
   await expect(page).toHaveURL(new RegExp(`/sheets/workbooks/${id}(?:\\?|$)`));
 });
+
+test("Structured data table overview shows actual workbook definitions", async ({ page }) => {
+  await page.goto("/o/northline/sheets/workbooks");
+  const id = await page.evaluate(async () => {
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "workbooks", currency: "GBP",
+      title: "QA Structured Table Screen", status: "active", fields: { folder: "Operations" },
+    }, { actor: "Maya Chen", now: new Date().toISOString() });
+    await repo.putRecord(record, { actor: "Maya Chen", now: new Date().toISOString() });
+    return record.id;
+  });
+  await page.goto(`/o/northline/sheets/workbooks/${id}/tables?tab=Tables`);
+  await expect(page.locator("#main").getByRole("heading", { name: "Structure behind the cells." })).toBeVisible();
+  await expect(page.locator("#main").getByLabel("Structured data overview")).toBeVisible();
+});
+
+test("Chart dashboard and export views expose the data source and calculation status", async ({ page }) => {
+  await page.goto("/o/northline/sheets/workbooks");
+  const id = await page.evaluate(async () => {
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "workbooks", currency: "GBP",
+      title: "QA Chart and Export Context", status: "active", fields: { folder: "Operations" },
+    }, { actor: "Maya Chen", now: new Date().toISOString() });
+    await repo.putRecord(record, { actor: "Maya Chen", now: new Date().toISOString() });
+    return record.id;
+  });
+  await page.goto(`/o/northline/sheets/workbooks/${id}/charts?tab=Dashboard`);
+  await expect(page.locator("#main").getByRole("heading", { name: "Dashboard from your data." })).toBeVisible();
+  await expect(page.locator("#main").getByLabel("Chart dashboard overview")).toBeVisible();
+  await page.goto(`/o/northline/sheets/workbooks/${id}/io?tab=Exports`);
+  await expect(page.locator("#main").getByRole("heading", { name: "Know exactly what you export." })).toBeVisible();
+  await expect(page.locator("#main").getByLabel("Export overview")).toBeVisible();
+});
