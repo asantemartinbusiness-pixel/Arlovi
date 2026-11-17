@@ -1555,6 +1555,7 @@ function InsightsScreen({ context, tab }: { context: ScreenContext; tab: "Writin
   const editor = useDocEditor(context, record);
   const pool = useCollections(["workbooks", "invoices", "products", "documents"]);
   const model = capabilityById("model.inference");
+  const { org } = useWorkspace();
 
   if (!record) return <Empty title="No document is open" icon={<FileText size={20} />} />;
 
@@ -1666,6 +1667,23 @@ function InsightsScreen({ context, tab }: { context: ScreenContext; tab: "Writin
     const headingStyle = editor.model.blocks.filter((block) => headingLevel(block) && /[.!?]$/.test(visibleText(block).trim()));
     const sentenceCase = editor.model.blocks.filter((block) => headingLevel(block) && visibleText(block).trim().split(/\s+/).filter((word) => /^[A-Z]/.test(word)).length > 2);
     return (
+      <Stack gap={4}>
+        <div className="dx-library-header">
+          <div><span className="dx-library-eyebrow">DOCUMENTS / COMPANY EXPRESSION</span><h2>Brand alignment, with evidence.</h2>
+            <p>Review how this document reflects the selected company. Checks are local rules, not a certified brand audit or an applied print identity.</p>
+          </div>
+          <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/docs/templates`)}>Open templates</Button>
+        </div>
+        <Card eyebrow="COMPANY CONTEXT" prov="human" title={org.name} subtitle="Information available to this document workspace">
+          <Properties rows={[
+            { label: "Company", value: org.name },
+            { label: "Jurisdiction", value: org.jurisdiction || "Not recorded" },
+            { label: "Currency", value: org.currency },
+            { label: "Document", value: record.title },
+            { label: "Template source", value: String(record.fields.templateId || "No master linked") },
+          ]} />
+          <Notice tone="info" title="Brand assets are not automatically embedded">This view checks document language and structure. It does not imply a verified logo, font licence, registered letterhead or exported corporate identity.</Notice>
+        </Card>
       <Grid>
         <Card span={6} eyebrow="BRAND" prov="human" title="House style" subtitle="Checked against the rules kept in this workspace">
           <Stack gap={3}>
@@ -1686,6 +1704,7 @@ function InsightsScreen({ context, tab }: { context: ScreenContext; tab: "Writin
           <Button size="sm" variant="secondary" style={{ marginBlockStart: "var(--space-3)" }} onClick={() => context.openOverlay("style settings")}>Style settings</Button>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
