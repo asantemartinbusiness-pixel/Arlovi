@@ -7,3 +7,10 @@
 .t6-build-library-metrics strong{font-size:clamp(1.3rem,2vw,1.7rem);font-variant-numeric:tabular-nums}
 @media(max-width:900px){.t6-build-library-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.t6-build-library-overview{padding:var(--space-3)}.t6-build-library-metrics>div{padding:var(--space-2)}}
+
+.t6-build-editor-overview{padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-4);border-bottom:1px solid var(--border-default)}
+.t6-build-editor-overview h2{font-size:clamp(1.25rem,2.25vw,1.8rem);line-height:1.2;letter-spacing:-.035em;margin:var(--space-2) 0}
+.t6-build-editor-overview p,.t6-build-component-context p{margin:0;max-width:66ch}
+.t6-build-component-context{display:flex;flex-direction:column;gap:var(--space-2);padding:var(--space-3);border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--bg-surface)}
+.t6-build-component-context strong{overflow-wrap:anywhere;min-width:0}
+@media(max-width:700px){.t6-build-editor-overview{padding:var(--space-3)}.t6-build-editor-overview .ds-row{flex-wrap:wrap}}
