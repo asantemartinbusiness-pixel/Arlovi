@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronDown, Menu as MenuIcon, Sparkles, Search, Bell, Inbox, X, UserRound } from "lucide-react";
 import { Button, Pill, Row } from "@/design-system";
@@ -40,6 +40,7 @@ export function AppShell() {
   const mutate = useMutations();
   const [navOpen, setNavOpen] = useState(false);
   const [displayOpen, setDisplayOpen] = useState(false);
+  const closeDisplay = useCallback(() => setDisplayOpen(false), []);
   const [attentionView, setAttentionView] = useState<"for-you" | "approvals" | "updates">("for-you");
   const searchTrigger = useRef<HTMLButtonElement>(null);
   const keyboardHint = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.userAgent) ? "⌘K" : "Ctrl+K";
@@ -449,7 +450,7 @@ export function AppShell() {
         </NavLink>
       </nav>
 
-      {displayOpen && <DisplayPreferences onClose={() => setDisplayOpen(false)} />}
+      {displayOpen && <DisplayPreferences onClose={closeDisplay} />}
       {ui.command && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening search…</div>}><CommandPalette onClose={() => {ui.setCommand(false);searchTrigger.current?.focus();}} /></Suspense>}
       {ui.notes && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening attention centre…</div>}><AttentionCentre key={attentionView} initialView={attentionView} items={attention} onClose={() => ui.setNotes(false)} /></Suspense>}
       {ui.ask && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening assistant…</div>}><AskPanel onClose={() => ui.setAsk(false)} seed={ui.askSeed} /></Suspense>}
