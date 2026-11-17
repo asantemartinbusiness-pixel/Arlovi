@@ -1,6 +1,7 @@
 import { BarChart3, FileText, LifeBuoy, MessageSquare, Receipt, ShieldCheck, Wand2 } from "lucide-react";
 import { Empty, Notice, Pill, Properties, Row, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
+import { GrowthOverviewNav } from "@/app/GrowthOverviewNav";
 import { useWorkspace } from "@/platform/workspace";
 import { confirmOverlay, submitFooter } from "@/applications/market/kit";
 import {
@@ -52,6 +53,7 @@ export const portalApp = registerApp({
     /* ------------------------------ 001 ------------------------------ */
     "ARL-PORTAL-001": {
       id: "ARL-PORTAL-001",
+      header: (context: ScreenContext) => <GrowthOverviewNav context={context} code="PORTAL" />,
       subtitle: (context) => `Every space ${context.org.shortName} shares with someone outside the company.`,
       tabs: ["Clients", "Customers", "Suppliers", "Partners"].map((audience) => ({
         id: audience,
