@@ -162,8 +162,8 @@ describe("Inbox: Projects assignee is the source of truth",()=>{
     const items=buildAttention({
       ...input([]),approvals:[approval("mine","Maya Chen"),approval("theirs","Ella Graham")],
     });
-    expect(mineAttentionItems(items,"Maya Chen").map(item=>item.title)).toEqual(["Approve mine"]);
-    expect(mineAttentionItems(items,"Ella Graham").map(item=>item.title)).toEqual(["Approve theirs"]);
+    expect(mineAttentionItems(items,"Maya Chen").map(item=>item.title)).toEqual(["Approve: Approve mine"]);
+    expect(mineAttentionItems(items,"Ella Graham").map(item=>item.title)).toEqual(["Approve: Approve theirs"]);
   });
 });
 
