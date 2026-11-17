@@ -25,8 +25,7 @@ import { wallMs } from "@/platform/clock";
 const nowIso = (context: ScreenContext) => context.now.toISOString();
 
 const routeProject = (records: Rec[], context: ScreenContext) => {
-  const routed = records.find((row) => row.id === context.params.id);
-  return routed ? [routed] : records;
+  return context.params.id ? records.filter((row) => row.id === context.params.id) : records;
 };
 
 const model = (record?: Rec): AppModel => readApp(record);
@@ -36,7 +35,7 @@ const SECRET_SHAPE = /(api[_-]?key|secret|password|token)\s*[:=]\s*["']?[A-Za-z0
 async function currentProject(context: ScreenContext): Promise<Rec | undefined> {
   const repo = await import("@/platform/repo");
   const projects = await repo.listByCollection(context.org.id, "appProjects");
-  return projects.find((item) => item.id === context.params.id) ?? projects[0];
+  return context.params.id ? projects.find((item) => item.id === context.params.id) : undefined;
 }
 
 /** Run the model suites, write the counts onto the project and an event the Runs tab reads. */

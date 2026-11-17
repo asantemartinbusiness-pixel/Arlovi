@@ -154,7 +154,7 @@ function AccessRequest({ context, close }: { context: ScreenContext; close: () =
   return (
     <form id="hr-access" className="ds-stack ds-gap-4" onSubmit={async (event) => {
       event.preventDefault();
-      if (saving || !context.can("edit_people") || reason.trim().length < 10 || !approver || sameRequest) return;
+      if (saving || !context.can("edit_people") || reason.trim().length < 10 || !reviewers.some((reviewer) => reviewer.title === approver) || sameRequest) return;
       setSaving(true);
       setError("");
       try {

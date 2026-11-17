@@ -1,4 +1,5 @@
 import { useState } from "react";
+import "./library.css";
 import { Activity, Boxes, Code2, GitBranch, KeyRound, Rocket, ShieldCheck, TestTube2 } from "lucide-react";
 import {
   BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties,
@@ -25,11 +26,33 @@ import { saveApp, useBuildUi } from "./state";
 export function ProjectLibrary({ context, scope }: { context: ScreenContext; scope: "Recent" | "Team" | "Templates" | "Archived" }) {
   const projects = useCollection("appProjects");
   const { org, now } = useWorkspace();
+  const [search, setSearch] = useState("");
+  const active = projects.filter((project) => project.status !== "archived");
+  const matching = (text: string) => text.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
+  const libraryOverview = (
+    <section className="t6-build-library-overview" aria-label="Build project overview">
+      <Row gap={3} wrap><div className="ds-grow" style={{ minWidth: 220 }}>
+        <span className="ds-subtle">BUILD / APP PROJECTS</span>
+        <h2>Build an application, not just a screen.</h2>
+        <p className="ds-subtle">Shape data, design workflows and validate releases from one connected project workspace.</p>
+      </div><Button size="sm" variant="primary" onClick={() => context.openOverlay("Project setup")}>New project</Button></Row>
+      <div className="t6-build-library-metrics" aria-label="Build project activity">
+        <div><span>Active projects</span><strong>{active.length}</strong></div>
+        <div><span>Drafts</span><strong>{active.filter((project) => project.status === "draft").length}</strong></div>
+        <div><span>Entities</span><strong>{active.reduce((count, project) => count + readApp(project).entities.length, 0)}</strong></div>
+        <div><span>Screens</span><strong>{active.reduce((count, project) => count + readApp(project).screens.length, 0)}</strong></div>
+      </div>
+    </section>
+  );
 
   if (scope === "Templates") {
+    const templates = PROJECT_TEMPLATES.filter((template) => matching(`${template.title} ${template.summary} ${template.build().entities.map((entity) => entity.name).join(" ")}`));
     return (
-      <Grid>
-        {PROJECT_TEMPLATES.map((template) => (
+      <Stack gap={4}>
+        {libraryOverview}
+        <Field label="Find a template"><TextInput type="search" aria-label="Find a template" value={search} placeholder="Search templates or business use cases" onChange={(event) => setSearch(event.target.value)} /></Field>
+        {templates.length === 0 ? <Empty title="No templates match this search" icon={<Boxes size={20} />} action={<Button variant="secondary" onClick={() => setSearch("")}>Clear search</Button>}>Try a different industry, entity or workflow.</Empty> : <Grid>
+        {templates.map((template) => (
           <Card key={template.id} span={6} title={template.title} subtitle={template.summary}
             footer={<Button size="sm" variant="primary" onClick={async () => {
               const created = await context.mutate.create({
@@ -47,27 +70,28 @@ export function ProjectLibrary({ context, scope }: { context: ScreenContext; sco
             ]} />
           </Card>
         ))}
-      </Grid>
+      </Grid>}
+      </Stack>
     );
   }
 
   const rows = projects.filter((record) => {
     if (scope === "Archived") return record.status === "archived";
     if (record.status === "archived") return false;
-    if (scope === "Team") return true;
     return true;
-  });
+  }).filter((record) => matching(`${record.title} ${record.summary} ${record.ownerName ?? ""} ${record.status} ${readApp(record).entities.map((entity) => entity.name).join(" ")}`))
+    .sort((left, right) => scope === "Recent"
+      ? right.updatedAt.localeCompare(left.updatedAt)
+      : left.title.localeCompare(right.title));
 
   if (rows.length === 0) {
-    return (
-      <Empty title={scope === "Archived" ? "Nothing archived" : "No app projects"} icon={<Boxes size={20} />}
-        action={<Button variant="primary" onClick={() => context.openOverlay("Project setup")}>New project</Button>}>
-        An app project is a data model, screens bound to it and the readable TypeScript that falls out of both.
-      </Empty>
-    );
+    return <Stack gap={4}>{libraryOverview}<Field label="Find a project"><TextInput type="search" aria-label="Find a project" value={search} placeholder="Search projects, owners and entities" onChange={(event) => setSearch(event.target.value)} /></Field><Empty title={search.trim() ? "No projects match this search" : scope === "Archived" ? "Nothing archived" : "No app projects"} icon={<Boxes size={20} />} action={<Button variant="secondary" onClick={() => search.trim() ? setSearch("") : context.openOverlay("Project setup")}>{search.trim() ? "Clear search" : "New project"}</Button>}>{search.trim() ? "Try searching by project name, owner or entity." : "An app project links its data model, screens and validated workflow."}</Empty></Stack>;
   }
 
   return (
+    <Stack gap={4}>
+      {libraryOverview}
+      <Field label="Find a project"><TextInput type="search" aria-label="Find a project" value={search} placeholder="Search projects, owners and entities" onChange={(event) => setSearch(event.target.value)} /></Field>
     <DataGrid
       rows={rows}
       rowId={(row) => row.id}
@@ -91,6 +115,7 @@ export function ProjectLibrary({ context, scope }: { context: ScreenContext; sco
       selectedId={context.selectedId}
       summary={<span>Runtime is blank for every project: nothing is deployed from this browser, so no project is described as running.</span>}
     />
+    </Stack>
   );
 }
 
@@ -238,6 +263,25 @@ export function AppOverview({ context, lens }: { context: ScreenContext; lens: "
   if (lens === "Overview") {
     return (
       <Stack gap={5}>
+        <section className="t6-build-library-overview" aria-label="Build project health overview">
+          <Row gap={3} wrap>
+            <div className="ds-grow" style={{ minWidth: 220 }}>
+              <span className="ds-subtle">BUILD / PROJECT OVERVIEW</span>
+              <h2>{record.title}</h2>
+              <p className="ds-subtle">Your application model, screen architecture, validation findings and delivery state in one workspace.</p>
+            </div>
+            <Row gap={2} wrap>
+              <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/builder`)}>Open builder</Button>
+              <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>Run through checks</Button>
+            </Row>
+          </Row>
+          <div className="t6-build-library-metrics" aria-label="Project readiness summary">
+            <div><span>Screens</span><strong>{model.screens.length}</strong></div>
+            <div><span>Components</span><strong>{model.screens.reduce((count, screen) => count + screen.components.length, 0)}</strong></div>
+            <div><span>Checks failing</span><strong>{totals.fail}</strong></div>
+            <div><span>Checks to review</span><strong>{totals.warn}</strong></div>
+          </div>
+        </section>
         <StatRow>
           <Stat prov="posted" label="Entities" value={String(model.entities.length)} meta={`${model.entities.reduce((sum, entity) => sum + entity.fields.length, 0)} fields`} />
           <Stat prov="posted" label="Screens" value={String(model.screens.length)} meta={`${model.screens.reduce((sum, screen) => sum + screen.components.length, 0)} components`} />
@@ -368,11 +412,27 @@ export function CodeScreen({ context, lens }: { context: ScreenContext; lens: "F
   const files = [...generatedFiles(model), ...model.files];
   const file = files.find((item) => item.path === path) ?? files[0];
   const issues = validateApp(model).filter((issue) => issue.level !== "pass");
+  const generatedCount = generatedFiles(model).length;
+  const codeOverview = (
+    <section className="t6-build-library-overview" aria-label="Build generated code overview">
+      <Row gap={2} wrap>
+        <div className="ds-grow" style={{ minWidth: 220 }}><span className="ds-subtle">BUILD / SOURCE WORKSPACE</span><h2>Understand what your model generates.</h2><p className="ds-subtle">Inspect generated files, project-owned additions, model diagnostics and change history without confusing this view with a connected Git repository.</p></div>
+        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/builder`)}>Back to builder</Button>
+      </Row>
+      <div className="t6-build-library-metrics" aria-label="Generated code status">
+        <div><span>Generated files</span><strong>{generatedCount}</strong></div>
+        <div><span>Project files</span><strong>{model.files.length}</strong></div>
+        <div><span>Problems</span><strong>{issues.filter((issue) => issue.level === "fail").length}</strong></div>
+        <div><span>To review</span><strong>{issues.filter((issue) => issue.level === "warn").length}</strong></div>
+      </div>
+    </section>
+  );
 
   if (lens === "Source control") {
     const changes = events.filter((event) => /entity|field|screen|component|automation|role/i.test(event.message));
     return (
       <Stack gap={4}>
+        {codeOverview}
         <Notice tone="info" title="The model is the source of truth">
           There is no repository here. Every change to the model writes an audit event, and the generated files are produced from the model each time they are read, so they cannot drift.
         </Notice>
@@ -397,19 +457,21 @@ export function CodeScreen({ context, lens }: { context: ScreenContext; lens: "F
   }
 
   if (lens === "Problems") {
-    return issues.length === 0
-      ? <Empty title="No problems" icon={<ShieldCheck size={20} />}>Every check on the model passes, so the generated code compiles against itself.</Empty>
-      : (
-        <Stack gap={2}>
-          {issues.map((issue) => (
+    return (
+      <Stack gap={4}>
+        {codeOverview}
+        {issues.length === 0 ? <Notice tone="success" title="No model problems detected">The model diagnostics have no failures or warnings. A runtime build and execution still require separate verification.</Notice> : (
+          <Stack gap={2}>{issues.map((issue) => (
             <div key={issue.id} className="t6-check" data-state={issue.level}>
               <span className="t6-check-dot" aria-hidden="true" />
               <div><strong>{issue.title}</strong><p className="ds-subtle">{issue.detail}</p></div>
               <Pill tone={issue.level === "fail" ? "danger" : "warning"}>{issue.area}</Pill>
             </div>
-          ))}
-        </Stack>
-      );
+          ))}</Stack>
+        )}
+        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>Review model checks</Button>
+      </Stack>
+    );
   }
 
   if (lens === "Tests") {
@@ -417,6 +479,8 @@ export function CodeScreen({ context, lens }: { context: ScreenContext; lens: "F
   }
 
   return (
+    <Stack gap={4}>
+      {codeOverview}
     <Grid>
       <Card span={4} title="Files" subtitle={`${files.length} files`}>
         <Stack gap={1}>
@@ -441,6 +505,7 @@ export function CodeScreen({ context, lens }: { context: ScreenContext; lens: "F
         <pre className="t6-code">{file?.content ?? "// No file selected"}</pre>
       </Card>
     </Grid>
+    </Stack>
   );
 }
 
@@ -630,6 +695,15 @@ export function ApiScreen({ context, lens }: { context: ScreenContext; lens: "En
   if (lens === "Endpoints") {
     return (
       <Stack gap={4}>
+        <section className="t6-build-library-overview" aria-label="API contract overview">
+          <Row gap={2} wrap><div className="ds-grow" style={{ minWidth: 220 }}><span className="ds-subtle">BUILD / API CONTRACT OVERVIEW</span><h2>Design API contracts with clear permissions.</h2><p className="ds-subtle">Review method, entity binding and authorisation before generating contracts. Endpoints are designs, not hosted services.</p></div></Row>
+          <div className="t6-build-library-metrics" aria-label="API contract overview metrics">
+            <div><span>Endpoints</span><strong>{model.endpoints.length}</strong></div>
+            <div><span>Role protected</span><strong>{model.endpoints.filter((endpoint) => endpoint.auth === "role").length}</strong></div>
+            <div><span>Open contracts</span><strong>{model.endpoints.filter((endpoint) => endpoint.auth === "none").length}</strong></div>
+            <div><span>Automations</span><strong>{model.automations.length}</strong></div>
+          </div>
+        </section>
         <Row gap={2}><Button variant="primary" onClick={() => context.openOverlay("Request builder")}>Define an endpoint</Button></Row>
         {model.endpoints.length === 0 ? (
           <Empty title="No endpoints defined" icon={<Code2 size={20} />}>An endpoint here is a contract: a method, a path, the entity it touches and whether it requires a role.</Empty>
@@ -728,6 +802,15 @@ export function AuthScreen({ context, lens }: { context: ScreenContext; lens: "U
   if (lens === "Roles") {
     return (
       <Stack gap={4}>
+        <section className="t6-build-library-overview" aria-label="Access policy overview">
+          <Row gap={2} wrap><div className="ds-grow" style={{ minWidth: 220 }}><span className="ds-subtle">BUILD / ACCESS POLICY OVERVIEW</span><h2>Make access intentional and reviewable.</h2><p className="ds-subtle">Assign role grants per entity and inspect approval authority. Preview permissions do not replace server enforcement.</p></div></Row>
+          <div className="t6-build-library-metrics" aria-label="Access policy overview metrics">
+            <div><span>Roles</span><strong>{model.roles.length}</strong></div>
+            <div><span>Entities</span><strong>{model.entities.length}</strong></div>
+            <div><span>Write grants</span><strong>{model.roles.reduce((n, role) => n + Object.values(role.grants).filter((grant) => grant === "write").length, 0)}</strong></div>
+            <div><span>Approvers</span><strong>{model.roles.filter((role) => role.canApprove).length}</strong></div>
+          </div>
+        </section>
         <Row gap={2}><Button variant="primary" onClick={() => context.openOverlay("Role editor")}>New role</Button></Row>
         <div className="t6-matrix-wrap">
           <table className="t6-matrix">
@@ -843,6 +926,20 @@ export function TestsScreen({ context, lens }: { context: ScreenContext; lens: "
   const issues = validateApp(model);
   const totals = issueTotals(issues);
   const lastRun = String(record.fields.lastCheckAt ?? "");
+  const testOverview = (
+    <section className="t6-build-library-overview" aria-label="Build checks overview">
+      <Row gap={2} wrap>
+        <div className="ds-grow" style={{ minWidth: 220 }}><span className="ds-subtle">BUILD / MODEL CHECKS</span><h2>Understand readiness before release.</h2><p className="ds-subtle">Review design consistency, inspect failures and confirm what still requires a real runtime.</p></div>
+        <Row gap={2} wrap><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/builder`)}>Builder</Button><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/deploy`)}>Release review</Button></Row>
+      </Row>
+      <div className="t6-build-library-metrics" aria-label="Model check summary">
+        <div><span>Checks</span><strong>{issues.length}</strong></div>
+        <div><span>Passing</span><strong>{totals.pass}</strong></div>
+        <div><span>Failing</span><strong>{totals.fail}</strong></div>
+        <div><span>Warnings</span><strong>{totals.warn}</strong></div>
+      </div>
+    </section>
+  );
 
   const suites: { name: string; area: ModelIssue["area"]; description: string }[] = [
     { name: "Data model", area: "Data", description: "Entity names, duplicate fields, references and choice options." },
@@ -854,6 +951,7 @@ export function TestsScreen({ context, lens }: { context: ScreenContext; lens: "
   if (lens === "Suites") {
     return (
       <Stack gap={4}>
+        {testOverview}
         <StatRow>
           <Stat prov="posted" label="Checks" value={String(issues.length)} meta="Computed from the model" />
           <Stat prov="posted" label="Failing" value={String(totals.fail)} meta="Would block a release" />
@@ -965,6 +1063,20 @@ export function DeployScreen({ context, lens }: { context: ScreenContext; lens: 
   const events = useEvents(record?.id);
   if (!record) return <NoProject />;
   const totals = issueTotals(validateApp(model));
+  const releaseOverview = (
+    <section className="t6-build-library-overview" aria-label="Build release overview">
+      <Row gap={2} wrap>
+        <div className="ds-grow" style={{ minWidth: 220 }}><span className="ds-subtle">BUILD / RELEASE MANAGEMENT</span><h2>Review the release, not just its label.</h2><p className="ds-subtle">Track model gates and local release attempts. A production runtime and hosting provider are not connected.</p></div>
+        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>View checks</Button>
+      </Row>
+      <div className="t6-build-library-metrics" aria-label="Build release status">
+        <div><span>Model failures</span><strong>{totals.fail}</strong></div>
+        <div><span>Warnings</span><strong>{totals.warn}</strong></div>
+        <div><span>Release attempts</span><strong>{model.releases.length}</strong></div>
+        <div><span>Connected runtimes</span><strong>0</strong></div>
+      </div>
+    </section>
+  );
 
   if (lens === "Environments") {
     const environments: { name: Release["environment"]; purpose: string }[] = [
@@ -973,6 +1085,8 @@ export function DeployScreen({ context, lens }: { context: ScreenContext; lens: 
       { name: "production", purpose: "What a runtime would serve. Nothing is connected." },
     ];
     return (
+      <Stack gap={4}>
+        {releaseOverview}
       <Grid>
         {environments.map((environment) => {
           const last = [...model.releases].filter((release) => release.environment === environment.name).sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""))[0];
@@ -998,6 +1112,7 @@ export function DeployScreen({ context, lens }: { context: ScreenContext; lens: 
           </Notice>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
@@ -1202,6 +1317,15 @@ export function IntegrationsScreen({ context, lens }: { context: ScreenContext; 
 
   return (
     <Stack gap={4}>
+      <section className="t6-build-library-overview" aria-label="Build integration overview">
+        <Row gap={2} wrap><div className="ds-grow" style={{ minWidth: 220 }}><span className="ds-subtle">BUILD / INTEGRATIONS</span><h2>Understand every connection boundary.</h2><p className="ds-subtle">Explore workspace connector records and their declared state. No external service is represented as connected without a provider.</p></div></Row>
+        <div className="t6-build-library-metrics" aria-label="Integration connection summary">
+          <div><span>Recorded connectors</span><strong>{connectors.length}</strong></div>
+          <div><span>Connected providers</span><strong>0</strong></div>
+          <div><span>API contracts</span><strong>{model.endpoints.length}</strong></div>
+          <div><span>Notify workflows</span><strong>{model.automations.filter((automation) => automation.steps.some((step) => step.kind === "notify")).length}</strong></div>
+        </div>
+      </section>
       {connectors.length === 0 ? <Empty title="No connectors recorded" icon={<KeyRound size={20} />} /> : (
         <DataGrid
           rows={connectors}
@@ -1237,6 +1361,15 @@ export function MonitorScreen({ context, lens }: { context: ScreenContext; lens:
   if (lens === "Errors") {
     return (
       <Stack gap={5}>
+        <section className="t6-build-library-overview" aria-label="Build monitoring overview">
+          <Row gap={2} wrap><div className="ds-grow" style={{ minWidth: 220 }}><span className="ds-subtle">BUILD / DIAGNOSTICS</span><h2>Separate verified model health from runtime monitoring.</h2><p className="ds-subtle">Review local model findings and project activity. Runtime errors, latency and production usage remain unavailable until a deployed runtime is connected.</p></div><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>Open checks</Button></Row>
+          <div className="t6-build-library-metrics" aria-label="Monitoring diagnostic summary">
+            <div><span>Model failures</span><strong>{totals.fail}</strong></div>
+            <div><span>Warnings</span><strong>{totals.warn}</strong></div>
+            <div><span>Project events</span><strong>{events.length}</strong></div>
+            <div><span>Connected runtimes</span><strong>0</strong></div>
+          </div>
+        </section>
         <StatRow>
           <Stat label="Runtime errors" value="Unavailable" unavailable meta="The app does not run anywhere" onClick={() => context.openOverlay("Trace viewer")} />
           <Stat prov="posted" label="Model failures" value={String(totals.fail)} meta="Measured from the design" />

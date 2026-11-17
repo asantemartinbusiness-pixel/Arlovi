@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { DragEndEvent } from "@dnd-kit/core";
 import {
   BarChart3, Boxes, FileText, LayoutList, Rows3, SquareStack, Table2, TextCursorInput, Type,
@@ -29,7 +29,9 @@ const COMPONENT_ICONS: Record<ComponentKind, React.ReactNode> = {
 export function useAppRecord(context: ScreenContext): { projects: Rec[]; record?: Rec; model: AppModel } {
   const projects = useCollection("appProjects");
   const routed = useRecord(context.params.id);
-  const record = routed?.collection === "appProjects" ? routed : projects[0];
+  const record = context.params.id
+    ? routed?.collection === "appProjects" && routed.organizationId === context.org.id ? routed : projects.find((item) => item.id === context.params.id)
+    : projects.find((item) => item.status !== "archived") ?? projects[0];
   const model = useMemo(() => readApp(record), [record]);
   return { projects, record, model };
 }
@@ -50,6 +52,8 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
   const component = screen?.components.find((item) => item.id === ui.componentId);
   const issues = validateApp(model);
   const totals = issueTotals(issues);
+  const componentCount = model.screens.reduce((total, item) => total + item.components.length, 0);
+  const unboundCount = model.screens.reduce((total, item) => total + item.components.filter((entry) => entry.kind !== "text" && !model.entities.some((entity) => entity.id === entry.entityId)).length, 0);
 
   async function write(next: AppModel, label: string) {
     await saveApp(context, record!, next, label);
@@ -275,6 +279,27 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
 
   return (
     <div className="t6-shell">
+      <section className="t6-build-editor-overview" aria-label="Build editor overview">
+        <Row gap={3} wrap>
+          <div className="ds-grow" style={{ minWidth: 220 }}>
+            <span className="ds-subtle">BUILD / VISUAL WORKSPACE</span>
+            <h2>{record.title}</h2>
+            <p className="ds-subtle">Structure your application, bind real data, inspect components and test the experience before release.</p>
+          </div>
+          <Row gap={2} wrap>
+            <Button size="sm" variant="secondary" onClick={() => context.setTab("Data")}>Data model</Button>
+            <Button size="sm" variant="secondary" onClick={() => context.setTab("Preview")}>Preview</Button>
+            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>Checks</Button>
+          </Row>
+        </Row>
+        <div className="t6-build-library-metrics" aria-label="Builder model status">
+          <div><span>Screens</span><strong>{model.screens.length}</strong></div>
+          <div><span>Components</span><strong>{componentCount}</strong></div>
+          <div><span>Entities</span><strong>{model.entities.length}</strong></div>
+          <div><span>Unbound components</span><strong>{unboundCount}</strong></div>
+        </div>
+        {totals.fail > 0 && <Notice tone="warning" title={`${totals.fail} failing model checks`}>Review the model checks before relying on a generated release.</Notice>}
+      </section>
       <div className="t6-shell-bar">
         <Toolbar label="App builder">
           <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}`)}>Project</Button>
@@ -300,12 +325,17 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
           <Button size="sm" variant="secondary" onClick={() => context.openOverlay("add component")}>Add component</Button>
           <Button size="sm" variant="ghost" disabled={!ui.componentId} title={ui.componentId ? undefined : "Select a component first"} onClick={() => context.openOverlay("edit styles")}>Edit styles</Button>
           <Button size="sm" variant="primary" onClick={async () => {
-            const name = `Screen ${model.screens.length + 1}`;
-            await write({
-              ...model,
-              screens: [...model.screens, { id: `sc-${wallMs().toString(36)}`, name, route: `/screen-${model.screens.length + 1}`, components: [] }],
-            }, `Screen ${name} added`);
-            context.toast("Screen added", `${name} is in the screen list.`);
+            const number = model.screens.length + 1;
+            const name = `Screen ${number}`;
+            const existingRoutes = new Set(model.screens.map((item) => item.route));
+            let candidate = number;
+            while (existingRoutes.has(`/screen-${candidate}`)) candidate += 1;
+            const newScreen = { id: `sc-${wallMs().toString(36)}`, name, route: `/screen-${candidate}`, components: [] };
+            await write({ ...model, screens: [...model.screens, newScreen] }, `Screen ${name} added`);
+            ui.setScreen(newScreen.id);
+            ui.selectComponent("");
+            context.setTab("Design");
+            context.toast("Screen added", `${name} is selected and ready for components.`);
           }}>New screen</Button>
         </Row>
       </div>
@@ -330,9 +360,14 @@ export function ComponentInspector({
   component, model, onEdit, onRemove,
 }: { component: ScreenComponent; model: AppModel; onEdit: (patch: Partial<ScreenComponent>) => void; onRemove?: () => void }) {
   const entity = model.entities.find((item) => item.id === component.entityId);
+  const [removeId, setRemoveId] = useState<string | null>(null);
   return (
     <Stack gap={3}>
-      <Row gap={2}><strong className="ds-grow">{COMPONENT_LABELS[component.kind]}</strong><Pill tone="neutral">{component.id}</Pill></Row>
+      <div className="t6-build-component-context" aria-label="Selected Build component">
+        <span className="ds-subtle">BUILD / COMPONENT SETTINGS</span>
+        <Row gap={2} wrap><strong className="ds-grow">{component.title || "Untitled component"}</strong><Pill tone="neutral">{COMPONENT_LABELS[component.kind]}</Pill></Row>
+        <p className="ds-subtle">{component.kind === "text" ? "Static screen content" : entity ? `Reads ${entity.name} · ${component.fieldIds.length || "default"} field selection` : "No entity selected yet"}</p>
+      </div>
       <Field label="Title"><TextInput value={component.title} onChange={(event) => onEdit({ title: event.target.value })} /></Field>
       {component.kind === "text" ? (
         <Field label="Copy"><TextArea rows={4} value={component.text} onChange={(event) => onEdit({ text: event.target.value })} /></Field>
@@ -382,7 +417,15 @@ export function ComponentInspector({
           The preview will say so rather than inventing rows. Bind it on the Data tab.
         </Notice>
       )}
-      {onRemove && <Button size="sm" variant="outline-danger" onClick={onRemove}>Remove this component</Button>}
+      {onRemove && (removeId === component.id ? (
+        <Notice tone="warning" title="Remove this component?">
+          The component will be removed from this screen's layout and binding configuration.
+          <Row gap={2} wrap>
+            <Button size="sm" variant="outline-danger" onClick={() => { setRemoveId(null); onRemove(); }}>Confirm removal</Button>
+            <Button size="sm" variant="secondary" onClick={() => setRemoveId(null)}>Cancel</Button>
+          </Row>
+        </Notice>
+      ) : <Button size="sm" variant="outline-danger" onClick={() => setRemoveId(component.id)}>Remove this component</Button>)}
     </Stack>
   );
 }
