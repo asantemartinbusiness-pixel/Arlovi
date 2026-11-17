@@ -1259,20 +1259,50 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
 function TemplatesScreen({ context, tab }: { context: ScreenContext; tab: "All" | "Company" | "Department" | "My templates" }) {
   const data = useCollections(["templates", "documents"]);
   const { actor } = useWorkspace();
+  const [query, setQuery] = useState("");
+  const [state, setState] = useState("all");
   const templates = data.templates.filter((record) => record.fields.kind === "document");
-  const rows = tab === "All" ? templates
+  const scoped = tab === "All" ? templates
     : tab === "Company" ? templates.filter((record) => record.fields.scope === "company")
       : tab === "Department" ? templates.filter((record) => record.fields.scope === "department")
         : templates.filter((record) => record.ownerName === actor);
+  const rows = scoped.filter((record) =>
+    (state === "all" || record.status === state)
+    && (!query.trim() || `${record.title} ${record.summary} ${String(record.fields.tokens ?? "")}`.toLowerCase().includes(query.trim().toLowerCase())));
+  const filtered = state !== "all" || Boolean(query.trim());
 
-  if (rows.length === 0) {
+  if (rows.length === 0 && !filtered) {
     return <Empty title={`No ${tab.toLowerCase()} templates`} icon={<FileText size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Template editor")}>Create template</Button>}>
       A template carries the sections and the company fields a document should start from.
     </Empty>;
   }
 
   return (
-    <Grid>
+    <Stack gap={4}>
+      <div className="dx-library-header">
+        <div><span className="dx-library-eyebrow">DOCUMENTS / TEMPLATE GOVERNANCE</span>
+          <h2>Masters that keep work consistent.</h2>
+          <p>Choose a company, department or personal template. A master supplies starting content; existing documents remain independent, including signed copies.</p>
+        </div>
+        <Button variant="primary" onClick={() => context.openOverlay("Template editor")}>New template</Button>
+      </div>
+      <div className="dx-library-metrics" aria-label="Template governance summary">
+        <div><span>Masters</span><strong>{templates.length}</strong><small>All scopes</small></div>
+        <div><span>Published</span><strong>{templates.filter((record) => record.status === "published").length}</strong><small>Available for reuse</small></div>
+        <div><span>Drafts</span><strong>{templates.filter((record) => record.status === "draft").length}</strong><small>Still in preparation</small></div>
+        <div><span>Retired</span><strong>{templates.filter((record) => record.status === "retired").length}</strong><small>No longer selectable</small></div>
+      </div>
+      <div className="dx-library-filters">
+        <Row gap={3} wrap>
+          <Field label="Search masters"><TextInput type="search" aria-label="Search masters" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, purpose or field" /></Field>
+          <Field label="Publication state"><Select aria-label="Publication state" value={state} onChange={(event) => setState(event.target.value)}>
+            <option value="all">All states</option><option value="published">Published</option><option value="draft">Draft</option><option value="retired">Retired</option>
+          </Select></Field>
+          {filtered && <Button size="sm" variant="ghost" onClick={() => { setQuery(""); setState("all"); }}>Clear filters</Button>}
+        </Row>
+      </div>
+      {rows.length === 0 && <Empty title="No templates match" action={<Button variant="secondary" onClick={() => { setQuery(""); setState("all"); }}>Clear filters</Button>}>Try a different name or publication state.</Empty>}
+      <Grid>
       {rows.map((record) => {
         const model = readDoc(record.body, record.ownerName, record.updatedAt);
         const tokens = String(record.fields.tokens ?? "").split(",").map((token) => token.trim()).filter(Boolean);
@@ -1311,7 +1341,8 @@ function TemplatesScreen({ context, tab }: { context: ScreenContext; tab: "All" 
           </Card>
         );
       })}
-    </Grid>
+      </Grid>
+    </Stack>
   );
 }
 
