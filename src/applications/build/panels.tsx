@@ -693,6 +693,15 @@ export function ApiScreen({ context, lens }: { context: ScreenContext; lens: "En
   if (lens === "Endpoints") {
     return (
       <Stack gap={4}>
+        <section className="t6-build-library-overview" aria-label="API contract overview">
+          <Row gap={2} wrap><div className="ds-grow" style={{ minWidth: 220 }}><span className="ds-subtle">BUILD / API CONTRACT OVERVIEW</span><h2>Design API contracts with clear permissions.</h2><p className="ds-subtle">Review method, entity binding and authorisation before generating contracts. Endpoints are designs, not hosted services.</p></div></Row>
+          <div className="t6-build-library-metrics" aria-label="API contract overview metrics">
+            <div><span>Endpoints</span><strong>{model.endpoints.length}</strong></div>
+            <div><span>Role protected</span><strong>{model.endpoints.filter((endpoint) => endpoint.auth === "role").length}</strong></div>
+            <div><span>Open contracts</span><strong>{model.endpoints.filter((endpoint) => endpoint.auth === "none").length}</strong></div>
+            <div><span>Automations</span><strong>{model.automations.length}</strong></div>
+          </div>
+        </section>
         <Row gap={2}><Button variant="primary" onClick={() => context.openOverlay("Request builder")}>Define an endpoint</Button></Row>
         {model.endpoints.length === 0 ? (
           <Empty title="No endpoints defined" icon={<Code2 size={20} />}>An endpoint here is a contract: a method, a path, the entity it touches and whether it requires a role.</Empty>
@@ -791,6 +800,15 @@ export function AuthScreen({ context, lens }: { context: ScreenContext; lens: "U
   if (lens === "Roles") {
     return (
       <Stack gap={4}>
+        <section className="t6-build-library-overview" aria-label="Access policy overview">
+          <Row gap={2} wrap><div className="ds-grow" style={{ minWidth: 220 }}><span className="ds-subtle">BUILD / ACCESS POLICY OVERVIEW</span><h2>Make access intentional and reviewable.</h2><p className="ds-subtle">Assign role grants per entity and inspect approval authority. Preview permissions do not replace server enforcement.</p></div></Row>
+          <div className="t6-build-library-metrics" aria-label="Access policy overview metrics">
+            <div><span>Roles</span><strong>{model.roles.length}</strong></div>
+            <div><span>Entities</span><strong>{model.entities.length}</strong></div>
+            <div><span>Write grants</span><strong>{model.roles.reduce((n, role) => n + Object.values(role.grants).filter((grant) => grant === "write").length, 0)}</strong></div>
+            <div><span>Approvers</span><strong>{model.roles.filter((role) => role.canApprove).length}</strong></div>
+          </div>
+        </section>
         <Row gap={2}><Button variant="primary" onClick={() => context.openOverlay("Role editor")}>New role</Button></Row>
         <div className="t6-matrix-wrap">
           <table className="t6-matrix">
