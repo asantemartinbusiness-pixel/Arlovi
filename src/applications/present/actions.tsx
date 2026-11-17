@@ -335,6 +335,7 @@ export function ShareDeck({ context, close }: { context: ScreenContext; close: (
   const editor = useDeckEditor(context, useDeckFor(context));
   const [scope, setScope] = useState<"workspace" | "link">("workspace");
   const [note, setNote] = useState("");
+  const [acknowledged, setAcknowledged] = useState(false);
   const open = editor.deck.comments.filter((comment) => !comment.resolved).length;
   return (
     <form
@@ -342,18 +343,20 @@ export function ShareDeck({ context, close }: { context: ScreenContext; close: (
       className="ds-stack ds-gap-3"
       onSubmit={(event) => {
         event.preventDefault();
-        editor.commit({ ...editor.deck, exports: [{ id: nextId("ex"), at: context.now.toISOString(), format: "Link", note: note.trim() || (scope === "workspace" ? "Workspace link" : "Public link, queued locally"), scope }, ...editor.deck.exports] }, "Share the deck");
-        void context.mutate.log(scope === "workspace" ? "Deck shared inside the workspace" : "Public link recorded as queued locally; no hosting is connected", { entityId: context.params.id, type: "share", capability: scope === "link" ? "queued_local" : undefined });
-        context.toast(scope === "workspace" ? "Shared in the workspace" : "Queued locally, not public", scope === "workspace" ? "People in this workspace can open the deck. The link is listed on the Publish tab with a revoke button." : "No hosting is connected, so no public URL exists and nothing left this browser. The request is recorded and can be revoked.", "info");
+        if (!acknowledged) return;
+        editor.commit({ ...editor.deck, exports: [{ id: nextId("ex"), at: context.now.toISOString(), format: "Link", note: note.trim() || (scope === "workspace" ? "Workspace sharing intent (local only)" : "Public link request, queued locally"), scope }, ...editor.deck.exports] }, "Share the deck");
+        void context.mutate.log(scope === "workspace" ? "Workspace sharing intent recorded locally; access was not granted" : "Public link request recorded locally; no hosting is connected", { entityId: context.params.id, type: "share", capability: scope === "link" ? "queued_local" : undefined });
+        context.toast(scope === "workspace" ? "Sharing intent recorded" : "Public request recorded locally", "The entry is stored in this browser and can be revoked in Publish. No external access or public URL has been created.", "info");
         close();
       }}
     >
-      <Field label="Who can open it">
-        <Select value={scope} onChange={(event) => setScope(event.target.value as "workspace")}>
-          <option value="workspace">People in this workspace</option>
-          <option value="link">Anyone with a public link</option>
+      <Field label="Record sharing intent">
+        <Select value={scope} onChange={(event) => { setScope(event.target.value as "workspace" | "link"); setAcknowledged(false); }}>
+          <option value="workspace">Workspace sharing record (local)</option>
+          <option value="link">Public link request (not connected)</option>
         </Select>
       </Field>
+      {scope === "workspace" && <Notice tone="info" title="This is not a working share link">This records sharing intent only. External access and server-side permissions are not connected.</Notice>}
       {scope === "link" && (
         <Notice tone="warning" title="A public link needs hosting, which is not connected">
           The request is recorded as {CAPABILITY_LABELS.queued_local.toLowerCase()}. Nobody outside this browser can open the deck until a host is connected.
@@ -361,6 +364,7 @@ export function ShareDeck({ context, close }: { context: ScreenContext; close: (
       )}
       {open > 0 && <Notice tone="warning" title={`${open} comments are unresolved`}>Sharing is allowed; the open comments stay visible to anyone who opens the deck here.</Notice>}
       <Field label="Note"><TextInput value={note} onChange={(event) => setNote(event.target.value)} placeholder="For the trade buyers" /></Field>
+      <Checkbox label="I understand this only records a request and does not grant access" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />
       <Properties rows={[{ label: "Hosting", value: <Pill tone="warning">{CAPABILITY_LABELS.not_connected}</Pill> }]} />
     </form>
   );
