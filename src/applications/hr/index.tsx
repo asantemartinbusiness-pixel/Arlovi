@@ -203,9 +203,7 @@ function AccessRequest({ context, close }: { context: ScreenContext; close: () =
         {reviewers.length === 0 && <Notice tone="warning" title="No reviewer available">An active reviewer must be recorded before requesting access.</Notice>}
         <Notice tone="info" title="No connected identity provider">Saving creates a local review task. A completed review will not provision access or prove the external grant happened.</Notice>
         {error && <Notice tone="danger" title="Request not saved">{error}</Notice>}
-        <Row gap={2}><Button variant="ghost" onClick={close} disabled={saving}>Cancel</Button><span className="ds-grow" />
-          <Button variant="primary" submit disabled={saving || !context.can("edit_people") || !approver || reason.trim().length < 10 || sameRequest}>{saving ? "Saving…" : "Request review"}</Button>
-        </Row>
+        <p className="ds-subtle">Use the request action below after completing all required fields. Unresolved duplicate requests are blocked.</p>
       </PeopleDialogSection>
     </form>
   );
