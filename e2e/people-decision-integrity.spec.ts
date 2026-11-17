@@ -72,7 +72,7 @@ test("a stale leave request cannot partially update an employee balance", async 
 });
 
 test("hiring records acceptance, preserves applicant history and creates no orphan on stale revisions", async ({ page }) => {
-  await page.goto("/o/northline/hr/candidates");
+  await page.goto("/o/northline/hr/recruitment");
   const candidateId = await page.evaluate(async () => {
     const repoPath = "/src/platform/repo.ts";
     const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
