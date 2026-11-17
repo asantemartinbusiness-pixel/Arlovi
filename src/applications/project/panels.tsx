@@ -247,8 +247,11 @@ export function ProjectDirectory({ context, lens }: { context: ScreenContext; le
 export function ProjectOverview({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useProjectData();
   const record = useRecord(context.params.id);
-  const project = record ?? data.projects[0];
   const { org, now } = useWorkspace();
+  // A stale/wrong-company detail URL must never display the first project.
+  const project = context.params.id
+    ? (record?.collection === "projects" && record.organizationId === org.id ? record : undefined)
+    : data.projects[0];
   const events = useCollections(["tasks"]);
   if (!project) return <Empty title="No project" icon={<FolderKanban size={20} />} />;
   const tasks = tasksOf(data.tasks, project.id);
@@ -438,8 +441,10 @@ export function BoardScreen({ context, lens }: { context: ScreenContext; lens: "
   const data = useProjectData();
   const boardFilterValue = boardFilter.use();
   const record = useRecord(context.params.id);
-  const project = record ?? data.projects[0];
   const { org } = useWorkspace();
+  const project = context.params.id
+    ? (record?.collection === "projects" && record.organizationId === org.id ? record : undefined)
+    : data.projects[0];
   if (!project) return <Empty title="No project" />;
   const allTasks = tasksOf(data.tasks, project.id);
   const tasks = allTasks.filter((task) => matchesBoard(task, boardFilterValue));
@@ -556,8 +561,10 @@ function checklistOf(task: Rec): ChecklistItem[] {
 export function TaskDetail({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useProjectData();
   const record = useRecord(context.params.id);
-  const task = record ?? data.tasks[0];
   const { org } = useWorkspace();
+  const task = context.params.id
+    ? (record?.collection === "tasks" && record.organizationId === org.id ? record : undefined)
+    : data.tasks[0];
   const [comment, setComment] = useState("");
   if (!task) return <Empty title="No task" icon={<ListChecks size={20} />} />;
   const project = data.projects.find((row) => row.id === task.parentId);
@@ -702,8 +709,11 @@ export function TaskDetail({ context, lens }: { context: ScreenContext; lens: st
 export function TimelineScreen({ context, lens }: { context: ScreenContext; lens: "Timeline" | "Critical path" | "Baseline" | "Risks" }) {
   const data = useProjectData();
   const record = useRecord(context.params.id);
-  const project = record ?? data.projects[0];
   const { org, now } = useWorkspace();
+  // A stale/wrong-company detail URL must never display the first project.
+  const project = context.params.id
+    ? (record?.collection === "projects" && record.organizationId === org.id ? record : undefined)
+    : data.projects[0];
   /* Hooks run before any early return: the project arrives one render late. */
   const tasks = useMemo(() => (project ? tasksOf(data.tasks, project.id) : []), [data.tasks, project]);
   const path = useMemo(() => criticalPath(tasks), [tasks]);
