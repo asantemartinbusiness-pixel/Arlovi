@@ -232,12 +232,22 @@ test("Export preview identifies its paper source and does not claim native PDF g
 });
 
 
-test("Document inspector links directly to editing, review and export without claiming cloud access", async ({ page }) => {
+test("Document inspector links to editing, review and export with template provenance", async ({ page }) => {
   await page.goto("/o/northline/docs/files");
-  const main = page.locator("#main");
-  const first = main.getByRole("row").filter({ has: page.getByRole("cell") }).first();
-  if ((await first.count()) === 0) return;
-  await first.click();
+  await page.evaluate(async () => {
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "documents", currency: "GBP",
+      title: "QA Inspector Cross Application", status: "draft", fields: { kind: "document", folder: "Operations" },
+    }, ctx);
+    await repo.putRecord(record, ctx);
+  });
+  await page.reload();
+  const row = page.getByRole("row", { name: /QA Inspector Cross Application/ });
+  await expect(row).toBeVisible();
+  await row.click();
   await expect(page.getByRole("button", { name: "Open editor" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Export and publish" })).toBeVisible();
   await expect(page.locator("body")).toContainText("Source master");
