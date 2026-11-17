@@ -1,6 +1,7 @@
 import { BarChart3, Boxes, CreditCard, Package, RotateCcw, ShoppingBag, Store, Tags, Truck } from "lucide-react";
 import { Empty, Notice, Pill, Properties, Row, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
+import { GrowthOverviewNav } from "@/app/GrowthOverviewNav";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { confirmOverlay, submitFooter } from "@/applications/market/kit";
 import { RequisitionForm, ScanOverlay } from "@/applications/proc/overlays";
@@ -66,6 +67,7 @@ export const commerceApp = registerApp({
     /* ------------------------------ 001 ------------------------------ */
     "ARL-COMMERCE-001": {
       id: "ARL-COMMERCE-001",
+      header: (context: ScreenContext) => <GrowthOverviewNav context={context} code="COMMERCE" />,
       subtitle: (context) => `Orders, stock and money for ${context.org.name}, reconciled to the records behind them.`,
       tabs: ["Overview", "Sales", "Operations", "Insights"].map((lens) => ({
         id: lens,
