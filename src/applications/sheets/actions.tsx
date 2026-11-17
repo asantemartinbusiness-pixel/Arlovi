@@ -520,7 +520,7 @@ export function PublishWorkbook({ context, close }: { context: ScreenContext; cl
       {editor.evaluation.errors.length > 0 && <Notice tone="warning" title="Some formulas return errors">The local publication status can still be recorded, but exported values may contain errors.</Notice>}
       {error && <Notice tone="danger" title="Publishing not recorded">{error}</Notice>}
       {saving && <p className="ds-subtle">Saving publishing record…</p>}
-      <Checkbox label={scope === "web" ? "I understand no public site will be created" : "I understand this records status without granting external access"} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />}
+      <Checkbox label={scope === "web" ? "I understand no public site will be created" : "I understand this records status without granting external access"} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
     </form>
   );
 }
