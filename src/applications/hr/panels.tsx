@@ -2408,96 +2408,208 @@ export function Payroll({ context, lens }: { context: ScreenContext; lens: "Runs
 
 export function Performance({ context, lens }: { context: ScreenContext; lens: "Cycles" | "My reviews" | "Team" | "Templates" }) {
   const data = useHrData();
-  const { actor } = useWorkspace();
+  const { actor, org } = useWorkspace();
+  const [query, setQuery] = useState("");
+  const [reviewState, setReviewState] = useState<"all" | "outstanding" | "acknowledged">("all");
+  const reviews = data.reviews;
+  const acknowledged = reviews.filter((review) => review.status === "acknowledged");
+  const outstanding = reviews.filter((review) => review.status !== "acknowledged");
+  const cycles = [...new Set(reviews.map((review) => String(review.fields.cycle ?? "")).filter(Boolean))];
+  const mine = reviews.filter((review) =>
+    String(review.fields.employeeName ?? "") === actor || String(review.fields.reviewer ?? "") === actor);
+  const canEdit = context.can("edit_people");
+  const titles = {
+    Cycles: "Every review cycle, accounted for.",
+    "My reviews": "Your reviews and decisions.",
+    Team: "The team review ledger.",
+    Templates: "Structure before judgement.",
+  };
+  const descriptions = {
+    Cycles: "Review completion and missing acknowledgements by recorded cycle. Ratings never become performance quotas.",
+    "My reviews": "See reviews attributed to you as a reviewer or employee, including outstanding acknowledgements.",
+    Team: "Check the people, owners and completion status behind each review without automated employee ranking.",
+    Templates: "Illustrative review structures for fair, evidence-led conversations. These examples are not automatically published templates.",
+  };
+  const header = (
+    <OpsHeader eyebrow={`People / Performance / ${lens}`} title={titles[lens]} description={descriptions[lens]}
+      actions={<>
+        <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)}>Open employees</Button>
+        {canEdit && <Button variant="primary" onClick={() => context.openOverlay("Review form")}>Create a review</Button>}
+      </>}
+      note="Written assessments remain attributable to a human reviewer; AI output does not determine employment outcomes."
+    />
+  );
+  const metrics = (
+    <OpsMetrics label="Performance review overview">
+      <OpsMetric label="Review cycles" value={cycles.length} detail="Distinct recorded periods" />
+      <OpsMetric label="Recorded reviews" value={reviews.length} detail="Across the company" />
+      <OpsMetric label="Awaiting completion" value={outstanding.length} detail="Not acknowledged" emphasis={outstanding.length ? "attention" : "neutral"} />
+      <OpsMetric label="Acknowledged" value={acknowledged.length} detail="Local acknowledgement records" emphasis={acknowledged.length ? "positive" : "neutral"} />
+    </OpsMetrics>
+  );
+  const searchable = (review: Rec) =>
+    [review.title, review.fields.employeeName, review.fields.reviewer, review.fields.cycle]
+      .some((field) => String(field ?? "").toLowerCase().includes(query.trim().toLowerCase()));
+  const stateFilter = (review: Rec) =>
+    reviewState === "all" || (reviewState === "acknowledged"
+      ? review.status === "acknowledged" : review.status !== "acknowledged");
+  const filterBar = (title: string, showStatus = true) => (
+    <div className="ops-toolbar" aria-label={`Filter ${title}`}>
+      <strong className="ops-toolbar-heading">{title}</strong>
+      <div className="hr-directory-search">
+        <TextInput aria-label="Search performance reviews" placeholder="Person, reviewer or cycle"
+          value={query} onChange={(event) => setQuery(event.target.value)} />
+      </div>
+      {showStatus && (["all", "outstanding", "acknowledged"] as const).map((option) => (
+        <Button key={option} size="sm" variant={reviewState === option ? "secondary" : "ghost"}
+          aria-pressed={reviewState === option} onClick={() => setReviewState(option)}>
+          {option === "all" ? "All" : option === "outstanding" ? "Outstanding" : "Acknowledged"}
+        </Button>
+      ))}
+    </div>
+  );
 
   if (lens === "My reviews") {
-    const mine = data.reviews.filter((review) => String(review.fields.employeeName ?? "") === actor || String(review.fields.reviewer ?? "") === actor);
-    return mine.length === 0 ? <Empty title="No review involves you" icon={<ClipboardCheck size={20} />}>Reviews you write or receive appear here.</Empty> : (
-      <Stack gap={3}>
-        {mine.map((review) => (
-          <Card key={review.id} title={review.title} subtitle={String(review.fields.cycle ?? "")} actions={<Pill tone={review.status === "acknowledged" ? "success" : "info"}>{review.status}</Pill>}
-            footer={<Button size="sm" variant="secondary" onClick={() => { context.select(review.id); context.openOverlay("Review form", { id: review.id }); }}>Open the form</Button>}>
-            <p>{review.summary}</p>
-          </Card>
-        ))}
+    const shown = mine.filter((review) => searchable(review) && stateFilter(review));
+    return (
+      <Stack gap={4}>
+        {header}
+        {metrics}
+        {filterBar("My review records")}
+        {shown.length === 0 ? (
+          <Empty title={mine.length ? "No reviews match these filters" : "No review involves you"} icon={<ClipboardCheck size={20} />}>
+            {mine.length ? "Change the search or completion filter." : "Only reviews you write or receive appear here."}
+          </Empty>
+        ) : (
+          <div className="hr-performance-grid">
+            {shown.map((review) => (
+              <Card key={review.id} eyebrow="MY REVIEW" title={review.title}
+                subtitle={String(review.fields.cycle || "Cycle not recorded")}
+                actions={<Pill tone={review.status === "acknowledged" ? "success" : "info"}>{review.status}</Pill>}
+                footer={<Button size="sm" variant="secondary" onClick={() => {
+                  context.select(review.id); context.openOverlay("Review form", { id: review.id });
+                }}>Open review</Button>}>
+                <Stack gap={2}>
+                  <p className="ds-subtle">{review.summary || "No written review summary recorded."}</p>
+                  <Properties rows={[
+                    { label: "Reviewer", value: String(review.fields.reviewer || "Not assigned") },
+                    { label: "Employee", value: String(review.fields.employeeName || "Not linked") },
+                  ]} />
+                </Stack>
+              </Card>
+            ))}
+          </div>
+        )}
       </Stack>
     );
   }
 
   if (lens === "Team") {
+    if (!canEdit) return <Stack gap={4}>{header}<RoleViewNote what="Team performance records" /></Stack>;
+    const shown = reviews.filter((review) => searchable(review) && stateFilter(review));
     return (
-      <DataGrid
-        rows={data.reviews}
-        rowId={(row) => row.id}
-        label="Team reviews"
-        selectedId={context.selectedId}
-        columns={[
-          { key: "person", header: "Person", primary: true, cell: (row) => String(row.fields.employeeName ?? ""), sortValue: (row) => String(row.fields.employeeName ?? ""), filterValue: (row) => `${String(row.fields.employeeName ?? "")} ${String(row.fields.reviewer ?? "")}` },
-          { key: "cycle", header: "Cycle", cell: (row) => String(row.fields.cycle ?? "") },
-          { key: "reviewer", header: "Reviewer", cell: (row) => String(row.fields.reviewer ?? ""), hideBelow: 900 },
-          { key: "rating", header: "Rating", cell: (row) => String(row.fields.rating || "Not set") },
-          { key: "ai", header: "AI assisted", cell: (row) => row.fields.aiAssisted === true ? <Pill tone="warning">Needs human review</Pill> : <Pill tone="neutral">No</Pill>, hideBelow: 1100 },
-          { key: "status", header: "Status", align: "end", cell: (row) => <Pill tone={row.status === "acknowledged" ? "success" : "info"} dot>{row.status}</Pill>, sortValue: (row) => row.status },
-        ]}
-        onSelect={(id) => context.select(id)}
-        onOpen={(id) => context.openOverlay("Review form", { id })}
-      />
+      <Stack gap={4}>
+        {header}
+        {metrics}
+        {filterBar("Team review records")}
+        <DataGrid
+          rows={shown}
+          rowId={(review) => review.id}
+          label="Team review ledger"
+          selectedId={context.selectedId}
+          card={(review) => <>
+            <strong>{String(review.fields.employeeName || "Unlinked employee")}</strong>
+            <span className="ds-subtle">{String(review.fields.cycle || "No cycle")} · {String(review.fields.reviewer || "Unassigned reviewer")}</span>
+            <Pill tone={review.status === "acknowledged" ? "success" : "info"}>{review.status}</Pill>
+          </>}
+          columns={[
+            { key: "person", header: "Employee", primary: true, cell: (row) => String(row.fields.employeeName || "Unlinked person"),
+              sortValue: (row) => String(row.fields.employeeName ?? ""), filterValue: (row) => `${String(row.fields.employeeName ?? "")} ${String(row.fields.reviewer ?? "")}` },
+            { key: "cycle", header: "Cycle", cell: (row) => String(row.fields.cycle || "Not recorded") },
+            { key: "reviewer", header: "Reviewer", cell: (row) => String(row.fields.reviewer || "Unassigned"), hideBelow: 900 },
+            { key: "status", header: "State", align: "end", cell: (row) => <Pill tone={row.status === "acknowledged" ? "success" : "info"}>{row.status}</Pill> },
+          ]}
+          onSelect={(id) => context.select(id)}
+          onOpen={(id) => context.openOverlay("Review form", { id })}
+          empty={<Empty title="No team reviews match the filters" icon={<ClipboardCheck size={20} />}>
+            Select another state or search to inspect team records.
+          </Empty>}
+        />
+        <Notice tone="info" title="Ratings are evidence, not a ranking">
+          No employee order, compensation decision or calibration quota is generated from review ratings.
+        </Notice>
+      </Stack>
     );
   }
 
   if (lens === "Templates") {
     const templates = [
-      { id: "t1", title: "Year end", sections: "Evidence, competencies, objectives, development", scale: "Below / Meeting / Exceeding" },
-      { id: "t2", title: "Mid-year check-in", sections: "What is going well, what is in the way, one change", scale: "No rating" },
-      { id: "t3", title: "Probation", sections: "Role requirements, support given, decision", scale: "Pass / Extend / Not passed" },
+      { id: "year-end", title: "Year-end reflection", purpose: "Evidence-led annual assessment",
+        sections: "Evidence, competencies, objectives and development", scale: "Below / Meeting / Exceeding" },
+      { id: "check-in", title: "Mid-year check-in", purpose: "Structured coaching conversation",
+        sections: "What is working, blockers and one meaningful change", scale: "No numerical rating" },
+      { id: "probation", title: "Probation review", purpose: "Evaluate documented role expectations",
+        sections: "Requirements, support given and the recorded outcome", scale: "Pass / Extend / Not passed" },
     ];
     return (
-      <Grid>
-        {templates.map((template) => (
-          <Card key={template.id} span={4} title={template.title} subtitle={template.scale}>
-            <Properties rows={[{ label: "Sections", value: template.sections }, { label: "Confidential", value: "Draft is visible to the reviewer only" }]} />
-          </Card>
-        ))}
-        <Card span={12} title="Rating scales are written down on purpose">
-          <Notice tone="info">A scale with a published definition is harder to apply unevenly than a number with no description.</Notice>
-        </Card>
-      </Grid>
+      <Stack gap={4}>
+        {header}
+        {metrics}
+        <Notice tone="info" title="Reference structures, not saved form templates">
+          These examples describe review formats. They are not company-approved templates and no action here silently creates a review or applies a score.
+        </Notice>
+        <div className="hr-performance-grid">
+          {templates.map((template) => (
+            <Card key={template.id} eyebrow="FORMAT EXAMPLE" title={template.title} subtitle={template.purpose}>
+              <Properties rows={[
+                { label: "Sections", value: template.sections },
+                { label: "Scale", value: template.scale },
+                { label: "Publication", value: "Illustrative only" },
+              ]} />
+            </Card>
+          ))}
+        </div>
+      </Stack>
     );
   }
 
-  const cycles = [...new Set(data.reviews.map((review) => String(review.fields.cycle ?? "")))].filter(Boolean);
   return (
-    <Grid>
-      {cycles.map((cycle) => {
-        const reviews = data.reviews.filter((review) => review.fields.cycle === cycle);
-        const done = reviews.filter((review) => review.status === "acknowledged").length;
-        return (
-          <Card key={cycle} span={4} title={cycle} subtitle={`${reviews.length} reviews`} actions={<Pill tone={done === reviews.length ? "success" : "info"}>{done} complete</Pill>}>
-            <Stack gap={3}>
-              <Meter value={done} max={reviews.length} label={`${cycle} completion`} tone={done === reviews.length ? "success" : undefined} />
-              <Stack gap={1}>
-                {reviews.map((review) => (
-                  <Row key={review.id} gap={2}>
-                    <span className="ds-grow ds-truncate">{String(review.fields.employeeName ?? "")}</span>
-                    <Pill tone={review.status === "acknowledged" ? "success" : review.status === "draft" ? "neutral" : "info"}>{review.status}</Pill>
-                  </Row>
-                ))}
-              </Stack>
-            </Stack>
-          </Card>
-        );
-      })}
-      <Card span={12} title="Calibration" subtitle="Comparing ratings across managers before they are shared">
-        <Row gap={3} wrap>
-          {["exceeding", "meeting", "below"].map((rating) => (
-            <Card key={rating} className="ds-grow" title={rating.charAt(0).toUpperCase() + rating.slice(1)} subtitle={`${data.reviews.filter((review) => review.fields.rating === rating).length} people`}>
-              <span className="ds-subtle">A distribution is a prompt for a conversation, never a quota.</span>
-            </Card>
-          ))}
-        </Row>
-        <Button variant="secondary" style={{ marginBlockStart: "var(--space-3)" }} onClick={() => context.openOverlay("calibration panel")}>Open calibration</Button>
-      </Card>
-    </Grid>
+    <Stack gap={4}>
+      {header}
+      {metrics}
+      {cycles.length === 0 ? (
+        <Empty title="No review cycles recorded" icon={<ClipboardCheck size={20} />}
+          action={canEdit ? <Button variant="primary" onClick={() => context.openOverlay("Review form")}>Create review</Button> : undefined}>
+          Cycles appear once recorded employee reviews refer to them.
+        </Empty>
+      ) : (
+        <div className="hr-performance-grid">
+          {cycles.map((cycle) => {
+            const members = reviews.filter((review) => review.fields.cycle === cycle);
+            const done = members.filter((review) => review.status === "acknowledged").length;
+            return (
+              <Card key={cycle} eyebrow="REVIEW CYCLE" title={cycle} subtitle={`${members.length} recorded reviews`}
+                actions={<Pill tone={done === members.length ? "success" : "info"}>{done} acknowledged</Pill>}
+                footer={<Button size="sm" variant="secondary" onClick={() => context.setTab("Team")}>Review team records</Button>}>
+                <Stack gap={3}>
+                  <Meter value={done} max={Math.max(1, members.length)} label={`${cycle} acknowledged reviews`} />
+                  {members.slice(0, 5).map((review) => (
+                    <Row key={review.id} gap={2}>
+                      <span className="ds-grow ds-truncate">{String(review.fields.employeeName || "Unlinked person")}</span>
+                      <Pill tone={review.status === "acknowledged" ? "success" : "neutral"}>{review.status}</Pill>
+                    </Row>
+                  ))}
+                  {members.length > 5 && <span className="ds-subtle">+{members.length - 5} further reviews in the team ledger</span>}
+                </Stack>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+      <Notice tone="info" title="A cycle is not a rating quota">
+        Compare written evidence and incomplete acknowledgements before making any human decision. No automated scoring or disciplinary decision occurs here.
+      </Notice>
+    </Stack>
   );
 }
 
