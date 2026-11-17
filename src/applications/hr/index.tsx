@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Briefcase, CalendarDays, ClipboardCheck, GraduationCap, Receipt, UserPlus, Users, Clock } from "lucide-react";
 import {
   Button, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
@@ -22,6 +23,7 @@ import { listByCollection } from "@/platform/repo";
 import { planOnboardingLaunch } from "./decisions";
 import { planShiftMove, planTimesheetApprovals } from "./workforce";
 import { scopedDetailRecord } from "@/platform/recordScope";
+import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
 
 function payrollRecords(context: ScreenContext, collection: string) {
   return listByCollection(context.org.id, collection);
@@ -997,65 +999,136 @@ function PayrollSignoff({ context, close }: { context: ScreenContext; close: () 
 
 function ReviewForm({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = useRecord(payload?.id ?? context.selectedId);
+  const raw = useRecord(payload?.id);
+  const existing = scopedDetailRecord(raw, context.org.id, "reviews");
   const data = useCollections(["employees"]);
+  const [error, setError] = useState("");
+  const [humanReviewed, setHumanReviewed] = useState(false);
+  const editing = Boolean(payload?.id);
+  const writable = context.can("edit_people") && (!existing || ["draft", "scheduled"].includes(existing.status));
+  const people = data.employees.filter((employee) =>
+    !["alumni", "terminated"].includes(employee.status) && employee.fields.employment !== "contractor");
+
+  if (editing && !existing) return (
+    <Empty title="Selected review unavailable">
+      Open the existing review from the same company. A missing record cannot turn into a new employee assessment.
+    </Empty>
+  );
+
   return (
-    <form
-      id="hr-review"
-      className="ds-stack ds-gap-4"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        const form = new FormData(event.currentTarget);
-        const rating = String(form.get("rating") ?? "");
-        const note = String(form.get("evidence") ?? "");
+    <form id="hr-review" className="ds-stack ds-gap-4" onSubmit={async (event) => {
+      event.preventDefault();
+      setError("");
+      if (!writable) {
+        setError("This stage or role does not permit editing the review. Use the named submission or acknowledgement workflow.");
+        return;
+      }
+      const fields = new FormData(event.currentTarget);
+      const rating = String(fields.get("rating") ?? "");
+      const evidence = String(fields.get("evidence") ?? "").trim();
+      const employeeId = String(fields.get("employee") ?? "");
+      const employee = people.find((person) => person.id === employeeId);
+      if (!existing && !employee) { setError("Choose an active employee from this company."); return; }
+      if (rating && evidence.length < 20) {
+        setError("A rating needs at least 20 characters of specific supporting evidence before it can be saved.");
+        return;
+      }
+      try {
         if (existing) {
-          await context.mutate.patch(existing.id, {
-            status: String(form.get("status") ?? existing.status),
-            summary: note || existing.summary,
-            fields: { ...existing.fields, rating, aiAssisted: false, reviewer: context.actor },
-          }, { expectRevision: existing.revision, event: `Review updated for ${String(existing.fields.employeeName ?? "")} by ${context.actor}` });
+          const saved = await context.mutate.patch(existing.id, {
+            summary: evidence,
+            fields: {
+              ...existing.fields, rating, reviewer: context.actor,
+              aiAssisted: existing.fields.aiAssisted === true && !humanReviewed,
+              ...(humanReviewed ? { humanReviewedBy: context.actor, humanReviewedAt: clockIso() } : {}),
+            },
+          }, {
+            expectRevision: existing.revision,
+            event: `Review evidence updated for ${String(existing.fields.employeeName || existing.title)} by ${context.actor}`,
+          });
+          if (!saved) {
+            setError("The review has changed. Close this form and reopen the current record before saving.");
+            return;
+          }
         } else {
-          const employeeId = String(form.get("employee") ?? "");
-          const employee = data.employees.find((row) => row.id === employeeId);
+          const cycle = String(fields.get("cycle") ?? "Year end");
           await context.mutate.create({
-            collection: "reviews",
-            title: `${employee?.title ?? "Review"} · ${String(form.get("cycle") ?? "Year end")}`,
-            status: "draft",
-            summary: note,
-            fields: { employeeId, employeeName: employee?.title ?? "", reviewer: context.actor, cycle: String(form.get("cycle") ?? "Year end"), rating, aiAssisted: false, confidential: true },
-          }, `Review created for ${employee?.title ?? ""}`);
+            collection: "reviews", title: `${employee?.title} · ${cycle}`, status: "draft",
+            summary: evidence,
+            fields: {
+              employeeId, employeeName: employee?.title ?? "", reviewer: context.actor,
+              cycle, rating, aiAssisted: false, confidential: true,
+            },
+          }, `Draft review created for ${employee?.title} by ${context.actor}`);
         }
-        context.toast("Review saved", "The rating and its evidence are on the record.");
+        context.toast("Review saved", "A local draft and its evidence were recorded. No employment decision was made automatically.");
         close();
-      }}
-    >
-      {!existing && (
-        <>
-          <Field label="Person" required>
-            <Select name="employee" required>{data.employees.filter((row) => row.status !== "alumni").map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}</Select>
-          </Field>
-          <Field label="Cycle"><Select name="cycle">{["Year end", "Mid-year", "Probation"].map((cycle) => <option key={cycle}>{cycle}</option>)}</Select></Field>
-        </>
-      )}
-      {existing && (
-        <Field label="Stage">
-          <Select name="status" defaultValue={existing.status}>{["draft", "submitted", "calibrated", "acknowledged"].map((status) => <option key={status}>{status}</option>)}</Select>
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "The review could not be saved.");
+      }
+    }}>
+      <PeopleDialogLead eyebrow="PEOPLE / PERFORMANCE" title={existing ? "Review the employee evidence" : "Create an evidence-led review"}
+        description="A human author is accountable for every assessment. The draft remains separate from submission, calibration and acknowledgement."
+        status={<Pill tone={existing?.status === "acknowledged" ? "success" : "neutral"}>
+          {existing?.status ?? "New draft"}
+        </Pill>} />
+      <PeopleDialogSection step="01" title="Person and review cycle" description="Check the exact employee and recorded period.">
+        {existing ? (
+          <Properties rows={[
+            { label: "Employee", value: String(existing.fields.employeeName || "Not linked") },
+            { label: "Cycle", value: String(existing.fields.cycle || "Not recorded") },
+            { label: "Current stage", value: existing.status },
+            { label: "Reviewer", value: String(existing.fields.reviewer || "Not recorded") },
+          ]} />
+        ) : (
+          <>
+            <Field label="Person" required>
+              <Select name="employee" required defaultValue="">
+                <option value="">Choose an active employee</option>
+                {people.map((person) => <option key={person.id} value={person.id}>{person.title}</option>)}
+              </Select>
+            </Field>
+            <Field label="Cycle">
+              <Select name="cycle" defaultValue="Year end">
+                {["Year end", "Mid-year", "Probation"].map((cycle) => <option key={cycle} value={cycle}>{cycle}</option>)}
+              </Select>
+            </Field>
+          </>
+        )}
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Assessment and supporting evidence"
+        description="Set a rating only when there is a specific, readable explanation for it.">
+        <Field label="Assessment" hint="Use the published scale; absence of a rating is not a negative rating.">
+          <Select name="rating" defaultValue={String(existing?.fields.rating ?? "")} disabled={!writable}>
+            <option value="">No rating recorded</option>
+            <option value="below">Below expectations</option>
+            <option value="meeting">Meeting expectations</option>
+            <option value="exceeding">Exceeding expectations</option>
+          </Select>
         </Field>
-      )}
-      <Field label="Rating" hint="Against the published scale, not a number without a definition.">
-        <Select name="rating" defaultValue={String(existing?.fields.rating ?? "")}>
-          <option value="">Not set</option>
-          {["below", "meeting", "exceeding"].map((rating) => <option key={rating}>{rating}</option>)}
-        </Select>
-      </Field>
-      <Field label="Evidence" required={!existing}>
-        <TextArea name="evidence" rows={4} defaultValue={existing?.summary ?? ""} />
-      </Field>
-      {existing?.fields.aiAssisted === true && (
-        <Notice tone="warning" title="This draft was assembled with help from an AI employee">
-          Saving sets the AI-assisted flag to false, because a person is now accountable for what it says.
-        </Notice>
-      )}
+        <Field label="Evidence and manager notes">
+          <TextArea name="evidence" rows={5} disabled={!writable}
+            defaultValue={existing?.summary ?? ""} />
+        </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Review accountability"
+        description="Saving a draft does not submit it, acknowledge it or alter the person's employment.">
+        {existing?.fields.aiAssisted === true && (
+          <Notice tone="warning" title="AI-assisted content still needs human review">
+            The AI-assisted marker remains until a reviewer explicitly confirms the evidence has been checked.
+            Merely pressing Save does not clear it.
+          </Notice>
+        )}
+        {existing?.fields.aiAssisted === true && (
+          <Checkbox label="I have personally read, checked and taken responsibility for this review evidence"
+            checked={humanReviewed} disabled={!writable}
+            onChange={(event) => setHumanReviewed(event.target.checked)} />
+        )}
+        {!writable && <Notice tone="warning" title="Review editing is restricted">
+          Use the native review submission or acknowledgement workflow. This existing record cannot be rewritten from this form.
+        </Notice>}
+        {error && <Notice tone="danger" title="Review not saved">{error}</Notice>}
+      </PeopleDialogSection>
     </form>
   );
 }
