@@ -19,6 +19,7 @@ import {
   swapShift, validateRun, verifyCompletion, viewEmployee,
 } from "./actions";
 import { listByCollection } from "@/platform/repo";
+import { scopedDetailRecord } from "@/platform/recordScope";
 
 function payrollRecords(context: ScreenContext, collection: string) {
   return listByCollection(context.org.id, collection);
@@ -43,9 +44,10 @@ function MailBoundary() {
 }
 
 function OffboardingConfirmation({ context, close }: { context: ScreenContext; close: () => void }) {
-  const employee = useRecord(context.params.id);
+  const fromRoute = useRecord(context.params.id);
+  const employee = scopedDetailRecord(fromRoute, context.org.id, "employees");
   const tasks = useCollections(["tasks"]).tasks;
-  if (!employee) return <Empty title="Open an employee first" />;
+  if (!employee) return <Empty title="Employee unavailable">Open a valid employee record before offboarding.</Empty>;
   const queued = tasks.filter((task) => task.fields.employeeId === employee.id && task.fields.group === "IT access" && task.status !== "done" && task.status !== "rescinded");
   return (
     <Stack gap={4}>
@@ -86,7 +88,9 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
 }
 
 function AccessRequest({ context, close }: { context: ScreenContext; close: () => void }) {
-  const employee = useRecord(context.params.id);
+  const fromRoute = useRecord(context.params.id);
+  const employee = scopedDetailRecord(fromRoute, context.org.id, "employees");
+  if (!employee) return <Empty title="Employee unavailable">Open a valid employee record before requesting access.</Empty>;
   return (
     <form
       id="hr-access"
@@ -98,9 +102,9 @@ function AccessRequest({ context, close }: { context: ScreenContext; close: () =
           collection: "tasks",
           title: `Access: ${String(form.get("grant") ?? "")}`,
           status: "waiting",
-          summary: `Requested by ${context.actor} for ${employee?.title ?? "an employee"}. ${String(form.get("reason") ?? "")}`,
-          fields: { kind: "onboarding", employeeId: employee?.id ?? "", stage: "waiting", assignee: "Maya Chen", group: "IT access" },
-          parentId: employee?.id,
+          summary: `Requested by ${context.actor} for ${employee.title}. ${String(form.get("reason") ?? "")}`,
+          fields: { kind: "onboarding", employeeId: employee.id, stage: "waiting", assignee: "Maya Chen", group: "IT access" },
+          parentId: employee.id,
         }, `Access requested: ${String(form.get("grant") ?? "")}`);
         context.toast("Access requested", "It is waiting for a named approver, not granted.");
         close();
@@ -114,6 +118,50 @@ function AccessRequest({ context, close }: { context: ScreenContext; close: () =
       <Field label="Why it is needed" required><TextArea name="reason" rows={3} required /></Field>
       <Notice tone="warning" title="Access is never inferred">
         Employment status does not grant anything on its own. This request waits for a named approver and is recorded either way.
+      </Notice>
+    </form>
+  );
+}
+
+/**
+ * The People app stores an auditable reference, not file bytes. Never claim
+ * that a contract, identity check or uploaded file exists unless a user
+ * explicitly records the reference against this exact employee.
+ */
+function PeopleFileReference({ context, close }: { context: ScreenContext; close: () => void }) {
+  const fromRoute = useRecord(context.params.id);
+  const employee = scopedDetailRecord(fromRoute, context.org.id, "employees");
+  if (!employee) return <Empty title="Employee unavailable">Open a valid employee record before filing a document reference.</Empty>;
+  return (
+    <form id="hr-document" className="ds-stack ds-gap-4" onSubmit={async (event) => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      const title = String(form.get("title") ?? "").trim();
+      if (!title) return;
+      const note = String(form.get("note") ?? "").trim();
+      await context.mutate.create({
+        collection: "documents",
+        title,
+        status: "filed",
+        summary: `Document reference entered by ${context.actor} for ${employee.title}; the file itself is not stored here.`,
+        parentId: employee.id,
+        fields: {
+          kind: "peopleFile", employeeId: employee.id, folder: "People files",
+          confidential: true, referenceOnly: true,
+          filedBy: context.actor, filedAt: context.now.toISOString(), note,
+        },
+      }, `Personnel document reference recorded: ${title} for ${employee.title}`);
+      context.toast("Reference added", `A ${title} reference is linked to ${employee.title}; no file was uploaded.`);
+      close();
+    }}>
+      <Field label="Document" required>
+        <Select name="title" required>
+          {["Employment contract", "Contract variation", "Right to work check", "Probation letter", "Training certificate", "Leaver letter"].map((option) => <option key={option}>{option}</option>)}
+        </Select>
+      </Field>
+      <Field label="Internal note"><TextArea name="note" rows={3} /></Field>
+      <Notice tone="info" title="A document reference, not a file upload">
+        This records a document's name, who entered the reference and when. The file stays in its existing storage location; Arlovi has not uploaded or verified it.
       </Notice>
     </form>
   );
@@ -243,38 +291,14 @@ export const hrApp = registerApp({
       actions: [
         { id: "Update profile", label: "Update profile", placement: "primary", capability: "edit_people", run: (context) => context.openOverlay("profile editor") },
         { id: "request change", label: "Request an access change", placement: "secondary", run: (context) => context.openOverlay("access request") },
-        { id: "upload document", label: "Add a document", placement: "overflow", run: (context) => context.openOverlay("Contract upload") },
+        { id: "upload document", label: "Add a document reference", placement: "overflow", run: (context) => context.openOverlay("Contract upload") },
         { id: "offboard", label: "Offboard", placement: "overflow", tone: "danger", capability: "edit_people", run: (context) => context.openOverlay("offboarding confirmation") },
       ],
       overlays: [
         { id: "profile editor", kind: "modal", title: "Update profile", width: 520, render: ({ close, ...context }) => <ProfileEditor context={context} close={close} />, footer: submitFooter("hr-profile", "Save the profile") },
-        { id: "Contract upload", kind: "modal", title: "Add a document to the people file", width: 520,
-          render: ({ close, ...context }) => (
-            <form id="hr-document" className="ds-stack ds-gap-4" onSubmit={async (event) => {
-              event.preventDefault();
-              const form = new FormData(event.currentTarget);
-              await context.mutate.create({
-                collection: "documents",
-                title: String(form.get("title") ?? "Document"),
-                status: "filed",
-                summary: `Filed against an employee record by ${context.actor}.`,
-                parentId: context.params.id,
-                fields: { kind: "peopleFile", employeeId: context.params.id ?? "", confidential: true },
-              }, `Document filed: ${String(form.get("title") ?? "")}`);
-              context.toast("Document filed", "A record of the document is in the people file.");
-              close();
-            }}>
-              <Field label="Document" required>
-                <Select name="title" required>{["Employment contract", "Contract variation", "Right to work check", "Probation letter", "Training certificate", "Leaver letter"].map((option) => <option key={option}>{option}</option>)}</Select>
-              </Field>
-              <Field label="Note"><TextArea name="note" rows={3} /></Field>
-              <Notice tone="info" title="Nothing is uploaded">
-                This records that the document exists, who filed it and when. The file itself stays wherever you keep it;
-                no storage provider is connected to this workspace.
-              </Notice>
-            </form>
-          ),
-          footer: submitFooter("hr-document", "File the document") },
+        { id: "Contract upload", kind: "modal", title: "Add a people-file reference", width: 520,
+          render: ({ close, ...context }) => <PeopleFileReference context={context} close={close} />,
+          footer: submitFooter("hr-document", "Save reference") },
         { id: "access request", kind: "modal", title: "Request access", width: 520, render: ({ close, ...context }) => <AccessRequest context={context} close={close} />, footer: submitFooter("hr-access", "Send the request") },
         { id: "offboarding confirmation", kind: "modal", title: "Offboard this person", tone: "danger", width: 520, render: ({ close, ...context }) => <OffboardingConfirmation context={context} close={close} /> },
       ],
