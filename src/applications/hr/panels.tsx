@@ -2661,7 +2661,7 @@ export function LeaveForm({ context, close }: { context: ScreenContext; close: (
       <Field label="Who is away" required>
         <Select value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}>
           {currentEmployees.length === 0 && <option value="">No current employees</option>}
-          {currentEmployees.map((row) => <option key={row.id} value={row.id}>{row.title}</option>}
+          {currentEmployees.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
         </Select>
       </Field>
       <Field label="Type">
