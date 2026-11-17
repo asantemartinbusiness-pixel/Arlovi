@@ -15,7 +15,7 @@ test("Present shared library never interprets another owner as external access",
   await page.goto("/o/northline/present/decks?tab=Shared");
   const main = page.locator("#main");
   await expect(main.getByRole("heading", { name: "Recorded sharing." })).toBeVisible();
-  await expect(main).toContainText("Public or workspace access is not implied.");
+  await expect(main).toContainText("These records do not grant public or workspace access.");
 });
 
 test("Present slide editor exposes slide status and contextual theme navigation", async ({ page }) => {
