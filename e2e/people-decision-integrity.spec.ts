@@ -71,7 +71,7 @@ test("a stale leave request cannot partially update an employee balance", async 
   expect(state).toEqual({ conflict: true, status: "requested", balance: 1 });
 });
 
-test("hiring records acceptance, preserves applicant history and creates no orphan on stale revisions", async ({ page }) => {
+test("hiring records acceptance and preserves applicant fields", async ({ page }) => {
   await page.goto("/o/northline/hr/recruitment");
   const candidateId = await page.evaluate(async () => {
     const repoPath = "/src/platform/repo.ts";
@@ -166,4 +166,39 @@ test("onboarding starts with six complete tasks and refuses a duplicate launch",
   await repeat.getByLabel("Mentor").selectOption({ label: "QA Onboarding Mentor" });
   await repeat.getByRole("button", { name: "Launch checklist" }).click();
   await expect.poll(read).toMatchObject({ taskCount: 6 });
+});
+
+test("a stale applicant revision cannot create an orphan employee", async ({ page }) => {
+  await page.goto("/o/northline/hr/recruitment");
+  const result = await page.evaluate(async () => {
+    const repoPath = "/src/platform/repo.ts";
+    const decisionsPath = "/src/applications/hr/decisions.ts";
+    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
+    const decisions = await import(/* @vite-ignore */ decisionsPath) as typeof import("../src/applications/hr/decisions");
+    const now = new Date().toISOString(), ctx = { actor: "Elena Voss", now };
+    const candidate = repo.newRecord({
+      organizationId: "org-northline", collection: "applicants", currency: "GBP",
+      title: "QA Stale Hiring Candidate", status: "active",
+      fields: { email: "qa-hire-stale@example.test", stage: "offer", rating: 5, offerIssuedBy: ctx.actor },
+    }, ctx);
+    await repo.putRecord(candidate, ctx);
+    const plan = decisions.planHireApplicant({
+      organizationId: "org-northline", currency: "GBP", actor: ctx.actor, now,
+    }, candidate, [], "Qualified", "Candidate sent an accepted offer reply");
+    await repo.patchRecord(candidate.id, { summary: "Another reviewer updated this record" }, ctx,
+      { expectRevision: candidate.revision });
+    let conflict = false;
+    try {
+      await repo.putMany(plan.records, ctx,
+        plan.messages.map((message, index) => ({
+          type: plan.eventTypes[index], entityId: plan.records[index].id, message,
+        })), "org-northline", plan.expectedRevisions);
+    } catch (error) { conflict = error instanceof repo.ConflictError; }
+    return {
+      conflict,
+      applicantStatus: (await repo.getRecord(candidate.id))?.status,
+      orphan: Boolean(await repo.getRecord(plan.records[1].id)),
+    };
+  });
+  expect(result).toEqual({ conflict: true, applicantStatus: "active", orphan: false });
 });
