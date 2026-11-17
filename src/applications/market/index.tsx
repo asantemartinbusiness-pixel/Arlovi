@@ -3,6 +3,7 @@ import { Empty, Notice, Pill, Properties, Row, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { GrowthOverviewNav } from "@/app/GrowthOverviewNav";
 import { CampaignDetailContext } from "./CampaignDetailContext";
+import { MarketingWorkAreaHeader } from "./MarketingWorkAreaHeader";
 import { useRecord } from "@/platform/workspace";
 import { confirmOverlay, submitFooter } from "@/applications/market/kit";
 import {
@@ -153,6 +154,7 @@ export const marketApp = registerApp({
     /* ------------------------------ 004 ------------------------------ */
     "ARL-MARKET-004": {
       id: "ARL-MARKET-004",
+      header: (context: ScreenContext) => <MarketingWorkAreaHeader context={context} area="calendar" />,
       subtitle: (context) => `Scheduled content in ${context.org.timezone}. Drag an item, or focus one and press Enter to move it with the arrow keys.`,
       tabs: ["Month", "Week", "List", "By channel"].map((view) => ({
         id: view,
@@ -175,6 +177,7 @@ export const marketApp = registerApp({
     /* ------------------------------ 005 ------------------------------ */
     "ARL-MARKET-005": {
       id: "ARL-MARKET-005",
+      header: (context: ScreenContext) => <MarketingWorkAreaHeader context={context} area="social" />,
       subtitle: () => "Drafts, local queue and the honest state of every item that was meant to go out.",
       tabs: ["Drafts", "Schedule", "Published", "Failed"].map((state) => ({
         id: state,
@@ -199,6 +202,7 @@ export const marketApp = registerApp({
     /* ------------------------------ 006 ------------------------------ */
     "ARL-MARKET-006": {
       id: "ARL-MARKET-006",
+      header: (context: ScreenContext) => <MarketingWorkAreaHeader context={context} area="email" />,
       subtitle: () => "Build the email, check who would receive it, and see why nothing can be sent yet.",
       tabs: ["Campaigns", "Templates", "Audiences", "Reports"].map((lens) => ({
         id: lens,
@@ -224,6 +228,7 @@ export const marketApp = registerApp({
     /* ------------------------------ 007 ------------------------------ */
     "ARL-MARKET-007": {
       id: "ARL-MARKET-007",
+      header: (context: ScreenContext) => <MarketingWorkAreaHeader context={context} area="audiences" />,
       subtitle: (context) => `Segments are evaluated against the contact records in ${context.org.shortName} every time this screen renders.`,
       tabs: ["Segments", "Contacts", "Exclusions", "Sources"].map((lens) => ({
         id: lens,
