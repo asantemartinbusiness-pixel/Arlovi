@@ -481,6 +481,9 @@ export function PublishWorkbook({ context, close }: { context: ScreenContext; cl
   const record = useWorkbookFor(context);
   const editor = useWorkbookEditor(context, record);
   const [scope, setScope] = useState<"workspace" | "web">("workspace");
+  const [confirmed, setConfirmed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   if (!record) return <Empty title="No workbook is open" />;
   return (
     <form
@@ -488,26 +491,36 @@ export function PublishWorkbook({ context, close }: { context: ScreenContext; cl
       className="ds-stack ds-gap-3"
       onSubmit={async (event) => {
         event.preventDefault();
+        if (!confirmed || saving) return;
+        setSaving(true);
+        setError("");
+        try {
         if (scope === "workspace") {
           await context.mutate.patch(record.id, { status: "published", fields: { ...record.fields, publishedAt: context.now.toISOString(), publishedBy: context.actor } }, { expectRevision: record.revision, event: `${record.title} published in the workspace` });
-          context.toast("Published in the workspace", "Its status is published and people in this workspace can open it read-only from the library.");
+          context.toast("Workspace status updated", "The workbook is marked published in this local workspace. This does not create server-side read-only permissions.");
         } else {
           editor.commit({ ...editor.workbook, io: [{ id: nextId("io"), at: context.now.toISOString(), kind: "export", format: "Publish to the web", note: `${CAPABILITY_LABELS.queued_local}: no hosting is connected, nothing was published.`, warnings: ["Not connected"] }, ...editor.workbook.io] }, "Request web publishing");
           void context.mutate.log("Web publishing requested and queued locally; no hosting is connected", { entityId: record.id, type: "publish", capability: "queued_local" });
           context.toast("Queued locally, not published", "No hosting is connected, so there is no public copy and nothing left this browser. The request is on the import and export history.", "info");
         }
         close();
+        } catch (cause) { setError(cause instanceof Error ? cause.message : "The workbook publishing record could not be saved."); }
+        finally { setSaving(false); }
       }}
     >
       <Field label="Publish to">
-        <Select value={scope} onChange={(event) => setScope(event.target.value as "workspace")}>
-          <option value="workspace">This workspace (read-only for others)</option>
+        <Select value={scope} onChange={(event) => { setScope(event.target.value as "workspace" | "web"); setConfirmed(false); }}>
+          <option value="workspace">Mark as published in this workspace</option>
           <option value="web">The public web</option>
         </Select>
       </Field>
+      {scope === "workspace" && <Notice tone="info" title="Status only, not access enforcement">Publishing marks the local workbook as published. Server-side permissions and external read-only access are not connected.</Notice>}
       {scope === "web" && <Notice tone="warning" title="Hosting is not connected">The request is recorded as {CAPABILITY_LABELS.queued_local.toLowerCase()}. No public URL exists until a host is connected.</Notice>}
       <Properties rows={[{ label: "Status now", value: record.status }, { label: "Formula errors", value: String(editor.evaluation.errors.length) }]} />
-      {editor.evaluation.errors.length > 0 && <Notice tone="warning" title="Some formulas return errors">Publishing is allowed; readers will see the error codes.</Notice>}
+      {editor.evaluation.errors.length > 0 && <Notice tone="warning" title="Some formulas return errors">The local publication status can still be recorded, but exported values may contain errors.</Notice>}
+      {error && <Notice tone="danger" title="Publishing not recorded">{error}</Notice>}
+      {saving && <p className="ds-subtle">Saving publishing record…</p>}
+      <Checkbox label={scope === "web" ? "I understand no public site will be created" : "I understand this records status without granting external access"} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
     </form>
   );
 }
