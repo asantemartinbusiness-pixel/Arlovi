@@ -564,7 +564,8 @@ function OfferApproval({ context, close }: { context: ScreenContext; close: () =
           variant="primary"
           disabled={!context.can("edit_people") || issued || !scored}
           onClick={async () => {
-            await context.mutate.patch(applicant.id, { fields: { ...applicant.fields, stage: "offer", offerIssuedBy: context.actor, offerIssuedAt: clockIso(), offerDelivery: "queued_local" } }, { expectRevision: applicant.revision, event: `Offer issued to ${applicant.title} by ${context.actor}; letter kept as a local draft` });
+            const updated = await context.mutate.patch(applicant.id, { fields: { ...applicant.fields, stage: "offer", offerIssuedBy: context.actor, offerIssuedAt: clockIso(), offerDelivery: "queued_local" } }, { expectRevision: applicant.revision, event: `Offer issued to ${applicant.title} by ${context.actor}; letter kept as a local draft` });
+            if (!updated) return;
             await context.mutate.log(`Offer letter for ${applicant.title} queued locally — no mail service is connected, so nothing has left this browser.`, { entityId: applicant.id, type: "boundary", capability: "queued_local" });
             context.toast("Offer issued", `Recorded against ${applicant.title} by ${context.actor}. The letter is a local draft; nothing was sent.`);
             close();
