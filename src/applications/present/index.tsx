@@ -921,6 +921,16 @@ function ThemeScreen({ context, tab }: { context: ScreenContext; tab: "Masters" 
 
   return (
     <Stack gap={4}>
+      <div className="pr-library-heading">
+        <div><span className="pr-library-eyebrow">PRESENT / DESIGN GOVERNANCE</span><h2>One coherent visual language.</h2>
+          <p>Inspect master layouts, see which slides have been customised and resolve typography before applying changes across the deck.</p></div>
+        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button>
+      </div>
+      <div className="pr-library-overview" aria-label="Presentation theme overview">
+        <div><span>Slides</span><strong>{editor.deck.slides.length}</strong></div>
+        <div><span>Theme variants</span><strong>{editor.deck.themes.length}</strong></div>
+        <div><span>Customised slides</span><strong>{editor.deck.slides.filter((slide) => customisedObjects(editor.deck, slide).length > 0).length}</strong></div>
+      </div>
       <Row gap={3} wrap>
         <Field label="Theme">
           <Select aria-label="Theme"
