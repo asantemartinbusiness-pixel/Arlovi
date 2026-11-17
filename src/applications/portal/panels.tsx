@@ -12,7 +12,7 @@ import { openInvoices, outstandingMinor } from "@/applications/fin/data";
 import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import {
-  bodyOf, expiryState, GATE_LABELS, MODULE_LABELS, portalDocuments, portalForRole, portalInvoices,
+  bodyOf, expiryState, GATE_LABELS, MODULE_LABELS, portalDocuments, portalForRole,
   listedPortals, portalMessages, portalUsers, portalVisibleInvoices, resolvePortal, sharedRecords, sharedWithPortal, statusTone, usePortalData, type PortalBody,
 } from "./data";
 
