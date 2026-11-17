@@ -1,18 +1,17 @@
-import { lazy, Suspense, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { ArrowRight, Building2, CalendarDays, ChevronRight, FolderKanban, Grid2X2, Home, Inbox, Layers, Megaphone, Plus, Search, Users, LockKeyhole, Activity } from "lucide-react";
-import { APP_ENTRIES, NAV_GROUPS } from "@/app/nav";
+import { ArrowRight, Building2, CalendarDays, ChevronRight, FolderKanban, Grid2X2, Home, Inbox, Layers, Megaphone, Plus, Users, LockKeyhole, Activity } from "lucide-react";
 import { ContextualCreate } from "@/app/ContextualCreate";
 const WorkspaceContinuity = lazy(() => import("@/app/WorkspaceContinuity").then(module => ({ default: module.WorkspaceContinuity })));
 const ResourceLibrary = lazy(() => import("@/app/ResourceLibrary").then(module => ({ default: module.ResourceLibrary })));
 const CompanyPeople = lazy(() => import("@/app/CompanyPeople").then(module => ({ default: module.CompanyPeople })));
 const AccountCloud = lazy(() => import("@/app/AccountCloud").then(module => ({ default: module.AccountCloud })));
 const WorkspaceHealth = lazy(() => import("@/app/WorkspaceHealth").then(module => ({ default: module.WorkspaceHealth })));
+const AppsDirectory = lazy(() => import("@/app/AppsDirectory").then(module => ({ default: module.AppsDirectory })));
 const TaskApprovalBoard = lazy(() => import("@/app/TaskApprovalBoard").then(module => ({ default: module.TaskApprovalBoard })));
 const AgentWorkBoard = lazy(() => import("@/app/AgentWorkBoard").then(module => ({ default: module.AgentWorkBoard })));
 import { appEntry } from "@/app/catalog";
 import { routeForRecord } from "@/platform/attention";
-import { canOpen } from "@/platform/policy";
 import { useCollections, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import "./workspace-navigation.css";
@@ -47,7 +46,7 @@ const headings: Record<WorkArea, string> = {
   home: "My Workspace", company: "Company Headquarters",
   spaces: "Spaces", work: "Work", apps: "Applications",
 };
-const collections = ["departments", "members", "projects", "missions", "tasks", "documents", "channels", "preferences", "objectives", "agents"];
+const collections = ["departments", "members", "projects", "missions", "tasks", "documents", "channels", "objectives", "agents"];
 const empty: Rec[] = [];
 
 function RowLink({ to, title, detail, icon: Icon = ChevronRight }: { to: string; title: string; detail?: string; icon?: ComponentType<{ size?: number; strokeWidth?: number; className?: string }> }) {
@@ -84,23 +83,19 @@ function SpaceDetail({ record, kind, all, slug }: { record: Rec; kind: "departme
 }
 
 export function WorkspaceNavigation() {
-  const { org, role, actor } = useWorkspace();
+  const { org, actor } = useWorkspace();
   const location = useLocation();
   const area = currentWorkArea(location.pathname);
   const data = useCollections(collections);
-  const [query, setQuery] = useState("");
   const departments = data.departments ?? empty;
   const projects = data.projects ?? empty;
   const missions = data.missions ?? empty;
   const tasks = data.tasks ?? empty;
   const docs = data.documents ?? empty;
   const members = data.members ?? empty;
-  const preferences = data.preferences ?? empty;
   const path = location.pathname.split("/");
   const detailKind = path[5] === "department" ? "department" : path[5] === "project" ? "project" : null;
   const detail = detailKind ? (detailKind === "department" ? departments : projects).find(item => item.id === path[6]) : undefined;
-  const pinned = new Set(preferences.filter(p => p.fields.pinned === true).map(p => String(p.fields.app)));
-  const appGroups = useMemo(() => NAV_GROUPS.map(group => ({ ...group, apps: group.apps.filter(app => canOpen(role, app.code) && (`${app.short} ${group.label}`).toLowerCase().includes(query.toLowerCase())) })).filter(group => group.apps.length), [role, query]);
 
   if (path[4] === "health") return <div className="ws-content"><header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / WORKSPACE OPERATIONS</span><h1>Workspace health</h1><p>Read-only checks for your company records, applications and browser storage.</p></header><DeferredPanel><WorkspaceHealth/></DeferredPanel></div>;
   if (path[4] === "account") return <div className="ws-content"><header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / DATA & IDENTITY</span><h1>Account & data readiness</h1><p>Understand local data, export a secure handoff archive, and see what is required for cloud accounts and synchronisation.</p></header><DeferredPanel><AccountCloud/></DeferredPanel></div>;
@@ -109,7 +104,7 @@ export function WorkspaceNavigation() {
   if (path[4] === "recent") return <div className="ws-content"><header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / CONTINUE WORKING</span><h1>Recent and saved work</h1><p>Return to the applications and workspaces you have opened in this organisation.</p></header><DeferredPanel><WorkspaceContinuity /></DeferredPanel></div>;
   if (detailKind) return detail ? <SpaceDetail key={detail.id} record={detail} kind={detailKind} all={data} slug={org.slug}/> : <div className="ws-content"><h1>Space not found</h1><p>This space is not available in this organisation.</p><Link to={workAreaPath(org.slug,area)}>Back to {headings[area]}</Link></div>;
   return <div className="ws-content">
-    <header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / {headings[area].toUpperCase()}</span><h1>{area === "home" ? "Your day, in one place." : headings[area]}</h1><p>{WORK_AREAS.find(item => item.id === area)?.description}. Everything here belongs to the active organisation.</p>{area !== "apps" && <div className="ws-page-actions"><ContextualCreate label="Create new"/></div>}</header>
+    <header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / {headings[area].toUpperCase()}</span><h1>{area === "home" ? "Your day, in one place." : headings[area]}</h1><p>{area === "apps" ? "Find the right tool for your work, or pick up where you left off. Each application opens in this company." : WORK_AREAS.find(item => item.id === area)?.description + ". Everything here belongs to the active organisation."}</p>{area !== "apps" && <div className="ws-page-actions"><ContextualCreate label="Create new"/></div>}</header>
     {area === "home" && <div className="ws-stack">
       <DeferredPanel><WorkspaceContinuity compact /></DeferredPanel>
       <div className="ws-stat-grid"><div><small>My assigned tasks</small><strong>{tasks.filter(t => t.ownerName === actor || t.fields.assignee === actor).length}</strong></div><div><small>Active projects</small><strong>{projects.filter(p => !["completed","archived","cancelled"].includes(p.status)).length}</strong></div><div><small>Open missions</small><strong>{missions.filter(m => !["completed","cancelled"].includes(m.status)).length}</strong></div></div>
@@ -121,6 +116,6 @@ export function WorkspaceNavigation() {
     {area === "company" && <div className="ws-stack"><div className="ws-stat-grid"><div><small>Departments</small><strong>{departments.length}</strong></div><div><small>People records</small><strong>{members.length}</strong></div><div><small>Active missions</small><strong>{missions.filter(m=>m.status==="running").length}</strong></div></div><WorkList title="Company objectives" records={(data.objectives ?? empty).slice(0,8)} slug={org.slug} fallback="No company objectives recorded."/><div className="ws-shortcuts"><RowLink to={appEntry("HQ",org.slug)} title="Executive headquarters" icon={Building2}/><RowLink to={appEntry("BRAIN",org.slug)} title="Company Brain" icon={Layers}/><RowLink to={appEntry("ADMIN",org.slug)} title="Company administration" icon={Users}/><RowLink to={`/o/${org.slug}/workspace/people`} title="People & collaboration" icon={Users}/><RowLink to={`/o/${org.slug}/workspace/account`} title="Account & data readiness" icon={LockKeyhole}/><RowLink to={`/o/${org.slug}/workspace/health`} title="Workspace health" icon={Activity}/></div></div>}
     {area === "spaces" && <div className="ws-stack"><section className="ws-section"><h2>Departments</h2><p className="ws-muted">Open a department's shared work, contributors, files and conversations.</p><div className="ws-entry-list">{departments.length ? departments.map(record => <RowLink key={record.id} to={`${workAreaPath(org.slug,"spaces")}/department/${record.id}`} title={record.title} detail={record.summary || record.status} icon={Megaphone}/>) : <p className="ws-empty">No departments in this organisation yet.</p>}</div></section><RowLink title="Manage departments and colleagues" to={appEntry("HQ",org.slug)} icon={Plus}/></div>}
     {area === "work" && <div className="ws-stack"><section className="ws-section"><h2>Projects</h2><div className="ws-entry-list">{projects.length ? projects.map(record => <RowLink key={record.id} to={`${workAreaPath(org.slug,"work")}/project/${record.id}`} title={record.title} detail={record.status.replace(/_/g," ")} icon={FolderKanban}/>) : <p className="ws-empty">No projects have been created in this company yet.</p>}</div></section><DeferredPanel><AgentWorkBoard/></DeferredPanel><DeferredPanel><TaskApprovalBoard/></DeferredPanel><WorkList title="Missions" records={missions.slice(0,12)} slug={org.slug} fallback="No mission records yet."/><div className="ws-shortcuts"><RowLink title="Project management" to={appEntry("PROJECT",org.slug)}/><RowLink title="Mission Control" to={appEntry("MISSION",org.slug)}/><RowLink title="Automation" to={appEntry("AUTO",org.slug)}/></div></div>}
-    {area === "apps" && <div className="ws-stack"><label className="ws-app-search"><Search size={18}/><span className="ds-sr-only">Find an application</span><input aria-label="Find an application" value={query} onChange={event => setQuery(event.target.value)} placeholder="Find an application or category"/></label>{pinned.size>0 && <section className="ws-section"><h2>Pinned applications</h2><div className="ws-app-grid">{NAV_GROUPS.flatMap(g=>g.apps).filter(a=>pinned.has(a.short)&&canOpen(role,a.code)).map(app=><RowLink key={app.code} title={app.short} to={appEntry(app.code,org.slug)} icon={app.icon}/>)}</div></section>}{appGroups.map(group=><section className="ws-section" key={group.label}><h2>{group.label}</h2><div className="ws-app-grid">{group.apps.map(app=><RowLink key={app.code} title={app.short} to={appEntry(app.code,org.slug)} icon={APP_ENTRIES[app.code].icon}/>)}</div></section>)}{appGroups.length===0 && <p className="ws-empty">No applications match your search.</p>}</div>}
+    {area === "apps" && <DeferredPanel><AppsDirectory /></DeferredPanel>}
   </div>;
 }

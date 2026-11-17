@@ -8,7 +8,8 @@ import type { ScreenContext } from "@/platform/registry";
 import { useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { ACTIVITY_LABEL, STAGES, activitiesFor, activityKind, probabilityOf, stageGuard, stageIndex, stageOf } from "@/domain/crm-pipeline";
-import { documentTotals, readLines, statusFor, writeLines } from "@/domain/fin-invoice";
+import { documentTotals, readLines, statusFor } from "@/domain/fin-invoice";
+import { dealAfterWin, dealWonBlocker, draftInvoiceFromDeal, nextDraftInvoiceNumber } from "./handoff";
 import {
   companyOfDeal, contactOfDeal, contactsOfCompany, invoicesOfDeal, quotesOfDeal, ticketsOfContact, useCrmData,
 } from "./data";
@@ -24,7 +25,10 @@ import { quoteTotals } from "./quotes";
 export function useDeal(context: ScreenContext): { deal?: Rec; data: CrmData } {
   const data = useCrmData();
   const fromRoute = useRecord(context.params.id);
-  const deal = fromRoute?.collection === "deals" ? fromRoute : data.deals.find((item) => item.id === context.selectedId) ?? data.deals[0];
+  // An invalid or cross-collection record URL may never display the first deal.
+  const deal = context.params.id
+    ? (fromRoute?.collection === "deals" ? fromRoute : undefined)
+    : data.deals.find((item) => item.id === context.selectedId) ?? data.deals[0];
   return { deal, data };
 }
 
@@ -561,7 +565,7 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
   const contact = contactOfDeal(data, deal);
   const existingInvoices = invoicesOfDeal(data, deal);
   const wonStage = STAGES.find((stage) => stage.kind === "won")!;
-  const guard = stageGuard(deal, wonStage);
+  const guard = dealWonBlocker({ deal, quote: latest, contact, invoices: existingInvoices, createInvoice: createInvoice === "yes", now });
 
   const lines = latest ? readLines(latest) : [];
   const totals = documentTotals({
@@ -617,58 +621,51 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
           disabled={Boolean(guard) || !context.can("edit_pipeline")}
           title={guard}
           onClick={async () => {
+            if (guard || !contact || busy) return;
             setBusy(true);
-            let invoiceId: string | undefined;
-            if (createInvoice === "yes") {
-              const numbers = data.invoices.map((invoice) => Number(/(\d+)/.exec(String(invoice.fields.number ?? invoice.title))?.[1] ?? 0));
-              const number = `INV-${Math.max(1000, ...numbers) + 1}`;
-              const invoice = await context.mutate.create({
-                collection: "invoices",
-                title: number,
-                status: "draft",
-                summary: `Raised from the won deal ${deal.title}.`,
-                amountMinor: totals.grossMinor,
-                at: now.toISOString(),
-                dueAt: new Date(now.getTime() + 21 * 86_400_000).toISOString(),
-                parentId: contact?.id,
-                tags: ["draft", "from-deal"],
-                fields: {
-                  number,
-                  contactId: contact?.id ?? "",
-                  dealId: deal.id,
-                  quoteId: latest?.id ?? "",
-                  netMinor: totals.netMinor,
-                  taxMinor: totals.taxMinor,
-                  customerTaxStatus: statusFor(latest, contact),
-                  taxUnresolved: totals.hasUnknownRate,
+            try {
+              const invoice = createInvoice === "yes"
+                ? draftInvoiceFromDeal({
+                    deal, quote: latest, contact, totals, now, actor: context.actor,
+                    currency: org.currency, number: nextDraftInvoiceNumber(data.invoices),
+                  })
+                : undefined;
+              const invoiceId = invoice?.id ?? existingInvoices[0]?.id;
+              const won = dealAfterWin(deal, context.actor, now, invoiceId, latest?.id);
+
+              // One scoped IndexedDB transaction commits the deal + invoice +
+              // their audit events. Expected revisions also protect the quote
+              // that supplied prices, even though quote status is unchanged.
+              // Failure leaves neither an orphan invoice nor a false deal win.
+              await context.mutate.putMany(
+                [won, ...(invoice ? [invoice] : [])],
+                [
+                  `${deal.title} closed won${invoiceId ? " with a linked Finance invoice" : ""}`,
+                  ...(invoice ? [`Invoice ${invoice.title} drafted from accepted deal ${deal.title}`] : []),
+                ],
+                {
+                  [deal.id]: deal.revision,
+                  ...(latest ? { [latest.id]: latest.revision } : {}),
                 },
-                body: writeLines(totals.lines),
-              }, `Invoice ${number} drafted from the won deal ${deal.title}`);
-              invoiceId = invoice.id;
+                invoice ? ["update", "create"] : ["update"],
+              );
+              context.toast(
+                "Deal closed won",
+                invoice
+                  ? `A draft invoice for ${context.money(totals.grossMinor)} is in Finance and linked to this deal. Nothing has been posted to the ledger.`
+                  : `${deal.title} is closed won with ${latest ? "its customer-accepted quote" : "an existing invoice"}. No additional invoice was created.`,
+              );
+              close();
+              if (invoice) context.navigate(`/o/${org.slug}/fin/invoices/${invoice.id}`);
+            } catch (error) {
+              context.toast(
+                "The handoff was not completed",
+                error instanceof Error ? error.message : "The deal or its pricing changed. Reopen the deal and retry.",
+                "failed",
+              );
+            } finally {
+              setBusy(false);
             }
-            if (latest && latest.status !== "accepted") {
-              await context.mutate.patch(latest.id, { status: "accepted", fields: { ...latest.fields, acceptedAt: now.toISOString() } }, { event: `Quote ${latest.title} accepted` });
-            }
-            await context.mutate.patch(deal.id, {
-              status: "won",
-              fields: {
-                ...deal.fields,
-                stage: "won",
-                probability: 100,
-                wonAt: now.toISOString(),
-                wonBy: context.actor,
-                ...(invoiceId ? { invoiceId } : {}),
-              },
-            }, { expectRevision: deal.revision, event: `${deal.title} closed won${invoiceId ? " with a linked draft invoice" : ""}` });
-            context.toast(
-              "Deal closed won",
-              invoiceId
-                ? `A draft invoice for ${context.money(totals.grossMinor)} is in Finance and linked to this deal. It is not on the ledger until Finance approves it.`
-                : `${deal.title} is closed won. No invoice was created, so nothing is receivable yet.`,
-            );
-            setBusy(false);
-            close();
-            if (invoiceId) context.navigate(`/o/${org.slug}/fin/invoices/${invoiceId}`);
           }}
         >
           <CheckCircle2 size={15} aria-hidden="true" /> Close won

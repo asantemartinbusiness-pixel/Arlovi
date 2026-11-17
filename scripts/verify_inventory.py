@@ -29,8 +29,14 @@ if len(CAT["applications"]) != 35 or len(CAT["screens"]) != 316:
 tabs = sum(len(screen["tabs"]) for screen in CAT["screens"])
 actions = sum(len(screen["actions"]) for screen in CAT["screens"])
 overlays = sum(len(screen["overlays"]) for screen in CAT["screens"])
-if (tabs, actions, overlays) != (reg_tabs, reg_actions, reg_overlays) or (tabs, actions, overlays) != (1323, 1328, 956):
-    errors.append(f"interaction counts tabs={tabs} actions={actions} overlays={overlays}")
+declared = REG["counts"]
+declared_counts = (declared["tabs"], declared["primary_actions"], declared["overlays"])
+actual_counts = (tabs, actions, overlays)
+registry_counts = (reg_tabs, reg_actions, reg_overlays)
+if actual_counts != registry_counts or actual_counts != declared_counts:
+    errors.append(
+        f"interaction counts catalog={actual_counts}, registry={registry_counts}, declared={declared_counts}"
+    )
 
 routes = [screen["route"] for screen in CAT["screens"]]
 if len(routes) != len(set(routes)):

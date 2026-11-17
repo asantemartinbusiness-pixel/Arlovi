@@ -4,7 +4,7 @@ import {
   Button, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
-import { useRecord, useWorkspace } from "@/platform/workspace";
+import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { stageOf } from "./board";
 import {
@@ -21,6 +21,8 @@ import {
 } from "./actions";
 import { getRecord } from "@/platform/repo";
 import { clockNow } from "@/platform/clock";
+import { createProjectFromTemplate, type ProjectPhase } from "./creation";
+import { positiveHours, taskMoveDecision } from "./progression";
 
 /** On project-scoped screens the initial selection is the project itself; a task action needs a task. */
 async function withTask(context: ScreenContext, what: string, then: (task: Rec) => void): Promise<void> {
@@ -37,7 +39,7 @@ const submitFooter = (formId: string, label: string) => ({ close }: { close: () 
   </>
 );
 
-interface Phase { name: string; tasks: string[] }
+type Phase = ProjectPhase;
 
 function ProjectFromTemplate({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useProjectData();
@@ -54,40 +56,25 @@ function ProjectFromTemplate({ context, close }: { context: ScreenContext; close
       onSubmit={async (event) => {
         event.preventDefault();
         if (!title.trim() || duplicate) return;
-        const now = clockNow();
-        const end = new Date(now.getTime() + 60 * 86_400_000);
-        const project = await context.mutate.create({
-          collection: "projects",
-          title: title.trim(),
-          status: "planning",
-          summary: template ? `Created from the ${template.title} template.` : "Created from scratch.",
-          startAt: now.toISOString(),
-          endAt: end.toISOString(),
-          dueAt: end.toISOString(),
-          amountMinor: 0,
-          fields: { health: "on_track", priority: "normal", programme: "Unassigned", budgetMinor: 0, spentMinor: 0, automationPaused: false },
-        }, `Project created: ${title.trim()}`);
-        let offset = 0;
-        for (const phase of phases) {
-          for (const label of phase.tasks) {
-            offset += 3;
-            const start = new Date(now.getTime() + (offset - 3) * 86_400_000);
-            const finish = new Date(now.getTime() + offset * 86_400_000);
-            await context.mutate.create({
-              collection: "tasks",
-              title: label,
-              status: "backlog",
-              summary: `${phase.name} phase, from the ${template?.title ?? "template"}.`,
-              parentId: project.id,
-              startAt: start.toISOString(),
-              endAt: finish.toISOString(),
-              dueAt: finish.toISOString(),
-              fields: { stage: "backlog", assignee: context.actor, priority: "normal", estimateHours: 8, loggedHours: 0, sprint: phase.name, kind: "task", dependsOn: "", delegatedToAgent: false },
-            }, `Task created from template: ${label}`);
-          }
+        if (templateId && !template) {
+          context.toast("Template unavailable", "Choose a published project template again.", "blocked");
+          return;
         }
-        context.toast("Project created", phases.length ? `${phases.reduce((sum, phase) => sum + phase.tasks.length, 0)} tasks were created from the template.` : "An empty project is ready for its plan.");
-        close();
+        try {
+          const plan = createProjectFromTemplate({
+            organizationId: context.org.id, currency: context.org.currency,
+            actor: context.actor, now: clockNow(),
+          }, title, template);
+          await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+          context.toast("Project created", plan.tasks.length
+            ? `${plan.tasks.length} tasks and their project were saved together.`
+            : "A new empty project is ready for its plan.");
+          context.navigate(`/o/${context.org.slug}/project/projects/${plan.project.id}`);
+          close();
+        } catch (error) {
+          context.toast("Project was not created", error instanceof Error ? error.message
+            : "The template or company changed. Review the selection and retry.", "failed");
+        }
       }}
     >
       <Field label="Project name" required>
@@ -97,12 +84,15 @@ function ProjectFromTemplate({ context, close }: { context: ScreenContext; close
       <Field label="Start from" hint="A template creates its phases as tasks; it never copies files or comments from an earlier project.">
         <Select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
           <option value="">Nothing — an empty project</option>
-          {data.templates.filter((row) => row.fields.kind === "project").map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
+          {data.templates.filter((row) => row.fields.kind === "project" && row.status === "published").map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
         </Select>
       </Field>
       {phases.length > 0 && (
         <Properties rows={phases.map((phase) => ({ label: phase.name, value: phase.tasks.join(", ") }))} />
       )}
+      <Notice tone="info" title="Project and tasks save together">
+        Arlovi checks this template again before committing. If any task or template validation fails, no partial project is created.
+      </Notice>
       <Notice tone="info" title="A clone starts clean">
         Confidential attachments, comments and approvals from the source project are not copied. Only the phase and task structure is.
       </Notice>
@@ -279,7 +269,9 @@ function StatusNote({ context, close }: { context: ScreenContext; close: () => v
 function StageRule({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string; lane?: string } | undefined;
   const task = useRecord(payload?.id ?? context.selectedId);
-  if (!task) return <Empty title="No task" />;
+  const tasks = useProjectData().tasks;
+  if (!task || task.collection !== "tasks") return <Empty title="No task" />;
+  const decision = taskMoveDecision(task, "done", tasks);
   return (
     <Stack gap={4}>
       <p className="ds-prose">
@@ -291,16 +283,24 @@ function StageRule({ context, close }: { context: ScreenContext; close: () => vo
         { label: "Requested stage", value: String(payload?.lane ?? "done") },
         { label: "What the rule is for", value: "High priority work gets a reviewer before it is called finished" },
       ]} />
+      {decision.blocked && <Notice tone="danger" title="Task cannot be finished">{decision.blocked}</Notice>}
       <Row gap={2}>
         <Button variant="ghost" onClick={close}>Leave it where it is</Button>
         <span className="ds-grow" />
         <Button variant="secondary" onClick={async () => {
-          await context.mutate.patch(task.id, { status: "review", fields: { ...task.fields, stage: "review" } }, { expectRevision: task.revision, event: `${task.title} sent to review` });
+          const saved = await context.mutate.patch(task.id, {
+            status: "review", fields: { ...task.fields, stage: "review" },
+          }, { expectRevision: task.revision, event: `${task.title} sent to review` });
+          if (!saved) return;
           context.toast("Moved to Review", "The reviewer can move it on from there.");
           close();
         }}>Send to Review instead</Button>
-        <Button variant="primary" onClick={async () => {
-          await context.mutate.patch(task.id, { status: "done", fields: { ...task.fields, stage: "done", reviewSkippedBy: context.actor } }, { expectRevision: task.revision, event: `${task.title} marked done without review by ${context.actor}` });
+        <Button variant="primary" disabled={Boolean(decision.blocked) || !decision.needsReviewDecision} onClick={async () => {
+          if (decision.blocked || !decision.needsReviewDecision) return;
+          const saved = await context.mutate.patch(task.id, {
+            status: "done", fields: { ...task.fields, stage: "done", reviewSkippedBy: context.actor },
+          }, { expectRevision: task.revision, event: `${task.title} marked done without review by ${context.actor}` });
+          if (!saved) return;
           context.toast("Moved to Done", "The skipped review is recorded against your name on the task.");
           close();
         }}>Move anyway and record it</Button>
@@ -389,9 +389,17 @@ function AllocationEditor({ context, close }: { context: ScreenContext; close: (
       onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        await context.mutate.patch(task.id, {
-          fields: { ...task.fields, estimateHours: Number(form.get("estimate") ?? 0), assignee: String(form.get("assignee") ?? task.fields.assignee) },
+        let hours: number;
+        try {
+          hours = positiveHours(form.get("estimate"));
+        } catch (error) {
+          context.toast("Check estimated hours", error instanceof Error ? error.message : "Enter a valid non-negative number.", "blocked");
+          return;
+        }
+        const saved = await context.mutate.patch(task.id, {
+          fields: { ...task.fields, estimateHours: hours, assignee: String(form.get("assignee") ?? task.fields.assignee) },
         }, { expectRevision: task.revision, event: `Estimate and owner changed on ${task.title}` });
+        if (!saved) return;
         context.toast("Allocation saved", "The estimate and owner are on the task record.");
         close();
       }}
@@ -471,12 +479,15 @@ function TemplatePreview({ context, close }: { context: ScreenContext; close: ()
   if (!template) return <Empty title="Select a template" />;
   const phases = (template.body as { phases?: Phase[] } | undefined)?.phases ?? [];
   const count = phases.reduce((sum, phase) => sum + phase.tasks.length, 0);
+  const templatePublished = template.status === "published";
+
   return (
     <Stack gap={4}>
       <h3>{template.title}</h3>
       <p className="ds-subtle">{template.summary}</p>
       <Properties rows={phases.map((phase) => ({ label: phase.name, value: phase.tasks.join(", ") }))} />
       <Field label="New project name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} required /></Field>
+      {!templatePublished && <Notice tone="warning" title="Publish the template first">Draft templates cannot create a new project. Publish this version, then create from it.</Notice>}
       <Notice tone="info" title="What is copied and what is not">
         {count} tasks across {phases.length} phases are created. Attachments, comments and approvals from any earlier project
         built on this template are not copied.
@@ -486,32 +497,21 @@ function TemplatePreview({ context, close }: { context: ScreenContext; close: ()
         <span className="ds-grow" />
         <Button
           variant="primary"
-          disabled={!name.trim()}
+          disabled={!name.trim() || template.status !== "published"}
           onClick={async () => {
-            const now = clockNow();
-            const end = new Date(now.getTime() + 60 * 86_400_000);
-            const project = await context.mutate.create({
-              collection: "projects", title: name.trim(), status: "planning",
-              summary: `Created from the ${template.title} template.`,
-              startAt: now.toISOString(), endAt: end.toISOString(), dueAt: end.toISOString(), amountMinor: 0,
-              fields: { health: "on_track", priority: "normal", programme: "Unassigned", budgetMinor: 0, spentMinor: 0, automationPaused: false },
-            }, `Project created from template: ${name.trim()}`);
-            let offset = 0;
-            for (const phase of phases) {
-              for (const label of phase.tasks) {
-                offset += 3;
-                await context.mutate.create({
-                  collection: "tasks", title: label, status: "backlog", summary: `${phase.name} phase.`, parentId: project.id,
-                  startAt: new Date(now.getTime() + (offset - 3) * 86_400_000).toISOString(),
-                  endAt: new Date(now.getTime() + offset * 86_400_000).toISOString(),
-                  dueAt: new Date(now.getTime() + offset * 86_400_000).toISOString(),
-                  fields: { stage: "backlog", assignee: context.actor, priority: "normal", estimateHours: 8, loggedHours: 0, sprint: phase.name, kind: "task", dependsOn: "", delegatedToAgent: false },
-                }, `Task created from template: ${label}`);
-              }
+            try {
+              const plan = createProjectFromTemplate({
+                organizationId: context.org.id, currency: context.org.currency,
+                actor: context.actor, now: clockNow(),
+              }, name, template);
+              await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+              context.toast("Project created", `${plan.tasks.length} tasks and their project were saved together.`);
+              context.navigate(`/o/${context.org.slug}/project/projects/${plan.project.id}`);
+              close();
+            } catch (error) {
+              context.toast("Project was not created", error instanceof Error ? error.message
+                : "The project template changed. Reload the template and retry.", "failed");
             }
-            context.toast("Project created", `${count} tasks were created in ${name.trim()}.`);
-            context.navigate(`/o/${context.org.slug}/project/projects/${project.id}`);
-            close();
           }}
         >
           Create the project
@@ -582,9 +582,13 @@ function GoalRevision({ context, close }: { context: ScreenContext; close: () =>
 
 function TimerOverlay({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useProjectData();
-  const [running, setRunning] = useState(false);
+  const employees = useCollection("employees").filter((row) =>
+    !["alumni", "terminated"].includes(row.status));
   const [minutes, setMinutes] = useState(30);
-  const tasks = data.tasks.filter((task) => stageOf(task) !== "done" && task.fields.kind !== "onboarding");
+  const tasks = data.tasks.filter((task) =>
+    stageOf(task) !== "done" && task.fields.kind !== "onboarding"
+    && data.projects.some((project) => project.id === task.parentId
+      && !["archived", "deleted", "cancelled"].includes(project.status)));
   return (
     <form
       id="pj-timer"
@@ -593,50 +597,68 @@ function TimerOverlay({ context, close }: { context: ScreenContext; close: () =>
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         const taskId = String(form.get("task") ?? "");
-        const task = data.tasks.find((row) => row.id === taskId);
-        const hours = Math.round((minutes / 60) * 4) / 4;
+        const employeeId = String(form.get("employee") ?? "");
+        const task = tasks.find((row) => row.id === taskId);
+        const project = data.projects.find((row) => row.id === task?.parentId);
+        const employee = employees.find((row) => row.id === employeeId);
+        if (!task || !project || !employee || !Number.isFinite(minutes) ||
+          minutes < 15 || minutes > 1440 || minutes % 15 !== 0) {
+          context.toast("Time not logged", "Choose a current employee, an open project task and a valid duration in 15-minute increments.", "blocked");
+          return;
+        }
+        const hours = minutes / 60;
         const now = clockNow();
+        const rate = Number(project.fields.billingRateMinor ?? project.fields.rateMinor);
+        const knownRate = Number.isFinite(rate) && rate > 0;
         await context.mutate.create({
           collection: "shifts",
-          title: `${context.actor.split(" ")[0]} · ${hours}h`,
+          title: `${employee.title.split(" ")[0]} · ${hours}h`,
           status: "submitted",
-          summary: `Logged against ${task?.title ?? "a task"}.`,
+          summary: `Logged for ${employee.title} against ${project.title} / ${task.title} by ${context.actor}. Rate ${knownRate ? "inherited from the project" : "not recorded"}.`,
           startAt: new Date(now.getTime() - minutes * 60_000).toISOString(),
           endAt: now.toISOString(),
           fields: {
-            kind: "time", employeeName: context.actor, taskId, projectId: task?.parentId ?? "",
-            hours, billable: form.get("billable") === "on", approved: false, rateMinor: 6_500,
+            kind: "time", employeeId: employee.id, employeeName: employee.title,
+            taskId: task.id, projectId: project.id, filedBy: context.actor,
+            hours, billable: form.get("billable") === "on", approved: false,
+            ...(knownRate ? { rateMinor: rate } : {}),
           },
-        }, `Time logged by ${context.actor}`);
-        context.toast("Time logged", `${hours} hours are on the timesheet, waiting for approval.`);
+        }, `Time logged by ${context.actor} for ${employee.title} on ${project.title}`);
+        context.toast("Time logged", `${hours} hours recorded for ${employee.title} on ${project.title}. It is awaiting approval in People and Inbox; no payroll or invoice was created.`);
         close();
       }}
     >
-      <Field label="Against which task" required>
-        <Select name="task" required>
-          <option value="">Choose a task</option>
-          {tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
+      <Field label="Person who did the work" required>
+        <Select name="employee" required defaultValue="">
+          <option value="">Choose an employee</option>
+          {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.title}</option>)}
         </Select>
       </Field>
-      <Row gap={3}>
-        <Field label="Minutes"><TextInput inputMode="numeric" align="end" value={String(minutes)} onChange={(event) => setMinutes(Number(event.target.value) || 0)} /></Field>
-        <Field label=" ">
-          <Button variant={running ? "outline-danger" : "secondary"} onClick={() => setRunning((value) => !value)}>{running ? "Stop the timer" : "Start a timer"}</Button>
-        </Field>
-      </Row>
-      {running && <Notice tone="info">The timer is a local stopwatch. The entry is created when you save, with the minutes shown above.</Notice>}
-      <Checkbox name="billable" label="Billable to a customer" />
-      <Notice tone="warning" title="Only a person's time goes here">
-        Work done by an AI employee is not logged as billable hours. It belongs in the finance ledger as a cost, not on a timesheet.
+      <Field label="Project task" required>
+        <Select name="task" required defaultValue="">
+          <option value="">Choose a task</option>
+          {tasks.map((task) => {
+            const project = data.projects.find((row) => row.id === task.parentId);
+            return <option key={task.id} value={task.id}>{project?.title ?? "Project"} · {task.title}</option>;
+          })}
+        </Select>
+      </Field>
+      <Field label="Minutes worked" required hint="Enter a real duration in 15-minute increments, from 15 minutes to 24 hours.">
+        <TextInput inputMode="numeric" align="end" value={String(minutes)} onChange={(event) => setMinutes(Number(event.target.value))} required />
+      </Field>
+      <Checkbox name="billable" label="Mark this time as potentially billable" />
+      <Notice tone="info" title="Manual time entry, not a running stopwatch">
+        This records the hours you enter, the employee, task and Project. A person must approve the entry in People; Finance must separately review any rate, tax and invoice.
       </Notice>
     </form>
   );
 }
 
 function TimesheetCorrection({ context, close }: { context: ScreenContext; close: () => void }) {
-  const data = useProjectData();
-  const entry = useRecord(context.selectedId) ?? data.shifts.find((row) => row.fields.kind === "time");
-  if (!entry) return <Empty title="Select a time entry" icon={<Timer size={20} />} />;
+  const candidate = useRecord(context.selectedId);
+  const entry = candidate?.organizationId === context.org.id && candidate.collection === "shifts"
+    && candidate.fields.kind === "time" ? candidate : undefined;
+  if (!entry) return <Empty title="Time entry unavailable" icon={<Timer size={20} />}>Select a time entry from this company before correcting it.</Empty>;
   return (
     <form
       id="pj-correction"
@@ -644,22 +666,31 @@ function TimesheetCorrection({ context, close }: { context: ScreenContext; close
       onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        await context.mutate.patch(entry.id, {
+        const hours = Number(form.get("hours"));
+        const reason = String(form.get("reason") ?? "").trim();
+        if (!Number.isFinite(hours) || hours <= 0 || hours > 24 || !reason) {
+          context.toast("Correction blocked", "Enter valid positive hours and the reason for the correction.", "blocked");
+          return;
+        }
+        const updated = await context.mutate.patch(entry.id, {
           status: "submitted",
-          fields: { ...entry.fields, hours: Number(form.get("hours") ?? 0), approved: false, correctedBy: context.actor, correctionReason: String(form.get("reason") ?? "") },
-        }, { expectRevision: entry.revision, event: `Time entry corrected by ${context.actor}: ${String(form.get("reason") ?? "")}` });
-        context.toast("Correction saved", "The entry is back to submitted so it is approved again.");
+          fields: { ...entry.fields, hours, approved: false, approvedBy: "", approvedAt: "",
+            billingReviewStatus: "", billingReviewedBy: "", billingReviewedAt: "",
+            correctedBy: context.actor, correctionReason: reason, correctedFrom: Number(entry.fields.hours ?? 0) },
+        }, { expectRevision: entry.revision, event: `Time corrected by ${context.actor}: ${reason}` });
+        if (!updated) return;
+        context.toast("Correction saved", "Prior approval was cleared; the corrected time must be approved again in People.");
         close();
       }}
     >
       <Properties rows={[
         { label: "Person", value: String(entry.fields.employeeName ?? entry.ownerName) },
-        { label: "Day", value: context.date(entry.startAt) },
+        { label: "Project", value: String(entry.fields.projectId ?? "Not linked") },
         { label: "Currently", value: `${String(entry.fields.hours ?? 0)} hours` },
       ]} />
       <Field label="Corrected hours" required><TextInput name="hours" inputMode="decimal" align="end" defaultValue={String(entry.fields.hours ?? 0)} required /></Field>
-      <Field label="Why" required><TextArea name="reason" rows={3} required /></Field>
-      <Notice tone="warning">A correction clears the approval, so somebody approves the corrected figure rather than the old one.</Notice>
+      <Field label="Reason" required><TextArea name="reason" rows={3} required /></Field>
+      <Notice tone="warning">Corrections are audited and require a new human approval. No invoice, timesheet payment or external service is updated.</Notice>
     </form>
   );
 }
@@ -667,19 +698,27 @@ function TimesheetCorrection({ context, close }: { context: ScreenContext; close
 function BillingLink({ context }: { context: ScreenContext }) {
   const data = useProjectData();
   const billable = data.shifts.filter((entry) => entry.fields.kind === "time" && entry.fields.billable === true);
-  const total = billable.reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0) * Number(entry.fields.rateMinor ?? 0), 0);
+  const approved = billable.filter((entry) => entry.status === "approved" && entry.fields.approved === true);
+  const rated = approved.filter((entry) => Number.isFinite(Number(entry.fields.rateMinor))
+    && Number(entry.fields.rateMinor) > 0 && entry.fields.rateMinor !== undefined);
+  const unknownRate = approved.length - rated.length;
+  const total = rated.reduce((sum, entry) =>
+    sum + Number(entry.fields.hours ?? 0) * Number(entry.fields.rateMinor), 0);
   return (
     <Stack gap={4}>
       <Properties rows={[
-        { label: "Billable entries", value: String(billable.length) },
-        { label: "Hours", value: String(billable.reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0)) },
-        { label: "At the recorded rate", value: context.money(total) },
+        { label: "Billable time entries recorded", value: String(billable.length) },
+        { label: "Approved and ready for Finance review", value: String(approved.length) },
+        { label: "Awaiting approval", value: String(billable.length - approved.length) },
+        { label: "Approved entries without a recorded rate", value: String(unknownRate) },
+        { label: "Illustrative subtotal at known recorded rates", value: rated.length ? context.money(total) : "No rated approvals" },
       ]} />
-      <Notice tone="info" title="Billing happens in Finance">
-        This screen can total billable time. Turning it into an invoice is a finance decision with tax on it, which belongs in
-        the finance application rather than here.
+      <Notice tone="warning" title="No invoice or payroll is created from this total">
+        Only approved entries with an explicit recorded rate contribute to the illustrative subtotal.
+        Entries missing a rate are not priced at zero or given a fabricated default.
+        Finance must review contracts, billability, tax and invoice decisions separately.
       </Notice>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/invoices`)}>Open invoices</Button>
+      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/invoices`)}>Open Finance invoices</Button>
     </Stack>
   );
 }
@@ -902,6 +941,7 @@ export const projectApp = registerApp({
         { id: "Milestone editor", kind: "modal", title: "Add a milestone", width: 520, render: ({ close, ...context }) => <MilestoneEditor context={context} close={close} />, footer: submitFooter("pj-milestone", "Add milestone") },
         { id: "project settings", kind: "modal", title: "Project settings", width: 560, render: ({ close, ...context }) => <ProjectSettings context={context} close={close} />, footer: submitFooter("pj-settings", "Save settings") },
         { id: "status note", kind: "modal", title: "Post a status update", width: 560, render: ({ close, ...context }) => <StatusNote context={context} close={close} />, footer: submitFooter("pj-status", "Record the update") },
+        { id: "stage rule", kind: "modal", title: "This move skips a review", tone: "danger", width: 540, render: ({ close, ...context }) => <StageRule context={context} close={close} /> },
       ],
     },
 

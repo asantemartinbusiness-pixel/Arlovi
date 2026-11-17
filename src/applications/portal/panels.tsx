@@ -8,11 +8,12 @@ import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
 import { clockIso, freshness } from "@/platform/clock";
 import { computeInvoice } from "@/platform/money";
+import { openInvoices, outstandingMinor } from "@/applications/fin/data";
 import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import {
-  bodyOf, expiryState, GATE_LABELS, MODULE_LABELS, portalDocuments, portalForRole, portalInvoices,
-  listedPortals, portalMessages, portalUsers, resolvePortal, sharedRecords, sharedWithPortal, statusTone, usePortalData, type PortalBody,
+  bodyOf, expiryState, GATE_LABELS, MODULE_LABELS, portalDocuments, portalForRole,
+  listedPortals, portalMessages, portalUsers, portalVisibleInvoices, resolvePortal, sharedRecords, sharedWithPortal, statusTone, usePortalData, type PortalBody,
 } from "./data";
 
 /* ====================================================================== *
@@ -29,20 +30,31 @@ export function usePortal(context: ScreenContext): { portal: Rec | undefined; lo
     const mine = portalForRole(role, data.portals, actor, data.contacts);
     return { portal: mine, locked: true };
   }
-  return { portal: fromRoute ?? listedPortals(data.portals)[0], locked: false };
+  // A named portal route must never silently substitute the first portal when
+  // its record is absent. Only the directory itself may choose a default.
+  return { portal: context.params.id ? fromRoute : listedPortals(data.portals)[0], locked: false };
 }
 
 export function ClientOnlyNotice({ context }: { context: ScreenContext }) {
-  const { actor, org } = useWorkspace();
+  const { actor, org, role } = useWorkspace();
+  const data = usePortalData();
+  const portal = portalForRole(role, data.portals, actor, data.contacts);
   return (
     <Stack gap={4}>
       <Notice tone="warning" title="This view only opens portal content">
-        {actor} is signed in with the client role. Portal administration, the builder and the access log belong to {org.shortName}, so this view goes to the portal itself instead.
-        Role views shape what this interface offers; they are not an account security boundary.
+        {actor} is viewing the browser-local client perspective. Portal administration,
+        the builder and the access log belong to {org.shortName}. This does not authenticate
+        anyone or grant access to a hosted client portal. Role views are not an account security boundary.
       </Notice>
-      <Button variant="primary" onClick={() => context.navigate(`/o/${org.slug}/portal/portals/${context.params.id ?? ""}/dashboard`)}>
-        Open your portal
-      </Button>
+      {portal ? (
+        <Button variant="primary" onClick={() => context.navigate(`/o/${org.slug}/portal/portals/${portal.id}/dashboard`)}>
+          Open matching portal
+        </Button>
+      ) : (
+        <Notice tone="info" title="No matching client portal">
+          This local view has no matching client contact, so no other client&apos;s portal is substituted.
+        </Notice>
+      )}
     </Stack>
   );
 }
@@ -261,9 +273,9 @@ export function PortalShell({ portal, active, children }: { portal: Rec; active:
           <>
             <Card eyebrow="WELCOME" prov="human" title={`Hello, ${portal.title}`} subtitle="Everything your project shares with you, in one place.">
               <Properties rows={[
-                { label: "Records shared with you", value: <span className="ds-num">{String(shared.length + portalDocuments(portal, data.documents).length)}</span> },
+                { label: "Records shared with you", value: <span className="ds-num">{String(sharedWithPortal(portal, data).length)}</span> },
                 { label: "Open requests", value: <span className="ds-num">{String(portalMessages(portal, data.messages).filter((message) => message.status === "open").length)}</span> },
-                { label: "Invoices", value: <span className="ds-num">{String(portalInvoices(portal, data.invoices).length)}</span> },
+                { label: "Invoices", value: <span className="ds-num">{String(portalVisibleInvoices(portal, data).length)}</span> },
               ]} />
             </Card>
             {shared.slice(0, 3).map((item) => (
@@ -287,7 +299,9 @@ export function ExternalDashboard({ context, lens }: { context: ScreenContext; l
   const shared = sharedRecords(portal, data);
   const documents = portalDocuments(portal, data.documents);
   const messages = portalMessages(portal, data.messages);
-  const invoices = portalInvoices(portal, data.invoices);
+  const invoices = portalVisibleInvoices(portal, data);
+  const openInvoiceRows = openInvoices(invoices);
+  const outstanding = openInvoiceRows.reduce((total, invoice) => total + outstandingMinor(invoice), 0);
 
   if (lens === "Work") {
     const work = shared.filter((item) => ["orders", "bookings", "purchaseOrders"].includes(item.collection));
@@ -335,7 +349,7 @@ export function ExternalDashboard({ context, lens }: { context: ScreenContext; l
         <Stat label="Shared with you" value={String(sharedWithPortal(portal, data).length)} prov="human" meta="Records this portal names" />
         <Stat label="Needs your review" value={String(documents.filter((document) => document.status === "needs_review").length)} prov="human" meta="Documents awaiting sign-off" />
         <Stat label="Open requests" value={String(messages.filter((message) => message.status === "open").length)} prov="human" meta="Waiting on the studio" />
-        <Stat label="Outstanding invoices" value={context.money(invoices.filter((invoice) => invoice.status !== "paid").reduce((sum, invoice) => sum + (invoice.amountMinor ?? 0), 0))} prov="posted" meta={`${invoices.filter((invoice) => invoice.status !== "paid").length} unpaid`} />
+        <Stat label="Outstanding invoices" value={context.money(outstanding)} prov="posted" meta={`${openInvoiceRows.length} unpaid or part paid`} />
       </StatRow>
 
       <Grid>
@@ -347,13 +361,13 @@ export function ExternalDashboard({ context, lens }: { context: ScreenContext; l
                 <Button size="sm" variant="secondary" onClick={() => { context.select(document.id); context.openOverlay("Shared item inspector", { id: document.id }); }}>Open</Button>
               </Row>
             ))}
-            {invoices.filter((invoice) => invoice.status === "awaiting_payment").map((invoice) => (
+            {openInvoiceRows.map((invoice) => (
               <Row key={invoice.id} gap={2} className="ds-panel" style={{ padding: "var(--space-3)" }}>
                 <div className="ds-grow"><strong className="ds-num">{invoice.title}</strong><p className="ds-subtle">Due {context.date(invoice.dueAt)}</p></div>
-                <strong className="ds-num">{context.money(invoice.amountMinor)}</strong>
+                <strong className="ds-num">{context.money(outstandingMinor(invoice))}</strong>
               </Row>
             ))}
-            {documents.filter((document) => document.status === "needs_review").length === 0 && invoices.filter((invoice) => invoice.status === "awaiting_payment").length === 0 && (
+            {documents.filter((document) => document.status === "needs_review").length === 0 && openInvoiceRows.length === 0 && (
               <span className="ds-subtle">Nothing is waiting on you.</span>
             )}
           </Stack>
@@ -534,15 +548,17 @@ export function PortalBilling({ context, lens }: { context: ScreenContext; lens:
   const { org, now } = useWorkspace();
   const { portal } = usePortal(context);
   if (!portal) return <Empty title="No portal" />;
-  const invoices = portalInvoices(portal, data.invoices);
+  const invoices = portalVisibleInvoices(portal, data);
+  const openInvoiceRows = openInvoices(invoices);
+  const outstanding = openInvoiceRows.reduce((total, invoice) => total + outstandingMinor(invoice), 0);
   const requests = portalMessages(portal, data.messages).filter((message) => String(message.fields.kind) === "request");
 
   if (lens === "Payments") {
     return (
       <Stack gap={4}>
         <StatRow>
-          <Stat label="Paid" value={context.money(invoices.filter((invoice) => invoice.status === "paid").reduce((sum, invoice) => sum + (invoice.amountMinor ?? 0), 0))} prov="posted" meta="Recorded in the studio's ledger" />
-          <Stat label="Outstanding" value={context.money(invoices.filter((invoice) => invoice.status === "awaiting_payment").reduce((sum, invoice) => sum + (invoice.amountMinor ?? 0), 0))} prov="posted" meta={`${invoices.filter((invoice) => invoice.status === "awaiting_payment").length} invoices`} />
+          <Stat label="Paid" value={context.money(invoices.filter((invoice) => invoice.status === "paid").reduce((sum, invoice) => sum + (invoice.amountMinor ?? 0), 0))} prov="posted" meta="Marked paid in local invoice records; no bank feed is connected" />
+          <Stat label="Outstanding" value={context.money(outstanding)} prov="posted" meta={`${openInvoiceRows.length} unpaid or part paid`} />
           <Stat label="Disputed" value={context.money(invoices.filter((invoice) => invoice.status === "disputed").reduce((sum, invoice) => sum + (invoice.amountMinor ?? 0), 0))} prov="posted" meta="Not pursued while open" />
           <Stat label="Pay online" value="Unavailable" unavailable meta="No payment provider is connected" />
         </StatRow>
@@ -602,6 +618,7 @@ export function PortalBilling({ context, lens }: { context: ScreenContext; lens:
           { key: "net", header: "Net", align: "end", cell: (row) => <span className="ds-num">{context.money(Number(row.fields.netMinor ?? 0))}</span> },
           { key: "tax", header: "Tax", align: "end", cell: (row) => <span className="ds-num">{context.money(Number(row.fields.taxMinor ?? 0))}</span> },
           { key: "total", header: "Total", align: "end", cell: (row) => <strong className="ds-num">{context.money(row.amountMinor)}</strong> },
+          { key: "outstanding", header: "Outstanding", align: "end", cell: (row) => <strong className="ds-num">{context.money(outstandingMinor(row))}</strong> },
           { key: "state", header: "State", cell: (row) => <Pill tone={statusTone(row.status)} dot>{row.status.replace("_", " ")}</Pill> },
         ]}
         bulkActions={[

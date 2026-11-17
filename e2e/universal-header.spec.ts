@@ -4,8 +4,8 @@ test("universal header exposes company, search, assistant, decisions, updates an
   await page.goto("/o/northline/workspace/home");
   const header=page.locator(".hq-header");
   await expect(header).toBeVisible();
-  await expect(header.getByRole("button",{name:/Switch company, current Northline Atelier/})).toBeVisible();
-  await expect(header.getByRole("button",{name:/Search Northline/})).toBeVisible();
+  await expect(header.getByRole("button",{name:/Switch company, current N Northline Atelier/})).toBeVisible();
+  await expect(header.getByRole("button",{name:/Search anything in Northline/})).toBeVisible();
   await expect(header.getByRole("button",{name:"Ask Arlovi"})).toBeVisible();
   await expect(header.getByRole("button",{name:/Inbox and decisions/})).toBeVisible();
   await expect(header.getByRole("button",{name:/Notifications/})).toBeVisible();
@@ -18,7 +18,7 @@ test("company switcher preserves safe context and cannot imply authenticated mem
   await expect(page.getByText(/Companies here are browser-local/)).toBeVisible();
   await page.getByRole("menuitem",{name:/Harbor Supply/}).click();
   await expect(page).toHaveURL(/\/o\/harbor\//);
-  await expect(page.getByRole("button",{name:/Switch company, current Harbor Supply/})).toBeVisible();
+  await expect(page.getByRole("button",{name:/Switch company, current H Harbor Supply/})).toBeVisible();
 });
 
 test("global search and native quick destinations are keyboard usable",async({page})=>{

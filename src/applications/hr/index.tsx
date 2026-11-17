@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Briefcase, CalendarDays, ClipboardCheck, GraduationCap, Receipt, UserPlus, Users, Clock } from "lucide-react";
 import {
   Button, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
@@ -6,25 +7,29 @@ import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { capabilityById } from "@/platform/capability";
 import {
-  ApplicantProfile, CandidateProfileOverlay, EmployeeDirectory, EmployeeProfile, InboxNote, LeaveApproval,
+  ApplicantProfile, CandidateProfileOverlay, EmployeeDirectory, EmployeeProfile, LeaveApproval,
   LeaveForm, LeaveScreen, Learning, Onboarding, Payroll, PayrollReview, PeopleOverview, Performance,
-  PositionEditor, Recruitment, Scheduling, SegmentedInspector, StaffingSummary, computePayroll,
+  PositionEditor, Recruitment, Scheduling, SegmentedInspector, StaffingSummary,
 } from "./panels";
 import { RoleViewNote, submitFooter } from "./kit";
 import { kitOverlays, needsSelection } from "./opsKit";
 import {
   AssignCourse, AssignReviewer, ApplicantMessage, BalanceAdjust, DirectoryFilter, MentorAssign, MetricDetail,
   ProfileEditor, ReconcileRun, ScheduleInterview, StageDecision, TimeCorrection, acknowledgePolicy, acknowledgeReview,
-  approveHours, approveLeave, completeModule, declineLeave, exportRun, prepareRun, rescindQueuedGrants, submitReview,
+  approveHours, approveLeave, completeModule, declineLeave, exportRun, prepareRun, payrollSalaryGaps, rescindQueuedGrants, submitReview,
   swapShift, validateRun, verifyCompletion, viewEmployee,
 } from "./actions";
 import { listByCollection } from "@/platform/repo";
+import { planOnboardingLaunch } from "./decisions";
+import { planShiftMove, planTimesheetApprovals } from "./workforce";
+import { scopedDetailRecord } from "@/platform/recordScope";
+import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
 
 function payrollRecords(context: ScreenContext, collection: string) {
   return listByCollection(context.org.id, collection);
 }
 import "./hr.css";
-import { clockIso, clockNow } from "@/platform/clock";
+import { clockIso } from "@/platform/clock";
 
 /** Focus a control the screen already renders, rather than faking an action. */
 function focusWithin(selector: string): void {
@@ -43,42 +48,88 @@ function MailBoundary() {
 }
 
 function OffboardingConfirmation({ context, close }: { context: ScreenContext; close: () => void }) {
-  const employee = useRecord(context.params.id);
+  const [reason, setReason] = useState("");
+  const [assetsReviewed, setAssetsReviewed] = useState(false);
+  const [accessFollowUp, setAccessFollowUp] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const fromRoute = useRecord(context.params.id);
+  const employee = scopedDetailRecord(fromRoute, context.org.id, "employees");
   const tasks = useCollections(["tasks"]).tasks;
-  if (!employee) return <Empty title="Open an employee first" />;
+  if (!employee) return <Empty title="Employee unavailable">Open a valid employee record before offboarding.</Empty>;
+  if (employee.status === "alumni") return <Empty title="Already offboarded">This employee is already marked as alumni. Review their history instead of repeating the action.</Empty>;
   const queued = tasks.filter((task) => task.fields.employeeId === employee.id && task.fields.group === "IT access" && task.status !== "done" && task.status !== "rescinded");
+  const canSubmit = reason.trim().length >= 10 && assetsReviewed && accessFollowUp && confirmed && !saving;
   return (
     <Stack gap={4}>
-      <p className="ds-prose">
-        Offboarding {employee.title} sets the record to alumni, dates the leaving day and marks every access grant as revoked.
-        A queued grant is rescinded rather than left pending, so nothing is granted after the last day by accident.
-      </p>
-      <Properties rows={[
-        { label: "Record", value: employee.title },
-        { label: "Current status", value: employee.status },
-        { label: "Access grants affected", value: "All recorded grants" },
-        { label: "Queued grants rescinded", value: String(queued.length) },
-      ]} />
-      <Notice tone="warning" title="What this does not do">
-        No identity provider is connected, so this records the decision. Someone still has to turn off the real accounts.
-      </Notice>
+      <PeopleDialogLead
+        eyebrow="PEOPLE / EMPLOYEE LIFECYCLE"
+        title="Record a departure"
+        description="Review the employee, record the human decision and identify the work that still has to happen outside Arlovi."
+        status={<Pill tone="warning">Local record only</Pill>}
+      />
+      <PeopleDialogSection step="01" title="Employee and pending requests" description="Confirm the person and the requests affected by this decision.">
+        <Properties rows={[
+          { label: "Employee", value: employee.title },
+          { label: "Employment status", value: employee.status },
+          { label: "Pending IT requests", value: String(queued.length) },
+          { label: "Recorded departure date", value: "Today — at time of saving" },
+        ]} />
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Reason and handover" description="The reason is recorded in the employee history. This does not generate a departure letter.">
+        <Field label="Reason for offboarding" required hint="At least 10 characters. Avoid unnecessary personal or medical details.">
+          <TextArea value={reason} onChange={(event) => setReason(event.target.value)} />
+        </Field>
+        <Checkbox checked={assetsReviewed} onChange={(event) => setAssetsReviewed(event.target.checked)} label="I have reviewed the equipment and document handover requirements." />
+        <Checkbox checked={accessFollowUp} onChange={(event) => setAccessFollowUp(event.target.checked)} label="I will ensure external accounts, building access and other systems are separately reviewed and revoked where appropriate." />
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Human authorisation" description="This changes the employee record; external revocation remains a separate responsibility.">
+        <Notice tone="warning" title="External access is not revoked">
+          Arlovi will mark this employee as alumni and attempt to rescind pending local IT requests. It cannot disable identity-provider, email, payroll or building-access accounts.
+        </Notice>
+        <Checkbox checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} label={`I, ${context.actor}, authorise recording this departure for ${employee.title}.`} />
+      </PeopleDialogSection>
+      {error && <Notice tone="danger" title="Departure could not be completed">{error}</Notice>}
       <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
+        <Button variant="ghost" onClick={close} disabled={saving}>Cancel</Button>
         <span className="ds-grow" />
         <Button
           variant="danger"
+          disabled={!canSubmit}
           onClick={async () => {
-            await context.mutate.patch(employee.id, {
-              status: "alumni",
-              endAt: clockIso(),
-              fields: { ...employee.fields, accessRevoked: true },
-            }, { expectRevision: employee.revision, event: `${employee.title} offboarded by ${context.actor}; access grants recorded as revoked` });
-            const rescinded = await rescindQueuedGrants(context, employee.id, tasks);
-            context.toast("Offboarding recorded", `${employee.title} is now alumni, every grant is marked revoked and ${rescinded} queued grant${rescinded === 1 ? " was" : "s were"} rescinded.`);
-            close();
+            if (!canSubmit) return;
+            setSaving(true);
+            setError("");
+            try {
+              const recordedAt = clockIso();
+              await context.mutate.patch(employee.id, {
+                status: "alumni",
+                endAt: recordedAt,
+                fields: {
+                  ...employee.fields,
+                  offboardingReason: reason.trim(),
+                  offboardingApprovedBy: context.actor,
+                  offboardingApprovedAt: recordedAt,
+                  offboardingAssetsReviewed: true,
+                  externalAccessRevocation: "manual_follow_up_required",
+                },
+              }, { expectRevision: employee.revision, event: `${employee.title} departure authorised by ${context.actor}; external access revocation not verified` });
+              try {
+                const rescinded = await rescindQueuedGrants(context, employee.id, tasks);
+                context.toast("Departure recorded", `${employee.title} is now alumni. ${rescinded} pending local IT request${rescinded === 1 ? " was" : "s were"} rescinded. External access still requires follow-up.`);
+              } catch {
+                context.toast("Departure saved; IT follow-up needed", "Employee marked alumni, but one or more pending IT requests could not be rescinded. Review them manually.", "blocked");
+              }
+              close();
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : "The employee record may have changed. Review it and try again.");
+            } finally {
+              setSaving(false);
+            }
           }}
         >
-          Offboard {employee.title.split(" ")[0]}
+          {saving ? "Recording…" : "Record departure"}
         </Button>
       </Row>
     </Stack>
@@ -86,35 +137,148 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
 }
 
 function AccessRequest({ context, close }: { context: ScreenContext; close: () => void }) {
-  const employee = useRecord(context.params.id);
+  const [grant, setGrant] = useState("Finance ledger (read)");
+  const [reason, setReason] = useState("");
+  const [approver, setApprover] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const fromRoute = useRecord(context.params.id);
+  const employee = scopedDetailRecord(fromRoute, context.org.id, "employees");
+  const people = useCollections(["employees", "tasks"]);
+  const reviewers = people.employees.filter((row) => row.status === "active" && row.id !== employee?.id);
+  if (!employee) return <Empty title="Employee unavailable">Open a valid employee record before requesting access.</Empty>;
+  if (employee.status === "alumni") return <Empty title="Former employee">New access requests cannot be opened for an offboarded employee.</Empty>;
+  const sameRequest = people.tasks.some((task) =>
+    task.fields.employeeId === employee.id && task.fields.group === "IT access"
+    && task.fields.grant === grant && !["done", "rescinded", "cancelled"].includes(task.status));
   return (
-    <form
-      id="hr-access"
-      className="ds-stack ds-gap-4"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        const form = new FormData(event.currentTarget);
+    <form id="hr-access" className="ds-stack ds-gap-4" onSubmit={async (event) => {
+      event.preventDefault();
+      if (saving || !context.can("edit_people") || reason.trim().length < 10 || !approver || sameRequest) return;
+      setSaving(true);
+      setError("");
+      try {
         await context.mutate.create({
           collection: "tasks",
-          title: `Access: ${String(form.get("grant") ?? "")}`,
+          title: `Access: ${grant}`,
           status: "waiting",
-          summary: `Requested by ${context.actor} for ${employee?.title ?? "an employee"}. ${String(form.get("reason") ?? "")}`,
-          fields: { kind: "onboarding", employeeId: employee?.id ?? "", stage: "waiting", assignee: "Maya Chen", group: "IT access" },
-          parentId: employee?.id,
-        }, `Access requested: ${String(form.get("grant") ?? "")}`);
-        context.toast("Access requested", "It is waiting for a named approver, not granted.");
+          summary: `Requested by ${context.actor} for ${employee.title}. Reason: ${reason.trim()}`,
+          fields: { kind: "onboarding", employeeId: employee.id, stage: "waiting",
+            assignee: approver, grant, group: "IT access", externalProvisioning: "not_verified",
+            requestedBy: context.actor, requestedAt: clockIso() },
+          parentId: employee.id,
+        }, `Access request for ${grant} recorded by ${context.actor}; not provisioned`);
+        context.toast("Access review requested", "A local request was saved for the named reviewer. No account or permission was granted.");
         close();
-      }}
-    >
-      <Field label="Grant" required>
-        <Select name="grant" required>
-          {["Finance ledger (read)", "Customer care queue", "Workshop door code", "Compliance toolkit", "Payroll"].map((grant) => <option key={grant}>{grant}</option>)}
-        </Select>
-      </Field>
-      <Field label="Why it is needed" required><TextArea name="reason" rows={3} required /></Field>
-      <Notice tone="warning" title="Access is never inferred">
-        Employment status does not grant anything on its own. This request waits for a named approver and is recorded either way.
-      </Notice>
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "The request could not be saved.");
+      } finally {
+        setSaving(false);
+      }
+    }}>
+      <PeopleDialogLead eyebrow="PEOPLE / ACCESS GOVERNANCE" title="Request an access review"
+        description="Specify the exact access, its business reason and the human responsible for review."
+        status={<Pill tone="warning">Not provisioned</Pill>} />
+      <PeopleDialogSection step="01" title="Person and access scope">
+        <Properties rows={[{ label: "Employee", value: employee.title }, { label: "Status", value: employee.status }]} />
+        <Field label="Requested access" required>
+          <Select value={grant} onChange={(event) => setGrant(event.target.value)}>
+            {["Finance ledger (read)", "Customer care queue", "Workshop door code", "Compliance toolkit", "Payroll"].map((item) => <option key={item}>{item}</option>)}
+          </Select>
+        </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Reason and accountable reviewer">
+        <Field label="Business reason" required hint="At least 10 characters.">
+          <TextArea rows={3} value={reason} onChange={(event) => setReason(event.target.value)} required />
+        </Field>
+        <Field label="Responsible reviewer" required>
+          <Select value={approver} onChange={(event) => setApprover(event.target.value)} required>
+            <option value="">Choose an active employee</option>
+            {reviewers.map((row) => <option key={row.id} value={row.title}>{row.title}</option>)}
+          </Select>
+        </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Request checks and external boundary">
+        {sameRequest && <Notice tone="danger" title="Existing request">An unresolved request for this access already exists for the employee.</Notice>}
+        {reviewers.length === 0 && <Notice tone="warning" title="No reviewer available">An active reviewer must be recorded before requesting access.</Notice>}
+        <Notice tone="info" title="No connected identity provider">Saving creates a local review task. A completed review will not provision access or prove the external grant happened.</Notice>
+        {error && <Notice tone="danger" title="Request not saved">{error}</Notice>}
+        <p className="ds-subtle">Use the request action below after completing all required fields. Unresolved duplicate requests are blocked.</p>
+      </PeopleDialogSection>
+    </form>
+  );
+}
+
+/**
+ * The People app stores an auditable reference, not file bytes. Never claim
+ * that a contract, identity check or uploaded file exists unless a user
+ * explicitly records the reference against this exact employee.
+ */
+function PeopleFileReference({ context, close }: { context: ScreenContext; close: () => void }) {
+  const [documentType, setDocumentType] = useState("Employment contract");
+  const [note, setNote] = useState("");
+  const [location, setLocation] = useState("");
+  const [reviewed, setReviewed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const fromRoute = useRecord(context.params.id);
+  const employee = scopedDetailRecord(fromRoute, context.org.id, "employees");
+  if (!employee) return <Empty title="Employee unavailable">Open a valid employee record before filing a document reference.</Empty>;
+  return (
+    <form id="hr-document" className="ds-stack ds-gap-4" onSubmit={async (event) => {
+      event.preventDefault();
+      if (saving || !context.can("edit_people") || !reviewed || location.trim().length < 3) return;
+      setSaving(true);
+      setError("");
+      try {
+        await context.mutate.create({
+          collection: "documents",
+          title: documentType,
+          status: "filed",
+          summary: `Personnel document reference recorded by ${context.actor} for ${employee.title}; file bytes are not stored here.`,
+          parentId: employee.id,
+          fields: {
+            kind: "peopleFile", employeeId: employee.id, folder: "People files",
+            confidential: true, referenceOnly: true,
+            filedBy: context.actor, filedAt: clockIso(), note: note.trim(),
+            sourceLocation: location.trim(), humanReviewedReference: true,
+            uploadedToArlovi: false, fileVerification: "not_verified",
+          },
+        }, `Personnel document reference recorded: ${documentType} for ${employee.title}; no upload or file verification`);
+        context.toast("Document reference created", "The employee reference is saved. The external document was not uploaded or verified by Arlovi.");
+        close();
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "The reference could not be created.");
+      } finally {
+        setSaving(false);
+      }
+    }}>
+      <PeopleDialogLead eyebrow="PEOPLE / PERSONNEL RECORDS" title="Record a personnel document reference"
+        description="Link a documented source to this employee without implying that Arlovi holds or has verified its contents."
+        status={<Pill tone="warning">Reference only</Pill>} />
+      <PeopleDialogSection step="01" title="Employee and document">
+        <Properties rows={[{ label: "Employee", value: employee.title }, { label: "Company", value: context.org.name }]} />
+        <Field label="Document category" required>
+          <Select value={documentType} onChange={(event) => setDocumentType(event.target.value)}>
+            {["Employment contract", "Contract variation", "Right to work check", "Probation letter", "Training certificate", "Leaver letter"].map((option) => <option key={option}>{option}</option>)}
+          </Select>
+        </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Source and filing information" description="Use a reference that allows an authorised team member to locate the existing source.">
+        <Field label="Existing document location or internal reference" required hint="Avoid pasting confidential access links, credentials or document contents.">
+          <TextInput value={location} onChange={(event) => setLocation(event.target.value)} required />
+        </Field>
+        <Field label="Internal filing note">
+          <TextArea value={note} onChange={(event) => setNote(event.target.value)} rows={3} />
+        </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Filing confirmation">
+        <Checkbox checked={reviewed} onChange={(event) => setReviewed(event.target.checked)}
+          label="I confirm this reference relates to the selected employee and an existing document." />
+        <Notice tone="info" title="No file uploaded or verified">This action stores the reference metadata only. Any file review, retention policy or right-to-work verification must occur through the authorised process.</Notice>
+        {error && <Notice tone="danger" title="Could not file reference">{error}</Notice>}
+        {saving && <p className="ds-subtle">Saving reference…</p>}
+      </PeopleDialogSection>
     </form>
   );
 }
@@ -184,39 +348,64 @@ export const hrApp = registerApp({
       ],
       overlays: [
         { id: "team filter", kind: "modal", title: "Filter the directory by team", width: 440, render: ({ close, ...context }) => <DirectoryFilter context={context} close={close} /> },
-        { id: "Invite employee", kind: "modal", title: "Invite someone to the workspace", width: 520,
+        { id: "Invite employee", kind: "modal", title: "Add an employee record", width: 560,
           render: ({ close, ...context }) => (
             <form id="hr-invite" className="ds-stack ds-gap-4" onSubmit={async (event) => {
               event.preventDefault();
               const form = new FormData(event.currentTarget);
-              await context.mutate.create({
-                collection: "employees",
-                title: String(form.get("name") ?? "New colleague"),
-                status: "probation",
-                summary: `Invited by ${context.actor}. The invitation is a local draft.`,
-                startAt: String(form.get("start") || "") || undefined,
-                fields: {
-                  kind: "human", title: String(form.get("role") ?? ""), employment: String(form.get("employment") ?? "full-time"),
-                  email: String(form.get("email") ?? ""), manager: context.actor, office: "Clerkenwell studio",
-                  leaveAllowance: 25, leaveTaken: 0, salaryMinor: 0, pensionPct: 5, phone: "Not shared",
-                },
-              }, `Employee record created for ${String(form.get("name") ?? "")}`);
-              context.toast("Record created", "The person is in the directory; the invitation itself has not been sent.");
-              close();
+              const name = String(form.get("name") ?? "").trim();
+              const email = String(form.get("email") ?? "").trim();
+              if (!name || !email) {
+                context.toast("Missing employee details", "Enter a name and work email before saving.", "blocked");
+                return;
+              }
+              try {
+                await context.mutate.create({
+                  collection: "employees",
+                  title: name,
+                  status: "probation",
+                  summary: `Employee draft recorded by ${context.actor}. No invitation has been sent.`,
+                  startAt: String(form.get("start") || "") || undefined,
+                  fields: {
+                    kind: "human", title: String(form.get("role") ?? ""), employment: String(form.get("employment") ?? "full-time"),
+                    email, manager: context.actor, office: "",
+                    leaveAllowance: 25, leaveTaken: 0, salaryMinor: 0, pensionPct: 5, phone: "Not shared",
+                    invitationStatus: "not_sent",
+                  },
+                }, `Employee record created for ${name}; invitation not sent`);
+                context.toast("Employee record created", "The employee is now in the directory. No email or workspace invitation was sent.");
+                close();
+              } catch (error) {
+                context.toast("Record was not created", error instanceof Error ? error.message : "Review the details and retry.", "blocked");
+              }
             }}>
-              <Field label="Name" required><TextInput name="name" required /></Field>
-              <Field label="Work email" required><TextInput name="email" type="email" required /></Field>
-              <Row gap={3}>
-                <Field label="Role"><TextInput name="role" /></Field>
-                <Field label="Employment">
-                  <Select name="employment">{["full-time", "part-time", "contractor"].map((option) => <option key={option}>{option}</option>)}</Select>
-                </Field>
-              </Row>
-              <Field label="Start date"><TextInput name="start" type="date" /></Field>
-              <InboxNote />
+              <PeopleDialogLead
+                eyebrow="PEOPLE / EMPLOYEE LIFECYCLE"
+                title="Create an employee record"
+                description="Capture the employee's identity and starting arrangement. Creating the record does not send an invitation or provision access."
+                status={<Pill tone="warning">Not invited</Pill>}
+              />
+              <PeopleDialogSection step="01" title="Identity" description="Enter the person's work identity in this company.">
+                <Field label="Full name" required><TextInput name="name" required /></Field>
+                <Field label="Work email" required><TextInput name="email" type="email" required /></Field>
+              </PeopleDialogSection>
+              <PeopleDialogSection step="02" title="Employment details" description="Choose the starting arrangement. Payroll and leave entitlements must be verified separately.">
+                <Field label="Job title"><TextInput name="role" /></Field>
+                <Row gap={3}>
+                  <Field label="Employment type">
+                    <Select name="employment">{["full-time", "part-time", "contractor"].map((option) => <option key={option}>{option}</option>)}</Select>
+                  </Field>
+                  <Field label="Start date"><TextInput name="start" type="date" /></Field>
+                </Row>
+              </PeopleDialogSection>
+              <PeopleDialogSection step="03" title="Invitation and access boundary" description="No connected delivery or identity provisioning takes place on save.">
+                <Notice tone="info" title="Record only — no message sent">
+                  This adds a local People record. Send any welcome email through a connected mailbox and complete access requests in the named workflow.
+                </Notice>
+              </PeopleDialogSection>
             </form>
           ),
-          footer: submitFooter("hr-invite", "Create the record") },
+          footer: submitFooter("hr-invite", "Create employee record") },
         { id: "directory card", kind: "drawer", title: "Roster", width: 420, render: ({ ...context }) => <SegmentedInspector context={context} /> },
         { id: "export permissions", kind: "modal", title: "Who can export this directory", width: 520, render: ({ ...context }) => (
           <Stack gap={3}>
@@ -243,38 +432,14 @@ export const hrApp = registerApp({
       actions: [
         { id: "Update profile", label: "Update profile", placement: "primary", capability: "edit_people", run: (context) => context.openOverlay("profile editor") },
         { id: "request change", label: "Request an access change", placement: "secondary", run: (context) => context.openOverlay("access request") },
-        { id: "upload document", label: "Add a document", placement: "overflow", run: (context) => context.openOverlay("Contract upload") },
+        { id: "upload document", label: "Add a document reference", placement: "overflow", run: (context) => context.openOverlay("Contract upload") },
         { id: "offboard", label: "Offboard", placement: "overflow", tone: "danger", capability: "edit_people", run: (context) => context.openOverlay("offboarding confirmation") },
       ],
       overlays: [
         { id: "profile editor", kind: "modal", title: "Update profile", width: 520, render: ({ close, ...context }) => <ProfileEditor context={context} close={close} />, footer: submitFooter("hr-profile", "Save the profile") },
-        { id: "Contract upload", kind: "modal", title: "Add a document to the people file", width: 520,
-          render: ({ close, ...context }) => (
-            <form id="hr-document" className="ds-stack ds-gap-4" onSubmit={async (event) => {
-              event.preventDefault();
-              const form = new FormData(event.currentTarget);
-              await context.mutate.create({
-                collection: "documents",
-                title: String(form.get("title") ?? "Document"),
-                status: "filed",
-                summary: `Filed against an employee record by ${context.actor}.`,
-                parentId: context.params.id,
-                fields: { kind: "peopleFile", employeeId: context.params.id ?? "", confidential: true },
-              }, `Document filed: ${String(form.get("title") ?? "")}`);
-              context.toast("Document filed", "A record of the document is in the people file.");
-              close();
-            }}>
-              <Field label="Document" required>
-                <Select name="title" required>{["Employment contract", "Contract variation", "Right to work check", "Probation letter", "Training certificate", "Leaver letter"].map((option) => <option key={option}>{option}</option>)}</Select>
-              </Field>
-              <Field label="Note"><TextArea name="note" rows={3} /></Field>
-              <Notice tone="info" title="Nothing is uploaded">
-                This records that the document exists, who filed it and when. The file itself stays wherever you keep it;
-                no storage provider is connected to this workspace.
-              </Notice>
-            </form>
-          ),
-          footer: submitFooter("hr-document", "File the document") },
+        { id: "Contract upload", kind: "modal", title: "Add a people-file reference", width: 520,
+          render: ({ close, ...context }) => <PeopleFileReference context={context} close={close} />,
+          footer: submitFooter("hr-document", "Save reference") },
         { id: "access request", kind: "modal", title: "Request access", width: 520, render: ({ close, ...context }) => <AccessRequest context={context} close={close} />, footer: submitFooter("hr-access", "Send the request") },
         { id: "offboarding confirmation", kind: "modal", title: "Offboard this person", tone: "danger", width: 520, render: ({ close, ...context }) => <OffboardingConfirmation context={context} close={close} /> },
       ],
@@ -395,6 +560,7 @@ export const hrApp = registerApp({
       ],
       overlays: [
         ...kitOverlays,
+        { id: "leave approval", kind: "drawer", title: "Review leave decision", width: 560, render: ({ ...context }) => <LeaveApproval context={context} /> },
         { id: "balance adjustment", kind: "modal", title: "Adjust a leave balance", width: 500, render: ({ close, ...context }) => <BalanceAdjust context={context} close={close} />, footer: submitFooter("hr-balance", "Adjust the balance") },
         { id: "Leave form", kind: "modal", title: "Request leave", width: 560, render: ({ close, ...context }) => <LeaveForm context={context} close={close} />, footer: submitFooter("hr-leave-form", "Send the request") },
         { id: "policy explanation", kind: "drawer", title: "How this balance is worked out", width: 480, render: ({ ...context }) => <BalanceExplainer context={context} /> },
@@ -420,6 +586,7 @@ export const hrApp = registerApp({
       overlays: [
         ...kitOverlays,
         { id: "Shift edit", kind: "modal", title: "Shift", width: 520, render: ({ close, ...context }) => <ShiftEdit context={context} close={close} />, footer: submitFooter("hr-shift", "Save shift") },
+        { id: "time review", kind: "drawer", title: "Review recorded time", width: 560, render: ({ close, ...context }) => <TimeReview context={context} close={close} /> },
         { id: "time correction", kind: "modal", title: "Correct a time entry", width: 520, render: ({ close, ...context }) => <TimeCorrection context={context} close={close} />, footer: submitFooter("hr-time-correction", "Save the correction") },
         { id: "export hours", kind: "modal", title: "Export hours", width: 520, render: ({ ...context }) => <ExportHours context={context} /> },
         { id: "overtime approval", kind: "drawer", title: "Overtime", width: 480, render: ({ ...context }) => <Overtime context={context} /> },
@@ -514,9 +681,14 @@ export const hrApp = registerApp({
 function OfferApproval({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCollections(["applicants", "positions"]);
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const applicant = data.applicants.find((row) => row.id === (payload?.id ?? context.selectedId) && row.collection === "applicants") ?? data.applicants.find((row) => row.fields.stage === "offer" && row.fields.offerIssuedBy === undefined);
-  if (!applicant) return <Empty title="No candidate is at the offer stage" icon={<UserPlus size={20} />}>Move a candidate to offer from their profile first.</Empty>;
-  const issued = applicant.fields.offerIssuedBy !== undefined;
+  const requestedId = payload?.id ?? context.selectedId;
+  const applicant = requestedId
+    ? data.applicants.find((row) => row.id === requestedId && row.collection === "applicants" && row.organizationId === context.org.id)
+    : data.applicants.find((row) => row.organizationId === context.org.id && row.fields.stage === "offer"
+      && !String(row.fields.offerIssuedBy ?? "").trim());
+  if (!applicant) return <Empty title={requestedId ? "Selected candidate unavailable" : "No candidate is at the offer stage"}
+    icon={<UserPlus size={20} />}>Open a valid candidate from this company before reviewing their offer.</Empty>;
+  const issued = Boolean(String(applicant.fields.offerIssuedBy ?? "").trim());
   const scored = Number(applicant.fields.rating ?? 0) > 0;
   const position = data.positions.find((row) => row.id === applicant.fields.positionId);
   return (
@@ -525,7 +697,10 @@ function OfferApproval({ context, close }: { context: ScreenContext; close: () =
         { label: "Candidate", value: applicant.title },
         { label: "Role", value: position?.title ?? String(applicant.fields.role ?? "") },
         { label: "Hiring manager", value: String(position?.fields.hiringManager ?? "") },
-        { label: "Range", value: context.can("view_payroll") && position ? `${context.money(Number(position.fields.salaryLowMinor ?? 0))} – ${context.money(Number(position.fields.salaryHighMinor ?? 0))}` : "Hidden in this role view" },
+        { label: "Range", value: !context.can("view_payroll") ? "Hidden in this role view"
+          : position?.fields.salaryLowMinor !== undefined && position.fields.salaryHighMinor !== undefined
+            ? `${context.money(Number(position.fields.salaryLowMinor))} – ${context.money(Number(position.fields.salaryHighMinor))}`
+            : "Not recorded" },
         { label: "Scorecard", value: scored ? `${String(applicant.fields.rating)} of 5` : "None recorded" },
         { label: "Offer", value: issued ? `Issued by ${String(applicant.fields.offerIssuedBy)} — awaiting the candidate's answer` : "Not issued" },
       ]} />
@@ -539,7 +714,8 @@ function OfferApproval({ context, close }: { context: ScreenContext; close: () =
           variant="primary"
           disabled={!context.can("edit_people") || issued || !scored}
           onClick={async () => {
-            await context.mutate.patch(applicant.id, { fields: { ...applicant.fields, stage: "offer", offerIssuedBy: context.actor, offerIssuedAt: clockIso(), offerDelivery: "queued_local" } }, { expectRevision: applicant.revision, event: `Offer issued to ${applicant.title} by ${context.actor}; letter kept as a local draft` });
+            const updated = await context.mutate.patch(applicant.id, { fields: { ...applicant.fields, stage: "offer", offerIssuedBy: context.actor, offerIssuedAt: clockIso(), offerDelivery: "queued_local" } }, { expectRevision: applicant.revision, event: `Offer issued to ${applicant.title} by ${context.actor}; letter kept as a local draft` });
+            if (!updated) return;
             await context.mutate.log(`Offer letter for ${applicant.title} queued locally — no mail service is connected, so nothing has left this browser.`, { entityId: applicant.id, type: "boundary", capability: "queued_local" });
             context.toast("Offer issued", `Recorded against ${applicant.title} by ${context.actor}. The letter is a local draft; nothing was sent.`);
             close();
@@ -553,59 +729,95 @@ function OfferApproval({ context, close }: { context: ScreenContext; close: () =
 }
 
 function OnboardingLaunch({ context, close }: { context: ScreenContext; close: () => void }) {
-  const data = useCollections(["employees", "members"]);
+  const data = useCollections(["employees", "members", "tasks"]);
   const starters = data.employees.filter((employee) => employee.status === "probation" || employee.status === "active");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const payload = context.overlayPayload as { employeeId?: string } | undefined;
+  const selectedStarter = starters.some((employee) => employee.id === payload?.employeeId) ? payload?.employeeId : "";
   return (
     <form
       id="hr-onboarding"
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
+        if (saving) return;
         const form = new FormData(event.currentTarget);
         const employeeId = String(form.get("employee") ?? "");
         const mentor = String(form.get("mentor") ?? "");
         const employee = data.employees.find((row) => row.id === employeeId);
-        const steps = [
-          { label: "Signed contract filed", group: "People", owner: context.actor },
-          { label: "Right to work check recorded", group: "People", owner: context.actor },
-          { label: "Workspace sign-in granted", group: "IT access", owner: "Maya Chen" },
-          { label: "Payroll inputs added", group: "Finance", owner: "Elena Voss" },
-          { label: `Mentor introduction with ${mentor}`, group: "Manager", owner: mentor },
-          { label: "Health and safety module", group: "Learning", owner: employee?.title ?? "New starter" },
-        ];
-        for (const step of steps) {
-          await context.mutate.create({
-            collection: "tasks",
-            title: step.label,
-            status: step.group === "IT access" ? "waiting" : "ready",
-            summary: `${step.group} step for ${employee?.title ?? "the new starter"}.`,
-            parentId: employeeId,
-            fields: { kind: "onboarding", employeeId, stage: "ready", assignee: step.owner, group: step.group },
-          }, `Onboarding step created: ${step.label}`);
+        const mentorRecord = data.employees.find((row) => row.title === mentor && row.status === "active");
+        if (!employee || !mentorRecord) {
+          context.toast("Checklist not launched", "Choose a current employee and an active mentor.", "blocked");
+          return;
         }
-        context.toast("Checklist launched", `${steps.length} steps are on the onboarding board.`);
-        close();
+        setSaving(true);
+        setError("");
+        try {
+          const plan = planOnboardingLaunch({
+            organizationId: context.org.id, currency: context.org.currency,
+            actor: context.actor, now: clockIso(),
+          }, employee, mentorRecord, data.tasks);
+          await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+          context.toast("Checklist launched", "All six onboarding steps were saved together for " + employee.title + ".");
+          close();
+        } catch (cause) {
+          const message = cause instanceof Error ? cause.message : "Reload the employee record and try again.";
+          setError(message);
+          context.toast("Checklist not launched", message, "blocked");
+        } finally {
+          setSaving(false);
+        }
       }}
     >
+      <PeopleDialogLead eyebrow="PEOPLE / STARTER HANDOVER" title="Launch an onboarding checklist"
+        description="Assign a starter and human mentor before recording the full cross-team handover checklist."
+        status={<Pill tone="info">Six local tasks</Pill>} />
+      <PeopleDialogSection step="01" title="Starter identity and assignment">
       <Field label="Who is starting" required>
-        <Select name="employee" required>{starters.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}</Select>
+        <Select name="employee" required defaultValue={selectedStarter}>
+          <option value="">Choose the employee</option>
+          {starters.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
+        </Select>
       </Field>
       <Field label="Mentor" required>
-        <Select name="mentor" required>{data.employees.filter((row) => row.status === "active").map((row) => <option key={row.id}>{row.title}</option>)}</Select>
+        <Select name="mentor" required defaultValue="">
+          <option value="">Choose an active mentor</option>
+          {data.employees.filter((row) => row.status === "active").map((row) => <option key={row.id}>{row.title}</option>)}
+        </Select>
       </Field>
-      <Notice tone="info" title="Six steps across four desks">
-        People file the paperwork, the manager does the introduction, IT access waits for an approver and Finance adds the payroll input.
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Cross-team handover" description="People, mentor, IT and Finance own distinct tasks.">
+      <Properties rows={[
+        { label: "People", value: "Document and starter checks" },
+        { label: "Mentor", value: "Introduction and induction" },
+        { label: "IT", value: "Human access review" },
+        { label: "Finance", value: "Payroll input review, not payroll submission" },
+      ]} />
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Record boundaries and launch">
+      <Notice tone="info" title="Six steps, one complete checklist">
+        People verify documents, the mentor completes the introduction, IT access waits for a human decision, and Finance reviews payroll inputs. A launch is saved atomically; no accounts or external services are provisioned.
       </Notice>
+      {error && <Notice tone="danger" title="Checklist could not be launched">{error}</Notice>}
+      {saving && <p className="ds-subtle">Saving the checklist…</p>}
+      </PeopleDialogSection>
     </form>
   );
 }
 
 function ITAccess({ context }: { context: ScreenContext }) {
   const data = useCollections(["tasks"]);
+  const [confirmedId, setConfirmedId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [error, setError] = useState("");
   const payload = context.overlayPayload as { employeeId?: string } | undefined;
   const requests = data.tasks.filter((task) => task.fields.kind === "onboarding" && task.fields.group === "IT access" && (!payload?.employeeId || task.fields.employeeId === payload.employeeId));
   return requests.length === 0 ? <Empty title="No access requests" /> : (
     <Stack gap={3}>
+      <PeopleDialogLead eyebrow="PEOPLE / IT HANDOVER" title="Review local access tasks"
+        description="Inspect each request, name the local decision and track external provisioning separately."
+        status={<Pill tone="warning">External status unverified</Pill>} />
       {requests.map((request) => (
         <div key={request.id} className="ds-panel" style={{ padding: "var(--space-3)" }}>
           <Row gap={2}>
@@ -613,21 +825,38 @@ function ITAccess({ context }: { context: ScreenContext }) {
             <Pill tone={request.status === "done" ? "success" : "warning"} dot>{request.status}</Pill>
           </Row>
           <p className="ds-subtle">{request.summary}</p>
-          {request.status !== "done" && (
-            <Button
-              size="sm"
-              variant="primary"
+          {["waiting", "ready", "requested"].includes(request.status) && (
+            <Stack gap={2}>
+            <Checkbox label={`I reviewed ${request.title} and understand this does not grant external access.`}
+              checked={confirmedId === request.id} onChange={(event) => setConfirmedId(event.target.checked ? request.id : null)} />
+            <Button size="sm" variant="primary" disabled={!context.can("edit_people") || confirmedId !== request.id || savingId !== null}
               style={{ marginBlockStart: "var(--space-2)" }}
               onClick={async () => {
-                await context.mutate.patch(request.id, { status: "done", fields: { ...request.fields, stage: "done", grantedBy: context.actor } }, { expectRevision: request.revision, event: `${request.title} granted by ${context.actor}` });
-                context.toast("Grant recorded", `${request.title} is recorded as granted by ${context.actor}.`);
-              }}
-            >
-              Record the grant
+                if (!context.can("edit_people") || confirmedId !== request.id) return;
+                setSavingId(request.id);
+                setError("");
+                try {
+                  await context.mutate.patch(request.id, { status: "done", fields: {
+                    ...request.fields, stage: "done", reviewedBy: context.actor, reviewedAt: clockIso(),
+                    externalProvisioning: "not_verified",
+                  } }, { expectRevision: request.revision,
+                    event: `${request.title} local review recorded by ${context.actor}; external access not verified` });
+                  context.toast("Local review recorded",
+                    `${request.title} was reviewed in Arlovi. Check external provisioning separately.`);
+                  setConfirmedId(null);
+                } catch (cause) {
+                  setError(cause instanceof Error ? cause.message : "The local decision was not saved.");
+                } finally {
+                  setSavingId(null);
+                }
+              }}>
+              Record local review
             </Button>
+            </Stack>
           )}
         </div>
       ))}
+      {error && <Notice tone="danger" title="Review not saved">{error}</Notice>}
       <Notice tone="warning" title="Recording is not provisioning">
         No identity provider is connected. Recording a grant says a person decided; somebody still has to make the account.
       </Notice>
@@ -638,21 +867,33 @@ function ITAccess({ context }: { context: ScreenContext }) {
 function BalanceExplainer({ context: _context }: { context: ScreenContext }) {
   const data = useCollections(["employees", "leaveRequests"]);
   const { actor } = useWorkspace();
-  const employee = data.employees.find((row) => row.title === actor) ?? data.employees[0];
-  if (!employee) return <Empty title="No employee record" />;
-  const approved = data.leaveRequests.filter((request) => request.fields.employeeId === employee.id && request.status === "approved");
+  const employee = data.employees.find((row) => row.title === actor && row.status !== "alumni");
+  if (!employee) return <Empty title="No matching employee record">
+    The signed-in local role view has no matching employee. Select the correct person in People before showing a personal balance.
+  </Empty>;
+  const annual = data.leaveRequests.filter((request) =>
+    request.fields.employeeId === employee.id && request.status === "approved"
+    && String(request.fields.type ?? "annual") === "annual");
+  const allowance = employee.fields.leaveAllowance === undefined ? null : Number(employee.fields.leaveAllowance);
+  const taken = Number(employee.fields.leaveTaken ?? 0);
+  const known = allowance !== null && Number.isFinite(allowance) && allowance >= 0 && Number.isFinite(taken);
+  const recordedDays = annual.reduce((sum, request) => {
+    const count = Number(request.fields.days);
+    return sum + (Number.isFinite(count) && count > 0 ? count : 0);
+  }, 0);
   return (
     <Stack gap={3}>
       <h3>{employee.title}</h3>
       <Properties rows={[
-        { label: "Allowance from the policy", value: `${String(employee.fields.leaveAllowance ?? 0)} days` },
-        { label: "Approved days on record", value: `${approved.reduce((sum, request) => sum + Number(request.fields.days ?? 1), 0)} days` },
-        { label: "Recorded as taken", value: `${String(employee.fields.leaveTaken ?? 0)} days` },
-        { label: "Remaining", value: `${Math.max(0, Number(employee.fields.leaveAllowance ?? 0) - Number(employee.fields.leaveTaken ?? 0))} days` },
+        { label: "Allowance on employee record", value: known ? `${allowance} days` : "Not recorded" },
+        { label: "Approved annual requests", value: `${annual.length} on record` },
+        { label: "Approved request days explicitly recorded", value: `${recordedDays} days` },
+        { label: "Recorded as taken", value: `${taken} days` },
+        { label: "Remaining", value: known ? `${Math.max(0, allowance - taken)} days` : "Unavailable until allowance is recorded" },
       ]} />
-      <Notice tone="info">
-        The balance moves when a request is approved, never when it is made. If the two figures above disagree, the approved
-        requests are the source and the balance needs an adjustment with a reason recorded against it.
+      <Notice tone={known ? "info" : "warning"} title={known ? "A recorded balance, not a statutory ruling" : "An entitlement has not been recorded"}>
+        The balance changes only when an annual leave request is approved through a reviewed transaction. Verify the allowance and
+        any mismatches with the published policy and the employee record before adjusting them; missing values are never treated as zero.
       </Notice>
     </Stack>
   );
@@ -660,9 +901,12 @@ function BalanceExplainer({ context: _context }: { context: ScreenContext }) {
 
 function ShiftEdit({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const shift = useRecord(payload?.id ?? context.selectedId);
-  const data = useCollections(["employees", "shifts"]);
-  if (!shift) return <Empty title="Select a shift" icon={<CalendarDays size={20} />} />;
+  const candidate = useRecord(payload?.id ?? context.selectedId);
+  const data = useCollections(["employees", "shifts", "leaveRequests", "projects"]);
+  const shift = scopedDetailRecord(candidate, context.org.id, "shifts");
+  if (!shift || shift.fields.kind !== "shift") {
+    return <Empty title="Shift unavailable" icon={<CalendarDays size={20} />}>Choose a roster shift in this company before editing.</Empty>;
+  }
   return (
     <form
       id="hr-shift"
@@ -672,51 +916,125 @@ function ShiftEdit({ context, close }: { context: ScreenContext; close: () => vo
         const form = new FormData(event.currentTarget);
         const employeeId = String(form.get("employee") ?? "");
         const employee = data.employees.find((row) => row.id === employeeId);
-        const hours = Number(form.get("hours") ?? 8);
         const day = String(form.get("day") ?? "");
         const time = String(form.get("time") ?? "");
-        const startAt = day && time ? new Date(`${day}T${time}:00.000Z`) : shift.startAt ? new Date(shift.startAt) : clockNow();
-        const endAt = new Date(startAt.getTime() + hours * 3_600_000);
-        const clash = data.shifts.find((row) => row.id !== shift.id && row.fields.kind === "shift" && row.fields.employeeId === employeeId && row.startAt && row.endAt && new Date(row.startAt) < endAt && new Date(row.endAt) > startAt);
-        if (clash) { context.toast("Shift not moved", `${employee?.title ?? "That person"} already works ${context.dateTime(clash.startAt)}. Nothing changed.`, "blocked"); return; }
-        const moved = shift.startAt !== startAt.toISOString();
-        await context.mutate.patch(shift.id, {
-          title: `${String(form.get("place") ?? "")} · ${(employee?.title ?? "").split(" ")[0]}`,
-          startAt: startAt.toISOString(),
-          endAt: endAt.toISOString(),
-          fields: { ...shift.fields, employeeId, employeeName: employee?.title ?? "", place: String(form.get("place") ?? ""), hours, overtime: hours > 8, timezone: context.org.timezone },
-        }, { expectRevision: shift.revision, event: moved ? `Shift moved to ${startAt.toISOString()} for ${employee?.title ?? "another person"} by ${context.actor}` : `Shift reassigned to ${employee?.title ?? "another person"}` });
-        context.toast(moved ? "Shift moved" : "Shift saved", "The roster record changed; nothing was only announced.");
-        close();
+        try {
+          if (!employee) throw new Error("Select an existing employee in this company.");
+          const plan = planShiftMove({
+            organizationId: context.org.id, currency: context.org.currency,
+            actor: context.actor, now: clockIso(), timezone: context.org.timezone,
+          }, shift, employee, data.shifts, data.leaveRequests, data.employees, data.projects, {
+            startAt: day && time ? `${day}T${time}:00.000Z` : "",
+            hours: Number(form.get("hours") ?? 0),
+            place: String(form.get("place") ?? ""),
+            projectId: String(form.get("project") ?? ""),
+          });
+          await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+          context.toast("Shift saved", "The roster was checked and the change saved. No external calendar was updated.");
+          close();
+        } catch (error) {
+          context.toast("Shift not saved", error instanceof Error ? error.message : "Reload this shift before editing.", "blocked");
+        }
       }}
     >
-      <Field label="Person">
-        <Select name="employee" defaultValue={String(shift.fields.employeeId ?? "")}>
-          {data.employees.filter((row) => row.status !== "alumni").map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
+      <Field label="Person" required>
+        <Select name="employee" required defaultValue={String(shift.fields.employeeId ?? "")}>
+          {data.employees.filter((row) => !["alumni", "terminated"].includes(row.status)).map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
         </Select>
       </Field>
-      <Field label="Place">
-        <Select name="place" defaultValue={String(shift.fields.place ?? "")}>{["Showroom", "Workshop bench", "Despatch"].map((place) => <option key={place}>{place}</option>)}</Select>
+      <Field label="Place" required>
+        <Select name="place" required defaultValue={String(shift.fields.place ?? "Showroom")}>{["Showroom", "Workshop bench", "Despatch"].map((place) => <option key={place}>{place}</option>)}</Select>
+      </Field>
+      <Field label="Project assignment" hint="Optional. Project links stay within this company and appear in the scheduling and timesheet context.">
+        <Select name="project" defaultValue={String(shift.fields.projectId ?? "")}>
+          <option value="">No project assigned</option>
+          {data.projects.filter((row) => !["cancelled", "archived", "deleted"].includes(row.status)).map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
+        </Select>
       </Field>
       <Row gap={3}>
-        <Field label="Day"><TextInput name="day" type="date" defaultValue={shift.startAt?.slice(0, 10) ?? ""} /></Field>
-        <Field label="Start (UTC)"><TextInput name="time" type="time" defaultValue={shift.startAt?.slice(11, 16) ?? "09:00"} /></Field>
-        <Field label="Hours"><TextInput name="hours" inputMode="numeric" align="end" defaultValue={String(shift.fields.hours ?? 8)} /></Field>
+        <Field label="Day (UTC)" required><TextInput name="day" type="date" required defaultValue={shift.startAt?.slice(0, 10) ?? ""} /></Field>
+        <Field label="Start (UTC)" required><TextInput name="time" type="time" required defaultValue={shift.startAt?.slice(11, 16) ?? "09:00"} /></Field>
+        <Field label="Hours" required><TextInput name="hours" inputMode="decimal" align="end" required defaultValue={String(shift.fields.hours ?? 8)} /></Field>
       </Row>
       <Properties rows={[
         { label: "Starts now", value: context.dateTime(shift.startAt) },
         { label: "Ends now", value: context.dateTime(shift.endAt) },
-        { label: "Time zone", value: context.org.timezone },
+        { label: "Location time zone", value: context.org.timezone },
+        { label: "Saved time standard", value: "UTC; no automatic local-time conversion" },
       ]} />
-      {shift.fields.timezone !== undefined && String(shift.fields.timezone) !== context.org.timezone && <Notice tone="warning" title="Cross-location shift">This shift was recorded in {String(shift.fields.timezone)}. Check working-time rules for both locations.</Notice>}
-      <Notice tone="info">More than eight hours is recorded as overtime and appears on the exceptions tab.</Notice>
+      <Notice tone="info" title="A checked roster, not a legal compliance guarantee">
+        An overlapping shift or approved leave blocks a change. More than eight hours is flagged as overtime for human review; no external calendar or payroll is updated automatically.
+      </Notice>
     </form>
+  );
+}
+
+/** A full record review is available from every Timesheet row and is not
+ * restricted to the desktop table. Decisions use the shared CAS plan. */
+function TimeReview({ context, close }: { context: ScreenContext; close: () => void }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const candidate = useRecord(payload?.id ?? context.selectedId);
+  const entry = scopedDetailRecord(candidate, context.org.id, "shifts");
+  const data = useCollections(["employees", "projects", "tasks"]);
+  if (!entry || entry.fields.kind !== "time") {
+    return <Empty title="Time entry unavailable">Choose a time entry from this company to review.</Empty>;
+  }
+  const person = data.employees.find((row) => row.id === entry.fields.employeeId);
+  const project = data.projects.find((row) => row.id === entry.fields.projectId);
+  const task = data.tasks.find((row) => row.id === entry.fields.taskId && row.parentId === project?.id);
+  const done = entry.status === "approved" && entry.fields.approved === true;
+  const inconsistent = (entry.status === "approved") !== (entry.fields.approved === true);
+  const validHours = Number.isFinite(Number(entry.fields.hours)) && Number(entry.fields.hours) > 0
+    && Number(entry.fields.hours) <= 24;
+  return (
+    <Stack gap={4}>
+      <Properties rows={[
+        { label: "Person", value: person?.title ?? "Unlinked — needs verified employee" },
+        { label: "Work date", value: context.date(entry.startAt) },
+        { label: "Time recorded", value: `${String(entry.fields.hours ?? "Not recorded")} hours` },
+        { label: "Project", value: project?.title ?? (entry.fields.projectId ? "Project unavailable" : "Internal / no project") },
+        { label: "Project task", value: task?.title ?? (entry.fields.taskId ? "Task unavailable" : "Not linked") },
+        { label: "Submitted by", value: String(entry.fields.filedBy ?? entry.ownerName ?? "Not recorded") },
+        { label: "State", value: inconsistent ? "Approval record mismatch" : done ? "Approved in Arlovi" : "Awaiting review" },
+        { label: "Approved by", value: String(entry.fields.approvedBy || "Not yet approved") },
+        { label: "Approved at", value: entry.fields.approvedAt ? context.dateTime(String(entry.fields.approvedAt)) : "Not recorded" },
+        { label: "Last correction", value: entry.fields.correctionReason ? String(entry.fields.correctionReason) : "None recorded" },
+      ]} />
+      {!person && <Notice tone="warning" title="Employee association must be verified">This entry contains a name but no matching current company employee record. Link the correct employee in Time Correction before approval.</Notice>}
+      {entry.fields.projectId && !project && <Notice tone="warning" title="Project is unavailable">The linked Project could not be found in this company. Resolve its reference before approval.</Notice>}
+      {inconsistent && <Notice tone="danger" title="Approval state needs reconciliation">The record's status and approval flag disagree. Do not count these hours as approved until this entry has been reviewed.</Notice>}
+      <Notice tone="info" title="Human decision, no external payment">
+        Reviewing this entry can change its local approval state and audit history. No connected payroll, invoicing or banking provider is updated.
+      </Notice>
+      <Row gap={2} wrap>
+        {project && <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${context.org.slug}/project/projects/${project.id}`); }}>Open Project</Button>}
+        {!done && <Button variant="secondary" onClick={() => {
+          close(); context.select(entry.id); context.openOverlay("time correction");
+        }}>Correct entry</Button>}
+        <span className="ds-grow" />
+        <Button variant="ghost" onClick={close}>Close</Button>
+        {!done && <Button variant="primary" disabled={!person || !validHours || (Boolean(entry.fields.projectId) && !project)}
+          onClick={async () => {
+            try {
+              const plan = planTimesheetApprovals({
+                organizationId: context.org.id, currency: context.org.currency,
+                actor: context.actor, now: clockIso(), timezone: context.org.timezone,
+              }, [entry], data.employees, data.projects);
+              await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+              context.toast("Hours approved", "The employee and Project were verified and the local approval was recorded.");
+              close();
+            } catch (error) {
+              context.toast("Hours not approved", error instanceof Error ? error.message : "Reload the entry and retry.", "blocked");
+            }
+          }}>Approve hours</Button>}
+      </Row>
+    </Stack>
   );
 }
 
 function Overtime({ context }: { context: ScreenContext }) {
   const data = useCollections(["shifts"]);
-  const overtime = data.shifts.filter((shift) => shift.fields.overtime === true);
+  const overtime = data.shifts.filter((shift) => shift.fields.kind === "shift" && shift.fields.overtime === true);
   return overtime.length === 0 ? <Empty title="No overtime on the roster" /> : (
     <Stack gap={2}>
       {overtime.map((shift) => (
@@ -725,10 +1043,18 @@ function Overtime({ context }: { context: ScreenContext }) {
             <strong>{String(shift.fields.employeeName ?? "")}</strong>
             <p className="ds-subtle">{context.date(shift.startAt)} · {String(shift.fields.hours ?? 0)} hours</p>
           </div>
-          <Button size="sm" variant="secondary" onClick={async () => {
-            await context.mutate.patch(shift.id, { fields: { ...shift.fields, overtimeApproved: true } }, { event: `Overtime approved for ${String(shift.fields.employeeName ?? "")}` });
-            context.toast("Overtime approved", "Recorded against the shift.");
-          }}>Approve</Button>
+          {shift.fields.overtimeApproved === true ? (
+            <Pill tone="success">Approved locally</Pill>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={async () => {
+              const saved = await context.mutate.patch(shift.id, { fields: {
+                ...shift.fields, overtimeApproved: true, overtimeApprovedBy: context.actor,
+                overtimeApprovedAt: clockIso(),
+              } }, { expectRevision: shift.revision,
+                event: `Overtime reviewed for ${String(shift.fields.employeeName ?? "")} by ${context.actor}` });
+              if (saved) context.toast("Overtime recorded", "The local approval was saved. Payroll is not submitted automatically.");
+            }}>Approve</Button>
+          )}
         </Row>
       ))}
     </Stack>
@@ -768,11 +1094,11 @@ function ExportHours({ context }: { context: ScreenContext }) {
 
 function PayrollExceptions({ context }: { context: ScreenContext }) {
   const data = useCollections(["employees", "shifts"]);
-  const lines = computePayroll(data.employees);
-  const noSalary = lines.filter((line) => line.grossMinor === 0);
+  const noSalary = payrollSalaryGaps(data.employees);
   const unapproved = data.shifts.filter((shift) => shift.fields.kind === "time" && shift.fields.approved !== true);
   const rows = [
-    ...noSalary.map((line) => ({ id: line.employeeId, issue: "No salary recorded", detail: `${line.name} has no pay on the employee record, so the run would pay nothing.` })),
+    ...noSalary.map((employee) => ({ id: employee.id, issue: "Salary missing or invalid",
+      detail: `${employee.title} has no verified salary input. They cannot be included in a complete payroll run.` })),
     ...unapproved.map((entry) => ({ id: entry.id, issue: "Hours not approved", detail: `${String(entry.fields.employeeName ?? "")} has ${String(entry.fields.hours ?? 0)} unapproved hours.` })),
   ];
   return (
@@ -800,35 +1126,97 @@ function PayrollExceptions({ context }: { context: ScreenContext }) {
 
 function PayrollSignoff({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCollections(["payrollRuns", "employees"]);
-  const run = data.payrollRuns.find((row) => row.status === "draft") ?? data.payrollRuns[0];
-  const lines = computePayroll(data.employees);
-  if (!run) return <Empty title="No run to approve" />;
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const [checkedSources, setCheckedSources] = useState(false);
+  const [checkedBoundary, setCheckedBoundary] = useState(false);
+  const [error, setError] = useState("");
+  const wantedId = payload?.id ?? context.selectedId;
+  const run = wantedId
+    ? data.payrollRuns.find((row) => row.id === wantedId && row.organizationId === context.org.id && row.status === "draft")
+    : data.payrollRuns.find((row) => row.status === "draft");
+  const gaps = payrollSalaryGaps(data.employees);
+  if (!context.can("view_payroll")) return <RoleViewNote what="Payroll approval" />;
+  if (!run) return (
+    <Empty title={wantedId ? "Selected draft run unavailable" : "No draft run to approve"}>
+      Open an actual company payroll draft; a missing or approved run cannot silently be substituted.
+    </Empty>
+  );
+  const grossMinor = Number(run.fields.grossMinor);
+  const hasGross = run.fields.grossMinor !== undefined && Number.isFinite(grossMinor) && grossMinor >= 0;
+  const exceptions = Number(run.fields.exceptions ?? 0);
+  const flagged = Number.isFinite(exceptions) && exceptions > 0 ? exceptions : 0;
+  const blocked = gaps.length > 0 || !hasGross || flagged > 0;
+  const ready = !blocked && checkedSources && checkedBoundary;
   return (
     <Stack gap={4}>
-      <p className="ds-prose">
-        Approving {run.title} records that {context.actor} checked {lines.length} people and {context.money(lines.reduce((sum, line) => sum + line.grossMinor, 0))} of gross pay.
-      </p>
-      <Properties rows={[
-        { label: "Filed with an authority", value: <Pill tone="warning">No connection</Pill> },
-        { label: "Bank file sent", value: <Pill tone="warning">No connection</Pill> },
-        { label: "What approval changes", value: "The run status, the approver's name and the audit entry" },
-      ]} />
-      <Checkbox label={`I have checked this run and I am ${context.actor}`} id="payroll-confirm" />
-      <Row gap={2}>
+      <PeopleDialogLead eyebrow="PEOPLE / PAYROLL / HUMAN SIGN-OFF" title="Approve this recorded draft"
+        description="Review the saved run and its source evidence. Approval records a human decision in this workspace; it never files, pays or issues payslips."
+        status={<Pill tone="warning">Draft review</Pill>} />
+      <PeopleDialogSection step="01" title="Selected run" description="The figures below are saved on the run, not recomputed from today's roster.">
+        <Properties rows={[
+          { label: "Payroll run", value: run.title },
+          { label: "Period", value: String(run.fields.period || "Not recorded") },
+          { label: "Recorded gross", value: hasGross ? context.money(grossMinor) : "Not recorded" },
+          { label: "Recorded people", value: run.fields.people === undefined ? "Not recorded" : String(run.fields.people) },
+          { label: "Prepared by", value: String(run.fields.preparedBy || "Not recorded") },
+          { label: "Validation", value: run.fields.validatedAt
+            ? `Local check by ${String(run.fields.validatedBy || "unknown reviewer")}`
+            : "No local validation recorded" },
+        ]} />
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Outstanding review exceptions"
+        description="Resolve known source problems before a local human sign-off.">
+        <div className="hr-dialog-evidence-row">
+          <span>Employees missing valid salary</span>
+          <Pill tone={gaps.length ? "warning" : "success"}>{gaps.length} flagged</Pill>
+        </div>
+        <div className="hr-dialog-evidence-row">
+          <span>Recorded validation exceptions</span>
+          <Pill tone={flagged ? "warning" : "neutral"}>{flagged}</Pill>
+        </div>
+        {!hasGross && <Notice tone="danger" title="No valid gross recorded">
+          Prepare and verify the original run before it can be approved.
+        </Notice>}
+        {(gaps.length > 0 || flagged > 0) && <Notice tone="danger" title="Sign-off blocked by source evidence">
+          Correct the missing pay inputs and recorded exceptions, then reopen the latest draft before deciding.
+        </Notice>}
+        <Button size="sm" variant="secondary" onClick={() =>
+          context.openOverlay("exception report", { id: run.id })}>Review exception report</Button>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Accountable approval"
+        description="Both confirmations are necessary. The saved audit will identify the reviewer and the time.">
+        <Checkbox checked={checkedSources} disabled={blocked}
+          onChange={(event) => setCheckedSources(event.target.checked)}
+          label={`I, ${context.actor}, have verified the recorded run inputs and any required exceptions`} />
+        <Checkbox checked={checkedBoundary} disabled={blocked}
+          onChange={(event) => setCheckedBoundary(event.target.checked)}
+          label="I understand this approval does not submit payroll, transfer money, issue payslips or certify tax compliance" />
+        <Notice tone="info" title="No external systems connected">
+          Bank payments, HMRC or other jurisdiction filings, pension providers and payroll distributions remain separate processes.
+        </Notice>
+        {error && <Notice tone="danger" title="Run not approved">{error}</Notice>}
+      </PeopleDialogSection>
+      <Row gap={2} wrap>
         <Button variant="ghost" onClick={close}>Cancel</Button>
         <span className="ds-grow" />
-        <Button
-          variant="primary"
-          onClick={async () => {
-            const confirmed = document.querySelector<HTMLInputElement>("#payroll-confirm")?.checked;
-            if (!confirmed) { context.toast("Not approved", "Tick the confirmation first.", "blocked"); return; }
-            await context.mutate.patch(run.id, { status: "approved", fields: { ...run.fields, approvedBy: context.actor } }, { expectRevision: run.revision, event: `Payroll run ${run.title} approved by ${context.actor}` });
-            context.toast("Run approved", "The record changed. Nothing was filed and nothing was paid.");
+        <Button variant="primary" disabled={!ready} onClick={async () => {
+          setError("");
+          if (!ready || !context.can("view_payroll")) return;
+          try {
+            const saved = await context.mutate.patch(run.id, {
+              status: "approved", fields: {
+                ...run.fields, approvedBy: context.actor, approvedAt: clockIso(),
+              },
+            }, { expectRevision: run.revision,
+              event: `Payroll run ${run.title} locally approved by ${context.actor} after two explicit confirmations` });
+            if (!saved) { setError("This payroll run changed; reopen its latest draft before approving."); return; }
+            context.toast("Local approval recorded",
+              "The draft's review status and human approver were saved. No tax filing, payslip or payment was sent.");
             close();
-          }}
-        >
-          Approve the run
-        </Button>
+          } catch (reason) {
+            setError(reason instanceof Error ? reason.message : "The selected draft could not be signed off.");
+          }
+        }}>Approve local draft</Button>
       </Row>
     </Stack>
   );
@@ -836,65 +1224,136 @@ function PayrollSignoff({ context, close }: { context: ScreenContext; close: () 
 
 function ReviewForm({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = useRecord(payload?.id ?? context.selectedId);
+  const raw = useRecord(payload?.id);
+  const existing = scopedDetailRecord(raw, context.org.id, "reviews");
   const data = useCollections(["employees"]);
+  const [error, setError] = useState("");
+  const [humanReviewed, setHumanReviewed] = useState(false);
+  const editing = Boolean(payload?.id);
+  const writable = context.can("edit_people") && (!existing || ["draft", "scheduled"].includes(existing.status));
+  const people = data.employees.filter((employee) =>
+    !["alumni", "terminated"].includes(employee.status) && employee.fields.employment !== "contractor");
+
+  if (editing && !existing) return (
+    <Empty title="Selected review unavailable">
+      Open the existing review from the same company. A missing record cannot turn into a new employee assessment.
+    </Empty>
+  );
+
   return (
-    <form
-      id="hr-review"
-      className="ds-stack ds-gap-4"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        const form = new FormData(event.currentTarget);
-        const rating = String(form.get("rating") ?? "");
-        const note = String(form.get("evidence") ?? "");
+    <form id="hr-review" className="ds-stack ds-gap-4" onSubmit={async (event) => {
+      event.preventDefault();
+      setError("");
+      if (!writable) {
+        setError("This stage or role does not permit editing the review. Use the named submission or acknowledgement workflow.");
+        return;
+      }
+      const fields = new FormData(event.currentTarget);
+      const rating = String(fields.get("rating") ?? "");
+      const evidence = String(fields.get("evidence") ?? "").trim();
+      const employeeId = String(fields.get("employee") ?? "");
+      const employee = people.find((person) => person.id === employeeId);
+      if (!existing && !employee) { setError("Choose an active employee from this company."); return; }
+      if (rating && evidence.length < 20) {
+        setError("A rating needs at least 20 characters of specific supporting evidence before it can be saved.");
+        return;
+      }
+      try {
         if (existing) {
-          await context.mutate.patch(existing.id, {
-            status: String(form.get("status") ?? existing.status),
-            summary: note || existing.summary,
-            fields: { ...existing.fields, rating, aiAssisted: false, reviewer: context.actor },
-          }, { expectRevision: existing.revision, event: `Review updated for ${String(existing.fields.employeeName ?? "")} by ${context.actor}` });
+          const saved = await context.mutate.patch(existing.id, {
+            summary: evidence,
+            fields: {
+              ...existing.fields, rating, reviewer: context.actor,
+              aiAssisted: existing.fields.aiAssisted === true && !humanReviewed,
+              ...(humanReviewed ? { humanReviewedBy: context.actor, humanReviewedAt: clockIso() } : {}),
+            },
+          }, {
+            expectRevision: existing.revision,
+            event: `Review evidence updated for ${String(existing.fields.employeeName || existing.title)} by ${context.actor}`,
+          });
+          if (!saved) {
+            setError("The review has changed. Close this form and reopen the current record before saving.");
+            return;
+          }
         } else {
-          const employeeId = String(form.get("employee") ?? "");
-          const employee = data.employees.find((row) => row.id === employeeId);
+          const cycle = String(fields.get("cycle") ?? "Year end");
           await context.mutate.create({
-            collection: "reviews",
-            title: `${employee?.title ?? "Review"} · ${String(form.get("cycle") ?? "Year end")}`,
-            status: "draft",
-            summary: note,
-            fields: { employeeId, employeeName: employee?.title ?? "", reviewer: context.actor, cycle: String(form.get("cycle") ?? "Year end"), rating, aiAssisted: false, confidential: true },
-          }, `Review created for ${employee?.title ?? ""}`);
+            collection: "reviews", title: `${employee?.title} · ${cycle}`, status: "draft",
+            summary: evidence,
+            fields: {
+              employeeId, employeeName: employee?.title ?? "", reviewer: context.actor,
+              cycle, rating, aiAssisted: false, confidential: true,
+            },
+          }, `Draft review created for ${employee?.title} by ${context.actor}`);
         }
-        context.toast("Review saved", "The rating and its evidence are on the record.");
+        context.toast("Review saved", "A local draft and its evidence were recorded. No employment decision was made automatically.");
         close();
-      }}
-    >
-      {!existing && (
-        <>
-          <Field label="Person" required>
-            <Select name="employee" required>{data.employees.filter((row) => row.status !== "alumni").map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}</Select>
-          </Field>
-          <Field label="Cycle"><Select name="cycle">{["Year end", "Mid-year", "Probation"].map((cycle) => <option key={cycle}>{cycle}</option>)}</Select></Field>
-        </>
-      )}
-      {existing && (
-        <Field label="Stage">
-          <Select name="status" defaultValue={existing.status}>{["draft", "submitted", "calibrated", "acknowledged"].map((status) => <option key={status}>{status}</option>)}</Select>
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "The review could not be saved.");
+      }
+    }}>
+      <PeopleDialogLead eyebrow="PEOPLE / PERFORMANCE" title={existing ? "Review the employee evidence" : "Create an evidence-led review"}
+        description="A human author is accountable for every assessment. The draft remains separate from submission, calibration and acknowledgement."
+        status={<Pill tone={existing?.status === "acknowledged" ? "success" : "neutral"}>
+          {existing?.status ?? "New draft"}
+        </Pill>} />
+      <PeopleDialogSection step="01" title="Person and review cycle" description="Check the exact employee and recorded period.">
+        {existing ? (
+          <Properties rows={[
+            { label: "Employee", value: String(existing.fields.employeeName || "Not linked") },
+            { label: "Cycle", value: String(existing.fields.cycle || "Not recorded") },
+            { label: "Current stage", value: existing.status },
+            { label: "Reviewer", value: String(existing.fields.reviewer || "Not recorded") },
+          ]} />
+        ) : (
+          <>
+            <Field label="Person" required>
+              <Select name="employee" required defaultValue="">
+                <option value="">Choose an active employee</option>
+                {people.map((person) => <option key={person.id} value={person.id}>{person.title}</option>)}
+              </Select>
+            </Field>
+            <Field label="Cycle">
+              <Select name="cycle" defaultValue="Year end">
+                {["Year end", "Mid-year", "Probation"].map((cycle) => <option key={cycle} value={cycle}>{cycle}</option>)}
+              </Select>
+            </Field>
+          </>
+        )}
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Assessment and supporting evidence"
+        description="Set a rating only when there is a specific, readable explanation for it.">
+        <Field label="Assessment" hint="Use the published scale; absence of a rating is not a negative rating.">
+          <Select name="rating" defaultValue={String(existing?.fields.rating ?? "")} disabled={!writable}>
+            <option value="">No rating recorded</option>
+            <option value="below">Below expectations</option>
+            <option value="meeting">Meeting expectations</option>
+            <option value="exceeding">Exceeding expectations</option>
+          </Select>
         </Field>
-      )}
-      <Field label="Rating" hint="Against the published scale, not a number without a definition.">
-        <Select name="rating" defaultValue={String(existing?.fields.rating ?? "")}>
-          <option value="">Not set</option>
-          {["below", "meeting", "exceeding"].map((rating) => <option key={rating}>{rating}</option>)}
-        </Select>
-      </Field>
-      <Field label="Evidence" required={!existing}>
-        <TextArea name="evidence" rows={4} defaultValue={existing?.summary ?? ""} />
-      </Field>
-      {existing?.fields.aiAssisted === true && (
-        <Notice tone="warning" title="This draft was assembled with help from an AI employee">
-          Saving sets the AI-assisted flag to false, because a person is now accountable for what it says.
-        </Notice>
-      )}
+        <Field label="Evidence and manager notes">
+          <TextArea name="evidence" rows={5} disabled={!writable}
+            defaultValue={existing?.summary ?? ""} />
+        </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Review accountability"
+        description="Saving a draft does not submit it, acknowledge it or alter the person's employment.">
+        {existing?.fields.aiAssisted === true && (
+          <Notice tone="warning" title="AI-assisted content still needs human review">
+            The AI-assisted marker remains until a reviewer explicitly confirms the evidence has been checked.
+            Merely pressing Save does not clear it.
+          </Notice>
+        )}
+        {existing?.fields.aiAssisted === true && (
+          <Checkbox label="I have personally read, checked and taken responsibility for this review evidence"
+            checked={humanReviewed} disabled={!writable}
+            onChange={(event) => setHumanReviewed(event.target.checked)} />
+        )}
+        {!writable && <Notice tone="warning" title="Review editing is restricted">
+          Use the native review submission or acknowledgement workflow. This existing record cannot be rewritten from this form.
+        </Notice>}
+        {error && <Notice tone="danger" title="Review not saved">{error}</Notice>}
+      </PeopleDialogSection>
     </form>
   );
 }
@@ -928,98 +1387,238 @@ function Calibration({ context }: { context: ScreenContext }) {
 
 function CourseBuilder({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = useRecord(payload?.id);
+  const raw = useRecord(payload?.id);
+  const existing = scopedDetailRecord(raw, context.org.id, "courses");
+  const [error, setError] = useState("");
+  const canEdit = context.can("edit_knowledge");
+  if (payload?.id && !existing) return (
+    <Empty title="Selected course unavailable">
+      The course was not found in this company. A broken edit link cannot create a replacement course.
+    </Empty>
+  );
   return (
-    <form
-      id="hr-course"
-      className="ds-stack ds-gap-4"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        const form = new FormData(event.currentTarget);
-        const fields = { minutes: Number(form.get("minutes") ?? 30), required: form.get("required") === "on", completions: Number(existing?.fields.completions ?? 0), format: "Recorded in this workspace" };
+    <form id="hr-course" className="ds-stack ds-gap-4" onSubmit={async (event) => {
+      event.preventDefault();
+      setError("");
+      if (!canEdit) { setError("This role cannot create or edit learning content."); return; }
+      const form = new FormData(event.currentTarget);
+      const title = String(form.get("title") ?? "").trim();
+      const summary = String(form.get("summary") ?? "").trim();
+      const rawMinutes = String(form.get("minutes") ?? "").trim();
+      const minutes = Number(rawMinutes);
+      if (title.length < 3) { setError("Enter a course title of at least three characters."); return; }
+      if (!/^\d+$/.test(rawMinutes) || !Number.isInteger(minutes) || minutes < 5 || minutes > 600) {
+        setError("Estimated duration must be a whole number between 5 and 600 minutes.");
+        return;
+      }
+      const required = form.get("required") === "on";
+      try {
         if (existing) {
-          await context.mutate.patch(existing.id, { title: String(form.get("title") ?? existing.title), summary: String(form.get("summary") ?? ""), fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Course updated: ${existing.title}` });
+          const saved = await context.mutate.patch(existing.id, {
+            title, summary,
+            fields: { ...existing.fields, minutes, required },
+          }, { expectRevision: existing.revision, event: `Learning record ${existing.title} updated by ${context.actor}` });
+          if (!saved) { setError("The course has changed. Reopen the latest record before saving."); return; }
         } else {
-          await context.mutate.create({ collection: "courses", title: String(form.get("title") ?? "Course"), status: "published", summary: String(form.get("summary") ?? ""), fields }, `Course created: ${String(form.get("title") ?? "")}`);
+          await context.mutate.create({
+            collection: "courses", title, status: "draft", summary,
+            fields: { minutes, required, format: "Local course metadata — content not hosted" },
+          }, `Draft course record created by ${context.actor}: ${title}`);
         }
-        context.toast("Course saved", "It is in the course list with its completion count.");
+        context.toast("Course record saved",
+          "The local course metadata was saved. No lesson, video, learner completion or external publication was created.");
         close();
-      }}
-    >
-      <Field label="Course title" required><TextInput name="title" defaultValue={existing?.title ?? ""} required /></Field>
-      <Field label="What it covers"><TextArea name="summary" rows={3} defaultValue={existing?.summary ?? ""} /></Field>
-      <Row gap={3}>
-        <Field label="Minutes"><TextInput name="minutes" inputMode="numeric" align="end" defaultValue={String(existing?.fields.minutes ?? 30)} /></Field>
-      </Row>
-      <Checkbox name="required" label="Everyone employed must complete this" defaultChecked={existing?.fields.required === true} />
-      <Notice tone="info">A course here is a record with a completion count. No video or document is hosted by this workspace.</Notice>
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "The course record could not be saved.");
+      }
+    }}>
+      <PeopleDialogLead eyebrow="PEOPLE / LEARNING" title={existing ? "Refine the course record" : "Build a new learning record"}
+        description="Define the subject, expected duration and required status. Actual teaching material and learner evidence must be supplied separately."
+        status={<Pill tone={existing?.status === "published" ? "info" : "neutral"}>
+          {existing?.status ?? "New draft"}
+        </Pill>} />
+      <PeopleDialogSection step="01" title="Course identity" description="A title that tells employees what they are expected to learn.">
+        <Field label="Course title" required>
+          <TextInput name="title" defaultValue={existing?.title ?? ""} required
+            placeholder="e.g. Account access and security" disabled={!canEdit} />
+        </Field>
+        <Field label="What this course covers">
+          <TextArea name="summary" rows={4} defaultValue={existing?.summary ?? ""}
+            disabled={!canEdit} />
+        </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Duration and assignment" description="Keep an estimate distinct from confirmed learner progress.">
+        <Field label="Estimated duration (minutes)" required hint="Whole minutes from 5 to 600.">
+          <TextInput name="minutes" inputMode="numeric" required
+            defaultValue={String(existing?.fields.minutes ?? 30)} disabled={!canEdit} />
+        </Field>
+        <Checkbox name="required" label="Mark as required — learners must still be assigned explicitly"
+          defaultChecked={existing?.fields.required === true} disabled={!canEdit} />
+        <Properties rows={[
+          { label: "Recorded completions", value: existing?.fields.completions === undefined
+            ? "Not recorded" : String(existing.fields.completions) },
+          { label: "Hosted course content", value: "No hosting connection" },
+        ]} />
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Publication boundary"
+        description="A course record does not imply lessons have been hosted, a quiz completed or a certificate issued.">
+        <Notice tone="info" title="Saving does not complete or publish a learning module">
+          This action stores company-scoped metadata. It does not change an existing completion count or generate a learner assignment.
+        </Notice>
+        {!canEdit && <Notice tone="warning" title="Role permission required">
+          Your current role cannot edit learning content.
+        </Notice>}
+        {error && <Notice tone="danger" title="Course not saved">{error}</Notice>}
+      </PeopleDialogSection>
     </form>
   );
 }
 
 function Quiz({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const course = useRecord(payload?.id);
+  const raw = useRecord(payload?.id);
+  const course = scopedDetailRecord(raw, context.org.id, "courses");
+  const [access, setAccess] = useState("");
+  const [reply, setReply] = useState("");
+  const [checked, setChecked] = useState(false);
+  if (payload?.id && !course) return (
+    <Empty title="Selected course unavailable">Open a company course to preview a sample knowledge check.</Empty>
+  );
+  const complete = Boolean(access && reply);
+  const correct = access === "named-approver" && reply === "human-draft";
   return (
     <Stack gap={4}>
-      <h3>{course?.title ?? "Course check"}</h3>
-      <Stack gap={3}>
-        <Field label="Who may approve an access grant?">
-          <Select defaultValue="">
+      <PeopleDialogLead eyebrow="PEOPLE / LEARNING / PREVIEW" title="Preview the knowledge check"
+        description={course ? `Sample assessment shown in the context of ${course.title}. These questions are not attached to the course content.`
+          : "A sample knowledge check demonstrating the interaction, without a saved learner result."}
+        status={<Pill tone="neutral">Preview only</Pill>} />
+      <PeopleDialogSection step="01" title="Access accountability">
+        <Field label="Who can approve a local access request?">
+          <Select value={access} onChange={(event) => { setAccess(event.target.value); setChecked(false); }}>
             <option value="">Choose an answer</option>
-            <option>Anyone whose employment status changed</option>
-            <option>A named approver, recorded on the request</option>
-            <option>The AI employee that noticed the gap</option>
+            <option value="anyone">Anyone whose employment status changed</option>
+            <option value="named-approver">A named approver on the request</option>
+            <option value="ai">An AI employee that noticed a gap</option>
           </Select>
         </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Communication control">
         <Field label="What may an AI employee do with a customer reply?">
-          <Select defaultValue="">
+          <Select value={reply} onChange={(event) => { setReply(event.target.value); setChecked(false); }}>
             <option value="">Choose an answer</option>
-            <option>Send it once it is confident</option>
-            <option>Draft it for a person to read and send</option>
-            <option>Send it if the customer has asked twice</option>
+            <option value="send-now">Send when confident</option>
+            <option value="human-draft">Draft for a person to review and send</option>
+            <option value="follow-up">Send if the customer asks twice</option>
           </Select>
         </Field>
-      </Stack>
-      <Button variant="primary" onClick={() => context.toast("Answers recorded", "The completion is recorded against your name in this browser.")}>Record my answers</Button>
-      <Notice tone="info">A quiz result is a record in this workspace, not a certificate from anybody.</Notice>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Check your selections"
+        description="The result is shown here only; nothing is submitted to a learner record.">
+        <Button variant="primary" disabled={!complete} onClick={() => setChecked(true)}>Check preview answers</Button>
+        {checked && <Notice tone={correct ? "info" : "warning"} title={correct
+          ? "Both sample answers are correct" : "Review the answer choices"}>
+          {correct ? "The preview matches the sample access and communication rules."
+            : "An access grant requires a named approver; an AI employee can draft but does not send an unchecked message."}
+          {" "}This is not an assessed completion or certificate.
+        </Notice>}
+        <Notice tone="info" title="No completion is recorded">
+          This preview has no linked assessment content or verified learner identity. Closing it will not alter course completions.
+        </Notice>
+      </PeopleDialogSection>
     </Stack>
   );
 }
 
 function PolicyPublication({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const policy = useRecord(payload?.id);
-  if (!policy) return <Empty title="Select a policy" />;
+  const raw = useRecord(payload?.id);
+  const policy = scopedDetailRecord(raw, context.org.id, "policies");
+  const [summary, setSummary] = useState(policy?.summary ?? "");
+  const [reason, setReason] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [error, setError] = useState("");
+  if (!policy || policy.fields.kind !== "hr") return (
+    <Empty title="Selected HR policy unavailable">
+      Choose a valid policy from this company before reviewing a revision.
+    </Empty>
+  );
   const current = String(policy.fields.version ?? "1.0");
-  const next = `${Number(current.split(".")[0]) + 0}.${Number(current.split(".")[1] ?? 0) + 1}`;
+  const version = /^(\d+)\.(\d+)$/.exec(current);
+  const next = version ? `${version[1]}.${Number(version[2]) + 1}` : "";
+  const canPublish = context.can("edit_people") || context.can("edit_knowledge");
+  const changed = summary.trim() !== policy.summary.trim();
+  const valid = canPublish && Boolean(next) && changed && summary.trim().length >= 20
+    && reason.trim().length >= 12 && confirmed;
   return (
     <Stack gap={4}>
-      <p className="ds-prose">
-        Publishing version {next} of {policy.title} keeps version {current} on the record and starts the acknowledgement count again
-        from zero. {String(policy.fields.acknowledged ?? 0)} acknowledgements of version {current} are preserved.
-      </p>
-      <Properties rows={[
-        { label: "Current version", value: current },
-        { label: "New version", value: next },
-        { label: "Acknowledgements kept", value: `${String(policy.fields.acknowledged ?? 0)} against v${current}` },
-        { label: "Acknowledgements needed again", value: policy.fields.acknowledgementRequired === true ? "Yes, from everyone employed" : "No" },
-      ]} />
-      <Row gap={2}>
+      <PeopleDialogLead eyebrow="PEOPLE / POLICY GOVERNANCE" title="Publish a reviewed record revision"
+        description="Compare the existing summary to its replacement, describe why it changes, and explicitly confirm the new acknowledgement cycle."
+        status={<Pill tone="warning">Human approval required</Pill>} />
+      <PeopleDialogSection step="01" title="Current record" description="This action affects the selected policy in this company only.">
+        <Properties rows={[
+          { label: "Policy", value: policy.title },
+          { label: "Current version", value: current },
+          { label: "Proposed version", value: next || "Version format needs review" },
+          { label: "Acknowledgements in current aggregate", value: policy.fields.acknowledged === undefined
+            ? "Not recorded" : String(policy.fields.acknowledged) },
+          { label: "New-version acknowledgement count", value: "Starts with none" },
+        ]} />
+        {!version && <Notice tone="danger" title="Invalid existing version">
+          The recorded version needs a numeric major.minor format before a next version can be derived.
+        </Notice>}
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Revised summary and publication reason"
+        description="The stored summary is updated and captured in record history. Attached or structured policy documents are not changed by this form.">
+        <Field label="Updated policy summary" required>
+          <TextArea rows={5} value={summary} disabled={!canPublish}
+            onChange={(event) => { setSummary(event.target.value); setError(""); }} />
+        </Field>
+        <Field label="Why is this revision necessary?" required>
+          <TextArea rows={3} value={reason} disabled={!canPublish}
+            onChange={(event) => { setReason(event.target.value); setError(""); }} />
+        </Field>
+        {!changed && <Notice tone="warning" title="No revised summary yet">
+          Enter a substantive change; simply incrementing the version would not communicate any new policy content.
+        </Notice>}
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Publication and acknowledgement"
+        description="The previous version's linked acknowledgements remain separate and its prior summary remains in record history.">
+        <Checkbox checked={confirmed} disabled={!canPublish} onChange={(event) => setConfirmed(event.target.checked)}
+          label="I reviewed this summary revision and understand that the new version requires its own acknowledgements" />
+        <Notice tone="info" title="This is a local record publication">
+          Changing this policy record does not send emails, change attached documents, legally validate the policy or automatically obtain employee acknowledgements.
+        </Notice>
+        {!canPublish && <Notice tone="warning" title="Publication role required">
+          Your current role cannot publish a revision of this HR policy.
+        </Notice>}
+        {error && <Notice tone="danger" title="Revision not published">{error}</Notice>}
+      </PeopleDialogSection>
+      <Row gap={2} wrap>
         <Button variant="ghost" onClick={close}>Cancel</Button>
         <span className="ds-grow" />
-        <Button
-          variant="primary"
-          onClick={async () => {
-            await context.mutate.patch(policy.id, {
-              fields: { ...policy.fields, version: next, acknowledged: 0, supersedes: current },
-            }, { expectRevision: policy.revision, event: `${policy.title} published as version ${next}, superseding ${current}` });
-            context.toast("Revision published", `Version ${next} is live and version ${current} is kept in the history.`);
+        <Button variant="primary" disabled={!valid} onClick={async () => {
+          setError("");
+          if (!valid || !next) return;
+          try {
+            const saved = await context.mutate.patch(policy.id, {
+              summary: summary.trim(),
+              fields: {
+                ...policy.fields, version: next, supersedes: current,
+                acknowledged: 0, revisionReason: reason.trim(),
+                publishedBy: context.actor, publishedAt: clockIso(),
+              },
+            }, {
+              expectRevision: policy.revision,
+              event: `${policy.title} summary revision ${next} published by ${context.actor}; supersedes ${current}`,
+            });
+            if (!saved) { setError("The policy has changed; reopen the latest record before publishing."); return; }
+            context.toast("Local policy revision saved",
+              `Version ${next} now has a revised summary and a fresh acknowledgement cycle; linked documents were not changed.`);
             close();
-          }}
-        >
-          Publish version {next}
-        </Button>
+          } catch (problem) {
+            setError(problem instanceof Error ? problem.message : "The policy revision could not be saved.");
+          }
+        }}>Publish version {next || "—"}</Button>
       </Row>
     </Stack>
   );

@@ -7,6 +7,11 @@ import type { Rec } from "@/domain/types";
 import { computePayroll } from "./panels";
 import { RoleViewNote, leaveBalance } from "./kit";
 import { recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
+import { scopedDetailRecord } from "@/platform/recordScope";
+import { planHireApplicant, planLeaveDecision } from "./decisions";
+import { newRecord } from "@/platform/repo";
+import { planShiftSwap, planTimesheetApprovals } from "./workforce";
+import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
 export { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 import { Boundary, askFirst, boundaryText, logBoundary, pickRecord, recordOf } from "./opsKit";
 
@@ -90,9 +95,10 @@ export function DirectoryFilter({ context, close }: { context: ScreenContext; cl
 /* ---------------- ARL-HR-003 · Update profile ---------------- */
 
 export function ProfileEditor({ context, close }: { context: ScreenContext; close: () => void }) {
-  const employee = useRecord(context.params.id);
+  const candidate = useRecord(context.params.id);
+  const employee = scopedDetailRecord(candidate, context.org.id, "employees");
   const data = useCollections(["departments", "employees"]);
-  if (!employee) return <Empty title="Open an employee first" />;
+  if (!employee) return <Empty title="Employee unavailable">Open an employee from the directory before editing.</Empty>;
   return (
     <form
       id="hr-profile"
@@ -165,20 +171,49 @@ export function ScheduleInterview({ context, close }: { context: ScreenContext; 
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!applicant || past || Number.isNaN(startAt.getTime())) return;
-        const meeting = await context.mutate.create({
-          collection: "meetings",
+        const reviewer = data.employees.find((employee) => employee.title === interviewer
+          && employee.organizationId === context.org.id && !["alumni", "terminated"].includes(employee.status));
+        if (!applicant || applicant.organizationId !== context.org.id || !open.some((row) => row.id === applicant.id)
+          || past || Number.isNaN(startAt.getTime()) || !Number.isInteger(minutes) || minutes < 15 || minutes > 180
+          || !reviewer) {
+          context.toast("Interview not recorded", "Select an active applicant, company interviewer and future date with a 15–180 minute duration.", "blocked");
+          return;
+        }
+        const stamp = clockIso();
+        const meeting = newRecord({
+          organizationId: context.org.id, currency: context.org.currency, collection: "meetings",
           title: `Interview · ${applicant.title}`,
           status: clashes.length ? "tentative" : "scheduled",
-          summary: `Interview for ${String(applicant.fields.role ?? "the role")}. Scorecard to be recorded by ${interviewer}.`,
+          summary: `Local interview record for ${String(applicant.fields.role || "the role")}. Reviewer: ${interviewer}.`,
           startAt: startAt.toISOString(), endAt: endAt.toISOString(), at: startAt.toISOString(),
           parentId: applicant.id,
-          fields: { where: "Studio table", organizer: context.actor, attendees: [interviewer, context.actor].filter((name, index, all) => all.indexOf(name) === index).join(","), minutes, kind: "interview", applicantId: applicant.id, conferencing: "not_connected", accepted: 0 },
-        }, `Interview with ${applicant.title} scheduled by ${context.actor}`);
-        await context.mutate.patch(applicant.id, { fields: { ...applicant.fields, stage: "interview", interviewAt: startAt.toISOString(), interviewId: meeting.id } }, { expectRevision: applicant.revision, event: `${applicant.title} moved to interview` });
-        await logBoundary(context, "calendar.sync", `Interview invitation for ${applicant.title} kept locally`, meeting.id);
-        context.toast("Interview scheduled", `${context.dateTime(startAt)} is on the calendar${clashes.length ? " as tentative because of a clash" : ""}. No invitation left this browser.`);
-        close();
+          fields: { where: "Studio table", organizer: context.actor,
+            attendees: [interviewer, context.actor].filter((name, index, all) => all.indexOf(name) === index).join(","),
+            minutes, kind: "interview", applicantId: applicant.id, conferencing: "not_connected", accepted: 0 },
+        }, { actor: context.actor, now: stamp });
+        const revised: Rec = {
+          ...applicant, revision: applicant.revision + 1, updatedAt: stamp, updatedBy: context.actor,
+          fields: { ...applicant.fields, stage: "interview", interviewAt: startAt.toISOString(), interviewId: meeting.id },
+          history: [{
+            title: applicant.title, status: applicant.status, summary: applicant.summary,
+            fields: { ...applicant.fields }, body: applicant.body,
+            amountMinor: applicant.amountMinor, at: stamp,
+          }, ...applicant.history].slice(0, 25),
+        };
+        try {
+          await context.mutate.putMany([meeting, revised],
+            [`Interview with ${applicant.title} recorded by ${context.actor}`,
+              `${applicant.title} linked to the local interview by ${context.actor}`],
+            { [applicant.id]: applicant.revision }, ["create", "update"]);
+          await logBoundary(context, "calendar.sync",
+            `Interview invitation for ${applicant.title} kept locally`, meeting.id);
+          context.toast("Interview recorded locally",
+            `${context.dateTime(startAt)} is stored${clashes.length ? " tentatively because of a conflict" : ""}. No external calendar or invitation was updated.`);
+          close();
+        } catch (error) {
+          context.toast("Interview not saved", error instanceof Error
+            ? error.message : "Reload the candidate and check the schedule before trying again.", "blocked");
+        }
       }}
     >
       <Field label="Candidate" required>
@@ -190,7 +225,7 @@ export function ScheduleInterview({ context, close }: { context: ScreenContext; 
       <Row gap={3}>
         <Field label="Date"><TextInput type="date" value={date} onChange={(event) => setDate(event.target.value)} invalid={past} /></Field>
         <Field label="Start (UTC)"><TextInput type="time" value={start} onChange={(event) => setStart(event.target.value)} /></Field>
-        <Field label="Minutes"><TextInput inputMode="numeric" align="end" value={String(minutes)} onChange={(event) => setMinutes(Number(event.target.value) || 45)} /></Field>
+        <Field label="Minutes"><TextInput inputMode="numeric" align="end" value={String(minutes)} onChange={(event) => setMinutes(Number(event.target.value))} /></Field>
       </Row>
       <Field label="Interviewer">
         <Select value={interviewer} onChange={(event) => setInterviewer(event.target.value)}>
@@ -209,17 +244,22 @@ export function ScheduleInterview({ context, close }: { context: ScreenContext; 
 const STAGES = ["applied", "screen", "interview", "offer", "hired", "rejected"];
 
 export function StageDecision({ context, close }: { context: ScreenContext; close: () => void }) {
-  const applicant = useRecord(context.params.id ?? context.selectedId);
+  const candidate = useRecord(context.params.id ?? context.selectedId);
+  const applicant = scopedDetailRecord(candidate, context.org.id, "applicants");
   const employees = useCollection("employees");
   const [stage, setStage] = useState("");
   const [reason, setReason] = useState("");
-  if (!applicant) return <Empty title="Open an applicant first" />;
+  const [acceptanceEvidence, setAcceptanceEvidence] = useState("");
+  if (!applicant) return <Empty title="Candidate unavailable">Open a valid candidate record before recording a hiring decision.</Empty>;
   const scored = applicant.fields.rating !== undefined && Number(applicant.fields.rating) > 0;
   const needsScore = (stage === "offer" || stage === "rejected") && !scored;
   const offerIssued = applicant.fields.offerIssuedBy !== undefined && String(applicant.fields.offerIssuedBy) !== "";
   const needsOffer = stage === "hired" && !offerIssued;
-  const email = String(applicant.fields.email ?? "").toLowerCase();
-  const existing = employees.find((row) => row.title === applicant.title || (email !== "" && String(row.fields.email ?? "").toLowerCase() === email));
+  const email = String(applicant.fields.email ?? "").trim().toLowerCase();
+  const matching = employees.filter((row) =>
+    row.fields.applicantId === applicant.id ||
+    (email !== "" && String(row.fields.email ?? "").trim().toLowerCase() === email));
+  const existing = matching.length === 1 ? matching[0] : undefined;
   return (
     <form
       id="hr-stage"
@@ -229,36 +269,26 @@ export function StageDecision({ context, close }: { context: ScreenContext; clos
         if (!stage || !reason.trim() || needsScore || needsOffer) return;
         const at = context.now.toISOString();
         if (stage === "hired") {
-          let employeeId = existing?.id;
-          if (!existing) {
-            const created = await context.mutate.create({
-              collection: "employees",
-              title: applicant.title,
-              status: "probation",
-              summary: `Hired from an accepted offer recorded by ${context.actor}. Any invitation is a local draft.`,
-              startAt: String(applicant.fields.startDate ?? "") || undefined,
-              fields: {
-                kind: "human", title: String(applicant.fields.role ?? ""), employment: String(applicant.fields.employment ?? "full-time"),
-                email: String(applicant.fields.email ?? ""), manager: context.actor, office: "Clerkenwell studio",
-                leaveAllowance: 25, leaveTaken: 0, salaryMinor: 0, pensionPct: 5, phone: "Not shared", applicantId: applicant.id,
-              },
-            }, `Employee record created for ${applicant.title} from an accepted offer`);
-            employeeId = created.id;
+          try {
+            const plan = planHireApplicant({
+              organizationId: context.org.id, currency: context.org.currency,
+              actor: context.actor, now: at,
+            }, applicant, employees, reason, acceptanceEvidence);
+            await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+            context.toast("Hiring recorded", existing
+              ? "The accepted application is linked to the existing employee record. No invitation was sent."
+              : "The accepted application and new employee were saved together. No invitation was sent.");
+            close();
+          } catch (error) {
+            context.toast("Hiring not recorded", error instanceof Error ? error.message : "The records changed. Reload and try again.", "blocked");
           }
-          await context.mutate.patch(applicant.id, {
-            status: "hired",
-            fields: { stage: "hired", offerAcceptedAt: at, offerAcceptedRecordedBy: context.actor, employeeId: employeeId ?? "", decidedBy: context.actor, decisionReason: reason.trim(), decidedAt: at },
-          }, { expectRevision: applicant.revision, event: `${applicant.title} accepted the offer; hired, recorded by ${context.actor}: ${reason.trim()}` });
-          context.toast("Hired", existing
-            ? `${applicant.title} accepted the offer. Their existing employee record is linked; no second record was made.`
-            : `${applicant.title} accepted the offer. An employee record was created in the directory; no invitation left this browser.`);
-          close();
           return;
         }
-        await context.mutate.patch(applicant.id, {
+        const updated = await context.mutate.patch(applicant.id, {
           status: stage === "rejected" ? "rejected" : applicant.status === "rejected" ? "active" : applicant.status,
           fields: { ...applicant.fields, stage, decidedBy: context.actor, decisionReason: reason.trim(), decidedAt: at },
         }, { expectRevision: applicant.revision, event: `${applicant.title} moved to ${stage} by ${context.actor}: ${reason.trim()}` });
+        if (!updated) return;
         context.toast("Decision recorded", `${applicant.title} is at ${stage}, decided by ${context.actor} with a reason on the record.`);
         close();
       }}
@@ -281,11 +311,19 @@ export function StageDecision({ context, close }: { context: ScreenContext; clos
       {needsScore && <Notice tone="danger" title="A scorecard comes first">An offer or a rejection needs a recorded scorecard so the decision rests on evidence.</Notice>}
       {needsOffer && <Notice tone="danger" title="No offer has been issued">A candidate is hired only after an issued offer is accepted. Issue the offer from Recruitment first.</Notice>}
       {stage === "hired" && !needsOffer && (
-        <Notice tone="info" title="Recording the candidate's acceptance">
-          {existing
-            ? `${applicant.title} already has an employee record; it is linked rather than duplicated.`
-            : `This records that ${applicant.title} accepted the offer and creates their employee record in the directory. No invitation or contract is sent.`}
-        </Notice>
+        <Stack gap={2}>
+          <Field label="Evidence that the candidate accepted" required hint="Record how the acceptance was confirmed, for example a dated reply or a signed offer kept separately. No message or contract is sent.">
+            <TextArea rows={3} value={acceptanceEvidence} onChange={(event) => setAcceptanceEvidence(event.target.value)} required />
+          </Field>
+          <Notice tone="info" title="Manual evidence is required">
+            {matching.length > 1
+              ? "Multiple employees match this candidate. Resolve the duplicate before hiring."
+              : existing
+                ? "The matching employee will be linked only if its identity is consistent."
+                : "The applicant and new employee are created together in a single revision-checked local transaction."}
+            This records the evidence supplied by a person; Arlovi does not independently verify acceptance.
+          </Notice>
+        </Stack>
       )}
       <Notice tone="info" title="A person decides">Nothing ranks or moves candidates automatically. The decision is attributed to {context.actor}.</Notice>
     </form>
@@ -293,9 +331,10 @@ export function StageDecision({ context, close }: { context: ScreenContext; clos
 }
 
 export function ApplicantMessage({ context, close }: { context: ScreenContext; close: () => void }) {
-  const applicant = useRecord(context.params.id ?? context.selectedId);
+  const candidate = useRecord(context.params.id ?? context.selectedId);
+  const applicant = scopedDetailRecord(candidate, context.org.id, "applicants");
   const thread = useCollection("emailThreads").filter((row) => row.parentId === applicant?.id);
-  if (!applicant) return <Empty title="Open an applicant first" />;
+  if (!applicant) return <Empty title="Candidate unavailable">Open a valid candidate before drafting a message.</Empty>;
   const consent = String(applicant.fields.consentUntil ?? applicant.fields.retainUntil ?? "");
   const lapsed = consent !== "" && new Date(consent) < context.now;
   return (
@@ -429,19 +468,24 @@ async function leaveRequestFor(context: ScreenContext, verb: string, then: (requ
 export function approveLeave(context: ScreenContext): Promise<void> {
   return leaveRequestFor(context, "Approve", (request) => {
     const who = String(request.fields.employeeName ?? request.ownerName);
-    const days = Number(request.fields.days ?? 1);
     askFirst(context, {
       title: "Approve leave",
       body: `${who} is booked away ${context.date(request.startAt)} – ${context.date(request.endAt)}. The request and the balance both change, and the approval is recorded against ${context.actor}.`,
       confirm: "Approve leave",
       run: async () => {
-        const { getRecord } = await import("@/platform/repo");
-        await context.mutate.patch(request.id, { status: "approved", fields: { ...request.fields, decidedBy: context.actor, decidedAt: clockIso() } }, { expectRevision: request.revision, event: `Leave approved for ${who} by ${context.actor}` });
-        const employee = await getRecord(String(request.fields.employeeId ?? ""));
-        if (employee && String(request.fields.type ?? "annual") === "annual") {
-          await context.mutate.patch(employee.id, { fields: { ...employee.fields, leaveTaken: Number(employee.fields.leaveTaken ?? 0) + days } }, { expectRevision: employee.revision, event: "Leave balance updated after approval" });
+        try {
+          const { getRecordInOrg } = await import("@/platform/repo");
+          const employeeId = String(request.fields.employeeId ?? "");
+          const employee = employeeId ? await getRecordInOrg(context.org.id, employeeId) : undefined;
+          const plan = planLeaveDecision({
+            organizationId: context.org.id, currency: context.org.currency,
+            actor: context.actor, now: clockIso(),
+          }, request, employee, "approved");
+          await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+          context.toast("Leave approved", `${who}'s request and any annual balance change were saved together.`);
+        } catch (error) {
+          context.toast("Leave not approved", error instanceof Error ? error.message : "Reload this request before deciding.", "blocked");
         }
-        context.toast("Leave approved", `${who}'s request is approved by ${context.actor}.`);
       },
     });
   });
@@ -456,8 +500,16 @@ export function declineLeave(context: ScreenContext): Promise<void> {
       confirm: "Decline the request",
       tone: "danger",
       run: async () => {
-        await context.mutate.patch(request.id, { status: "declined", fields: { ...request.fields, decidedBy: context.actor, decidedAt: clockIso() } }, { expectRevision: request.revision, event: `Leave declined for ${who} by ${context.actor}` });
-        context.toast("Leave declined", `Recorded against the request, decided by ${context.actor}.`);
+        try {
+          const plan = planLeaveDecision({
+            organizationId: context.org.id, currency: context.org.currency,
+            actor: context.actor, now: clockIso(),
+          }, request, undefined, "declined");
+          await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+          context.toast("Leave declined", `Recorded against the request, decided by ${context.actor}.`);
+        } catch (error) {
+          context.toast("Leave not declined", error instanceof Error ? error.message : "Reload this request before deciding.", "blocked");
+        }
       },
     });
   });
@@ -502,11 +554,23 @@ export function BalanceAdjust({ context, close }: { context: ScreenContext; clos
 export async function approveHours(context: ScreenContext): Promise<void> {
   const approve = (entry: Rec) => askFirst(context, {
     title: "Approve hours",
-    body: `${String(entry.fields.employeeName ?? entry.ownerName)} · ${String(entry.fields.hours ?? 0)} hours on ${context.date(entry.startAt)}. Approved hours feed the payroll inputs.`,
+    body: `${String(entry.fields.employeeName ?? entry.ownerName)} · ${String(entry.fields.hours ?? 0)} hours on ${context.date(entry.startAt)}. Approval records evidence for Finance review; it does not calculate or submit payroll.`,
     confirm: "Approve hours",
     run: async () => {
-      await context.mutate.patch(entry.id, { status: "approved", fields: { ...entry.fields, approved: true, approvedBy: context.actor } }, { expectRevision: entry.revision, event: `Hours approved for ${String(entry.fields.employeeName ?? entry.ownerName)} by ${context.actor}` });
-      context.toast("Hours approved", `Recorded against the time entry by ${context.actor}.`);
+      try {
+        const { listByCollection } = await import("@/platform/repo");
+        const [employees, projects] = await Promise.all([
+          listByCollection(context.org.id, "employees"), listByCollection(context.org.id, "projects"),
+        ]);
+        const plan = planTimesheetApprovals({
+          organizationId: context.org.id, currency: context.org.currency,
+          actor: context.actor, now: clockIso(), timezone: context.org.timezone,
+        }, [entry], employees, projects);
+        await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+        context.toast("Hours approved", "A linked employee and any project were verified. This is a local approval, not a payroll submission.");
+      } catch (error) {
+        context.toast("Hours not approved", error instanceof Error ? error.message : "Reload the time entry and try again.", "blocked");
+      }
     },
   });
   const chosen = await recordOf(context, context.selectedId, "shifts");
@@ -541,11 +605,23 @@ export async function swapShift(context: ScreenContext): Promise<void> {
         ],
         confirm: "Swap the shifts",
         run: async () => {
-          const a = { employeeId: shift.fields.employeeId, employeeName: shift.fields.employeeName };
-          const b = { employeeId: other.fields.employeeId, employeeName: other.fields.employeeName };
-          await context.mutate.patch(shift.id, { fields: { ...shift.fields, ...b, swappedBy: context.actor } }, { expectRevision: shift.revision, event: `Shift swapped to ${String(b.employeeName)} by ${context.actor}` });
-          await context.mutate.patch(other.id, { fields: { ...other.fields, ...a, swappedBy: context.actor } }, { expectRevision: other.revision, event: `Shift swapped to ${String(a.employeeName)} by ${context.actor}` });
-          context.toast("Shifts swapped", "Both roster records changed.");
+          try {
+            const { listByCollection } = await import("@/platform/repo");
+            const [roster, employees, leave, projects] = await Promise.all([
+              listByCollection(context.org.id, "shifts"),
+              listByCollection(context.org.id, "employees"),
+              listByCollection(context.org.id, "leaveRequests"),
+              listByCollection(context.org.id, "projects"),
+            ]);
+            const plan = planShiftSwap({
+              organizationId: context.org.id, currency: context.org.currency,
+              actor: context.actor, now: clockIso(), timezone: context.org.timezone,
+            }, shift, other, roster, employees, leave, projects);
+            await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+            context.toast("Shifts swapped", "Both roster records were saved together after overlap and leave checks.");
+          } catch (error) {
+            context.toast("Swap not saved", error instanceof Error ? error.message : "Reload both shifts and try again.", "blocked");
+          }
         },
       });
     },
@@ -563,36 +639,72 @@ export async function swapShift(context: ScreenContext): Promise<void> {
 
 export function TimeCorrection({ context, close }: { context: ScreenContext; close: () => void }) {
   const entries = useCollection("shifts").filter((row) => row.fields.kind === "time");
+  const employees = useCollection("employees").filter((row) => !["alumni", "terminated"].includes(row.status));
+  const projects = useCollection("projects").filter((row) => !["archived", "deleted", "cancelled"].includes(row.status));
   const [entryIdRaw, setEntryId] = useState<string | null>(null);
   const entryId = entryIdRaw ?? (entries.find((row) => row.id === context.selectedId)?.id ?? entries[0]?.id ?? "");
   const entry = entries.find((row) => row.id === entryId);
   const [hoursRaw, setHours] = useState<string | null>(null);
-  const hours = hoursRaw ?? (String(entry?.fields.hours ?? ""));
+  const [employeeIdRaw, setEmployeeId] = useState<string | null>(null);
+  const [projectIdRaw, setProjectId] = useState<string | null>(null);
+  const hours = hoursRaw ?? String(entry?.fields.hours ?? "");
+  const employeeId = employeeIdRaw ?? String(entry?.fields.employeeId ?? "");
+  const projectId = projectIdRaw ?? String(entry?.fields.projectId ?? "");
   const [reason, setReason] = useState("");
   const value = Number(hours);
-  const invalid = !Number.isFinite(value) || value < 0 || value > 24;
+  const invalid = !Number.isFinite(value) || value <= 0 || value > 24;
   return (
     <form
       id="hr-time-correction"
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!entry || invalid || !reason.trim()) return;
-        await context.mutate.patch(entry.id, { status: "submitted", fields: { ...entry.fields, hours: value, approved: false, correctedFrom: Number(entry.fields.hours ?? 0), correctedBy: context.actor, correctionReason: reason.trim() } }, { expectRevision: entry.revision, event: `Time corrected from ${String(entry.fields.hours ?? 0)} to ${value} hours by ${context.actor}: ${reason.trim()}` });
-        context.toast("Time corrected", "The entry is back to submitted so somebody approves the corrected hours.");
+        const employee = employees.find((row) => row.id === employeeId);
+        const project = projectId ? projects.find((row) => row.id === projectId) : undefined;
+        if (!entry || invalid || !reason.trim() || !employee || (projectId && !project)) {
+          context.toast("Correction blocked", "Enter valid hours, a responsible employee, an available project and a reason.", "blocked");
+          return;
+        }
+        const updated = await context.mutate.patch(entry.id, { status: "submitted", fields: {
+          ...entry.fields, hours: value, employeeId: employee.id, employeeName: employee.title,
+          projectId, approved: false, approvedBy: "", approvedAt: "",
+          billingReviewStatus: "", billingReviewedBy: "", billingReviewedAt: "",
+          correctedFrom: Number(entry.fields.hours ?? 0), correctedBy: context.actor, correctionReason: reason.trim(),
+        } }, { expectRevision: entry.revision,
+          event: `Time corrected for ${employee.title} from ${String(entry.fields.hours ?? 0)} to ${value} hours by ${context.actor}: ${reason.trim()}` });
+        if (!updated) return;
+        context.toast("Time corrected", "Employee and Project links were verified. Prior approval is cleared; People must review this entry again.");
         close();
       }}
     >
       {entries.length === 0 ? <Empty title="No time entries" /> : (
         <>
-          <Field label="Entry">
-            <Select value={entryId} onChange={(event) => { setEntryId(event.target.value); setHours(String(entries.find((row) => row.id === event.target.value)?.fields.hours ?? "")); }}>
-              {entries.map((row) => <option key={row.id} value={row.id}>{String(row.fields.employeeName ?? "")} · {context.date(row.startAt)} · {String(row.fields.hours ?? 0)}h</option>)}
+          <Field label="Time entry" required>
+            <Select value={entryId} onChange={(event) => {
+              setEntryId(event.target.value); setHours(null); setEmployeeId(null); setProjectId(null);
+            }}>
+              {entries.map((row) => <option key={row.id} value={row.id}>{String(row.fields.employeeName ?? "Unlinked person")} · {context.date(row.startAt)} · {String(row.fields.hours ?? 0)}h</option>)}
             </Select>
           </Field>
-          <Field label="Corrected hours"><TextInput inputMode="decimal" align="end" value={hours} onChange={(event) => setHours(event.target.value)} invalid={invalid} /></Field>
+          <Field label="Person who did the work" required>
+            <Select value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}>
+              <option value="">Choose the matching employee record</option>
+              {employees.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
+            </Select>
+          </Field>
+          <Field label="Project" hint="Optional for internal work, but a project link must belong to this company.">
+            <Select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+              <option value="">No Project linked</option>
+              {projects.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
+            </Select>
+          </Field>
+          <Field label="Corrected hours" required>
+            <TextInput inputMode="decimal" align="end" value={hours} onChange={(event) => setHours(event.target.value)} invalid={invalid} required />
+          </Field>
           <Field label="Reason" required><TextArea rows={2} value={reason} onChange={(event) => setReason(event.target.value)} required /></Field>
-          <Notice tone="info">A correction clears the approval, keeps the original figure on the entry and needs approving again.</Notice>
+          <Notice tone="info" title="A corrected entry needs a new approval">
+            This can repair an older time entry missing a real employee or Project link. It clears previous approval, records who corrected it and does not update external payroll.
+          </Notice>
         </>
       )}
     </form>
@@ -605,7 +717,27 @@ function periodKey(now: Date): string {
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+export function payrollSalaryGaps(employees: Rec[]): Rec[] {
+  return employees.filter((employee) => !["alumni", "terminated"].includes(employee.status)
+    && employee.fields.employment !== "contractor"
+    && (employee.fields.salaryMinor === undefined || employee.fields.salaryMinor === null
+      || String(employee.fields.salaryMinor).trim() === ""
+      || !Number.isFinite(Number(employee.fields.salaryMinor))
+      || Number(employee.fields.salaryMinor) < 0));
+}
+
 export async function prepareRun(context: ScreenContext, runs: Rec[], employees: Rec[]): Promise<void> {
+  if (!context.can("view_payroll")) {
+    context.toast("Payroll restricted", "An authorised payroll role is required.", "blocked");
+    return;
+  }
+  const gaps = payrollSalaryGaps(employees);
+  if (gaps.length) {
+    context.toast("Payroll input incomplete",
+      `${gaps.length} eligible employee${gaps.length === 1 ? "" : "s"} have no valid recorded salary. Verify the source records before preparing a run.`,
+      "blocked");
+    return;
+  }
   const period = periodKey(context.now);
   const lines = computePayroll(employees);
   const gross = lines.reduce((sum, line) => sum + line.grossMinor, 0);
@@ -626,14 +758,24 @@ export async function prepareRun(context: ScreenContext, runs: Rec[], employees:
 export async function validateRun(context: ScreenContext, runs: Rec[], employees: Rec[], shifts: Rec[]): Promise<void> {
   const run = runs.find((row) => row.status === "draft");
   if (!run) { context.toast("No draft run", "Prepare a run first; approved runs are not re-validated.", "blocked"); return; }
-  const lines = computePayroll(employees);
-  const exceptions = lines.filter((line) => line.grossMinor === 0).length + shifts.filter((row) => row.fields.kind === "time" && row.fields.approved !== true).length;
+  const exceptions = payrollSalaryGaps(employees).length
+    + shifts.filter((row) => row.fields.kind === "time"
+      && (row.fields.approved !== true || row.status !== "approved")).length;
   await context.mutate.patch(run.id, { fields: { ...run.fields, validatedBy: context.actor, validatedAt: clockIso(), exceptions, jurisdictionValidated: false } }, { expectRevision: run.revision, event: `${run.title} validated by ${context.actor}: ${exceptions} data exceptions; ${context.org.jurisdiction} rules not validated` });
   context.toast(exceptions ? "Exceptions found" : "No data exceptions", `${exceptions} exception${exceptions === 1 ? "" : "s"} recorded on the run. ${context.org.jurisdiction} rules still need a payroll provider.`, exceptions ? "blocked" : "ok");
   context.openOverlay("exception report");
 }
 
 export async function exportRun(context: ScreenContext, runs: Rec[], employees: Rec[]): Promise<void> {
+  if (!context.can("view_payroll") || !context.can("export_data")) {
+    context.toast("Export unavailable", "The current role cannot export payroll inputs.", "blocked");
+    return;
+  }
+  const gaps = payrollSalaryGaps(employees);
+  if (gaps.length) {
+    context.toast("Export blocked", `${gaps.length} eligible employee salary records are incomplete. Verify them first.`, "blocked");
+    return;
+  }
   const run = runs.find((row) => row.status === "draft") ?? runs[0];
   const lines = computePayroll(employees);
   const header = "person,basis,gross,tax,ni,pension,net\n";
@@ -649,48 +791,113 @@ export async function exportRun(context: ScreenContext, runs: Rec[], employees: 
 }
 
 export function ReconcileRun({ context, close }: { context: ScreenContext; close: () => void }) {
-  const data = useCollections(["payrollRuns", "employees", "journals", "accounts"]);
-  const run = data.payrollRuns.find((row) => row.status === "draft") ?? data.payrollRuns[0];
+  const data = useCollections(["payrollRuns", "journals", "accounts"]);
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const [journalId, setJournalId] = useState("");
+  const [checked, setChecked] = useState(false);
+  const [error, setError] = useState("");
+  const wantedId = payload?.id ?? context.selectedId;
+  const run = wantedId
+    ? data.payrollRuns.find((row) => row.id === wantedId && row.organizationId === context.org.id)
+    : data.payrollRuns.find((row) => row.status === "draft");
   const wages = data.accounts.find((row) => String(row.fields.code ?? "") === "6300");
-  const journals = data.journals
+  const candidates = data.journals
     .filter((row) => row.status === "posted")
     .map((row) => {
-      const body = row.body as { lines?: { accountId: string; debitMinor: number }[] } | undefined;
-      const debit = (body?.lines ?? []).filter((line) => wages && line.accountId === wages.id).reduce((sum, line) => sum + line.debitMinor, 0);
+      const journal = row.body as { lines?: { accountId: string; debitMinor: number }[] } | undefined;
+      const debit = (journal?.lines ?? [])
+        .filter((line) => wages && line.accountId === wages.id)
+        .reduce((sum, line) => sum + Number(line.debitMinor || 0), 0);
       return { row, debit };
     })
-    .filter((item) => item.debit > 0)
-    .sort((a, b) => String(b.row.at).localeCompare(String(a.row.at)));
-  const latest = journals[0];
-  const gross = computePayroll(data.employees).reduce((sum, line) => sum + line.grossMinor, 0);
-  if (!context.can("view_payroll")) return <RoleViewNote what="Payroll reconciliation" />;
-  if (!run) return <Empty title="No payroll run" />;
-  const difference = latest ? gross - latest.debit : undefined;
+    .filter((entry) => Number.isFinite(entry.debit) && entry.debit > 0)
+    .sort((left, right) => String(right.row.at ?? right.row.createdAt).localeCompare(String(left.row.at ?? left.row.createdAt)));
+  const chosen = candidates.find((entry) => entry.row.id === journalId);
+  const recorded = run?.fields.grossMinor ?? run?.amountMinor;
+  const gross = Number(recorded);
+  const validGross = recorded !== undefined && Number.isFinite(gross) && gross >= 0;
+  const difference = validGross && chosen ? gross - chosen.debit : undefined;
+  const canReview = context.can("view_payroll");
+  if (!canReview) return <RoleViewNote what="Payroll reconciliation" />;
+  if (!run) return <Empty title={wantedId ? "Selected payroll run unavailable" : "No draft payroll run"}>
+    Open the correct company run to compare against a real posted wages journal.
+  </Empty>;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Run", value: run.title },
-        { label: "Run gross", value: context.money(gross) },
-        { label: "Ledger wages account", value: wages ? `${String(wages.fields.code)} ${wages.title}` : "Not found in the chart of accounts" },
-        { label: "Latest posted wages journal", value: latest ? `${latest.row.title} · ${context.money(latest.debit)}` : "Unavailable — no posted wages journal" },
-        { label: "Difference", value: difference === undefined ? "Unavailable" : <Pill tone={difference === 0 ? "success" : "warning"}>{context.money(difference)}</Pill> },
-      ]} />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Close</Button>
-        <Button variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/fin/ledger`)}>Open the ledger</Button>
+      <PeopleDialogLead eyebrow="PEOPLE / PAYROLL / FINANCE HANDOFF" title="Compare a saved payroll run with the ledger"
+        description="Choose the posted wages journal deliberately. A numerical comparison is not proof that payments or statutory filings occurred."
+        status={<Pill tone="neutral">Evidence review</Pill>} />
+      <PeopleDialogSection step="01" title="Source payroll run" description="Use the gross figure saved on this run, not current salary estimates.">
+        <Properties rows={[
+          { label: "Run", value: run.title },
+          { label: "Period", value: String(run.fields.period || "Not recorded") },
+          { label: "Saved gross", value: validGross ? context.money(gross) : "Not recorded" },
+          { label: "Payroll status", value: run.status },
+          { label: "Wages ledger account", value: wages ? `${String(wages.fields.code)} · ${wages.title}`
+            : "No wages account found" },
+        ]} />
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Select the posted wages journal"
+        description="No journal is selected automatically. Verify its period, source and account before comparing.">
+        <Field label="Posted wages journal" required>
+          <Select value={journalId} onChange={(event) => {
+            setJournalId(event.target.value); setChecked(false); setError("");
+          }}>
+            <option value="">Choose a posted wages journal</option>
+            {candidates.map((entry) => <option key={entry.row.id} value={entry.row.id}>
+              {entry.row.title} · {context.date(entry.row.at)} · {context.money(entry.debit)}
+            </option>)}
+          </Select>
+        </Field>
+        {chosen && <Properties rows={[
+          { label: "Selected journal", value: chosen.row.title },
+          { label: "Journal date", value: context.date(chosen.row.at) },
+          { label: "Posted wages debit", value: context.money(chosen.debit) },
+          { label: "Saved run minus posted journal", value: difference === undefined ? "Cannot calculate"
+            : context.money(difference) },
+        ]} />}
+        {!wages && <Notice tone="warning" title="No wages account found">
+          A matching posted journal cannot be verified until the chart of accounts includes the expected wages account.
+        </Notice>}
+        {difference !== undefined && difference !== 0 && <Notice tone="warning" title="Amounts do not match">
+          A difference is recorded as an unresolved discrepancy, not a successful reconciliation.
+        </Notice>}
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Record the comparison"
+        description="The evidence link and difference are saved to the payroll run; the ledger itself is not posted or changed.">
+        <Checkbox checked={checked} disabled={!chosen || !validGross}
+          onChange={(event) => setChecked(event.target.checked)}
+          label="I checked this journal belongs to the selected payroll period and reviewed any difference" />
+        <Notice tone="info" title="No automatic reconciliation or payment">
+          This saves an auditable local comparison. It does not reconcile bank payments, create a journal, or certify payroll compliance.
+        </Notice>
+        {error && <Notice tone="danger" title="Comparison not saved">{error}</Notice>}
+      </PeopleDialogSection>
+      <Row gap={2} wrap>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
+        <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/ledger`)}>Open ledger</Button>
         <span className="ds-grow" />
-        <Button
-          variant="primary"
-          disabled={!latest}
+        <Button variant="primary" disabled={!chosen || difference === undefined || !checked}
           onClick={async () => {
-            if (!latest || difference === undefined) return;
-            await context.mutate.patch(run.id, { fields: { ...run.fields, reconciledBy: context.actor, reconciledAt: clockIso(), ledgerJournalId: latest.row.id, ledgerMinor: latest.debit, differenceMinor: difference } }, { expectRevision: run.revision, event: `${run.title} reconciled to ${latest.row.title} by ${context.actor}; difference ${context.money(difference)}` });
-            context.toast("Reconciliation recorded", `Difference of ${context.money(difference)} recorded on the run.`);
-            close();
-          }}
-        >
-          Record the reconciliation
-        </Button>
+            if (!chosen || difference === undefined || !checked) return;
+            setError("");
+            try {
+              const saved = await context.mutate.patch(run.id, {
+                fields: {
+                  ...run.fields, reconciledBy: context.actor, reconciledAt: clockIso(),
+                  ledgerJournalId: chosen.row.id, ledgerMinor: chosen.debit, differenceMinor: difference,
+                  reconciliationStatus: difference === 0 ? "matched" : "discrepancy",
+                },
+              }, { expectRevision: run.revision,
+                event: `${run.title} compared with posted journal ${chosen.row.title} by ${context.actor}; difference ${context.money(difference)}` });
+              if (!saved) { setError("The payroll run changed. Reopen it before saving the comparison."); return; }
+              context.toast(difference === 0 ? "Amounts matched locally" : "Discrepancy recorded",
+                `The comparison to ${chosen.row.title} was recorded; no accounting entry or bank payment was created.`);
+              close();
+            } catch (reason) {
+              setError(reason instanceof Error ? reason.message : "The comparison could not be recorded.");
+            }
+          }}>Record comparison</Button>
       </Row>
     </Stack>
   );

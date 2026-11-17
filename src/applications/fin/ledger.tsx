@@ -490,23 +490,36 @@ export function LedgerPeriods({ context }: { context: ScreenContext }) {
       context.toast("No period record", "This workspace has no accounting-period record to write to.", "failed");
       return;
     }
+    if (!/^\d{4}-\d{2}$/.test(period) || (lock && lockedPeriods(record).includes(period))
+      || (!lock && !lockedPeriods(record).includes(period))) return;
     setBusy(period);
-    const current = lockedPeriods(record);
-    const next = lock ? [...new Set([...current, period])].sort() : current.filter((item) => item !== period);
-    const body = record.body as Record<string, unknown> | undefined;
-    await context.mutate.patch(record.id, {
-      body: {
-        ...(body ?? {}),
-        locked: next,
-        closedBy: { ...((body?.closedBy as Record<string, string>) ?? {}), ...(lock ? { [period]: context.actor } : {}) },
-        closedAt: { ...((body?.closedAt as Record<string, string>) ?? {}), ...(lock ? { [period]: clockIso() } : {}) },
-      },
-    }, { expectRevision: record.revision, event: lock ? `Closed period ${period}` : `Reopened period ${period}` });
-    context.toast(
-      lock ? "Period closed" : "Period reopened",
-      lock ? `No journal can be posted into ${period} until it is reopened.` : `${period} accepts postings again. Statements already circulated may no longer agree.`,
-    );
-    setBusy(undefined);
+    try {
+      const current = lockedPeriods(record);
+      const next = lock ? [...new Set([...current, period])].sort() : current.filter((item) => item !== period);
+      const body = record.body as Record<string, unknown> | undefined;
+      const changed = await context.mutate.patch(record.id, {
+        body: {
+          ...(body ?? {}),
+          locked: next,
+          closedBy: { ...((body?.closedBy as Record<string, string>) ?? {}), ...(lock ? { [period]: context.actor } : {}) },
+          closedAt: { ...((body?.closedAt as Record<string, string>) ?? {}), ...(lock ? { [period]: clockIso() } : {}) },
+          reopenedBy: { ...((body?.reopenedBy as Record<string, string>) ?? {}), ...(!lock ? { [period]: context.actor } : {}) },
+          reopenedAt: { ...((body?.reopenedAt as Record<string, string>) ?? {}), ...(!lock ? { [period]: clockIso() } : {}) },
+        },
+      }, { expectRevision: record.revision, event: lock ? `Closed period ${period}` : `Reopened period ${period}` });
+      // The mutation returns null after a stale-revision conflict. Never
+      // announce a close or reopen that did not actually reach storage.
+      if (!changed) return;
+      context.toast(
+        lock ? "Period closed" : "Period reopened",
+        lock ? `No new journal can be posted into ${period} until it is reopened.`
+          : `${period} accepts postings again. Existing issued statements may no longer agree.`,
+      );
+    } catch (error) {
+      context.toast("Period change not saved", error instanceof Error ? error.message : "Reload the accounting periods and retry.", "failed");
+    } finally {
+      setBusy(undefined);
+    }
   }
 
   return (

@@ -4,9 +4,10 @@ import {
   Button, Card, DataGrid, Empty, Field, Grid, MoneyInput, Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
-import { useWorkspace } from "@/platform/workspace";
+
 import { CAPABILITY_LABELS, PROVIDER_CAPABILITIES } from "@/platform/capability";
 import type { Rec } from "@/domain/types";
+import { touch } from "@/domain/types";
 import {
   accountCode, accountType, isStatementLine, journalLines, matchCandidates, periodOf, reconcile, statementSummaries,
 } from "@/domain/fin-ledger";
@@ -15,6 +16,9 @@ import { useFinData } from "./data";
 import type { FinData } from "./data";
 import { AccountLabel, Amount, CapabilityNotice, CapabilityPill, SourceNote, StatementRow } from "./parts";
 import { wallMs } from "@/platform/clock";
+import { commitStatementMatch, commitStatementUnmatch } from "./reconciliationLinks";
+import { reconciliationEvidence, reconciliationSignoffBlocker, reconciliationSignoffIsCurrent } from "@/domain/finance-signoff";
+import { newRecord } from "@/platform/repo";
 
 /* ---------------------------- FIN-008 ---------------------------- */
 
@@ -282,7 +286,6 @@ export function BankConnection({ context, close }: { context: ScreenContext; clo
 /** A real CSV importer: paste or type rows, map the columns, see what will be created. */
 export function CsvMapper({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useFinData();
-  const { now } = useWorkspace();
   const payload = context.overlayPayload as { code?: string } | undefined;
   const [text, setText] = useState("date,description,amount\n2026-11-14,Card · brass polish,-4850\n2026-11-14,Faster payment · Pike Lighting,126000");
   const [code, setCode] = useState(payload?.code ?? "1000");
@@ -290,6 +293,9 @@ export function CsvMapper({ context, close }: { context: ScreenContext; close: (
   const [dateColumn, setDateColumn] = useState(0);
   const [descriptionColumn, setDescriptionColumn] = useState(1);
   const [amountColumn, setAmountColumn] = useState(2);
+  const [filename, setFilename] = useState("Pasted CSV statement");
+  const [openingBalance, setOpeningBalance] = useState("");
+  const [closingBalance, setClosingBalance] = useState("");
   const [busy, setBusy] = useState(false);
 
   const parsed = useMemo(() => {
@@ -315,11 +321,19 @@ export function CsvMapper({ context, close }: { context: ScreenContext; close: (
   const existing = data.bankLines.filter(isStatementLine);
   const duplicates = good.filter((row) => existing.some((line) =>
     (line.at ?? "").slice(0, 10) === row.date && Number(line.amountMinor ?? 0) === row.amountMinor));
+  const balancesValid = openingBalance.trim() !== "" && closingBalance.trim() !== ""
+    && Number.isSafeInteger(Number(openingBalance))
+    && Number.isSafeInteger(Number(closingBalance));
+  const accountValid = cashAccounts(data).some((account) => accountCode(account) === code);
+  const fromDate = [...good].map((row) => row.date).sort()[0];
+  const toDate = [...good].map((row) => row.date).sort().at(-1);
 
   return (
     <Stack gap={4}>
       <Notice tone="info" title="This import runs entirely in the browser">
-        Paste the CSV your bank gave you. Nothing is uploaded; the rows become statement lines in this workspace, all unmatched.
+        Paste the CSV and enter the opening and closing balances from the actual statement. Nothing
+        is uploaded or verified by a bank. The statement header and its unmatched lines are saved together; without
+        real balances, no reconciliation can be confirmed.
       </Notice>
       <Field label="CSV rows" hint="Comma separated. Amounts in minor units, negative for money out.">
         <TextArea aria-label="CSV rows" value={text} rows={6} onChange={(event) => setText(event.target.value)} style={{ fontFamily: "var(--font-mono, monospace)" }} />
@@ -339,6 +353,18 @@ export function CsvMapper({ context, close }: { context: ScreenContext; close: (
         <Field label="Amount column"><TextInput aria-label="Amount column" align="end" inputMode="numeric" value={String(amountColumn)} onChange={(event) => setAmountColumn(Number(event.target.value.replace(/\D/g, "")) || 0)} /></Field>
       </Row>
 
+      <Row gap={3} wrap>
+        <Field label="Statement reference" required>
+          <TextInput aria-label="Statement reference" value={filename} onChange={(event) => setFilename(event.target.value)} placeholder="e.g. bank-account-Nov-2026.csv" required />
+        </Field>
+        <Field label="Opening balance (minor units)" required hint="Use the actual statement amount in pennies/cents; negative if overdrawn.">
+          <TextInput aria-label="Opening balance (minor units)" value={openingBalance} onChange={(event) => setOpeningBalance(event.target.value)} placeholder="e.g. 250000" required />
+        </Field>
+        <Field label="Closing balance (minor units)" required>
+          <TextInput aria-label="Closing balance (minor units)" value={closingBalance} onChange={(event) => setClosingBalance(event.target.value)} placeholder="e.g. 321500" required />
+        </Field>
+      </Row>
+      {!balancesValid && <Notice tone="warning" title="Statement balances are required">Enter both balances as whole minor units. Arlovi will not infer them from imported rows or the ledger.</Notice>}
       {parsed.length > 0 && (
         <DataGrid
           rows={parsed}
@@ -362,32 +388,59 @@ export function CsvMapper({ context, close }: { context: ScreenContext; close: (
         <Button
           variant="primary"
           busy={busy}
-          disabled={good.length === 0}
+          disabled={good.length === 0 || !balancesValid || !filename.trim() || !accountValid || busy}
           onClick={async () => {
+            if (!balancesValid || !filename.trim() || !accountValid || !fromDate || !toDate) return;
             setBusy(true);
-            const batch = `import-${now.getTime().toString(36)}`;
-            for (const row of good) {
-              const isDuplicate = duplicates.includes(row);
-              await context.mutate.create({
+            try {
+              const batch = `import-${crypto.randomUUID()}`;
+              const ctx = { actor: context.actor, now: context.now.toISOString() };
+              const header = newRecord({
+                organizationId: context.org.id,
+                currency: context.org.currency,
+                collection: "bankTransactions",
+                title: filename.trim(),
+                status: "imported",
+                summary: "Statement metadata and balances manually entered from a CSV. No bank provider verification.",
+                amountMinor: Number(closingBalance),
+                at: context.now.toISOString(),
+                fields: {
+                  kind: "statement", source: "manual-csv", bankAccountCode: code,
+                  importBatch: batch, filename: filename.trim(),
+                  openingMinor: Number(openingBalance), closingMinor: Number(closingBalance),
+                  from: fromDate, to: toDate, verification: "manual_local",
+                },
+              }, ctx);
+              const lines = good.map((row) => newRecord({
+                organizationId: context.org.id,
+                currency: context.org.currency,
                 collection: "bankTransactions",
                 title: row.description || "Statement line",
                 status: "unmatched",
-                summary: `Imported by hand from a CSV on ${context.date(now)}.`,
+                summary: `Manually imported with ${filename.trim()}.`,
                 amountMinor: row.amountMinor,
                 at: `${row.date}T00:00:00.000Z`,
                 fields: {
-                  matched: false,
-                  source: "statement-import",
-                  bankAccountCode: code,
-                  importBatch: batch,
+                  matched: false, source: "statement-import",
+                  bankAccountCode: code, importBatch: batch, statementId: header.id,
                   reference: row.description,
-                  ...(isDuplicate ? { possibleDuplicate: true } : {}),
+                  ...(duplicates.includes(row) ? { possibleDuplicate: true } : {}),
                 },
-              }, `Statement line imported: ${row.description}`);
+              }, ctx));
+              await context.mutate.putMany(
+                [header, ...lines],
+                [`Statement ${filename.trim()} imported with entered balances`,
+                  ...lines.map((row) => `Statement line imported: ${row.title}`)],
+                {},
+                ["create", ...lines.map(() => "create" as const)],
+              );
+              context.toast("Statement imported", `${good.length} unmatched lines and their manually entered opening/closing balances saved atomically. ${bad.length} rows skipped. Nothing was reconciled.`);
+              close();
+            } catch (error) {
+              context.toast("Import not completed", error instanceof Error ? error.message : "Review the statement and retry.", "failed");
+            } finally {
+              setBusy(false);
             }
-            context.toast("Statement imported", `${good.length} lines added, all unmatched. ${bad.length} rows were skipped. Nothing has been reconciled.`);
-            setBusy(false);
-            close();
           }}
         >
           Import {good.length} line{good.length === 1 ? "" : "s"}
@@ -519,15 +572,14 @@ export function ToReconcile({ context }: { context: ScreenContext }) {
                         busy={busy === line.id}
                         onClick={async () => {
                           setBusy(line.id);
-                          await context.mutate.patch(line.id, {
-                            status: "matched",
-                            fields: { ...line.fields, matched: true, journalId: candidate.journal.id, matchedBy: context.actor },
-                          }, { expectRevision: line.revision, event: `Statement line ${line.title} matched to ${candidate.journal.title}` });
-                          await context.mutate.patch(candidate.journal.id, {
-                            fields: { ...candidate.journal.fields, bankLineId: line.id },
-                          }, { event: `${candidate.journal.title} linked to a statement line` });
-                          context.toast("Matched", `${line.title} is linked to ${candidate.journal.title}. The ledger balance did not change, because the journal was already posted.`);
-                          setBusy(undefined);
+                          try {
+                            await commitStatementMatch(context, line, candidate.journal, recon.bankAccountId);
+                            context.toast("Matched", `${line.title} is linked to ${candidate.journal.title}. The posted ledger balance has not changed.`);
+                          } catch (error) {
+                            context.toast("The match was not saved", error instanceof Error ? error.message : "Reload and retry.", "failed");
+                          } finally {
+                            setBusy(undefined);
+                          }
                         }}
                       >
                         Match
@@ -582,17 +634,13 @@ export function MatchedLines({ context }: { context: ScreenContext }) {
         { key: "amount", header: "Amount", align: "end", cell: (row) => <Amount minor={row.amountMinor} context={context} /> },
         { key: "unmatch", header: "", cell: (row) => (
           <Button size="sm" variant="ghost" onClick={async () => {
-            const journalId = String(row.fields.journalId ?? "");
-            const fields: Record<string, string | number | boolean> = { ...row.fields, matched: false };
-            delete fields.journalId;
-            await context.mutate.patch(row.id, { status: "unmatched", fields }, { replaceFields: true, event: `Statement line ${row.title} unmatched` });
-            const journal = data.journals.find((item) => item.id === journalId);
-            if (journal) {
-              const journalFields: Record<string, string | number | boolean> = { ...journal.fields };
-              delete journalFields.bankLineId;
-              await context.mutate.patch(journal.id, { fields: journalFields }, { replaceFields: true, event: `${journal.title} unlinked from a statement line` });
+            const journal = data.journals.find((item) => item.id === String(row.fields.journalId ?? ""));
+            try {
+              await commitStatementUnmatch(context, row, journal);
+              context.toast("Unmatched", "Both links have been removed. No posted ledger entry was changed.");
+            } catch (error) {
+              context.toast("The match could not be removed", error instanceof Error ? error.message : "Reload and retry.", "failed");
             }
-            context.toast("Unmatched", "The link is removed. No ledger entry was changed.");
           }}>Unmatch</Button>
         ) },
       ]}
@@ -651,6 +699,8 @@ export function ReconciliationHistory({ context }: { context: ScreenContext }) {
   const data = useFinData();
   const confirmations = data.bankLines.filter((line) => line.fields.kind === "reconciliation");
   const statements = statementSummaries(data.bankLines);
+  const current = useReconciliation("1000");
+  const currentEvidence = reconciliationEvidence(current, data.journals);
   return (
     <Stack gap={4}>
       {confirmations.length === 0 ? (
@@ -669,6 +719,11 @@ export function ReconciliationHistory({ context }: { context: ScreenContext }) {
             { key: "closing", header: "Statement closing", align: "end", cell: (row) => <Amount minor={Number(row.fields.closingMinor ?? 0)} context={context} /> },
             { key: "ledger", header: "Ledger", align: "end", cell: (row) => <Amount minor={Number(row.fields.ledgerMinor ?? 0)} context={context} /> },
             { key: "difference", header: "Difference", align: "end", cell: (row) => <Amount minor={Number(row.fields.differenceMinor ?? 0)} context={context} bold /> },
+            { key: "evidence", header: "Evidence", cell: (row) => {
+              const sameAccount = String(row.fields.bankAccountCode ?? "") === current.bankAccountCode;
+              const stillCurrent = sameAccount && current.complete && reconciliationSignoffIsCurrent(row, currentEvidence);
+              return <Pill tone={stillCurrent ? "success" : "warning"} dot>{stillCurrent ? "Current" : "Superseded / unverified"}</Pill>;
+            } },
           ]}
         />
       )}
@@ -724,14 +779,15 @@ export function MatchCandidatesOverlay({ context, close }: { context: ScreenCont
                 busy={busy}
                 onClick={async () => {
                   setBusy(true);
-                  await context.mutate.patch(line.id, {
-                    status: "matched",
-                    fields: { ...line.fields, matched: true, journalId: candidate.journal.id, matchedBy: context.actor },
-                  }, { expectRevision: line.revision, event: `Statement line ${line.title} matched to ${candidate.journal.title}` });
-                  await context.mutate.patch(candidate.journal.id, { fields: { ...candidate.journal.fields, bankLineId: line.id } }, { event: `${candidate.journal.title} linked to a statement line` });
-                  context.toast("Matched", `${line.title} is linked to ${candidate.journal.title}.`);
-                  setBusy(false);
-                  close();
+                  try {
+                    await commitStatementMatch(context, line, candidate.journal, recon.bankAccountId);
+                    context.toast("Matched", `${line.title} is linked to ${candidate.journal.title} without changing the ledger balance.`);
+                    close();
+                  } catch (error) {
+                    context.toast("The match was not saved", error instanceof Error ? error.message : "Reload and retry.", "failed");
+                  } finally {
+                    setBusy(false);
+                  }
                 }}
               >
                 Match
@@ -844,36 +900,55 @@ export function AdjustmentReview({ context, close }: { context: ScreenContext; c
           disabled={Boolean(blocked) || !context.can("post_journal")}
           title={!context.can("post_journal") ? "Posting needs the Finance or Owner role view" : blocked}
           onClick={async () => {
+            if (busy || blocked) return;
             setBusy(true);
-            const date = (line.at ?? context.now.toISOString()).slice(0, 10);
-            const lines: JLine[] = amount >= 0
-              ? [
-                { accountId: recon.bankAccountId!, debitMinor: amount, creditMinor: 0, memo: line.title },
-                ...rows.map((row) => ({ accountId: row.accountId, debitMinor: 0, creditMinor: row.amountMinor, memo: line.title })),
-              ]
-              : [
-                ...rows.map((row) => ({ accountId: row.accountId, debitMinor: row.amountMinor, creditMinor: 0, memo: line.title })),
-                { accountId: recon.bankAccountId!, debitMinor: 0, creditMinor: Math.abs(amount), memo: line.title },
-              ];
-            const journal = await context.mutate.create({
-              collection: "journals",
-              title: `Adjustment · ${line.title}`,
-              status: "posted",
-              summary: `Posted from an unmatched statement line on ${context.date(line.at)}.`,
-              amountMinor: Math.abs(amount),
-              at: `${date}T09:00:00.000Z`,
-              parentId: line.id,
-              tags: ["ledger", "reconciliation"],
-              fields: { date, source: "reconciliation", bankLineId: line.id },
-              body: { date, memo: line.title, lines },
-            }, `Adjustment posted for statement line ${line.title}`);
-            await context.mutate.patch(line.id, {
-              status: "matched",
-              fields: { ...line.fields, matched: true, journalId: journal.id, matchedBy: context.actor },
-            }, { expectRevision: line.revision, event: `Statement line ${line.title} matched to a new adjustment` });
-            context.toast("Adjustment posted", `${context.money(Math.abs(amount))} is now on the ledger and the line is matched. The difference has moved by that amount.`);
-            setBusy(false);
-            close();
+            try {
+              const date = (line.at ?? context.now.toISOString()).slice(0, 10);
+              const journalLines: JLine[] = amount >= 0
+                ? [
+                  { accountId: recon.bankAccountId!, debitMinor: amount, creditMinor: 0, memo: line.title },
+                  ...rows.map((row) => ({ accountId: row.accountId, debitMinor: 0, creditMinor: row.amountMinor, memo: line.title })),
+                ]
+                : [
+                  ...rows.map((row) => ({ accountId: row.accountId, debitMinor: row.amountMinor, creditMinor: 0, memo: line.title })),
+                  { accountId: recon.bankAccountId!, debitMinor: 0, creditMinor: Math.abs(amount), memo: line.title },
+                ];
+              const ctx = { actor: context.actor, now: context.now.toISOString() };
+              const journal = newRecord({
+                organizationId: context.org.id,
+                currency: context.org.currency,
+                collection: "journals",
+                title: `Adjustment · ${line.title}`,
+                status: "posted",
+                summary: `Posted from an unmatched statement line on ${context.date(line.at)}.`,
+                amountMinor: Math.abs(amount),
+                at: `${date}T09:00:00.000Z`,
+                parentId: line.id,
+                tags: ["ledger", "reconciliation"],
+                fields: { date, source: "reconciliation", bankLineId: line.id },
+                body: { date, memo: line.title, lines: journalLines },
+              }, ctx);
+              const matched = touch(line, context.actor, ctx.now, {
+                status: "matched",
+                fields: { ...line.fields, matched: true, journalId: journal.id, matchedBy: context.actor },
+              });
+              await context.mutate.putMany(
+                [matched, journal],
+                [
+                  `Statement line ${line.title} matched to posted adjustment ${journal.title}`,
+                  `Adjustment posted for statement line ${line.title}`,
+                ],
+                { [line.id]: line.revision },
+                ["update", "create"],
+              );
+              context.toast("Adjustment posted", `${context.money(Math.abs(amount))} is now on the ledger and the statement line has a reciprocal match.`);
+              close();
+            } catch (error) {
+              context.toast("Adjustment was not posted", error instanceof Error ? error.message : "The statement or period changed. Reopen the record.", "failed");
+            } finally {
+              setBusy(false);
+            }
+
           }}
         >
           Post the adjustment
@@ -886,8 +961,12 @@ export function AdjustmentReview({ context, close }: { context: ScreenContext; c
 
 export function ReconciliationApproval({ context, close }: { context: ScreenContext; close: () => void }) {
   const recon = useReconciliation("1000");
+  const data = useFinData();
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const blocked = reconciliationSignoffBlocker({
+    recon, accounts: data.accounts, journals: data.journals, bankLines: data.bankLines,
+  });
 
   return (
     <Stack gap={4}>
@@ -895,49 +974,49 @@ export function ReconciliationApproval({ context, close }: { context: ScreenCont
         context={context}
         rows={[
           { label: "Statement closing", minor: recon.statementClosingMinor },
-          { label: "Ledger balance", minor: recon.ledgerMinor },
+          { label: "Ledger at statement end", minor: recon.ledgerMinor },
           { label: "Difference", minor: recon.differenceMinor, bold: true },
-          { label: "Explained by open lines", minor: recon.needsPostingMinor },
+          { label: "Open lines without journals", minor: recon.needsPostingMinor },
           { label: "Unexplained", minor: recon.unexplainedMinor, bold: true },
         ]}
       />
-      {recon.complete ? (
-        <Notice tone="success" title="Nothing is unexplained">
-          Every statement line is matched to a posted journal and the balances agree. Confirming records who reconciled and what the figures were.
-        </Notice>
-      ) : (
-        <Notice tone="danger" title="This reconciliation cannot be confirmed">{recon.blockedReason}</Notice>
+      {recon.statement && (
+        <Properties rows={[
+          { label: "Statement", value: recon.statement.filename },
+          { label: "Period ends", value: context.date(recon.statement.to) },
+          { label: "Evidence", value: "Manually imported, locally checked; no bank provider verification" },
+        ]} />
       )}
-      <Field label="Note" hint="Kept on the reconciliation record.">
+      {blocked ? (
+        <Notice tone="danger" title="This reconciliation cannot be confirmed">{blocked}</Notice>
+      ) : (
+        <Notice tone="success" title="Local ledger evidence is complete">
+          Every imported line for this statement is linked reciprocally to an exact-value posted journal.
+          The balance at the statement end date agrees. The database checks all source revisions again
+          when you confirm, and keeps the evidence snapshot for later review.
+        </Notice>
+      )}
+      <Field label="Note" hint="Retained in the locally confirmed reconciliation record.">
         <TextArea aria-label="Note" value={note} rows={3} onChange={(event) => setNote(event.target.value)} />
       </Field>
       <Row gap={2}>
         <Button
           variant="primary"
           busy={busy}
-          disabled={!recon.complete}
-          title={recon.blockedReason}
+          disabled={Boolean(blocked) || !context.can("post_journal")}
+          title={!context.can("post_journal") ? "Finance or Owner role view required" : blocked}
           onClick={async () => {
+            if (busy || blocked || !recon.statement) return;
             setBusy(true);
-            await context.mutate.create({
-              collection: "bankTransactions",
-              title: `Reconciliation ${context.date(context.now)} · ${recon.bankAccountCode}`,
-              status: "confirmed",
-              summary: note || "Reconciliation confirmed with no unexplained difference.",
-              amountMinor: recon.statementClosingMinor ?? 0,
-              at: context.now.toISOString(),
-              fields: {
-                kind: "reconciliation",
-                bankAccountCode: recon.bankAccountCode,
-                closingMinor: recon.statementClosingMinor ?? 0,
-                ledgerMinor: recon.ledgerMinor,
-                differenceMinor: recon.differenceMinor ?? 0,
-                confirmedBy: context.actor,
-              },
-            }, `Reconciliation confirmed for ${recon.bankAccountCode}`);
-            context.toast("Reconciliation confirmed", "It is recorded with the balances it was tied to. It is a local record, not a bank confirmation.");
-            setBusy(false);
-            close();
+            try {
+              await context.mutate.confirmReconciliation(recon.bankAccountCode, recon.statement.record.id, note);
+              context.toast("Statement signed off locally", "The account, statement and ledger evidence were rechecked and recorded atomically. No bank provider confirmed this reconciliation.");
+              close();
+            } catch (error) {
+              context.toast("Reconciliation not confirmed", error instanceof Error ? error.message : "Records changed. Reopen and review.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Confirm the statement

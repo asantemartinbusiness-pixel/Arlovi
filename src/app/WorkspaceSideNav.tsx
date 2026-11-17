@@ -104,10 +104,17 @@ export function WorkspaceSideNav() {
       </>}
       {!detailRoot && <SidebarGroup label={sectionLabel} items={main}/>}
       {recordGroup.length>0 && <SidebarGroup label={area==="spaces"?"DEPARTMENTS":"PROJECTS"} items={recordGroup}/>}
-      {area==="apps" && NAV_GROUPS.map(group=>{
-        const options = group.apps.filter(a=>canOpen(role,a.code)).slice(0,4).map(a=>({label:a.short,to:appEntry(a.code,org.slug),icon:a.icon}));
-        return <SidebarGroup key={group.label} label={group.label.toUpperCase()} items={options}/>;
-      })}
+      {area==="apps" && <div className="ws-side-app-groups" aria-label="Native application categories">
+        {NAV_GROUPS.map(group=>{
+          const options = group.apps.filter(a=>canOpen(role,a.code))
+            .map(a=>({label:a.short,to:appEntry(a.code,org.slug),icon:a.icon}));
+          if (!options.length) return null;
+          return <details key={group.label} className="ws-side-app-group">
+            <summary>{group.label}<span aria-hidden="true">{options.length}</span></summary>
+            <SidebarGroup items={options}/>
+          </details>;
+        })}
+      </div>}
       {shortcuts.length>0 && <SidebarGroup label="TOOLS" items={shortcuts}/>}
       {(area==="home" || area==="company") && <div className="ws-side-footnote">
         {area==="home"?"Switch areas using the icon rail. Recent work stays within this company.":"Company settings and access planning are local until cloud accounts are configured."}

@@ -5,7 +5,7 @@ import {
   Button, Card, Checkbox, DataGrid, Empty, Field, Grid, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
-import { useEvents, useRecord, useWorkspace } from "@/platform/workspace";
+import { useCollections, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import { downloadFile } from "@/runtime/db";
 import type { Rec } from "@/domain/types";
 import {
@@ -18,6 +18,9 @@ import { contactOf, openInvoices, outstandingMinor, useFinData } from "./data";
 import type { FinData } from "./data";
 import { Amount, CapabilityNotice, CapabilityPill, OverdueBadge, SourceNote, StatementRow, StatusPill, TaxCodePill, taxRateText } from "./parts";
 import { clockIso } from "@/platform/clock";
+import { prepareInvoiceIssue, prepareInvoiceReceipt } from "./settlement";
+import { assessTimeBilling } from "./timeBilling";
+import { OpsHeader, OpsMetric, OpsMetrics } from "@/applications/shared/operational-surfaces";
 
 /* ------------------------------------------------------------------ *
  * FIN-004 Invoice list and FIN-005 Invoice detail.
@@ -156,6 +159,168 @@ export function InvoiceList({ context, tab }: { context: ScreenContext; tab: str
   );
 }
 
+/**
+ * Finance sees linked source records rather than an invented invoice subtotal.
+ * This is a review queue: approval by People is necessary but not sufficient
+ * to charge a customer, resolve tax or create a posted receivable.
+ */
+export function FinanceTimeInputs({ context }: { context: ScreenContext }) {
+  const data = useCollections(["shifts", "employees", "projects", "invoices"]);
+  const [view, setView] = useState<"all" | "attention" | "ready" | "reviewed">("all");
+  const sourceRows = data.shifts
+    .filter((row) => row.fields.kind === "time" && row.fields.billable === true)
+    .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+  const assess = (entry: Rec) => assessTimeBilling(entry, data.employees, data.projects, data.invoices);
+  const ready = sourceRows.filter((entry) => assess(entry).state === "ready");
+  const reviewed = sourceRows.filter((entry) => assess(entry).state === "reviewed");
+  const needsWork = sourceRows.filter((entry) => !["ready", "reviewed", "invoiced"].includes(assess(entry).state));
+  const rows = view === "attention" ? needsWork : view === "ready" ? ready : view === "reviewed" ? reviewed : sourceRows;
+  const approvedEstimate = reviewed.reduce((sum, entry) => sum + Number(assess(entry).netEstimateMinor ?? 0), 0);
+  return (
+    <Stack gap={4}>
+      <OpsHeader
+        eyebrow="Finance / Invoices / Time inputs"
+        title="From recorded time to accountable billing."
+        description="An evidence-led review surface for approved project work. See what's ready, what's missing and what Finance has already reviewed before preparing an invoice."
+        actions={<Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/invoices?tab=Draft`)}>
+          Open draft invoices
+        </Button>}
+        note="Illustrative amounts are exclusive of tax and are not posted revenue."
+      />
+      <OpsMetrics label="Finance time input review">
+        <OpsMetric label="Time inputs" value={sourceRows.length} detail="Marked potentially billable" />
+        <OpsMetric label="Needs source work" value={needsWork.length} detail="Approvals, links, rates or hours" emphasis={needsWork.length ? "attention" : "neutral"} />
+        <OpsMetric label="Ready for review" value={ready.length} detail="Verified source and recorded rate" />
+        <OpsMetric label="Reviewed estimate" value={reviewed.length ? context.money(approvedEstimate) : "—"}
+          detail={`${reviewed.length} reviewed records · before tax`} emphasis={reviewed.length ? "positive" : "neutral"} />
+      </OpsMetrics>
+      <div className="ops-toolbar" aria-label="Filter time inputs">
+        <strong className="ops-toolbar-heading">Time input queue</strong>
+        <Button size="sm" variant={view === "all" ? "secondary" : "ghost"} aria-pressed={view === "all"} onClick={() => setView("all")}>All ({sourceRows.length})</Button>
+        <Button size="sm" variant={view === "attention" ? "secondary" : "ghost"} aria-pressed={view === "attention"} onClick={() => setView("attention")}>Needs work ({needsWork.length})</Button>
+        <Button size="sm" variant={view === "ready" ? "secondary" : "ghost"} aria-pressed={view === "ready"} onClick={() => setView("ready")}>Ready ({ready.length})</Button>
+        <Button size="sm" variant={view === "reviewed" ? "secondary" : "ghost"} aria-pressed={view === "reviewed"} onClick={() => setView("reviewed")}>Reviewed ({reviewed.length})</Button>
+      </div>
+      <Notice tone="info" title="Source records, not an invoice or revenue">
+        These entries come from People and Projects. A recorded time approval does not prove a contractual rate, tax status, customer
+        or invoice. Finance must independently prepare and approve the invoice; nothing here posts to the ledger or sends a bill.
+      </Notice>
+      {rows.length === 0 ? (
+        <Empty title={sourceRows.length ? "Nothing in this review filter" : "No billable time submitted"}>
+          {sourceRows.length ? "Select another queue filter to inspect the remaining time inputs." : "Project time entries marked billable will appear here for Finance review, including those that still need a People approval."}
+        </Empty>
+      ) : (
+        <DataGrid
+          rows={rows}
+          rowId={(entry) => entry.id}
+          label="Billable time source records"
+          filterable
+          onOpen={(id) => context.openOverlay("finance time review", { id })}
+          card={(entry) => {
+            const person = data.employees.find((record) => record.id === entry.fields.employeeId);
+            const project = data.projects.find((record) => record.id === entry.fields.projectId);
+            const state = assess(entry);
+            return <>
+              <strong>{person?.title ?? String(entry.fields.employeeName ?? "Unlinked person")}</strong>
+              <span className="ds-subtle">{project?.title ?? "Unlinked Project"} · {String(entry.fields.hours ?? "—")}h · {state.netEstimateMinor !== undefined
+                ? context.money(state.netEstimateMinor) + " illustrative net" : "Rate not recorded"}</span>
+              <Pill tone={state.state === "reviewed" ? "success" : state.state === "ready" ? "info" : "warning"}>{state.label}</Pill>
+            </>;
+          }}
+          rowTone={(entry) => ["identity_missing", "project_missing", "invoice_missing", "invalid_hours"].includes(assess(entry).state)
+            ? "danger" : ["unapproved", "rate_missing"].includes(assess(entry).state) ? "warning" : undefined}
+          columns={[
+            { key: "person", header: "Employee", primary: true,
+              cell: (entry) => data.employees.find((person) => person.id === entry.fields.employeeId)?.title
+                ?? <span className="ds-subtle">{String(entry.fields.employeeName ?? "Unlinked")} · verify</span>,
+              filterValue: (entry) => String(entry.fields.employeeName ?? "") },
+            { key: "project", header: "Project",
+              cell: (entry) => data.projects.find((project) => project.id === entry.fields.projectId)?.title
+                ?? <span className="ds-subtle">Not linked</span> },
+            { key: "hours", header: "Hours", align: "end",
+              cell: (entry) => <span className="ds-num">{String(entry.fields.hours ?? "—")}</span>,
+              sortValue: (entry) => Number(entry.fields.hours ?? 0) },
+            { key: "estimate", header: "Net estimate", align: "end",
+              cell: (entry) => assess(entry).netEstimateMinor !== undefined
+                ? context.money(assess(entry).netEstimateMinor ?? 0) : <span className="ds-subtle">Unpriced</span>,
+              sortValue: (entry) => assess(entry).netEstimateMinor ?? 0 },
+            { key: "state", header: "Review",
+              cell: (entry) => {
+                const state = assess(entry);
+                return <Pill tone={state.state === "reviewed" ? "success" : state.state === "ready" ? "info" : "warning"}>{state.label}</Pill>;
+              }},
+          ]}
+          summary={<>
+            <span className="ds-subtle">Reviewed-only illustrative net subtotal, excluding tax</span>
+            <strong>{reviewed.length ? context.money(approvedEstimate) : "No reviewed rated time"}</strong>
+          </>}
+        />
+      )}
+      <Notice tone="warning" title="Amounts are not invoice totals">
+        Estimates include only recorded positive rates and valid approved hours; customer rates and applicable tax must be checked on the actual invoice.
+        Unpriced or unapproved entries are never silently valued at zero.
+      </Notice>
+    </Stack>
+  );
+}
+
+export function FinanceTimeReview({ context, close }: { context: ScreenContext; close: () => void }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const entry = useRecord(payload?.id ?? context.selectedId);
+  const data = useCollections(["employees", "projects", "invoices"]);
+  if (!entry || entry.organizationId !== context.org.id || entry.collection !== "shifts"
+    || entry.fields.kind !== "time" || entry.fields.billable !== true) {
+    return <Empty title="Time entry unavailable">Select an actual billable time entry in this company.</Empty>;
+  }
+  const person = data.employees.find((row) => row.id === entry.fields.employeeId);
+  const project = data.projects.find((row) => row.id === entry.fields.projectId);
+  const assessment = assessTimeBilling(entry, data.employees, data.projects, data.invoices);
+  const canReview = context.can("post_journal");
+  return (
+    <Stack gap={4}>
+      <Properties rows={[
+        { label: "Employee", value: person?.title ?? "No linked employee" },
+        { label: "Project", value: project?.title ?? "No linked Project" },
+        { label: "Hours", value: String(entry.fields.hours ?? "Not recorded") },
+        { label: "Recorded rate", value: entry.fields.rateMinor !== undefined ? context.money(Number(entry.fields.rateMinor)) : "Not recorded" },
+        { label: "Illustrative net", value: assessment.netEstimateMinor !== undefined ? context.money(assessment.netEstimateMinor) : "Unavailable" },
+        { label: "People approval", value: entry.status === "approved" && entry.fields.approved === true
+          ? `Approved by ${String(entry.fields.approvedBy ?? "Unknown")}`
+          : "Not approved" },
+        { label: "Finance review", value: assessment.label },
+        { label: "Reviewed by", value: String(entry.fields.billingReviewedBy || "No Finance review yet") },
+      ]} />
+      <Notice tone={assessment.eligible || assessment.state === "reviewed" ? "info" : "warning"} title={assessment.label}>
+        {assessment.eligible
+          ? "This record can be marked reviewed locally. That does not set a customer, tax code or invoice number."
+          : "Resolve the underlying source record in People or Projects before using this time for Finance invoicing."}
+      </Notice>
+      <Row gap={2} wrap>
+        {context.role === "owner" && <Button variant="secondary" onClick={() => {
+          close(); context.navigate(`/o/${context.org.slug}/hr/scheduling?tab=Timesheets`);
+        }}>Open People timesheets</Button>}
+        <span className="ds-grow" />
+        <Button variant="ghost" onClick={close}>Close</Button>
+        {assessment.eligible && <Button variant="primary" disabled={!canReview} onClick={async () => {
+          const updated = await context.mutate.patch(entry.id, {
+            fields: {
+              ...entry.fields,
+              billingReviewStatus: "ready",
+              billingReviewedBy: context.actor,
+              billingReviewedAt: clockIso(),
+            },
+          }, { expectRevision: entry.revision,
+            event: `Approved billable time reviewed by Finance: ${entry.title}. No invoice created.` });
+          if (!updated) return;
+          context.toast("Finance review saved", "This time input is ready for manual invoice preparation. No ledger entry or invoice was created.");
+          close();
+        }}>Mark reviewed for billing</Button>}
+      </Row>
+      {!canReview && <Notice tone="warning">Only an owner or Finance role with journal-review capability can record this Finance decision in the local workspace.</Notice>}
+    </Stack>
+  );
+}
+
 function exportInvoices(context: ScreenContext, data: FinData, rows: Rec[]): void {
   const header = "number,customer,issued,due,status,net_minor,tax_minor,gross_minor,outstanding_minor,tax_codes\n";
   const body = rows.map((invoice) => {
@@ -185,7 +350,10 @@ export function useInvoice(context: ScreenContext): { invoice?: Rec; data: FinDa
   const data = useFinData();
   const { org, now } = useWorkspace();
   const fromRoute = useRecord(context.params.id);
-  const invoice = fromRoute ?? data.invoices.find((item) => item.id === context.selectedId) ?? data.invoices[0];
+  // An unknown or wrong-collection detail URL never substitutes another invoice.
+  const invoice = context.params.id
+    ? (fromRoute?.collection === "invoices" ? fromRoute : undefined)
+    : data.invoices.find((item) => item.id === context.selectedId) ?? data.invoices[0];
   const customer = contactOf(data, invoice);
   const totals = invoiceTotals(data, invoice, org.jurisdiction, now);
   return { invoice, data, totals, customer };
@@ -229,7 +397,7 @@ export function InvoiceOverview({ context }: { context: ScreenContext }) {
   const { org } = useWorkspace();
   if (!invoice) return <Empty title="No invoice selected" />;
   const status = statusFor(invoice, customer);
-  const paid = Number(invoice.fields.paidMinor ?? 0);
+  const paid = invoice.status === "paid" ? totals.grossMinor : Math.max(0, Number(invoice.fields.paidMinor ?? 0));
   const journal = data.journals.find((item) => item.id === String(invoice.fields.journalId ?? ""));
 
   return (
@@ -269,7 +437,7 @@ export function InvoiceOverview({ context }: { context: ScreenContext }) {
             { label: "Tax", minor: totals.taxMinor },
             { label: "Gross", minor: totals.grossMinor, bold: true },
             { label: "Paid", minor: paid },
-            { label: "Outstanding", minor: totals.grossMinor - paid, bold: true },
+            { label: "Outstanding", minor: outstandingMinor(invoice), bold: true },
           ]}
         />
       </Card>
@@ -655,9 +823,15 @@ export function InvoicePayments({ context }: { context: ScreenContext }) {
   const receipts = data.journals.filter((journal) =>
     String(journal.fields.invoiceId ?? "") === invoice.id && journal.fields.source === "payment");
   const legacy = data.journals.filter((journal) => journal.id === String(invoice.fields.paymentJournalId ?? ""));
-  const all = [...new Map([...receipts, ...legacy].map((journal) => [journal.id, journal])).values()];
-  const paid = Number(invoice.fields.paidMinor ?? 0);
-  const outstanding = totals.grossMinor - paid;
+  const all = [...new Map([...receipts, ...legacy]
+    .filter((journal) => journal.status === "posted")
+    .map((journal) => [journal.id, journal])).values()];
+  const outstanding = outstandingMinor(invoice);
+  const recordedPaid = Number(invoice.fields.paidMinor ?? 0);
+  const paid = invoice.status === "paid"
+    ? totals.grossMinor
+    : Math.min(totals.grossMinor, Math.max(0, recordedPaid));
+  const unlinkedHistoricPayment = invoice.status === "paid" && all.length === 0;
 
   return (
     <Grid>
@@ -691,6 +865,12 @@ export function InvoicePayments({ context }: { context: ScreenContext }) {
               { label: "Outstanding", minor: outstanding, bold: true },
             ]}
           />
+          {unlinkedHistoricPayment && (
+            <Notice tone="warning" title="Paid status has no linked posted receipt">
+              This historical invoice is marked paid, but no receipt journal is linked to it.
+              Its zero outstanding amount follows the recorded status; verify the ledger before reconciliation.
+            </Notice>
+          )}
           <CapabilityNotice id="payment.capture" />
           <Button
             variant="primary"
@@ -701,7 +881,7 @@ export function InvoicePayments({ context }: { context: ScreenContext }) {
             Record a payment
           </Button>
           {paid > 0 && outstanding > 0 && <Pill tone="info" dot>Part paid</Pill>}
-          <SourceNote>Settlement is computed from posted receipt journals, not from a bank feed. The figure moves only when a journal is posted.</SourceNote>
+          <SourceNote>Current receipts update the invoice allocation and post a journal together. Historical paid records without a linked journal are flagged for ledger review; no bank feed is connected.</SourceNote>
         </Stack>
       </Card>
       <Card prov="human" span={12} title="Receivables ageing for this customer" subtitle="Every open invoice on the same contact">
@@ -1012,7 +1192,7 @@ export function DocumentPreview({ context }: { context: ScreenContext }) {
           <div className="ds-grow" />
           <div style={{ textAlign: "end" }}>
             <span className="ds-stat-label">Amount due</span>
-            <div className="ds-stat-value">{context.money(totals.grossMinor - Number(invoice.fields.paidMinor ?? 0))}</div>
+            <div className="ds-stat-value">{context.money(outstandingMinor(invoice))}</div>
           </div>
         </Row>
         <hr className="ds-divider" />
@@ -1053,22 +1233,26 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
   const { invoice, data, totals } = useInvoice(context);
   const { now } = useWorkspace();
   const paid = Number(invoice?.fields.paidMinor ?? 0);
-  const outstanding = totals.grossMinor - paid;
+  const outstanding = Math.max(0, totals.grossMinor - paid);
   const [amount, setAmount] = useState(outstanding);
   const [date, setDate] = useState(now.toISOString().slice(0, 10));
   const [accountId, setAccountId] = useState("");
   const [method, setMethod] = useState("Bank transfer");
   const [busy, setBusy] = useState(false);
 
-  const cashAccounts = data.accounts.filter((account) => accountType(account) === "asset" && (account.tags.includes("cash") || accountCode(account).startsWith("10")));
+  const cashAccounts = data.accounts.filter((account) => account.status !== "inactive"
+    && accountType(account) === "asset"
+    && (account.tags.includes("cash") || accountCode(account).startsWith("10")));
   useEffect(() => { setAccountId((current) => current || cashAccounts[0]?.id || ""); }, [cashAccounts]);
   useEffect(() => { setAmount(outstanding); }, [outstanding]);
 
   if (!invoice) return <Empty title="No invoice selected" />;
   const ar = data.accounts.find((account) => accountCode(account) === "1100");
   const tooMuch = amount > outstanding;
-  const blocked = !ar
-    ? "The chart of accounts has no 1100 receivables account."
+  const blocked = !["awaiting_payment", "part_paid"].includes(invoice.status)
+    ? "Only an issued invoice with an outstanding balance can receive a payment."
+    : !ar
+      ? "The chart of accounts has no 1100 receivables account."
     : !accountId
       ? "Choose the account the money arrived in."
       : amount <= 0
@@ -1116,35 +1300,44 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
           disabled={Boolean(blocked) || !context.can("post_journal")}
           title={!context.can("post_journal") ? "Posting needs the Finance or Owner role view" : blocked}
           onClick={async () => {
-            if (!ar) return;
+            if (busy || blocked) return;
             setBusy(true);
-            const lines: JLine[] = [
-              { accountId, debitMinor: amount, creditMinor: 0, memo: `Receipt ${invoice.title}` },
-              { accountId: ar.id, debitMinor: 0, creditMinor: amount, memo: `Receipt ${invoice.title}` },
-            ];
-            const journal = await context.mutate.create({
-              collection: "journals",
-              title: `Receipt ${invoice.title}`,
-              status: "posted",
-              summary: `Local receipt for ${invoice.title} by ${method.toLowerCase()}. No payment provider confirmed it.`,
-              amountMinor: amount,
-              at: `${date}T09:00:00.000Z`,
-              parentId: invoice.id,
-              tags: ["ledger", "receipt"],
-              fields: { date, source: "payment", invoiceId: invoice.id, method },
-              body: { date, memo: `Receipt for ${invoice.title}`, lines },
-            }, `Receipt posted for ${invoice.title}`);
-            const nextPaid = paid + amount;
-            await context.mutate.patch(invoice.id, {
-              status: nextPaid >= totals.grossMinor ? "paid" : "part_paid",
-              fields: { ...invoice.fields, paidMinor: nextPaid, paymentJournalId: journal.id, paidAt: `${date}T09:00:00.000Z` },
-            }, { expectRevision: invoice.revision, event: `Payment of ${context.money(amount)} recorded on ${invoice.title}` });
-            context.toast(
-              nextPaid >= totals.grossMinor ? "Invoice settled" : "Part payment recorded",
-              `${context.money(amount)} posted as a balanced receipt. Outstanding is now ${context.money(totals.grossMinor - nextPaid)}.`,
-            );
-            setBusy(false);
-            close();
+            try {
+              const result = prepareInvoiceReceipt({
+                invoice, grossMinor: totals.grossMinor,
+                amountMinor: amount, accounts: data.accounts,
+                locked: data.locked, cashAccountId: accountId,
+                date, method, actor: context.actor, now,
+              });
+              if (!result.posting) {
+                context.toast("Receipt posting blocked", result.blocked ?? "Review the payment and retry.", "blocked");
+                return;
+              }
+              const prepared = result.posting;
+              await context.mutate.putMany(
+                [prepared.invoice, prepared.journal],
+                [
+                  `Payment of ${context.money(amount)} recorded on ${invoice.title}`,
+                  `Receipt posted for ${invoice.title}`,
+                ],
+                prepared.expectedRevisions,
+                ["update", "create"],
+              );
+              const nextPaid = Number(prepared.invoice.fields.paidMinor ?? 0);
+              context.toast(
+                prepared.invoice.status === "paid" ? "Invoice settled" : "Part payment recorded",
+                `${context.money(amount)} posted as a balanced receipt. Outstanding is now ${context.money(totals.grossMinor - nextPaid)}.`,
+              );
+              close();
+            } catch (error) {
+              context.toast(
+                "Payment was not recorded",
+                error instanceof Error ? error.message : "This invoice changed. Reopen the record and retry.",
+                "failed",
+              );
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Post the receipt
@@ -1473,36 +1666,41 @@ export function ApproveInvoice({ context, close }: { context: ScreenContext; clo
         disabled={Boolean(blocked) || !context.can("post_journal")}
         title={!context.can("post_journal") ? "Posting needs the Finance or Owner role view" : blocked}
         onClick={async () => {
+          if (busy || blocked) return;
           setBusy(true);
-          const date = (invoice.at ?? context.now.toISOString()).slice(0, 10);
-          const journal = await context.mutate.create({
-            collection: "journals",
-            title: `Issue ${invoice.title}`,
-            status: "posted",
-            summary: `Receivable raised for ${invoice.title}.`,
-            amountMinor: totals.grossMinor,
-            at: `${date}T09:00:00.000Z`,
-            parentId: invoice.id,
-            tags: ["ledger", "invoice"],
-            fields: { date, source: "invoice", invoiceId: invoice.id, postedBy: context.actor, approvedBy: context.actor },
-            body: { date, memo: invoice.title, lines: posting.lines },
-          }, `Issued ${invoice.title} and posted a balanced journal`);
-          const versions = ((invoice.body as { versions?: unknown[] })?.versions ?? []) as unknown[];
-          await context.mutate.patch(invoice.id, {
-            status: "awaiting_payment",
-            amountMinor: totals.grossMinor,
-            body: {
-              ...(invoice.body as object ?? {}),
-              versions: [...versions, { at: clockIso(), by: context.actor, note: "Issued and posted", grossMinor: totals.grossMinor }],
-            },
-            fields: {
-              ...invoice.fields, journalId: journal.id, netMinor: totals.netMinor, taxMinor: totals.taxMinor,
-              issuedAt: clockIso(), approvedBy: context.actor, approvedAt: clockIso(),
-            },
-          }, { expectRevision: invoice.revision, event: `${invoice.title} approved by ${context.actor} and issued` });
-          setBusy(false);
-          context.toast("Invoice issued", `${context.money(totals.grossMinor)} is on the ledger as a balanced journal. The invoice is now immutable.`);
-          close();
+          try {
+            const result = prepareInvoiceIssue({
+              invoice, totals, lines: posting.lines,
+              accounts: data.accounts, locked: data.locked,
+              actor: context.actor, now: context.now,
+            });
+            if (!result.posting) {
+              context.toast("Invoice posting blocked", result.blocked ?? "Review this invoice before posting.", "blocked");
+              return;
+            }
+            const prepared = result.posting;
+            // Invoice and posted journal become visible together, or neither
+            // does; a stale revision cannot leave an unlinked ledger entry.
+            await context.mutate.putMany(
+              [prepared.invoice, prepared.journal],
+              [
+                `${invoice.title} approved by ${context.actor} and issued`,
+                `Issued ${invoice.title} and posted a balanced journal`,
+              ],
+              prepared.expectedRevisions,
+              ["update", "create"],
+            );
+            context.toast("Invoice issued", `${context.money(totals.grossMinor)} is on the ledger as a balanced journal. The invoice is now immutable.`);
+            close();
+          } catch (error) {
+            context.toast(
+              "Invoice was not issued",
+              error instanceof Error ? error.message : "The record changed. Reopen the invoice and retry.",
+              "failed",
+            );
+          } finally {
+            setBusy(false);
+          }
         }}
       >
         Approve and post {context.money(totals.grossMinor)}

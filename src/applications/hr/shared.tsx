@@ -3,6 +3,8 @@ import { Button, Empty, Pill, Row, Stack } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
+import { listChildren, newRecord } from "@/platform/repo";
+import { clockIso } from "@/platform/clock";
 
 /* Pieces of the People actions that the panels also render. Kept apart so
    panels.tsx and actions.tsx do not import each other. */
@@ -19,13 +21,53 @@ export function useDirectoryTeam(): string {
 
 /** One acknowledgement per person per version; earlier versions' acknowledgements are kept. */
 export async function recordAcknowledgement(context: ScreenContext, policy: Rec): Promise<void> {
+  if (policy.organizationId !== context.org.id || policy.collection !== "policies"
+      || policy.fields.kind !== "hr" || !context.actor.trim()) {
+    context.toast("Acknowledgement unavailable", "Choose a valid HR policy and a named company user.", "blocked");
+    return;
+  }
   const version = String(policy.fields.version ?? "1.0");
-  const { listChildren } = await import("@/platform/repo");
-  const existing = (await listChildren(context.org.id, policy.id)).filter((row) => row.collection === "acknowledgements" && row.fields.person === context.actor && String(row.fields.version) === version);
-  if (existing.length > 0) { context.toast("Already acknowledged", `${context.actor} acknowledged v${version} ${context.relative(existing[0].createdAt)}.`, "info"); return; }
-  await context.mutate.create({ collection: "acknowledgements", title: `${policy.title} v${version} · ${context.actor}`, status: "acknowledged", summary: `Acknowledged by ${context.actor}.`, parentId: policy.id, fields: { policyId: policy.id, person: context.actor, version } }, `${context.actor} acknowledged ${policy.title} v${version}`);
-  await context.mutate.patch(policy.id, { fields: { ...policy.fields, acknowledged: Number(policy.fields.acknowledged ?? 0) + 1 } }, { expectRevision: policy.revision, event: `Acknowledgement count for ${policy.title} v${version} increased` });
-  context.toast("Policy acknowledged", `${policy.title} v${version} is recorded against ${context.actor}.`);
+  try {
+    const linked = (await listChildren(context.org.id, policy.id)).filter((row) =>
+      row.collection === "acknowledgements" && String(row.fields.version) === version);
+    const prior = linked.find((row) => row.fields.person === context.actor);
+    if (prior) {
+      context.toast("Already acknowledged",
+        `${context.actor} acknowledged v${version} ${context.relative(prior.createdAt)}.`, "info");
+      return;
+    }
+    const now = clockIso();
+    const acknowledgement = newRecord({
+      organizationId: context.org.id, currency: context.org.currency,
+      collection: "acknowledgements",
+      title: `${policy.title} v${version} · ${context.actor}`,
+      status: "acknowledged", summary: `Policy acknowledgement by ${context.actor}`,
+      parentId: policy.id,
+      fields: { policyId: policy.id, person: context.actor, version },
+    }, { actor: context.actor, now });
+    const unique = new Set(linked.map((row) => String(row.fields.person || "").trim()).filter(Boolean));
+    unique.add(context.actor);
+    const revised: Rec = {
+      ...policy,
+      revision: policy.revision + 1, updatedAt: now, updatedBy: context.actor,
+      fields: { ...policy.fields, acknowledged: unique.size },
+      history: [{
+        title: policy.title, status: policy.status, summary: policy.summary,
+        fields: { ...policy.fields }, body: policy.body, amountMinor: policy.amountMinor, at: now,
+      }, ...policy.history].slice(0, 25),
+    };
+    await context.mutate.putMany(
+      [acknowledgement, revised],
+      [`${context.actor} acknowledged ${policy.title} v${version}`,
+       `Policy ${policy.title} v${version} acknowledgement count reconciled to ${unique.size}`],
+      { [policy.id]: policy.revision }, ["create", "update"],
+    );
+    context.toast("Policy acknowledged",
+      `${policy.title} v${version} was recorded for ${context.actor}; the count and linked acknowledgement saved together.`);
+  } catch (reason) {
+    context.toast("Acknowledgement not saved", reason instanceof Error
+      ? reason.message : "The policy changed. Reload before acknowledging it.", "blocked");
+  }
 }
 
 /** My learning: only what is actually assigned to or completed by this person. */

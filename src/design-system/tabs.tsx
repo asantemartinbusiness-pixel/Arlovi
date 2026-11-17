@@ -43,7 +43,10 @@ export function Tabs({
             id={`tab-${item.id}`}
             className="ds-tab"
             aria-selected={item.id === value}
-            aria-controls={`panel-${item.id}`}
+            // Only the active panel is mounted by consumers. An aria-controls
+            // IDREF on an inactive tab would point to a nonexistent element
+            // and fail accessibility validation. Keep the active relationship.
+            aria-controls={item.id === value ? `panel-${item.id}` : undefined}
             tabIndex={item.id === value ? 0 : -1}
             disabled={item.disabled}
             onClick={() => onChange(item.id)}

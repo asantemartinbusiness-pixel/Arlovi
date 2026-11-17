@@ -149,7 +149,8 @@ export interface Mutations {
   create: (input: Omit<repo.NewRecordInput, "organizationId" | "currency"> & { currency?: string }, event?: string) => Promise<Rec>;
   patch: (id: string, patch: Partial<Rec>, options?: Omit<repo.PatchOptions, "event" | "expectedOrganizationId"> & { event?: string }) => Promise<Rec | null>;
   remove: (id: string, event?: string) => Promise<void>;
-  putMany: (records: Rec[], messages?: string[]) => Promise<void>;
+  putMany: (records: Rec[], messages?: string[], expectedRevisions?: Record<string, number>, eventTypes?: ("create" | "update")[]) => Promise<void>;
+  confirmReconciliation: (bankAccountCode: string, statementId: string, note: string) => Promise<Rec>;
   log: (message: string, options?: { entityId?: string; type?: string; capability?: Audit["capability"] }) => Promise<void>;
 }
 
@@ -202,9 +203,25 @@ export function useMutations(screenId?: string): Mutations {
         throw error;
       }
     },
-    async putMany(records, messages = []) {
+    async putMany(records, messages = [], expectedRevisions = {}, eventTypes: ("create" | "update")[] = []) {
       const ctx = context();
-      await repo.putMany(records, ctx, messages.map((message) => ({ type: "update", message })), org.id);
+      await repo.putMany(
+        records,
+        ctx,
+        messages.map((message, index) => ({
+          type: eventTypes[index] ?? "update",
+          message,
+          // Match an audit message to its record when callers supply one per
+          // record. Other legacy batches retain their old event semantics.
+          ...(messages.length === records.length ? { entityId: records[index]?.id } : {}),
+        })),
+        org.id,
+        expectedRevisions,
+      );
+    },
+    async confirmReconciliation(bankAccountCode, statementId, note) {
+      const ctx = context();
+      return repo.confirmBankReconciliation(org.id, bankAccountCode, statementId, note, ctx);
     },
     async log(message, options) {
       const ctx = context();

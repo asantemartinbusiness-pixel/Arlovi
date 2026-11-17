@@ -32,7 +32,7 @@ export function TaskBoard({
 }: {
   context: ScreenContext;
   tasks: Rec[];
-  onMove: (task: Rec, lane: LaneId) => Promise<void> | void;
+  onMove: (task: Rec, lane: LaneId) => Promise<boolean> | boolean;
   onOpen: (task: Rec) => void;
 }) {
   const [dragId, setDragId] = useState<string | null>(null);
@@ -49,10 +49,20 @@ export function TaskBoard({
 
   const move = useCallback(async (task: Rec, lane: LaneId) => {
     if (stageOf(task) === lane) return;
-    await onMove(task, lane);
-    setAnnouncement(`${task.title} moved to ${LANES.find((item) => item.id === lane)?.label}.`);
+    try {
+      const saved = await onMove(task, lane);
+      // Neither stale revisions nor a review-decision modal constitute a
+      // successful stage change. The screen reader must hear the real result.
+      setAnnouncement(saved
+        ? `${task.title} moved to ${LANES.find((item) => item.id === lane)?.label}.`
+        : `${task.title} was not moved; review its current stage or approval rule.`);
+    } catch (error) {
+      setAnnouncement(`${task.title} was not moved.`);
+      context.toast("Task move failed", error instanceof Error ? error.message
+        : "The task changed. Reload its stage and retry.", "failed");
+    }
     setFocusId(task.id);
-  }, [onMove]);
+  }, [context, onMove]);
 
   function onCardKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, task: Rec) {
     const lane = stageOf(task);

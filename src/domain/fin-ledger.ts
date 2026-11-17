@@ -424,7 +424,7 @@ export interface StatementSummary {
 
 export function statementSummaries(lines: Rec[]): StatementSummary[] {
   return lines
-    .filter((line) => line.fields.kind === "statement")
+    .filter((line) => line.collection === "bankTransactions" && line.fields.kind === "statement")
     .map((record) => ({
       record,
       bankAccountCode: String(record.fields.bankAccountCode ?? "1000"),
@@ -433,11 +433,19 @@ export function statementSummaries(lines: Rec[]): StatementSummary[] {
       from: record.fields.from ? String(record.fields.from) : undefined,
       to: record.fields.to ? String(record.fields.to) : undefined,
       filename: String(record.fields.filename ?? record.title),
-    }));
+    }))
+    // A newly imported statement supersedes an older statement for the same
+    // bank account. Never use insertion order to select the closing balance.
+    .sort((a, b) => String(b.to ?? b.record.at ?? b.record.createdAt)
+      .localeCompare(String(a.to ?? a.record.at ?? a.record.createdAt))
+      || String(b.record.createdAt).localeCompare(String(a.record.createdAt))
+      || b.record.id.localeCompare(a.record.id));
 }
 
 export function isStatementLine(record: Rec): boolean {
-  return record.collection === "bankTransactions" && record.fields.kind !== "statement";
+  return record.collection === "bankTransactions"
+    && record.fields.kind !== "statement"
+    && record.fields.kind !== "reconciliation";
 }
 
 export interface MatchCandidate {
@@ -499,11 +507,20 @@ export function reconcile(input: {
 }): Reconciliation {
   const account = input.accounts.find((item) => accountCode(item) === input.bankAccountCode);
   const statement = statementSummaries(input.lines).find((item) => item.bankAccountCode === input.bankAccountCode);
-  const own = input.lines.filter((line) => isStatementLine(line) && String(line.fields.bankAccountCode ?? "1000") === input.bankAccountCode);
+  const activeBatch = statement?.record.fields.importBatch;
+  const own = input.lines.filter((line) =>
+    isStatementLine(line)
+    && String(line.fields.bankAccountCode ?? "1000") === input.bankAccountCode
+    // New imports carry a statement batch. Do not mix historical statement
+    // lines from older months into the current statement's sign-off.
+    && (!activeBatch || String(line.fields.importBatch ?? "") === String(activeBatch)));
   let ledgerMinor = 0;
   if (account) {
     for (const journal of input.journals) {
       if (journal.status !== "posted") continue;
+      // Bank closing balances are as-of the statement date, not today's
+      // balance. Newer legitimate postings must not rewrite old statements.
+      if (statement?.to && journalDate(journal) > statement.to) continue;
       for (const entry of journalLines(journal)) {
         if (entry.accountId === account.id) ledgerMinor += entry.debitMinor - entry.creditMinor;
       }

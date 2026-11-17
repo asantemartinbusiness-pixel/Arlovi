@@ -1,5 +1,8 @@
 import { db } from "@/runtime/db";
 import type { Audit, Rec, Snapshot } from "@/domain/types";
+import { journalDate, lockedPeriods, periodOf } from "@/domain/fin-ledger";
+import { validateBankReconciliation } from "@/domain/finance-signoff";
+import { assertRosterIntegrity } from "@/domain/scheduling";
 
 /* ------------------------------------------------------------------ *
  * Narrow repository.
@@ -23,6 +26,63 @@ export class ConflictError extends Error {
     super(`Record ${id} changed since it was read (expected revision ${expected}, found ${actual}).`);
     this.name = "ConflictError";
   }
+}
+
+/**
+ * All newly posted journals pass the live accounting-period lock from the
+ * database, inside the same transaction that writes the journal.
+ * Reconciliation link metadata may be added to an already-posted journal;
+ * that operation does not post a new ledger entry.
+ */
+async function assertOpenJournalPeriod(record: Rec, previous?: Rec): Promise<void> {
+  if (record.collection !== "journals" || record.status !== "posted") return;
+  const dateChanged = previous && journalDate(previous) !== journalDate(record);
+  if (previous?.status === "posted" && !dateChanged) return;
+  const prefs = await db.records.where("[organizationId+collection]")
+    .equals([record.organizationId, "preferences"]).toArray();
+  const controls = prefs.find((item) => item.fields.kind === "accountingPeriods");
+  const period = periodOf(journalDate(record));
+  if (lockedPeriods(controls).includes(period)) {
+    throw new Error(`Accounting period ${period} is closed. No posted journal was written; choose an open period.`);
+  }
+}
+
+
+/** Only scheduling changes need a new roster conflict check. Approving an
+ * already-recorded overtime note must not retroactively rewrite the roster. */
+function rosterChanged(next: Rec, previous?: Rec): boolean {
+  if (next.collection !== "shifts" || next.fields.kind !== "shift") return false;
+  if (!previous) return true;
+  return next.startAt !== previous.startAt || next.endAt !== previous.endAt
+    || next.status !== previous.status || next.fields.employeeId !== previous.fields.employeeId
+    || next.fields.hours !== previous.fields.hours || next.fields.projectId !== previous.fields.projectId;
+}
+
+async function validateRosterWrites(scopeId: string, proposed: Rec[], pendingBatch: Rec[] = []): Promise<void> {
+  if (!proposed.length) return;
+  const [storedRoster, storedEmployees, storedLeave, storedProjects] = await Promise.all([
+    db.records.where("[organizationId+collection]").equals([scopeId, "shifts"]).toArray(),
+    db.records.where("[organizationId+collection]").equals([scopeId, "employees"]).toArray(),
+    db.records.where("[organizationId+collection]").equals([scopeId, "leaveRequests"]).toArray(),
+    db.records.where("[organizationId+collection]").equals([scopeId, "projects"]).toArray(),
+  ]);
+  // A single atomic import may create an employee, project and their first
+  // shift together. Resolve linked records against the transaction's proposed
+  // post-write state, not just the pre-write database snapshot.
+  const overlay = (stored: Rec[], collection: string): Rec[] => {
+    const merged = new Map(stored.map((row) => [row.id, row]));
+    for (const row of pendingBatch) if (row.collection === collection && row.organizationId === scopeId) {
+      merged.set(row.id, row);
+    }
+    return [...merged.values()];
+  };
+  assertRosterIntegrity({
+    organizationId: scopeId, changes: proposed,
+    roster: overlay(storedRoster, "shifts"),
+    employees: overlay(storedEmployees, "employees"),
+    approvedLeave: overlay(storedLeave, "leaveRequests"),
+    projects: overlay(storedProjects, "projects"),
+  });
 }
 
 /* Last-read copy of every record this tab has seen. Forms seed their state
@@ -131,6 +191,8 @@ export async function patchRecord(id: string, patch: Partial<Rec>, context: Writ
       updatedAt: context.now,
       updatedBy: context.actor,
     };
+    await assertOpenJournalPeriod(next, current);
+    if (rosterChanged(next, current)) await validateRosterWrites(current.organizationId, [next]);
     await db.records.put(next);
     prime(next);
     if (options.event) {
@@ -154,6 +216,7 @@ export async function putRecord(record: Rec, context: WriteContext, event?: Omit
     if (previous && previous.organizationId !== record.organizationId) {
       throw new OrganizationScopeError(record.id, record.organizationId, previous.organizationId);
     }
+    await assertOpenJournalPeriod(record, previous);
     await db.records.put(record);
     if (event) {
       await db.events.add({
@@ -170,7 +233,7 @@ export async function putRecord(record: Rec, context: WriteContext, event?: Omit
   });
 }
 
-export async function putMany(records: Rec[], context: WriteContext, events: Omit<Audit, "id" | "at" | "actor" | "organizationId">[] = [], expectedOrgId?: string): Promise<void> {
+export async function putMany(records: Rec[], context: WriteContext, events: Omit<Audit, "id" | "at" | "actor" | "organizationId">[] = [], expectedOrgId?: string, expectedRevisions: Record<string, number> = {}): Promise<void> {
   if (records.length === 0 && events.length === 0) return;
   const scopeId = expectedOrgId ?? records[0]?.organizationId;
   if (!scopeId) throw new Error("Bulk audit events require an organization scope.");
@@ -185,6 +248,85 @@ export async function putMany(records: Rec[], context: WriteContext, events: Omi
           throw new OrganizationScopeError(original.id, scopeId, original.organizationId);
         }
       }
+      // Compare-and-swap *inside* the same transaction that writes the records.
+      // A stale deal cannot write a new invoice and then fail its own update.
+      // New records must not overwrite an existing ID.
+      for (const [index, record] of records.entries()) {
+        const original = existing[index];
+        const expected = expectedRevisions[record.id];
+        if (expected !== undefined) {
+          if (!original || original.revision !== expected) {
+            throw new ConflictError(record.id, expected, original?.revision ?? -1);
+          }
+        } else if (Object.keys(expectedRevisions).length > 0 && original) {
+          // When a caller asks for an atomic CAS batch, every other record in
+          // that batch must be genuinely new rather than an unguarded update.
+          throw new ConflictError(record.id, 0, original.revision);
+        }
+      }
+      // Creating a parent and children in one batch must be create-only.
+      // A colliding id cannot replace an existing record even when this batch
+      // does not need compare-and-swap revisions for another source.
+      const createIds = new Set(events
+        .filter((event) => event.type === "create")
+        .map((event) => event.entityId)
+        .filter((id): id is string => typeof id === "string"));
+      for (const [index, record] of records.entries()) {
+        if (createIds.has(record.id) && existing[index]) {
+          throw new ConflictError(record.id, 0, existing[index].revision);
+        }
+      }
+      // Project names must remain unique per organisation even when two
+      // open tabs submit the same title. Check inside the write transaction.
+      const newProjects = records.filter((record) =>
+        record.collection === "projects" && createIds.has(record.id));
+      if (newProjects.length) {
+        const knownProjects = await db.records.where("[organizationId+collection]")
+          .equals([scopeId, "projects"]).toArray();
+        const claimed = new Set(knownProjects.map((row) => row.title.trim().toLocaleLowerCase()));
+        for (const project of newProjects) {
+          const title = project.title.trim().toLocaleLowerCase();
+          if (!title || claimed.has(title)) {
+            throw new Error(`A project named "${project.title}" already exists in this company. Choose a different name.`);
+          }
+          claimed.add(title);
+        }
+      }
+      // Also verify source documents read by a cross-app handoff, even if
+      // the source record itself is not changed (e.g. an accepted quote).
+      const written = new Set(records.map((record) => record.id));
+      const readOnlyIds = Object.keys(expectedRevisions).filter((id) => !written.has(id));
+      if (readOnlyIds.length) {
+        const sources = await db.records.bulkGet(readOnlyIds);
+        for (const [index, id] of readOnlyIds.entries()) {
+          const source = sources[index];
+          const expected = expectedRevisions[id];
+          if (!source || source.organizationId !== scopeId || source.revision !== expected) {
+            throw new ConflictError(id, expected, source?.revision ?? -1);
+          }
+        }
+      }
+      // A new draft invoice must not reuse an existing displayed invoice
+      // number, including when another deal was closed in a different tab.
+      if (Object.keys(expectedRevisions).length > 0) {
+        const newInvoices = records.filter((record, index) =>
+          record.collection === "invoices" && !existing[index]);
+        if (newInvoices.length) {
+          const allInvoices = await db.records.where("[organizationId+collection]")
+            .equals([scopeId, "invoices"]).toArray();
+          for (const invoice of newInvoices) {
+            const number = String(invoice.fields.number ?? invoice.title);
+            if (allInvoices.some((row) => String(row.fields.number ?? row.title) === number)) {
+              throw new Error(`Invoice number ${number} was already used. Reopen this deal and retry the handoff.`);
+            }
+          }
+        }
+      }
+      for (const [index, record] of records.entries()) {
+        await assertOpenJournalPeriod(record, existing[index]);
+      }
+      const proposedShifts = records.filter((record, index) => rosterChanged(record, existing[index]));
+      await validateRosterWrites(scopeId, proposedShifts, records);
       await db.records.bulkPut(records);
     }
     if (events.length) {
@@ -200,12 +342,75 @@ export async function putMany(records: Rec[], context: WriteContext, events: Omi
   });
 }
 
+/**
+ * The entire confirmation is revalidated inside one IndexedDB transaction.
+ * The browser-local signoff cannot be saved from an outdated React render:
+ * ledger, statement, matched lines, reciprocal links and duplicate confirmations
+ * are inspected together with the final confirmation write.
+ */
+export async function confirmBankReconciliation(
+  organizationId: string,
+  bankAccountCode: string,
+  expectedStatementId: string,
+  note: string,
+  context: WriteContext,
+): Promise<Rec> {
+  return db.transaction("rw", [db.records, db.events], async () => {
+    const records = await db.records.where("organizationId").equals(organizationId).toArray();
+    const { recon, evidence } = validateBankReconciliation({
+      organizationId, bankAccountCode, expectedStatementId, records,
+    });
+    const record = newRecord({
+      organizationId,
+      collection: "bankTransactions",
+      currency: records.find((item) => item.collection === "accounts")?.currency ?? "GBP",
+      title: `Reconciliation ${context.now.slice(0, 10)} · ${bankAccountCode}`,
+      status: "confirmed",
+      summary: note.trim() || "Local statement signoff with complete reciprocal ledger evidence.",
+      amountMinor: recon.statementClosingMinor ?? 0,
+      at: context.now,
+      fields: {
+        kind: "reconciliation",
+        statementId: evidence.statementId,
+        bankAccountCode,
+        closingMinor: evidence.closingMinor,
+        ledgerMinor: evidence.ledgerMinor,
+        differenceMinor: 0,
+        confirmedBy: context.actor,
+        confirmedAt: context.now,
+        journalCount: Object.keys(evidence.journalRevisions).length,
+        matchedCount: Object.keys(evidence.lineRevisions).length,
+        verification: "manual_local",
+      },
+      body: { evidence },
+    }, context);
+    await db.records.add(record);
+    await db.events.add({
+      id: crypto.randomUUID(),
+      organizationId,
+      at: context.now,
+      actor: context.actor,
+      type: "create",
+      message: `Statement ${expectedStatementId} manually reconciled against account ${bankAccountCode} by ${context.actor}`,
+      entityId: record.id,
+      screenId: context.screenId,
+    });
+    prime(record);
+    return record;
+  });
+}
+
 export async function deleteRecord(id: string, context: WriteContext, event?: Omit<Audit, "id" | "at" | "actor" | "organizationId">, expectedOrgId?: string): Promise<void> {
   await db.transaction("rw", [db.records, db.events], async () => {
     const current = await db.records.get(id);
     if (!current) return;
     if (expectedOrgId && current.organizationId !== expectedOrgId) {
       throw new OrganizationScopeError(id, expectedOrgId, current.organizationId);
+    }
+    // Posted journals remain immutable accounting evidence. Reverse them
+    // through the ledger instead of deleting them from the chart of accounts.
+    if (current.collection === "journals" && current.status === "posted") {
+      throw new Error("A posted journal cannot be deleted. Create a balanced reversal instead.");
     }
     await db.records.delete(id);
     if (event && current) {

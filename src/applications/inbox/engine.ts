@@ -106,7 +106,7 @@ export function busItem(id: string | undefined): InboxItem | undefined {
 }
 
 export const INBOX_COLLECTIONS = [
-  "notifications", "invoices", "bills", "tasks", "missions", "approvals",
+  "notifications", "invoices", "bills", "tasks", "shifts", "missions", "approvals",
   "incidents", "messages", "preferences", TRIAGE_COLLECTION,
 ];
 
@@ -133,6 +133,7 @@ export function useInboxData(): InboxData {
       invoices: data.invoices,
       bills: data.bills,
       tasks: data.tasks,
+      shifts: data.shifts,
       missions: data.missions,
       approvals: data.approvals,
       orgSlug: org.slug,
@@ -157,7 +158,9 @@ export function useInboxData(): InboxData {
         resolved: item.resolved || bool(state?.fields.resolved),
         snoozedUntil,
         snoozed: Boolean(snoozedUntil && new Date(snoozedUntil) > now),
-        assignee: text(record?.fields.assignee) ?? text(state?.fields.assignee),
+        assignee: item.kind === "assignment" && item.assignee
+          ? item.assignee
+          : text(record?.fields.assignee) ?? text(state?.fields.assignee) ?? item.assignee,
         record,
         state,
       };

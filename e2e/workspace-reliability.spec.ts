@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("workspace health is read-only and shows company-scoped diagnostics",async({page})=>{
   await page.goto("/o/northline/workspace/health");
-  await expect(page.getByRole("heading",{name:"Workspace health"})).toBeVisible();
+  await expect(page.getByRole("heading",{level:1,name:"Workspace health"})).toBeVisible();
   await expect(page.getByRole("heading",{name:"Workspace diagnostics"})).toBeVisible();
   await expect(page.getByText("Company records")).toBeVisible();
   await expect(page.getByText("Application loading")).toBeVisible();

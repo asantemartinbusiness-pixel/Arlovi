@@ -7,6 +7,8 @@ import type { Rec } from "@/domain/types";
 import { askFirst, Boundary, logBoundary, selectedOf } from "@/applications/hr/opsKit";
 import { LANES, stageOf, type LaneId } from "./board";
 import { clockIso } from "@/platform/clock";
+import { duplicateProjectPlan, nextProjectCopyTitle } from "./creation";
+import { positiveHours, taskMoveDecision } from "./progression";
 
 /* ------------------------------------------------------------------ *
  * Contract actions for the Projects module that change records.
@@ -136,29 +138,31 @@ export function PortfolioReport({ context, close }: { context: ScreenContext; cl
 export async function duplicateProject(context: ScreenContext): Promise<void> {
   const project = await selectedOf(context, "projects", "a project");
   if (!project) return;
-  const tasks = ownTasks(await listByCollection(context.org.id, "tasks"), project.id);
+  const [allTasks, allProjects] = await Promise.all([
+    listByCollection(context.org.id, "tasks"),
+    listByCollection(context.org.id, "projects"),
+  ]);
+  const tasks = ownTasks(allTasks, project.id);
+  const proposed = nextProjectCopyTitle(project.title, allProjects.map((item) => item.title));
   askFirst(context, {
     title: `Duplicate ${project.title}`,
-    body: `Creates a new project with the same ${tasks.length} tasks, reset to Backlog. Attachments, comments, approvals and time entries are not copied.`,
+    body: `Creates ${proposed} with ${tasks.length} backlog tasks and internal dependency links. Existing assignees, approvals, review history, AI delegation, worklogs, comments and attachments are not copied. The entire copy is saved together.`,
     confirm: "Duplicate the project",
     run: async () => {
-      const copy = await context.mutate.create({
-        collection: "projects",
-        title: `${project.title} (copy)`,
-        status: "planning",
-        summary: `Duplicated from ${project.title}.`,
-        startAt: project.startAt, endAt: project.endAt, dueAt: project.dueAt, amountMinor: 0,
-        fields: { ...project.fields, spentMinor: 0, automationPaused: false, pinnedBy: "", duplicatedFrom: project.id },
-      }, `${project.title} duplicated by ${context.actor}`);
-      for (const task of tasks) {
-        await context.mutate.create({
-          collection: "tasks", title: task.title, status: "backlog", summary: task.summary, parentId: copy.id,
-          startAt: task.startAt, endAt: task.endAt, dueAt: task.dueAt,
-          fields: { ...task.fields, stage: "backlog", loggedHours: 0, dependsOn: "", completedBy: "", reviewSkippedBy: "" },
-        }, `Task copied into ${copy.title}: ${task.title}`);
+      try {
+        const plan = duplicateProjectPlan({
+          organizationId: context.org.id, currency: context.org.currency,
+          actor: context.actor, now: new Date(clockIso()),
+        }, project, tasks, proposed);
+        await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+        context.toast("Project duplicated",
+          `${plan.project.title} has ${plan.tasks.length} new backlog tasks. All dependencies point to copied tasks in this project.`);
+        context.select(plan.project.id);
+        context.navigate(`/o/${context.org.slug}/project/projects/${plan.project.id}`);
+      } catch (error) {
+        context.toast("Project was not duplicated",
+          error instanceof Error ? error.message : "The source changed. Reopen this project and retry.", "failed");
       }
-      context.toast("Project duplicated", `${copy.title} has ${tasks.length} tasks and nothing confidential from the source.`);
-      context.select(copy.id);
     },
   });
 }
@@ -347,9 +351,9 @@ export function MoveTask({ context, close }: { context: ScreenContext; close: ()
   const data = useCollections(["tasks"]);
   const [lane, setLane] = useState<LaneId | "">("");
   if (!task || task.collection !== "tasks") return <Empty title="Select a card on the board first" />;
-  const blockers = dependenciesOf(task).map((id) => data.tasks.find((row) => row.id === id)).filter((row): row is Rec => Boolean(row) && stageOf(row!) !== "done");
-  const blockedByDeps = lane === "done" && blockers.length > 0;
-  const skipsReview = lane === "done" && stageOf(task) !== "review" && String(task.fields.priority ?? "") === "high";
+  const decision = lane ? taskMoveDecision(task, lane, data.tasks) : undefined;
+  const blockedByDeps = Boolean(decision?.blocked);
+  const skipsReview = Boolean(decision?.needsReviewDecision);
   return (
     <Stack gap={4}>
       <h3>{task.title}</h3>
@@ -359,7 +363,7 @@ export function MoveTask({ context, close }: { context: ScreenContext; close: ()
           {LANES.filter((item) => item.id !== stageOf(task)).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
         </Select>
       </Field>
-      {blockedByDeps && <Notice tone="danger" title="Waiting on unfinished work">{blockers.map((row) => row.title).join(", ")} must be done first. The move is refused.</Notice>}
+      {blockedByDeps && <Notice tone="danger" title="Task move blocked">{decision?.blocked}</Notice>}
       {skipsReview && <Notice tone="warning" title="This skips Review">High priority work goes through Review. Continuing opens the stage rule so the skip is a recorded decision.</Notice>}
       <Notice tone="info">Moving a card changes its stage only. No automation or external side effect runs from a stage change.</Notice>
       <Row gap={2}>
@@ -371,7 +375,10 @@ export function MoveTask({ context, close }: { context: ScreenContext; close: ()
           onClick={async () => {
             if (!lane) return;
             if (skipsReview) { context.openOverlay("stage rule", { id: task.id, lane }); return; }
-            await context.mutate.patch(task.id, { status: lane, fields: { ...task.fields, stage: lane } }, { expectRevision: task.revision, event: `${task.title} moved to ${lane} by ${context.actor}` });
+            const saved = await context.mutate.patch(task.id, {
+              status: lane, fields: { ...task.fields, stage: lane },
+            }, { expectRevision: task.revision, event: `${task.title} moved to ${lane} by ${context.actor}` });
+            if (!saved) return;
             context.toast("Task moved", `${task.title} is in ${lane}.`);
             close();
           }}
@@ -434,12 +441,20 @@ export function TaskEditor({ context, close }: { context: ScreenContext; close: 
         const title = String(form.get("title") ?? "").trim();
         if (!title) return;
         const due = String(form.get("due") ?? "");
-        await context.mutate.patch(task.id, {
+        let estimate: number;
+        try {
+          estimate = positiveHours(form.get("estimate") ?? task.fields.estimateHours ?? 0);
+        } catch (error) {
+          context.toast("Check estimated hours", error instanceof Error ? error.message : "Use a valid non-negative number.", "blocked");
+          return;
+        }
+        const saved = await context.mutate.patch(task.id, {
           title,
           summary: String(form.get("summary") ?? ""),
           dueAt: due ? new Date(`${due}T17:00:00.000Z`).toISOString() : task.dueAt,
-          fields: { ...task.fields, priority: String(form.get("priority") ?? "normal"), estimateHours: Number(form.get("estimate") ?? task.fields.estimateHours ?? 0) },
+          fields: { ...task.fields, priority: String(form.get("priority") ?? "normal"), estimateHours: estimate },
         }, { expectRevision: task.revision, event: `${task.title} edited by ${context.actor}` });
+        if (!saved) return;
         context.toast("Task saved", "The earlier version is kept in the task's history with its author.");
         close();
       }}

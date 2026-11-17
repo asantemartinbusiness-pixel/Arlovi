@@ -57,7 +57,7 @@ export function sharedRecords(portal: Rec | undefined, data: ReturnType<typeof u
   const out: { collection: string; record: Rec }[] = [];
   for (const scope of shared) {
     for (const id of scope.ids) {
-      const record = (pools[scope.collection] ?? []).find((item) => item.id === id);
+      const record = (pools[scope.collection] ?? []).find((item) => item.id === id && item.organizationId === portal?.organizationId);
       if (record) out.push({ collection: scope.collection, record });
     }
   }
@@ -91,45 +91,85 @@ export function portalUsers(portal: Rec | undefined): PortalUser[] {
  */
 export function resolvePortal(id: string | undefined, portals: Rec[]): Rec | undefined {
   if (!id) return undefined;
-  const full = portals.find((item) => String(item.fields.canonicalFor ?? "") === id);
-  if (full) return full;
-  return portals.find((item) => item.id === id);
+  const direct = portals.find((item) => item.id === id);
+  const full = portals.find((item) => String(item.fields.canonicalFor ?? "") === id
+    && (!direct || item.organizationId === direct.organizationId));
+  return full ?? direct;
 }
 
-/** Portals as screens list them: a stub that has a full definition is not listed twice. */
+/** Hide only a stub replaced by a canonical portal in the SAME organisation. */
 export function listedPortals(portals: Rec[]): Rec[] {
-  const replaced = new Set(portals.map((item) => String(item.fields.canonicalFor ?? "")).filter(Boolean));
-  return portals.filter((item) => !replaced.has(item.id));
+  const replaced = new Set(portals
+    .filter((item) => typeof item.fields.canonicalFor === "string" && item.fields.canonicalFor)
+    .map((item) => item.organizationId + ":" + String(item.fields.canonicalFor)));
+  return portals.filter((item) => !replaced.has(item.organizationId + ":" + item.id));
 }
 
-/** Documents attached to a portal, which are shared by their own field. */
+/** Canonical portal and legacy route stub identify the same scoped space. */
+function portalIdentityIds(portal: Rec | undefined): Set<string> {
+  if (!portal) return new Set();
+  const ids = [portal.id];
+  const alias = portal.fields.canonicalFor;
+  if (typeof alias === "string" && alias) ids.push(alias);
+  return new Set(ids);
+}
+
+/** Documents attached to this portal, including only its explicit route alias. */
 export function portalDocuments(portal: Rec | undefined, documents: Rec[]): Rec[] {
   if (!portal) return [];
-  return documents.filter((document) => String(document.fields.portalId ?? "") === portal.id);
+  const ids = portalIdentityIds(portal);
+  return documents.filter((document) => document.organizationId === portal.organizationId
+    && ids.has(String(document.fields.portalId ?? "")));
 }
 
 export function portalMessages(portal: Rec | undefined, messages: Rec[]): Rec[] {
   if (!portal) return [];
+  const ids = portalIdentityIds(portal);
   return messages
-    .filter((message) => String(message.fields.portalId ?? "") === portal.id && message.fields.internalOnly !== true)
+    .filter((message) => message.organizationId === portal.organizationId
+      && ids.has(String(message.fields.portalId ?? ""))
+      && message.fields.internalOnly !== true)
     .sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
 }
 
 export function portalInvoices(portal: Rec | undefined, invoices: Rec[]): Rec[] {
   if (!portal) return [];
-  return invoices.filter((invoice) => String(invoice.fields.portalId ?? "") === portal.id);
+  const ids = portalIdentityIds(portal);
+  return invoices.filter((invoice) => invoice.organizationId === portal.organizationId
+    && ids.has(String(invoice.fields.portalId ?? "")));
+}
+
+/**
+ * A portal may show an invoice either through its explicit shared-record
+ * grant or an invoice's own portalId (including the canonical route alias).
+ * Billing and dashboard must use this same union so a grant cannot appear in
+ * the directory count but disappear from the client's invoice list.
+ */
+export function portalVisibleInvoices(
+  portal: Rec | undefined,
+  data: ReturnType<typeof usePortalData>,
+): Rec[] {
+  if (!portal) return [];
+  const invoiceIds = new Set(
+    sharedRecords(portal, data)
+      .filter((entry) => entry.collection === "invoices")
+      .map((entry) => entry.record.id),
+  );
+  for (const invoice of portalInvoices(portal, data.invoices)) invoiceIds.add(invoice.id);
+  return data.invoices.filter((invoice) =>
+    invoice.organizationId === portal.organizationId && invoiceIds.has(invoice.id));
 }
 
 /** The portal a client role view is allowed to see, and nothing else. */
 export function portalForRole(role: Role, portals: Rec[], actor: string, contacts: Rec[]): Rec | undefined {
   if (role !== "client") return undefined;
   const contact = contacts.find((item) => item.title === actor);
-  const own = contact ? portals.find((portal) => String(portal.fields.contactId) === contact.id) : undefined;
-  const resolved = own ? resolvePortal(own.id, portals) : undefined;
-  if (resolved && resolved.status === "live") return resolved;
-  const listed = listedPortals(portals);
-  return listed.find((portal) => contact && String(portal.fields.contactId) === contact.id && portal.status === "live")
-    ?? listed.find((portal) => portal.status === "live");
+  if (!contact) return undefined;
+  const own = listedPortals(portals).find((portal) =>
+    portal.organizationId === contact.organizationId
+    && String(portal.fields.contactId) === contact.id
+    && portal.status === "live");
+  return own ? resolvePortal(own.id, portals) : undefined;
 }
 
 export function statusTone(status: string): "success" | "warning" | "danger" | "info" | "neutral" {

@@ -85,3 +85,343 @@
   .hr-cal-day { min-height: 64px; }
   .hr-cal-chip { font-size: 10px; }
 }
+
+/* Responsive scheduling surfaces use the shared design-system tokens. */
+.hr-roster-coverage { display: block; white-space: nowrap; font-weight: 400; margin-top: 3px; }
+.hr-roster-cell { vertical-align: top; min-width: 130px; }
+.hr-roster-stack { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-2); }
+.hr-roster-cards { display: none; }
+.hr-roster-mobile-day { display: grid; grid-template-columns: minmax(92px, 0.4fr) minmax(0, 1fr); gap: var(--space-3); align-items: start; }
+.hr-roster-mobile-day + .hr-roster-mobile-day { border-top: 1px solid var(--border-default); padding-top: var(--space-3); }
+.hr-roster-mobile-day > strong { font-size: var(--text-sm); }
+
+@media (max-width: 767px) {
+  .hr-roster-table { display: none; }
+  .hr-roster-cards { display: grid; gap: var(--space-3); }
+}
+
+@media (max-width: 440px) {
+  .hr-roster-mobile-day { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+}
+
+/* People / Scheduling — app-owned, responsive operational layouts.
+   All colors, typography and radii are the existing Arlovi design tokens. */
+.hr-roster-weekdays {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  gap: 1px;
+  background: var(--border-default);
+}
+.hr-roster-day-summary {
+  appearance: none;
+  border: 0;
+  background: var(--bg-surface);
+  color: var(--fg-default);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  font: inherit;
+}
+.hr-roster-day-summary:hover { background: var(--bg-hover); }
+.hr-roster-day-summary[data-active="true"] { background: var(--bg-selected); box-shadow: inset 0 -2px 0 var(--fg-default); }
+.hr-roster-day-summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 1; }
+.hr-roster-day-summary > span { font-size: var(--text-xs); color: var(--fg-muted); line-height: 1.35; }
+.hr-roster-day-summary > strong { font-size: var(--text-sm); line-height: 1.35; font-weight: 660; }
+.hr-roster-day-summary > small { font-size: var(--text-xs); color: var(--fg-subtle); }
+.hr-roster-section-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
+.hr-availability-search { flex: 1 1 240px; min-width: min(220px, 100%); max-width: 400px; }
+.hr-availability-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.hr-availability-person { min-width: 0; background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: var(--space-4); }
+.hr-availability-person-heading { display: flex; align-items: center; gap: var(--space-3); }
+.hr-availability-person-identity { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; }
+.hr-availability-person-identity strong { font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hr-availability-person-identity span { color: var(--fg-muted); font-size: var(--text-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hr-availability-summary { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: var(--space-4) 0; font-size: var(--text-xs); color: var(--fg-muted); }
+.hr-availability-summary strong { color: var(--fg-default); font-variant-numeric: tabular-nums; font-weight: 680; }
+.hr-availability-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.hr-availability-day { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-2) 2px; background: var(--bg-inset); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.hr-availability-day span { color: var(--fg-muted); font-size: 10px; line-height: 1.3; }
+.hr-availability-day strong { font-size: var(--text-xs); line-height: 1.4; font-variant-numeric: tabular-nums; }
+.hr-availability-day[data-state="scheduled"] { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent-soft-fg); }
+.hr-availability-day[data-state="away"] { background: var(--neutral-soft); color: var(--fg-muted); }
+.hr-availability-day[data-state="conflict"] { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger); }
+.hr-availability-footer { margin: var(--space-3) 0 0; font-size: var(--text-xs); line-height: 1.5; color: var(--fg-subtle); }
+@media (max-width: 1150px) {
+  .hr-roster-weekdays { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 850px) {
+  .hr-availability-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .hr-roster-weekdays { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hr-roster-day-summary { padding: var(--space-3); }
+  .hr-availability-person { padding: var(--space-3); }
+  .hr-availability-summary { gap: var(--space-2); }
+}
+
+/* People directory, profile and overview: per-page composition using the
+   approved Arlovi tokens, without changing global typography or colours. */
+.hr-directory-search { flex: 1 1 225px; min-width: min(210px, 100%); max-width: 420px; }
+.hr-directory-card { min-width: 0; width: 100%; display: flex; gap: var(--space-3); align-items: center; text-align: start; }
+.hr-directory-card-copy { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; }
+.hr-directory-card-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); }
+.hr-directory-card-copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-muted); font-size: var(--text-xs); }
+
+.hr-profile-identity {
+  padding: clamp(20px, 2.6vw, 34px);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  display: flex;
+  gap: var(--space-5);
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.hr-profile-identity-main { display: flex; gap: var(--space-4); min-width: 0; align-items: flex-start; flex: 1 1 390px; }
+.hr-profile-identity-copy { min-width: 0; }
+.hr-profile-identity-copy .ops-eyebrow { margin-bottom: var(--space-2); }
+.hr-profile-identity-copy h2 {
+  font-size: clamp(1.5rem, 3vw, 2.4rem);
+  line-height: 1.08;
+  letter-spacing: -.04em;
+  margin: 0;
+  font-weight: 680;
+}
+.hr-profile-identity-copy > p { margin: var(--space-2) 0 0; color: var(--fg-muted); font-size: var(--text-sm); line-height: 1.5; }
+.hr-profile-identifiers { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-4); }
+.hr-profile-identifiers > span:not(:first-child) { font-size: var(--text-xs); color: var(--fg-subtle); border-inline-start: 1px solid var(--border-default); padding-inline-start: var(--space-2); }
+.hr-profile-identity-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.hr-profile-section-description { max-width: 67ch; color: var(--fg-muted); font-size: var(--text-sm); line-height: 1.6; margin: 0; }
+
+@media (max-width: 640px) {
+  .hr-profile-identity { padding: var(--space-4); gap: var(--space-3); }
+  .hr-profile-identity-main { flex-basis: 100%; gap: var(--space-3); }
+  .hr-profile-identity-actions { justify-content: flex-start; width: 100%; }
+  .hr-profile-identifiers { gap: var(--space-2); }
+  .hr-directory-search { flex-basis: 100%; max-width: none; }
+  .hr-directory-card { align-items: flex-start; }
+}
+
+/* Recruitment, onboarding and leave — app-owned surfaces, no global token changes. */
+.hr-hiring-stage-filters {
+  display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center;
+  padding: var(--space-2) 0;
+}
+.hr-hiring-pipeline {
+  display: flex; gap: var(--space-3); align-items: stretch; overflow-x: auto; overscroll-behavior-inline: contain;
+  scroll-snap-type: x proximity; padding-block-end: var(--space-3);
+}
+.hr-hiring-stage { flex: 1 0 230px; min-width: 0; scroll-snap-align: start; }
+.hr-hiring-stage .ds-card-body { min-height: 160px; }
+.hr-hiring-stage .ds-record-card { display: flex; flex-direction: column; gap: var(--space-2); width: 100%; text-align: start; }
+.hr-hiring-stage .ds-record-card + .ds-record-card { margin-block-start: var(--space-2); }
+.hr-onboarding-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); align-items: start; }
+.hr-onboarding-step-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.hr-onboarding-step {
+  display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: center;
+  padding: var(--space-3); border: 1px solid var(--border-default);
+  background: var(--bg-inset); border-radius: var(--radius-md);
+}
+.hr-onboarding-step-meta { flex: 1 1 130px; min-width: 0; display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+.hr-onboarding-step-meta span { color: var(--fg-muted); font-size: var(--text-xs); }
+.hr-leave-decision-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); align-items: start; }
+.hr-hiring-pipeline:focus-visible, .hr-hiring-stage-filters button:focus-visible { outline-offset: 2px; }
+@media (max-width: 980px) {
+  .hr-onboarding-grid, .hr-leave-decision-grid { grid-template-columns: minmax(0, 1fr); }
+  .hr-hiring-stage { flex-basis: 245px; }
+}
+@media (max-width: 620px) {
+  .hr-hiring-stage { flex-basis: min(85vw, 270px); }
+  .hr-hiring-pipeline { margin-inline-end: calc(-1 * var(--space-3)); }
+  .hr-onboarding-step-meta { justify-content: flex-start; }
+}
+
+/* People / Performance, Learning and Payroll —
+   distinct operational compositions using approved Arlovi tokens. */
+.hr-performance-grid,
+.hr-learning-grid,
+.hr-payroll-run-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+.hr-performance-grid > *,
+.hr-learning-grid > *,
+.hr-payroll-run-grid > * { min-width: 0; }
+.hr-payroll-evidence-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-inset);
+}
+.hr-payroll-evidence-line > span:first-child {
+  flex: 1 1 190px;
+  min-width: 0;
+}
+@media (max-width: 880px) {
+  .hr-performance-grid, .hr-learning-grid, .hr-payroll-run-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .hr-performance-grid, .hr-learning-grid, .hr-payroll-run-grid { gap: var(--space-2); }
+}
+
+/* People dialog system — local, editorial composition for detailed decisions.
+   Intentionally reuses existing Arlovi type, colour, spacing and state tokens. */
+.hr-dialog-lead {
+  padding: clamp(var(--space-4), 2vw, var(--space-6));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  position: relative;
+}
+.hr-dialog-lead::before {
+  content: "";
+  position: absolute;
+  top: -1px; left: var(--space-4);
+  width: 46px; height: 2px;
+  background: var(--fg-default);
+}
+.hr-dialog-eyebrow {
+  display: block;
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: .095em;
+  line-height: 1.45;
+  margin-bottom: var(--space-2);
+}
+.hr-dialog-title-row {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.hr-dialog-title-row h3 {
+  font-size: clamp(1.25rem, 2vw, 1.55rem);
+  letter-spacing: -.035em;
+  line-height: 1.16;
+  font-weight: 680;
+  margin: 0;
+  flex: 1 1 220px;
+}
+.hr-dialog-status { flex: 0 0 auto; }
+.hr-dialog-lead > p {
+  margin: var(--space-3) 0 0;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  max-width: 62ch;
+}
+.hr-dialog-section {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  padding: clamp(var(--space-3), 2vw, var(--space-5));
+  min-width: 0;
+}
+.hr-dialog-section-head {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-default);
+  margin-bottom: var(--space-4);
+}
+.hr-dialog-section-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px; height: 28px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-subtle);
+  background: var(--bg-inset);
+}
+.hr-dialog-section-head > div { min-width: 0; }
+.hr-dialog-section-head h4 {
+  margin: 3px 0 0;
+  font-size: var(--text-sm);
+  font-weight: 680;
+  line-height: 1.35;
+  color: var(--fg-default);
+}
+.hr-dialog-section-head p {
+  margin: var(--space-1) 0 0;
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+.hr-dialog-section-content { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.hr-dialog-evidence-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-default);
+  background: var(--bg-inset);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+.hr-dialog-evidence-row > span { min-width: 0; flex: 1 1 180px; }
+@media (max-width: 640px) {
+  .hr-dialog-lead, .hr-dialog-section { padding: var(--space-3); }
+  .hr-dialog-section-head { gap: var(--space-2); }
+  .hr-dialog-title-row h3 { flex-basis: 100%; }
+}
+
+/* Profile workflow cues — responsive, app-scoped, existing token language. */
+.hr-profile-workflow-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+.hr-profile-workflow-strip > * { max-width: 100%; }
+@media (max-width: 640px) {
+  .hr-profile-workflow-strip { align-items: stretch; flex-direction: column; }
+}
+
+/* Employee record history stays intentionally metadata-only; no sensitive snapshots exposed. */
+.hr-employee-history {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.hr-employee-history-item {
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-inset);
+}
+.hr-employee-history-item p { margin: var(--space-2) 0 0; line-height: 1.5; }
+@media (max-width: 760px) {
+  .hr-employee-history { grid-template-columns: minmax(0, 1fr); }
+}

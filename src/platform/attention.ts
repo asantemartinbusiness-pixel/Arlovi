@@ -29,6 +29,8 @@ export interface AttentionItem {
   read: boolean;
   acknowledged: boolean;
   resolved: boolean;
+  /** Live task owner or named decision recipient, if the source records one. */
+  assignee?: string;
   /** Source record if the item is backed by one. */
   sourceId?: string;
   group: string;
@@ -53,6 +55,7 @@ export interface AttentionInput {
   invoices: Rec[];
   bills: Rec[];
   tasks: Rec[];
+  shifts?: Rec[];
   missions: Rec[];
   approvals: Rec[];
   workflowApprovals?: Rec[];
@@ -100,11 +103,34 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
       entityId: record.id,
       at: record.updatedAt,
       audience: approverRoles(record.collection),
+      assignee: typeof record.fields.assignee === "string" ? record.fields.assignee : undefined,
       read: false,
       acknowledged: false,
       resolved: false,
       sourceId: record.id,
       group: "Approvals",
+    });
+  }
+
+  // Submitted timesheets are genuine People decisions. They disappear from
+  // Inbox as soon as a recorded approval succeeds, with no separate fake alert.
+  for (const entry of input.shifts ?? []) {
+    if (entry.collection !== "shifts" || entry.fields.kind !== "time"
+      || entry.fields.approved === true || entry.status === "approved"
+      || !["submitted", "pending", "ready"].includes(entry.status)) continue;
+    const hours = Number(entry.fields.hours ?? 0);
+    items.push({
+      id: `time-approval-${entry.id}`,
+      kind: "approval", priority: "P2",
+      title: `Approve time: ${String(entry.fields.employeeName ?? entry.ownerName)}`,
+      body: `${Number.isFinite(hours) ? hours : "Unverified"} hours submitted for human review. Payroll is not submitted by this approval.`,
+      route: `/o/${orgSlug}/hr/scheduling?tab=Timesheets`,
+      entityId: entry.id, at: entry.updatedAt,
+      audience: ["owner", "people"],
+      assignee: typeof entry.fields.approver === "string" && entry.fields.approver.trim()
+        ? entry.fields.approver : undefined,
+      read: false, acknowledged: false, resolved: false,
+      sourceId: entry.id, group: "Time approvals",
     });
   }
 
@@ -124,7 +150,9 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
       id: `task-approval-${request.id}`, kind: "approval", priority: "P2",
       title: request.title, body: request.summary || "Task completion is waiting for human review.",
       route, entityId: request.id, at: request.updatedAt,
-      audience: ["owner"], read: false, acknowledged: false, resolved: false,
+      audience: ["owner"],
+      assignee: typeof request.fields.assignee === "string" ? request.fields.assignee : undefined,
+      read: false, acknowledged: false, resolved: false,
       sourceId: request.id, group: "Task completion approvals",
     });
   }
@@ -186,6 +214,9 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
       entityId: task.id,
       at: task.dueAt,
       audience: [],
+      // "Mine" in Inbox must follow the actual Project assignee, not a stale
+      // notification triage override or everyone else's overdue tasks.
+      assignee: String(task.fields.assignee || task.ownerName),
       read: false,
       acknowledged: false,
       resolved: false,
@@ -242,6 +273,12 @@ export function routeForRecord(record: Rec, orgSlug: string): string | undefined
   const route = RECORD_ROUTES[record.collection];
   if (!route) return undefined;
   return route.detail ? `/o/${orgSlug}/${route.detail}/${record.id}` : `/o/${orgSlug}/${route.list}`;
+}
+
+/** A person's Inbox "Mine" lens must not contain somebody else's tasks. */
+export function mineAttentionItems<T extends AttentionItem>(items: T[], actor: string): T[] {
+  return items.filter((item) => item.assignee === actor
+    || (item.kind === "approval" && !item.assignee));
 }
 
 export function filterForRole(items: AttentionItem[], role: Role): AttentionItem[] {

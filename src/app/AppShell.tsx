@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, Menu as MenuIcon, Sparkles, Search, Bell, Inbox, X, UserRound } from "lucide-react";
+import { ArrowLeft, ChevronDown, Menu as MenuIcon, Sparkles, Search, Bell, Inbox, X, UserRound } from "lucide-react";
 import { Button, Pill, Row } from "@/design-system";
 import { Menu } from "@/design-system/overlays";
 import { ArloviMark, brand, palettes } from "@/app/brand";
@@ -226,9 +226,11 @@ export function AppShell() {
           label="Switch company"
           align="start"
           trigger={
-            <button type="button" className="hq-orgswitch" aria-label={`Switch company, current ${org.name}`}>
+            <button type="button" className="hq-orgswitch">
+              <span className="ds-sr-only">Switch company, current </span>
               <span className="hq-orgdot" style={{ background: org.accent }}>{org.shortName.slice(0, 1)}</span>
-              <span className="name ds-truncate">{org.name}</span>
+              <span className="name ds-truncate" aria-hidden="true">{org.name}</span>
+              <span className="ds-sr-only">{org.name}</span>
               <ChevronDown size={14} />
             </button>
           }
@@ -250,9 +252,10 @@ export function AppShell() {
         </div>
         <span className="ds-grow" />
 
-        <button ref={searchTrigger} type="button" className="hq-search" onClick={openCommand} aria-label={`Search ${org.shortName}`} aria-keyshortcuts="Control+K Meta+K">
-          <Search size={15} />
-          <span className="ds-grow hq-search-label" style={{ textAlign: "start" }}>Search anything in {org.shortName}</span>
+        <button ref={searchTrigger} type="button" className="hq-search" onClick={openCommand} aria-keyshortcuts="Control+K Meta+K">
+          <Search size={15} aria-hidden="true" />
+          <span className="ds-sr-only">Search anything in {org.shortName}</span>
+          <span className="ds-grow hq-search-label" aria-hidden="true" style={{ textAlign: "start" }}>Search anything in {org.shortName}</span>
           <kbd className="ds-kbd">{keyboardHint}</kbd>
         </button>
 
@@ -341,6 +344,9 @@ export function AppShell() {
         {!isWorkspaceArea && appModule && (
           <nav className="hq-appnav" aria-label={`${appModule.short} navigation`}>
             <div className="hq-appnav-head">
+              <Link className="hq-appnav-back" to={workAreaPath(org.slug, "apps")}>
+                <ArrowLeft size={14} aria-hidden="true"/> All applications
+              </Link>
               <Row gap={2}>
                 <appModule.icon size={18} strokeWidth={1.9} />
                 <h2 className="ds-grow ds-truncate">{appModule.short}</h2>
@@ -375,6 +381,10 @@ export function AppShell() {
                   })}
                 </div>
               ))}
+              {!activeMatch?.params.id && appModule.nav.some(section => section.items.some(item => {
+                const target = screens.find(screen => screen.id === item.screenId);
+                return target && /:id\b/.test(target.route);
+              })) && <p className="hq-appnav-help">Open a record from this app to access its detail views.</p>}
             </div>
           </nav>
         )}

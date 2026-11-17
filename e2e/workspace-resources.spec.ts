@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("company resource folders are saved, searchable and survive reload", async ({ page }) => {
   await page.goto("/o/northline/workspace/resources");
-  await expect(page.getByRole("heading",{name:"Files & resources"})).toBeVisible();
+  await expect(page.getByRole("heading",{level:1,name:"Files & resources"})).toBeVisible();
   const folderName="Operations filing "+Math.floor(Math.random()*1000000);
   await page.getByRole("button",{name:"New folder"}).click();
   await page.getByRole("textbox",{name:"Folder name"}).fill(folderName);
