@@ -37,3 +37,25 @@ test("Present slide editor exposes slide status and contextual theme navigation"
   await main.getByLabel("Active slide context").getByRole("button", { name: "Theme" }).click();
   await expect(page).toHaveURL(new RegExp(`/present/decks/${id}/theme`));
 });
+
+test("Animation and audience screens expose visible workflow status", async ({ page }) => {
+  await page.goto("/o/northline/present/decks");
+  const id = await page.evaluate(async () => {
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "decks", currency: "GBP",
+      title: "QA Presenter Motion Context", status: "active", fields: { folder: "Marketing" },
+    }, ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  });
+  await page.goto(`/o/northline/present/decks/${id}/animation?tab=Slides`);
+  const main = page.locator("#main");
+  await expect(main.getByRole("heading", { name: "Motion with purpose." })).toBeVisible();
+  await expect(main.getByLabel("Animation workflow overview")).toBeVisible();
+  await page.goto(`/o/northline/present/decks/${id}/present?tab=Audience`);
+  await expect(main.getByRole("heading", { name: "What your audience will see." })).toBeVisible();
+  await expect(main.getByLabel("Audience session overview")).toBeVisible();
+});
