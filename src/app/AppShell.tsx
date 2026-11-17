@@ -51,6 +51,11 @@ export function AppShell() {
   const activeScreen = activeMatch?.screen;
   const activeCode = activeScreen?.applicationCode ?? "HQ";
   const appModule = getApp(activeCode);
+  const activeGroup = NAV_GROUPS.find(group => group.apps.some(app => app.code === activeCode));
+  const appDirectoryPath = `${workAreaPath(org.slug, "apps")}${activeGroup ? `?category=${encodeURIComponent(activeGroup.label)}` : ""}`;
+  const platformPeers = activeGroup?.label === "Platform"
+    ? activeGroup.apps.filter(app => app.code !== activeCode && canOpen(role, app.code))
+    : [];
 
   // Load the actual destination before any unrelated native application.
   useEffect(() => {
@@ -348,7 +353,7 @@ export function AppShell() {
         {!isWorkspaceArea && appModule && (
           <nav className="hq-appnav" aria-label={`${appModule.short} navigation`}>
             <div className="hq-appnav-head">
-              <Link className="hq-appnav-back" to={workAreaPath(org.slug, "apps")}>
+              <Link className="hq-appnav-back" to={appDirectoryPath}>
                 <ArrowLeft size={14} aria-hidden="true"/> All applications
               </Link>
               <Row gap={2}>
@@ -389,6 +394,20 @@ export function AppShell() {
                 const target = screens.find(screen => screen.id === item.screenId);
                 return target && /:id\b/.test(target.route);
               })) && <p className="hq-appnav-help">Open a record from this app to access its detail views.</p>}
+              {platformPeers.length > 0 && (
+                <details className="hq-appnav-related">
+                  <summary>Other Platform apps <ChevronDown size={15} aria-hidden="true" /></summary>
+                  <div className="hq-appnav-related-links">
+                    {platformPeers.map(peer => {
+                      const PeerIcon = peer.icon;
+                      return <Link key={peer.code} to={appEntry(peer.code, org.slug)} className="hq-navlink">
+                        <PeerIcon size={15} aria-hidden="true" />
+                        <span className="ds-truncate">{peer.short}</span>
+                      </Link>;
+                    })}
+                  </div>
+                </details>
+              )}
             </div>
           </nav>
         )}
