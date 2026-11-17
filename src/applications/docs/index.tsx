@@ -1773,7 +1773,7 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
             collection: "documents", title: title.trim(), status: "draft",
             summary: template ? `Started from ${template.title}.` : "New document.",
             tags: confidential ? ["confidential"] : [],
-            fields: { folder, confidential, kind: "document", templateId: template?.id ?? "", templateSourceRevision: template?.revision ?? null },
+            fields: { folder, confidential, kind: "document", templateId: template?.id ?? "", templateSourceRevision: template?.revision ?? 0 },
             body,
           }, `Document ${title.trim()} created`);
           if (template) {
