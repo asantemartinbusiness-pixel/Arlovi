@@ -103,3 +103,66 @@
 @media (max-width: 440px) {
   .hr-roster-mobile-day { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
 }
+
+/* People / Scheduling — app-owned, responsive operational layouts.
+   All colors, typography and radii are the existing Arlovi design tokens. */
+.hr-roster-weekdays {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  gap: 1px;
+  background: var(--border-default);
+}
+.hr-roster-day-summary {
+  appearance: none;
+  border: 0;
+  background: var(--bg-surface);
+  color: var(--fg-default);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  font: inherit;
+}
+.hr-roster-day-summary:hover { background: var(--bg-hover); }
+.hr-roster-day-summary[data-active="true"] { background: var(--bg-selected); box-shadow: inset 0 -2px 0 var(--fg-default); }
+.hr-roster-day-summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 1; }
+.hr-roster-day-summary > span { font-size: var(--text-xs); color: var(--fg-muted); line-height: 1.35; }
+.hr-roster-day-summary > strong { font-size: var(--text-sm); line-height: 1.35; font-weight: 660; }
+.hr-roster-day-summary > small { font-size: var(--text-xs); color: var(--fg-subtle); }
+.hr-roster-section-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
+.hr-availability-search { flex: 1 1 240px; min-width: min(220px, 100%); max-width: 400px; }
+.hr-availability-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.hr-availability-person { min-width: 0; background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: var(--space-4); }
+.hr-availability-person-heading { display: flex; align-items: center; gap: var(--space-3); }
+.hr-availability-person-identity { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; }
+.hr-availability-person-identity strong { font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hr-availability-person-identity span { color: var(--fg-muted); font-size: var(--text-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hr-availability-summary { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: var(--space-4) 0; font-size: var(--text-xs); color: var(--fg-muted); }
+.hr-availability-summary strong { color: var(--fg-default); font-variant-numeric: tabular-nums; font-weight: 680; }
+.hr-availability-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.hr-availability-day { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-2) 2px; background: var(--bg-inset); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.hr-availability-day span { color: var(--fg-muted); font-size: 10px; line-height: 1.3; }
+.hr-availability-day strong { font-size: var(--text-xs); line-height: 1.4; font-variant-numeric: tabular-nums; }
+.hr-availability-day[data-state="scheduled"] { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent-soft-fg); }
+.hr-availability-day[data-state="away"] { background: var(--neutral-soft); color: var(--fg-muted); }
+.hr-availability-day[data-state="conflict"] { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger); }
+.hr-availability-footer { margin: var(--space-3) 0 0; font-size: var(--text-xs); line-height: 1.5; color: var(--fg-subtle); }
+@media (max-width: 1150px) {
+  .hr-roster-weekdays { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 850px) {
+  .hr-availability-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .hr-roster-weekdays { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hr-roster-day-summary { padding: var(--space-3); }
+  .hr-availability-person { padding: var(--space-3); }
+  .hr-availability-summary { gap: var(--space-2); }
+}
