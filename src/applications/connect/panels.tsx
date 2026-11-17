@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  Activity, Plug, RefreshCcw, ShieldAlert, ShieldCheck, Webhook,
+  Activity, Plug, RefreshCcw, Search, ShieldAlert, ShieldCheck, Webhook, X,
 } from "lucide-react";
 import {
   Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties,
@@ -12,6 +12,7 @@ import { CAPABILITY_LABELS, CAPABILITY_TONE } from "@/platform/capability";
 import { clockIso, freshness } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { downloadCsv } from "@/applications/t6kit/kit";
+import "./integrations.css";
 import {
   CATEGORIES, CONNECTOR_ENTRIES, adapterChecks, adapterOperations, authorisationSteps, entryById, entryForRecord,
   type ConnectorEntry,
@@ -23,13 +24,14 @@ import {
 
 export function useConnector(context: ScreenContext): { records: Rec[]; record?: Rec; entry?: ConnectorEntry } {
   const records = useCollection("connectors");
-  const routed = records.find((item) => item.id === context.params.id);
-  const record = routed ?? records[0];
+  const routeId = context.params.id;
+  // An explicit connection URL never substitutes another connector's record.
+  const record = routeId ? records.find(item => item.id === routeId) : records[0];
   const entry = useMemo(() => {
-    const byRoute = entryById(context.params.id ?? "");
+    const byRoute = entryById(routeId ?? "");
     if (byRoute) return byRoute;
-    return record ? entryForRecord(record.fields) ?? CONNECTOR_ENTRIES[0] : CONNECTOR_ENTRIES[0];
-  }, [context.params.id, record]);
+    return record ? entryForRecord(record.fields) : undefined;
+  }, [routeId, record]);
   return { records, record, entry };
 }
 
@@ -47,111 +49,139 @@ function StateCell({ entry }: { entry: ConnectorEntry }) {
 
 export function Marketplace({ context, lens }: { context: ScreenContext; lens: "Featured" | "Categories" | "Installed" | "Custom" }) {
   const records = useCollection("connectors");
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<"All" | ConnectorEntry["category"]>("Communication");
+  const accessibleCount = CONNECTOR_ENTRIES.length;
+  const matched = (lens === "Featured" && !query.trim()
+    ? CONNECTOR_ENTRIES.filter(entry => entry.featured)
+    : CONNECTOR_ENTRIES).filter(entry => {
+      if (lens === "Categories" && category !== "All" && entry.category !== category) return false;
+      const needle = query.trim().toLocaleLowerCase();
+      return !needle || [
+        entry.capability.label, entry.capability.provider, entry.capability.note,
+        entry.category, entry.capability.localEquivalent, ...entry.operations.map(operation => operation.name),
+      ].join(" ").toLocaleLowerCase().includes(needle);
+    });
+
+  const marketplaceOverview = <section className="connect-marketplace-overview" aria-label="Integration catalogue overview">
+    <div className="connect-marketplace-head">
+      <div>
+        <span className="connect-eyebrow">PLATFORM / INTEGRATIONS</span>
+        <h2>Connect the tools your work depends on.</h2>
+        <p>Explore provider requirements, permissions and local alternatives before requesting access. Nothing is externally connected yet.</p>
+      </div>
+      <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>View connections</Button>
+    </div>
+    <div className="connect-marketplace-metrics" aria-label="Integration catalogue summary">
+      <div><span>Available contracts</span><strong>{accessibleCount}</strong></div>
+      <div><span>Live connections</span><strong>0</strong></div>
+      <div><span>Local alternatives</span><strong>{CONNECTOR_ENTRIES.filter(entry => entry.capability.localEquivalent).length}</strong></div>
+      <div><span>Categories</span><strong>{CATEGORIES.length}</strong></div>
+    </div>
+  </section>;
 
   if (lens === "Installed") {
-    const installed = CONNECTOR_ENTRIES.filter((entry) => entry.capability.state !== "not_connected");
-    return (
-      <Stack gap={4}>
-        <Notice tone="warning" title="Nothing is installed">
-          Every capability in this workspace reports <strong>not connected</strong>, and that state comes from the platform capability register rather than from this screen. There is no code path here that can mark one connected.
-        </Notice>
-        {installed.length > 0 && (
-          <Stack gap={2}>{installed.map((entry) => <Row key={entry.capability.id} gap={2}><span className="ds-grow">{entry.capability.label}</span><StateCell entry={entry} /></Row>)}</Stack>
-        )}
-        <Card eyebrow="LOCAL WORK" prov="human" title="What runs instead" subtitle="One row per capability, from the same register">
-          <div className="t6-matrix-wrap">
-            <table className="t6-matrix">
-              <caption className="ds-sr-only">What Arlovi does locally for each capability</caption>
-              <thead><tr><th scope="col">Capability</th><th scope="col">Done here instead</th></tr></thead>
-              <tbody>
-                {CONNECTOR_ENTRIES.map((entry) => (
-                  <tr key={entry.capability.id}>
-                    <th scope="row">{entry.capability.label}</th>
-                    <td>{entry.capability.localEquivalent}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      </Stack>
-    );
+    return <Stack gap={4}>
+      {marketplaceOverview}
+      <Notice tone="warning" title="Nothing is installed">
+        No provider has a verified grant or successful read. Recorded install requests are proposals, not active integrations.
+      </Notice>
+      <div className="connect-marketplace-empty-actions">
+        <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>Review connection requests</Button>
+        <Button variant="ghost" onClick={() => context.setTab("Categories")}>Explore categories</Button>
+      </div>
+      <Card eyebrow="LOCAL WORK" prov="human" title="What Arlovi can do without a provider" subtitle="Real local alternatives from the capability register">
+        <div className="t6-matrix-wrap"><table className="t6-matrix">
+          <caption className="ds-sr-only">Local alternatives for registered provider capabilities</caption>
+          <thead><tr><th scope="col">Capability</th><th scope="col">Done here instead</th></tr></thead>
+          <tbody>{CONNECTOR_ENTRIES.map(entry => <tr key={entry.capability.id}>
+            <th scope="row">{entry.capability.label}</th><td>{entry.capability.localEquivalent}</td>
+          </tr>)}</tbody>
+        </table></div>
+      </Card>
+    </Stack>;
   }
 
   if (lens === "Custom") {
-    const custom = records.filter((record) => String(record.fields.kind ?? "") === "custom");
-    return (
-      <Stack gap={4}>
-        <Row gap={2}><Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/custom`)}>Open the adapter workbench</Button></Row>
-        {custom.length === 0
-          ? <Empty title="No custom adapter yet" icon={<Plug size={20} />}>A custom adapter declares its own actions against the same normalised contract the built-in capabilities use.</Empty>
-          : <Grid>{custom.map((record) => (
-            <Card key={record.id} span={6} eyebrow="CUSTOM" prov="human" title={record.title} subtitle={record.summary}
-              actions={<Pill tone="warning" dot>{String(record.fields.capability ?? record.status).replace(/_/g, " ")}</Pill>} />
-          ))}</Grid>}
-      </Stack>
-    );
+    const custom = records.filter(record => String(record.fields.kind ?? "") === "custom");
+    return <Stack gap={4}>
+      {marketplaceOverview}
+      <Row gap={2} wrap>
+        <Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/custom`)}>Open adapter workbench</Button>
+        <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/capabilities`)}>Capability registry</Button>
+      </Row>
+      {custom.length === 0
+        ? <Empty title="No custom adapter yet" icon={<Plug size={20} />}>Create a local adapter declaration in the workbench. This does not establish a provider connection.</Empty>
+        : <Grid>{custom.map(record => <Card key={record.id} span={6} eyebrow="CUSTOM" prov="human"
+          title={record.title} subtitle={record.summary}
+          actions={<Pill tone="warning" dot>{String(record.fields.capability ?? record.status).replace(/_/g, " ")}</Pill>} />)}</Grid>}
+    </Stack>;
   }
 
-  const entries = lens === "Featured" ? CONNECTOR_ENTRIES.filter((entry) => entry.featured) : CONNECTOR_ENTRIES;
-
-  if (lens === "Categories") {
-    return (
-      <Stack gap={5}>
-        {CATEGORIES.map((category) => {
-          const group = CONNECTOR_ENTRIES.filter((entry) => entry.category === category);
-          if (group.length === 0) return null;
-          return (
-            <section key={category}>
-              <h3 style={{ fontSize: "var(--text-md)", marginBlockEnd: "var(--space-3)" }}>{category}</h3>
-              <Grid>
-                {group.map((entry) => <ConnectorCard key={entry.capability.id} entry={entry} context={context} />)}
-              </Grid>
-            </section>
-          );
-        })}
-      </Stack>
-    );
-  }
-
-  return (
-    <Stack gap={4}>
-      <Notice tone="warning" title="Every provider here is not connected">
-        This directory lists what each provider would enable, what it would need, and what Arlovi does instead. None of them has a grant, and nothing on this screen can create one.
-      </Notice>
-      <Grid>
-        {entries.map((entry) => <ConnectorCard key={entry.capability.id} entry={entry} context={context} />)}
-      </Grid>
-    </Stack>
-  );
+  return <Stack gap={4}>
+    {marketplaceOverview}
+    <div className="connect-marketplace-toolbar">
+      <label className="connect-marketplace-search">
+        <Search size={17} aria-hidden="true" />
+        <span className="ds-sr-only">Search integration capabilities</span>
+        <input type="search" aria-label="Search integration capabilities" value={query}
+          onChange={event => setQuery(event.target.value)}
+          placeholder="Search providers, workflows, operations…" />
+        {query && <button type="button" aria-label="Clear integration search" onClick={() => setQuery("")}>
+          <X size={15} aria-hidden="true" />
+        </button>}
+      </label>
+      <Button variant="secondary" size="sm" onClick={() => context.openOverlay("compare connectors")}>Compare</Button>
+    </div>
+    {lens === "Categories" && <nav className="connect-category-picker" aria-label="Integration categories">
+      {(["All", ...CATEGORIES] as const).map(item => {
+        const count = item === "All" ? CONNECTOR_ENTRIES.length
+          : CONNECTOR_ENTRIES.filter(entry => entry.category === item).length;
+        return <button key={item} type="button" aria-current={category === item ? "true" : undefined}
+          onClick={() => setCategory(item)}>
+          <span>{item === "All" ? "All categories" : item}</span><span className="connect-category-count">{count}</span>
+        </button>;
+      })}
+    </nav>}
+    <div className="connect-results-header">
+      <span role="status"><strong>{matched.length}</strong> {matched.length === 1 ? "integration" : "integrations"} {query ? "matching your search" : lens === "Featured" ? "featured" : "in this category"}</span>
+      <span>Permission requirements shown before connection</span>
+    </div>
+    {matched.length === 0 ? <Empty title="No integrations match" icon={<Plug size={20} />}
+      action={<Button variant="secondary" onClick={() => { setQuery(""); setCategory("All"); }}>Clear filters</Button>}>
+      Search by provider, capability or operation, or choose another category.
+    </Empty> : <div className="connect-marketplace-grid" aria-label="Integration catalogue">
+      {matched.map(entry => <ConnectorCard key={entry.capability.id} entry={entry} context={context} />)}
+    </div>}
+    <p className="connect-marketplace-boundary">Every provider is currently not connected. Reviewing an integration or recording an install request does not grant access, send data or activate a sync.</p>
+  </Stack>;
 }
 
 function ConnectorCard({ entry, context }: { entry: ConnectorEntry; context: ScreenContext }) {
-  return (
-    <Card
-      span={4}
-      eyebrow={entry.category.toUpperCase()}
-      prov="unknown"
-      title={entry.capability.label}
-      subtitle={entry.capability.provider}
-      actions={<StateCell entry={entry} />}
-      footer={<>
-        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/marketplace/${entry.capability.id}`)}>Details</Button>
-        <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Connector preview", { id: entry.capability.id })}>What it needs</Button>
-        <span className="ds-grow" />
-        <Pill tone={entry.risk.level === "high" ? "danger" : entry.risk.level === "medium" ? "warning" : "neutral"}>{entry.risk.level} risk</Pill>
-      </>}
-    >
-      <Stack gap={2}>
-        <p className="ds-subtle">{entry.capability.note}</p>
-        <Properties rows={[
-          { label: "Would enable", value: <span>{plural(entry.operations.filter((operation) => operation.direction === "action").length, "action")}, {plural(entry.operations.filter((operation) => operation.direction === "read").length, "read")}</span> },
-          { label: "Scopes", value: <span className="ds-num">{`${entry.scopes.filter((scope) => scope.kind === "write").length} write · ${entry.scopes.filter((scope) => scope.kind === "read").length} read`}</span> },
-          { label: "Instead", value: entry.capability.localEquivalent },
-        ]} />
-      </Stack>
-    </Card>
-  );
+  const actions = entry.operations.filter(operation => operation.direction === "action").length;
+  const reads = entry.operations.filter(operation => operation.direction === "read").length;
+  const writes = entry.scopes.filter(scope => scope.kind === "write").length;
+  return <article className="connect-marketplace-card">
+    <div className="connect-marketplace-card-top">
+      <div className="connect-card-symbol"><Plug size={19} strokeWidth={1.7} aria-hidden="true" /></div>
+      <StateCell entry={entry} />
+    </div>
+    <div className="connect-marketplace-card-main">
+      <span className="connect-card-category">{entry.category} / {entry.capability.provider}</span>
+      <h3>{entry.capability.label}</h3>
+      <p>{entry.capability.note}</p>
+    </div>
+    <div className="connect-card-facts" aria-label={`${entry.capability.label} requirements`}>
+      <span>{plural(actions, "action")} · {plural(reads, "read")}</span>
+      <span>{writes} proposed write {writes === 1 ? "scope" : "scopes"}</span>
+    </div>
+    <div className="connect-card-fallback"><strong>Available locally</strong><span>{entry.capability.localEquivalent}</span></div>
+    <div className="connect-marketplace-card-foot">
+      <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/marketplace/${entry.capability.id}`)}>View details</Button>
+      <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Connector preview", { id: entry.capability.id })}>Requirements</Button>
+      <Pill tone={entry.risk.level === "high" ? "danger" : entry.risk.level === "medium" ? "warning" : "neutral"}>{entry.risk.level} risk</Pill>
+    </div>
+  </article>;
 }
 
 export function ConnectorPreview({ context }: { context: ScreenContext }) {
@@ -216,10 +246,40 @@ export function RiskSummary({ context }: { context: ScreenContext }) {
  * ARL-CONNECT-002 — Connector Detail
  * ================================================================ */
 
-export function ConnectorDetail({ context, lens }: { context: ScreenContext; lens: "Overview" | "Capabilities" | "Permissions" | "Versions" | "Help" }) {
-  const { entry } = useConnector(context);
-  if (!entry) return <Empty title="No connector" icon={<Plug size={20} />} />;
+type ConnectorLens = "Overview" | "Capabilities" | "Permissions" | "Versions" | "Help";
 
+export function ConnectorDetail({ context, lens }: { context: ScreenContext; lens: ConnectorLens }) {
+  const { entry } = useConnector(context);
+  if (!entry) return <Empty title="No connector" icon={<Plug size={20} />}>
+    This connector does not exist in the catalogue or this company's connection records.
+  </Empty>;
+  return <Stack gap={4}>
+    <section className="connect-connector-overview" aria-label="Connector details overview">
+      <div className="connect-connector-head">
+        <div>
+          <span className="connect-eyebrow">INTEGRATIONS / ${entry.category.toUpperCase()}</span>
+          <h2>{entry.capability.label}</h2>
+          <p>{entry.capability.provider} · {entry.capability.note}</p>
+        </div>
+        <StateCell entry={entry} />
+      </div>
+      <div className="connect-connector-metrics" aria-label="Connector scope summary">
+        <div><span>Read permissions</span><strong>{entry.scopes.filter(scope => scope.kind === "read").length}</strong></div>
+        <div><span>Proposed write permissions</span><strong>{entry.scopes.filter(scope => scope.kind === "write").length}</strong></div>
+        <div><span>Operations</span><strong>{entry.operations.length}</strong></div>
+        <div><span>External grants</span><strong>0</strong></div>
+      </div>
+      <div className="connect-connector-actions">
+        <Button size="sm" variant="secondary" onClick={() => context.setTab("Permissions")}>Review permissions</Button>
+        <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/connect/marketplace`)}>All integrations</Button>
+        <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connect/${entry.capability.id}`)}>Connection requirements</Button>
+      </div>
+    </section>
+    <ConnectorDetailBody context={context} lens={lens} entry={entry} />
+  </Stack>;
+}
+
+function ConnectorDetailBody({ context, lens, entry }: { context: ScreenContext; lens: ConnectorLens; entry: ConnectorEntry }) {
   if (lens === "Capabilities") {
     return (
       <Stack gap={4}>
@@ -365,6 +425,20 @@ export function ConnectionWizard({ context, lens }: { context: ScreenContext; le
 
   return (
     <Stack gap={5}>
+      <section className="connect-connector-overview" aria-label="Connector authorisation overview">
+        <div className="connect-connector-head">
+          <div>
+            <span className="connect-eyebrow">INTEGRATIONS / AUTHORISATION PREVIEW</span>
+            <h2>{entry.capability.label}</h2>
+            <p>Review the account, permission requests and verification requirements. A provider redirect and callback are not available in this browser.</p>
+          </div>
+          <StateCell entry={entry} />
+        </div>
+        <div className="connect-connector-actions">
+          <Button size="sm" variant="secondary" onClick={() => context.setTab("Permissions")}>Review scopes</Button>
+          <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/connect/marketplace/${entry.capability.id}`)}>Connector details</Button>
+        </div>
+      </section>
       <ul className="t6-steps">
         {steps.slice(0, 4).map((step) => (
           <li key={step.id} className="t6-step" data-state={step.state}>
@@ -580,61 +654,88 @@ export function ConsentStatus({ context }: { context: ScreenContext }) {
 export function Connections({ context, lens }: { context: ScreenContext; lens: "All" | "Healthy" | "Needs action" | "Disabled" }) {
   const records = useCollection("connectors");
   const { org } = useWorkspace();
-  const rows = records.filter((record) => {
+  const [search, setSearch] = useState("");
+  const active = records.filter(record => record.status !== "disabled");
+  const rows = records.filter(record => {
     if (lens === "Healthy") return false;
-    if (lens === "Disabled") return record.status === "disabled";
-    if (lens === "Needs action") return record.status !== "disabled";
-    return true;
+    if (lens === "Disabled" && record.status !== "disabled") return false;
+    if (lens === "Needs action" && record.status === "disabled") return false;
+    const entry = entryForRecord(record.fields);
+    const needle = search.trim().toLocaleLowerCase();
+    return !needle || [record.title, record.summary, record.ownerName, record.status,
+      entry?.capability.label ?? "", entry?.capability.provider ?? ""]
+      .join(" ").toLocaleLowerCase().includes(needle);
   });
+  const overview = <section className="connect-connections-overview" aria-label="Connection management overview">
+    <div className="connect-connections-head">
+      <div>
+        <span className="connect-eyebrow">INTEGRATIONS / CONNECTIONS</span>
+        <h2>Know what is connected — and what isn't.</h2>
+        <p>Manage local connector requests, inspect access requirements and see their recorded state without implying an external grant exists.</p>
+      </div>
+      <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/connect/marketplace`)}>Browse integrations</Button>
+    </div>
+    <div className="connect-connections-metrics" aria-label="Connection status summary">
+      <div><span>Connector records</span><strong>{records.length}</strong></div>
+      <div><span>Pending setup</span><strong>{active.length}</strong></div>
+      <div><span>Disabled</span><strong>{records.length - active.length}</strong></div>
+      <div><span>Verified connections</span><strong>0</strong></div>
+    </div>
+  </section>;
 
-  if (lens === "Healthy") {
-    return (
-      <Empty title="No connection is healthy" icon={<ShieldCheck size={20} />}>
-        A connection is healthy when a grant exists and one read has succeeded. Neither has happened for any provider, so this tab is empty rather than optimistic.
-      </Empty>
-    );
-  }
-
-  if (rows.length === 0) {
-    return <Empty title={`Nothing ${lens.toLowerCase()}`} icon={<Plug size={20} />}>Connector records are kept in this workspace with the state the capability register reports.</Empty>;
-  }
-
-  return (
-    <Stack gap={4}>
-      <DataGrid
-        rows={rows}
-        rowId={(row) => row.id}
-        label="Connections"
-        rowTone={(row) => (row.status === "disabled" ? undefined : "warning")}
+  return <Stack gap={4}>
+    {overview}
+    {lens !== "Healthy" && <div className="connect-connections-toolbar">
+      <label className="connect-connections-search">
+        <Search size={17} aria-hidden="true" />
+        <span className="ds-sr-only">Find a connection</span>
+        <input type="search" aria-label="Find a connection" value={search}
+          onChange={event => setSearch(event.target.value)}
+          placeholder="Search requests, owners and providers" />
+        {search && <button type="button" aria-label="Clear connection search" onClick={() => setSearch("")}>
+          <X size={15} aria-hidden="true" />
+        </button>}
+      </label>
+      <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/connect/receipts`)}>Action receipts</Button>
+    </div>}
+    {lens === "Healthy" ? <Empty title="No connection is healthy" icon={<ShieldCheck size={20} />}>
+      A verified provider grant and a successful read are required before a connection can appear here. Neither is available.
+    </Empty> : rows.length === 0 ? <Empty
+      title={search.trim() ? "No connections match your search" : lens === "All" ? "No connection requests yet" : `No ${lens.toLowerCase()} connections`}
+      icon={<Plug size={20} />}
+      action={<Button variant="secondary" onClick={() => search.trim() ? setSearch("") : context.navigate(`/o/${org.slug}/connect/marketplace`)}>
+        {search.trim() ? "Clear search" : "Browse integrations"}
+      </Button>}>
+      {search.trim() ? "Try a connector name, provider, owner or request status." : "Connection records are created when a setup or install request is recorded."}
+    </Empty> : <>
+      <div className="connect-results-header" role="status"><span><strong>{rows.length}</strong> {rows.length === 1 ? "record" : "records"} shown</span><span>No provider tokens or grants stored here</span></div>
+      <DataGrid rows={rows} rowId={row => row.id} label="Connections"
+        rowTone={row => row.status === "disabled" ? undefined : "warning"}
         columns={[
-          { key: "title", header: "Connection", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
+          { key: "title", header: "Connection", primary: true, cell: row => row.title, sortValue: row => row.title, filterValue: row => `${row.title} ${row.summary}` },
           { key: "account", header: "Account", cell: () => <span className="ds-subtle">None linked</span> },
-          { key: "owner", header: "Owner", cell: (row) => row.ownerName },
-          {
-            key: "scopes", header: "Scopes granted", align: "end", cell: (row) => {
-              const entry = entryForRecord(row.fields);
-              return <span className="ds-num">0 of {entry?.scopes.length ?? 0}</span>;
-            },
-          },
+          { key: "owner", header: "Owner", cell: row => row.ownerName },
+          { key: "scopes", header: "Scopes granted", align: "end", cell: row => {
+            const entry = entryForRecord(row.fields);
+            return <span className="ds-num">0 of {entry?.scopes.length ?? 0}</span>;
+          } },
           { key: "expiry", header: "Expiry", cell: () => <span className="ds-subtle">No grant to expire</span> },
-          {
-            key: "state", header: "State", cell: (row) => {
-              const entry = entryForRecord(row.fields);
-              return entry ? <StateCell entry={entry} /> : <Pill tone="warning" dot>{String(row.fields.capability ?? row.status).replace(/_/g, " ")}</Pill>;
-            },
-          },
-          { key: "local", header: "Done here instead", cell: (row) => row.summary },
+          { key: "state", header: "State", cell: row => {
+            const entry = entryForRecord(row.fields);
+            return entry ? <StateCell entry={entry} /> :
+              <Pill tone="warning" dot>{String(row.fields.capability ?? row.status).replace(/_/g, " ")}</Pill>;
+          } },
+          { key: "local", header: "Local alternative", cell: row => row.summary },
         ]}
-        onOpen={(id) => context.navigate(`/o/${org.slug}/connect/connections/${id}`)}
-        onSelect={(id) => context.select(id)}
-        selectedId={context.selectedId}
-        summary={<span>Usage is not shown because no call has been made. A zero would be true but a usage column implies a history that does not exist.</span>}
+        onOpen={id => context.navigate(`/o/${org.slug}/connect/connections/${id}`)}
+        onSelect={id => context.select(id)} selectedId={context.selectedId}
+        summary={<span>Usage and provider latency are unavailable because no external calls have been made. A request is not an installed integration.</span>}
       />
-      <Notice tone="warning" title="Revocation would have nothing to revoke">
-        There is no cached grant, no token and no queued call, so suspending a connection here only changes a label. The screen says so rather than offering a reassuring button.
+      <Notice tone="warning" title="No external grant exists to revoke">
+        Disabling a connector record only updates local workspace state. It does not revoke a provider token or contact an account.
       </Notice>
-    </Stack>
-  );
+    </>}
+  </Stack>;
 }
 
 /* ================================================================ *
@@ -875,15 +976,64 @@ export function CapabilityInspector({ context }: { context: ScreenContext }) {
 export function SyncCentre({ context, lens }: { context: ScreenContext; lens: "Jobs" | "Conflicts" | "Schedules" | "Data mapping" }) {
   const records = useCollection("connectors");
   const conflicts = useCollection("conflicts");
+  const [conflictQuery, setConflictQuery] = useState("");
+  const [conflictScope, setConflictScope] = useState<"all" | "open">("open");
+  const visibleConflicts = conflicts.filter(conflict => {
+    if (conflictScope === "open" && conflict.status !== "open") return false;
+    const needle = conflictQuery.trim().toLocaleLowerCase();
+    return !needle || [conflict.title, conflict.summary, conflict.status, conflict.ownerName]
+      .join(" ").toLocaleLowerCase().includes(needle);
+  });
+  const overview = <section className="connect-sync-overview" aria-label="Synchronisation overview">
+    <div className="connect-sync-head">
+      <div>
+        <span className="connect-eyebrow">INTEGRATIONS / SYNCHRONISATION</span>
+        <h2>Understand every movement of data.</h2>
+        <p>Review potential sources, conflicts, schedules and field mappings. No provider ingestion or background jobs are running.</p>
+      </div>
+      <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>Connection records</Button>
+    </div>
+    <div className="connect-sync-metrics" aria-label="Synchronisation status summary">
+      <div><span>Connected sources</span><strong>0</strong></div>
+      <div><span>Ingestion jobs</span><strong>0</strong></div>
+      <div><span>Local conflicts</span><strong>{conflicts.length}</strong></div>
+      <div><span>Active schedules</span><strong>0</strong></div>
+    </div>
+    <nav className="connect-sync-nav" aria-label="Synchronisation work areas">
+      {(["Jobs", "Conflicts", "Schedules", "Data mapping"] as const).map(name =>
+        <button key={name} type="button" aria-current={lens === name ? "true" : undefined}
+          onClick={() => context.setTab(name)}>{name}</button>)}
+    </nav>
+  </section>;
 
   if (lens === "Conflicts") {
     return (
       <Stack gap={4}>
-        {conflicts.length === 0 ? (
-          <Empty title="No conflicts" icon={<RefreshCcw size={20} />}>A conflict happens when two sources disagree about one record. With one source there is nothing to disagree with.</Empty>
+        {overview}
+        <div className="connect-connections-toolbar">
+          <label className="connect-connections-search">
+            <Search size={17} aria-hidden="true" />
+            <span className="ds-sr-only">Search sync conflicts</span>
+            <input type="search" aria-label="Search sync conflicts" value={conflictQuery}
+              placeholder="Search conflicts, owners and records"
+              onChange={event => setConflictQuery(event.target.value)} />
+            {conflictQuery && <button type="button" aria-label="Clear conflict search" onClick={() => setConflictQuery("")}>
+              <X size={15} aria-hidden="true" /></button>}
+          </label>
+          <div className="connect-conflict-filters" role="group" aria-label="Conflict status filter">
+            <button type="button" aria-pressed={conflictScope === "open"} onClick={() => setConflictScope("open")}>Open</button>
+            <button type="button" aria-pressed={conflictScope === "all"} onClick={() => setConflictScope("all")}>All</button>
+          </div>
+        </div>
+        {visibleConflicts.length === 0 ? (
+          <Empty title={conflictQuery.trim() ? "No conflicts match this search" : "No conflicts in this view"} icon={<RefreshCcw size={20} />}
+            action={conflictQuery.trim() ? <Button variant="secondary" onClick={() => setConflictQuery("")}>Clear search</Button> : undefined}>
+            {conflictQuery.trim() ? "Search by title, owner or status." :
+              "A conflict requires two sources that disagree on a record. No provider sync is running."}
+          </Empty>
         ) : (
           <DataGrid
-            rows={conflicts}
+            rows={visibleConflicts}
             rowId={(row) => row.id}
             label="Conflicts"
             columns={[
@@ -903,18 +1053,22 @@ export function SyncCentre({ context, lens }: { context: ScreenContext; lens: "J
 
   if (lens === "Schedules") {
     return (
-      <Grid>
-        <Card span={7} eyebrow="SCHEDULES" prov="unknown" title="Nothing is scheduled" subtitle="A schedule without a source would only produce empty runs">
-          <Stack gap={3}>
-            <Properties rows={[
-              { label: "Jobs scheduled", value: <span className="ds-num">0</span> },
-              { label: "Next run", value: <Pill tone="warning">none</Pill> },
-              { label: "Cadence", value: "Would follow the provider's rate limit, not a round number" },
-            ]} />
-            <Checkbox label="Run an ingestion when a connection becomes healthy" defaultChecked />
-            <Checkbox label="Pause the schedule after three consecutive failures" defaultChecked />
-          </Stack>
-        </Card>
+      <Stack gap={4}>
+        {overview}
+        <Grid>
+          <Card span={7} eyebrow="SCHEDULES" prov="unknown" title="Nothing is scheduled" subtitle="A schedule without a connected source would only produce empty runs">
+            <Stack gap={3}>
+              <Properties rows={[
+                { label: "Jobs scheduled", value: <span className="ds-num">0</span> },
+                { label: "Next run", value: <Pill tone="warning">none</Pill> },
+                { label: "Cadence", value: "Not configured — depends on provider rate limits" },
+              ]} />
+              <Notice tone="info" title="Planned safeguards, not enabled settings">
+                Future schedules will require a verified connection, pause after repeated failures and preserve provider cursors. None of those policies is active while there is no ingestion service.
+              </Notice>
+              <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/health`)}>Check connector readiness</Button>
+            </Stack>
+          </Card>
         <Card span={5} eyebrow="RATE LIMITS" prov="unknown" title="What a schedule would respect">
           <ul className="ds-prose">
             {CONNECTOR_ENTRIES.filter((entry) => entry.limits.length).slice(0, 4).map((entry) => (
@@ -922,13 +1076,15 @@ export function SyncCentre({ context, lens }: { context: ScreenContext; lens: "J
             ))}
           </ul>
         </Card>
-      </Grid>
+        </Grid>
+      </Stack>
     );
   }
 
   if (lens === "Data mapping") {
     return (
       <Stack gap={4}>
+        {overview}
         <Notice tone="info" title="A mapping is written before a sync, not after">
           Each row below says which workspace collection a capability's records would land in, and what makes two records the same thing.
         </Notice>
@@ -963,6 +1119,7 @@ export function SyncCentre({ context, lens }: { context: ScreenContext; lens: "J
 
   return (
     <Stack gap={4}>
+      {overview}
       <StatRow>
         <Stat label="Jobs" value="0" prov="posted" meta="No ingestion has been defined" />
         <Stat label="Records ingested" value="0" prov="posted" meta="Counted, and genuinely nought" />
@@ -993,11 +1150,27 @@ export function SyncCentre({ context, lens }: { context: ScreenContext; lens: "J
 export function ConnectorHealth({ context, lens }: { context: ScreenContext; lens: "Overview" | "Outages" | "Rate limits" | "Deprecations" }) {
   const incidents = useCollection("incidents");
   const [ran, setRan] = useState("");
+  const overview = <section className="connect-health-overview" aria-label="Connector health overview">
+    <div className="connect-health-head">
+      <div>
+        <span className="connect-eyebrow">INTEGRATIONS / RELIABILITY</span>
+        <h2>Separate local readiness from provider health.</h2>
+        <p>Review checks, incidents, proposed limits and contract versions. External availability cannot be measured without an authorised connection.</p>
+      </div>
+      <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>Review connections</Button>
+    </div>
+    <nav className="connect-sync-nav" aria-label="Connector health areas">
+      {(["Overview", "Outages", "Rate limits", "Deprecations"] as const).map(name =>
+        <button key={name} type="button" aria-current={lens === name ? "true" : undefined}
+          onClick={() => context.setTab(name)}>{name}</button>)}
+    </nav>
+  </section>;
 
   if (lens === "Outages") {
     const providerIncidents = incidents.filter((record) => String(record.fields.connectorId ?? ""));
     return (
       <Stack gap={4}>
+        {overview}
         <Notice tone="warning" title="A provider outage is not ours to fix or to report">
           This workspace cannot reach a provider's status page, so it never claims one is down. What it can show is incidents raised here about a connector, which is below.
         </Notice>
@@ -1022,6 +1195,7 @@ export function ConnectorHealth({ context, lens }: { context: ScreenContext; len
   if (lens === "Rate limits") {
     return (
       <Stack gap={4}>
+        {overview}
         <div className="t6-matrix-wrap">
           <table className="t6-matrix">
             <caption className="ds-sr-only">Rate limits each provider would impose</caption>
@@ -1047,6 +1221,7 @@ export function ConnectorHealth({ context, lens }: { context: ScreenContext; len
   if (lens === "Deprecations") {
     return (
       <Stack gap={4}>
+        {overview}
         <Notice tone="info" title="No provider version is being tracked">
           Tracking a deprecation means reading a provider's changelog. This workspace reads nothing external, so it would be guessing. What it does track is its own contract version, below.
         </Notice>
@@ -1067,6 +1242,7 @@ export function ConnectorHealth({ context, lens }: { context: ScreenContext; len
 
   return (
     <Stack gap={5}>
+      {overview}
       <StatRow>
         <Stat label="Connected providers" value="0" prov="posted" meta={`${CONNECTOR_ENTRIES.length} in the register, none connected`} />
         <Stat label="Calls made" value="0" prov="posted" meta="This workspace makes no network calls" />
@@ -1236,18 +1412,31 @@ function ValidateDeclaration({ draft }: { draft: string }) {
 export function ActionReceipts({ context, lens }: { context: ScreenContext; lens: "All" | "Confirmed" | "Pending" | "Failed" | "Blocked" }) {
   const events = useEvents();
   const { org } = useWorkspace();
+  const [search, setSearch] = useState("");
   const receipts = events.filter((event) => event.type === "capability" || event.capability !== undefined);
   const rows = receipts.filter((event) => {
     const state = event.capability ?? "not_connected";
-    if (lens === "Confirmed") return state === "verified_external";
-    if (lens === "Pending") return state === "queued_local" || state === "awaiting_external_confirmation";
-    if (lens === "Failed") return state === "failed";
-    if (lens === "Blocked") return state === "not_connected" || state === "blocked" || state === "configuration_required";
-    return true;
-  });
+    if (lens === "Blocked" && !(state === "not_connected" || state === "blocked" || state === "configuration_required")) return false;
+    if (lens === "Confirmed" && state !== "verified_external") return false;
+    if (lens === "Pending" && !(state === "queued_local" || state === "awaiting_external_confirmation")) return false;
+    if (lens === "Failed" && state !== "failed") return false;
+    const needle = search.trim().toLocaleLowerCase();
+    return !needle || [event.actor, event.message, event.screenId ?? "", CAPABILITY_LABELS[state]]
+      .join(" ").toLocaleLowerCase().includes(needle);
+  }).sort((left, right) => right.at.localeCompare(left.at));
 
   return (
     <Stack gap={4}>
+      <section className="connect-receipts-overview" aria-label="Action receipt overview">
+        <div className="connect-receipts-head">
+          <div>
+            <span className="connect-eyebrow">INTEGRATIONS / AUDIT RECEIPTS</span>
+            <h2>Trace every request at the provider boundary.</h2>
+            <p>Review which actions were attempted, blocked or confirmed. A local log entry is not proof that an external provider completed an operation.</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/connect/sync`)}>Synchronisation</Button>
+        </div>
+      </section>
       <StatRow>
         <Stat label="Receipts" value={String(receipts.length)} prov="posted" meta="Audit entries about a provider boundary" />
         <Stat label="Confirmed by a provider" value="0" prov="posted" meta="None, and the tab says so" />
@@ -1255,9 +1444,23 @@ export function ActionReceipts({ context, lens }: { context: ScreenContext; lens
         <Stat label="Delivery proof" value="Unavailable" unavailable meta="Proof comes from a provider's response" />
       </StatRow>
 
+      <div className="connect-connections-toolbar">
+        <label className="connect-connections-search">
+          <Search size={17} aria-hidden="true" />
+          <span className="ds-sr-only">Search action receipts</span>
+          <input type="search" aria-label="Search action receipts" value={search}
+            placeholder="Search actions, actors and outcomes"
+            onChange={event => setSearch(event.target.value)} />
+          {search && <button type="button" aria-label="Clear receipt search" onClick={() => setSearch("")}>
+            <X size={15} aria-hidden="true" />
+          </button>}
+        </label>
+      </div>
       {rows.length === 0 ? (
-        <Empty title={`No ${lens === "All" ? "" : lens.toLowerCase() + " "}receipts`} icon={<Activity size={20} />}>
-          A receipt is written whenever something reaches a provider boundary. Attempt an authorisation and one appears here.
+        <Empty title={search.trim() ? "No receipts match your search" : `No ${lens === "All" ? "" : lens.toLowerCase() + " "}receipts`} icon={<Activity size={20} />}
+          action={search.trim() ? <Button variant="secondary" onClick={() => setSearch("")}>Clear search</Button> : undefined}>
+          {search.trim() ? "Try another actor, operation or outcome." :
+            "A receipt is written whenever an action reaches a provider boundary. Attempt an authorisation and one appears here."}
         </Empty>
       ) : (
         <DataGrid
@@ -1293,7 +1496,10 @@ export function ActionReceipts({ context, lens }: { context: ScreenContext; lens
 export function ReceiptDetail({ context }: { context: ScreenContext }) {
   const events = useEvents();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const event = events.find((item) => item.id === payload?.id) ?? events.find((item) => item.type === "capability");
+  // A specified receipt identifier never falls back to unrelated audit evidence.
+  const event = payload?.id
+    ? events.find(item => item.id === payload.id && (item.type === "capability" || item.capability !== undefined))
+    : undefined;
   if (!event) return <Empty title="No receipt selected" icon={<Activity size={20} />} />;
   return (
     <Stack gap={3}>
