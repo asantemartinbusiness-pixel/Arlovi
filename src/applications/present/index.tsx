@@ -163,21 +163,42 @@ function SlideSorter({ editor, context }: { editor: DeckEditor; context: ScreenC
 
 function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" | "Shared" | "Templates" | "Archived" }) {
   const decks = useCollection("decks");
-  const { org, actor } = useWorkspace();
+  const { org } = useWorkspace();
+  const [query, setQuery] = useState("");
   const rows = useMemo(() => {
-    if (tab === "Recent") return [...decks].filter((record) => record.status !== "archived").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    if (tab === "Shared") return decks.filter((record) => record.ownerName !== actor && record.status !== "archived");
-    if (tab === "Templates") return decks.filter((record) => record.fields.isTemplate === true);
-    return decks.filter((record) => record.status === "archived");
-  }, [decks, tab, actor]);
+    const list = tab === "Recent"
+      ? [...decks].filter((record) => record.status !== "archived").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      : tab === "Shared"
+        ? decks.filter((record) => String(record.fields.sharedWith ?? "").trim().length > 0 && record.status !== "archived")
+        : tab === "Templates"
+          ? decks.filter((record) => record.fields.isTemplate === true)
+          : decks.filter((record) => record.status === "archived");
+    const needle = query.trim().toLowerCase();
+    return needle ? list.filter((record) => `${record.title} ${record.summary} ${record.tags.join(" ")}`.toLowerCase().includes(needle)) : list;
+  }, [decks, tab, query]);
 
-  if (rows.length === 0) {
+  if (rows.length === 0 && tab !== "Shared" && !query.trim()) {
     return <Empty title={`No ${tab.toLowerCase()} decks`} icon={<Presentation size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("new deck")}>New deck</Button>}>
       {tab === "Templates" ? "Mark a deck as a template to reuse its masters and theme." : "Create a deck, or import one."}
     </Empty>;
   }
 
   return (
+    <Stack gap={4}>
+      <div className="pr-library-heading">
+        <div><span className="pr-library-eyebrow">PRESENT / DECK LIBRARY</span>
+          <h2>{tab === "Shared" ? "Recorded sharing." : tab === "Templates" ? "Reusable presentations." : tab === "Archived" ? "Presentation archive." : "Presentations in progress."}</h2>
+          <p>{tab === "Shared" ? "Only decks with an explicitly recorded sharing list appear here. Public or workspace access is not implied." : "Find and present the right deck with its source, review state and design context visible."}</p>
+        </div>
+        <Button variant="primary" onClick={() => context.openOverlay("new deck")}>New presentation</Button>
+      </div>
+      <div className="pr-library-overview" aria-label="Presentation library overview">
+        <div><span>Current decks</span><strong>{decks.filter((record) => record.status !== "archived").length}</strong></div>
+        <div><span>Templates</span><strong>{decks.filter((record) => record.fields.isTemplate === true).length}</strong></div>
+        <div><span>Archived</span><strong>{decks.filter((record) => record.status === "archived").length}</strong></div>
+      </div>
+      <Field label="Find a presentation"><TextInput type="search" aria-label="Find a presentation" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, summary or tags" /></Field>
+      {rows.length === 0 ? <Empty title="No presentations match this view" action={<Button variant="secondary" onClick={() => setQuery("")}>Clear search</Button>}>Try another search or create a presentation.</Empty> : (
     <Grid>
       {rows.map((record) => {
         const deck = readDeck(record.body);
@@ -218,6 +239,8 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
         );
       })}
     </Grid>
+      )}
+    </Stack>
   );
 }
 
