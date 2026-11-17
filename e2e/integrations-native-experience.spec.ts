@@ -111,7 +111,7 @@ test("Connector health provides real diagnostic context across all tabs", async 
   await nav.getByRole("button", { name: "Deprecations" }).click();
   await expect(main).toContainText("No provider version is being tracked");
   await nav.getByRole("button", { name: "Overview" }).click();
-  await expect(main.getByRole("button", { name: "Run the health test" })).toBeVisible();
+  await expect(main.getByRole("button", { name: "Run the health test" }).first()).toBeVisible();
   await overview.getByRole("button", { name: "Review connections" }).click();
   await expect(page).toHaveURL(/\/connect\/connections$/);
 });
