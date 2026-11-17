@@ -100,7 +100,7 @@ test("Inbox Needs me follows live Project assignments and not other colleagues' 
       {type:"create",message:"QA overdue task for Theo",entityId:another.id},
     ],org);
   });
-  await page.goto("/o/northline/inbox/for-you");
+  await page.goto("/o/northline/inbox/inbox");
   const mineButton=page.getByRole("button",{name:"Needs me",exact:true});
   await expect(mineButton).toBeVisible();
   await mineButton.click();
