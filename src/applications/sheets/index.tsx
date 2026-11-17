@@ -1010,7 +1010,7 @@ function DataTables({ context, tab }: { context: ScreenContext; tab: "Tables" | 
   if (tab === "Validation") {
     const table = editor.workbook.tables[0];
     if (!table) return <Empty title="Define a table first" icon={<Database size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Column editor", { mode: "create" })}>Create a table</Button>} />;
-    const sheet = editor.workbook.sheets.find((item) => item.id === editor.workbook.charts.find(() => true)?.sheetId) ?? editor.sheet;
+    const sheet = editor.sheet;
     const box = rangeBox(table.ref);
     const breaches: { id: string; address: string; column: string; expected: string; found: string }[] = [];
     if (box) {
@@ -1033,6 +1033,9 @@ function DataTables({ context, tab }: { context: ScreenContext; tab: "Tables" | 
     }
     return (
       <Stack gap={4}>
+        <Notice tone="info" title={`Validation scope: ${sheet.name} · ${table.name}`}>
+          Rules are checked against the currently active sheet. Table definitions do not yet store a sheet identifier, so results are not presented as workbook-wide validation.
+        </Notice>
         <StatRow>
           <Stat prov="human" label="Columns with a rule" value={String(table.columns.filter((column) => column.rule || column.required).length)} />
           <Stat prov="human" label="Rows checked" value={box ? String(box.toRow - box.fromRow + (table.headerRow ? 0 : 1)) : "0"} />
@@ -1058,6 +1061,18 @@ function DataTables({ context, tab }: { context: ScreenContext; tab: "Tables" | 
 
   return (
     <Stack gap={4}>
+      <div className="sx-formula-overview">
+        <div className="sx-formula-header"><span className="sx-library-eyebrow">SHEETS / STRUCTURED DATA</span><h2>Structure behind the cells.</h2>
+          <p>Review table definitions, typed columns and validation rules. Table schemas describe ranges; they do not move or rewrite the underlying values.</p>
+        </div>
+        <div className="sx-formula-metrics" aria-label="Structured data overview">
+          <div><span>Tables</span><strong>{editor.workbook.tables.length}</strong><small>Defined structures</small></div>
+          <div><span>Columns</span><strong>{editor.workbook.tables.reduce((total, table) => total + table.columns.length, 0)}</strong><small>Across all definitions</small></div>
+          <div><span>Validation rules</span><strong>{editor.workbook.tables.reduce((total, table) => total + table.columns.filter((column) => column.required || column.rule).length, 0)}</strong><small>Required and constrained fields</small></div>
+        </div>
+        <Row gap={2} wrap><Button size="sm" variant="primary" onClick={() => context.openOverlay("Column editor", { mode: "create" })}>Create a table</Button>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/sheets/workbooks/${record.id}`)}>Back to grid</Button></Row>
+      </div>
       {editor.workbook.tables.length === 0 ? (
         <Empty title="No structured table" icon={<Table2 size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Column editor", { mode: "create" })}>Create a table</Button>}>
           A table gives a range a name, a header row and a type per column, so validation and relationships have something to check against.
