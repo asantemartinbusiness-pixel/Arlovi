@@ -8,8 +8,8 @@
   "counts": {
     "applications": 35,
     "screens": 316,
-    "tabs": 1323,
-    "overlays": 956,
+    "tabs": 1324,
+    "overlays": 957,
     "primary_actions": 1328,
     "workflows": 20,
     "shared_components": 21
@@ -5853,7 +5853,8 @@
             "Awaiting payment",
             "Overdue",
             "Paid",
-            "Void"
+            "Void",
+            "Time inputs"
           ],
           "actions": [
             "Create",
@@ -5865,7 +5866,8 @@
           "overlays": [
             "New invoice",
             "bulk action preview",
-            "reminder approval"
+            "reminder approval",
+            "finance time review"
           ],
           "ai": "Prepares invoices from CRM and approved projects",
           "edge": "Duplicate outbound sends guarded by provider reconciliation",
@@ -5899,6 +5901,11 @@
               "name": "Void",
               "behavior": "The void subsection of Invoice List; show only related void records, with owner, current state, relevant dates, source and permission-aware actions.",
               "keyboard": "Arrow keys/Home/End within tablist; Enter/Space if manual activation; selected state announced; preserve edits."
+            },
+            {
+              "name": "Time inputs",
+              "behavior": "Show only company-scoped billable Project/People time records, with their employee and Project source, recorded hours, explicit rate, approval state and Finance review. Separate unapproved, unpriced, unlinked, reviewed and invoice-linked entries. A reviewed input never implies an invoice, tax resolution, payment or ledger posting.",
+              "keyboard": "Use the native tablist with arrow navigation and Enter/Space activation. Each timesheet row has a keyboard-operable review drawer; focus returns to the source row on dismissal."
             }
           ],
           "action_contracts": [
@@ -5935,6 +5942,10 @@
             {
               "name": "reminder approval",
               "behavior": "reminder approval — a focused review dialog with precise affected records, actor, policy, amount/recipients if applicable, reversible impact, confirm/decline, validation, loading and receipt states."
+            },
+            {
+              "name": "finance time review",
+              "behavior": "Invoice Time inputs drawer: show employee, Project, hours, approval, known rate and illustrative pre-tax subtotal; block review when data is unapproved, unlinked or unpriced. Save reviewer, timestamp and revision-checked local review only. Never create an invoice, tax entry, ledger posting or external action."
             }
           ],
           "acceptance": [
@@ -5942,7 +5953,9 @@
             "Switching between Draft and Void shows the correct distinct content, preserves relevant state, supports keyboard activation and an accessible selected-state announcement.",
             "The action “Create” performs its stated change or navigation with loading, validation, explicit success/failed state and a traceable record when consequential.",
             "The “New invoice” overlay is accessible, context-specific, resizes on mobile and returns focus without losing unsaved work.",
-            "Edge test: Duplicate outbound sends guarded by provider reconciliation; verify denial/fallback, status language, audit/event and safe recovery."
+            "Edge test: Duplicate outbound sends guarded by provider reconciliation; verify denial/fallback, status language, audit/event and safe recovery.",
+            "The Time inputs tab shows only company-owned source records and never counts unapproved or unpriced time as invoice revenue.",
+            "Finance time review is revision-checked, records the reviewer and date and cannot create a new invoice or ledger entry; editing hours invalidates the prior review."
           ]
         },
         {
