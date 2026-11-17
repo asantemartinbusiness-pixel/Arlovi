@@ -29,9 +29,8 @@ test("Finance reviews approved Project time without creating an invoice or ledge
       fields: { kind: "time", employeeId: employee.id, employeeName: employee.title,
         projectId: project.id, hours: 1, billable: true, approved: true, approvedBy: "Elena Voss" },
     }, ctx);
-    const invoices = (await repo.listByCollection("org-northline", "invoices")).length;
     await repo.putMany([employee, project, entry, unpriced], ctx, [], "org-northline");
-    return { entry: entry.id, unpriced: unpriced.id, invoices };
+    return { entry: entry.id, unpriced: unpriced.id };
   });
   await page.reload();
   const main = page.locator("#main");
@@ -39,6 +38,16 @@ test("Finance reviews approved Project time without creating an invoice or ledge
   await expect(main).toContainText("QA Finance Time Project");
   await expect(main).toContainText("Ready for Finance review");
   await expect(main).toContainText("Agreed rate required");
+  // Capture the invoice baseline after seeded demo records have loaded.
+  // Finance review must not increase invoice or journal counts.
+  const baseline = await page.evaluate(async () => {
+    const repoPath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
+    return {
+      invoices: (await repo.listByCollection("org-northline", "invoices")).length,
+      journals: (await repo.listByCollection("org-northline", "journals")).length,
+    };
+  });
 
   const isMobile = await page.evaluate(() => window.matchMedia("(max-width: 767px)").matches);
   if (isMobile) {
@@ -58,15 +67,18 @@ test("Finance reviews approved Project time without creating an invoice or ledge
     const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
     const time = await repo.getRecord(state.entry);
     const invoices = await repo.listByCollection("org-northline", "invoices");
+    const journals = await repo.listByCollection("org-northline", "journals");
     return {
       review: time?.fields.billingReviewStatus,
       reviewedBy: typeof time?.fields.billingReviewedBy === "string",
       status: time?.status,
       invoiceId: time?.fields.invoiceId ?? null,
       invoices: invoices.length,
+      journals: journals.length,
     };
   }, ids)).toEqual({
-    review: "ready", reviewedBy: true, status: "approved", invoiceId: null, invoices: ids.invoices,
+    review: "ready", reviewedBy: true, status: "approved", invoiceId: null,
+    invoices: baseline.invoices, journals: baseline.journals,
   });
   await expect(main).toContainText("Reviewed for invoice preparation");
 });
