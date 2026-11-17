@@ -649,6 +649,9 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
   const openChecklist = onboarding.filter((task) => task.status !== "done");
   const pendingAccess = data.tasks.filter((task) => task.fields.employeeId === employee.id
     && task.fields.group === "IT access" && !["done", "rescinded", "cancelled"].includes(task.status));
+  const pendingLeave = leave.filter((request) => request.status === "requested");
+  const outstandingReviews = reviews.filter((review) => review.status !== "acknowledged");
+  const canEdit = context.can("edit_people");
   const profileDescriptions: Record<string, string> = {
     Overview: "An employee-centered workspace: identity, role, contact preferences and the next tasks that need attention.",
     Job: "The recorded employment relationship, management line, skills and pay information available to your current role view.",
@@ -695,6 +698,14 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
       {profileHeader}
       <p className="hr-profile-section-description">{profileDescriptions[lens] ?? profileDescriptions.Overview}</p>
       {profileMetrics}
+      {(terminated || pendingLeave.length > 0 || pendingAccess.length > 0 || outstandingReviews.length > 0) && (
+        <div className="hr-profile-workflow-strip" aria-label="Employee workflow status">
+          {terminated && <Pill tone="warning">Former employee · departure recorded locally</Pill>}
+          {pendingLeave.length > 0 && <Button size="sm" variant="secondary" onClick={() => context.setTab("Leave")}>{pendingLeave.length} pending leave request{pendingLeave.length === 1 ? "" : "s"}</Button>}
+          {outstandingReviews.length > 0 && <Button size="sm" variant="secondary" onClick={() => context.setTab("Performance")}>{outstandingReviews.length} review{outstandingReviews.length === 1 ? "" : "s"} awaiting acknowledgement</Button>}
+          {pendingAccess.length > 0 && <Button size="sm" variant="secondary" onClick={() => context.setTab("Access")}>{pendingAccess.length} open local access request{pendingAccess.length === 1 ? "" : "s"}</Button>}
+        </div>
+      )}
       {body}
     </Stack>
   );
@@ -702,7 +713,8 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
   if (lens === "Job") {
     return withProfileFrame(
       <Grid>
-        <Card span={6} eyebrow="JOB" prov="human" title="Job details">
+        <Card span={6} eyebrow="JOB" prov="human" title="Job details"
+          actions={canEdit && !terminated ? <Button size="sm" variant="secondary" onClick={() => context.openOverlay("profile editor")}>Update job details</Button> : undefined}>
           <Properties rows={[
             { label: "Job title", value: String(employee.fields.title ?? "Not recorded") },
             { label: "Department", value: departmentName(data.departments, employee.fields.departmentId) },
@@ -728,7 +740,7 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
             </Stack>
           ) : <RoleViewNote what="Pay, pension and national insurance" />}
         </Card>
-        <Card span={12} title="Skills recorded for work matching">
+        <Card span={12} title="Skills recorded for work matching" subtitle="Entered on the employee profile, not independently verified">
           <Row gap={2} wrap>
             {String(employee.fields.skills ?? "").split(",").filter(Boolean).map((skill) => <Pill key={skill} tone="neutral">{skill.trim()}</Pill>)}
             {!employee.fields.skills && <span className="ds-subtle">No skills recorded.</span>}
@@ -765,7 +777,7 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
         <Notice tone="info" title="Only linked records appear here">
           A reference records a document's name and filing details; it does not upload the file itself. No connected storage or identity service is implied.
         </Notice>
-        <Button variant="secondary" onClick={() => context.openOverlay("Contract upload")}>Add a document reference</Button>
+        {canEdit && <Button variant="secondary" onClick={() => context.openOverlay("Contract upload")}>Add a document reference</Button>}
       </Stack>
     );
   }
@@ -776,22 +788,24 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
         <Card span={5} eyebrow="BALANCE" prov={balance.known ? "human" : "unknown"} title="Balance" subtitle={balance.known ? `${balance.left} days left of ${balance.allowance}` : "No allowance recorded"}>
           <Stack gap={3}>
             {!balance.known && <Notice tone="warning" title="No allowance is recorded for this person">A balance is left unavailable rather than shown as zero.</Notice>}
-            <Meter value={balance.taken} max={Math.max(1, balance.allowance)} label="Leave used" tone={balance.left <= 2 ? "warning" : "success"} />
+            {balance.known && <Meter value={balance.taken} max={Math.max(1, balance.allowance)} label="Leave used" tone={balance.left <= 2 ? "warning" : "success"} />}
             <Properties rows={[
-              { label: "Allowance", value: `${balance.allowance} days` },
-              { label: "Taken", value: `${balance.taken} days` },
-              { label: "Remaining", value: `${balance.left} days` },
-              { label: "Carry over", value: "Capped at five days by policy" },
+              { label: "Allowance", value: balance.known ? `${balance.allowance} days` : "Not verified" },
+              { label: "Taken", value: balance.known ? `${balance.taken} days` : "Not verified" },
+              { label: "Remaining", value: balance.known ? `${balance.left} days` : "Not verified" },
+              { label: "Carry over", value: employee.fields.carryOverDays === undefined ? "No carry-over figure recorded" : `${String(employee.fields.carryOverDays)} days recorded` },
             ]} />
           </Stack>
         </Card>
-        <Card span={7} title="Requests" subtitle={`${leave.length} on record`} flush>
+        <Card span={7} title="Requests" subtitle={`${leave.length} on record`}
+          actions={<Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/leave?tab=Approvals`)}>Open leave workspace</Button>} flush>
           {leave.length === 0 ? <div className="ds-card-body"><Empty title="No leave recorded" icon={<CalendarDays size={20} />} /></div> : (
             <DataGrid
               rows={leave}
               rowId={(row) => row.id}
               label="Leave requests"
               filterable={false}
+              onOpen={(id) => { context.select(id); context.navigate(`/o/${org.slug}/hr/leave?tab=Approvals`); }}
               columns={[
                 { key: "type", header: "Type", primary: true, cell: (row) => String(row.fields.type ?? "annual") },
                 { key: "from", header: "From", cell: (row) => context.date(row.startAt), sortValue: (row) => row.startAt ?? "" },
@@ -808,8 +822,11 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
   if (lens === "Performance") {
     return withProfileFrame(reviews.length === 0 ? <Empty title="No reviews recorded" icon={<ClipboardCheck size={20} />}>Reviews are created from the performance cycle.</Empty> : (
       <Stack gap={3}>
+        <Row gap={2} wrap><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/performance?tab=Team`)}>Open performance workspace</Button></Row>
         {reviews.map((review) => (
-          <Card key={review.id} title={review.title} subtitle={`${String(review.fields.cycle ?? "")} · reviewer ${String(review.fields.reviewer ?? "")}`} actions={<Pill tone={review.status === "acknowledged" ? "success" : "info"}>{review.status}</Pill>}>
+          <Card key={review.id} title={review.title} subtitle={`${String(review.fields.cycle ?? "")} · reviewer ${String(review.fields.reviewer ?? "Not assigned")}`}
+            actions={<Pill tone={review.status === "acknowledged" ? "success" : "info"}>{review.status}</Pill>}
+            footer={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("Review form", { id: review.id })}>Inspect review</Button>}>
             <Stack gap={2}>
               <p>{review.summary}</p>
               {review.fields.aiAssisted === true && (
@@ -862,8 +879,8 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
           Completion of a task here never proves that an external account, door code or permission was enabled or disabled.
         </Notice>
         <Row gap={2}>
-          {!terminated && <Button variant="secondary" onClick={() => context.openOverlay("access request")}>Request access</Button>}
-          {!terminated && <Button variant="outline-danger" onClick={() => context.openOverlay("offboarding confirmation")}>Start offboarding</Button>}
+          {!terminated && canEdit && <Button variant="secondary" onClick={() => context.openOverlay("access request")}>Request access</Button>}
+          {!terminated && canEdit && <Button variant="outline-danger" onClick={() => context.openOverlay("offboarding confirmation")}>Start offboarding</Button>}
         </Row>
       </Stack>
     );
@@ -895,7 +912,7 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
         </Stack>
       </Card>
       <Card span={4} eyebrow="LEAVE" prov={balance.known ? "human" : "unknown"} title="Leave" subtitle={balance.known ? `${balance.left} of ${balance.allowance} days left` : "No allowance recorded"}>
-        <Meter value={balance.taken} max={Math.max(1, balance.allowance)} label="Leave used" tone={balance.left <= 2 ? "warning" : "success"} />
+        {balance.known ? <Meter value={balance.taken} max={Math.max(1, balance.allowance)} label="Leave used" tone={balance.left <= 2 ? "warning" : "success"} /> : <Notice tone="warning" title="Allowance unverified">A missing balance is not zero days available.</Notice>}
         <Button size="sm" variant="ghost" style={{ marginBlockStart: "var(--space-3)" }} onClick={() => context.setTab("Leave")}>See requests</Button>
       </Card>
       <Card span={4} title="Pay" subtitle="Payroll role view">
