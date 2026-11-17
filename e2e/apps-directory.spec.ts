@@ -8,12 +8,12 @@ test("Apps directory exposes all tools with capability search and category navig
   await search.fill("invoices");
   await expect(page.getByRole("link", { name: "Finance", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Design", exact: true })).toHaveCount(0);
-  await expect(page).toHaveURL(new RegExp("/o/northline/it/home$"));
+  await expect(page).toHaveURL(/q=invoices/);
   await page.getByRole("button", { name: "Clear application search" }).click();
   await page.getByRole("navigation", { name: "Application categories" })
     .getByRole("button", { name: /^Studio/ }).click();
   await expect(page.locator(".apps-directory-open")).toHaveCount(8);
-  await expect(page).toHaveURL(new RegExp("/o/northline/it/home$"));
+  await expect(page).toHaveURL(/category=Studio/);
   await page.reload();
   await expect(page.locator(".apps-directory-open")).toHaveCount(8);
 });
@@ -30,7 +30,7 @@ test("pinning an app updates native navigation and remains scoped to the company
   await expect(page.getByRole("button", { name: "Unpin Finance" })).toBeVisible();
   await page.getByRole("button", { name: /Switch company/ }).click();
   await page.getByRole("menuitem", { name: /Harbor Supply/ }).first().click();
-  await expect(page).toHaveURL(new RegExp("/o/northline/it/home$"));
+  await expect(page).toHaveURL(/\/o\/harbor\/workspace\/apps$/);
   await expect(page.getByRole("button", { name: "Pin Finance" })).toBeVisible();
 });
 
@@ -70,13 +70,16 @@ test("Platform category offers real work-area shortcuts and preserves category n
   await expect(sidebar.getByRole("link", { name: "All applications" })).toHaveAttribute(
     "href", "/o/northline/workspace/apps?category=Platform",
   );
+  // Tablet and mobile native navigation is inside the collapsible drawer.
+  const openNavigation = page.getByRole("button", { name: "Open navigation" });
+  if (await openNavigation.isVisible()) await openNavigation.click();
   await sidebar.getByText("Other Platform apps").click();
   await expect(sidebar.getByRole("link", { name: "IT Operations" })).toBeVisible();
   await sidebar.getByRole("link", { name: "IT Operations" }).click();
-  await expect(page).toHaveURL(new RegExp("/o/northline/it/home$"));
+  await expect(page).toHaveURL(/\/o\/northline\/it\/home$/);
   await page.getByRole("navigation", { name: "IT Operations navigation" })
     .getByRole("link", { name: "All applications" }).click();
-  await expect(page).toHaveURL(new RegExp("/o/northline/it/home$"));
+  await expect(page).toHaveURL(/category=Platform/);
   await expect(page.locator(".apps-directory-open")).toHaveCount(5);
 });
 
