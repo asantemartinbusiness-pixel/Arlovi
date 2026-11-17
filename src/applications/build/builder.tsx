@@ -29,7 +29,9 @@ const COMPONENT_ICONS: Record<ComponentKind, React.ReactNode> = {
 export function useAppRecord(context: ScreenContext): { projects: Rec[]; record?: Rec; model: AppModel } {
   const projects = useCollection("appProjects");
   const routed = useRecord(context.params.id);
-  const record = routed?.collection === "appProjects" ? routed : projects[0];
+  const record = context.params.id
+    ? routed?.collection === "appProjects" && routed.organizationId === context.org.id ? routed : projects.find((item) => item.id === context.params.id)
+    : projects.find((item) => item.status !== "archived") ?? projects[0];
   const model = useMemo(() => readApp(record), [record]);
   return { projects, record, model };
 }
