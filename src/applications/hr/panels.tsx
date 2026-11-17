@@ -1731,7 +1731,7 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
   const [timeFilter, setTimeFilter] = useState<"pending" | "approved" | "mismatch" | "all">("all");
   const [personQuery, setPersonQuery] = useState("");
   const [hideAway, setHideAway] = useState(false);
-  const [exceptionFilter, setExceptionFilter] = useState<"all" | "critical" | "review">("all");
+  const [exceptionFilter, setExceptionFilter] = useState<"all" | "critical" | "review" | "attendance">("all");
   const [focusedDay, setFocusedDay] = useState<string | null>(null);
   const roster = data.shifts.filter((shift) => shift.fields.kind === "shift");
   const timesheets = data.shifts.filter((shift) => shift.fields.kind === "time");
@@ -1965,6 +1965,8 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
       catch { return false; }
     }));
     const unapproved = timesheets.filter((entry) => entry.fields.approved !== true || entry.status !== "approved");
+    const invalidHours = timesheets.filter((entry) => !Number.isFinite(Number(entry.fields.hours)) || Number(entry.fields.hours) <= 0);
+    const inconsistent = timesheets.filter((entry) => (entry.status === "approved") !== (entry.fields.approved === true));
     const rows = [
       ...clashes.map((shift) => ({
         id: `${shift.id}-leave`, recordId: shift.id, source: "shift" as const,
@@ -1982,6 +1984,14 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
         id: `${shift.id}-overtime`, recordId: shift.id, source: "shift" as const,
         kind: "Overtime review", detail: `${String(shift.fields.employeeName ?? "Unlinked employee")} · ${String(shift.fields.hours ?? "—")}h · ${context.date(shift.startAt)}`, tone: "warning" as const,
       })),
+      ...invalidHours.map((entry) => ({
+        id: `${entry.id}-hours`, recordId: entry.id, source: "time" as const,
+        kind: "Invalid recorded hours", detail: `${String(entry.fields.employeeName ?? "Unlinked employee")} · Check the original time entry`, tone: "danger" as const,
+      })),
+      ...inconsistent.map((entry) => ({
+        id: `${entry.id}-status`, recordId: entry.id, source: "time" as const,
+        kind: "Approval status mismatch", detail: `${String(entry.fields.employeeName ?? "Unlinked employee")} · Status and approval evidence disagree`, tone: "danger" as const,
+      })),
       ...unapproved.map((entry) => ({
         id: `${entry.id}-time`, recordId: entry.id, source: "time" as const,
         kind: "Time awaiting review", detail: `${String(entry.fields.employeeName ?? "Unlinked employee")} · ${String(entry.fields.hours ?? "—")}h`, tone: "warning" as const,
@@ -1990,7 +2000,7 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
     const critical = rows.filter((row) => row.tone === "danger");
     const review = rows.filter((row) => row.tone === "warning");
     const filtered = rows.filter((row) =>
-      exceptionFilter === "all" || (exceptionFilter === "critical" ? row.tone === "danger" : row.tone === "warning"));
+      exceptionFilter === "all" || (exceptionFilter === "critical" ? row.tone === "danger" : exceptionFilter === "attendance" ? row.source === "time" : row.tone === "warning"));
     const openSource = (row: (typeof rows)[number]) => {
       context.select(row.recordId);
       context.openOverlay(row.source === "shift" ? "Shift edit" : "time review", { id: row.recordId });
@@ -2015,6 +2025,7 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
           <Button size="sm" variant={exceptionFilter === "all" ? "secondary" : "ghost"} aria-pressed={exceptionFilter === "all"} onClick={() => setExceptionFilter("all")}>All ({rows.length})</Button>
           <Button size="sm" variant={exceptionFilter === "critical" ? "secondary" : "ghost"} aria-pressed={exceptionFilter === "critical"} onClick={() => setExceptionFilter("critical")}>Critical ({critical.length})</Button>
           <Button size="sm" variant={exceptionFilter === "review" ? "secondary" : "ghost"} aria-pressed={exceptionFilter === "review"} onClick={() => setExceptionFilter("review")}>Needs review ({review.length})</Button>
+          <Button size="sm" variant={exceptionFilter === "attendance" ? "secondary" : "ghost"} aria-pressed={exceptionFilter === "attendance"} onClick={() => setExceptionFilter("attendance")}>Time & attendance ({rows.filter((row) => row.source === "time").length})</Button>
         </div>
         {filtered.length === 0 ? (
           <Empty title={rows.length ? "Nothing in this filter" : "No scheduling exceptions"} icon={<ClipboardCheck size={20} />}>
@@ -2476,7 +2487,7 @@ export function Performance({ context, lens }: { context: ScreenContext; lens: "
   const data = useHrData();
   const { actor, org } = useWorkspace();
   const [query, setQuery] = useState("");
-  const [reviewState, setReviewState] = useState<"all" | "outstanding" | "acknowledged">("all");
+  const [reviewState, setReviewState] = useState<"all" | "draft" | "submitted" | "outstanding" | "acknowledged">("all");
   const reviews = data.reviews;
   const acknowledged = reviews.filter((review) => review.status === "acknowledged");
   const outstanding = reviews.filter((review) => review.status !== "acknowledged");
@@ -2517,8 +2528,10 @@ export function Performance({ context, lens }: { context: ScreenContext; lens: "
     [review.title, review.fields.employeeName, review.fields.reviewer, review.fields.cycle]
       .some((field) => String(field ?? "").toLowerCase().includes(query.trim().toLowerCase()));
   const stateFilter = (review: Rec) =>
-    reviewState === "all" || (reviewState === "acknowledged"
-      ? review.status === "acknowledged" : review.status !== "acknowledged");
+    reviewState === "all" || (reviewState === "acknowledged" ? review.status === "acknowledged"
+      : reviewState === "draft" ? review.status === "draft"
+      : reviewState === "submitted" ? ["submitted", "calibrated"].includes(review.status)
+      : review.status !== "acknowledged");
   const filterBar = (title: string, showStatus = true) => (
     <div className="ops-toolbar" aria-label={`Filter ${title}`}>
       <strong className="ops-toolbar-heading">{title}</strong>
@@ -2526,10 +2539,10 @@ export function Performance({ context, lens }: { context: ScreenContext; lens: "
         <TextInput aria-label="Search performance reviews" placeholder="Person, reviewer or cycle"
           value={query} onChange={(event) => setQuery(event.target.value)} />
       </div>
-      {showStatus && (["all", "outstanding", "acknowledged"] as const).map((option) => (
+      {showStatus && (["all", "draft", "submitted", "outstanding", "acknowledged"] as const).map((option) => (
         <Button key={option} size="sm" variant={reviewState === option ? "secondary" : "ghost"}
           aria-pressed={reviewState === option} onClick={() => setReviewState(option)}>
-          {option === "all" ? "All" : option === "outstanding" ? "Outstanding" : "Acknowledged"}
+          {option === "all" ? "All" : option === "draft" ? "Drafts" : option === "submitted" ? "Submitted / calibration" : option === "outstanding" ? "Outstanding" : "Acknowledged"}
         </Button>
       ))}
     </div>
@@ -2688,6 +2701,7 @@ export function Learning({ context, lens }: { context: ScreenContext; lens: "Cou
   const { org } = useWorkspace();
   const [query, setQuery] = useState("");
   const [requiredOnly, setRequiredOnly] = useState(false);
+  const [courseState, setCourseState] = useState<"all" | "draft" | "available">("all");
   const courses = data.courses;
   const policies = data.policies.filter((policy) => policy.fields.kind === "hr");
   const staff = humans(data.employees);
@@ -2825,12 +2839,19 @@ export function Learning({ context, lens }: { context: ScreenContext; lens: "Cou
     );
   }
 
-  const shown = courses.filter((course) => matches(course) && (!requiredOnly || course.fields.required === true));
+  const shown = courses.filter((course) => matches(course) && (!requiredOnly || course.fields.required === true)
+    && (courseState === "all" || (courseState === "draft" ? course.status === "draft" : course.status !== "draft")));
   return (
     <Stack gap={4}>
       {header}
       {metrics}
       {toolbar("Course library", true)}
+      <div className="ops-toolbar" role="group" aria-label="Filter course publication status">
+        <strong className="ops-toolbar-heading">Publication state</strong>
+        {(["all", "draft", "available"] as const).map((state) => <Button key={state} size="sm"
+          variant={courseState === state ? "secondary" : "ghost"} aria-pressed={courseState === state}
+          onClick={() => setCourseState(state)}>{state === "all" ? "All courses" : state === "draft" ? "Local drafts" : "Non-draft records"}</Button>)}
+      </div>
       {shown.length === 0 ? (
         <Empty title={courses.length ? "No courses match the filters" : "No courses recorded"} icon={<GraduationCap size={20} />}
           action={canBuildCourses ? <Button variant="primary" onClick={() => context.openOverlay("Course builder")}>Create course</Button> : undefined}>
@@ -2844,9 +2865,8 @@ export function Learning({ context, lens }: { context: ScreenContext; lens: "Cou
             return (
               <Card key={course.id} eyebrow="LEARNING" title={course.title}
                 subtitle={course.fields.minutes ? `${String(course.fields.minutes)} minutes recorded` : "Duration not recorded"}
-                actions={<Pill tone={course.fields.required === true ? "warning" : "neutral"}>
-                  {course.fields.required === true ? "Required" : "Optional"}
-                </Pill>}
+                actions={<Row gap={2}><Pill tone={course.status === "draft" ? "warning" : "neutral"}>{course.status === "draft" ? "Local draft" : course.status}</Pill>
+                  <Pill tone={course.fields.required === true ? "warning" : "neutral"}>{course.fields.required === true ? "Required" : "Optional"}</Pill></Row>}
                 footer={<>
                   {canBuildCourses && <Button size="sm" variant="secondary" onClick={() =>
                     context.openOverlay("Course builder", { id: course.id })}>Edit course</Button>}
