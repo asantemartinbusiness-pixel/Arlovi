@@ -1329,24 +1329,107 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
   }
 
   if (lens === "Availability") {
-    const people = data.employees.filter((employee) => employee.status !== "alumni");
+    const week = rosterWeekDays(now, org.timezone, weekOffset);
+    const staff = data.employees.filter((person) => !["alumni", "terminated"].includes(person.status));
+    const weekShifts = roster.filter((shift) =>
+      week.some((day) => rosterShiftsForDay([shift], String(shift.fields.employeeId ?? ""), day, org.timezone).length > 0));
+    const leaveDaysFor = (person: Rec) => week.filter((day) =>
+      employeeOnLeave(data.leaveRequests, person.id, day, org.timezone));
+    const shiftsFor = (person: Rec) => weekShifts.filter((shift) =>
+      shift.fields.employeeId === person.id);
+    const onLeave = staff.filter((person) => leaveDaysFor(person).length > 0);
+    const withoutShifts = staff.filter((person) => shiftsFor(person).length === 0);
+    const results = staff.filter((person) =>
+      (!hideAway || leaveDaysFor(person).length === 0)
+      && [person.title, person.fields.title, person.fields.office].some((field) =>
+        String(field ?? "").toLowerCase().includes(personQuery.trim().toLowerCase())))
+      .sort((a, b) => a.title.localeCompare(b.title));
+    const totalHours = weekShifts.reduce((sum, shift) => {
+      const hours = Number(shift.fields.hours);
+      return sum + (Number.isFinite(hours) && hours > 0 ? hours : 0);
+    }, 0);
     return (
-      <Grid>
-        {people.map((person) => {
-          const shifts = roster.filter((shift) => shift.fields.employeeId === person.id);
-          const away = data.leaveRequests.filter((request) => request.fields.employeeId === person.id && request.status === "approved" && request.endAt && new Date(request.endAt) >= now);
-          return (
-            <Card key={person.id} span={4} title={<Row gap={2}><Avatar name={person.title} size="sm" />{person.title}</Row>} subtitle={String(person.fields.title ?? "")}>
-              <Properties rows={[
-                { label: "Contract", value: String(person.fields.employment ?? "") },
-                { label: "Shifts on the roster", value: String(shifts.length) },
-                { label: "Booked away", value: away.length ? `${away.length} period${away.length === 1 ? "" : "s"}` : "None" },
-                { label: "Base", value: String(person.fields.office ?? "—") },
-              ]} />
-            </Card>
-          );
-        })}
-      </Grid>
+      <Stack gap={4}>
+        <OpsHeader
+          eyebrow="People / Scheduling / Availability"
+          title="See the team behind the schedule."
+          description="A people-first weekly view of assigned shifts, approved leave and days without a roster assignment. Review workload before making the next staffing decision."
+          actions={<Button variant="primary" onClick={() => context.navigate(`/o/${org.slug}/hr/scheduling?tab=Roster`)}>Open weekly roster</Button>}
+          note={`Calendar dates reflect ${org.timezone}. No shift does not guarantee availability.`}
+        />
+        <OpsMetrics label="Weekly workforce availability">
+          <OpsMetric label="Employees" value={staff.length} detail="Current company profiles" />
+          <OpsMetric label="With a scheduled shift" value={staff.length - withoutShifts.length} detail="At least one shift this week" />
+          <OpsMetric label="Approved leave" value={onLeave.length} detail="Employees away during the week" emphasis={onLeave.length ? "attention" : "neutral"} />
+          <OpsMetric label="Rostered hours" value={totalHours.toFixed(1)} detail="All shifts touching this week" />
+        </OpsMetrics>
+        <div className="ops-toolbar">
+          <Button size="sm" variant="secondary" onClick={() => setWeekOffset((value) => value - 1)}>Previous</Button>
+          <strong className="ops-toolbar-heading">{rosterDateLabel(week[0])} – {rosterDateLabel(week[6])}</strong>
+          <Button size="sm" variant="ghost" onClick={() => setWeekOffset(0)}>This week</Button>
+          <Button size="sm" variant="secondary" onClick={() => setWeekOffset((value) => value + 1)}>Next</Button>
+        </div>
+        <div className="ops-toolbar">
+          <div className="hr-availability-search">
+            <TextInput
+              aria-label="Find an employee"
+              placeholder="Search employees, roles or locations"
+              value={personQuery}
+              onChange={(event) => setPersonQuery(event.target.value)}
+            />
+          </div>
+          <Button size="sm" variant={hideAway ? "secondary" : "ghost"} aria-pressed={hideAway}
+            onClick={() => setHideAway((value) => !value)}>Hide employees on leave</Button>
+          <span className="ops-toolbar-note">{results.length} of {staff.length} people</span>
+        </div>
+        {results.length === 0 ? (
+          <Empty title={staff.length ? "No employees match these filters" : "No employees in this company"} icon={<Users size={20} />}>
+            {staff.length ? "Adjust the search or leave filter to review the team." : "Employee records appear here when they are created."}
+          </Empty>
+        ) : (
+          <div className="hr-availability-grid">
+            {results.map((person) => {
+              const assigned = shiftsFor(person);
+              const leave = leaveDaysFor(person);
+              const hours = assigned.reduce((sum, shift) => sum + Number(shift.fields.hours ?? 0), 0);
+              return (
+                <div key={person.id} className="hr-availability-person">
+                  <div className="hr-availability-person-heading">
+                    <Avatar name={person.title} size="md" />
+                    <div className="hr-availability-person-identity">
+                      <strong>{person.title}</strong>
+                      <span>{String(person.fields.title || person.fields.employment || "Employee")}</span>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/hr/employees/${person.id}`)}>Profile</Button>
+                  </div>
+                  <div className="hr-availability-summary">
+                    <span><strong>{assigned.length}</strong> shifts</span>
+                    <span><strong>{Number.isFinite(hours) ? hours.toFixed(1) : "—"}</strong> hours</span>
+                    <span>{leave.length ? <strong>{leave.length} leave days</strong> : "No approved leave"}</span>
+                  </div>
+                  <div className="hr-availability-week" aria-label={`Weekly schedule for ${person.title}`}>
+                    {week.map((day) => {
+                      const shifts = rosterShiftsForDay(weekShifts, person.id, day, org.timezone);
+                      const away = employeeOnLeave(data.leaveRequests, person.id, day, org.timezone);
+                      const status = shifts.length && away ? "conflict" : away ? "away" : shifts.length ? "scheduled" : "none";
+                      const label = status === "conflict" ? "Shift and leave conflict"
+                        : status === "away" ? "Approved leave" : status === "scheduled" ? `${shifts.length} shifts` : "No shift recorded";
+                      return (
+                        <div className="hr-availability-day" data-state={status} key={day}
+                          title={`${rosterDateLabel(day)}: ${label}`}>
+                          <span>{rosterDateLabel(day, { weekday: "short" })}</span>
+                          <strong>{status === "away" ? "Away" : status === "conflict" ? "!" : shifts.length ? shifts.length : "—"}</strong>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="hr-availability-footer">{String(person.fields.office ?? "No workplace recorded")} · Unassigned days need confirmation before offering work.</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Stack>
     );
   }
 
