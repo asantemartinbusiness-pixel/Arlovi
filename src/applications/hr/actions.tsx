@@ -608,40 +608,71 @@ export async function swapShift(context: ScreenContext): Promise<void> {
 
 export function TimeCorrection({ context, close }: { context: ScreenContext; close: () => void }) {
   const entries = useCollection("shifts").filter((row) => row.fields.kind === "time");
+  const employees = useCollection("employees").filter((row) => !["alumni", "terminated"].includes(row.status));
+  const projects = useCollection("projects").filter((row) => !["archived", "deleted", "cancelled"].includes(row.status));
   const [entryIdRaw, setEntryId] = useState<string | null>(null);
   const entryId = entryIdRaw ?? (entries.find((row) => row.id === context.selectedId)?.id ?? entries[0]?.id ?? "");
   const entry = entries.find((row) => row.id === entryId);
   const [hoursRaw, setHours] = useState<string | null>(null);
-  const hours = hoursRaw ?? (String(entry?.fields.hours ?? ""));
+  const [employeeIdRaw, setEmployeeId] = useState<string | null>(null);
+  const [projectIdRaw, setProjectId] = useState<string | null>(null);
+  const hours = hoursRaw ?? String(entry?.fields.hours ?? "");
+  const employeeId = employeeIdRaw ?? String(entry?.fields.employeeId ?? "");
+  const projectId = projectIdRaw ?? String(entry?.fields.projectId ?? "");
   const [reason, setReason] = useState("");
   const value = Number(hours);
-  const invalid = !Number.isFinite(value) || value < 0 || value > 24;
+  const invalid = !Number.isFinite(value) || value <= 0 || value > 24;
   return (
     <form
       id="hr-time-correction"
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!entry || invalid || !reason.trim()) return;
+        const employee = employees.find((row) => row.id === employeeId);
+        const project = projectId ? projects.find((row) => row.id === projectId) : undefined;
+        if (!entry || invalid || !reason.trim() || !employee || (projectId && !project)) {
+          context.toast("Correction blocked", "Enter valid hours, a responsible employee, an available project and a reason.", "blocked");
+          return;
+        }
         const updated = await context.mutate.patch(entry.id, { status: "submitted", fields: {
-          ...entry.fields, hours: value, approved: false, approvedBy: "", approvedAt: "",
+          ...entry.fields, hours: value, employeeId: employee.id, employeeName: employee.title,
+          projectId, approved: false, approvedBy: "", approvedAt: "",
           correctedFrom: Number(entry.fields.hours ?? 0), correctedBy: context.actor, correctionReason: reason.trim(),
-        } }, { expectRevision: entry.revision, event: `Time corrected from ${String(entry.fields.hours ?? 0)} to ${value} hours by ${context.actor}: ${reason.trim()}` });
+        } }, { expectRevision: entry.revision,
+          event: `Time corrected for ${employee.title} from ${String(entry.fields.hours ?? 0)} to ${value} hours by ${context.actor}: ${reason.trim()}` });
         if (!updated) return;
-        context.toast("Time corrected", "Approval was cleared; the corrected entry requires a fresh human review.");
+        context.toast("Time corrected", "Employee and Project links were verified. Prior approval is cleared; People must review this entry again.");
         close();
       }}
     >
       {entries.length === 0 ? <Empty title="No time entries" /> : (
         <>
-          <Field label="Entry">
-            <Select value={entryId} onChange={(event) => { setEntryId(event.target.value); setHours(String(entries.find((row) => row.id === event.target.value)?.fields.hours ?? "")); }}>
-              {entries.map((row) => <option key={row.id} value={row.id}>{String(row.fields.employeeName ?? "")} · {context.date(row.startAt)} · {String(row.fields.hours ?? 0)}h</option>)}
+          <Field label="Time entry" required>
+            <Select value={entryId} onChange={(event) => {
+              setEntryId(event.target.value); setHours(null); setEmployeeId(null); setProjectId(null);
+            }}>
+              {entries.map((row) => <option key={row.id} value={row.id}>{String(row.fields.employeeName ?? "Unlinked person")} · {context.date(row.startAt)} · {String(row.fields.hours ?? 0)}h</option>)}
             </Select>
           </Field>
-          <Field label="Corrected hours"><TextInput inputMode="decimal" align="end" value={hours} onChange={(event) => setHours(event.target.value)} invalid={invalid} /></Field>
+          <Field label="Person who did the work" required>
+            <Select value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}>
+              <option value="">Choose the matching employee record</option>
+              {employees.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
+            </Select>
+          </Field>
+          <Field label="Project" hint="Optional for internal work, but a project link must belong to this company.">
+            <Select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+              <option value="">No Project linked</option>
+              {projects.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
+            </Select>
+          </Field>
+          <Field label="Corrected hours" required>
+            <TextInput inputMode="decimal" align="end" value={hours} onChange={(event) => setHours(event.target.value)} invalid={invalid} required />
+          </Field>
           <Field label="Reason" required><TextArea rows={2} value={reason} onChange={(event) => setReason(event.target.value)} required /></Field>
-          <Notice tone="info">A correction clears the approval, keeps the original figure on the entry and needs approving again.</Notice>
+          <Notice tone="info" title="A corrected entry needs a new approval">
+            This can repair an older time entry missing a real employee or Project link. It clears previous approval, records who corrected it and does not update external payroll.
+          </Notice>
         </>
       )}
     </form>
