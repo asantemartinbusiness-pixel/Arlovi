@@ -25,6 +25,7 @@ import {
 } from "./model";
 import { DocumentCanvas, type EditIntent } from "./canvas";
 import { SAVE_LABEL, SAVE_TONE, activeDocEditor, useDocEditor, type DocEditor } from "./state";
+import { publicationBlockers } from "./reviewGate";
 import { useGuardRefresh } from "@/applications/design/sharedDoc";
 import { scopedDetailRecord } from "@/platform/recordScope";
 import { createStore, useStore } from "@/applications/visual/kit";
@@ -45,6 +46,33 @@ function useDocument(context: ScreenContext): Rec | undefined {
   const fromRoute = useRecord(context.params.id);
   // An unknown or wrong-collection URL must never open an unrelated document.
   return scopedDetailRecord(fromRoute, context.org.id, "documents");
+}
+
+/** Publish only the editor revision we can verify was saved in this company.
+ * A stale write or unresolved required review never becomes a published record. */
+async function publishReviewedDocument(context: ScreenContext, record: Rec, editor: DocEditor, approvalNote?: string): Promise<void> {
+  const proposedBlockers = publicationBlockers(editor.model);
+  if (proposedBlockers.length) throw new Error(proposedBlockers.join("; "));
+  await editor.saveNow();
+  const { getRecordInOrg } = await import("@/platform/repo");
+  const fresh = await getRecordInOrg(context.org.id, record.id);
+  if (!fresh || fresh.collection !== "documents") throw new Error("The original document is unavailable in this company.");
+  const saved = readDoc(fresh.body, fresh.ownerName, fresh.updatedAt);
+  if (JSON.stringify(saved) !== JSON.stringify(editor.model)) {
+    throw new Error("The latest editor content is not saved. Resolve the edit conflict before publishing.");
+  }
+  const remaining = publicationBlockers(saved);
+  if (remaining.length) throw new Error(remaining.join("; "));
+  const approvals = String(fresh.fields.approvals ?? "").split("|").filter(Boolean);
+  const approvalFields = approvalNote !== undefined
+    ? { approvals: [...approvals, context.actor + " " + context.now.toISOString() + (approvalNote.trim() ? " " + approvalNote.trim() : "")].join("|") }
+    : {};
+  const result = await context.mutate.patch(fresh.id, {
+    status: "published", fields: { ...fresh.fields, ...approvalFields },
+  }, { expectRevision: fresh.revision, event: approvalNote === undefined
+    ? fresh.title + " published in the workspace"
+    : fresh.title + " approved by " + context.actor });
+  if (!result) throw new Error("The document changed while publishing. Reload and review it again.");
 }
 
 /** The editor's contract actions, on its own bar (the full-chrome surface has no page header). */
@@ -1307,6 +1335,7 @@ function PublishScreen({ context, tab }: { context: ScreenContext; tab: "Export"
 
   if (tab === "Publish") {
     const signature = String(record.fields.signatureStatus ?? "not_requested");
+    const blockers = publicationBlockers(editor.model);
     return (
       <Grid>
         <Card span={6} eyebrow="PUBLISHING" prov="human" title="Publish in the workspace" subtitle={`Current status: ${record.status.replace("_", " ")}`}>
@@ -1316,13 +1345,23 @@ function PublishScreen({ context, tab }: { context: ScreenContext; tab: "Export"
               { label: "Open comments", value: String(editor.model.comments.filter((comment) => !comment.resolved).length) },
               { label: "Open changes", value: String(openSuggestions(editor.model).length) },
             ]} />
+            {blockers.length > 0 && (
+              <Notice tone="warning" title="Review required before publishing">
+                {blockers.join("; ")}. Resolve these in Review & comments, then publish the saved revision.
+              </Notice>
+            )}
             <Row gap={2}>
-              <Button variant="primary" disabled={record.status === "published"} onClick={async () => {
-                await context.mutate.patch(record.id, { status: "published" }, { expectRevision: record.revision, event: `${record.title} published in the workspace` });
-                context.toast("Published", "The document status changed on the record.");
+              <Button variant="primary" disabled={record.status === "published" || blockers.length > 0} onClick={async () => {
+                try {
+                  await publishReviewedDocument(context, record, editor);
+                  context.toast("Published", "Reviewed document status and saved content were confirmed on the record.");
+                } catch (error) {
+                  context.toast("Publication blocked", error instanceof Error ? error.message : "Review the document and retry.", "blocked");
+                }
               }}>Publish</Button>
               <Button variant="secondary" disabled={record.status !== "published"} onClick={async () => {
-                await context.mutate.patch(record.id, { status: "draft" }, { expectRevision: record.revision, event: `${record.title} unpublished` });
+                const result = await context.mutate.patch(record.id, { status: "draft" }, { expectRevision: record.revision, event: `${record.title} unpublished` });
+                if (result) context.toast("Unpublished", "Document returned to draft status in this workspace.");
               }}>Unpublish</Button>
             </Row>
           </Stack>
@@ -2896,7 +2935,7 @@ function ApproveDocument({ context, close }: { context: ScreenContext; close: ()
   const editor = useDocEditor(context, record);
   const [note, setNote] = useState("");
   if (!record) return <Empty title="No document is open" />;
-  const mandatoryOpen = editor.model.comments.filter((comment) => comment.mandatory && !comment.resolved);
+  const blockers = publicationBlockers(editor.model);
   const approvals = record.fields.approvals ? String(record.fields.approvals).split("|").filter(Boolean) : [];
   return (
     <form
@@ -2904,26 +2943,25 @@ function ApproveDocument({ context, close }: { context: ScreenContext; close: ()
       className="ds-stack ds-gap-3"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (mandatoryOpen.length > 0) return;
-        await editor.saveNow();
-        const fresh = await import("@/platform/repo").then((module) => module.getRecord(record.id));
-        await context.mutate.patch(record.id, {
-          status: "published",
-          fields: { ...(fresh ?? record).fields, approvals: [...approvals, `${context.actor} ${context.now.toISOString()}${note.trim() ? ` ${note.trim()}` : ""}`].join("|") },
-        }, { expectRevision: (fresh ?? record).revision, event: `${record.title} approved by ${context.actor}` });
-        context.toast("Approved", `${record.title} is approved by ${context.actor} and published in this workspace.`);
-        close();
+        if (blockers.length > 0) return;
+        try {
+          await publishReviewedDocument(context, record, editor, note);
+          context.toast("Approved", record.title + " was approved by " + context.actor + " and published in this workspace.");
+          close();
+        } catch (error) {
+          context.toast("Approval blocked", error instanceof Error ? error.message : "Reload the document and try again.", "blocked");
+        }
       }}
     >
-      {mandatoryOpen.length > 0 ? (
-        <Notice tone="danger" title={`${mandatoryOpen.length} mandatory review${mandatoryOpen.length === 1 ? " is" : "s are"} still open`}>
-          Approval is blocked until each “must resolve” comment is resolved, so a reviewer's objection is never erased by an approval. {mandatoryOpen.map((comment) => `${comment.author}: “${comment.body.slice(0, 60)}”`).join(" · ")}
+      {blockers.length > 0 ? (
+        <Notice tone="danger" title="Review requirements are still open">
+          Approval is blocked until mandatory comments and tracked edits are resolved: {blockers.join("; ")}.
         </Notice>
       ) : (
-        <Notice tone="info" title="Approving publishes the document in this workspace">The approval records who approved and when. Nothing is sent outside this browser.</Notice>
+        <Notice tone="info" title="Approving publishes the document in this workspace">The saved document revision and the named human approval are recorded together. Nothing is sent outside this browser.</Notice>
       )}
       <Properties rows={[{ label: "Status now", value: record.status.replace("_", " ") }, { label: "Earlier approvals", value: String(approvals.length) }, { label: "Open tracked changes", value: String(openSuggestions(editor.model).length) }]} />
-      <Field label="Note"><TextInput value={note} onChange={(event) => setNote(event.target.value)} disabled={mandatoryOpen.length > 0} placeholder="Approved for the trade launch" /></Field>
+      <Field label="Note"><TextInput value={note} onChange={(event) => setNote(event.target.value)} disabled={blockers.length > 0} placeholder="Approved for the trade launch" /></Field>
     </form>
   );
 }
