@@ -95,3 +95,50 @@ test("Documents never fall back to an unrelated record on an unknown document UR
   await expect(page.locator("#main")).toContainText("No document is open");
   await expect(page.getByLabel("Document working status")).toHaveCount(0);
 });
+
+
+test("Document approval requires an explicit human confirmation", async ({ page }) => {
+  await page.goto("/o/northline/docs/files");
+  const id = await page.evaluate(async () => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    const context = { actor: "Maya Chen", now: new Date().toISOString() };
+    const document = repo.newRecord({
+      organizationId: "org-northline", collection: "documents", currency: "GBP",
+      title: "QA Approval Control", status: "draft", fields: { kind: "document", folder: "Operations" },
+    }, context);
+    await repo.putRecord(document, context);
+    return document.id;
+  });
+  await page.goto(`/o/northline/docs/documents/${id}/review?tab=Approvals`);
+  const approve = page.locator("#main").getByRole("button", { name: "Review and approve…" });
+  await expect(approve).toBeVisible();
+  await approve.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Approve and publish locally");
+  await expect(dialog.getByRole("checkbox", { name: /reviewed this version/ })).not.toBeChecked();
+  await expect(dialog).toContainText("The dialog’s Approve action is only valid after acknowledgement");
+  await dialog.getByRole("checkbox", { name: /reviewed this version/ }).check();
+  await expect(dialog.getByRole("checkbox", { name: /reviewed this version/ })).toBeChecked();
+});
+
+test("Document reviewer assignment exposes reason, existing state, and no email claim", async ({ page }) => {
+  await page.goto("/o/northline/docs/files");
+  const id = await page.evaluate(async () => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    const context = { actor: "Maya Chen", now: new Date().toISOString() };
+    const document = repo.newRecord({
+      organizationId: "org-northline", collection: "documents", currency: "GBP",
+      title: "QA Reviewer Assignment", status: "draft", fields: { kind: "document" },
+    }, context);
+    await repo.putRecord(document, context);
+    return document.id;
+  });
+  await page.goto(`/o/northline/docs/documents/${id}/review?tab=Approvals`);
+  await page.locator("#main").getByRole("button", { name: "Assign reviewers" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Assign accountable reviewers");
+  await expect(dialog.getByText("Reason for review assignment")).toBeVisible();
+  await expect(dialog).toContainText("Not sent");
+});
