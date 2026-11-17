@@ -658,14 +658,14 @@ export function SubmissionsScreen({ context, lens }: { context: ScreenContext; l
                 ["received", "from", "version", "state", ...labels],
                 rows.map((row) => [
                   row.at ?? row.createdAt, row.title, row.fields.formVersion ?? "", row.status,
-                  ...labels.map((label) => (sensitive.includes(label) && !revealed.includes(row.id) ? "[redacted]" : String(row.fields[label] ?? ""))),
+                  ...labels.map((label) => (sensitive.includes(label) ? "[redacted]" : String(row.fields[label] ?? ""))),
                 ]),
               );
               void context.mutate.log(`${rows.length} submissions exported to CSV${sensitive.length ? " with sensitive answers redacted" : ""}`, { entityId: record.id, type: "export" });
               context.toast("Exported", `${rows.length} rows written to CSV${sensitive.length ? ", sensitive answers redacted" : ""}.`);
             }}>Export CSV</Button>
           }
-          summary={<span>Sensitive answers export as <code>[redacted]</code> unless they have been revealed on screen, and every reveal is recorded in the audit log.</span>}
+          summary={<span>Sensitive answers always export as <code>[redacted]</code>; revealing on screen does not include them in the CSV. Every reveal is logged.</span>}
         />
       )}
     </Stack>
@@ -676,11 +676,12 @@ export function SubmissionDrawer({ context }: { context: ScreenContext }) {
   const { record, model } = useFormRecord(context);
   const children = useChildren(record?.id);
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const [shown, setShown] = useState(false);
+  const [revealedSubmissionId, setRevealedSubmissionId] = useState<string | null>(null);
   const submission = payload?.id ? children.find((row) => row.id === payload.id) : undefined;
   if (!record) return <NoForm />;
   if (!submission) return <Empty title="Submission unavailable" icon={<Inbox size={20} />}>The selected response could not be found for this form. No other person's answers were opened.</Empty>;
   const sensitive = model.fields.filter((field) => field.sensitive).map((field) => field.label);
+  const shown = revealedSubmissionId === submission.id;
   return (
     <Stack gap={4}>
       <div><span className="ds-subtle">FORMS / RESPONSE DETAIL</span><h3 style={{ margin: "var(--space-2) 0" }}>{submission.title}</h3><p className="ds-subtle">Review the original answers and record a follow-up. Sensitive values stay hidden unless revealed explicitly.</p></div>
@@ -700,7 +701,7 @@ export function SubmissionDrawer({ context }: { context: ScreenContext }) {
         }))} />
       {sensitive.length > 0 && (
         <Button size="sm" variant="secondary" onClick={() => {
-          setShown((current) => !current);
+          setRevealedSubmissionId(shown ? null : submission.id);
           void context.mutate.log(`${shown ? "Hid" : "Revealed"} sensitive answers on ${submission.title}`, { entityId: submission.id, type: "privacy" });
         }}>{shown ? "Hide sensitive answers" : "Reveal sensitive answers"}</Button>
       )}
