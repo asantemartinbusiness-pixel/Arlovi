@@ -2802,6 +2802,7 @@ registerApp({
         },
       ],
       overlays: [
+        { id: "share", kind: "modal", title: "Workbook sharing", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="share-workbook">Save</Button></>, render: (context) => <ShareWorkbook context={context} close={context.close} /> },
         { id: "Conflict resolver", kind: "drawer", title: "Conflict", width: 540, render: (context) => <ConflictResolver context={context} close={context.close} /> },
         { id: "protected range", kind: "modal", title: "Protect a range", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="protected-range">Protect</Button></>, render: (context) => <ProtectedRangeOverlay context={context} close={context.close} /> },
         { id: "comment cell", kind: "modal", title: "Comment on a cell", width: 480, footer: formFooter("sheets-comment", "Comment"), render: (context) => <CommentCell context={context} close={context.close} /> },
