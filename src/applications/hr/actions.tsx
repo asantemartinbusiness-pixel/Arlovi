@@ -253,16 +253,6 @@ export function StageDecision({ context, close }: { context: ScreenContext; clos
           return;
         }
         await context.mutate.patch(applicant.id, {
-            status: "hired",
-            fields: { stage: "hired", offerAcceptedAt: at, offerAcceptedRecordedBy: context.actor, employeeId: employeeId ?? "", decidedBy: context.actor, decisionReason: reason.trim(), decidedAt: at },
-          }, { expectRevision: applicant.revision, event: `${applicant.title} accepted the offer; hired, recorded by ${context.actor}: ${reason.trim()}` });
-          context.toast("Hired", existing
-            ? `${applicant.title} accepted the offer. Their existing employee record is linked; no second record was made.`
-            : `${applicant.title} accepted the offer. An employee record was created in the directory; no invitation left this browser.`);
-          close();
-          return;
-        }
-        await context.mutate.patch(applicant.id, {
           status: stage === "rejected" ? "rejected" : applicant.status === "rejected" ? "active" : applicant.status,
           fields: { ...applicant.fields, stage, decidedBy: context.actor, decisionReason: reason.trim(), decidedAt: at },
         }, { expectRevision: applicant.revision, event: `${applicant.title} moved to ${stage} by ${context.actor}: ${reason.trim()}` });
