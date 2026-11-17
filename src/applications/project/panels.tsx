@@ -9,6 +9,7 @@ import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { addDays, clockIso, daysBetween, startOfWeek } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { LANES, TaskBoard, stageOf, type LaneId } from "./board";
+import { taskMoveDecision } from "./progression";
 import { BoardFilterNotice, PortfolioFilterNotice, TaskComments, boardFilter, matchesBoard, matchesPortfolio, pinnedBy, portfolioFilter } from "./actions";
 import { Gantt, createsCycle, criticalPath, dependenciesOf } from "./timeline";
 
@@ -260,7 +261,20 @@ export function ProjectOverview({ context, lens }: { context: ScreenContext; len
         context={context}
         tasks={tasks}
         onMove={async (task, lane) => {
-          await context.mutate.patch(task.id, { status: lane, fields: { ...task.fields, stage: lane } }, { expectRevision: task.revision, event: `${task.title} moved to ${lane}` });
+          const decision = taskMoveDecision(task, lane, tasks);
+          if (decision.blocked) {
+            context.toast("Task not moved", decision.blocked, "blocked");
+            return false;
+          }
+          if (decision.needsReviewDecision) {
+            context.select(task.id);
+            context.openOverlay("stage rule", { id: task.id, lane });
+            return false;
+          }
+          const saved = await context.mutate.patch(task.id, {
+            status: lane, fields: { ...task.fields, stage: lane },
+          }, { expectRevision: task.revision, event: `${task.title} moved to ${lane}` });
+          return Boolean(saved);
         }}
         onOpen={(task) => context.navigate(`/o/${org.slug}/project/tasks/${task.id}`)}
       />
@@ -430,19 +444,21 @@ export function BoardScreen({ context, lens }: { context: ScreenContext; lens: "
   const allTasks = tasksOf(data.tasks, project.id);
   const tasks = allTasks.filter((task) => matchesBoard(task, boardFilterValue));
 
-  async function moveTask(task: Rec, lane: LaneId) {
-    const blockers = dependenciesOf(task)
-      .map((id) => data.tasks.find((item) => item.id === id))
-      .filter((item): item is Rec => Boolean(item) && stageOf(item!) !== "done");
-    if (lane === "done" && blockers.length > 0) {
-      context.toast("Not moved", `${task.title} depends on ${blockers.map((item) => item.title).join(" and ")}, which ${blockers.length === 1 ? "is" : "are"} not done.`, "blocked");
-      return;
+  async function moveTask(task: Rec, lane: LaneId): Promise<boolean> {
+    const decision = taskMoveDecision(task, lane, allTasks);
+    if (decision.blocked) {
+      context.toast("Task not moved", decision.blocked, "blocked");
+      return false;
     }
-    if (lane === "done" && stageOf(task) !== "review" && String(task.fields.priority ?? "") === "high") {
+    if (decision.needsReviewDecision) {
+      context.select(task.id);
       context.openOverlay("stage rule", { id: task.id, lane });
-      return;
+      return false;
     }
-    await context.mutate.patch(task.id, { status: lane, fields: { ...task.fields, stage: lane } }, { expectRevision: task.revision, event: `${task.title} moved to ${lane}` });
+    const saved = await context.mutate.patch(task.id, {
+      status: lane, fields: { ...task.fields, stage: lane },
+    }, { expectRevision: task.revision, event: `${task.title} moved to ${lane}` });
+    return Boolean(saved);
   }
 
   if (lens === "List") {
