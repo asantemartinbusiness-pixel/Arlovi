@@ -2567,49 +2567,70 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const data = useCollections(["leaveRequests", "employees"]);
   const pending = data.leaveRequests.filter((request) => request.status === "requested");
-  const chosen = data.leaveRequests.find((request) => request.id === (payload?.id ?? context.selectedId)) ?? pending[0];
-  if (!chosen) return <Empty title="Nothing is waiting for a decision" icon={<ClipboardCheck size={20} />} />;
+  const explicitId = payload?.id ?? context.selectedId;
+  const chosen = explicitId
+    ? pending.find((request) => request.id === explicitId)
+    : pending[0];
+  if (!chosen) return <Empty title={explicitId ? "The selected leave request is unavailable" : "Nothing is waiting for a decision"}
+    icon={<ClipboardCheck size={20} />}>
+    {explicitId ? "A request may have been decided in another view. Select a current request and try again." : "New leave requests appear here for a named human reviewer."}
+  </Empty>;
   const employee = data.employees.find((row) => row.id === chosen.fields.employeeId);
-  const days = leaveDays(chosen);
+  const count = leaveDays(chosen);
+  const balance = employee ? leaveBalance(employee) : undefined;
+  const annual = String(chosen.fields.type ?? "annual") === "annual";
+  const canApprove = context.can("edit_people");
+  const decision = async (next: "approved" | "declined") => {
+    if (!canApprove) {
+      context.toast("Decision unavailable", "Your current role view cannot decide leave requests.", "blocked");
+      return;
+    }
+    try {
+      const plan = planLeaveDecision({
+        organizationId: context.org.id, currency: context.org.currency,
+        actor: context.actor, now: clockIso(),
+      }, chosen, next === "approved" ? employee : undefined, next);
+      await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+      context.toast(next === "approved" ? "Leave approved" : "Leave declined",
+        next === "approved" && annual
+          ? "The annual balance and request were recorded together in one revision-checked decision."
+          : `The ${next} decision and responsible reviewer were recorded locally.`);
+      context.closeOverlay();
+    } catch (error) {
+      context.toast("Decision not saved", error instanceof Error ? error.message : "Reload the request before deciding.", "blocked");
+    }
+  };
   return (
     <Stack gap={4}>
       <Row gap={3}>
-        <Avatar name={String(chosen.fields.employeeName ?? chosen.ownerName)} size="lg" />
-        <div>
-          <h3>{String(chosen.fields.employeeName ?? chosen.ownerName)}</h3>
-          <p className="ds-subtle">{context.date(chosen.startAt)} – {context.date(chosen.endAt)} · {days} days · {String(chosen.fields.type ?? "annual")}</p>
+        <Avatar name={leavePerson(chosen, data.employees)} size="lg" />
+        <div className="ds-grow">
+          <h3>{leavePerson(chosen, data.employees)}</h3>
+          <p className="ds-subtle">{context.date(chosen.startAt)} – {context.date(chosen.endAt)}
+            {" · "}{days(count)} · {String(chosen.fields.type ?? "annual")}</p>
         </div>
+        <Pill tone="warning">Requested</Pill>
       </Row>
-      <p>{chosen.summary}</p>
+      <p>{chosen.summary || "No request note recorded."}</p>
       <Properties rows={[
         { label: "Requested", value: context.relative(chosen.at) },
-        { label: "Approver", value: String(chosen.fields.approver ?? "—") },
-        { label: "Balance if approved", value: employee ? `${Math.max(0, leaveBalance(employee).left - days)} days` : "Unavailable" },
+        { label: "Assigned approver", value: String(chosen.fields.approver ?? "Not recorded") },
+        { label: "Allowance remaining", value: annual && balance?.known
+          ? `${balance.left} days` : annual ? "Not recorded" : "Not applicable" },
+        { label: "Balance after approval", value: annual && balance?.known
+          ? balance.left >= count ? `${balance.left - count} days` : "Insufficient recorded allowance"
+          : annual ? "Unavailable until allowance is verified" : "Annual balance unchanged" },
       ]} />
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          onClick={async () => {
-            await context.mutate.patch(chosen.id, { status: "approved", fields: { ...chosen.fields, decidedBy: context.actor, decidedAt: clockIso() } }, { expectRevision: chosen.revision, event: `Leave approved for ${String(chosen.fields.employeeName ?? "")} by ${context.actor}` });
-            if (employee) await context.mutate.patch(employee.id, { fields: { ...employee.fields, leaveTaken: Number(employee.fields.leaveTaken ?? 0) + days } }, { event: "Leave balance updated after approval" });
-            context.toast("Leave approved", "The request and the balance both changed.");
-            context.closeOverlay();
-          }}
-        >
-          Approve
-        </Button>
-        <Button
-          variant="outline-danger"
-          onClick={async () => {
-            await context.mutate.patch(chosen.id, { status: "declined", fields: { ...chosen.fields, decidedBy: context.actor, decidedAt: clockIso() } }, { expectRevision: chosen.revision, event: `Leave declined for ${String(chosen.fields.employeeName ?? "")} by ${context.actor}` });
-            context.toast("Leave declined", "Recorded as declined against the request.");
-            context.closeOverlay();
-          }}
-        >
-          Decline
-        </Button>
+      {!canApprove && <Notice tone="warning" title="Human reviewer role required">
+        The current role view cannot approve or decline a request. Review it from an authorised People role.
+      </Notice>}
+      <Row gap={2} wrap>
+        <Button variant="primary" disabled={!canApprove} onClick={() => decision("approved")}>Approve</Button>
+        <Button variant="outline-danger" disabled={!canApprove} onClick={() => decision("declined")}>Decline</Button>
+        <span className="ds-grow" />
+        <Button variant="secondary" onClick={() => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/hr/scheduling?tab=Roster`); }}>Check roster</Button>
       </Row>
-      <Notice tone="info">No private health detail is shown here, whatever the leave type.</Notice>
+      <Notice tone="info">This records a local review. The request and employee balance are updated atomically; no external calendar or payroll provider is connected.</Notice>
     </Stack>
   );
 }
