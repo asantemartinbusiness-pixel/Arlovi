@@ -2795,6 +2795,7 @@ function ApprovalOverlay({ context, close }: { context: ScreenContext; close: ()
   const [reviewer, setReviewer] = useState(members[0]?.title ?? "");
   const [decision, setDecision] = useState<"approved" | "changes">("approved");
   const [note, setNote] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
   if (!record) return <Empty title="No deck is open" />;
   const openComments = editor.deck.comments.filter((comment) => !comment.resolved);
   return (
@@ -2803,15 +2804,12 @@ function ApprovalOverlay({ context, close }: { context: ScreenContext; close: ()
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!reviewer) return;
+        if (!reviewer || !confirmed) return;
         editor.commit({
           ...editor.deck,
-          approvals: [{ id: nextId("ap"), reviewer, at: context.now.toISOString(), decision, note }, ...editor.deck.approvals],
-        }, "Record approval");
-        if (decision === "approved") {
-          await context.mutate.patch(record.id, { status: "published" }, { event: `${record.title} approved by ${reviewer}` });
-        }
-        context.toast("Recorded", `${reviewer} ${decision === "approved" ? "approved" : "asked for changes to"} the deck. It is on the record, not just a toast.`);
+          approvals: [{ id: nextId("ap"), reviewer, at: context.now.toISOString(), decision, note: `Recorded by ${context.actor}. ${note.trim()}`.trim() }, ...editor.deck.approvals],
+        }, "Record review decision");
+        context.toast("Review decision recorded", `A local ${decision === "approved" ? "approval" : "changes-requested"} entry for ${reviewer} was recorded by ${context.actor}. This is not identity-verified and does not publish the deck.`, "info");
         close();
       }}
     >
@@ -2820,6 +2818,9 @@ function ApprovalOverlay({ context, close }: { context: ScreenContext; close: ()
           Approving does not resolve them. They stay listed under Comments so an approval cannot bury a reviewer's objection.
         </Notice>
       )}
+      <Notice tone="info" title="Local review record, not verified approval">
+        The selected reviewer is a reference on this local record. Their identity and decision have not been independently verified. Recording a decision does not publish the presentation.
+      </Notice>
       <Field label="Reviewer" required>
         <Select aria-label="Reviewer" value={reviewer} onChange={(event) => setReviewer(event.target.value)} required>
           {members.map((member) => <option key={member.id} value={member.title}>{member.title}</option>)}
@@ -2831,6 +2832,7 @@ function ApprovalOverlay({ context, close }: { context: ScreenContext; close: ()
         </Select>
       </Field>
       <Field label="Note"><TextArea aria-label="Note" rows={3} value={note} onChange={(event) => setNote(event.target.value)} /></Field>
+      <Checkbox label="I understand this is a local, unverified review record" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
     </form>
   );
 }
