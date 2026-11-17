@@ -17,3 +17,24 @@ test("Sheets shared tab shows records of collaboration without promising externa
   await expect(main.getByRole("heading", { name: "Recorded collaboration." })).toBeVisible();
   await expect(main).toContainText("This is not an external permission or invitation.");
 });
+
+test("Formula audit shows calculated workbook health and a return route to the grid", async ({ page }) => {
+  await page.goto("/o/northline/sheets/workbooks");
+  const id = await page.evaluate(async () => {
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const workbook = repo.newRecord({
+      organizationId: "org-northline", collection: "workbooks", currency: "GBP",
+      title: "QA Sheets Calculation Context", status: "active", fields: { folder: "Operations" },
+    }, ctx);
+    await repo.putRecord(workbook, ctx);
+    return workbook.id;
+  });
+  await page.goto(`/o/northline/sheets/workbooks/${id}/formulas?tab=Errors`);
+  const main = page.locator("#main");
+  await expect(main.getByRole("heading", { name: "Understand every result." })).toBeVisible();
+  await expect(main.getByLabel("Calculation overview")).toBeVisible();
+  await main.getByRole("button", { name: "Back to grid" }).click();
+  await expect(page).toHaveURL(new RegExp(`/sheets/workbooks/${id}(?:\\?|$)`));
+});
