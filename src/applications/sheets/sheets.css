@@ -191,3 +191,5 @@
 .sx-formula-metrics strong{font-size:clamp(1.3rem,2vw,1.8rem);font-variant-numeric:tabular-nums}
 .sx-formula-metrics small{font-size:var(--text-xs);color:var(--fg-muted)}
 @media(max-width:600px){.sx-formula-overview{padding:var(--space-3)}.sx-formula-metrics{grid-template-columns:1fr}}
+
+.sx-compact-value{font-size:clamp(.95rem,1.5vw,1.2rem)!important;overflow-wrap:anywhere;letter-spacing:-.02em!important}
