@@ -131,3 +131,70 @@ test("Marketing portfolio filter recovery retains the complete screen hierarchy"
   await expect(page.getByRole("heading", { name: "Every campaign, one place" })).toBeVisible();
   await expect(page.getByRole("searchbox", { name: "Search campaigns" })).toHaveValue("");
 });
+
+test("Marketing calendar filters content by channel across its native views", async ({ page }) => {
+  await page.goto("/o/northline/market/calendar?tab=List");
+  await expect(page.getByRole("region", { name: "Content Calendar workspace summary" })).toBeVisible();
+  const filter = page.getByRole("combobox", { name: "Filter calendar by channel" });
+  await expect(filter).toHaveValue("all");
+  await filter.selectOption("instagram");
+  await expect(filter).toHaveValue("instagram");
+  await expect(page.getByRole("group", { name: "Content calendar filters" })
+    .getByRole("status")).toContainText("dated items");
+  await page.getByRole("tab", { name: "By channel" }).click();
+  await expect(page.getByRole("group", { name: "Content calendar filters" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Filter calendar by channel" })).toBeVisible();
+});
+
+test("Social publishing account panel can expand without hiding local status", async ({ page }) => {
+  await page.goto("/o/northline/market/social?tab=Drafts");
+  await expect(page.getByRole("region", { name: "Social Publishing workspace summary" })).toBeVisible();
+  const connections = page.getByRole("group", { name: "Social publishing filters" });
+  await expect(connections).toBeVisible();
+  const accounts = page.locator(".t4-social-accounts");
+  await expect(accounts).not.toHaveAttribute("open");
+  await accounts.locator("summary").click();
+  await expect(accounts).toHaveAttribute("open", "");
+  await expect(accounts.getByRole("button", { name: "Review connection" })).toHaveCount(4);
+  await connections.getByRole("combobox", { name: "Filter social posts by channel" }).selectOption("instagram");
+  await expect(connections.getByRole("button", { name: "Clear channel" })).toBeVisible();
+});
+
+test("Email campaigns can be filtered by lifecycle without implying mail delivery", async ({ page }) => {
+  await page.goto("/o/northline/market/email?tab=Campaigns");
+  await expect(page.getByRole("region", { name: "Email Campaigns workspace summary" })).toBeVisible();
+  const group = page.getByRole("group", { name: "Email campaign status filters" });
+  await group.getByRole("button", { name: "Draft", exact: true }).click();
+  await expect(group.getByRole("status")).toContainText("no mail provider connected");
+  await expect(page.getByText("Email preparation is local")).toBeVisible();
+  await group.getByRole("button", { name: "All", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Build email communications" })).toHaveCount(0);
+});
+
+test("Audience Segments allows searchable compact rules and filter recovery", async ({ page }) => {
+  await page.goto("/o/northline/market/audiences?tab=Segments");
+  await expect(page.getByRole("region", { name: "Audience Segments workspace summary" })).toBeVisible();
+  const search = page.getByRole("searchbox", { name: "Search audience segments" });
+  await search.fill("Trade accounts");
+  await expect(page.getByRole("region", { name: "Audience segments directory" })
+    .getByRole("status")).toContainText("of");
+  await expect(page.getByText("Trade accounts with consent", { exact: true })).toBeVisible();
+  await page.locator(".t4-audience-rules summary").first().click();
+  await expect(page.locator(".t4-audience-rules[open]")).toHaveCount(1);
+  await search.fill("no matching rule 39493");
+  await expect(page.getByText("No segments match this view")).toBeVisible();
+  await page.getByRole("button", { name: "Show all segments" }).click();
+  await expect(search).toHaveValue("");
+});
+
+for (const width of [390, 820, 1440]) {
+  test(`Marketing content, social, email and audience workspaces fit at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    for (const route of ["/market/calendar?tab=List", "/market/social", "/market/email", "/market/audiences"]) {
+      await page.goto(`/o/northline${route}`);
+      await expect(page.locator(".t4-workarea-head")).toBeVisible();
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow, route).toBeLessThanOrEqual(1);
+    }
+  });
+}
