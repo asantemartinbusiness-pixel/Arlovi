@@ -541,9 +541,14 @@ export const hrApp = registerApp({
 function OfferApproval({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCollections(["applicants", "positions"]);
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const applicant = data.applicants.find((row) => row.id === (payload?.id ?? context.selectedId) && row.collection === "applicants") ?? data.applicants.find((row) => row.fields.stage === "offer" && row.fields.offerIssuedBy === undefined);
-  if (!applicant) return <Empty title="No candidate is at the offer stage" icon={<UserPlus size={20} />}>Move a candidate to offer from their profile first.</Empty>;
-  const issued = applicant.fields.offerIssuedBy !== undefined;
+  const requestedId = payload?.id ?? context.selectedId;
+  const applicant = requestedId
+    ? data.applicants.find((row) => row.id === requestedId && row.collection === "applicants" && row.organizationId === context.org.id)
+    : data.applicants.find((row) => row.organizationId === context.org.id && row.fields.stage === "offer"
+      && !String(row.fields.offerIssuedBy ?? "").trim());
+  if (!applicant) return <Empty title={requestedId ? "Selected candidate unavailable" : "No candidate is at the offer stage"}
+    icon={<UserPlus size={20} />}>Open a valid candidate from this company before reviewing their offer.</Empty>;
+  const issued = Boolean(String(applicant.fields.offerIssuedBy ?? "").trim());
   const scored = Number(applicant.fields.rating ?? 0) > 0;
   const position = data.positions.find((row) => row.id === applicant.fields.positionId);
   return (
@@ -552,7 +557,10 @@ function OfferApproval({ context, close }: { context: ScreenContext; close: () =
         { label: "Candidate", value: applicant.title },
         { label: "Role", value: position?.title ?? String(applicant.fields.role ?? "") },
         { label: "Hiring manager", value: String(position?.fields.hiringManager ?? "") },
-        { label: "Range", value: context.can("view_payroll") && position ? `${context.money(Number(position.fields.salaryLowMinor ?? 0))} – ${context.money(Number(position.fields.salaryHighMinor ?? 0))}` : "Hidden in this role view" },
+        { label: "Range", value: !context.can("view_payroll") ? "Hidden in this role view"
+          : position?.fields.salaryLowMinor !== undefined && position.fields.salaryHighMinor !== undefined
+            ? `${context.money(Number(position.fields.salaryLowMinor))} – ${context.money(Number(position.fields.salaryHighMinor))}`
+            : "Not recorded" },
         { label: "Scorecard", value: scored ? `${String(applicant.fields.rating)} of 5` : "None recorded" },
         { label: "Offer", value: issued ? `Issued by ${String(applicant.fields.offerIssuedBy)} — awaiting the candidate's answer` : "Not issued" },
       ]} />
@@ -645,7 +653,7 @@ function ITAccess({ context }: { context: ScreenContext }) {
             <Pill tone={request.status === "done" ? "success" : "warning"} dot>{request.status}</Pill>
           </Row>
           <p className="ds-subtle">{request.summary}</p>
-          {request.status !== "done" && (
+          {["waiting", "ready", "requested"].includes(request.status) && (
             <Button size="sm" variant="primary" disabled={!context.can("edit_people")}
               style={{ marginBlockStart: "var(--space-2)" }}
               onClick={async () => {
