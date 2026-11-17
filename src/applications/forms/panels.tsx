@@ -919,6 +919,8 @@ import { FormThemeEditor as ThemeEditorImpl } from "./builder";
 
 export function PublishReviewForm({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, model } = useFormRecord(context);
+  const [confirmed, setConfirmed] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   if (!record) return <NoForm />;
   const issues = logicIssues(model);
   const blocking = issues.filter((issue) => issue.level === "fail");
@@ -934,9 +936,10 @@ export function PublishReviewForm({ context, close }: { context: ScreenContext; 
         <li className="t6-step" data-state={blocking.length === 0 ? "done" : "blocked"}><span className="t6-step-n">3</span>Reachable branches</li>
         <li className="t6-step" data-state="current"><span className="t6-step-n">4</span>Version {model.settings.version} → {model.settings.version + 1}</li>
       </ul>
-      {(blocking.length > 0 || noLabel.length > 0 || emptyOptions.length > 0) && (
+      {(answerable.length === 0 || blocking.length > 0 || noLabel.length > 0 || emptyOptions.length > 0) && (
         <Notice tone="danger" title="Publishing is blocked">
           <ul style={{ margin: "4px 0 0", paddingInlineStart: 18 }}>
+            {answerable.length === 0 && <li>Add at least one answerable question.</li>}
             {noLabel.map((field) => <li key={field.id}>A {FIELD_LABELS[field.type].toLowerCase()} field has no question text.</li>)}
             {emptyOptions.map((field) => <li key={field.id}>{field.label} has no options to choose from.</li>)}
             {blocking.map((issue) => <li key={issue.id}>{issue.title}</li>)}
@@ -950,18 +953,26 @@ export function PublishReviewForm({ context, close }: { context: ScreenContext; 
         { label: "Required", value: String(answerable.filter((field) => field.required).length) },
         { label: "Sensitive", value: String(answerable.filter((field) => field.sensitive).length) },
       ]} />
+      <Checkbox label="I understand this records a local publication status and does not create a hosted public form" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
       <Button
         variant="primary"
-        disabled={blocking.length > 0 || noLabel.length > 0 || emptyOptions.length > 0}
+        disabled={!confirmed || publishing || answerable.length === 0 || blocking.length > 0 || noLabel.length > 0 || emptyOptions.length > 0}
         onClick={async () => {
-          const next = { ...model, settings: { ...model.settings, version: model.settings.version + 1 } };
-          await saveForm(context, record, next, `Form published as version ${next.settings.version}`);
-          await context.mutate.patch(record.id, { status: "live" }, { event: `Form ${record.title} is live at version ${next.settings.version}` });
-          context.toast("Published", `Version ${next.settings.version} is live. Submissions from now on record that version.`);
-          close();
+          setPublishing(true);
+          try {
+            const next = { ...model, settings: { ...model.settings, version: model.settings.version + 1 } };
+            await saveForm(context, record, next, `Form version ${next.settings.version} recorded locally`);
+            await context.mutate.patch(record.id, { status: "live" }, { event: `Form ${record.title} marked live locally at version ${next.settings.version}` });
+            context.toast("Local status recorded", `Version ${next.settings.version} is marked live in this workspace. No public form was hosted.`, "info");
+            close();
+          } catch {
+            context.toast("Publication incomplete", "The form could not be fully updated. Review its current version and status before retrying.", "blocked");
+          } finally {
+            setPublishing(false);
+          }
         }}
       >
-        Publish version {model.settings.version + 1}
+        {publishing ? "Recording publication…" : `Mark version ${model.settings.version + 1} live locally`}
       </Button>
       <Notice tone="info" title="Publishing here means inside this workspace">
         The form answers in this browser and writes records here. There is no public address, because nothing is hosted.
