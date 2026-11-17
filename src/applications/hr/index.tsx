@@ -1251,30 +1251,55 @@ function CourseBuilder({ context, close }: { context: ScreenContext; close: () =
 
 function Quiz({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const course = useRecord(payload?.id);
+  const raw = useRecord(payload?.id);
+  const course = scopedDetailRecord(raw, context.org.id, "courses");
+  const [access, setAccess] = useState("");
+  const [reply, setReply] = useState("");
+  const [checked, setChecked] = useState(false);
+  if (payload?.id && !course) return (
+    <Empty title="Selected course unavailable">Open a company course to preview a sample knowledge check.</Empty>
+  );
+  const complete = Boolean(access && reply);
+  const correct = access === "named-approver" && reply === "human-draft";
   return (
     <Stack gap={4}>
-      <h3>{course?.title ?? "Course check"}</h3>
-      <Stack gap={3}>
-        <Field label="Who may approve an access grant?">
-          <Select defaultValue="">
+      <PeopleDialogLead eyebrow="PEOPLE / LEARNING / PREVIEW" title="Preview the knowledge check"
+        description={course ? `Sample assessment shown in the context of ${course.title}. These questions are not attached to the course content.`
+          : "A sample knowledge check demonstrating the interaction, without a saved learner result."}
+        status={<Pill tone="neutral">Preview only</Pill>} />
+      <PeopleDialogSection step="01" title="Access accountability">
+        <Field label="Who can approve a local access request?">
+          <Select value={access} onChange={(event) => { setAccess(event.target.value); setChecked(false); }}>
             <option value="">Choose an answer</option>
-            <option>Anyone whose employment status changed</option>
-            <option>A named approver, recorded on the request</option>
-            <option>The AI employee that noticed the gap</option>
+            <option value="anyone">Anyone whose employment status changed</option>
+            <option value="named-approver">A named approver on the request</option>
+            <option value="ai">An AI employee that noticed a gap</option>
           </Select>
         </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Communication control">
         <Field label="What may an AI employee do with a customer reply?">
-          <Select defaultValue="">
+          <Select value={reply} onChange={(event) => { setReply(event.target.value); setChecked(false); }}>
             <option value="">Choose an answer</option>
-            <option>Send it once it is confident</option>
-            <option>Draft it for a person to read and send</option>
-            <option>Send it if the customer has asked twice</option>
+            <option value="send-now">Send when confident</option>
+            <option value="human-draft">Draft for a person to review and send</option>
+            <option value="follow-up">Send if the customer asks twice</option>
           </Select>
         </Field>
-      </Stack>
-      <Button variant="primary" onClick={() => context.toast("Answers recorded", "The completion is recorded against your name in this browser.")}>Record my answers</Button>
-      <Notice tone="info">A quiz result is a record in this workspace, not a certificate from anybody.</Notice>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Check your selections"
+        description="The result is shown here only; nothing is submitted to a learner record.">
+        <Button variant="primary" disabled={!complete} onClick={() => setChecked(true)}>Check preview answers</Button>
+        {checked && <Notice tone={correct ? "info" : "warning"} title={correct
+          ? "Both sample answers are correct" : "Review the answer choices"}>
+          {correct ? "The preview matches the sample access and communication rules."
+            : "An access grant requires a named approver; an AI employee can draft but does not send an unchecked message."}
+          {" "}This is not an assessed completion or certificate.
+        </Notice>}
+        <Notice tone="info" title="No completion is recorded">
+          This preview has no linked assessment content or verified learner identity. Closing it will not alter course completions.
+        </Notice>
+      </PeopleDialogSection>
     </Stack>
   );
 }
