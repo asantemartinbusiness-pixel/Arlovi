@@ -1783,9 +1783,11 @@ function ImportMapper({ context, close }: { context: ScreenContext; close: () =>
 function ShareWorkbook({ context, close }: { context: ScreenContext; close: () => void }) {
   const selected = useRecord(context.selectedId);
   const workbooks = useCollection("workbooks");
-  const record = selected ?? workbooks[0];
+  const record = selected ?? (context.params.id ? workbooks.find((item) => item.id === context.params.id) : undefined);
   const members = useCollection("members");
   const [chosen, setChosen] = useState<string[]>(String(record?.fields.sharedWith ?? "").split("|").filter(Boolean));
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   if (!record) return <Empty title="Select a workbook" />;
   return (
     <form
@@ -1793,11 +1795,21 @@ function ShareWorkbook({ context, close }: { context: ScreenContext; close: () =
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await context.mutate.patch(record.id, { fields: { ...record.fields, sharedWith: chosen.join("|") } }, { expectRevision: record.revision, event: `${record.title} shared with ${chosen.join(", ") || "nobody"}` });
-        context.toast("Recorded", "The workbook lists who it is shared with. Role views shape the interface and are not an account security boundary.");
-        close();
+        if (saving) return;
+        setSaving(true);
+        setError("");
+        try {
+          await context.mutate.patch(record.id, { fields: { ...record.fields, sharedWith: chosen.join("|") } }, { expectRevision: record.revision, event: `${record.title} sharing list updated` });
+          context.toast("Sharing recorded", "The local workbook list was updated. No invitations were sent.");
+          close();
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "The workbook could not be updated.");
+        } finally { setSaving(false); }
       }}
     >
+      <div className="sx-share-summary"><strong>{record.title}</strong><p className="ds-subtle">Select the people recorded on this workbook.</p></div>
+      {error && <Notice tone="danger" title="Sharing not saved">{error}</Notice>}
+      {saving && <p className="ds-subtle">Saving sharing record…</p>}
       <div className="sx-share-summary"><strong>Recorded access list</strong><p className="ds-subtle">Existing names remain selected. Save to update this browser-local collaboration record; no invitations are sent.</p></div>
       <Stack gap={2}>
         {members.filter((member) => member.fields.kind === "human").map((member) => (
