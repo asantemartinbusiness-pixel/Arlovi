@@ -37,3 +37,54 @@ test("Documents library archive and search have distinct empty and filter reset 
   await main.getByRole("button", { name: "Clear filters" }).click();
   await expect(main.getByRole("searchbox", { name: "Search" })).toHaveValue("");
 });
+
+
+test("Document editor displays lifecycle context and routes to review and publishing", async ({ page }) => {
+  await page.goto("/o/northline/docs/files");
+  const id = await page.evaluate(async () => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    const context = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "documents", currency: "GBP",
+      title: "QA Docs Editor Lifecycle", status: "draft",
+      fields: { kind: "document", folder: "Operations", confidential: false },
+    }, context);
+    await repo.putRecord(record, context);
+    return record.id;
+  });
+  await page.goto(`/o/northline/docs/documents/${id}`);
+  const status = page.getByLabel("Document working status");
+  await expect(status).toBeVisible();
+  await expect(status).toContainText("CURRENT DOCUMENT");
+  await expect(status).toContainText("draft");
+  await status.getByRole("button", { name: "Review history" }).click();
+  await expect(page).toHaveURL(/\/review/);
+  await page.goto(`/o/northline/docs/documents/${id}`);
+  await status.getByRole("button", { name: "Publishing" }).click();
+  await expect(page).toHaveURL(/\/publish/);
+});
+
+test("Document review shows accountable readiness and toggles responsive panels", async ({ page }) => {
+  await page.goto("/o/northline/docs/files");
+  const id = await page.evaluate(async () => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    const context = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "documents", currency: "GBP",
+      title: "QA Docs Review Status", status: "draft", fields: { kind: "document", folder: "Operations" },
+    }, context);
+    await repo.putRecord(record, context);
+    return record.id;
+  });
+  await page.goto(`/o/northline/docs/documents/${id}?tab=Review`);
+  await expect(page.getByLabel("Document review readiness")).toBeVisible();
+  await expect(page.getByLabel("Document review readiness")).toContainText("does not approve or publish");
+  const outline = page.getByRole("button", { name: "Outline", exact: true });
+  await outline.click();
+  await expect(outline).toHaveAttribute("aria-pressed", "true");
+  const details = page.getByRole("button", { name: "Details", exact: true });
+  await details.click();
+  await expect(details).toHaveAttribute("aria-pressed", "true");
+});
