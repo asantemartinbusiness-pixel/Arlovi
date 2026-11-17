@@ -112,3 +112,58 @@ test("hiring records acceptance, preserves applicant history and creates no orph
     employees: 1, linked: true,
   });
 });
+
+test("onboarding starts with six complete tasks and refuses a duplicate launch", async ({ page }) => {
+  await page.goto("/o/northline/hr/onboarding");
+  const ids = await page.evaluate(async () => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Elena Voss", now: new Date().toISOString() };
+    const starter = repo.newRecord({
+      organizationId: "org-northline", collection: "employees", currency: "GBP",
+      title: "QA Onboarding Starter", status: "probation",
+      fields: { title: "Project Assistant", employment: "full-time" },
+    }, ctx);
+    const mentor = repo.newRecord({
+      organizationId: "org-northline", collection: "employees", currency: "GBP",
+      title: "QA Onboarding Mentor", status: "active",
+      fields: { title: "Senior Designer", employment: "full-time" },
+    }, ctx);
+    await repo.putMany([starter, mentor], ctx, [], "org-northline");
+    return { starter: starter.id, mentor: mentor.id };
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Launch a checklist" }).click();
+  const dialog = page.getByRole("dialog", { name: "Launch an onboarding checklist" });
+  await dialog.getByLabel("Who is starting").selectOption(ids.starter);
+  await dialog.getByLabel("Mentor").selectOption({ label: "QA Onboarding Mentor" });
+  await dialog.getByRole("button", { name: "Launch checklist" }).click();
+  await expect(dialog).toHaveCount(0);
+
+  const read = async () => page.evaluate(async (id) => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    const employee = await repo.getRecord(id);
+    const tasks = (await repo.listByCollection("org-northline", "tasks"))
+      .filter((task) => task.fields.kind === "onboarding" && task.fields.employeeId === id);
+    return {
+      launched: typeof employee?.fields.onboardingLaunchedAt === "string",
+      mentor: employee?.fields.mentor,
+      taskCount: tasks.length,
+      allLinked: tasks.every((task) => task.parentId === id),
+      waitingIT: tasks.filter((task) => task.fields.group === "IT access" && task.status === "waiting").length,
+      falselyGranted: tasks.some((task) => task.title.toLowerCase().includes("granted")),
+    };
+  }, ids.starter);
+  await expect.poll(read).toEqual({
+    launched: true, mentor: "QA Onboarding Mentor",
+    taskCount: 6, allLinked: true, waitingIT: 1, falselyGranted: false,
+  });
+
+  await page.getByRole("button", { name: "Launch a checklist" }).click();
+  const repeat = page.getByRole("dialog", { name: "Launch an onboarding checklist" });
+  await repeat.getByLabel("Who is starting").selectOption(ids.starter);
+  await repeat.getByLabel("Mentor").selectOption({ label: "QA Onboarding Mentor" });
+  await repeat.getByRole("button", { name: "Launch checklist" }).click();
+  await expect.poll(read).toMatchObject({ taskCount: 6 });
+});
