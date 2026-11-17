@@ -1635,7 +1635,6 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
             </Card>
           );
         })}
-      </Stack>
         </div>
         )}
       </Stack>
