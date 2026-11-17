@@ -753,7 +753,7 @@ function ShiftEdit({ context, close }: { context: ScreenContext; close: () => vo
 
 function Overtime({ context }: { context: ScreenContext }) {
   const data = useCollections(["shifts"]);
-  const overtime = data.shifts.filter((shift) => shift.fields.overtime === true);
+  const overtime = data.shifts.filter((shift) => shift.fields.kind === "shift" && shift.fields.overtime === true);
   return overtime.length === 0 ? <Empty title="No overtime on the roster" /> : (
     <Stack gap={2}>
       {overtime.map((shift) => (
@@ -762,10 +762,18 @@ function Overtime({ context }: { context: ScreenContext }) {
             <strong>{String(shift.fields.employeeName ?? "")}</strong>
             <p className="ds-subtle">{context.date(shift.startAt)} · {String(shift.fields.hours ?? 0)} hours</p>
           </div>
-          <Button size="sm" variant="secondary" onClick={async () => {
-            await context.mutate.patch(shift.id, { fields: { ...shift.fields, overtimeApproved: true } }, { event: `Overtime approved for ${String(shift.fields.employeeName ?? "")}` });
-            context.toast("Overtime approved", "Recorded against the shift.");
-          }}>Approve</Button>
+          {shift.fields.overtimeApproved === true ? (
+            <Pill tone="success">Approved locally</Pill>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={async () => {
+              const saved = await context.mutate.patch(shift.id, { fields: {
+                ...shift.fields, overtimeApproved: true, overtimeApprovedBy: context.actor,
+                overtimeApprovedAt: clockIso(),
+              } }, { expectRevision: shift.revision,
+                event: `Overtime reviewed for ${String(shift.fields.employeeName ?? "")} by ${context.actor}` });
+              if (saved) context.toast("Overtime recorded", "The local approval was saved. Payroll is not submitted automatically.");
+            }}>Approve</Button>
+          )}
         </Row>
       ))}
     </Stack>
