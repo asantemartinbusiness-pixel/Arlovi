@@ -85,3 +85,21 @@
   .hr-cal-day { min-height: 64px; }
   .hr-cal-chip { font-size: 10px; }
 }
+
+/* Responsive scheduling surfaces use the shared design-system tokens. */
+.hr-roster-coverage { display: block; white-space: nowrap; font-weight: 400; margin-top: 3px; }
+.hr-roster-cell { vertical-align: top; min-width: 130px; }
+.hr-roster-stack { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-2); }
+.hr-roster-cards { display: none; }
+.hr-roster-mobile-day { display: grid; grid-template-columns: minmax(92px, 0.4fr) minmax(0, 1fr); gap: var(--space-3); align-items: start; }
+.hr-roster-mobile-day + .hr-roster-mobile-day { border-top: 1px solid var(--border-default); padding-top: var(--space-3); }
+.hr-roster-mobile-day > strong { font-size: var(--text-sm); }
+
+@media (max-width: 767px) {
+  .hr-roster-table { display: none; }
+  .hr-roster-cards { display: grid; gap: var(--space-3); }
+}
+
+@media (max-width: 440px) {
+  .hr-roster-mobile-day { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+}
