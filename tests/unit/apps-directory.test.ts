@@ -3,6 +3,7 @@ import { DIRECTORY_APPS, findDirectoryApps } from "@/app/AppsDirectory";
 import { applications, appEntry, findScreen, screens } from "@/app/catalog";
 import { NAV_GROUPS } from "@/app/nav";
 import { canOpen } from "@/platform/policy";
+import { platformDestinations } from "@/app/platformDirectory";
 
 describe("the native application directory", () => {
   it("includes every registered app exactly once and retains the existing six groups", () => {
@@ -39,6 +40,32 @@ describe("the native application directory", () => {
     expect(findDirectoryApps(DIRECTORY_APPS, "studio", "Operations")).toEqual([]);
     expect(findDirectoryApps(DIRECTORY_APPS, "", "Studio").every(app => app.group === "Studio")).toBe(true);
     expect(findDirectoryApps(DIRECTORY_APPS, "zzzz-unknown-capability")).toEqual([]);
+  });
+
+  it("resolves Platform quick links without making up record IDs", () => {
+    const codes = ["WEB", "BUILD", "FORMS", "CONNECT", "IT"];
+    for (const code of codes) {
+      const routes = platformDestinations(code, "northline");
+      expect(routes.length, code).toBeGreaterThan(0);
+      for (const route of routes) {
+        expect(route.to.startsWith("/o/northline/")).toBe(true);
+        expect(route.to.includes(":")).toBe(false);
+        expect(findScreen(route.to)?.screen.applicationCode).toBe(code);
+        expect(findScreen(route.to)?.params.id).toBeUndefined();
+      }
+    }
+    expect(platformDestinations("BUILD", "northline")).toEqual([
+      { label: "Projects", to: "/o/northline/build/projects" },
+    ]);
+    expect(platformDestinations("WEB", "northline")).toHaveLength(1);
+    expect(platformDestinations("FORMS", "northline")).toHaveLength(1);
+    expect(platformDestinations("FIN", "northline")).toEqual([]);
+  });
+
+  it("finds native Platform capabilities by their registered screen titles", () => {
+    expect(findDirectoryApps(DIRECTORY_APPS, "Synchronization", "Platform").map(app => app.code)).toContain("CONNECT");
+    expect(findDirectoryApps(DIRECTORY_APPS, "Security Centre", "Platform").map(app => app.code)).toContain("IT");
+    expect(findDirectoryApps(DIRECTORY_APPS, "Form Submissions", "Platform").map(app => app.code)).toContain("FORMS");
   });
 
   it("keeps client role-view visibility distinct from identity and backend access", () => {

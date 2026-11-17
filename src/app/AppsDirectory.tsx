@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowUpRight, Bookmark, BookmarkCheck, Clock3, Search, X } from "lucide-react";
-import { applications, appEntry, findScreen } from "@/app/catalog";
+import { platformDestinations } from "@/app/platformDirectory";
+import { applications, appEntry, findScreen, screens } from "@/app/catalog";
 import { NAV_GROUPS, type AppNavEntry } from "@/app/nav";
 import { canOpen } from "@/platform/policy";
 import { useCollection, useMutations, useWorkspace } from "@/platform/workspace";
@@ -16,6 +17,11 @@ export interface DirectoryApp extends AppNavEntry {
 }
 
 const metadata = new Map(applications.map(app => [app.code, app]));
+const screenKeywords = new Map<string, string>();
+for (const screen of screens) {
+  screenKeywords.set(screen.applicationCode,
+    [screenKeywords.get(screen.applicationCode) ?? "", screen.title].join(" "));
+}
 /** One canonical directory for every registered native application. */
 export const DIRECTORY_APPS: DirectoryApp[] = NAV_GROUPS.flatMap(group =>
   group.apps.map(app => {
@@ -39,7 +45,7 @@ export function findDirectoryApps(apps: DirectoryApp[], query: string, group = "
   const tokens = normalize(query).split(" ").filter(Boolean);
   const matches = apps.filter(app => {
     if (group !== "All" && app.group !== group) return false;
-    const haystack = normalize([app.short, app.name, app.group, app.purpose, app.entities].join(" "));
+    const haystack = normalize([app.short, app.name, app.group, app.purpose, app.entities, screenKeywords.get(app.code) ?? ""].join(" "));
     return tokens.every(token => haystack.includes(token)
       || (token.length > 4 && token.endsWith("ies") && haystack.includes(token.slice(0, -3) + "y"))
       || (token.length > 4 && token.endsWith("s") && haystack.includes(token.slice(0, -1))));
@@ -58,16 +64,18 @@ export function findDirectoryApps(apps: DirectoryApp[], query: string, group = "
 }
 
 function ApplicationCard({
-  app, slug, pinned, busy, onPin,
+  app, slug, pinned, busy, onPin, platform,
 }: {
   app: DirectoryApp;
   slug: string;
   pinned: boolean;
   busy: boolean;
   onPin: (app: DirectoryApp) => void;
+  platform: boolean;
 }) {
   const Icon = app.icon;
-  return <article className="apps-directory-card">
+  const shortcuts = platform ? platformDestinations(app.code, slug) : [];
+  return <article className="apps-directory-card" data-platform={platform ? "true" : undefined}>
     <Link className="apps-directory-open" to={appEntry(app.code, slug)} aria-label={app.short}>
       <span className="apps-directory-icon"><Icon size={20} strokeWidth={1.8} aria-hidden="true" /></span>
       <span className="apps-directory-copy">
@@ -81,6 +89,13 @@ function ApplicationCard({
       disabled={busy} onClick={() => onPin(app)}>
       {pinned ? <BookmarkCheck size={17} aria-hidden="true" /> : <Bookmark size={17} aria-hidden="true" />}
     </button>
+    {shortcuts.length > 0 && <div className="apps-directory-card-foot">
+      <span className="apps-directory-card-foot-label">Work areas</span>
+      <div className="apps-directory-card-links">
+        {shortcuts.map(destination => <Link key={destination.to} to={destination.to}
+          aria-label={`${app.short}: ${destination.label}`}>{destination.label}</Link>)}
+      </div>
+    </div>}
   </article>;
 }
 
@@ -194,6 +209,17 @@ export function AppsDirectory() {
       })}
     </nav>
 
+    {group === "Platform" && !query && visible.length > 0 && (
+      <section className="apps-platform-intro" aria-label="Platform application overview">
+        <div>
+          <span className="apps-platform-kicker">PLATFORM TOOLS</span>
+          <h2>Build, connect and operate</h2>
+          <p>Open a native tool or jump straight to a work area. Project editors remain inside their real site, application or form.</p>
+        </div>
+        <span className="apps-platform-count">{visible.length} of 5 tools available in this role view</span>
+      </section>
+    )}
+
     {!query && group === "All" && (pinnedApps.length > 0 || recentApps.length > 0) && (
       <div className="apps-directory-continuity">
         {pinnedApps.length > 0 && <section className="ws-section" aria-label="Pinned applications">
@@ -231,7 +257,7 @@ export function AppsDirectory() {
             </div>
             <div className="apps-directory-grid">
               {items.map(app => <ApplicationCard key={app.code} app={app} slug={org.slug}
-                pinned={favourites.has(app.short)} busy={busyCode === app.code}
+                pinned={favourites.has(app.short)} busy={busyCode === app.code} platform={group === "Platform"}
                 onPin={item => void togglePin(item)}/>)}
             </div>
           </section>;
