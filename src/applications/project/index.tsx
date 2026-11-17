@@ -21,7 +21,7 @@ import {
 } from "./actions";
 import { getRecord } from "@/platform/repo";
 import { clockNow } from "@/platform/clock";
-import { createProjectFromTemplate, readProjectPhases, type ProjectPhase } from "./creation";
+import { createProjectFromTemplate, type ProjectPhase } from "./creation";
 
 /** On project-scoped screens the initial selection is the project itself; a task action needs a task. */
 async function withTask(context: ScreenContext, what: string, then: (task: Rec) => void): Promise<void> {
