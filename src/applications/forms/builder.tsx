@@ -29,7 +29,9 @@ const ICONS: Record<FieldType, React.ReactNode> = {
 export function useFormRecord(context: ScreenContext): { forms: Rec[]; record?: Rec; model: FormModel } {
   const forms = useCollection("forms");
   const routed = useRecord(context.params.id);
-  const record = routed?.collection === "forms" ? routed : forms[0];
+  const record = context.params.id
+    ? routed?.collection === "forms" ? routed : forms.find((item) => item.id === context.params.id)
+    : forms.find((item) => item.status !== "archived") ?? forms[0];
   const model = useMemo(() => readForm(record), [record]);
   return { forms, record, model };
 }
@@ -48,6 +50,9 @@ export function FormBuilder({ context }: { context: ScreenContext }) {
   if (!record) return <NoForm />;
   const selected = model.fields.find((field) => field.id === ui.selectedFieldId);
   const issues = logicIssues(model);
+  const answerableCount = model.fields.filter((field) => !STRUCTURAL.includes(field.type)).length;
+  const requiredCount = model.fields.filter((field) => !STRUCTURAL.includes(field.type) && field.required).length;
+  const sensitiveCount = model.fields.filter((field) => field.sensitive).length;
 
   async function write(next: FormModel, label: string) {
     await saveForm(context, record!, next, label);
@@ -220,6 +225,26 @@ export function FormBuilder({ context }: { context: ScreenContext }) {
 
   return (
     <div className="t6-shell">
+      <section className="t6-editor-overview" aria-label="Form editor overview">
+        <div className="t6-editor-overview-heading">
+          <div><span className="ds-subtle">FORMS / BUILDER</span>
+            <h2>{record.title}</h2>
+            <p className="ds-subtle">Build the questions, validate branching, preview the response experience and review publication readiness.</p>
+          </div>
+          <Row gap={2} wrap>
+            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/logic`)}>Logic</Button>
+            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/submissions`)}>Submissions</Button>
+            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/analytics`)}>Analytics</Button>
+          </Row>
+        </div>
+        <div className="t6-directory-metrics" aria-label="Form editor health">
+          <div><span>Questions</span><strong>{answerableCount}</strong></div>
+          <div><span>Required</span><strong>{requiredCount}</strong></div>
+          <div><span>Logic rules</span><strong>{model.logic.length}</strong></div>
+          <div><span>Review notes</span><strong>{issues.length + sensitiveCount}</strong></div>
+        </div>
+        {issues.some((issue) => issue.level === "fail") && <Notice tone="warning" title="Logic needs review">Resolve the failing branches before publishing. <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/logic`)}>Review logic</Button></Notice>}
+      </section>
       <div className="t6-shell-bar">
         <Toolbar label="Form builder">
           <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms`)}>All forms</Button>
