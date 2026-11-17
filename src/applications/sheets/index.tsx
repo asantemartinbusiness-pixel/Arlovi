@@ -1469,10 +1469,30 @@ function Collaboration({ context, tab }: { context: ScreenContext; tab: "Comment
   const editor = useWorkbookEditor(context, record);
   const members = useCollection("members");
   if (!record) return <Empty title="No workbook is open" icon={<FileSpreadsheet size={20} />} />;
+  const openComments = editor.workbook.comments.filter((comment) => !comment.resolved).length;
+  const collaborationOverview = (
+    <div className="sx-formula-overview">
+      <div className="sx-formula-header">
+        <span className="sx-library-eyebrow">SHEETS / COLLABORATION & VERSIONING</span>
+        <h2>A clear record of changes.</h2>
+        <p>Review comments, deliberate saved versions, local range protection and cell differences. Shared names are recorded here, but no external access is granted.</p>
+      </div>
+      <div className="sx-formula-metrics" aria-label="Workbook collaboration overview">
+        <div><span>Open comments</span><strong>{openComments}</strong><small>Awaiting review</small></div>
+        <div><span>Saved versions</span><strong>{record.history.length}</strong><small>Deliberate snapshots</small></div>
+        <div><span>Protected ranges</span><strong>{editor.workbook.protection.length}</strong><small>Local editing safeguards</small></div>
+      </div>
+      <Row gap={2} wrap>
+        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/sheets/workbooks/${record.id}`)}>Back to grid</Button>
+        <Button size="sm" variant="secondary" onClick={() => context.openOverlay("share workbook")}>Sharing list</Button>
+      </Row>
+    </div>
+  );
 
   if (tab === "History") {
     return (
       <Stack gap={4}>
+        {collaborationOverview}
         <Notice tone="info" title="Autosave does not create a version per keystroke">
           Cell edits are written with history suppressed. The list below holds deliberate saves, which is what makes restoring one meaningful.
         </Notice>
@@ -1499,6 +1519,8 @@ function Collaboration({ context, tab }: { context: ScreenContext; tab: "Comment
 
   if (tab === "Permissions") {
     return (
+      <Stack gap={4}>
+        {collaborationOverview}
       <Grid>
         <Card span={7} eyebrow="PROTECTION" prov="human" title="Protected ranges" subtitle={`${editor.workbook.protection.length} protected`}>
           {editor.workbook.protection.length === 0 ? (
@@ -1531,6 +1553,7 @@ function Collaboration({ context, tab }: { context: ScreenContext; tab: "Comment
           <Notice tone="neutral">Nobody else is connected: this workspace lives in one browser. Showing live cursors would be a fiction.</Notice>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
@@ -1550,6 +1573,7 @@ function Collaboration({ context, tab }: { context: ScreenContext; tab: "Comment
     }
     return (
       <Stack gap={4}>
+        {collaborationOverview}
         {!previous ? <Empty title="No stored version to compare against" icon={<Copy size={20} />} /> : changes.length === 0 ? (
           <Empty title="No cell differs from the last stored version" icon={<Copy size={20} />} />
         ) : (
@@ -1589,6 +1613,8 @@ function Collaboration({ context, tab }: { context: ScreenContext; tab: "Comment
 
   const comments = editor.workbook.comments;
   return (
+    <Stack gap={4}>
+      {collaborationOverview}
     <Grid>
       <Card span={8} eyebrow="REVIEW" prov="human" title="Cell comments" subtitle={`${comments.filter((comment) => !comment.resolved).length} open of ${comments.length}`}>
         {comments.length === 0 ? (
@@ -1631,6 +1657,7 @@ function Collaboration({ context, tab }: { context: ScreenContext; tab: "Comment
         ]} />
       </Card>
     </Grid>
+    </Stack>
   );
 }
 
