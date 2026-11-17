@@ -293,7 +293,8 @@ export function CampaignLibrary({ context, state }: { context: ScreenContext; st
       bulkActions={[
         {
           label: "Duplicate as draft",
-          onRun: (selected) => selected.forEach(async (campaign) => {
+          onRun: async (selected) => {
+          for (const campaign of selected) {
             const body = bodyOf<CampaignBody>(campaign, {});
             await context.mutate.create({
               collection: "campaigns",
@@ -304,16 +305,20 @@ export function CampaignLibrary({ context, state }: { context: ScreenContext; st
               fields: { ...campaign.fields, spentMinor: 0, approval: "draft", delivery: "not_connected" },
               body: { ...body, channels: (body.channels ?? []).map((channel) => ({ ...channel, spentMinor: 0, impressions: 0, clicks: 0, conversions: 0, revenueMinor: 0 })) },
             }, `Campaign ${campaign.title} duplicated as a draft`);
-            context.toast("Duplicated as draft", "Spend, results and any approval were reset. No external spend authorisation was copied.");
-          }),
+          }
+          context.toast("Duplicated as draft", `${selected.length} campaign${selected.length === 1 ? "" : "s"} copied. Spend, results and approvals were reset; no external spend authorisation was copied.`);
         },
+        }
         {
           label: "Archive",
           tone: "danger",
           disabled: (selected) => selected.some((campaign) => campaign.status === "active"),
-          onRun: (selected) => selected.forEach((campaign) => {
-            void context.mutate.patch(campaign.id, { status: "archived" }, { expectRevision: campaign.revision, event: `Campaign ${campaign.title} archived` });
-          }),
+          onRun: async (selected) => {
+            for (const campaign of selected) {
+              await context.mutate.patch(campaign.id, { status: "archived" }, { expectRevision: campaign.revision, event: `Campaign ${campaign.title} archived` });
+            }
+            context.toast("Campaigns archived", `${selected.length} campaign${selected.length === 1 ? "" : "s"} archived.`);
+          },
         },
       ]}
       summary={<span>{rows.length} of {data.campaigns.length} campaigns</span>}
