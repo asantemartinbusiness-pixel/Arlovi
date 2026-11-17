@@ -1150,11 +1150,27 @@ export function SyncCentre({ context, lens }: { context: ScreenContext; lens: "J
 export function ConnectorHealth({ context, lens }: { context: ScreenContext; lens: "Overview" | "Outages" | "Rate limits" | "Deprecations" }) {
   const incidents = useCollection("incidents");
   const [ran, setRan] = useState("");
+  const overview = <section className="connect-health-overview" aria-label="Connector health overview">
+    <div className="connect-health-head">
+      <div>
+        <span className="connect-eyebrow">INTEGRATIONS / RELIABILITY</span>
+        <h2>Separate local readiness from provider health.</h2>
+        <p>Review checks, incidents, proposed limits and contract versions. External availability cannot be measured without an authorised connection.</p>
+      </div>
+      <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>Review connections</Button>
+    </div>
+    <nav className="connect-sync-nav" aria-label="Connector health areas">
+      {(["Overview", "Outages", "Rate limits", "Deprecations"] as const).map(name =>
+        <button key={name} type="button" aria-current={lens === name ? "true" : undefined}
+          onClick={() => context.setTab(name)}>{name}</button>)}
+    </nav>
+  </section>;
 
   if (lens === "Outages") {
     const providerIncidents = incidents.filter((record) => String(record.fields.connectorId ?? ""));
     return (
       <Stack gap={4}>
+        {overview}
         <Notice tone="warning" title="A provider outage is not ours to fix or to report">
           This workspace cannot reach a provider's status page, so it never claims one is down. What it can show is incidents raised here about a connector, which is below.
         </Notice>
@@ -1179,6 +1195,7 @@ export function ConnectorHealth({ context, lens }: { context: ScreenContext; len
   if (lens === "Rate limits") {
     return (
       <Stack gap={4}>
+        {overview}
         <div className="t6-matrix-wrap">
           <table className="t6-matrix">
             <caption className="ds-sr-only">Rate limits each provider would impose</caption>
@@ -1204,6 +1221,7 @@ export function ConnectorHealth({ context, lens }: { context: ScreenContext; len
   if (lens === "Deprecations") {
     return (
       <Stack gap={4}>
+        {overview}
         <Notice tone="info" title="No provider version is being tracked">
           Tracking a deprecation means reading a provider's changelog. This workspace reads nothing external, so it would be guessing. What it does track is its own contract version, below.
         </Notice>
@@ -1224,6 +1242,7 @@ export function ConnectorHealth({ context, lens }: { context: ScreenContext; len
 
   return (
     <Stack gap={5}>
+      {overview}
       <StatRow>
         <Stat label="Connected providers" value="0" prov="posted" meta={`${CONNECTOR_ENTRIES.length} in the register, none connected`} />
         <Stat label="Calls made" value="0" prov="posted" meta="This workspace makes no network calls" />
