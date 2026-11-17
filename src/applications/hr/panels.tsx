@@ -924,7 +924,8 @@ export function Recruitment({ context, lens }: { context: ScreenContext; lens: "
   const { org } = useWorkspace();
   const [query, setQuery] = useState("");
   const [focusStage, setFocusStage] = useState("all");
-  const live = data.applicants.filter((row) => !["rejected", "withdrawn"].includes(row.status));
+  const live = data.applicants.filter((row) => !["rejected", "withdrawn"].includes(row.status))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const interviews = live.filter((row) => row.fields.stage === "interview");
   const dated = interviews.filter((row) => Number.isFinite(Date.parse(String(row.fields.interviewAt ?? ""))));
   const offers = live.filter((row) => row.fields.stage === "offer");
@@ -1104,7 +1105,7 @@ export function Recruitment({ context, lens }: { context: ScreenContext; lens: "
         {stages.map((stage) => (
           <Card key={stage} className="hr-hiring-stage" title={stage.charAt(0).toUpperCase() + stage.slice(1)} subtitle={`${visible.filter((applicant) => applicant.fields.stage === stage).length} candidates`}>
             <Stack gap={2}>
-              {live.filter((applicant) => applicant.fields.stage === stage).map((applicant) => (
+              {visible.filter((applicant) => applicant.fields.stage === stage).map((applicant) => (
                 <button
                   key={applicant.id}
                   type="button"
@@ -1119,7 +1120,7 @@ export function Recruitment({ context, lens }: { context: ScreenContext; lens: "
                   <span className="ds-subtle">{String(applicant.fields.role ?? "")}</span>
                 </button>
               ))}
-              {live.filter((applicant) => applicant.fields.stage === stage).length === 0 && <span className="ds-subtle">Empty</span>}
+              {visible.filter((applicant) => applicant.fields.stage === stage).length === 0 && <span className="ds-subtle">Empty</span>}
             </Stack>
           </Card>
         ))}
