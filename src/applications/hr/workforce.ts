@@ -43,7 +43,7 @@ function validHours(hours: number): number {
   return hours;
 }
 
-function revisionPlan(records: Rec[], original: Rec[], ctx: WorkforceContext, messages: string[],
+function revisionPlan(records: Rec[], original: Rec[], messages: string[],
   readOnly: Rec[] = []): WorkforcePlan {
   if (records.length !== original.length || records.length !== messages.length) {
     throw new Error("The workforce decision plan is incomplete.");
@@ -88,7 +88,7 @@ export function planShiftMove(
   });
   assertRosterIntegrity({ organizationId: ctx.organizationId, changes: [next],
     roster, employees, approvedLeave, projects });
-  return revisionPlan([next], [shift], ctx,
+  return revisionPlan([next], [shift],
     ["Shift scheduled for " + person.title + " by " + ctx.actor],
     [person, ...(project ? [project] : [])]);
 }
@@ -118,7 +118,7 @@ export function planShiftSwap(
   });
   assertRosterIntegrity({ organizationId: ctx.organizationId, changes: [nextA, nextB],
     roster, employees, approvedLeave: leave, projects });
-  return revisionPlan([nextA, nextB], [a, b], ctx,
+  return revisionPlan([nextA, nextB], [a, b],
     ["Shift swapped to " + employeeB.title + " by " + ctx.actor,
       "Shift swapped to " + employeeA.title + " by " + ctx.actor],
     [employeeA, employeeB]);
@@ -155,7 +155,7 @@ export function planTimesheetApprovals(
       fields: { ...entry.fields, approved: true, approvedBy: ctx.actor, approvedAt: ctx.now },
     }));
   }
-  return revisionPlan(updated, requested, ctx,
+  return revisionPlan(updated, requested,
     requested.map((row) => "Time entry of " + String(row.fields.hours) + "h approved by " + ctx.actor),
     [...readOnly.values()]);
 }
