@@ -7,7 +7,9 @@ test("display scaling saves and restores global preference", async ({ page }) =>
   const dialog = page.getByRole("dialog", { name: "Display & scaling" });
   await expect(dialog).toBeVisible();
   const slider = dialog.getByRole("slider", { name: "Interface scale" });
-  await slider.evaluate((node: HTMLInputElement) => { node.value = "125"; node.dispatchEvent(new Event("input", { bubbles: true })); node.dispatchEvent(new Event("change", { bubbles: true })); });
+  await slider.focus();
+  await slider.press("Home");
+  for (let step = 0; step < 10; step++) await slider.press("ArrowRight");
   await expect(dialog.locator("output")).toHaveText("125%");
   await expect.poll(() => page.locator("html").evaluate(el => getComputedStyle(el).getPropertyValue("--interface-scale").trim())).toBe("1.25");
   await dialog.getByText("Compact", { exact: true }).click();
