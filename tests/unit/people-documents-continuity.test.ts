@@ -3,18 +3,28 @@ import type { Rec } from "@/domain/types";
 import { linkedPersonnelDocuments, scopedDetailRecord } from "@/platform/recordScope";
 
 const organization = "org-northline";
+const at = "2026-11-16T09:00:00Z";
+function record(id: string, collection: string, org: string, overrides: Partial<Rec> = {}): Rec {
+  return {
+    id, collection, organizationId: org, title: id, status: "active",
+    ownerName: "QA", summary: "", currency: "GBP", tags: [], fields: {},
+    createdAt: at, updatedAt: at, revision: 1, createdBy: "QA",
+    updatedBy: "QA", history: [], ...overrides,
+  };
+}
 const person = (id: string, collection: "employees" | "applicants" = "employees", org = organization) =>
-  ({ id, collection, organizationId: org } as Rec);
+  record(id, collection, org);
 const document = (id: string, options: {
   org?: string; parentId?: string; employeeId?: string; applicantId?: string;
   status?: string; title?: string; updatedAt?: string;
-} = {}) => ({
-  id, collection: "documents", organizationId: options.org ?? organization,
+} = {}) => record(id, "documents", options.org ?? organization, {
   parentId: options.parentId, title: options.title ?? id,
-  status: options.status ?? "filed",
-  updatedAt: options.updatedAt ?? "2026-11-16T09:00:00Z",
-  fields: { employeeId: options.employeeId, applicantId: options.applicantId },
-} as Rec);
+  status: options.status ?? "filed", updatedAt: options.updatedAt ?? at,
+  fields: {
+    ...(options.employeeId ? { employeeId: options.employeeId } : {}),
+    ...(options.applicantId ? { applicantId: options.applicantId } : {}),
+  },
+});
 
 describe("People and Documents record continuity", () => {
   it("never substitutes a missing, foreign or wrong-collection record for a detail route", () => {
