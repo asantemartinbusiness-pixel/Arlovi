@@ -2966,26 +2966,42 @@ function ApproveDocument({ context, close }: { context: ScreenContext; close: ()
   const record = useDocument(context);
   const editor = useDocEditor(context, record);
   const [note, setNote] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   if (!record) return <Empty title="No document is open" />;
   const mandatoryOpen = editor.model.comments.filter((comment) => comment.mandatory && !comment.resolved);
   const approvals = record.fields.approvals ? String(record.fields.approvals).split("|").filter(Boolean) : [];
+  const pendingChanges = openSuggestions(editor.model);
+  const blocked = mandatoryOpen.length > 0 || pendingChanges.length > 0 || record.status === "published" || !context.can("edit_knowledge");
   return (
     <form
       id="docs-approve"
       className="ds-stack ds-gap-3"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (mandatoryOpen.length > 0) return;
-        await editor.saveNow();
-        const fresh = await import("@/platform/repo").then((module) => module.getRecord(record.id));
-        await context.mutate.patch(record.id, {
-          status: "published",
-          fields: { ...(fresh ?? record).fields, approvals: [...approvals, `${context.actor} ${context.now.toISOString()}${note.trim() ? ` ${note.trim()}` : ""}`].join("|") },
-        }, { expectRevision: (fresh ?? record).revision, event: `${record.title} approved by ${context.actor}` });
-        context.toast("Approved", `${record.title} is approved by ${context.actor} and published in this workspace.`);
-        close();
+        if (blocked || !confirmed || saving) return;
+        setSaving(true);
+        setError("");
+        try {
+          await editor.saveNow();
+          const fresh = await import("@/platform/repo").then((module) => module.getRecord(record.id));
+          if (!fresh || fresh.organizationId !== context.org.id || fresh.collection !== "documents") throw new Error("The document is no longer available in this workspace.");
+          if (fresh.status === "published") throw new Error("This document has already been published.");
+          await context.mutate.patch(record.id, {
+            status: "published",
+            fields: { ...fresh.fields, approvals: [...approvals, `${context.actor} ${context.now.toISOString()}${note.trim() ? ` ${note.trim()}` : ""}`].join("|") },
+          }, { expectRevision: fresh.revision, event: `${record.title} approved by ${context.actor}` });
+          context.toast("Approved in Arlovi", `${record.title} is published in this local workspace. No external distribution was performed.`);
+          close();
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "The approval could not be recorded.");
+        } finally {
+          setSaving(false);
+        }
       }}
     >
+      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENT REVIEW / HUMAN DECISION</span><h3>Approve and publish locally</h3><p>Inspect outstanding changes and mandatory review comments before accepting responsibility for publication.</p></div>
       {mandatoryOpen.length > 0 ? (
         <Notice tone="danger" title={`${mandatoryOpen.length} mandatory review${mandatoryOpen.length === 1 ? " is" : "s are"} still open`}>
           Approval is blocked until each “must resolve” comment is resolved, so a reviewer's objection is never erased by an approval. {mandatoryOpen.map((comment) => `${comment.author}: “${comment.body.slice(0, 60)}”`).join(" · ")}
@@ -2993,8 +3009,15 @@ function ApproveDocument({ context, close }: { context: ScreenContext; close: ()
       ) : (
         <Notice tone="info" title="Approving publishes the document in this workspace">The approval records who approved and when. Nothing is sent outside this browser.</Notice>
       )}
-      <Properties rows={[{ label: "Status now", value: record.status.replace("_", " ") }, { label: "Earlier approvals", value: String(approvals.length) }, { label: "Open tracked changes", value: String(openSuggestions(editor.model).length) }]} />
-      <Field label="Note"><TextInput value={note} onChange={(event) => setNote(event.target.value)} disabled={mandatoryOpen.length > 0} placeholder="Approved for the trade launch" /></Field>
+      {pendingChanges.length > 0 && <Notice tone="danger" title={`${pendingChanges.length} tracked change${pendingChanges.length === 1 ? "" : "s"} awaiting a decision`}>Accept or reject the pending suggestions before publication. The approval cannot silently resolve proposed edits.</Notice>}
+      {record.status === "published" && <Notice tone="warning" title="Already published">A new version needs a separate review rather than a duplicate approval.</Notice>}
+      <Properties rows={[{ label: "Status now", value: record.status.replace("_", " ") }, { label: "Earlier approvals", value: String(approvals.length) }, { label: "Open tracked changes", value: String(pendingChanges.length) }, { label: "Open mandatory comments", value: String(mandatoryOpen.length) }, { label: "Approver", value: context.actor }]} />
+      <Field label="Note"><TextInput value={note} onChange={(event) => setNote(event.target.value)} disabled={blocked || saving} placeholder="Approved for the trade launch" /></Field>
+      <Checkbox label="I have reviewed this version and confirm the document is ready to publish in Arlovi." checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+      {!context.can("edit_knowledge") && <Notice tone="warning" title="Insufficient role permissions">Your current role cannot record document approvals.</Notice>}
+      {error && <Notice tone="danger" title="Approval not saved">{error}</Notice>}
+      {saving && <p className="ds-subtle">Recording the approval…</p>}
+      <p className="ds-subtle">The dialog’s Approve action is only valid after acknowledgement and resolution of all mandatory comments and tracked changes.</p>
     </form>
   );
 }
