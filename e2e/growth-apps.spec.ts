@@ -18,6 +18,9 @@ test("Growth directory exposes five apps and registered work-area shortcuts", as
   const sidebar = page.getByRole("navigation", { name: "Commerce navigation" });
   await expect(sidebar.getByRole("link", { name: "All applications" }))
     .toHaveAttribute("href", "/o/northline/workspace/apps?category=Growth");
+  // Tablet/mobile sidebar is a drawer; make it visible before interacting.
+  const openNavigation = page.getByRole("button", { name: "Open navigation" });
+  if (await openNavigation.isVisible()) await openNavigation.click();
   await sidebar.getByText("Other Growth apps").click();
   await expect(sidebar.getByRole("link", { name: "Marketing" })).toBeVisible();
   await sidebar.getByRole("link", { name: "Marketing" }).click();
