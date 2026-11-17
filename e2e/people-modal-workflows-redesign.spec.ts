@@ -302,3 +302,22 @@ test("Employee job tab shows prior record history without sensitive field snapsh
   await expect(page.locator("#main").getByRole("heading", { name: "Employment record history" })).toBeVisible();
   await expect(page.locator("#main")).toContainText("This shows locally saved record snapshots");
 });
+
+
+test("Access request requires a named reviewer and written reason", async ({ page }) => {
+  await page.goto("/o/northline/hr/employees");
+  const id = await page.evaluate(async () => {
+    const repo = await import("../src/platform/repo");
+    return (await repo.listByCollection("org-northline", "employees")).find((row) => row.status !== "alumni")?.id;
+  });
+  expect(id).toBeTruthy();
+  await page.goto(`/o/northline/hr/employees/${id}?tab=Access`);
+  await page.locator("#main").getByRole("button", { name: "Request access" }).first().click();
+  const modal = page.getByRole("dialog");
+  await expect(modal.getByRole("heading", { name: "Request an access review" })).toBeVisible();
+  await expect(modal.locator(".hr-dialog-section")).toHaveCount(3);
+  await expect(modal).toContainText("No connected identity provider");
+  await expect(modal.getByText("Responsible reviewer")).toBeVisible();
+  await expect(modal.getByText("Business reason")).toBeVisible();
+});
+
