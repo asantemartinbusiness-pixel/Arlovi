@@ -156,9 +156,19 @@ export function FormRuntime({
       onSubmit={async (event) => {
         event.preventDefault();
         const found = validate(model, answers);
-        setErrors(found);
-        if (found.length > 0) return;
+        const currentIds = new Set(current.map((field) => field.id));
+        const currentErrors = last ? found : found.filter((error) => currentIds.has(error.fieldId));
+        setErrors(currentErrors);
+        if (currentErrors.length > 0) return;
         if (!last) { setPage((value) => value + 1); return; }
+        if (found.length > 0) {
+          const firstInvalidPage = pageList.findIndex((fields) => fields.some((field) => found.some((error) => error.fieldId === field.id)));
+          if (firstInvalidPage >= 0) {
+            setPage(firstInvalidPage);
+            setErrors(found.filter((error) => pageList[firstInvalidPage].some((field) => field.id === error.fieldId)));
+          }
+          return;
+        }
         if (mode === "preview") { setDone("preview"); return; }
         setBusy(true);
         try {
@@ -190,7 +200,7 @@ export function FormRuntime({
         <div>
           <h2>{record.title}</h2>
           {record.summary && <p className="ds-subtle">{record.summary}</p>}
-          {pageList.length > 1 && <p className="ds-subtle">Page {page + 1} of {pageList.length}</p>}
+          {pageList.length > 1 && <p className="ds-subtle" role="status" aria-live="polite">Page {page + 1} of {pageList.length}</p>}
         </div>
 
         {current.length === 0 && <Notice tone="neutral" title="No questions on this page">Add a field in the builder.</Notice>}
@@ -227,7 +237,7 @@ export function FormRuntime({
         )}
 
         <div className="ds-row ds-gap-2">
-          {page > 0 && <Button variant="ghost" onClick={() => setPage((value) => value - 1)}>Back</Button>}
+          {page > 0 && <Button type="button" variant="ghost" onClick={() => { setErrors([]); setPage((value) => value - 1); }}>Back</Button>}
           <Button type="submit" variant="primary" busy={busy}>
             {last ? (mode === "live" ? "Submit" : "Check the answers") : "Next"}
           </Button>
