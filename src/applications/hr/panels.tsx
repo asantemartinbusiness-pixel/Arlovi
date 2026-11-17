@@ -2940,6 +2940,7 @@ export function LeaveForm({ context, close }: { context: ScreenContext; close: (
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
+        if (saving) return;
         if (!validDates || backwards || !validDuration || !employee) {
           context.toast("Leave request not saved", "Choose a current employee and valid dates in chronological order.", "blocked");
           return;
@@ -3026,6 +3027,9 @@ export function LeaveForm({ context, close }: { context: ScreenContext; close: (
 export function LeaveApproval({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const data = useCollections(["leaveRequests", "employees"]);
+  const [reviewed, setReviewed] = useState(false);
+  const [deciding, setDeciding] = useState(false);
+  const [error, setError] = useState("");
   const pending = data.leaveRequests.filter((request) => request.status === "requested");
   const explicitId = payload?.id ?? context.selectedId;
   const chosen = explicitId
@@ -3041,10 +3045,12 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
   const annual = String(chosen.fields.type ?? "annual") === "annual";
   const canApprove = context.can("edit_people");
   const decision = async (next: "approved" | "declined") => {
-    if (!canApprove) {
+    if (!canApprove || !reviewed || deciding) {
       context.toast("Decision unavailable", "Your current role view cannot decide leave requests.", "blocked");
       return;
     }
+    setDeciding(true);
+    setError("");
     try {
       const plan = planLeaveDecision({
         organizationId: context.org.id, currency: context.org.currency,
@@ -3056,12 +3062,20 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
           ? "The annual balance and request were recorded together in one revision-checked decision."
           : `The ${next} decision and responsible reviewer were recorded locally.`);
       context.closeOverlay();
-    } catch (error) {
-      context.toast("Decision not saved", error instanceof Error ? error.message : "Reload the request before deciding.", "blocked");
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Reload the request before deciding.";
+      setError(message);
+      context.toast("Decision not saved", message, "blocked");
+    } finally {
+      setDeciding(false);
     }
   };
   return (
     <Stack gap={4}>
+      <PeopleDialogLead eyebrow="PEOPLE / LEAVE DECISION" title="Review a leave request"
+        description="Confirm the applicant, dates, available evidence and your responsibility before recording a decision."
+        status={<Pill tone="warning">Decision required</Pill>} />
+      <PeopleDialogSection step="01" title="Request identity and dates">
       <Row gap={3}>
         <Avatar name={leavePerson(chosen, data.employees)} size="lg" />
         <div className="ds-grow">
@@ -3072,6 +3086,8 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
         <Pill tone="warning">Requested</Pill>
       </Row>
       <p>{chosen.summary || "No request note recorded."}</p>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Available balance and decision evidence" description="Check the entitlement and roster before deciding.">
       <Properties rows={[
         { label: "Requested", value: context.relative(chosen.at) },
         { label: "Assigned approver", value: String(chosen.fields.approver ?? "Not recorded") },
@@ -3084,13 +3100,19 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
       {!canApprove && <Notice tone="warning" title="Human reviewer role required">
         The current role view cannot approve or decline a request. Review it from an authorised People role.
       </Notice>}
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Human decision" description="Approval or decline is an accountable local record.">
+      <Checkbox checked={reviewed} onChange={(event) => setReviewed(event.target.checked)}
+        label={`I, ${context.actor}, reviewed this request, recorded balance and available coverage evidence.`} />
+      {error && <Notice tone="danger" title="Decision could not be saved">{error}</Notice>}
       <Row gap={2} wrap>
-        <Button variant="primary" disabled={!canApprove} onClick={() => decision("approved")}>Approve</Button>
-        <Button variant="outline-danger" disabled={!canApprove} onClick={() => decision("declined")}>Decline</Button>
+        <Button variant="primary" disabled={!canApprove || !reviewed || deciding} onClick={() => decision("approved")}>{deciding ? "Saving…" : "Approve"}</Button>
+        <Button variant="outline-danger" disabled={!canApprove || !reviewed || deciding} onClick={() => decision("declined")}>Decline</Button>
         <span className="ds-grow" />
         <Button variant="secondary" onClick={() => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/hr/scheduling?tab=Roster`); }}>Check roster</Button>
       </Row>
       <Notice tone="info">This records a local review. The request and employee balance are updated atomically; no external calendar or payroll provider is connected.</Notice>
+      </PeopleDialogSection>
     </Stack>
   );
 }
