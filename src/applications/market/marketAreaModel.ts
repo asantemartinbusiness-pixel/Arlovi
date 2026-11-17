@@ -3,13 +3,7 @@ import type { CampaignBody } from "./data";
 
 export type MarketingArea = "calendar" | "social" | "email" | "audiences";
 
-export function marketAreaCounts(area: MarketingArea, data: {
-  socialPosts: Rec[];
-  campaigns: Rec[];
-  audiences: Rec[];
-  contacts: Rec[];
-  templates: Rec[];
-}) {
+export function marketAreaCounts(area: MarketingArea, data: Record<string, Rec[]>) {
   if (area === "calendar") return [
     { label: "Dated content", count: data.socialPosts.filter(post => Boolean(post.startAt)).length },
     { label: "Queued locally", count: data.socialPosts.filter(post => post.status === "scheduled").length },
