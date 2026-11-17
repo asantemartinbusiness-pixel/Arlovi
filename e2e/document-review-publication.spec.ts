@@ -29,10 +29,11 @@ test("a document cannot publish with unresolved mandatory reviews or tracked cha
   await page.goto(`/o/northline/docs/documents/${id}/publish`);
   await page.getByRole("tab", { name: "Publish", exact: true }).click();
   const main = page.locator("#main");
-  await expect(main.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
-  await expect(main).toContainText("Review required before publishing");
-  await expect(main).toContainText("mandatory review comment");
-  await expect(main).toContainText("tracked change");
+  const review = main.getByRole("button", { name: "Review and publish…" });
+  await expect(review).toBeDisabled();
+  await expect(main).toContainText("Open comments");
+  await expect(main).toContainText("Open changes");
+  await expect(main).toContainText("Resolve mandatory comments and decide tracked changes");
 
   await page.evaluate(async (recordId) => {
     const repoPath = "/src/platform/repo.ts";
@@ -54,8 +55,13 @@ test("a document cannot publish with unresolved mandatory reviews or tracked cha
   }, id);
   await page.reload();
   await page.getByRole("tab", { name: "Publish", exact: true }).click();
-  await expect(main.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
-  await main.getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(review).toBeEnabled();
+  await review.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Approve and publish locally" })).toBeVisible();
+  await expect(dialog).toContainText("Approver");
+  await dialog.getByRole("checkbox", { name: /reviewed this version and confirm/ }).check();
+  await dialog.getByRole("button", { name: "Approve", exact: true }).click();
   await expect.poll(async () => page.evaluate(async (recordId) => {
     const repoPath = "/src/platform/repo.ts";
     const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
