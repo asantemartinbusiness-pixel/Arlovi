@@ -26,8 +26,11 @@ test("leave approval is atomic and only charges the correct employee's annual al
   await page.reload();
   await page.getByRole("tab", { name: "Approvals", exact: true }).click();
   const card = page.locator("#main .ds-card").filter({ hasText: "QA Annual Leave Employee" }).first();
-  await expect(card.getByRole("button", { name: "Approve", exact: true })).toBeVisible();
-  await card.getByRole("button", { name: "Approve", exact: true }).click();
+  await expect(card.getByRole("button", { name: "Review decision", exact: true })).toBeVisible();
+  await card.getByRole("button", { name: "Review decision", exact: true }).click();
+  const decision = page.getByRole("dialog", { name: "Review leave decision" });
+  await decision.getByRole("checkbox", { name: /reviewed this request/ }).check();
+  await decision.getByRole("button", { name: "Approve", exact: true }).click();
   await expect.poll(async () => page.evaluate(async (ids) => {
     const repoPath = "/src/platform/repo.ts";
     const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
