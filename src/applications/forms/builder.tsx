@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { DragEndEvent } from "@dnd-kit/core";
 import {
   AlignLeft, Calendar, CheckSquare, ChevronsUpDown, FileText, Hash, Heading, ListChecks,
@@ -287,9 +287,15 @@ export function FieldInspector({
   field, model, onEdit, onRemove,
 }: { field: FormField; model: FormModel; onEdit: (patch: Partial<FormField>) => void; onRemove?: () => void }) {
   const governed = model.logic.filter((rule) => rule.targetId === field.id);
+  const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
+  const confirmingRemoval = pendingRemovalId === field.id;
   return (
     <Stack gap={3}>
-      <Row gap={2}><strong className="ds-grow">{FIELD_LABELS[field.type]}</strong><Pill tone="neutral">{field.id}</Pill></Row>
+      <div className="t6-field-context" aria-label="Selected field context">
+        <span className="ds-subtle">FORM BUILDER / FIELD SETTINGS</span>
+        <Row gap={2} wrap><strong className="ds-grow">{field.label || "Untitled field"}</strong><Pill tone="neutral">{FIELD_LABELS[field.type]}</Pill></Row>
+        <p className="ds-subtle">{STRUCTURAL.includes(field.type) ? "This element structures the form; it does not collect an answer." : `Question ${model.fields.findIndex((item) => item.id === field.id) + 1} of ${model.fields.length} · ${field.required ? "Required" : "Optional"} · ${governed.length} conditional rules`}</p>
+      </div>
       <Field label={field.type === "section" ? "Heading" : "Question"} required>
         <TextInput value={field.label} onChange={(event) => onEdit({ label: event.target.value })} />
       </Field>
@@ -302,7 +308,7 @@ export function FieldInspector({
             <Select value={field.type} onChange={(event) => {
               const type = event.target.value as FieldType;
               const fresh = makeField(type);
-              onEdit({ type, options: fresh.options.length ? fresh.options : field.options, pattern: fresh.pattern, min: fresh.min, max: fresh.max, maxLength: fresh.maxLength });
+              onEdit({ type, options: type === "select" || type === "multiselect" ? (field.options.length ? field.options : fresh.options) : [], pattern: fresh.pattern, min: fresh.min, max: fresh.max, maxLength: fresh.maxLength });
             }}>
               {FIELD_TYPES.map((type) => <option key={type} value={type}>{FIELD_LABELS[type]}</option>)}
             </Select>
@@ -349,7 +355,15 @@ export function FieldInspector({
           {governed.map((rule) => `${rule.action} when ${model.fields.find((item) => item.id === rule.whenFieldId)?.label ?? "a missing field"} ${rule.operator.replace("_", " ")} ${rule.value}`).join("; ")}
         </Notice>
       )}
-      {onRemove && <Button size="sm" variant="outline-danger" onClick={onRemove}>Remove this field</Button>}
+      {onRemove && (confirmingRemoval ? (
+        <Notice tone="warning" title="Remove this field?">
+          This removes the question from the form. Check conditional rules that use it; those references may require repair.
+          <Row gap={2} wrap>
+            <Button size="sm" variant="outline-danger" onClick={() => { setPendingRemovalId(null); onRemove(); }}>Confirm removal</Button>
+            <Button size="sm" variant="secondary" onClick={() => setPendingRemovalId(null)}>Cancel</Button>
+          </Row>
+        </Notice>
+      ) : <Button size="sm" variant="outline-danger" onClick={() => setPendingRemovalId(field.id)}>Remove this field</Button>)}
     </Stack>
   );
 }
