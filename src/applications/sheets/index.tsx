@@ -1720,7 +1720,7 @@ function ShareWorkbook({ context, close }: { context: ScreenContext; close: () =
   const workbooks = useCollection("workbooks");
   const record = selected ?? workbooks[0];
   const members = useCollection("members");
-  const [chosen, setChosen] = useState<string[]>([]);
+  const [chosen, setChosen] = useState<string[]>(String(record?.fields.sharedWith ?? "").split("|").filter(Boolean));
   if (!record) return <Empty title="Select a workbook" />;
   return (
     <form
@@ -1733,6 +1733,7 @@ function ShareWorkbook({ context, close }: { context: ScreenContext; close: () =
         close();
       }}
     >
+      <div className="sx-share-summary"><strong>Recorded access list</strong><p className="ds-subtle">Existing names remain selected. Save to update this browser-local collaboration record; no invitations are sent.</p></div>
       <Stack gap={2}>
         {members.filter((member) => member.fields.kind === "human").map((member) => (
           <Checkbox
@@ -1743,7 +1744,7 @@ function ShareWorkbook({ context, close }: { context: ScreenContext; close: () =
           />
         ))}
       </Stack>
-      <Notice tone="neutral">Everything stays in this browser, so sharing is a record of intent rather than a transfer.</Notice>
+      <Notice tone="neutral">Everything stays in this browser, so sharing is a record of intent rather than a transfer or verified external permission.</Notice>
     </form>
   );
 }
