@@ -7,6 +7,7 @@ import type { Rec } from "@/domain/types";
 import { computePayroll } from "./panels";
 import { RoleViewNote, leaveBalance } from "./kit";
 import { recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
+import { scopedDetailRecord } from "@/platform/recordScope";
 export { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 import { Boundary, askFirst, boundaryText, logBoundary, pickRecord, recordOf } from "./opsKit";
 
@@ -90,9 +91,10 @@ export function DirectoryFilter({ context, close }: { context: ScreenContext; cl
 /* ---------------- ARL-HR-003 · Update profile ---------------- */
 
 export function ProfileEditor({ context, close }: { context: ScreenContext; close: () => void }) {
-  const employee = useRecord(context.params.id);
+  const candidate = useRecord(context.params.id);
+  const employee = scopedDetailRecord(candidate, context.org.id, "employees");
   const data = useCollections(["departments", "employees"]);
-  if (!employee) return <Empty title="Open an employee first" />;
+  if (!employee) return <Empty title="Employee unavailable">Open an employee from the directory before editing.</Empty>;
   return (
     <form
       id="hr-profile"
@@ -209,11 +211,12 @@ export function ScheduleInterview({ context, close }: { context: ScreenContext; 
 const STAGES = ["applied", "screen", "interview", "offer", "hired", "rejected"];
 
 export function StageDecision({ context, close }: { context: ScreenContext; close: () => void }) {
-  const applicant = useRecord(context.params.id ?? context.selectedId);
+  const candidate = useRecord(context.params.id ?? context.selectedId);
+  const applicant = scopedDetailRecord(candidate, context.org.id, "applicants");
   const employees = useCollection("employees");
   const [stage, setStage] = useState("");
   const [reason, setReason] = useState("");
-  if (!applicant) return <Empty title="Open an applicant first" />;
+  if (!applicant) return <Empty title="Candidate unavailable">Open a valid candidate record before recording a hiring decision.</Empty>;
   const scored = applicant.fields.rating !== undefined && Number(applicant.fields.rating) > 0;
   const needsScore = (stage === "offer" || stage === "rejected") && !scored;
   const offerIssued = applicant.fields.offerIssuedBy !== undefined && String(applicant.fields.offerIssuedBy) !== "";
@@ -293,9 +296,10 @@ export function StageDecision({ context, close }: { context: ScreenContext; clos
 }
 
 export function ApplicantMessage({ context, close }: { context: ScreenContext; close: () => void }) {
-  const applicant = useRecord(context.params.id ?? context.selectedId);
+  const candidate = useRecord(context.params.id ?? context.selectedId);
+  const applicant = scopedDetailRecord(candidate, context.org.id, "applicants");
   const thread = useCollection("emailThreads").filter((row) => row.parentId === applicant?.id);
-  if (!applicant) return <Empty title="Open an applicant first" />;
+  if (!applicant) return <Empty title="Candidate unavailable">Open a valid candidate before drafting a message.</Empty>;
   const consent = String(applicant.fields.consentUntil ?? applicant.fields.retainUntil ?? "");
   const lapsed = consent !== "" && new Date(consent) < context.now;
   return (
