@@ -325,12 +325,17 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
           <Button size="sm" variant="secondary" onClick={() => context.openOverlay("add component")}>Add component</Button>
           <Button size="sm" variant="ghost" disabled={!ui.componentId} title={ui.componentId ? undefined : "Select a component first"} onClick={() => context.openOverlay("edit styles")}>Edit styles</Button>
           <Button size="sm" variant="primary" onClick={async () => {
-            const name = `Screen ${model.screens.length + 1}`;
-            await write({
-              ...model,
-              screens: [...model.screens, { id: `sc-${wallMs().toString(36)}`, name, route: `/screen-${model.screens.length + 1}`, components: [] }],
-            }, `Screen ${name} added`);
-            context.toast("Screen added", `${name} is in the screen list.`);
+            const number = model.screens.length + 1;
+            const name = `Screen ${number}`;
+            const existingRoutes = new Set(model.screens.map((item) => item.route));
+            let candidate = number;
+            while (existingRoutes.has(`/screen-${candidate}`)) candidate += 1;
+            const newScreen = { id: `sc-${wallMs().toString(36)}`, name, route: `/screen-${candidate}`, components: [] };
+            await write({ ...model, screens: [...model.screens, newScreen] }, `Screen ${name} added`);
+            ui.setScreen(newScreen.id);
+            ui.selectComponent("");
+            context.setTab("Design");
+            context.toast("Screen added", `${name} is selected and ready for components.`);
           }}>New screen</Button>
         </Row>
       </div>
