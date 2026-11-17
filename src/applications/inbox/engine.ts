@@ -157,7 +157,9 @@ export function useInboxData(): InboxData {
         resolved: item.resolved || bool(state?.fields.resolved),
         snoozedUntil,
         snoozed: Boolean(snoozedUntil && new Date(snoozedUntil) > now),
-        assignee: text(record?.fields.assignee) ?? text(state?.fields.assignee),
+        assignee: item.kind === "assignment" && item.assignee
+          ? item.assignee
+          : text(record?.fields.assignee) ?? text(state?.fields.assignee) ?? item.assignee,
         record,
         state,
       };
