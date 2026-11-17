@@ -20,6 +20,7 @@ import {
 } from "./actions";
 import { listByCollection } from "@/platform/repo";
 import { planOnboardingLaunch } from "./decisions";
+import { planShiftMove } from "./workforce";
 import { scopedDetailRecord } from "@/platform/recordScope";
 
 function payrollRecords(context: ScreenContext, collection: string) {
@@ -682,9 +683,12 @@ function BalanceExplainer({ context: _context }: { context: ScreenContext }) {
 
 function ShiftEdit({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const shift = useRecord(payload?.id ?? context.selectedId);
-  const data = useCollections(["employees", "shifts"]);
-  if (!shift) return <Empty title="Select a shift" icon={<CalendarDays size={20} />} />;
+  const candidate = useRecord(payload?.id ?? context.selectedId);
+  const data = useCollections(["employees", "shifts", "leaveRequests", "projects"]);
+  const shift = scopedDetailRecord(candidate, context.org.id, "shifts");
+  if (!shift || shift.fields.kind !== "shift") {
+    return <Empty title="Shift unavailable" icon={<CalendarDays size={20} />}>Choose a roster shift in this company before editing.</Empty>;
+  }
   return (
     <form
       id="hr-shift"
@@ -694,44 +698,55 @@ function ShiftEdit({ context, close }: { context: ScreenContext; close: () => vo
         const form = new FormData(event.currentTarget);
         const employeeId = String(form.get("employee") ?? "");
         const employee = data.employees.find((row) => row.id === employeeId);
-        const hours = Number(form.get("hours") ?? 8);
         const day = String(form.get("day") ?? "");
         const time = String(form.get("time") ?? "");
-        const startAt = day && time ? new Date(`${day}T${time}:00.000Z`) : shift.startAt ? new Date(shift.startAt) : clockNow();
-        const endAt = new Date(startAt.getTime() + hours * 3_600_000);
-        const clash = data.shifts.find((row) => row.id !== shift.id && row.fields.kind === "shift" && row.fields.employeeId === employeeId && row.startAt && row.endAt && new Date(row.startAt) < endAt && new Date(row.endAt) > startAt);
-        if (clash) { context.toast("Shift not moved", `${employee?.title ?? "That person"} already works ${context.dateTime(clash.startAt)}. Nothing changed.`, "blocked"); return; }
-        const moved = shift.startAt !== startAt.toISOString();
-        await context.mutate.patch(shift.id, {
-          title: `${String(form.get("place") ?? "")} · ${(employee?.title ?? "").split(" ")[0]}`,
-          startAt: startAt.toISOString(),
-          endAt: endAt.toISOString(),
-          fields: { ...shift.fields, employeeId, employeeName: employee?.title ?? "", place: String(form.get("place") ?? ""), hours, overtime: hours > 8, timezone: context.org.timezone },
-        }, { expectRevision: shift.revision, event: moved ? `Shift moved to ${startAt.toISOString()} for ${employee?.title ?? "another person"} by ${context.actor}` : `Shift reassigned to ${employee?.title ?? "another person"}` });
-        context.toast(moved ? "Shift moved" : "Shift saved", "The roster record changed; nothing was only announced.");
-        close();
+        try {
+          if (!employee) throw new Error("Select an existing employee in this company.");
+          const plan = planShiftMove({
+            organizationId: context.org.id, currency: context.org.currency,
+            actor: context.actor, now: clockIso(), timezone: context.org.timezone,
+          }, shift, employee, data.shifts, data.leaveRequests, data.employees, data.projects, {
+            startAt: day && time ? `${day}T${time}:00.000Z` : "",
+            hours: Number(form.get("hours") ?? 0),
+            place: String(form.get("place") ?? ""),
+            projectId: String(form.get("project") ?? ""),
+          });
+          await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+          context.toast("Shift saved", "The roster was checked and the change saved. No external calendar was updated.");
+          close();
+        } catch (error) {
+          context.toast("Shift not saved", error instanceof Error ? error.message : "Reload this shift before editing.", "blocked");
+        }
       }}
     >
-      <Field label="Person">
-        <Select name="employee" defaultValue={String(shift.fields.employeeId ?? "")}>
-          {data.employees.filter((row) => row.status !== "alumni").map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
+      <Field label="Person" required>
+        <Select name="employee" required defaultValue={String(shift.fields.employeeId ?? "")}>
+          {data.employees.filter((row) => !["alumni", "terminated"].includes(row.status)).map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
         </Select>
       </Field>
-      <Field label="Place">
-        <Select name="place" defaultValue={String(shift.fields.place ?? "")}>{["Showroom", "Workshop bench", "Despatch"].map((place) => <option key={place}>{place}</option>)}</Select>
+      <Field label="Place" required>
+        <Select name="place" required defaultValue={String(shift.fields.place ?? "Showroom")}>{["Showroom", "Workshop bench", "Despatch"].map((place) => <option key={place}>{place}</option>)}</Select>
+      </Field>
+      <Field label="Project assignment" hint="Optional. Project links stay within this company and appear in the scheduling and timesheet context.">
+        <Select name="project" defaultValue={String(shift.fields.projectId ?? "")}>
+          <option value="">No project assigned</option>
+          {data.projects.filter((row) => !["cancelled", "archived", "deleted"].includes(row.status)).map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
+        </Select>
       </Field>
       <Row gap={3}>
-        <Field label="Day"><TextInput name="day" type="date" defaultValue={shift.startAt?.slice(0, 10) ?? ""} /></Field>
-        <Field label="Start (UTC)"><TextInput name="time" type="time" defaultValue={shift.startAt?.slice(11, 16) ?? "09:00"} /></Field>
-        <Field label="Hours"><TextInput name="hours" inputMode="numeric" align="end" defaultValue={String(shift.fields.hours ?? 8)} /></Field>
+        <Field label="Day (UTC)" required><TextInput name="day" type="date" required defaultValue={shift.startAt?.slice(0, 10) ?? ""} /></Field>
+        <Field label="Start (UTC)" required><TextInput name="time" type="time" required defaultValue={shift.startAt?.slice(11, 16) ?? "09:00"} /></Field>
+        <Field label="Hours" required><TextInput name="hours" inputMode="decimal" align="end" required defaultValue={String(shift.fields.hours ?? 8)} /></Field>
       </Row>
       <Properties rows={[
         { label: "Starts now", value: context.dateTime(shift.startAt) },
         { label: "Ends now", value: context.dateTime(shift.endAt) },
-        { label: "Time zone", value: context.org.timezone },
+        { label: "Location time zone", value: context.org.timezone },
+        { label: "Saved time standard", value: "UTC; no automatic local-time conversion" },
       ]} />
-      {shift.fields.timezone !== undefined && String(shift.fields.timezone) !== context.org.timezone && <Notice tone="warning" title="Cross-location shift">This shift was recorded in {String(shift.fields.timezone)}. Check working-time rules for both locations.</Notice>}
-      <Notice tone="info">More than eight hours is recorded as overtime and appears on the exceptions tab.</Notice>
+      <Notice tone="info" title="A checked roster, not a legal compliance guarantee">
+        An overlapping shift or approved leave blocks a change. More than eight hours is flagged as overtime for human review; no external calendar or payroll is updated automatically.
+      </Notice>
     </form>
   );
 }
