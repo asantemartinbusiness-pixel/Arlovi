@@ -1572,10 +1572,26 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
   const members = useCollection("members");
   const [note, setNote] = useState("");
   if (!record) return <Empty title="No deck is open" icon={<Presentation size={20} />} />;
+  const reviewFindings = reviewDeck(editor.deck);
+  const reviewOverview = (
+    <section className="pr-workflow-overview" aria-label="Presentation review overview">
+      <div className="pr-library-heading">
+        <div><span className="pr-library-eyebrow">PRESENT / REVIEW & DELIVERY</span><h2>Ready for the room.</h2>
+          <p>Review unresolved feedback, output quality and saved changes before distributing a presentation. Exports are generated locally.</p></div>
+        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button>
+      </div>
+      <div className="pr-library-overview">
+        <div><span>Open comments</span><strong>{editor.deck.comments.filter((comment) => !comment.resolved).length}</strong></div>
+        <div><span>Quality findings</span><strong>{reviewFindings.length}</strong></div>
+        <div><span>Saved versions</span><strong>{record.history.length}</strong></div>
+      </div>
+    </section>
+  );
 
   if (tab === "History") {
     return (
       <Stack gap={4}>
+        {reviewOverview}
         <Notice tone="info" title="Autosave does not create a version per drag">
           Object moves are written with history suppressed, so the version list holds deliberate saves.
         </Notice>
@@ -1599,6 +1615,8 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
 
   if (tab === "Export") {
     return (
+      <Stack gap={4}>
+        {reviewOverview}
       <Grid>
         <Card span={6} eyebrow="EXPORT" title="Export" subtitle="Deterministic renderers, run in this browser">
           <Stack gap={3}>
@@ -1648,6 +1666,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
           })()}
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
