@@ -9,6 +9,7 @@ import { RoleViewNote, leaveBalance } from "./kit";
 import { recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 import { scopedDetailRecord } from "@/platform/recordScope";
 import { planHireApplicant, planLeaveDecision } from "./decisions";
+import { planShiftSwap, planTimesheetApprovals } from "./workforce";
 export { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 import { Boundary, askFirst, boundaryText, logBoundary, pickRecord, recordOf } from "./opsKit";
 
@@ -525,8 +526,20 @@ export async function approveHours(context: ScreenContext): Promise<void> {
     body: `${String(entry.fields.employeeName ?? entry.ownerName)} · ${String(entry.fields.hours ?? 0)} hours on ${context.date(entry.startAt)}. Approved hours feed the payroll inputs.`,
     confirm: "Approve hours",
     run: async () => {
-      await context.mutate.patch(entry.id, { status: "approved", fields: { ...entry.fields, approved: true, approvedBy: context.actor } }, { expectRevision: entry.revision, event: `Hours approved for ${String(entry.fields.employeeName ?? entry.ownerName)} by ${context.actor}` });
-      context.toast("Hours approved", `Recorded against the time entry by ${context.actor}.`);
+      try {
+        const { listByCollection } = await import("@/platform/repo");
+        const [employees, projects] = await Promise.all([
+          listByCollection(context.org.id, "employees"), listByCollection(context.org.id, "projects"),
+        ]);
+        const plan = planTimesheetApprovals({
+          organizationId: context.org.id, currency: context.org.currency,
+          actor: context.actor, now: clockIso(), timezone: context.org.timezone,
+        }, [entry], employees, projects);
+        await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+        context.toast("Hours approved", "A linked employee and any project were verified. This is a local approval, not a payroll submission.");
+      } catch (error) {
+        context.toast("Hours not approved", error instanceof Error ? error.message : "Reload the time entry and try again.", "blocked");
+      }
     },
   });
   const chosen = await recordOf(context, context.selectedId, "shifts");
@@ -561,11 +574,23 @@ export async function swapShift(context: ScreenContext): Promise<void> {
         ],
         confirm: "Swap the shifts",
         run: async () => {
-          const a = { employeeId: shift.fields.employeeId, employeeName: shift.fields.employeeName };
-          const b = { employeeId: other.fields.employeeId, employeeName: other.fields.employeeName };
-          await context.mutate.patch(shift.id, { fields: { ...shift.fields, ...b, swappedBy: context.actor } }, { expectRevision: shift.revision, event: `Shift swapped to ${String(b.employeeName)} by ${context.actor}` });
-          await context.mutate.patch(other.id, { fields: { ...other.fields, ...a, swappedBy: context.actor } }, { expectRevision: other.revision, event: `Shift swapped to ${String(a.employeeName)} by ${context.actor}` });
-          context.toast("Shifts swapped", "Both roster records changed.");
+          try {
+            const { listByCollection } = await import("@/platform/repo");
+            const [roster, employees, leave, projects] = await Promise.all([
+              listByCollection(context.org.id, "shifts"),
+              listByCollection(context.org.id, "employees"),
+              listByCollection(context.org.id, "leaveRequests"),
+              listByCollection(context.org.id, "projects"),
+            ]);
+            const plan = planShiftSwap({
+              organizationId: context.org.id, currency: context.org.currency,
+              actor: context.actor, now: clockIso(), timezone: context.org.timezone,
+            }, shift, other, roster, employees, leave, projects);
+            await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+            context.toast("Shifts swapped", "Both roster records were saved together after overlap and leave checks.");
+          } catch (error) {
+            context.toast("Swap not saved", error instanceof Error ? error.message : "Reload both shifts and try again.", "blocked");
+          }
         },
       });
     },
@@ -598,8 +623,12 @@ export function TimeCorrection({ context, close }: { context: ScreenContext; clo
       onSubmit={async (event) => {
         event.preventDefault();
         if (!entry || invalid || !reason.trim()) return;
-        await context.mutate.patch(entry.id, { status: "submitted", fields: { ...entry.fields, hours: value, approved: false, correctedFrom: Number(entry.fields.hours ?? 0), correctedBy: context.actor, correctionReason: reason.trim() } }, { expectRevision: entry.revision, event: `Time corrected from ${String(entry.fields.hours ?? 0)} to ${value} hours by ${context.actor}: ${reason.trim()}` });
-        context.toast("Time corrected", "The entry is back to submitted so somebody approves the corrected hours.");
+        const updated = await context.mutate.patch(entry.id, { status: "submitted", fields: {
+          ...entry.fields, hours: value, approved: false, approvedBy: "", approvedAt: "",
+          correctedFrom: Number(entry.fields.hours ?? 0), correctedBy: context.actor, correctionReason: reason.trim(),
+        } }, { expectRevision: entry.revision, event: `Time corrected from ${String(entry.fields.hours ?? 0)} to ${value} hours by ${context.actor}: ${reason.trim()}` });
+        if (!updated) return;
+        context.toast("Time corrected", "Approval was cleared; the corrected entry requires a fresh human review.");
         close();
       }}
     >
