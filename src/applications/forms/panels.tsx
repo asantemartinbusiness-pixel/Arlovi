@@ -646,6 +646,8 @@ export function SubmissionsScreen({ context, lens }: { context: ScreenContext; l
             { key: "status", header: "State", cell: (row) => <Pill tone={row.status === "new" ? "info" : row.status === "routed" ? "success" : "neutral"}>{row.status}</Pill> },
           ]}
           onOpen={(id) => context.openOverlay("Submission drawer", { id })}
+          onSelect={(id) => context.select(id)}
+          selectedId={context.selectedId}
           bulkActions={[
             { label: "Mark reviewed", onRun: (selected) => selected.forEach((row) => void context.mutate.patch(row.id, { status: "reviewed" }, { event: `Submission ${row.title} marked reviewed` })) },
             { label: "Assign to me", onRun: (selected) => selected.forEach((row) => void context.mutate.patch(row.id, { status: "routed", fields: { ...row.fields, assignee: context.actor } }, { event: `Submission ${row.title} assigned to ${context.actor}` })) },
