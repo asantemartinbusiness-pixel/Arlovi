@@ -534,30 +534,78 @@ export function ContentCalendar({ context, view }: { context: ScreenContext; vie
 export function SocialPublishing({ context, state }: { context: ScreenContext; state: string }) {
   const data = useMarketData();
   const { org } = useWorkspace();
+  const [networkFilter, setNetworkFilter] = useState("all");
+  const [busy, setBusy] = useState(false);
+  const [writeError, setWriteError] = useState("");
   const map: Record<string, string[]> = { Drafts: ["draft"], Schedule: ["scheduled"], Published: ["published"], Failed: ["failed"] };
-  const rows = data.socialPosts.filter((post) => (map[state] ?? ["draft"]).includes(post.status));
+  const inState = data.socialPosts.filter((post) => (map[state] ?? ["draft"]).includes(post.status));
+  const rows = inState.filter(post => networkFilter === "all" || String(post.fields.network) === networkFilter);
+  const channels = [...new Set(data.socialPosts.map(post => String(post.fields.network ?? "")).filter(Boolean))].sort();
+  const filterBar = <div className="t4-market-filters" role="group" aria-label="Social publishing filters">
+    <label>Channel
+      <Select aria-label="Filter social posts by channel" value={networkFilter}
+        onChange={event => { setNetworkFilter(event.target.value); context.select(undefined); }}>
+        <option value="all">All channels</option>
+        {channels.map(network => <option key={network} value={network}>{networkOf(network).label}</option>)}
+      </Select>
+    </label>
+    <span className="t4-market-filter-count" role="status" aria-live="polite">
+      {rows.length} of {inState.length} posts in {state.toLowerCase()}
+    </span>
+    {networkFilter !== "all" && <Button size="sm" variant="ghost" onClick={() => setNetworkFilter("all")}>Clear channel</Button>}
+  </div>;
+
+  async function returnToDrafts(selected: Rec[]) {
+    if (busy || selected.some(post => post.status === "published")) return;
+    setBusy(true);
+    setWriteError("");
+    try {
+      for (const post of selected) {
+        const result = await context.mutate.patch(post.id, { status: "draft", fields: { ...post.fields, delivery: "ready_local", error: "" } },
+          { expectRevision: post.revision, event: `${post.title} returned to drafts` });
+        if (!result) throw new Error("Record revision changed");
+      }
+      context.toast("Returned to drafts", `${selected.length} post${selected.length === 1 ? "" : "s"} updated locally. No provider was contacted.`);
+    } catch {
+      setWriteError("Not every post could be moved. Some may already have changed; check the Drafts tab before retrying.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const accounts = (
-    <Card title="Channel accounts" subtitle="Nothing is authorised, so nothing can publish">
-      <Stack gap={2}>
-        {["instagram", "facebook", "linkedin", "x"].map((network) => (
-          <Row key={network} gap={2} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-            <strong className="ds-grow">{networkOf(network).label}</strong>
-            <span className="ds-subtle">{networkOf(network).media}</span>
+    <details className="t4-social-accounts" aria-label="Social channel account connections">
+      <summary>
+        <strong>Channel accounts</strong>
+        <span>0 of 4 connected · Publishing unavailable until a provider is authorised</span>
+        <Pill tone="warning">Not connected</Pill>
+      </summary>
+      <div className="t4-social-account-list">
+        {["instagram", "facebook", "linkedin", "x"].map(network => (
+          <div key={network} className="t4-social-account-row">
+            <strong>{networkOf(network).label}</strong>
+            <span>{networkOf(network).media}</span>
             <Pill tone="warning" dot>Not connected</Pill>
-            <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Account authorization", { network })}>Connect</Button>
-          </Row>
+            <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Account authorization", { network })}>Review connection</Button>
+          </div>
         ))}
-      </Stack>
-    </Card>
+      </div>
+    </details>
   );
 
   if (rows.length === 0) {
     return (
       <Stack gap={4}>
         {accounts}
-        <Empty title={`No ${state.toLowerCase()} posts`} icon={<Megaphone size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("post composer")}>Create post</Button>}>
-          {state === "Failed" ? "A post is marked failed when its scheduled time passes without a connected account." : "Drafts and scheduled posts live here until a provider is connected."}
+        {filterBar}
+        <Empty title={networkFilter === "all" ? `No ${state.toLowerCase()} posts` : "No posts for this channel"}
+          icon={<Megaphone size={20} />}
+          action={networkFilter !== "all"
+            ? <Button variant="secondary" onClick={() => setNetworkFilter("all")}>Show all channels</Button>
+            : <Button variant="primary" onClick={() => context.openOverlay("post composer")}>Create post</Button>}>
+          {networkFilter !== "all" ? "Try another channel without changing your posts." : state === "Failed"
+            ? "A post can fail when its scheduled time passes without a connected account."
+            : "Drafts and scheduled posts remain local until a provider is connected."}
         </Empty>
       </Stack>
     );
@@ -566,6 +614,8 @@ export function SocialPublishing({ context, state }: { context: ScreenContext; s
   return (
     <Stack gap={4}>
       {accounts}
+      {filterBar}
+      {writeError && <Notice tone="danger" title="Some posts need review">{writeError}</Notice>}
       {state === "Failed" && (
         <Notice tone="danger" title="Retrying is blocked while the publication state is unknown">
           None of these posts reached a provider, so there is no external state to compare against. A retry would risk a duplicate if an account were connected in between, so each one must be re-approved individually from its composer.
@@ -594,10 +644,8 @@ export function SocialPublishing({ context, state }: { context: ScreenContext; s
           },
           {
             label: "Move to drafts",
-            disabled: (selected) => selected.some((post) => post.status === "published"),
-            onRun: (selected) => selected.forEach((post) => {
-              void context.mutate.patch(post.id, { status: "draft", fields: { ...post.fields, delivery: "ready_local", error: "" } }, { expectRevision: post.revision, event: `${post.title} returned to drafts` });
-            }),
+            disabled: selected => busy || selected.some(post => post.status === "published"),
+            onRun: selected => { void returnToDrafts(selected); },
           },
         ]}
         summary={<span>Accounts connected: 0 of 4 · workspace {org.shortName}</span>}
