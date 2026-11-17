@@ -51,3 +51,23 @@
   .apps-directory-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
 }
 @media(prefers-reduced-motion:reduce){.apps-directory-card{transition:none}}
+
+/* Platform category: a compact work-area index, not a second dashboard. */
+.apps-platform-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--space-5);padding:var(--space-5);border:1px solid var(--border-default);border-radius:var(--radius-lg);background:var(--bg-surface)}
+.apps-platform-intro>div{min-width:0;max-width:670px}
+.apps-platform-kicker{display:block;font-size:var(--text-2xs);font-weight:600;letter-spacing:var(--tracking-label);color:var(--fg-subtle);margin-bottom:var(--space-2)}
+.apps-platform-intro h2{font:500 var(--text-xl) var(--font-display);letter-spacing:-.025em}
+.apps-platform-intro p{font-size:var(--text-sm);color:var(--fg-muted);line-height:1.55;margin-top:var(--space-2)}
+.apps-platform-count{flex:none;font-size:var(--text-xs);color:var(--fg-subtle);font-variant-numeric:tabular-nums}
+.apps-directory-card[data-platform=true]{flex-direction:column;min-height:220px}
+.apps-directory-card[data-platform=true] .apps-directory-open{min-height:128px}
+.apps-directory-card-foot{border-top:1px solid var(--border-subtle);margin:0 var(--space-4);padding:var(--space-3) 0 var(--space-4);display:flex;flex-direction:column;gap:var(--space-2)}
+.apps-directory-card-foot-label{font-size:var(--text-2xs);font-weight:500;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--fg-subtle)}
+.apps-directory-card-links{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2)}
+.apps-directory-card-links a{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:var(--space-1) var(--space-3);border:1px solid var(--border-default);border-radius:var(--radius-pill);color:var(--fg-default);background:var(--bg-surface);text-decoration:none;font-size:var(--text-xs);line-height:1.3}
+.apps-directory-card-links a:hover{background:var(--bg-hover);border-color:var(--border-strong)}
+.apps-directory-card-links a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:699px){
+  .apps-platform-intro{align-items:flex-start;flex-direction:column;padding:var(--space-4);gap:var(--space-3)}
+  .apps-platform-count{white-space:normal}
+}
