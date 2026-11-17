@@ -52,6 +52,10 @@ test("Build project overview and builder expose visible workflow context", async
   await expect(page.getByLabel("Builder model status")).toBeVisible();
   await page.getByLabel("Build editor overview").getByRole("button", { name: "Data model" }).click();
   await expect(page.getByRole("tab", { name: "Data", exact: true })).toHaveAttribute("aria-selected", "true");
+  await main.getByRole("button", { name: "New screen", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "Design", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(main.getByRole("combobox", { name: "Screen being designed" }).locator("option:checked")).toHaveText("Screen 1");
+  await expect(main.getByText("/screen-1", { exact: true })).toBeVisible();
 });
 
 test("Build code, checks and releases expose their real readiness boundaries", async ({ page }) => {
