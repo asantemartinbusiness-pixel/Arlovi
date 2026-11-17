@@ -539,33 +539,43 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
   }
 
   if (lens === "Access") {
-    const grants = [
-      { id: "workspace", label: "Workspace sign-in", state: terminated ? "revoked" : "active" },
-      { id: "ledger", label: "Finance ledger (read)", state: terminated ? "revoked" : String(employee.fields.departmentId) === "nl-departments-002" ? "active" : "not granted" },
-      { id: "care", label: "Customer care queue", state: terminated ? "revoked" : "not granted" },
-      { id: "workshop", label: "Workshop door code", state: terminated ? "revoked" : String(employee.fields.departmentId) === "nl-departments-020" ? "active" : "not granted" },
-      { id: "queued", label: "Compliance toolkit (requested)", state: terminated ? "rescinded" : "queued" },
-    ];
+    // These are recorded requests, not actual cloud grants. Do not synthesize
+    // sign-in, payroll or door access from an employee's department.
+    const requests = data.tasks
+      .filter((task) => task.collection === "tasks"
+        && task.fields.employeeId === employee.id && task.fields.group === "IT access")
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return (
       <Stack gap={4}>
         {terminated && (
-          <Notice tone="danger" title="This person has left">
-            Every grant was revoked on {context.date(employee.endAt)} and the queued request was rescinded rather than left pending.
-            Nothing here is enforced by a server: the record states what should have been done.
+          <Notice tone="warning" title="Offboarding recorded locally">
+            Offboarding was recorded for {employee.title} on {context.date(employee.endAt)}.
+            Pending access requests are rescinded in this workspace; connected identity and building systems must still be checked separately.
           </Notice>
         )}
-        <DataGrid
-          rows={grants}
-          rowId={(row) => row.id}
-          label="Access grants"
-          filterable={false}
-          columns={[
-            { key: "label", header: "Grant", primary: true, cell: (row) => row.label },
-            { key: "state", header: "State", align: "end", cell: (row) => <Pill tone={row.state === "active" ? "success" : row.state === "queued" ? "warning" : "neutral"} dot>{row.state}</Pill> },
-          ]}
-        />
+        {requests.length === 0 ? (
+          <Empty title="No access requests recorded" icon={<ClipboardCheck size={20} />}>
+            Employment status and department membership do not establish that an account or physical grant exists.
+          </Empty>
+        ) : (
+          <DataGrid
+            rows={requests}
+            rowId={(row) => row.id}
+            label="Recorded access requests"
+            filterable={false}
+            columns={[
+              { key: "request", header: "Request", primary: true, cell: (row) => row.title },
+              { key: "state", header: "Local status", cell: (row) => <Pill tone={row.status === "rescinded" ? "neutral" : row.status === "done" ? "info" : "warning"} dot>{row.status === "done" ? "Completed in Arlovi" : row.status}</Pill> },
+              { key: "assignee", header: "Responsible", cell: (row) => String(row.fields.assignee ?? "Unassigned") },
+            ]}
+          />
+        )}
+        <Notice tone="info" title="No connected identity provider">
+          These are browser-local requests and decisions, not independently verified access grants.
+          Completion of a task here never proves that an external account, door code or permission was enabled or disabled.
+        </Notice>
         <Row gap={2}>
-          <Button variant="secondary" onClick={() => context.openOverlay("access request")}>Request access</Button>
+          {!terminated && <Button variant="secondary" onClick={() => context.openOverlay("access request")}>Request access</Button>}
           {!terminated && <Button variant="outline-danger" onClick={() => context.openOverlay("offboarding confirmation")}>Start offboarding</Button>}
         </Row>
       </Stack>
