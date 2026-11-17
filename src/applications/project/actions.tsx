@@ -8,6 +8,7 @@ import { askFirst, Boundary, logBoundary, selectedOf } from "@/applications/hr/o
 import { LANES, stageOf, type LaneId } from "./board";
 import { clockIso } from "@/platform/clock";
 import { duplicateProjectPlan, nextProjectCopyTitle } from "./creation";
+import { positiveHours, taskMoveDecision } from "./progression";
 
 /* ------------------------------------------------------------------ *
  * Contract actions for the Projects module that change records.
@@ -350,9 +351,9 @@ export function MoveTask({ context, close }: { context: ScreenContext; close: ()
   const data = useCollections(["tasks"]);
   const [lane, setLane] = useState<LaneId | "">("");
   if (!task || task.collection !== "tasks") return <Empty title="Select a card on the board first" />;
-  const blockers = dependenciesOf(task).map((id) => data.tasks.find((row) => row.id === id)).filter((row): row is Rec => Boolean(row) && stageOf(row!) !== "done");
-  const blockedByDeps = lane === "done" && blockers.length > 0;
-  const skipsReview = lane === "done" && stageOf(task) !== "review" && String(task.fields.priority ?? "") === "high";
+  const decision = lane ? taskMoveDecision(task, lane, data.tasks) : undefined;
+  const blockedByDeps = Boolean(decision?.blocked);
+  const skipsReview = Boolean(decision?.needsReviewDecision);
   return (
     <Stack gap={4}>
       <h3>{task.title}</h3>
@@ -362,7 +363,7 @@ export function MoveTask({ context, close }: { context: ScreenContext; close: ()
           {LANES.filter((item) => item.id !== stageOf(task)).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
         </Select>
       </Field>
-      {blockedByDeps && <Notice tone="danger" title="Waiting on unfinished work">{blockers.map((row) => row.title).join(", ")} must be done first. The move is refused.</Notice>}
+      {blockedByDeps && <Notice tone="danger" title="Task move blocked">{decision?.blocked}</Notice>}
       {skipsReview && <Notice tone="warning" title="This skips Review">High priority work goes through Review. Continuing opens the stage rule so the skip is a recorded decision.</Notice>}
       <Notice tone="info">Moving a card changes its stage only. No automation or external side effect runs from a stage change.</Notice>
       <Row gap={2}>
@@ -374,7 +375,10 @@ export function MoveTask({ context, close }: { context: ScreenContext; close: ()
           onClick={async () => {
             if (!lane) return;
             if (skipsReview) { context.openOverlay("stage rule", { id: task.id, lane }); return; }
-            await context.mutate.patch(task.id, { status: lane, fields: { ...task.fields, stage: lane } }, { expectRevision: task.revision, event: `${task.title} moved to ${lane} by ${context.actor}` });
+            const saved = await context.mutate.patch(task.id, {
+              status: lane, fields: { ...task.fields, stage: lane },
+            }, { expectRevision: task.revision, event: `${task.title} moved to ${lane} by ${context.actor}` });
+            if (!saved) return;
             context.toast("Task moved", `${task.title} is in ${lane}.`);
             close();
           }}
@@ -437,12 +441,20 @@ export function TaskEditor({ context, close }: { context: ScreenContext; close: 
         const title = String(form.get("title") ?? "").trim();
         if (!title) return;
         const due = String(form.get("due") ?? "");
-        await context.mutate.patch(task.id, {
+        let estimate: number;
+        try {
+          estimate = positiveHours(form.get("estimate") ?? task.fields.estimateHours ?? 0);
+        } catch (error) {
+          context.toast("Check estimated hours", error instanceof Error ? error.message : "Use a valid non-negative number.", "blocked");
+          return;
+        }
+        const saved = await context.mutate.patch(task.id, {
           title,
           summary: String(form.get("summary") ?? ""),
           dueAt: due ? new Date(`${due}T17:00:00.000Z`).toISOString() : task.dueAt,
-          fields: { ...task.fields, priority: String(form.get("priority") ?? "normal"), estimateHours: Number(form.get("estimate") ?? task.fields.estimateHours ?? 0) },
+          fields: { ...task.fields, priority: String(form.get("priority") ?? "normal"), estimateHours: estimate },
         }, { expectRevision: task.revision, event: `${task.title} edited by ${context.actor}` });
+        if (!saved) return;
         context.toast("Task saved", "The earlier version is kept in the task's history with its author.");
         close();
       }}
