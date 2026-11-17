@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Rec } from "@/domain/types";
+import { openInvoices, outstandingMinor } from "@/applications/fin/data";
 import {
   listedPortals, portalDocuments, portalForRole, portalInvoices, portalMessages,
-  resolvePortal, sharedRecords, sharedWithPortal, type PortalBody, type usePortalData,
+  portalVisibleInvoices, resolvePortal, sharedRecords, sharedWithPortal, type PortalBody, type usePortalData,
 } from "@/applications/portal/data";
 
 function record(
@@ -51,6 +52,40 @@ describe("portal record-scope acceptance", () => {
     expect(sharedWithPortal(canonical, data).map(item => item.id)).toEqual([
       document.id, aliasDoc.id, invoice.id,
     ]);
+  });
+
+  it("shows attached and explicitly granted invoices once, using the Finance net amount due", () => {
+    const attached = {
+      ...invoice, status: "part_paid", amountMinor: 12000,
+      fields: { ...invoice.fields, paidMinor: 5000 },
+    };
+    const explicitlyGranted = {
+      ...record("nl-invoices-202", "invoices"), status: "awaiting_payment",
+      amountMinor: 2400, fields: { paidMinor: 0 },
+    };
+    const foreign = {
+      ...record("hb-invoices-202", "invoices", "org-harbor"), status: "awaiting_payment",
+      amountMinor: 80000,
+    };
+    const body = canonical.body as PortalBody;
+    const withGrant: Rec = {
+      ...canonical,
+      body: {
+        ...body,
+        shared: [
+          ...(body.shared ?? []),
+          { collection: "invoices", ids: [attached.id, explicitlyGranted.id, foreign.id] },
+        ],
+      },
+    };
+    const scoped = {
+      ...data, invoices: [attached, explicitlyGranted, foreign],
+    } as ReturnType<typeof usePortalData>;
+    const visible = portalVisibleInvoices(withGrant, scoped);
+    expect(visible.map(item => item.id)).toEqual([attached.id, explicitlyGranted.id]);
+    expect(visible.some(item => item.id === foreign.id)).toBe(false);
+    expect(openInvoices(visible).reduce((total, item) => total + outstandingMinor(item), 0))
+      .toBe(9400);
   });
 
   it("never counts another client's or another company's documents or private messages", () => {
