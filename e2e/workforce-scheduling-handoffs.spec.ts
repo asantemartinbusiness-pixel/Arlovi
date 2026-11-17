@@ -29,9 +29,12 @@ test("People roster refuses conflicting moves and saves a valid company Project 
     return { employee: employee.id, other: other.id, project: project.id, shift: current.id };
   });
   await page.reload();
-  const row = page.getByRole("row", { name: /QA Scheduling Employee/ });
-  await expect(row).toBeVisible();
-  await row.locator("button.hr-shift").click();
+  const narrow = await page.evaluate(() => window.matchMedia("(max-width: 767px)").matches);
+  const roster = narrow
+    ? page.locator(".hr-roster-cards .ds-card").filter({ hasText: "QA Scheduling Employee" }).first()
+    : page.getByRole("row", { name: /QA Scheduling Employee/ });
+  await expect(roster).toBeVisible();
+  await roster.locator("button.hr-shift").first().click();
   const dialog = page.getByRole("dialog", { name: "Shift", exact: true });
   await expect(dialog).toBeVisible();
 
