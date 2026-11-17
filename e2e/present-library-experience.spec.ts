@@ -99,3 +99,11 @@ test("Present publishing keeps local status separate from public access", async 
   await expect(main.getByRole("button", { name: "Mark as published locally" })).toBeVisible();
   await expect(main.getByRole("button", { name: "Record sharing intent" })).toBeVisible();
 });
+
+test("An unknown presentation URL never opens a different deck", async ({ page }) => {
+  await page.goto("/o/northline/present/decks");
+  const id = "missing-deck-" + Date.now();
+  await page.goto(`/o/northline/present/decks/${id}`);
+  await expect(page.locator("#main")).toContainText("No deck is open");
+  await expect(page.locator("#main").getByLabel("Active slide context")).toHaveCount(0);
+});
