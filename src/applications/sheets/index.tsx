@@ -1333,6 +1333,18 @@ function ImportExport({ context, tab }: { context: ScreenContext; tab: "Imports"
     const rowsRaw = sheetToRows(editor.sheet, editor.values, editor.format, false);
     const rowsEvaluated = sheetToRows(editor.sheet, editor.values, editor.format, true);
     return (
+      <Stack gap={4}>
+        <div className="sx-formula-overview">
+          <div className="sx-formula-header"><span className="sx-library-eyebrow">SHEETS / DATA PORTABILITY</span><h2>Know exactly what you export.</h2>
+            <p>Choose calculated values, original formula text or the structured workbook. Downloads stay on the device; no external integration is implied.</p></div>
+          <div className="sx-formula-metrics" aria-label="Export overview">
+            <div><span>Sheet</span><strong className="sx-compact-value">{editor.sheet.name}</strong><small>Current worksheet</small></div>
+            <div><span>Rows</span><strong>{rowsEvaluated.length}</strong><small>In calculated CSV</small></div>
+            <div><span>Formula errors</span><strong>{editor.evaluation.errors.length}</strong><small>Inspect before distribution</small></div>
+          </div>
+          <Row gap={2} wrap><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/sheets/workbooks/${record.id}`)}>Back to grid</Button>
+            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/sheets/workbooks/${record.id}/formulas`)}>Formula audit</Button></Row>
+        </div>
       <Grid>
         <Card span={6} eyebrow="EXPORT" title="Export this sheet" subtitle={`${editor.sheet.name} · ${rowsRaw.length} rows`}>
           <Stack gap={3}>
@@ -1359,6 +1371,7 @@ function ImportExport({ context, tab }: { context: ScreenContext; tab: "Imports"
           <TextArea readOnly rows={12} value={toCsv(rowsEvaluated.slice(0, 20))} style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }} aria-label="Export preview" />
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
