@@ -19,6 +19,7 @@ import {
   swapShift, validateRun, verifyCompletion, viewEmployee,
 } from "./actions";
 import { listByCollection } from "@/platform/repo";
+import { planOnboardingLaunch } from "./decisions";
 import { scopedDetailRecord } from "@/platform/recordScope";
 
 function payrollRecords(context: ScreenContext, collection: string) {
@@ -577,7 +578,7 @@ function OfferApproval({ context, close }: { context: ScreenContext; close: () =
 }
 
 function OnboardingLaunch({ context, close }: { context: ScreenContext; close: () => void }) {
-  const data = useCollections(["employees", "members"]);
+  const data = useCollections(["employees", "members", "tasks"]);
   const starters = data.employees.filter((employee) => employee.status === "probation" || employee.status === "active");
   return (
     <form
@@ -589,26 +590,22 @@ function OnboardingLaunch({ context, close }: { context: ScreenContext; close: (
         const employeeId = String(form.get("employee") ?? "");
         const mentor = String(form.get("mentor") ?? "");
         const employee = data.employees.find((row) => row.id === employeeId);
-        const steps = [
-          { label: "Signed contract filed", group: "People", owner: context.actor },
-          { label: "Right to work check recorded", group: "People", owner: context.actor },
-          { label: "Workspace sign-in granted", group: "IT access", owner: "Maya Chen" },
-          { label: "Payroll inputs added", group: "Finance", owner: "Elena Voss" },
-          { label: `Mentor introduction with ${mentor}`, group: "Manager", owner: mentor },
-          { label: "Health and safety module", group: "Learning", owner: employee?.title ?? "New starter" },
-        ];
-        for (const step of steps) {
-          await context.mutate.create({
-            collection: "tasks",
-            title: step.label,
-            status: step.group === "IT access" ? "waiting" : "ready",
-            summary: `${step.group} step for ${employee?.title ?? "the new starter"}.`,
-            parentId: employeeId,
-            fields: { kind: "onboarding", employeeId, stage: "ready", assignee: step.owner, group: step.group },
-          }, `Onboarding step created: ${step.label}`);
+        const mentorRecord = data.employees.find((row) => row.title === mentor && row.status === "active");
+        if (!employee || !mentorRecord) {
+          context.toast("Checklist not launched", "Choose a current employee and an active mentor.", "blocked");
+          return;
         }
-        context.toast("Checklist launched", `${steps.length} steps are on the onboarding board.`);
-        close();
+        try {
+          const plan = planOnboardingLaunch({
+            organizationId: context.org.id, currency: context.org.currency,
+            actor: context.actor, now: clockIso(),
+          }, employee, mentorRecord, data.tasks);
+          await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+          context.toast("Checklist launched", "All six onboarding steps were saved together for " + employee.title + ".");
+          close();
+        } catch (error) {
+          context.toast("Checklist not launched", error instanceof Error ? error.message : "Reload the employee record and try again.", "blocked");
+        }
       }}
     >
       <Field label="Who is starting" required>
@@ -617,8 +614,8 @@ function OnboardingLaunch({ context, close }: { context: ScreenContext; close: (
       <Field label="Mentor" required>
         <Select name="mentor" required>{data.employees.filter((row) => row.status === "active").map((row) => <option key={row.id}>{row.title}</option>)}</Select>
       </Field>
-      <Notice tone="info" title="Six steps across four desks">
-        People file the paperwork, the manager does the introduction, IT access waits for an approver and Finance adds the payroll input.
+      <Notice tone="info" title="Six steps, one complete checklist">
+        People verify documents, the mentor completes the introduction, IT access waits for a human decision, and Finance reviews payroll inputs. A launch is saved atomically; no accounts or external services are provisioned.
       </Notice>
     </form>
   );
