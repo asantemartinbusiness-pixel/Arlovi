@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { ArrowUpRight, Bookmark, BookmarkCheck, Clock3, Search, X } from "lucide-react";
 import { platformDestinations } from "@/app/platformDirectory";
 import { growthDestinations } from "@/app/growthDirectory";
+import { CATEGORY_OVERVIEWS, categoryDestinations } from "@/app/categoryDirectory";
 import { applications, appEntry, findScreen, screens } from "@/app/catalog";
 import { NAV_GROUPS, type AppNavEntry } from "@/app/nav";
 import { canOpen } from "@/platform/policy";
@@ -65,7 +66,7 @@ export function findDirectoryApps(apps: DirectoryApp[], query: string, group = "
 }
 
 function ApplicationCard({
-  app, slug, pinned, busy, onPin, platform, growth,
+  app, slug, pinned, busy, onPin, platform, growth, focused,
 }: {
   app: DirectoryApp;
   slug: string;
@@ -74,10 +75,13 @@ function ApplicationCard({
   onPin: (app: DirectoryApp) => void;
   platform: boolean;
   growth: boolean;
+  focused: boolean;
 }) {
   const Icon = app.icon;
-  const shortcuts = platform ? platformDestinations(app.code, slug) : growth ? growthDestinations(app.code, slug) : [];
-  return <article className="apps-directory-card" data-platform={platform ? "true" : undefined} data-growth={growth ? "true" : undefined}>
+  const shortcuts = !focused ? [] : platform ? platformDestinations(app.code, slug)
+    : growth ? growthDestinations(app.code, slug) : categoryDestinations(app.code, slug);
+  return <article className="apps-directory-card" data-platform={platform ? "true" : undefined}
+    data-growth={growth ? "true" : undefined} data-workareas={shortcuts.length ? "true" : undefined}>
     <Link className="apps-directory-open" to={appEntry(app.code, slug)} aria-label={app.short}>
       <span className="apps-directory-icon"><Icon size={20} strokeWidth={1.8} aria-hidden="true" /></span>
       <span className="apps-directory-copy">
@@ -211,26 +215,16 @@ export function AppsDirectory() {
       })}
     </nav>
 
-    {group === "Platform" && !query && visible.length > 0 && (
-      <section className="apps-platform-intro" aria-label="Platform application overview">
+    {group !== "All" && !query && visible.length > 0 && CATEGORY_OVERVIEWS[group] && (
+      <section className="apps-platform-intro" aria-label={`${group} application overview`}>
         <div>
-          <span className="apps-platform-kicker">PLATFORM TOOLS</span>
-          <h2>Build, connect and operate</h2>
-          <p>Open a native tool or jump straight to a work area. Project editors remain inside their real site, application or form.</p>
+          <span className="apps-platform-kicker">{CATEGORY_OVERVIEWS[group].kicker}</span>
+          <h2>{CATEGORY_OVERVIEWS[group].title}</h2>
+          <p>{CATEGORY_OVERVIEWS[group].description}</p>
         </div>
-        <span className="apps-platform-count">{visible.length} of 5 tools available in this role view</span>
-      </section>
-    )}
-
-    {group === "Growth" && !query && visible.length > 0 && (
-      <section className="apps-platform-intro apps-growth-intro" aria-label="Growth application overview">
-        <div>
-          <span className="apps-platform-kicker">GROWTH TOOLS</span>
-          <h2>Reach, sell, serve and collaborate</h2>
-          <p>Five connected workspaces for marketing, commerce, bookings, procurement and client relationships.
-            Enter an app or choose a work area to continue directly.</p>
-        </div>
-        <span className="apps-platform-count">{visible.length} of 5 tools available in this role view</span>
+        <span className="apps-platform-count">
+          {visible.length} of {NAV_GROUPS.find(item => item.label === group)?.apps.length ?? 0} tools available in this role view
+        </span>
       </section>
     )}
 
@@ -271,7 +265,7 @@ export function AppsDirectory() {
             </div>
             <div className="apps-directory-grid">
               {items.map(app => <ApplicationCard key={app.code} app={app} slug={org.slug}
-                pinned={favourites.has(app.short)} busy={busyCode === app.code} platform={group === "Platform"} growth={group === "Growth"}
+                pinned={favourites.has(app.short)} busy={busyCode === app.code} platform={group === "Platform"} growth={group === "Growth"} focused={group !== "All"}
                 onPin={item => void togglePin(item)}/>)}
             </div>
           </section>;

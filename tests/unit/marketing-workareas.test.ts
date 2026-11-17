@@ -6,7 +6,7 @@ import { searchAudienceSegments } from "@/applications/market/AudienceSegmentsLi
 function makeRecord(id: string, collection: string, status: string, fields: Rec["fields"] = {}, body?: unknown): Rec {
   return {
     id, organizationId: "northline", collection, status, fields, body,
-    title: id, summary: "Trade audience", ownerName: "Team", amountMinor: 0,
+    title: id, summary: `${id} record`, ownerName: "Team", amountMinor: 0,
     currency: "GBP", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z",
     revision: 1, createdBy: "Team", updatedBy: "Team", tags: [], history: [],
   };
