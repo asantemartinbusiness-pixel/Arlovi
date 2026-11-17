@@ -1306,37 +1306,94 @@ function Quiz({ context }: { context: ScreenContext }) {
 
 function PolicyPublication({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const policy = useRecord(payload?.id);
-  if (!policy) return <Empty title="Select a policy" />;
+  const raw = useRecord(payload?.id);
+  const policy = scopedDetailRecord(raw, context.org.id, "policies");
+  const [summary, setSummary] = useState(policy?.summary ?? "");
+  const [reason, setReason] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [error, setError] = useState("");
+  if (!policy || policy.fields.kind !== "hr") return (
+    <Empty title="Selected HR policy unavailable">
+      Choose a valid policy from this company before reviewing a revision.
+    </Empty>
+  );
   const current = String(policy.fields.version ?? "1.0");
-  const next = `${Number(current.split(".")[0]) + 0}.${Number(current.split(".")[1] ?? 0) + 1}`;
+  const version = /^(\d+)\.(\d+)$/.exec(current);
+  const next = version ? `${version[1]}.${Number(version[2]) + 1}` : "";
+  const canPublish = context.can("edit_people") || context.can("edit_knowledge");
+  const changed = summary.trim() !== policy.summary.trim();
+  const valid = canPublish && Boolean(next) && changed && summary.trim().length >= 20
+    && reason.trim().length >= 12 && confirmed;
   return (
     <Stack gap={4}>
-      <p className="ds-prose">
-        Publishing version {next} of {policy.title} keeps version {current} on the record and starts the acknowledgement count again
-        from zero. {String(policy.fields.acknowledged ?? 0)} acknowledgements of version {current} are preserved.
-      </p>
-      <Properties rows={[
-        { label: "Current version", value: current },
-        { label: "New version", value: next },
-        { label: "Acknowledgements kept", value: `${String(policy.fields.acknowledged ?? 0)} against v${current}` },
-        { label: "Acknowledgements needed again", value: policy.fields.acknowledgementRequired === true ? "Yes, from everyone employed" : "No" },
-      ]} />
-      <Row gap={2}>
+      <PeopleDialogLead eyebrow="PEOPLE / POLICY GOVERNANCE" title="Publish a reviewed record revision"
+        description="Compare the existing summary to its replacement, describe why it changes, and explicitly confirm the new acknowledgement cycle."
+        status={<Pill tone="warning">Human approval required</Pill>} />
+      <PeopleDialogSection step="01" title="Current record" description="This action affects the selected policy in this company only.">
+        <Properties rows={[
+          { label: "Policy", value: policy.title },
+          { label: "Current version", value: current },
+          { label: "Proposed version", value: next || "Version format needs review" },
+          { label: "Acknowledgements in current aggregate", value: policy.fields.acknowledged === undefined
+            ? "Not recorded" : String(policy.fields.acknowledged) },
+          { label: "New-version acknowledgement count", value: "Starts with none" },
+        ]} />
+        {!version && <Notice tone="danger" title="Invalid existing version">
+          The recorded version needs a numeric major.minor format before a next version can be derived.
+        </Notice>}
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Revised summary and publication reason"
+        description="The stored summary is updated and captured in record history. Attached or structured policy documents are not changed by this form.">
+        <Field label="Updated policy summary" required>
+          <TextArea rows={5} value={summary} disabled={!canPublish}
+            onChange={(event) => { setSummary(event.target.value); setError(""); }} />
+        </Field>
+        <Field label="Why is this revision necessary?" required>
+          <TextArea rows={3} value={reason} disabled={!canPublish}
+            onChange={(event) => { setReason(event.target.value); setError(""); }} />
+        </Field>
+        {!changed && <Notice tone="warning" title="No revised summary yet">
+          Enter a substantive change; simply incrementing the version would not communicate any new policy content.
+        </Notice>}
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Publication and acknowledgement"
+        description="The previous version's linked acknowledgements remain separate and its prior summary remains in record history.">
+        <Checkbox checked={confirmed} disabled={!canPublish} onChange={(event) => setConfirmed(event.target.checked)}
+          label="I reviewed this summary revision and understand that the new version requires its own acknowledgements" />
+        <Notice tone="info" title="This is a local record publication">
+          Changing this policy record does not send emails, change attached documents, legally validate the policy or automatically obtain employee acknowledgements.
+        </Notice>
+        {!canPublish && <Notice tone="warning" title="Publication role required">
+          Your current role cannot publish a revision of this HR policy.
+        </Notice>}
+        {error && <Notice tone="danger" title="Revision not published">{error}</Notice>}
+      </PeopleDialogSection>
+      <Row gap={2} wrap>
         <Button variant="ghost" onClick={close}>Cancel</Button>
         <span className="ds-grow" />
-        <Button
-          variant="primary"
-          onClick={async () => {
-            await context.mutate.patch(policy.id, {
-              fields: { ...policy.fields, version: next, acknowledged: 0, supersedes: current },
-            }, { expectRevision: policy.revision, event: `${policy.title} published as version ${next}, superseding ${current}` });
-            context.toast("Revision published", `Version ${next} is live and version ${current} is kept in the history.`);
+        <Button variant="primary" disabled={!valid} onClick={async () => {
+          setError("");
+          if (!valid || !next) return;
+          try {
+            const saved = await context.mutate.patch(policy.id, {
+              summary: summary.trim(),
+              fields: {
+                ...policy.fields, version: next, supersedes: current,
+                acknowledged: 0, revisionReason: reason.trim(),
+                publishedBy: context.actor, publishedAt: clockIso(),
+              },
+            }, {
+              expectRevision: policy.revision,
+              event: `${policy.title} summary revision ${next} published by ${context.actor}; supersedes ${current}`,
+            });
+            if (!saved) { setError("The policy has changed; reopen the latest record before publishing."); return; }
+            context.toast("Local policy revision saved",
+              `Version ${next} now has a revised summary and a fresh acknowledgement cycle; linked documents were not changed.`);
             close();
-          }}
-        >
-          Publish version {next}
-        </Button>
+          } catch (problem) {
+            setError(problem instanceof Error ? problem.message : "The policy revision could not be saved.");
+          }
+        }}>Publish version {next || "—"}</Button>
       </Row>
     </Stack>
   );
