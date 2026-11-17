@@ -678,7 +678,10 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
       <div className="hr-profile-identity-actions">
         <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)}>Employee directory</Button>
         {context.can("edit_people") && !terminated && (
-          <Button variant="primary" onClick={() => context.openOverlay("profile editor")}>Edit profile</Button>
+          <>
+            <Button variant="primary" onClick={() => context.openOverlay("profile editor")}>Edit profile</Button>
+            <Button variant="outline-danger" onClick={() => context.openOverlay("offboarding confirmation")}>Offboard</Button>
+          </>
         )}
       </div>
     </section>
