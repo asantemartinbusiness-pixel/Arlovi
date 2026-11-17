@@ -79,3 +79,22 @@ test("Unknown website builder URLs cannot substitute a real site", async ({ page
   await expect(main).toContainText(/Record not found|No site in this workspace/);
   await expect(main.getByLabel("Website editor overview")).toHaveCount(0);
 });
+
+
+test("Website quality review filters long check lists and returns to the same editor", async ({ page }) => {
+  await page.goto("/o/northline/web/sites");
+  const dashboard = await page.locator(".web-library-card").first()
+    .getByRole("link", { name: "Dashboard" }).getAttribute("href");
+  await page.goto(dashboard + "/quality?tab=Accessibility");
+  const main = page.locator("#main");
+  const review = main.getByLabel("Website quality review");
+  await expect(review).toBeVisible();
+  await expect(review).toContainText("Accessibility checks");
+  const filters = main.getByRole("group", { name: "Quality issue filter" });
+  await expect(filters.getByRole("button", { name: /Needs attention/ })).toHaveAttribute("aria-pressed", "true");
+  await filters.getByRole("button", { name: /All checks/ }).click();
+  await expect(filters.getByRole("button", { name: /All checks/ })).toHaveAttribute("aria-pressed", "true");
+  await review.getByRole("button", { name: "Open editor" }).click();
+  await expect(page).toHaveURL(new RegExp(dashboard + "/builder$"));
+  await expect(main.getByLabel("Website editor overview")).toBeVisible();
+});
