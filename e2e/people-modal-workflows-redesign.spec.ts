@@ -241,3 +241,23 @@ test("Learning distinguishes locally saved draft courses from other states", asy
   await expect(filter).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#main")).toContainText("Publication state");
 });
+
+
+test("Employee profile tabs expose scoped actions and avoid unverified balance claims", async ({ page }) => {
+  await page.goto("/o/northline/hr/employees");
+  const employeeId = await page.evaluate(async () => {
+    const repo = await import("../src/platform/repo");
+    const rows = await repo.listByCollection("org-northline", "employees");
+    return rows.find((row) => row.status !== "alumni")?.id ?? null;
+  });
+  expect(employeeId).toBeTruthy();
+  await page.goto(`/o/northline/hr/employees/${employeeId}?tab=Job`);
+  await expect(page.locator("#main").getByRole("button", { name: "Update job details" })).toBeVisible();
+  await page.goto(`/o/northline/hr/employees/${employeeId}?tab=Documents`);
+  await expect(page.locator("#main").getByRole("button", { name: "Add a document reference" })).toBeVisible();
+  await page.goto(`/o/northline/hr/employees/${employeeId}?tab=Leave`);
+  await expect(page.locator("#main").getByRole("button", { name: "Open leave workspace" })).toBeVisible();
+  await expect(page.locator("#main")).not.toContainText("Capped at five days by policy");
+  await page.goto(`/o/northline/hr/employees/${employeeId}?tab=Access`);
+  await expect(page.locator("#main")).toContainText("No connected identity provider");
+});
