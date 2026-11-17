@@ -2296,7 +2296,6 @@ export function Payroll({ context, lens }: { context: ScreenContext; lens: "Runs
   // explicitly recorded annual salary. They are NOT historical payroll snapshots.
   const lines = useMemo(() => computePayroll(eligible.filter(hasSalary)), [eligible]);
   const gross = lines.reduce((sum, line) => sum + line.grossMinor, 0);
-  const net = lines.reduce((sum, line) => sum + line.netMinor, 0);
   const pending = data.payrollRuns.filter((run) => run.status === "draft");
   const canView = context.can("view_payroll");
   if (!canView) return (
