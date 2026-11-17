@@ -87,3 +87,21 @@ test("Forms analytics and publishing keep measured context and local-only disclo
   await expect(page.locator("#main").getByLabel("Form publishing overview")).toBeVisible();
   await expect(page.locator("#main")).toContainText("External hosting, public access controls and email delivery are not connected.");
 });
+
+test("Forms local publication requires acknowledgement and answerable questions", async ({ page }) => {
+  await page.goto("/o/northline/forms/forms");
+  const id = await page.evaluate(async () => {
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({ organizationId: "org-northline", collection: "forms", currency: "GBP", title: "QA Consent Guard", status: "draft", fields: {} }, ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  });
+  await page.goto(`/o/northline/forms/forms/${id}`);
+  await page.getByRole("button", { name: "Publish", exact: true }).first().click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Publishing is blocked");
+  await expect(dialog.getByRole("checkbox", { name: /I understand this records a local publication status/ })).not.toBeChecked();
+  await expect(dialog.getByRole("button", { name: /Mark version .* live locally/ })).toBeDisabled();
+});
