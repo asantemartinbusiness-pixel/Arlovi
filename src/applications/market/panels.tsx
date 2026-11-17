@@ -693,7 +693,17 @@ export function SocialPublishing({ context, state }: { context: ScreenContext; s
 export function EmailCampaigns({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useMarketData();
   const { now } = useWorkspace();
+  const [campaignFilter, setCampaignFilter] = useState<"all" | "draft" | "approval" | "active">("all");
   const emailCampaigns = data.campaigns.filter((campaign) => (bodyOf<CampaignBody>(campaign, {}).channels ?? []).some((channel) => channel.network === "email"));
+  const visibleEmailCampaigns = campaignFilter === "all" ? emailCampaigns
+    : emailCampaigns.filter(campaign => campaign.status === campaignFilter);
+  const campaignToolbar = <div className="t4-market-filters" role="group" aria-label="Email campaign status filters">
+    <Segmented label="Email campaign status" value={campaignFilter} onChange={value => { setCampaignFilter(value); context.select(undefined); }}
+      options={[{ value: "all", label: "All" }, { value: "draft", label: "Draft" }, { value: "approval", label: "Review" }, { value: "active", label: "Active" }]} />
+    <span className="t4-market-filter-count" role="status" aria-live="polite">
+      {visibleEmailCampaigns.length} of {emailCampaigns.length} campaign plans · no mail provider connected
+    </span>
+  </div>;
   const emailTemplates = data.templates.filter((template) => String(template.fields.kind) === "email");
 
   if (lens === "Templates") {
@@ -754,11 +764,18 @@ export function EmailCampaigns({ context, lens }: { context: ScreenContext; lens
     );
   }
 
-  return emailCampaigns.length === 0
-    ? <Empty title="No email campaigns" icon={<Mail size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("email builder")}>Build an email</Button>} />
-    : (
-      <DataGrid
-        rows={emailCampaigns}
+  return <Stack gap={4}>
+    {campaignToolbar}
+    {visibleEmailCampaigns.length === 0
+      ? <Empty title={campaignFilter === "all" ? "No email campaigns" : "No campaign plans in this status"}
+          icon={<Mail size={20} />}
+          action={campaignFilter === "all"
+            ? <Button variant="primary" onClick={() => context.openOverlay("email builder")}>Build an email</Button>
+            : <Button variant="secondary" onClick={() => setCampaignFilter("all")}>Show all campaign plans</Button>}>
+          Drafts, approval and launch status are workspace records; no email has been sent from this interface.
+        </Empty>
+      : <DataGrid
+        rows={visibleEmailCampaigns}
         rowId={(row) => row.id}
         label="Email campaigns"
         selectedId={context.selectedId}
@@ -772,8 +789,11 @@ export function EmailCampaigns({ context, lens }: { context: ScreenContext; lens
           { key: "state", header: "State", cell: (row) => <Pill tone={toneForStatus(row.status)} dot>{row.status}</Pill> },
           { key: "delivery", header: "Delivery", cell: () => <Pill tone="warning">Not connected</Pill> },
         ]}
-      />
-    );
+      />}
+    <Notice tone="info" title="Email preparation is local">
+      Campaign status, segment eligibility and send windows are stored in this workspace. No external email delivery, open-rate or click-rate evidence is available.
+    </Notice>
+  </Stack>;
 }
 
 /* ---------------------------- MARKET-007 ---------------------------- */
