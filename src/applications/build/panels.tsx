@@ -410,11 +410,27 @@ export function CodeScreen({ context, lens }: { context: ScreenContext; lens: "F
   const files = [...generatedFiles(model), ...model.files];
   const file = files.find((item) => item.path === path) ?? files[0];
   const issues = validateApp(model).filter((issue) => issue.level !== "pass");
+  const generatedCount = generatedFiles(model).length;
+  const codeOverview = (
+    <section className="t6-build-library-overview" aria-label="Build generated code overview">
+      <Row gap={2} wrap>
+        <div className="ds-grow" style={{ minWidth: 220 }}><span className="ds-subtle">BUILD / SOURCE WORKSPACE</span><h2>Understand what your model generates.</h2><p className="ds-subtle">Inspect generated files, project-owned additions, model diagnostics and change history without confusing this view with a connected Git repository.</p></div>
+        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/builder`)}>Back to builder</Button>
+      </Row>
+      <div className="t6-build-library-metrics" aria-label="Generated code status">
+        <div><span>Generated files</span><strong>{generatedCount}</strong></div>
+        <div><span>Project files</span><strong>{model.files.length}</strong></div>
+        <div><span>Problems</span><strong>{issues.filter((issue) => issue.level === "fail").length}</strong></div>
+        <div><span>To review</span><strong>{issues.filter((issue) => issue.level === "warn").length}</strong></div>
+      </div>
+    </section>
+  );
 
   if (lens === "Source control") {
     const changes = events.filter((event) => /entity|field|screen|component|automation|role/i.test(event.message));
     return (
       <Stack gap={4}>
+        {codeOverview}
         <Notice tone="info" title="The model is the source of truth">
           There is no repository here. Every change to the model writes an audit event, and the generated files are produced from the model each time they are read, so they cannot drift.
         </Notice>
@@ -439,19 +455,21 @@ export function CodeScreen({ context, lens }: { context: ScreenContext; lens: "F
   }
 
   if (lens === "Problems") {
-    return issues.length === 0
-      ? <Empty title="No problems" icon={<ShieldCheck size={20} />}>Every check on the model passes, so the generated code compiles against itself.</Empty>
-      : (
-        <Stack gap={2}>
-          {issues.map((issue) => (
+    return (
+      <Stack gap={4}>
+        {codeOverview}
+        {issues.length === 0 ? <Notice tone="success" title="No model problems detected">The model diagnostics have no failures or warnings. A runtime build and execution still require separate verification.</Notice> : (
+          <Stack gap={2}>{issues.map((issue) => (
             <div key={issue.id} className="t6-check" data-state={issue.level}>
               <span className="t6-check-dot" aria-hidden="true" />
               <div><strong>{issue.title}</strong><p className="ds-subtle">{issue.detail}</p></div>
               <Pill tone={issue.level === "fail" ? "danger" : "warning"}>{issue.area}</Pill>
             </div>
-          ))}
-        </Stack>
-      );
+          ))}</Stack>
+        )}
+        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>Review model checks</Button>
+      </Stack>
+    );
   }
 
   if (lens === "Tests") {
@@ -459,6 +477,8 @@ export function CodeScreen({ context, lens }: { context: ScreenContext; lens: "F
   }
 
   return (
+    <Stack gap={4}>
+      {codeOverview}
     <Grid>
       <Card span={4} title="Files" subtitle={`${files.length} files`}>
         <Stack gap={1}>
@@ -483,6 +503,7 @@ export function CodeScreen({ context, lens }: { context: ScreenContext; lens: "F
         <pre className="t6-code">{file?.content ?? "// No file selected"}</pre>
       </Card>
     </Grid>
+    </Stack>
   );
 }
 
