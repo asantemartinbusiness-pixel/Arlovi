@@ -5,7 +5,7 @@ import {
   Button, Card, Checkbox, DataGrid, Empty, Field, Grid, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
-import { useEvents, useRecord, useWorkspace } from "@/platform/workspace";
+import { useCollections, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import { downloadFile } from "@/runtime/db";
 import type { Rec } from "@/domain/types";
 import {
@@ -19,6 +19,7 @@ import type { FinData } from "./data";
 import { Amount, CapabilityNotice, CapabilityPill, OverdueBadge, SourceNote, StatementRow, StatusPill, TaxCodePill, taxRateText } from "./parts";
 import { clockIso } from "@/platform/clock";
 import { prepareInvoiceIssue, prepareInvoiceReceipt } from "./settlement";
+import { assessTimeBilling } from "./timeBilling";
 
 /* ------------------------------------------------------------------ *
  * FIN-004 Invoice list and FIN-005 Invoice detail.
@@ -153,6 +154,141 @@ export function InvoiceList({ context, tab }: { context: ScreenContext; tab: str
           <SourceNote>A reminder is written as a draft against the invoice with its recipient and body, and the invoice records that a reminder exists. Nothing leaves this browser, so a duplicate send is impossible.</SourceNote>
         </Card>
       </Grid>
+    </Stack>
+  );
+}
+
+/**
+ * Finance sees linked source records rather than an invented invoice subtotal.
+ * This is a review queue: approval by People is necessary but not sufficient
+ * to charge a customer, resolve tax or create a posted receivable.
+ */
+export function FinanceTimeInputs({ context }: { context: ScreenContext }) {
+  const data = useCollections(["shifts", "employees", "projects", "invoices"]);
+  const rows = data.shifts
+    .filter((row) => row.fields.kind === "time" && row.fields.billable === true)
+    .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+  const assess = (entry: Rec) => assessTimeBilling(entry, data.employees, data.projects, data.invoices);
+  const ready = rows.filter((entry) => assess(entry).state === "ready");
+  const reviewed = rows.filter((entry) => assess(entry).state === "reviewed");
+  const needsWork = rows.filter((entry) => !["ready", "reviewed", "invoiced"].includes(assess(entry).state));
+  const approvedEstimate = reviewed.reduce((sum, entry) => sum + Number(assess(entry).netEstimateMinor ?? 0), 0);
+  return (
+    <Stack gap={4}>
+      <Row gap={3} wrap>
+        <div className="ds-grow">
+          <strong>{rows.length} potentially billable time entries</strong>
+          <p className="ds-subtle">{ready.length} ready for Finance review · {reviewed.length} reviewed · {needsWork.length} need attention</p>
+        </div>
+        <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/invoices?tab=Draft`)}>
+          Open draft invoices
+        </Button>
+      </Row>
+      <Notice tone="info" title="Source records, not an invoice or revenue">
+        These entries come from People and Projects. A recorded time approval does not prove a contractual rate, tax status, customer
+        or invoice. Finance must independently prepare and approve the invoice; nothing here posts to the ledger or sends a bill.
+      </Notice>
+      {rows.length === 0 ? (
+        <Empty title="No billable time submitted">
+          Project time entries marked billable will appear here for Finance review, including those that still need a People approval.
+        </Empty>
+      ) : (
+        <DataGrid
+          rows={rows}
+          rowId={(entry) => entry.id}
+          label="Billable time source records"
+          filterable
+          onOpen={(id) => context.openOverlay("finance time review", { id })}
+          rowTone={(entry) => ["identity_missing", "project_missing", "invoice_missing", "invalid_hours"].includes(assess(entry).state)
+            ? "danger" : ["unapproved", "rate_missing"].includes(assess(entry).state) ? "warning" : undefined}
+          columns={[
+            { key: "person", header: "Employee", primary: true,
+              cell: (entry) => data.employees.find((person) => person.id === entry.fields.employeeId)?.title
+                ?? <span className="ds-subtle">{String(entry.fields.employeeName ?? "Unlinked")} · verify</span>,
+              filterValue: (entry) => String(entry.fields.employeeName ?? "") },
+            { key: "project", header: "Project",
+              cell: (entry) => data.projects.find((project) => project.id === entry.fields.projectId)?.title
+                ?? <span className="ds-subtle">Not linked</span> },
+            { key: "hours", header: "Hours", align: "end",
+              cell: (entry) => <span className="ds-num">{String(entry.fields.hours ?? "—")}</span>,
+              sortValue: (entry) => Number(entry.fields.hours ?? 0) },
+            { key: "estimate", header: "Net estimate", align: "end",
+              cell: (entry) => assess(entry).netEstimateMinor !== undefined
+                ? context.money(assess(entry).netEstimateMinor ?? 0) : <span className="ds-subtle">Unpriced</span>,
+              sortValue: (entry) => assess(entry).netEstimateMinor ?? 0 },
+            { key: "state", header: "Review",
+              cell: (entry) => {
+                const state = assess(entry);
+                return <Pill tone={state.state === "reviewed" ? "success" : state.state === "ready" ? "info" : "warning"}>{state.label}</Pill>;
+              }},
+          ]}
+          summary={<>
+            <span className="ds-subtle">Reviewed-only illustrative net subtotal, excluding tax</span>
+            <strong>{reviewed.length ? context.money(approvedEstimate) : "No reviewed rated time"}</strong>
+          </>}
+        />
+      )}
+      <Notice tone="warning" title="Amounts are not invoice totals">
+        Estimates include only recorded positive rates and valid approved hours; customer rates and applicable tax must be checked on the actual invoice.
+        Unpriced or unapproved entries are never silently valued at zero.
+      </Notice>
+    </Stack>
+  );
+}
+
+export function FinanceTimeReview({ context, close }: { context: ScreenContext; close: () => void }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const entry = useRecord(payload?.id ?? context.selectedId);
+  const data = useCollections(["employees", "projects", "invoices"]);
+  if (!entry || entry.organizationId !== context.org.id || entry.collection !== "shifts"
+    || entry.fields.kind !== "time" || entry.fields.billable !== true) {
+    return <Empty title="Time entry unavailable">Select an actual billable time entry in this company.</Empty>;
+  }
+  const person = data.employees.find((row) => row.id === entry.fields.employeeId);
+  const project = data.projects.find((row) => row.id === entry.fields.projectId);
+  const assessment = assessTimeBilling(entry, data.employees, data.projects, data.invoices);
+  const canReview = context.can("post_journal");
+  return (
+    <Stack gap={4}>
+      <Properties rows={[
+        { label: "Employee", value: person?.title ?? "No linked employee" },
+        { label: "Project", value: project?.title ?? "No linked Project" },
+        { label: "Hours", value: String(entry.fields.hours ?? "Not recorded") },
+        { label: "Recorded rate", value: entry.fields.rateMinor !== undefined ? context.money(Number(entry.fields.rateMinor)) : "Not recorded" },
+        { label: "Illustrative net", value: assessment.netEstimateMinor !== undefined ? context.money(assessment.netEstimateMinor) : "Unavailable" },
+        { label: "People approval", value: entry.status === "approved" && entry.fields.approved === true
+          ? `Approved by ${String(entry.fields.approvedBy ?? "Unknown")}`
+          : "Not approved" },
+        { label: "Finance review", value: assessment.label },
+        { label: "Reviewed by", value: String(entry.fields.billingReviewedBy || "No Finance review yet") },
+      ]} />
+      <Notice tone={assessment.eligible || assessment.state === "reviewed" ? "info" : "warning"} title={assessment.label}>
+        {assessment.eligible
+          ? "This record can be marked reviewed locally. That does not set a customer, tax code or invoice number."
+          : "Resolve the underlying source record in People or Projects before using this time for Finance invoicing."}
+      </Notice>
+      <Row gap={2} wrap>
+        {context.role === "owner" && <Button variant="secondary" onClick={() => {
+          close(); context.navigate(`/o/${context.org.slug}/hr/scheduling?tab=Timesheets`);
+        }}>Open People timesheets</Button>}
+        <span className="ds-grow" />
+        <Button variant="ghost" onClick={close}>Close</Button>
+        {assessment.eligible && <Button variant="primary" disabled={!canReview} onClick={async () => {
+          const updated = await context.mutate.patch(entry.id, {
+            fields: {
+              ...entry.fields,
+              billingReviewStatus: "ready",
+              billingReviewedBy: context.actor,
+              billingReviewedAt: clockIso(),
+            },
+          }, { expectRevision: entry.revision,
+            event: `Approved billable time reviewed by Finance: ${entry.title}. No invoice created.` });
+          if (!updated) return;
+          context.toast("Finance review saved", "This time input is ready for manual invoice preparation. No ledger entry or invoice was created.");
+          close();
+        }}>Mark reviewed for billing</Button>}
+      </Row>
+      {!canReview && <Notice tone="warning">Only an owner or Finance role with journal-review capability can record this Finance decision in the local workspace.</Notice>}
     </Stack>
   );
 }
