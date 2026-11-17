@@ -1,4 +1,5 @@
 import { useState } from "react";
+import "./library.css";
 import { ClipboardList, Copy, FileText, Inbox, Link2, ShieldAlert, Workflow } from "lucide-react";
 import {
   BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties,
@@ -72,82 +73,104 @@ export function FormsDirectory({ context, scope }: { context: ScreenContext; sco
   const forms = useCollection("forms");
   const submissions = useCollection("submissions");
   const { org } = useWorkspace();
-
-  if (scope === "Templates") {
-    return (
-      <Grid>
-        {TEMPLATES.map((template) => (
-          <Card key={template.id} span={6} title={template.title} subtitle={template.summary}
-            footer={<Button size="sm" variant="primary" onClick={async () => {
-              const model: FormModel = {
-                ...readForm(undefined),
-                fields: template.fields.map((field) => {
-                  const made = makeField(field.type);
-                  return { ...made, label: field.label, required: field.required ?? false, options: field.options ?? made.options };
-                }),
-              };
-              const created = await context.mutate.create({
-                collection: "forms",
-                title: `${template.title} form`,
-                status: "draft",
-                summary: template.summary,
-                body: model,
-              }, `Form created from the ${template.title} template`);
-              context.toast("Form created", `${created.title} has ${model.fields.length} fields and is a draft.`);
-              context.navigate(`/o/${org.slug}/forms/forms/${created.id}`);
-            }}>Start from this</Button>}>
-            <Stack gap={1}>
-              {template.fields.map((field) => (
-                <Row key={field.label} gap={2}>
-                  <span className="ds-grow">{field.label}</span>
-                  <Pill tone="neutral">{FIELD_LABELS[field.type]}</Pill>
-                  {field.required && <Pill tone="warning">required</Pill>}
-                </Row>
-              ))}
-            </Stack>
-          </Card>
-        ))}
-      </Grid>
-    );
-  }
-
-  const rows = forms.filter((record) => {
-    if (scope === "Live") return record.status === "live";
-    if (scope === "Draft") return record.status !== "live" && record.status !== "archived";
-    return record.status !== "archived";
-  });
-
-  if (rows.length === 0) {
-    return (
-      <Empty title={scope === "All" ? "No forms yet" : `No ${scope.toLowerCase()} forms`} icon={<ClipboardList size={20} />}
-        action={<Button variant="primary" onClick={() => context.openOverlay("New form")}>Create a form</Button>}>
-        A form is a list of typed questions with its own validation and rules. Answers become records in this workspace.
-      </Empty>
-    );
-  }
-
+  const [query, setQuery] = useState("");
+  const active = forms.filter((record) => record.status !== "archived");
+  const live = active.filter((record) => record.status === "live");
+  const draft = active.filter((record) => record.status !== "live");
+  const rowsInScope = scope === "Live" ? live : scope === "Draft" ? draft : active;
+  const needle = query.trim().toLocaleLowerCase();
+  const rows = rowsInScope.filter((record) => !needle || [record.title, record.summary, record.ownerName, ...record.tags].join(" ").toLocaleLowerCase().includes(needle));
+  const templateRows = TEMPLATES.filter((template) => !needle || [template.title, template.summary, ...template.fields.map((field) => field.label)].join(" ").toLocaleLowerCase().includes(needle));
+  const formIds = new Set(active.map((record) => record.id));
+  const totalResponses = submissions.filter((record) => record.parentId && formIds.has(record.parentId)).length;
+  const heading = scope === "Templates" ? "Start from a proven structure." : scope === "Live" ? "Forms accepting responses." : scope === "Draft" ? "Prepare the next form." : "Forms and their responses.";
   return (
-    <DataGrid
-      rows={rows}
-      rowId={(row) => row.id}
-      label="Forms"
-      columns={[
-        { key: "title", header: "Form", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
-        { key: "fields", header: "Questions", align: "end", cell: (row) => String(readForm(row).fields.filter((field) => !STRUCTURAL.includes(field.type)).length), sortValue: (row) => readForm(row).fields.length },
-        { key: "status", header: "State", cell: (row) => <Pill tone={row.status === "live" ? "success" : "neutral"} dot>{row.status}</Pill> },
-        { key: "access", header: "Audience", cell: (row) => readForm(row).settings.access === "link" ? "Anyone with the link" : "This workspace" },
-        { key: "subs", header: "Submissions", align: "end", cell: (row) => String(submissions.filter((item) => item.parentId === row.id).length), sortValue: (row) => submissions.filter((item) => item.parentId === row.id).length },
-        { key: "sensitive", header: "Sensitive", cell: (row) => readForm(row).fields.some((field) => field.sensitive) ? <Pill tone="danger">flagged</Pill> : <span className="ds-subtle">No</span> },
-        { key: "owner", header: "Owner", cell: (row) => row.ownerName },
-      ]}
-      onOpen={(id) => context.navigate(`/o/${org.slug}/forms/forms/${id}`)}
-      onSelect={(id) => context.select(id)}
-      selectedId={context.selectedId}
-      summary={<span>A form flagged sensitive keeps its answers redacted in the submissions table until someone chooses to reveal them, and the choice is recorded.</span>}
-      bulkActions={[
-        { label: "Archive", tone: "danger", onRun: (selected) => selected.forEach((row) => void context.mutate.patch(row.id, { status: "archived" }, { event: `Form ${row.title} archived` })) },
-      ]}
-    />
+    <Stack gap={4}>
+      <section aria-label="Forms library overview" className="t6-directory-intro">
+        <Row gap={3} wrap>
+          <div className="ds-grow" style={{ minWidth: 220 }}>
+            <span className="ds-subtle">FORMS / {scope.toUpperCase()}</span>
+            <h2 style={{ margin: "var(--space-2) 0", fontSize: "clamp(1.3rem, 2.5vw, 1.8rem)", letterSpacing: "-.03em" }}>{heading}</h2>
+            <p className="ds-subtle" style={{ maxWidth: "65ch", margin: 0 }}>
+              {scope === "Templates" ? "Choose a starting point, then customise every question and validation rule." : "Find the right form, inspect its response activity, and continue editing without losing context."}
+            </p>
+          </div>
+          <Button variant="primary" onClick={() => context.openOverlay("New form")}>New form</Button>
+        </Row>
+      </section>
+      <div className="t6-directory-metrics" aria-label="Forms activity summary">
+        <div><span>Active forms</span><strong>{active.length}</strong></div>
+        <div><span>Live forms</span><strong>{live.length}</strong></div>
+        <div><span>Draft forms</span><strong>{draft.length}</strong></div>
+        <div><span>Stored responses</span><strong>{totalResponses}</strong></div>
+      </div>
+      <Field label={scope === "Templates" ? "Find a template" : "Find a form"}>
+        <TextInput type="search" aria-label={scope === "Templates" ? "Find a template" : "Find a form"} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={scope === "Templates" ? "Search templates or questions" : "Search name, description, owner or tags"} />
+      </Field>
+      {scope === "Templates" ? (
+        templateRows.length === 0 ? (
+          <Empty title="No templates match this search" icon={<ClipboardList size={20} />} action={<Button variant="secondary" onClick={() => setQuery("")}>Clear search</Button>}>Try a different keyword to browse the available templates.</Empty>
+        ) : (
+          <Grid>
+            {templateRows.map((template) => (
+              <Card key={template.id} span={6} title={template.title} subtitle={template.summary}
+                footer={<Button size="sm" variant="primary" onClick={async () => {
+                  const model: FormModel = {
+                    ...readForm(undefined),
+                    fields: template.fields.map((field) => {
+                      const made = makeField(field.type);
+                      return { ...made, label: field.label, required: field.required ?? false, options: field.options ?? made.options };
+                    }),
+                  };
+                  const created = await context.mutate.create({
+                    collection: "forms", title: `${template.title} form`, status: "draft",
+                    summary: template.summary, body: model,
+                  }, `Form created from the ${template.title} template`);
+                  context.toast("Form created", `${created.title} has ${model.fields.length} fields and is a draft.`);
+                  context.navigate(`/o/${org.slug}/forms/forms/${created.id}`);
+                }}>Start from this</Button>}>
+                <Stack gap={1}>
+                  {template.fields.map((field) => (
+                    <Row key={field.label} gap={2}>
+                      <span className="ds-grow">{field.label}</span>
+                      <Pill tone="neutral">{FIELD_LABELS[field.type]}</Pill>
+                      {field.required && <Pill tone="warning">required</Pill>}
+                    </Row>
+                  ))}
+                </Stack>
+              </Card>
+            ))}
+          </Grid>
+        )
+      ) : rows.length === 0 ? (
+        <Empty title={needle ? "No forms match this search" : scope === "All" ? "No forms yet" : `No ${scope.toLowerCase()} forms`} icon={<ClipboardList size={20} />}
+          action={needle ? <Button variant="secondary" onClick={() => setQuery("")}>Clear search</Button> : <Button variant="primary" onClick={() => context.openOverlay("New form")}>Create a form</Button>}>
+          {needle ? "Try a different name, owner, description or tag." : "Forms start as drafts. Add questions, test the logic and publish when ready."}
+        </Empty>
+      ) : (
+        <DataGrid
+          rows={rows}
+          rowId={(row) => row.id}
+          label="Forms"
+          columns={[
+            { key: "title", header: "Form", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
+            { key: "fields", header: "Questions", align: "end", cell: (row) => String(readForm(row).fields.filter((field) => !STRUCTURAL.includes(field.type)).length), sortValue: (row) => readForm(row).fields.length },
+            { key: "status", header: "State", cell: (row) => <Pill tone={row.status === "live" ? "success" : "neutral"} dot>{row.status}</Pill> },
+            { key: "access", header: "Access setting", cell: (row) => readForm(row).settings.access === "link" ? "Link option (local)" : "Workspace option (local)" },
+            { key: "subs", header: "Submissions", align: "end", cell: (row) => String(submissions.filter((item) => item.parentId === row.id).length), sortValue: (row) => submissions.filter((item) => item.parentId === row.id).length },
+            { key: "sensitive", header: "Sensitive", cell: (row) => readForm(row).fields.some((field) => field.sensitive) ? <Pill tone="danger">flagged</Pill> : <span className="ds-subtle">No</span> },
+            { key: "owner", header: "Owner", cell: (row) => row.ownerName },
+          ]}
+          onOpen={(id) => context.navigate(`/o/${org.slug}/forms/forms/${id}`)}
+          onSelect={(id) => context.select(id)}
+          selectedId={context.selectedId}
+          summary={<span>Access options are stored locally, not server-enforced invitations or hosted public links. Sensitive answers remain redacted until explicitly revealed.</span>}
+          bulkActions={[
+            { label: "Archive", tone: "danger", onRun: (selected) => selected.forEach((row) => void context.mutate.patch(row.id, { status: "archived" }, { event: `Form ${row.title} archived` })) },
+          ]}
+        />
+      )}
+    </Stack>
   );
 }
 
@@ -241,10 +264,30 @@ export function LogicScreen({ context, lens }: { context: ScreenContext; lens: "
   if (!record) return <NoForm />;
   const issues = logicIssues(model);
   const answerable = model.fields.filter((field) => !STRUCTURAL.includes(field.type));
+  const blockingIssues = issues.filter((issue) => issue.level === "fail").length;
+  const workflowOverview = (
+    <section className="t6-workflow-overview" aria-label="Conditional logic overview">
+      <Row gap={3} wrap>
+        <div className="ds-grow" style={{ minWidth: 220 }}>
+          <span className="ds-subtle">FORMS / CONDITIONAL LOGIC</span>
+          <h2 style={{ margin: "var(--space-2) 0", fontSize: "clamp(1.2rem, 2vw, 1.65rem)", letterSpacing: "-.03em" }}>Make every path understandable.</h2>
+          <p className="ds-subtle" style={{ margin: 0 }}>Rules decide which questions appear and which answers are required. Validate every branch before collecting responses.</p>
+        </div>
+        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}`)}>Back to builder</Button>
+      </Row>
+      <div className="t6-directory-metrics">
+        <div><span>Rules</span><strong>{model.logic.length}</strong></div>
+        <div><span>Answerable fields</span><strong>{answerable.length}</strong></div>
+        <div><span>Blocking issues</span><strong>{blockingIssues}</strong></div>
+        <div><span>Warnings</span><strong>{issues.length - blockingIssues}</strong></div>
+      </div>
+    </section>
+  );
 
   if (lens === "Rules") {
     return (
       <Stack gap={4}>
+        {workflowOverview}
         <Row gap={2} wrap>
           <Button variant="primary" onClick={() => context.openOverlay("Rule editor")}>New rule</Button>
           <Button variant="secondary" onClick={() => context.openOverlay("invalid path")}>Check the branches</Button>
@@ -522,18 +565,36 @@ export function SubmissionsScreen({ context, lens }: { context: ScreenContext; l
   const children = useChildren(record?.id);
   const { now } = useWorkspace();
   const [revealed, setRevealed] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
   if (!record) return <NoForm />;
   const sensitive = model.fields.filter((field) => field.sensitive).map((field) => field.label);
   const rows = children.filter((row) => {
-    if (lens === "New") return row.status === "new";
-    if (lens === "Reviewed") return row.status === "reviewed";
-    if (lens === "Routed") return row.status === "routed";
-    return true;
+    if (lens === "New" && row.status !== "new") return false;
+    if (lens === "Reviewed" && row.status !== "reviewed") return false;
+    if (lens === "Routed" && row.status !== "routed") return false;
+    const needle = query.trim().toLocaleLowerCase();
+    return !needle || [row.title, row.summary, String(row.fields.assignee ?? ""), row.status].join(" ").toLocaleLowerCase().includes(needle);
   });
   const overdue = children.filter((row) => daysBetween(new Date(row.at ?? row.createdAt), now) > model.settings.retentionDays);
 
   return (
     <Stack gap={4}>
+      <section className="t6-workflow-overview" aria-label="Submission inbox overview">
+        <Row gap={3} wrap><div className="ds-grow" style={{ minWidth: 220 }}>
+          <span className="ds-subtle">FORMS / RESPONSES</span>
+          <h2 className="t6-workflow-title">Every answer has a next step.</h2>
+          <p className="ds-subtle">Review incoming records, protect sensitive answers and route follow-up to a responsible owner.</p>
+        </div>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}`)}>Back to builder</Button>
+        </Row>
+        <div className="t6-directory-metrics" aria-label="Submission workflow counts">
+          <div><span>Received</span><strong>{children.length}</strong></div>
+          <div><span>New</span><strong>{children.filter((row) => row.status === "new").length}</strong></div>
+          <div><span>Reviewed</span><strong>{children.filter((row) => row.status === "reviewed").length}</strong></div>
+          <div><span>Routed</span><strong>{children.filter((row) => row.status === "routed").length}</strong></div>
+        </div>
+        <Field label="Search responses"><TextInput type="search" aria-label="Search responses" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search respondent, status or assignee" /></Field>
+      </section>
       <StatRow>
         <Stat prov="posted" label="Submissions" value={String(children.length)} meta={`${children.filter((row) => row.status === "new").length} not yet reviewed`} />
         <Stat prov="posted" label="Sensitive answers" value={String(sensitive.length)} meta={sensitive.length ? `${sensitive.join(", ")} redacted by default` : "None flagged"} />
@@ -549,8 +610,8 @@ export function SubmissionsScreen({ context, lens }: { context: ScreenContext; l
       )}
 
       {rows.length === 0 ? (
-        <Empty title={`No ${lens === "All" ? "" : lens.toLowerCase() + " "}submissions`} icon={<Inbox size={20} />}>
-          Answer the form on its publish screen and the record appears here.
+        <Empty title={query.trim() ? "No responses match this search" : `No ${lens === "All" ? "" : lens.toLowerCase() + " "}submissions`} icon={<Inbox size={20} />} action={query.trim() ? <Button variant="secondary" onClick={() => setQuery("")}>Clear search</Button> : undefined}>
+          {query.trim() ? "Try a different respondent, status or assignee." : "Answer the form on its publish screen and the record appears here."}
         </Empty>
       ) : (
         <DataGrid
@@ -585,6 +646,8 @@ export function SubmissionsScreen({ context, lens }: { context: ScreenContext; l
             { key: "status", header: "State", cell: (row) => <Pill tone={row.status === "new" ? "info" : row.status === "routed" ? "success" : "neutral"}>{row.status}</Pill> },
           ]}
           onOpen={(id) => context.openOverlay("Submission drawer", { id })}
+          onSelect={(id) => context.select(id)}
+          selectedId={context.selectedId}
           bulkActions={[
             { label: "Mark reviewed", onRun: (selected) => selected.forEach((row) => void context.mutate.patch(row.id, { status: "reviewed" }, { event: `Submission ${row.title} marked reviewed` })) },
             { label: "Assign to me", onRun: (selected) => selected.forEach((row) => void context.mutate.patch(row.id, { status: "routed", fields: { ...row.fields, assignee: context.actor } }, { event: `Submission ${row.title} assigned to ${context.actor}` })) },
@@ -597,14 +660,14 @@ export function SubmissionsScreen({ context, lens }: { context: ScreenContext; l
                 ["received", "from", "version", "state", ...labels],
                 rows.map((row) => [
                   row.at ?? row.createdAt, row.title, row.fields.formVersion ?? "", row.status,
-                  ...labels.map((label) => (sensitive.includes(label) && !revealed.includes(row.id) ? "[redacted]" : String(row.fields[label] ?? ""))),
+                  ...labels.map((label) => (sensitive.includes(label) ? "[redacted]" : String(row.fields[label] ?? ""))),
                 ]),
               );
               void context.mutate.log(`${rows.length} submissions exported to CSV${sensitive.length ? " with sensitive answers redacted" : ""}`, { entityId: record.id, type: "export" });
               context.toast("Exported", `${rows.length} rows written to CSV${sensitive.length ? ", sensitive answers redacted" : ""}.`);
             }}>Export CSV</Button>
           }
-          summary={<span>Sensitive answers export as <code>[redacted]</code> unless they have been revealed on screen, and every reveal is recorded in the audit log.</span>}
+          summary={<span>Sensitive answers always export as <code>[redacted]</code>; revealing on screen does not include them in the CSV. Every reveal is logged.</span>}
         />
       )}
     </Stack>
@@ -615,13 +678,15 @@ export function SubmissionDrawer({ context }: { context: ScreenContext }) {
   const { record, model } = useFormRecord(context);
   const children = useChildren(record?.id);
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const [shown, setShown] = useState(false);
-  const submission = children.find((row) => row.id === payload?.id) ?? children[0];
+  const [revealedSubmissionId, setRevealedSubmissionId] = useState<string | null>(null);
+  const submission = payload?.id ? children.find((row) => row.id === payload.id) : undefined;
   if (!record) return <NoForm />;
-  if (!submission) return <Empty title="No submission selected" icon={<Inbox size={20} />} />;
+  if (!submission) return <Empty title="Submission unavailable" icon={<Inbox size={20} />}>The selected response could not be found for this form. No other person's answers were opened.</Empty>;
   const sensitive = model.fields.filter((field) => field.sensitive).map((field) => field.label);
+  const shown = revealedSubmissionId === submission.id;
   return (
     <Stack gap={4}>
+      <div><span className="ds-subtle">FORMS / RESPONSE DETAIL</span><h3 style={{ margin: "var(--space-2) 0" }}>{submission.title}</h3><p className="ds-subtle">Review the original answers and record a follow-up. Sensitive values stay hidden unless revealed explicitly.</p></div>
       <Properties rows={[
         { label: "From", value: submission.title },
         { label: "Received", value: context.dateTime(submission.at ?? submission.createdAt) },
@@ -638,7 +703,7 @@ export function SubmissionDrawer({ context }: { context: ScreenContext }) {
         }))} />
       {sensitive.length > 0 && (
         <Button size="sm" variant="secondary" onClick={() => {
-          setShown((current) => !current);
+          setRevealedSubmissionId(shown ? null : submission.id);
           void context.mutate.log(`${shown ? "Hid" : "Revealed"} sensitive answers on ${submission.title}`, { entityId: submission.id, type: "privacy" });
         }}>{shown ? "Hide sensitive answers" : "Reveal sensitive answers"}</Button>
       )}
@@ -657,6 +722,8 @@ export function PrivacyControl({ context }: { context: ScreenContext }) {
   const { record, model } = useFormRecord(context);
   const children = useChildren(record?.id);
   const { now } = useWorkspace();
+  const [confirmed, setConfirmed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   if (!record) return <NoForm />;
   const overdue = children.filter((row) => daysBetween(new Date(row.at ?? row.createdAt), now) > model.settings.retentionDays);
   return (
@@ -679,10 +746,20 @@ export function PrivacyControl({ context }: { context: ScreenContext }) {
               </Row>
             ))}
           </Stack>
-          <Button variant="outline-danger" onClick={async () => {
-            for (const row of overdue) await context.mutate.remove(row.id, `Submission ${row.title} deleted under the ${model.settings.retentionDays} day retention policy`);
-            context.toast("Deleted under policy", `${overdue.length} submissions were removed and each deletion is in the audit log.`, "blocked");
-          }}>Delete {overdue.length} past the period</Button>
+          <Notice tone="warning" title="Review before deleting">This will remove {overdue.length} stored response records from this workspace. Confirm the retention decision and any applicable holds before proceeding.</Notice>
+          <Checkbox label="I have reviewed the affected responses and authorise this deletion" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+          <Button variant="outline-danger" disabled={!confirmed || deleting} onClick={async () => {
+            setDeleting(true);
+            try {
+              for (const row of overdue) await context.mutate.remove(row.id, `Submission ${row.title} deleted under the ${model.settings.retentionDays} day retention policy`);
+              context.toast("Deletion recorded", `${overdue.length} submissions were removed from this workspace.`, "info");
+              setConfirmed(false);
+            } catch {
+              context.toast("Deletion incomplete", "One or more records could not be removed. Review the remaining submissions before retrying.", "blocked");
+            } finally {
+              setDeleting(false);
+            }
+          }}>{deleting ? "Deleting…" : `Delete ${overdue.length} past the period`}</Button>
         </>
       )}
       <Notice tone="info" title="Deletion is a decision, not a schedule">
@@ -720,9 +797,27 @@ export function PublishScreen({ context, lens }: { context: ScreenContext; lens:
   const { record, model } = useFormRecord(context);
   const [device, setDevice] = useState<"mobile" | "desktop">("desktop");
   if (!record) return <NoForm />;
+  const publishOverview = (
+    <section className="t6-workflow-overview" aria-label="Form publishing overview">
+      <Row gap={3} wrap><div className="ds-grow" style={{ minWidth: 220 }}>
+        <span className="ds-subtle">FORMS / DESIGN & DELIVERY</span>
+        <h2 className="t6-workflow-title">Prepare the form people will answer.</h2>
+        <p className="ds-subtle">Review appearance, response experience, versions and access boundaries before recording publication.</p>
+      </div><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}`)}>Back to builder</Button></Row>
+      <div className="t6-directory-metrics">
+        <div><span>Version</span><strong>{model.settings.version}</strong></div>
+        <div><span>Questions</span><strong>{model.fields.filter((field) => !STRUCTURAL.includes(field.type)).length}</strong></div>
+        <div><span>Logic rules</span><strong>{model.logic.length}</strong></div>
+        <div><span>Logic issues</span><strong>{logicIssues(model).length}</strong></div>
+      </div>
+      <Notice tone="info">Publication status is local to this workspace. External hosting, public access controls and email delivery are not connected.</Notice>
+    </section>
+  );
 
   if (lens === "Design") {
     return (
+      <Stack gap={4}>
+      {publishOverview}
       <Grid>
         <Card span={5} title="Appearance" subtitle="Saved on the form record">
           <FormThemeEditorBridge context={context} record={record} model={model} />
@@ -734,12 +829,15 @@ export function PublishScreen({ context, lens }: { context: ScreenContext; lens:
           </div>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
   if (lens === "Embed") {
     const snippet = embedSnippet(record.id, record.title, model.theme);
     return (
+      <Stack gap={4}>
+      {publishOverview}
       <Grid>
         <Card span={6} eyebrow="LIVE FORM" prov="human" title="The live form" subtitle={`Version ${model.settings.version} · a submission here writes a record`}>
           <Stack gap={3}>
@@ -764,23 +862,26 @@ export function PublishScreen({ context, lens }: { context: ScreenContext; lens:
           </Stack>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
   if (lens === "Access") {
     return (
+      <Stack gap={4}>
+      {publishOverview}
       <Grid>
         <Card span={6} eyebrow="ACCESS" prov="human" title="Who can answer" subtitle="Shapes the interface; it is not an account security boundary">
           <Stack gap={3}>
             <Properties rows={[
-              { label: "Audience", value: model.settings.access === "link" ? "Anyone with the link" : "People in this workspace" },
+              { label: "Audience preference", value: model.settings.access === "link" ? "Link mode (local only)" : "Workspace mode (local only)" },
               { label: "State", value: <Pill tone={model.settings.closed ? "warning" : "success"} dot>{model.settings.closed ? "Closed" : "Open"}</Pill> },
               { label: "Version", value: String(model.settings.version) },
-              { label: "Link", value: <code>/o/{context.org.slug}/forms/forms/{record.id}/publish</code> },
+              { label: "Editor route", value: <code>/o/{context.org.slug}/forms/forms/{record.id}/publish</code> },
             ]} />
             <Row gap={2} wrap>
               <Button size="sm" variant="secondary" onClick={() => void saveForm(context, record, { ...model, settings: { ...model.settings, access: model.settings.access === "link" ? "workspace" : "link" } }, "Form audience changed")}>
-                Switch to {model.settings.access === "link" ? "this workspace only" : "anyone with the link"}
+                Switch preference to {model.settings.access === "link" ? "workspace" : "link"} mode
               </Button>
               <Button size="sm" variant={model.settings.closed ? "primary" : "outline-danger"} onClick={() => void saveForm(context, record, { ...model, settings: { ...model.settings, closed: !model.settings.closed } }, model.settings.closed ? "Form reopened" : "Form closed")}>
                 {model.settings.closed ? "Reopen the form" : "Close the form"}
@@ -805,10 +906,11 @@ export function PublishScreen({ context, lens }: { context: ScreenContext; lens:
           </Stack>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
-  return <FormAnalytics context={context} lens="Funnel" />;
+  return <Stack gap={4}>{publishOverview}<FormAnalytics context={context} lens="Funnel" /></Stack>;
 }
 
 function FormThemeEditorBridge({ context, record, model }: { context: ScreenContext; record: Rec; model: FormModel }) {
@@ -819,6 +921,8 @@ import { FormThemeEditor as ThemeEditorImpl } from "./builder";
 
 export function PublishReviewForm({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, model } = useFormRecord(context);
+  const [confirmed, setConfirmed] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   if (!record) return <NoForm />;
   const issues = logicIssues(model);
   const blocking = issues.filter((issue) => issue.level === "fail");
@@ -834,9 +938,10 @@ export function PublishReviewForm({ context, close }: { context: ScreenContext; 
         <li className="t6-step" data-state={blocking.length === 0 ? "done" : "blocked"}><span className="t6-step-n">3</span>Reachable branches</li>
         <li className="t6-step" data-state="current"><span className="t6-step-n">4</span>Version {model.settings.version} → {model.settings.version + 1}</li>
       </ul>
-      {(blocking.length > 0 || noLabel.length > 0 || emptyOptions.length > 0) && (
+      {(answerable.length === 0 || blocking.length > 0 || noLabel.length > 0 || emptyOptions.length > 0) && (
         <Notice tone="danger" title="Publishing is blocked">
           <ul style={{ margin: "4px 0 0", paddingInlineStart: 18 }}>
+            {answerable.length === 0 && <li>Add at least one answerable question.</li>}
             {noLabel.map((field) => <li key={field.id}>A {FIELD_LABELS[field.type].toLowerCase()} field has no question text.</li>)}
             {emptyOptions.map((field) => <li key={field.id}>{field.label} has no options to choose from.</li>)}
             {blocking.map((issue) => <li key={issue.id}>{issue.title}</li>)}
@@ -850,18 +955,26 @@ export function PublishReviewForm({ context, close }: { context: ScreenContext; 
         { label: "Required", value: String(answerable.filter((field) => field.required).length) },
         { label: "Sensitive", value: String(answerable.filter((field) => field.sensitive).length) },
       ]} />
+      <Checkbox label="I understand this records a local publication status and does not create a hosted public form" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
       <Button
         variant="primary"
-        disabled={blocking.length > 0 || noLabel.length > 0 || emptyOptions.length > 0}
+        disabled={!confirmed || publishing || answerable.length === 0 || blocking.length > 0 || noLabel.length > 0 || emptyOptions.length > 0}
         onClick={async () => {
-          const next = { ...model, settings: { ...model.settings, version: model.settings.version + 1 } };
-          await saveForm(context, record, next, `Form published as version ${next.settings.version}`);
-          await context.mutate.patch(record.id, { status: "live" }, { event: `Form ${record.title} is live at version ${next.settings.version}` });
-          context.toast("Published", `Version ${next.settings.version} is live. Submissions from now on record that version.`);
-          close();
+          setPublishing(true);
+          try {
+            const next = { ...model, settings: { ...model.settings, version: model.settings.version + 1 } };
+            await saveForm(context, record, next, `Form version ${next.settings.version} recorded locally`);
+            await context.mutate.patch(record.id, { status: "live" }, { event: `Form ${record.title} marked live locally at version ${next.settings.version}` });
+            context.toast("Local status recorded", `Version ${next.settings.version} is marked live in this workspace. No public form was hosted.`, "info");
+            close();
+          } catch {
+            context.toast("Publication incomplete", "The form could not be fully updated. Review its current version and status before retrying.", "blocked");
+          } finally {
+            setPublishing(false);
+          }
         }}
       >
-        Publish version {model.settings.version + 1}
+        {publishing ? "Recording publication…" : `Mark version ${model.settings.version + 1} live locally`}
       </Button>
       <Notice tone="info" title="Publishing here means inside this workspace">
         The form answers in this browser and writes records here. There is no public address, because nothing is hosted.
@@ -918,10 +1031,26 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
   if (!record) return <NoForm />;
   const answerable = model.fields.filter((field) => !STRUCTURAL.includes(field.type));
   const enough = children.length >= 20;
+  const analyticsOverview = (
+    <section className="t6-workflow-overview" aria-label="Form analytics overview">
+      <Row gap={3} wrap><div className="ds-grow" style={{ minWidth: 220 }}>
+        <span className="ds-subtle">FORMS / ANALYTICS</span>
+        <h2 className="t6-workflow-title">Insights grounded in answers.</h2>
+        <p className="ds-subtle">Understand recorded submissions and question coverage without inventing views, visits or conversion rates.</p>
+      </div><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/submissions`)}>Review responses</Button></Row>
+      <div className="t6-directory-metrics">
+        <div><span>Responses</span><strong>{children.length}</strong></div>
+        <div><span>Reviewed or routed</span><strong>{children.filter((row) => row.status !== "new").length}</strong></div>
+        <div><span>Questions</span><strong>{answerable.length}</strong></div>
+        <div><span>Versions answered</span><strong>{new Set(children.map((row) => String(row.fields.formVersion ?? "?"))).size}</strong></div>
+      </div>
+    </section>
+  );
 
   if (lens === "Funnel") {
     return (
       <Stack gap={5}>
+        {analyticsOverview}
         <StatRow>
           <Stat label="Views" value="Unavailable" unavailable meta="Nothing counts an impression" onClick={() => context.openOverlay("Metric methods")} />
           <Stat label="Starts" value="Unavailable" unavailable meta="A start needs a view to compare against" />
@@ -950,6 +1079,7 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
     }));
     return (
       <Stack gap={4}>
+        {analyticsOverview}
         {children.length === 0 ? (
           <Empty title="No responses yet" icon={<Inbox size={20} />}>Answer the form on its publish screen and the counts appear here.</Empty>
         ) : (
@@ -985,6 +1115,7 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
   if (lens === "Sources") {
     return (
       <Stack gap={4}>
+        {analyticsOverview}
         <Notice tone="warning" title="A source needs a referrer">
           Where a person came from is in the request headers of a hosted page. There is no hosted page, so no source is recorded and none is guessed.
         </Notice>
@@ -1009,6 +1140,7 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
   const days = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
   return (
     <Stack gap={4}>
+      {analyticsOverview}
       {days.length === 0 ? (
         <Empty title="Nothing to time yet" icon={<Inbox size={20} />}>Submission timestamps are the only timing signal available here.</Empty>
       ) : (

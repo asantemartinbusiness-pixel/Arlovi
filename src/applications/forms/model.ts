@@ -282,7 +282,7 @@ export function validate(model: FormModel, answers: Answers): FieldError[] {
     if (!visible.has(field.id)) continue;
     const raw = answers[field.id];
     const text = answerText(raw).trim();
-    if (required.has(field.id) && text.length === 0) {
+    if (required.has(field.id) && (text.length === 0 || (field.type === "checkbox" && raw !== true) || (field.type === "multiselect" && (!Array.isArray(raw) || raw.length === 0)))) {
       errors.push({ fieldId: field.id, message: `${field.label} is required.` });
       continue;
     }

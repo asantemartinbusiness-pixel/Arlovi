@@ -233,7 +233,7 @@ export const formsApp = registerApp({
         render: (context: ScreenContext) => <SubmissionsScreen context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Inspect", label: "Inspect", placement: "primary", run: (context) => context.openOverlay("Submission drawer") },
+        { id: "Inspect", label: "Inspect", placement: "primary", guard: (context) => context.selectedId ? undefined : "Select a submission first", run: (context) => context.openOverlay("Submission drawer", { id: context.selectedId }) },
         { id: "export", label: "Export CSV", placement: "secondary", capability: "export_data", run: (context) => exportSubmissions(context) },
         { id: "assign", label: "Assign", placement: "overflow", run: openAct("assign submission") },
         { id: "delete under policy", label: "Delete under the retention policy", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("privacy control") },

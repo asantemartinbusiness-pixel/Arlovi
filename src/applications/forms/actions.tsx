@@ -21,8 +21,8 @@ import { saveForm, useFormsUi } from "./state";
 
 const nowIso = (context: ScreenContext) => context.now.toISOString();
 const routeForm = (records: Rec[], context: ScreenContext) => {
-  const routed = records.find((row) => row.id === context.params.id);
-  return routed ? [routed] : records.filter((row) => row.status !== "archived");
+  if (context.params.id) return records.filter((row) => row.id === context.params.id);
+  return records.filter((row) => row.status !== "archived");
 };
 const form = (record?: Rec): FormModel => readForm(record);
 const answerable = (model: FormModel) => model.fields.filter((field) => !STRUCTURAL.includes(field.type));
@@ -211,8 +211,11 @@ export const assignSubmission = actOverlay({
 export async function exportSubmissions(context: ScreenContext): Promise<void> {
   const repo = await import("@/platform/repo");
   const forms = await repo.listByCollection(context.org.id, "forms");
-  const record = forms.find((item) => item.id === context.params.id) ?? forms[0];
-  if (!record) return;
+  const record = context.params.id ? forms.find((item) => item.id === context.params.id) : undefined;
+  if (!record) {
+    context.toast("Form unavailable", "Choose a valid form before exporting submissions.", "blocked");
+    return;
+  }
   const model = readForm(record);
   const rows = (await repo.listByCollection(context.org.id, "submissions")).filter((row) => row.parentId === record.id);
   const labels = answerable(model).map((field) => field.label);
@@ -279,8 +282,11 @@ export function CompareVersions({ context }: { context: ScreenContext }) {
 export async function exportAnalytics(context: ScreenContext): Promise<void> {
   const repo = await import("@/platform/repo");
   const forms = await repo.listByCollection(context.org.id, "forms");
-  const record = forms.find((item) => item.id === context.params.id) ?? forms[0];
-  if (!record) return;
+  const record = context.params.id ? forms.find((item) => item.id === context.params.id) : undefined;
+  if (!record) {
+    context.toast("Form unavailable", "Choose a valid form before exporting analytics.", "blocked");
+    return;
+  }
   const model = readForm(record);
   const rows = (await repo.listByCollection(context.org.id, "submissions")).filter((row) => row.parentId === record.id);
   const stats = versionStats(model, rows);
