@@ -23,7 +23,8 @@ import { clockIso } from "@/platform/clock";
 function useDeckFor(context: ScreenContext): Rec | undefined {
   const fromRoute = useRecord(context.params.id);
   const all = useCollection("decks");
-  return fromRoute ?? all.find((record) => record.fields.isTemplate !== true) ?? all[0];
+  if (context.params.id) return fromRoute?.collection === "decks" ? fromRoute : all.find((record) => record.id === context.params.id);
+  return all.find((record) => record.fields.isTemplate !== true) ?? all[0];
 }
 
 function editorFor(context: ScreenContext): DeckEditor | undefined {
