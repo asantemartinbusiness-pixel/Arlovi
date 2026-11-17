@@ -88,7 +88,7 @@ test("Workbook collaboration exposes review context and keeps local sharing expl
     await repo.putRecord(record, ctx);
     return record.id;
   });
-  await page.goto(`/o/northline/sheets/workbooks/${id}/collaboration?tab=Permissions`);
+  await page.goto(`/o/northline/sheets/workbooks/${id}/collab?tab=Permissions`);
   const main = page.locator("#main");
   await expect(main.getByRole("heading", { name: "A clear record of changes." })).toBeVisible();
   await expect(main.getByLabel("Workbook collaboration overview")).toBeVisible();
