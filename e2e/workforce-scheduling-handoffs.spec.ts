@@ -113,3 +113,56 @@ test("submitted time is a live Inbox decision and disappears after the linked lo
   await expect(page.locator("#main")).toContainText("QA Hours Employee");
   await expect(page.locator("#main")).toContainText("QA Hours Project");
 });
+
+test("Project Time records a real People employee and task, never a fabricated billing rate", async ({ page }) => {
+  await page.goto("/o/northline/project/time");
+  const ids = await page.evaluate(async () => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const employee = repo.newRecord({
+      organizationId: "org-northline", collection: "employees", currency: "GBP",
+      title: "QA Project Time Employee", status: "active",
+      fields: { title: "Engineer", employment: "full-time" },
+    }, ctx);
+    const project = repo.newRecord({
+      organizationId: "org-northline", collection: "projects", currency: "GBP",
+      title: "QA Project Time Assignment", status: "planning",
+      fields: { priority: "normal" },
+    }, ctx);
+    const task = repo.newRecord({
+      organizationId: "org-northline", collection: "tasks", currency: "GBP",
+      title: "QA Recorded Project Task", status: "backlog", parentId: project.id,
+      fields: { kind: "task", stage: "backlog", assignee: employee.title },
+    }, ctx);
+    await repo.putMany([employee, project, task], ctx, [], "org-northline");
+    return { employee: employee.id, project: project.id, task: task.id };
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Log time", exact: true }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Log time", exact: true });
+  await dialog.getByLabel("Person who did the work").selectOption(ids.employee);
+  await dialog.getByLabel("Project task").selectOption(ids.task);
+  await dialog.getByLabel("Minutes worked").fill("45");
+  await dialog.getByRole("button", { name: "Save entry" }).click();
+  await expect(dialog).toHaveCount(0);
+
+  const saved = await page.evaluate(async (ids) => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    const times = await repo.listByCollection("org-northline", "shifts");
+    const found = times.filter((row) => row.fields.kind === "time" && row.fields.taskId === ids.task);
+    return found.map((row) => ({
+      employeeId: row.fields.employeeId, projectId: row.fields.projectId,
+      hours: row.fields.hours, approved: row.fields.approved,
+      hasRate: row.fields.rateMinor !== undefined, status: row.status,
+    }));
+  }, ids);
+  expect(saved).toEqual([{
+    employeeId: ids.employee, projectId: ids.project, hours: 0.75,
+    approved: false, hasRate: false, status: "submitted",
+  }]);
+  await page.goto("/o/northline/inbox/inbox");
+  await page.getByRole("button", { name: "Needs me", exact: true }).click();
+  await expect(page.locator("#main")).toContainText("Approve time: QA Project Time Employee");
+});
