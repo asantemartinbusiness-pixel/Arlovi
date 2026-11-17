@@ -215,40 +215,70 @@ function AccessRequest({ context, close }: { context: ScreenContext; close: () =
  * explicitly records the reference against this exact employee.
  */
 function PeopleFileReference({ context, close }: { context: ScreenContext; close: () => void }) {
+  const [documentType, setDocumentType] = useState("Employment contract");
+  const [note, setNote] = useState("");
+  const [location, setLocation] = useState("");
+  const [reviewed, setReviewed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const fromRoute = useRecord(context.params.id);
   const employee = scopedDetailRecord(fromRoute, context.org.id, "employees");
   if (!employee) return <Empty title="Employee unavailable">Open a valid employee record before filing a document reference.</Empty>;
   return (
     <form id="hr-document" className="ds-stack ds-gap-4" onSubmit={async (event) => {
       event.preventDefault();
-      const form = new FormData(event.currentTarget);
-      const title = String(form.get("title") ?? "").trim();
-      if (!title) return;
-      const note = String(form.get("note") ?? "").trim();
-      await context.mutate.create({
-        collection: "documents",
-        title,
-        status: "filed",
-        summary: `Document reference entered by ${context.actor} for ${employee.title}; the file itself is not stored here.`,
-        parentId: employee.id,
-        fields: {
-          kind: "peopleFile", employeeId: employee.id, folder: "People files",
-          confidential: true, referenceOnly: true,
-          filedBy: context.actor, filedAt: context.now.toISOString(), note,
-        },
-      }, `Personnel document reference recorded: ${title} for ${employee.title}`);
-      context.toast("Reference added", `A ${title} reference is linked to ${employee.title}; no file was uploaded.`);
-      close();
+      if (saving || !context.can("edit_people") || !reviewed || location.trim().length < 3) return;
+      setSaving(true);
+      setError("");
+      try {
+        await context.mutate.create({
+          collection: "documents",
+          title: documentType,
+          status: "filed",
+          summary: `Personnel document reference recorded by ${context.actor} for ${employee.title}; file bytes are not stored here.`,
+          parentId: employee.id,
+          fields: {
+            kind: "peopleFile", employeeId: employee.id, folder: "People files",
+            confidential: true, referenceOnly: true,
+            filedBy: context.actor, filedAt: clockIso(), note: note.trim(),
+            sourceLocation: location.trim(), humanReviewedReference: true,
+            uploadedToArlovi: false, fileVerification: "not_verified",
+          },
+        }, `Personnel document reference recorded: ${documentType} for ${employee.title}; no upload or file verification`);
+        context.toast("Document reference created", "The employee reference is saved. The external document was not uploaded or verified by Arlovi.");
+        close();
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "The reference could not be created.");
+      } finally {
+        setSaving(false);
+      }
     }}>
-      <Field label="Document" required>
-        <Select name="title" required>
-          {["Employment contract", "Contract variation", "Right to work check", "Probation letter", "Training certificate", "Leaver letter"].map((option) => <option key={option}>{option}</option>)}
-        </Select>
-      </Field>
-      <Field label="Internal note"><TextArea name="note" rows={3} /></Field>
-      <Notice tone="info" title="A document reference, not a file upload">
-        This records a document's name, who entered the reference and when. The file stays in its existing storage location; Arlovi has not uploaded or verified it.
-      </Notice>
+      <PeopleDialogLead eyebrow="PEOPLE / PERSONNEL RECORDS" title="Record a personnel document reference"
+        description="Link a documented source to this employee without implying that Arlovi holds or has verified its contents."
+        status={<Pill tone="warning">Reference only</Pill>} />
+      <PeopleDialogSection step="01" title="Employee and document">
+        <Properties rows={[{ label: "Employee", value: employee.title }, { label: "Company", value: context.org.name }]} />
+        <Field label="Document category" required>
+          <Select value={documentType} onChange={(event) => setDocumentType(event.target.value)}>
+            {["Employment contract", "Contract variation", "Right to work check", "Probation letter", "Training certificate", "Leaver letter"].map((option) => <option key={option}>{option}</option>)}
+          </Select>
+        </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Source and filing information" description="Use a reference that allows an authorised team member to locate the existing source.">
+        <Field label="Existing document location or internal reference" required hint="Avoid pasting confidential access links, credentials or document contents.">
+          <TextInput value={location} onChange={(event) => setLocation(event.target.value)} required />
+        </Field>
+        <Field label="Internal filing note">
+          <TextArea value={note} onChange={(event) => setNote(event.target.value)} rows={3} />
+        </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Filing confirmation">
+        <Checkbox checked={reviewed} onChange={(event) => setReviewed(event.target.checked)}
+          label="I confirm this reference relates to the selected employee and an existing document." />
+        <Notice tone="info" title="No file uploaded or verified">This action stores the reference metadata only. Any file review, retention policy or right-to-work verification must occur through the authorised process.</Notice>
+        {error && <Notice tone="danger" title="Could not file reference">{error}</Notice>}
+        {saving && <p className="ds-subtle">Saving reference…</p>}
+      </PeopleDialogSection>
     </form>
   );
 }
