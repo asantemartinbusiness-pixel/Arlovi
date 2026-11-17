@@ -52,3 +52,32 @@ test("Build project overview and builder expose visible workflow context", async
   await page.getByLabel("Build editor overview").getByRole("button", { name: "Data model" }).click();
   await expect(page.getByRole("tab", { name: "Data", exact: true })).toHaveAttribute("aria-selected", "true");
 });
+
+test("Build code, checks and releases expose their real readiness boundaries", async ({ page }) => {
+  await page.goto("/o/northline/build/projects");
+  const id = await page.evaluate(async () => {
+    const repoPath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "appProjects",
+      currency: "GBP", title: "QA Build Readiness", status: "draft", fields: {},
+    }, ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  });
+
+  await page.goto(`/o/northline/build/projects/${id}/code`);
+  const main = page.locator("#main");
+  await expect(main.getByLabel("Build generated code overview")).toBeVisible();
+  await expect(main.getByLabel("Generated code status")).toBeVisible();
+
+  await page.goto(`/o/northline/build/projects/${id}/tests`);
+  await expect(main.getByLabel("Build checks overview")).toBeVisible();
+  await expect(main.getByLabel("Model check summary")).toBeVisible();
+
+  await page.goto(`/o/northline/build/projects/${id}/deploy`);
+  await expect(main.getByLabel("Build release overview")).toBeVisible();
+  await expect(main.getByLabel("Build release status")).toBeVisible();
+  await expect(main.getByLabel("Build release status")).toContainText("Connected runtimes");
+});
