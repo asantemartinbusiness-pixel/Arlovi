@@ -565,18 +565,36 @@ export function SubmissionsScreen({ context, lens }: { context: ScreenContext; l
   const children = useChildren(record?.id);
   const { now } = useWorkspace();
   const [revealed, setRevealed] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
   if (!record) return <NoForm />;
   const sensitive = model.fields.filter((field) => field.sensitive).map((field) => field.label);
   const rows = children.filter((row) => {
-    if (lens === "New") return row.status === "new";
-    if (lens === "Reviewed") return row.status === "reviewed";
-    if (lens === "Routed") return row.status === "routed";
-    return true;
+    if (lens === "New" && row.status !== "new") return false;
+    if (lens === "Reviewed" && row.status !== "reviewed") return false;
+    if (lens === "Routed" && row.status !== "routed") return false;
+    const needle = query.trim().toLocaleLowerCase();
+    return !needle || [row.title, row.summary, String(row.fields.assignee ?? ""), row.status].join(" ").toLocaleLowerCase().includes(needle);
   });
   const overdue = children.filter((row) => daysBetween(new Date(row.at ?? row.createdAt), now) > model.settings.retentionDays);
 
   return (
     <Stack gap={4}>
+      <section className="t6-workflow-overview" aria-label="Submission inbox overview">
+        <Row gap={3} wrap><div className="ds-grow" style={{ minWidth: 220 }}>
+          <span className="ds-subtle">FORMS / RESPONSES</span>
+          <h2 className="t6-workflow-title">Every answer has a next step.</h2>
+          <p className="ds-subtle">Review incoming records, protect sensitive answers and route follow-up to a responsible owner.</p>
+        </div>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}`)}>Back to builder</Button>
+        </Row>
+        <div className="t6-directory-metrics" aria-label="Submission workflow counts">
+          <div><span>Received</span><strong>{children.length}</strong></div>
+          <div><span>New</span><strong>{children.filter((row) => row.status === "new").length}</strong></div>
+          <div><span>Reviewed</span><strong>{children.filter((row) => row.status === "reviewed").length}</strong></div>
+          <div><span>Routed</span><strong>{children.filter((row) => row.status === "routed").length}</strong></div>
+        </div>
+        <Field label="Search responses"><TextInput type="search" aria-label="Search responses" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search respondent, status or assignee" /></Field>
+      </section>
       <StatRow>
         <Stat prov="posted" label="Submissions" value={String(children.length)} meta={`${children.filter((row) => row.status === "new").length} not yet reviewed`} />
         <Stat prov="posted" label="Sensitive answers" value={String(sensitive.length)} meta={sensitive.length ? `${sensitive.join(", ")} redacted by default` : "None flagged"} />
@@ -592,8 +610,8 @@ export function SubmissionsScreen({ context, lens }: { context: ScreenContext; l
       )}
 
       {rows.length === 0 ? (
-        <Empty title={`No ${lens === "All" ? "" : lens.toLowerCase() + " "}submissions`} icon={<Inbox size={20} />}>
-          Answer the form on its publish screen and the record appears here.
+        <Empty title={query.trim() ? "No responses match this search" : `No ${lens === "All" ? "" : lens.toLowerCase() + " "}submissions`} icon={<Inbox size={20} />} action={query.trim() ? <Button variant="secondary" onClick={() => setQuery("")}>Clear search</Button> : undefined}>
+          {query.trim() ? "Try a different respondent, status or assignee." : "Answer the form on its publish screen and the record appears here."}
         </Empty>
       ) : (
         <DataGrid
@@ -659,12 +677,13 @@ export function SubmissionDrawer({ context }: { context: ScreenContext }) {
   const children = useChildren(record?.id);
   const payload = context.overlayPayload as { id?: string } | undefined;
   const [shown, setShown] = useState(false);
-  const submission = children.find((row) => row.id === payload?.id) ?? children[0];
+  const submission = payload?.id ? children.find((row) => row.id === payload.id) : undefined;
   if (!record) return <NoForm />;
-  if (!submission) return <Empty title="No submission selected" icon={<Inbox size={20} />} />;
+  if (!submission) return <Empty title="Submission unavailable" icon={<Inbox size={20} />}>The selected response could not be found for this form. No other person's answers were opened.</Empty>;
   const sensitive = model.fields.filter((field) => field.sensitive).map((field) => field.label);
   return (
     <Stack gap={4}>
+      <div><span className="ds-subtle">FORMS / RESPONSE DETAIL</span><h3 style={{ margin: "var(--space-2) 0" }}>{submission.title}</h3><p className="ds-subtle">Review the original answers and record a follow-up. Sensitive values stay hidden unless revealed explicitly.</p></div>
       <Properties rows={[
         { label: "From", value: submission.title },
         { label: "Received", value: context.dateTime(submission.at ?? submission.createdAt) },
@@ -700,6 +719,8 @@ export function PrivacyControl({ context }: { context: ScreenContext }) {
   const { record, model } = useFormRecord(context);
   const children = useChildren(record?.id);
   const { now } = useWorkspace();
+  const [confirmed, setConfirmed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   if (!record) return <NoForm />;
   const overdue = children.filter((row) => daysBetween(new Date(row.at ?? row.createdAt), now) > model.settings.retentionDays);
   return (
@@ -722,10 +743,20 @@ export function PrivacyControl({ context }: { context: ScreenContext }) {
               </Row>
             ))}
           </Stack>
-          <Button variant="outline-danger" onClick={async () => {
-            for (const row of overdue) await context.mutate.remove(row.id, `Submission ${row.title} deleted under the ${model.settings.retentionDays} day retention policy`);
-            context.toast("Deleted under policy", `${overdue.length} submissions were removed and each deletion is in the audit log.`, "blocked");
-          }}>Delete {overdue.length} past the period</Button>
+          <Notice tone="warning" title="Review before deleting">This will remove {overdue.length} stored response records from this workspace. Confirm the retention decision and any applicable holds before proceeding.</Notice>
+          <Checkbox label="I have reviewed the affected responses and authorise this deletion" checked={confirmed} onChange={setConfirmed} />
+          <Button variant="outline-danger" disabled={!confirmed || deleting} onClick={async () => {
+            setDeleting(true);
+            try {
+              for (const row of overdue) await context.mutate.remove(row.id, `Submission ${row.title} deleted under the ${model.settings.retentionDays} day retention policy`);
+              context.toast("Deletion recorded", `${overdue.length} submissions were removed from this workspace.`, "info");
+              setConfirmed(false);
+            } catch {
+              context.toast("Deletion incomplete", "One or more records could not be removed. Review the remaining submissions before retrying.", "blocked");
+            } finally {
+              setDeleting(false);
+            }
+          }}>{deleting ? "Deleting…" : `Delete ${overdue.length} past the period`}</Button>
         </>
       )}
       <Notice tone="info" title="Deletion is a decision, not a schedule">
