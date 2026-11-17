@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  Activity, Plug, RefreshCcw, ShieldAlert, ShieldCheck, Webhook,
+  Activity, Plug, RefreshCcw, Search, ShieldAlert, ShieldCheck, Webhook, X,
 } from "lucide-react";
 import {
   Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties,
@@ -12,6 +12,7 @@ import { CAPABILITY_LABELS, CAPABILITY_TONE } from "@/platform/capability";
 import { clockIso, freshness } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { downloadCsv } from "@/applications/t6kit/kit";
+import "./integrations.css";
 import {
   CATEGORIES, CONNECTOR_ENTRIES, adapterChecks, adapterOperations, authorisationSteps, entryById, entryForRecord,
   type ConnectorEntry,
@@ -47,111 +48,139 @@ function StateCell({ entry }: { entry: ConnectorEntry }) {
 
 export function Marketplace({ context, lens }: { context: ScreenContext; lens: "Featured" | "Categories" | "Installed" | "Custom" }) {
   const records = useCollection("connectors");
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<"All" | ConnectorEntry["category"]>("Communication");
+  const accessibleCount = CONNECTOR_ENTRIES.length;
+  const matched = (lens === "Featured" && !query.trim()
+    ? CONNECTOR_ENTRIES.filter(entry => entry.featured)
+    : CONNECTOR_ENTRIES).filter(entry => {
+      if (lens === "Categories" && category !== "All" && entry.category !== category) return false;
+      const needle = query.trim().toLocaleLowerCase();
+      return !needle || [
+        entry.capability.label, entry.capability.provider, entry.capability.note,
+        entry.category, entry.capability.localEquivalent, ...entry.operations.map(operation => operation.name),
+      ].join(" ").toLocaleLowerCase().includes(needle);
+    });
+
+  const marketplaceOverview = <section className="connect-marketplace-overview" aria-label="Integration catalogue overview">
+    <div className="connect-marketplace-head">
+      <div>
+        <span className="connect-eyebrow">PLATFORM / INTEGRATIONS</span>
+        <h2>Connect the tools your work depends on.</h2>
+        <p>Explore provider requirements, permissions and local alternatives before requesting access. Nothing is externally connected yet.</p>
+      </div>
+      <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>View connections</Button>
+    </div>
+    <div className="connect-marketplace-metrics" aria-label="Integration catalogue summary">
+      <div><span>Available contracts</span><strong>{accessibleCount}</strong></div>
+      <div><span>Live connections</span><strong>0</strong></div>
+      <div><span>Local alternatives</span><strong>{CONNECTOR_ENTRIES.filter(entry => entry.capability.localEquivalent).length}</strong></div>
+      <div><span>Categories</span><strong>{CATEGORIES.length}</strong></div>
+    </div>
+  </section>;
 
   if (lens === "Installed") {
-    const installed = CONNECTOR_ENTRIES.filter((entry) => entry.capability.state !== "not_connected");
-    return (
-      <Stack gap={4}>
-        <Notice tone="warning" title="Nothing is installed">
-          Every capability in this workspace reports <strong>not connected</strong>, and that state comes from the platform capability register rather than from this screen. There is no code path here that can mark one connected.
-        </Notice>
-        {installed.length > 0 && (
-          <Stack gap={2}>{installed.map((entry) => <Row key={entry.capability.id} gap={2}><span className="ds-grow">{entry.capability.label}</span><StateCell entry={entry} /></Row>)}</Stack>
-        )}
-        <Card eyebrow="LOCAL WORK" prov="human" title="What runs instead" subtitle="One row per capability, from the same register">
-          <div className="t6-matrix-wrap">
-            <table className="t6-matrix">
-              <caption className="ds-sr-only">What Arlovi does locally for each capability</caption>
-              <thead><tr><th scope="col">Capability</th><th scope="col">Done here instead</th></tr></thead>
-              <tbody>
-                {CONNECTOR_ENTRIES.map((entry) => (
-                  <tr key={entry.capability.id}>
-                    <th scope="row">{entry.capability.label}</th>
-                    <td>{entry.capability.localEquivalent}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      </Stack>
-    );
+    return <Stack gap={4}>
+      {marketplaceOverview}
+      <Notice tone="warning" title="Nothing is installed">
+        No provider has a verified grant or successful read. Recorded install requests are proposals, not active integrations.
+      </Notice>
+      <div className="connect-marketplace-empty-actions">
+        <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>Review connection requests</Button>
+        <Button variant="ghost" onClick={() => context.setTab("Categories")}>Explore categories</Button>
+      </div>
+      <Card eyebrow="LOCAL WORK" prov="human" title="What Arlovi can do without a provider" subtitle="Real local alternatives from the capability register">
+        <div className="t6-matrix-wrap"><table className="t6-matrix">
+          <caption className="ds-sr-only">Local alternatives for registered provider capabilities</caption>
+          <thead><tr><th scope="col">Capability</th><th scope="col">Done here instead</th></tr></thead>
+          <tbody>{CONNECTOR_ENTRIES.map(entry => <tr key={entry.capability.id}>
+            <th scope="row">{entry.capability.label}</th><td>{entry.capability.localEquivalent}</td>
+          </tr>)}</tbody>
+        </table></div>
+      </Card>
+    </Stack>;
   }
 
   if (lens === "Custom") {
-    const custom = records.filter((record) => String(record.fields.kind ?? "") === "custom");
-    return (
-      <Stack gap={4}>
-        <Row gap={2}><Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/custom`)}>Open the adapter workbench</Button></Row>
-        {custom.length === 0
-          ? <Empty title="No custom adapter yet" icon={<Plug size={20} />}>A custom adapter declares its own actions against the same normalised contract the built-in capabilities use.</Empty>
-          : <Grid>{custom.map((record) => (
-            <Card key={record.id} span={6} eyebrow="CUSTOM" prov="human" title={record.title} subtitle={record.summary}
-              actions={<Pill tone="warning" dot>{String(record.fields.capability ?? record.status).replace(/_/g, " ")}</Pill>} />
-          ))}</Grid>}
-      </Stack>
-    );
+    const custom = records.filter(record => String(record.fields.kind ?? "") === "custom");
+    return <Stack gap={4}>
+      {marketplaceOverview}
+      <Row gap={2} wrap>
+        <Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/custom`)}>Open adapter workbench</Button>
+        <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/capabilities`)}>Capability registry</Button>
+      </Row>
+      {custom.length === 0
+        ? <Empty title="No custom adapter yet" icon={<Plug size={20} />}>Create a local adapter declaration in the workbench. This does not establish a provider connection.</Empty>
+        : <Grid>{custom.map(record => <Card key={record.id} span={6} eyebrow="CUSTOM" prov="human"
+          title={record.title} subtitle={record.summary}
+          actions={<Pill tone="warning" dot>{String(record.fields.capability ?? record.status).replace(/_/g, " ")}</Pill>} />)}</Grid>}
+    </Stack>;
   }
 
-  const entries = lens === "Featured" ? CONNECTOR_ENTRIES.filter((entry) => entry.featured) : CONNECTOR_ENTRIES;
-
-  if (lens === "Categories") {
-    return (
-      <Stack gap={5}>
-        {CATEGORIES.map((category) => {
-          const group = CONNECTOR_ENTRIES.filter((entry) => entry.category === category);
-          if (group.length === 0) return null;
-          return (
-            <section key={category}>
-              <h3 style={{ fontSize: "var(--text-md)", marginBlockEnd: "var(--space-3)" }}>{category}</h3>
-              <Grid>
-                {group.map((entry) => <ConnectorCard key={entry.capability.id} entry={entry} context={context} />)}
-              </Grid>
-            </section>
-          );
-        })}
-      </Stack>
-    );
-  }
-
-  return (
-    <Stack gap={4}>
-      <Notice tone="warning" title="Every provider here is not connected">
-        This directory lists what each provider would enable, what it would need, and what Arlovi does instead. None of them has a grant, and nothing on this screen can create one.
-      </Notice>
-      <Grid>
-        {entries.map((entry) => <ConnectorCard key={entry.capability.id} entry={entry} context={context} />)}
-      </Grid>
-    </Stack>
-  );
+  return <Stack gap={4}>
+    {marketplaceOverview}
+    <div className="connect-marketplace-toolbar">
+      <label className="connect-marketplace-search">
+        <Search size={17} aria-hidden="true" />
+        <span className="ds-sr-only">Search integration capabilities</span>
+        <input type="search" aria-label="Search integration capabilities" value={query}
+          onChange={event => setQuery(event.target.value)}
+          placeholder="Search providers, workflows, operations…" />
+        {query && <button type="button" aria-label="Clear integration search" onClick={() => setQuery("")}>
+          <X size={15} aria-hidden="true" />
+        </button>}
+      </label>
+      <Button variant="secondary" size="sm" onClick={() => context.openOverlay("compare connectors")}>Compare</Button>
+    </div>
+    {lens === "Categories" && <nav className="connect-category-picker" aria-label="Integration categories">
+      {(["All", ...CATEGORIES] as const).map(item => {
+        const count = item === "All" ? CONNECTOR_ENTRIES.length
+          : CONNECTOR_ENTRIES.filter(entry => entry.category === item).length;
+        return <button key={item} type="button" aria-current={category === item ? "true" : undefined}
+          onClick={() => setCategory(item)}>
+          <span>{item === "All" ? "All categories" : item}</span><span className="connect-category-count">{count}</span>
+        </button>;
+      })}
+    </nav>}
+    <div className="connect-results-header">
+      <span role="status"><strong>{matched.length}</strong> {matched.length === 1 ? "integration" : "integrations"} {query ? "matching your search" : lens === "Featured" ? "featured" : "in this category"}</span>
+      <span>Permission requirements shown before connection</span>
+    </div>
+    {matched.length === 0 ? <Empty title="No integrations match" icon={<Plug size={20} />}
+      action={<Button variant="secondary" onClick={() => { setQuery(""); setCategory("All"); }}>Clear filters</Button>}>
+      Search by provider, capability or operation, or choose another category.
+    </Empty> : <div className="connect-marketplace-grid" aria-label="Integration catalogue">
+      {matched.map(entry => <ConnectorCard key={entry.capability.id} entry={entry} context={context} />)}
+    </div>}
+    <p className="connect-marketplace-boundary">Every provider is currently not connected. Reviewing an integration or recording an install request does not grant access, send data or activate a sync.</p>
+  </Stack>;
 }
 
 function ConnectorCard({ entry, context }: { entry: ConnectorEntry; context: ScreenContext }) {
-  return (
-    <Card
-      span={4}
-      eyebrow={entry.category.toUpperCase()}
-      prov="unknown"
-      title={entry.capability.label}
-      subtitle={entry.capability.provider}
-      actions={<StateCell entry={entry} />}
-      footer={<>
-        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/marketplace/${entry.capability.id}`)}>Details</Button>
-        <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Connector preview", { id: entry.capability.id })}>What it needs</Button>
-        <span className="ds-grow" />
-        <Pill tone={entry.risk.level === "high" ? "danger" : entry.risk.level === "medium" ? "warning" : "neutral"}>{entry.risk.level} risk</Pill>
-      </>}
-    >
-      <Stack gap={2}>
-        <p className="ds-subtle">{entry.capability.note}</p>
-        <Properties rows={[
-          { label: "Would enable", value: <span>{plural(entry.operations.filter((operation) => operation.direction === "action").length, "action")}, {plural(entry.operations.filter((operation) => operation.direction === "read").length, "read")}</span> },
-          { label: "Scopes", value: <span className="ds-num">{`${entry.scopes.filter((scope) => scope.kind === "write").length} write · ${entry.scopes.filter((scope) => scope.kind === "read").length} read`}</span> },
-          { label: "Instead", value: entry.capability.localEquivalent },
-        ]} />
-      </Stack>
-    </Card>
-  );
+  const actions = entry.operations.filter(operation => operation.direction === "action").length;
+  const reads = entry.operations.filter(operation => operation.direction === "read").length;
+  const writes = entry.scopes.filter(scope => scope.kind === "write").length;
+  return <article className="connect-marketplace-card">
+    <div className="connect-marketplace-card-top">
+      <div className="connect-card-symbol"><Plug size={19} strokeWidth={1.7} aria-hidden="true" /></div>
+      <StateCell entry={entry} />
+    </div>
+    <div className="connect-marketplace-card-main">
+      <span className="connect-card-category">{entry.category} / {entry.capability.provider}</span>
+      <h3>{entry.capability.label}</h3>
+      <p>{entry.capability.note}</p>
+    </div>
+    <div className="connect-card-facts" aria-label={`${entry.capability.label} requirements`}>
+      <span>{plural(actions, "action")} · {plural(reads, "read")}</span>
+      <span>{writes} proposed write {writes === 1 ? "scope" : "scopes"}</span>
+    </div>
+    <div className="connect-card-fallback"><strong>Available locally</strong><span>{entry.capability.localEquivalent}</span></div>
+    <div className="connect-marketplace-card-foot">
+      <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/marketplace/${entry.capability.id}`)}>View details</Button>
+      <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Connector preview", { id: entry.capability.id })}>Requirements</Button>
+      <Pill tone={entry.risk.level === "high" ? "danger" : entry.risk.level === "medium" ? "warning" : "neutral"}>{entry.risk.level} risk</Pill>
+    </div>
+  </article>;
 }
 
 export function ConnectorPreview({ context }: { context: ScreenContext }) {
