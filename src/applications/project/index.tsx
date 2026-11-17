@@ -21,6 +21,7 @@ import {
 } from "./actions";
 import { getRecord } from "@/platform/repo";
 import { clockNow } from "@/platform/clock";
+import { createProjectFromTemplate, readProjectPhases, type ProjectPhase } from "./creation";
 
 /** On project-scoped screens the initial selection is the project itself; a task action needs a task. */
 async function withTask(context: ScreenContext, what: string, then: (task: Rec) => void): Promise<void> {
@@ -37,7 +38,7 @@ const submitFooter = (formId: string, label: string) => ({ close }: { close: () 
   </>
 );
 
-interface Phase { name: string; tasks: string[] }
+type Phase = ProjectPhase;
 
 function ProjectFromTemplate({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useProjectData();
@@ -54,40 +55,25 @@ function ProjectFromTemplate({ context, close }: { context: ScreenContext; close
       onSubmit={async (event) => {
         event.preventDefault();
         if (!title.trim() || duplicate) return;
-        const now = clockNow();
-        const end = new Date(now.getTime() + 60 * 86_400_000);
-        const project = await context.mutate.create({
-          collection: "projects",
-          title: title.trim(),
-          status: "planning",
-          summary: template ? `Created from the ${template.title} template.` : "Created from scratch.",
-          startAt: now.toISOString(),
-          endAt: end.toISOString(),
-          dueAt: end.toISOString(),
-          amountMinor: 0,
-          fields: { health: "on_track", priority: "normal", programme: "Unassigned", budgetMinor: 0, spentMinor: 0, automationPaused: false },
-        }, `Project created: ${title.trim()}`);
-        let offset = 0;
-        for (const phase of phases) {
-          for (const label of phase.tasks) {
-            offset += 3;
-            const start = new Date(now.getTime() + (offset - 3) * 86_400_000);
-            const finish = new Date(now.getTime() + offset * 86_400_000);
-            await context.mutate.create({
-              collection: "tasks",
-              title: label,
-              status: "backlog",
-              summary: `${phase.name} phase, from the ${template?.title ?? "template"}.`,
-              parentId: project.id,
-              startAt: start.toISOString(),
-              endAt: finish.toISOString(),
-              dueAt: finish.toISOString(),
-              fields: { stage: "backlog", assignee: context.actor, priority: "normal", estimateHours: 8, loggedHours: 0, sprint: phase.name, kind: "task", dependsOn: "", delegatedToAgent: false },
-            }, `Task created from template: ${label}`);
-          }
+        if (templateId && !template) {
+          context.toast("Template unavailable", "Choose a published project template again.", "blocked");
+          return;
         }
-        context.toast("Project created", phases.length ? `${phases.reduce((sum, phase) => sum + phase.tasks.length, 0)} tasks were created from the template.` : "An empty project is ready for its plan.");
-        close();
+        try {
+          const plan = createProjectFromTemplate({
+            organizationId: context.org.id, currency: context.org.currency,
+            actor: context.actor, now: clockNow(),
+          }, title, template);
+          await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+          context.toast("Project created", plan.tasks.length
+            ? `${plan.tasks.length} tasks and their project were saved together.`
+            : "A new empty project is ready for its plan.");
+          context.navigate(`/o/${context.org.slug}/project/projects/${plan.project.id}`);
+          close();
+        } catch (error) {
+          context.toast("Project was not created", error instanceof Error ? error.message
+            : "The template or company changed. Review the selection and retry.", "failed");
+        }
       }}
     >
       <Field label="Project name" required>
@@ -97,12 +83,15 @@ function ProjectFromTemplate({ context, close }: { context: ScreenContext; close
       <Field label="Start from" hint="A template creates its phases as tasks; it never copies files or comments from an earlier project.">
         <Select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
           <option value="">Nothing — an empty project</option>
-          {data.templates.filter((row) => row.fields.kind === "project").map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
+          {data.templates.filter((row) => row.fields.kind === "project" && row.status === "published").map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
         </Select>
       </Field>
       {phases.length > 0 && (
         <Properties rows={phases.map((phase) => ({ label: phase.name, value: phase.tasks.join(", ") }))} />
       )}
+      <Notice tone="info" title="Project and tasks save together">
+        Arlovi checks this template again before committing. If any task or template validation fails, no partial project is created.
+      </Notice>
       <Notice tone="info" title="A clone starts clean">
         Confidential attachments, comments and approvals from the source project are not copied. Only the phase and task structure is.
       </Notice>
@@ -471,12 +460,15 @@ function TemplatePreview({ context, close }: { context: ScreenContext; close: ()
   if (!template) return <Empty title="Select a template" />;
   const phases = (template.body as { phases?: Phase[] } | undefined)?.phases ?? [];
   const count = phases.reduce((sum, phase) => sum + phase.tasks.length, 0);
+  const templatePublished = template.status === "published";
+
   return (
     <Stack gap={4}>
       <h3>{template.title}</h3>
       <p className="ds-subtle">{template.summary}</p>
       <Properties rows={phases.map((phase) => ({ label: phase.name, value: phase.tasks.join(", ") }))} />
       <Field label="New project name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} required /></Field>
+      {!templatePublished && <Notice tone="warning" title="Publish the template first">Draft templates cannot create a new project. Publish this version, then create from it.</Notice>}
       <Notice tone="info" title="What is copied and what is not">
         {count} tasks across {phases.length} phases are created. Attachments, comments and approvals from any earlier project
         built on this template are not copied.
@@ -486,32 +478,21 @@ function TemplatePreview({ context, close }: { context: ScreenContext; close: ()
         <span className="ds-grow" />
         <Button
           variant="primary"
-          disabled={!name.trim()}
+          disabled={!name.trim() || template.status !== "published"}
           onClick={async () => {
-            const now = clockNow();
-            const end = new Date(now.getTime() + 60 * 86_400_000);
-            const project = await context.mutate.create({
-              collection: "projects", title: name.trim(), status: "planning",
-              summary: `Created from the ${template.title} template.`,
-              startAt: now.toISOString(), endAt: end.toISOString(), dueAt: end.toISOString(), amountMinor: 0,
-              fields: { health: "on_track", priority: "normal", programme: "Unassigned", budgetMinor: 0, spentMinor: 0, automationPaused: false },
-            }, `Project created from template: ${name.trim()}`);
-            let offset = 0;
-            for (const phase of phases) {
-              for (const label of phase.tasks) {
-                offset += 3;
-                await context.mutate.create({
-                  collection: "tasks", title: label, status: "backlog", summary: `${phase.name} phase.`, parentId: project.id,
-                  startAt: new Date(now.getTime() + (offset - 3) * 86_400_000).toISOString(),
-                  endAt: new Date(now.getTime() + offset * 86_400_000).toISOString(),
-                  dueAt: new Date(now.getTime() + offset * 86_400_000).toISOString(),
-                  fields: { stage: "backlog", assignee: context.actor, priority: "normal", estimateHours: 8, loggedHours: 0, sprint: phase.name, kind: "task", dependsOn: "", delegatedToAgent: false },
-                }, `Task created from template: ${label}`);
-              }
+            try {
+              const plan = createProjectFromTemplate({
+                organizationId: context.org.id, currency: context.org.currency,
+                actor: context.actor, now: clockNow(),
+              }, name, template);
+              await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+              context.toast("Project created", `${plan.tasks.length} tasks and their project were saved together.`);
+              context.navigate(`/o/${context.org.slug}/project/projects/${plan.project.id}`);
+              close();
+            } catch (error) {
+              context.toast("Project was not created", error instanceof Error ? error.message
+                : "The project template changed. Reload the template and retry.", "failed");
             }
-            context.toast("Project created", `${count} tasks were created in ${name.trim()}.`);
-            context.navigate(`/o/${context.org.slug}/project/projects/${project.id}`);
-            close();
           }}
         >
           Create the project
