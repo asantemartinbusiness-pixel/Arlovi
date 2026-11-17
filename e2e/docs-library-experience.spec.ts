@@ -224,7 +224,7 @@ test("Export preview identifies its paper source and does not claim native PDF g
     return document.id;
   });
   await page.goto(`/o/northline/docs/documents/${id}/publish?tab=Export`);
-  await page.locator("#main").getByRole("button", { name: "Preview the export" }).first().click();
+  await page.getByRole("button", { name: "Preview the export" }).first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("Inspect the rendered document");
   await expect(dialog).toContainText("Pagination remains an estimate");
