@@ -79,16 +79,16 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
       </PeopleDialogSection>
       <PeopleDialogSection step="02" title="Reason and handover" description="The reason is recorded in the employee history. This does not generate a departure letter.">
         <Field label="Reason for offboarding" required hint="At least 10 characters. Avoid unnecessary personal or medical details.">
-          <TextArea value={reason} onChange={(value) => setReason(value)} />
+          <TextArea value={reason} onChange={(event) => setReason(event.target.value)} />
         </Field>
-        <Checkbox checked={assetsReviewed} onChange={setAssetsReviewed} label="I have reviewed the equipment and document handover requirements." />
-        <Checkbox checked={accessFollowUp} onChange={setAccessFollowUp} label="I will ensure external accounts, building access and other systems are separately reviewed and revoked where appropriate." />
+        <Checkbox checked={assetsReviewed} onChange={(event) => setAssetsReviewed(event.target.checked)} label="I have reviewed the equipment and document handover requirements." />
+        <Checkbox checked={accessFollowUp} onChange={(event) => setAccessFollowUp(event.target.checked)} label="I will ensure external accounts, building access and other systems are separately reviewed and revoked where appropriate." />
       </PeopleDialogSection>
       <PeopleDialogSection step="03" title="Human authorisation" description="This changes the employee record; external revocation remains a separate responsibility.">
         <Notice tone="warning" title="External access is not revoked">
           Arlovi will mark this employee as alumni and attempt to rescind pending local IT requests. It cannot disable identity-provider, email, payroll or building-access accounts.
         </Notice>
-        <Checkbox checked={confirmed} onChange={setConfirmed} label={`I, ${context.actor}, authorise recording this departure for ${employee.title}.`} />
+        <Checkbox checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} label={`I, ${context.actor}, authorise recording this departure for ${employee.title}.`} />
       </PeopleDialogSection>
       {error && <Notice tone="danger" title="Departure could not be completed">{error}</Notice>}
       <Row gap={2}>
