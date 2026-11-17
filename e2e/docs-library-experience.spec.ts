@@ -198,3 +198,35 @@ test("Documents brand insights show grounded company context and template handof
   await main.getByRole("button", { name: "Open templates" }).click();
   await expect(page).toHaveURL(/\/docs\/templates/);
 });
+
+
+test("New documents expose master provenance and do not offer unpublished templates", async ({ page }) => {
+  await page.goto("/o/northline/docs/files");
+  await page.locator("#main").getByRole("button", { name: "New document" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Start a new company document");
+  await expect(dialog).toContainText("Distribution");
+  await expect(dialog).toContainText("browser-local record");
+  await expect(dialog.getByRole("combobox", { name: "Start from" })).toBeVisible();
+});
+
+test("Export preview identifies its paper source and does not claim native PDF generation", async ({ page }) => {
+  await page.goto("/o/northline/docs/files");
+  const id = await page.evaluate(async () => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    const context = { actor: "Maya Chen", now: new Date().toISOString() };
+    const document = repo.newRecord({
+      organizationId: "org-northline", collection: "documents", currency: "GBP",
+      title: "QA Export Preview", status: "draft", fields: { kind: "document", folder: "Operations" },
+    }, context);
+    await repo.putRecord(document, context);
+    return document.id;
+  });
+  await page.goto(`/o/northline/docs/documents/${id}/publish?tab=Export`);
+  await page.locator("#main").getByRole("button", { name: "Preview the export" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Inspect the rendered document");
+  await expect(dialog).toContainText("Pagination remains an estimate");
+  await expect(dialog.getByTitle("Export preview of QA Export Preview")).toBeVisible();
+});
