@@ -27,7 +27,7 @@ function payrollRecords(context: ScreenContext, collection: string) {
   return listByCollection(context.org.id, collection);
 }
 import "./hr.css";
-import { clockIso, clockNow } from "@/platform/clock";
+import { clockIso } from "@/platform/clock";
 
 /** Focus a control the screen already renders, rather than faking an action. */
 function focusWithin(selector: string): void {
