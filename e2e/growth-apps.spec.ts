@@ -71,3 +71,36 @@ test("Growth detail URLs never show a different record when the requested ID is 
     await expect(page.getByText("No other record was substituted.", { exact: false })).toBeVisible();
   }
 });
+
+test("Marketing Campaign Library has searchable portfolio and card/list views", async ({ page }) => {
+  await page.goto("/o/northline/market/campaigns");
+  await expect(page.getByRole("heading", { name: "Every campaign, one place" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Campaign portfolio" })).toBeVisible();
+  const search = page.getByRole("searchbox", { name: "Search campaigns" });
+  await search.fill("Clerkenwell");
+  await expect(page.getByRole("status").filter({ hasText: "1 of" })).toBeVisible();
+  await expect(page.getByText("Clerkenwell open studio", { exact: true })).toBeVisible();
+  await page.getByRole("group", { name: "Campaign layout" }).getByRole("button", { name: "Cards" }).click();
+  await expect(page.getByRole("list", { name: "All campaign cards" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Clerkenwell open studio" })).toBeVisible();
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(search).toHaveValue("");
+  await expect(page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Winter trade list 2026" }) })).toBeVisible();
+  await page.getByRole("tab", { name: "Draft" }).click();
+  await expect(page.getByRole("link", { name: "Drift Pendant launch" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Winter trade list 2026" })).toHaveCount(0);
+});
+
+for (const width of [390, 820, 1440]) {
+  test(`Marketing campaign portfolio fits without document overflow at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/o/northline/market/campaigns");
+    await expect(page.getByRole("heading", { name: "Every campaign, one place" })).toBeVisible();
+    await page.getByRole("group", { name: "Campaign layout" }).getByRole("button", { name: "Cards" }).click();
+    await expect(page.getByRole("list", { name: "All campaign cards" })).toBeVisible();
+    const extra = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(extra).toBeLessThanOrEqual(1);
+    await page.getByRole("group", { name: "Campaign layout" }).getByRole("button", { name: "List" }).click();
+    await expect(page.getByRole("region", { name: "Campaign portfolio" })).toBeVisible();
+  });
+}
