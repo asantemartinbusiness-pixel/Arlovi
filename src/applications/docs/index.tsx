@@ -2447,6 +2447,9 @@ function TemplateEditor({ context, close }: { context: ScreenContext; close: () 
   const [scope, setScope] = useState(String(template?.fields.scope ?? "company"));
   const [tokens, setTokens] = useState(String(template?.fields.tokens ?? ""));
   const [documentTitle, setDocumentTitle] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const existingTitle = documents.some((record) => record.title.trim().toLowerCase() === documentTitle.trim().toLowerCase());
 
   if (payload?.mode === "use" && template) {
     return (
@@ -2455,23 +2458,34 @@ function TemplateEditor({ context, close }: { context: ScreenContext; close: () 
         className="ds-stack ds-gap-4"
         onSubmit={async (event) => {
           event.preventDefault();
-          if (!documentTitle.trim()) return;
+          if (!documentTitle.trim() || saving || existingTitle) return;
+          if (template.status !== "published") { setError("This master must be published before it can be used."); return; }
+          setSaving(true);
+          setError("");
+          try {
           const created = await context.mutate.create({
             collection: "documents",
             title: documentTitle.trim(),
             status: "draft",
             summary: `Created from ${template.title}.`,
-            fields: { folder: "Unfiled", templateId: template.id, kind: String(template.fields.kind ?? "document"), confidential: false },
+            fields: { folder: "Unfiled", templateId: template.id, templateSourceRevision: template.revision, kind: "document", confidential: false },
             body: readDoc(template.body, context.actor, context.now.toISOString()),
           }, `Document created from ${template.title}`);
-          await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true });
+          try { await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true, expectRevision: template.revision }); }
+          catch { context.toast("Document saved", "Template usage count could not be refreshed.", "info"); }
           close();
           context.navigate(`/o/${org.slug}/docs/documents/${created.id}`);
+          } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not create document."); }
+          finally { setSaving(false); }
         }}
       >
+        <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENTS / TEMPLATE APPLICATION</span><h3>Create a document from {template.title}</h3><p>The new document will be a draft copy, linked to this master and its current revision. Existing documents are never overwritten.</p></div>
         <Field label="New document title" required>
           <TextInput aria-label="New document title" value={documentTitle} onChange={(event) => setDocumentTitle(event.target.value)} required autoFocus />
         </Field>
+        {existingTitle && <Notice tone="warning" title="A document already uses this name">Choose a distinct title so people can identify the correct record.</Notice>}
+        {error && <Notice tone="danger" title="Document not created">{error}</Notice>}
+        {saving && <p className="ds-subtle">Creating the document…</p>}
         <Notice tone="info" title="Tokens stay as tokens">
           {String(template.fields.tokens ?? "No tokens mapped")}. They are left in the text so a person fills them in deliberately rather than finding a wrong figure already there.
         </Notice>
