@@ -43,7 +43,9 @@ test("a posted Finance invoice settles in two real receipts and updates CRM cont
   await dialog.getByRole("button", {name:"Post the receipt"}).click();
   await expect(dialog).toHaveCount(0);
   await page.reload();
-  await expect(page.locator("#main")).toContainText("£0.00");
+  // Money renders an em dash for zero; assert the settlement amount by label
+  // rather than requiring a £0.00 string that the UI deliberately omits.
+  await expect(page.locator("#main")).toContainText(/Outstanding\s*—/);
   await expect(page.getByRole("button", {name:"Record a payment"})).toBeDisabled();
   await expect(page.locator("#main")).toContainText("2 receipts posted against this invoice");
 
