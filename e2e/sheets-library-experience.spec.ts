@@ -135,7 +135,7 @@ test("Publishing explains local-only status and requires confirmation", async ({
     return record.id;
   });
   await page.goto(`/o/northline/sheets/workbooks/${id}/io?tab=Exports`);
-  await page.getByRole("button", { name: "Publish…", exact: false }).first().click();
+  await page.locator("#main").getByRole("button", { name: "Publish workbook" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("Status only, not access enforcement");
   await expect(dialog.getByRole("checkbox", { name: /records status without granting external access/ })).not.toBeChecked();
@@ -158,5 +158,5 @@ test("Archived workbooks remain discoverable through the library status filter",
   const main = page.locator("#main");
   await main.getByLabel("Workbook status").selectOption("archived");
   await main.getByRole("searchbox", { name: "Search" }).fill(title);
-  await expect(main.getByText(title)).toBeVisible();
+  await expect(main.getByRole("table").getByText(title).first()).toBeVisible();
 });
