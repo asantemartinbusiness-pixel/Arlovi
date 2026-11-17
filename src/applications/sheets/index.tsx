@@ -236,10 +236,11 @@ function WorkbookLibrary({ context, tab }: { context: ScreenContext; tab: "Recen
   const sharedCount = workbooks.filter((record) => String(record.fields.sharedWith ?? "").split("|").some((name) => name.trim().length > 0)).length;
 
   const rows = useMemo(() => {
-    let list = tab === "Templates" ? workbooks : active;
-    if (tab === "Recent") list = [...active].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 12);
-    if (tab === "Mine") list = active.filter((record) => record.ownerName === actor);
-    if (tab === "Shared") list = active.filter((record) => String(record.fields.sharedWith ?? "").split("|").some((name) => name.trim().length > 0));
+    const pool = status === "archived" ? workbooks : active;
+    let list = tab === "Templates" ? workbooks : pool;
+    if (tab === "Recent") list = [...pool].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 12);
+    if (tab === "Mine") list = pool.filter((record) => record.ownerName === actor);
+    if (tab === "Shared") list = pool.filter((record) => String(record.fields.sharedWith ?? "").split("|").some((name) => name.trim().length > 0));
     if (tab === "Templates") list = workbooks.filter((record) => record.fields.isTemplate === true || record.status === "template");
     if (status !== "all") list = list.filter((record) => record.status === status);
     if (folder !== "all") list = list.filter((record) => String(record.fields.folder ?? "Unfiled") === folder);
@@ -270,7 +271,7 @@ function WorkbookLibrary({ context, tab }: { context: ScreenContext; tab: "Recen
         <Button variant="primary" onClick={() => context.openOverlay("new workbook")}>New workbook</Button>
       </div>
       <div className="sx-library-metrics" aria-label="Workbook library overview">
-        <div><span>Active workbooks</span><strong>{active.length}</strong><small>Available in this workspace</small></div>
+        <div><span>Active workbooks</span><strong>{active.length}</strong><small>Excludes archived workbooks</small></div>
         <div><span>Owned by you</span><strong>{active.filter((record) => record.ownerName === actor).length}</strong><small>Your working models</small></div>
         <div><span>Sharing recorded</span><strong>{sharedCount}</strong><small>Local record only</small></div>
         <div><span>Templates</span><strong>{templateCount}</strong><small>Reusable structures</small></div>
