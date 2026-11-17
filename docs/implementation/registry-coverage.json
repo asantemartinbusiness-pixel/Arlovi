@@ -6,12 +6,12 @@
     "bespoke": 316,
     "fallback": 0,
     "legacy": 0,
-    "tabsRequired": 1323,
-    "tabsDeclared": 1323,
+    "tabsRequired": 1324,
+    "tabsDeclared": 1324,
     "actionsRequired": 1328,
     "actionsDeclared": 1328,
-    "overlaysRequired": 956,
-    "overlaysDeclared": 956
+    "overlaysRequired": 957,
+    "overlaysDeclared": 957
   },
   "rows": [
     {
@@ -884,12 +884,12 @@
       "route": "/o/:org/fin/invoices",
       "app": "FIN",
       "implementation": "bespoke",
-      "tabsRequired": 5,
-      "tabsDeclared": 5,
+      "tabsRequired": 6,
+      "tabsDeclared": 6,
       "actionsRequired": 5,
       "actionsDeclared": 6,
-      "overlaysRequired": 3,
-      "overlaysDeclared": 4,
+      "overlaysRequired": 4,
+      "overlaysDeclared": 5,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -1159,9 +1159,9 @@
       "tabsRequired": 5,
       "tabsDeclared": 5,
       "actionsRequired": 5,
-      "actionsDeclared": 6,
+      "actionsDeclared": 7,
       "overlaysRequired": 3,
-      "overlaysDeclared": 5,
+      "overlaysDeclared": 6,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -1321,7 +1321,7 @@
       "actionsRequired": 4,
       "actionsDeclared": 6,
       "overlaysRequired": 3,
-      "overlaysDeclared": 6,
+      "overlaysDeclared": 7,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -1337,7 +1337,7 @@
       "actionsRequired": 4,
       "actionsDeclared": 6,
       "overlaysRequired": 3,
-      "overlaysDeclared": 6,
+      "overlaysDeclared": 7,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -1433,7 +1433,7 @@
       "actionsRequired": 4,
       "actionsDeclared": 8,
       "overlaysRequired": 3,
-      "overlaysDeclared": 8,
+      "overlaysDeclared": 9,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -2473,7 +2473,7 @@
       "actionsRequired": 4,
       "actionsDeclared": 4,
       "overlaysRequired": 3,
-      "overlaysDeclared": 5,
+      "overlaysDeclared": 6,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
@@ -2601,7 +2601,7 @@
       "actionsRequired": 5,
       "actionsDeclared": 5,
       "overlaysRequired": 3,
-      "overlaysDeclared": 5,
+      "overlaysDeclared": 6,
       "missingTabs": [],
       "missingActions": [],
       "missingOverlays": []
