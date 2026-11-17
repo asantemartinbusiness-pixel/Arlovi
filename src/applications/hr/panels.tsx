@@ -2724,6 +2724,7 @@ export function Learning({ context, lens }: { context: ScreenContext; lens: "Cou
   const required = courses.filter((course) => course.fields.required === true);
   const acknowledging = policies.filter((policy) => policy.fields.acknowledgementRequired === true);
   const canEdit = context.can("edit_people");
+  const canBuildCourses = context.can("edit_knowledge");
   const matches = (record: Rec) =>
     [record.title, record.summary, record.fields.version].some((field) =>
       String(field ?? "").toLowerCase().includes(query.trim().toLowerCase()));
@@ -2739,7 +2740,7 @@ export function Learning({ context, lens }: { context: ScreenContext; lens: "Cou
       description="Find the recorded courses, required acknowledgements and training obligations without inventing certificates or completed assessments."
       actions={<>
         <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)}>Employee directory</Button>
-        {canEdit && <Button variant="primary" onClick={() => context.openOverlay("Course builder")}>Create course</Button>}
+        {canBuildCourses && <Button variant="primary" onClick={() => context.openOverlay("Course builder")}>Create course</Button>}
       </>}
       note="Local training and policy records are not independently verified legal compliance or externally issued certification."
     />
@@ -2862,7 +2863,7 @@ export function Learning({ context, lens }: { context: ScreenContext; lens: "Cou
       {toolbar("Course library", true)}
       {shown.length === 0 ? (
         <Empty title={courses.length ? "No courses match the filters" : "No courses recorded"} icon={<GraduationCap size={20} />}
-          action={canEdit ? <Button variant="primary" onClick={() => context.openOverlay("Course builder")}>Create course</Button> : undefined}>
+          action={canBuildCourses ? <Button variant="primary" onClick={() => context.openOverlay("Course builder")}>Create course</Button> : undefined}>
           {courses.length ? "Change the search or show optional courses." : "Create a course to add it to the company learning library."}
         </Empty>
       ) : (
@@ -2877,7 +2878,7 @@ export function Learning({ context, lens }: { context: ScreenContext; lens: "Cou
                   {course.fields.required === true ? "Required" : "Optional"}
                 </Pill>}
                 footer={<>
-                  {canEdit && <Button size="sm" variant="secondary" onClick={() =>
+                  {canBuildCourses && <Button size="sm" variant="secondary" onClick={() =>
                     context.openOverlay("Course builder", { id: course.id })}>Edit course</Button>}
                   <Button size="sm" variant="ghost" onClick={() =>
                     context.openOverlay("quiz", { id: course.id })}>Preview quiz</Button>
