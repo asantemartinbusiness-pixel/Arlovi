@@ -729,11 +729,35 @@ function FormulaManager({ context, tab }: { context: ScreenContext; tab: "All" |
       };
     }));
 
+  const formulaErrors = editor.evaluation.errors.length;
+  const formulaCycles = editor.evaluation.cycles.length;
+  const formulaReady = formulaErrors === 0 && formulaCycles === 0;
+  const overview = (
+    <div className="sx-formula-overview">
+      <div className="sx-formula-header">
+        <span className="sx-library-eyebrow">SHEETS / CALCULATION AUDIT</span>
+        <h2>Understand every result.</h2>
+        <p>Trace formula dependencies, inspect errors and navigate named ranges. All calculations are evaluated in this workbook, not by an external service.</p>
+      </div>
+      <div className="sx-formula-metrics" aria-label="Calculation overview">
+        <div><span>Formulas</span><strong>{formulas.length}</strong><small>Across {editor.workbook.sheets.length} sheets</small></div>
+        <div><span>Formula errors</span><strong>{formulaErrors}</strong><small>{formulaReady ? "No errors reported" : "Review before sharing"}</small></div>
+        <div><span>Circular dependencies</span><strong>{formulaCycles}</strong><small>Identified by the calculation graph</small></div>
+      </div>
+      <Row gap={2} wrap>
+        <Button variant="secondary" size="sm" onClick={() => context.navigate(`/o/${context.org.slug}/sheets/workbooks/${record.id}`)}>Back to grid</Button>
+        <Button variant="secondary" size="sm" onClick={() => context.navigate(`/o/${context.org.slug}/sheets/workbooks/${record.id}/io`)}>Import & export</Button>
+        <Pill tone={formulaReady ? "success" : "warning"}>{formulaReady ? "Calculation checks clear" : "Review required"}</Pill>
+      </Row>
+    </div>
+  );
+
   if (tab === "Errors") {
     const errors = editor.evaluation.errors;
     const cycles = editor.evaluation.cycles;
     return (
       <Stack gap={4}>
+        {overview}
         <StatRow>
           <Stat prov="human" label="Formulas" value={String(formulas.length)} />
           <Stat prov="human" label="In error" value={String(errors.length)} meta={errors.length ? "Shown explicitly, never hidden" : "All evaluating"} />
@@ -793,6 +817,8 @@ function FormulaManager({ context, tab }: { context: ScreenContext; tab: "All" |
     const graph = Object.entries(editor.evaluation.graph);
     const order = editor.evaluation.order;
     return (
+      <Stack gap={4}>
+        {overview}
       <Grid>
         <Card span={7} eyebrow="DEPENDENCIES" prov="human" title="Recalculation order" subtitle={`${order.length} formulas, computed in this order every time`}>
           {order.length === 0 ? <Empty title="No formulas" /> : (
@@ -833,6 +859,7 @@ function FormulaManager({ context, tab }: { context: ScreenContext; tab: "All" |
           />
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
