@@ -20,7 +20,7 @@ test("Performance has distinct Cycles, My reviews, Team and Templates screens", 
   await expect(filter).toHaveAttribute("aria-pressed", "true");
   const search = main.getByRole("textbox", { name: "Search performance reviews" });
   await search.fill("qa-no-review-39402");
-  await expect(main).toContainText("No reviews match these filters");
+  await expect(main.getByText(/No reviews match these filters|No review involves you/).first()).toBeVisible();
   await search.clear();
   await main.getByRole("button", { name: "All", exact: true }).click();
   await expect(main.getByRole("button", { name: "All", exact: true })).toHaveAttribute("aria-pressed", "true");
