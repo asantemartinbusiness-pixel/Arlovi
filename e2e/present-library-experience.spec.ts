@@ -79,3 +79,23 @@ test("Present review export states source output limitations clearly", async ({ 
   await expect(main.getByLabel("Presentation review overview")).toBeVisible();
   await expect(main).toContainText("PPTX is not produced here");
 });
+
+test("Present publishing keeps local status separate from public access", async ({ page }) => {
+  await page.goto("/o/northline/present/decks");
+  const id = await page.evaluate(async () => {
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "decks", currency: "GBP",
+      title: "QA Local Publishing Disclosure", status: "draft", fields: {},
+    }, ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  });
+  await page.goto(`/o/northline/present/decks/${id}/review?tab=Publish`);
+  const main = page.locator("#main");
+  await expect(main.getByText("Publication status is not a shared website")).toBeVisible();
+  await expect(main.getByRole("button", { name: "Mark as published locally" })).toBeVisible();
+  await expect(main.getByRole("button", { name: "Record sharing intent" })).toBeVisible();
+});
