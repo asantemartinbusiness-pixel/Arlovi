@@ -20,6 +20,7 @@ import { Amount, CapabilityNotice, CapabilityPill, OverdueBadge, SourceNote, Sta
 import { clockIso } from "@/platform/clock";
 import { prepareInvoiceIssue, prepareInvoiceReceipt } from "./settlement";
 import { assessTimeBilling } from "./timeBilling";
+import { OpsHeader, OpsMetric, OpsMetrics } from "@/applications/shared/operational-surfaces";
 
 /* ------------------------------------------------------------------ *
  * FIN-004 Invoice list and FIN-005 Invoice detail.
@@ -165,32 +166,48 @@ export function InvoiceList({ context, tab }: { context: ScreenContext; tab: str
  */
 export function FinanceTimeInputs({ context }: { context: ScreenContext }) {
   const data = useCollections(["shifts", "employees", "projects", "invoices"]);
-  const rows = data.shifts
+  const [view, setView] = useState<"all" | "attention" | "ready" | "reviewed">("all");
+  const sourceRows = data.shifts
     .filter((row) => row.fields.kind === "time" && row.fields.billable === true)
     .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
   const assess = (entry: Rec) => assessTimeBilling(entry, data.employees, data.projects, data.invoices);
-  const ready = rows.filter((entry) => assess(entry).state === "ready");
-  const reviewed = rows.filter((entry) => assess(entry).state === "reviewed");
-  const needsWork = rows.filter((entry) => !["ready", "reviewed", "invoiced"].includes(assess(entry).state));
+  const ready = sourceRows.filter((entry) => assess(entry).state === "ready");
+  const reviewed = sourceRows.filter((entry) => assess(entry).state === "reviewed");
+  const needsWork = sourceRows.filter((entry) => !["ready", "reviewed", "invoiced"].includes(assess(entry).state));
+  const rows = view === "attention" ? needsWork : view === "ready" ? ready : view === "reviewed" ? reviewed : sourceRows;
   const approvedEstimate = reviewed.reduce((sum, entry) => sum + Number(assess(entry).netEstimateMinor ?? 0), 0);
   return (
     <Stack gap={4}>
-      <Row gap={3} wrap>
-        <div className="ds-grow">
-          <strong>{rows.length} potentially billable time entries</strong>
-          <p className="ds-subtle">{ready.length} ready for Finance review · {reviewed.length} reviewed · {needsWork.length} need attention</p>
-        </div>
-        <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/invoices?tab=Draft`)}>
+      <OpsHeader
+        eyebrow="Finance / Invoices / Time inputs"
+        title="From recorded time to accountable billing."
+        description="An evidence-led review surface for approved project work. See what's ready, what's missing and what Finance has already reviewed before preparing an invoice."
+        actions={<Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/invoices?tab=Draft`)}>
           Open draft invoices
-        </Button>
-      </Row>
+        </Button>}
+        note="Illustrative amounts are exclusive of tax and are not posted revenue."
+      />
+      <OpsMetrics label="Finance time input review">
+        <OpsMetric label="Time inputs" value={sourceRows.length} detail="Marked potentially billable" />
+        <OpsMetric label="Needs source work" value={needsWork.length} detail="Approvals, links, rates or hours" emphasis={needsWork.length ? "attention" : "neutral"} />
+        <OpsMetric label="Ready for review" value={ready.length} detail="Verified source and recorded rate" />
+        <OpsMetric label="Reviewed estimate" value={reviewed.length ? context.money(approvedEstimate) : "—"}
+          detail={`${reviewed.length} reviewed records · before tax`} emphasis={reviewed.length ? "positive" : "neutral"} />
+      </OpsMetrics>
+      <div className="ops-toolbar" aria-label="Filter time inputs">
+        <strong className="ops-toolbar-heading">Time input queue</strong>
+        <Button size="sm" variant={view === "all" ? "secondary" : "ghost"} aria-pressed={view === "all"} onClick={() => setView("all")}>All ({sourceRows.length})</Button>
+        <Button size="sm" variant={view === "attention" ? "secondary" : "ghost"} aria-pressed={view === "attention"} onClick={() => setView("attention")}>Needs work ({needsWork.length})</Button>
+        <Button size="sm" variant={view === "ready" ? "secondary" : "ghost"} aria-pressed={view === "ready"} onClick={() => setView("ready")}>Ready ({ready.length})</Button>
+        <Button size="sm" variant={view === "reviewed" ? "secondary" : "ghost"} aria-pressed={view === "reviewed"} onClick={() => setView("reviewed")}>Reviewed ({reviewed.length})</Button>
+      </div>
       <Notice tone="info" title="Source records, not an invoice or revenue">
         These entries come from People and Projects. A recorded time approval does not prove a contractual rate, tax status, customer
         or invoice. Finance must independently prepare and approve the invoice; nothing here posts to the ledger or sends a bill.
       </Notice>
       {rows.length === 0 ? (
-        <Empty title="No billable time submitted">
-          Project time entries marked billable will appear here for Finance review, including those that still need a People approval.
+        <Empty title={sourceRows.length ? "Nothing in this review filter" : "No billable time submitted"}>
+          {sourceRows.length ? "Select another queue filter to inspect the remaining time inputs." : "Project time entries marked billable will appear here for Finance review, including those that still need a People approval."}
         </Empty>
       ) : (
         <DataGrid
