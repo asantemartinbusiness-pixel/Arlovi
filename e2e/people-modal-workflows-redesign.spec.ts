@@ -212,3 +212,32 @@ test("Leave decision requires an explicit reviewer acknowledgement", async ({ pa
   await drawer.getByRole("checkbox", { name: /reviewed this request/ }).check();
   await expect(approve).toBeEnabled();
 });
+
+
+test("Scheduling exceptions expose source-based time and attendance review", async ({ page }) => {
+  await page.goto("/o/northline/hr/scheduling?tab=Exceptions");
+  const filter = page.locator("#main").getByRole("button", { name: /Time & attendance/ });
+  await expect(filter).toBeVisible();
+  await filter.click();
+  await expect(filter).toHaveAttribute("aria-pressed", "true");
+});
+
+test("Performance separates draft reviews from submitted and acknowledged reviews", async ({ page }) => {
+  await page.goto("/o/northline/hr/performance?tab=Team");
+  const drafts = page.locator("#main").getByRole("button", { name: "Drafts" });
+  await expect(drafts).toBeVisible();
+  await drafts.click();
+  await expect(drafts).toHaveAttribute("aria-pressed", "true");
+  const submitted = page.locator("#main").getByRole("button", { name: "Submitted / calibration" });
+  await submitted.click();
+  await expect(submitted).toHaveAttribute("aria-pressed", "true");
+});
+
+test("Learning distinguishes locally saved draft courses from other states", async ({ page }) => {
+  await page.goto("/o/northline/hr/learning?tab=Courses");
+  const filter = page.locator("#main").getByRole("button", { name: "Local drafts" });
+  await expect(filter).toBeVisible();
+  await filter.click();
+  await expect(filter).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#main")).toContainText("Publication state");
+});
