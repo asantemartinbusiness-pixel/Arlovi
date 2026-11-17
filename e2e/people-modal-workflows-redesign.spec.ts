@@ -179,3 +179,36 @@ test("Employee intake is a three-step local record workflow and does not claim a
   });
   expect(created).toEqual([{ invitationStatus: "not_sent", office: "", summary: expect.stringContaining("No invitation has been sent") }]);
 });
+
+
+test("Leave request presents identity, dates, balance and conflict review", async ({ page }) => {
+  await page.goto("/o/northline/hr/leave?tab=My%20leave");
+  await page.locator("#main").getByRole("button", { name: "Request leave" }).first().click();
+  const modal = page.getByRole("dialog");
+  await expect(modal.getByRole("heading", { name: "Request time away" })).toBeVisible();
+  await expect(modal.locator(".hr-dialog-section")).toHaveCount(3);
+  await expect(modal).toContainText("Recorded balance and conflicts");
+  await expect(modal).toContainText("A submitted request does not reserve time");
+});
+
+test("Timesheets offer a dedicated approval-mismatch filter", async ({ page }) => {
+  await page.goto("/o/northline/hr/scheduling?tab=Timesheets");
+  const filter = page.locator("#main").getByRole("button", { name: /Review mismatches/ });
+  await expect(filter).toBeVisible();
+  await filter.click();
+  await expect(filter).toHaveAttribute("aria-pressed", "true");
+});
+
+test("Leave decision requires an explicit reviewer acknowledgement", async ({ page }) => {
+  await page.goto("/o/northline/hr/leave?tab=Approvals");
+  const review = page.locator("#main").getByRole("button", { name: "Review decision" }).first();
+  await expect(review).toBeVisible();
+  await review.click();
+  const drawer = page.getByRole("dialog");
+  await expect(drawer.getByRole("heading", { name: "Review a leave request" })).toBeVisible();
+  await expect(drawer.locator(".hr-dialog-section")).toHaveCount(3);
+  const approve = drawer.getByRole("button", { name: "Approve", exact: true });
+  await expect(approve).toBeDisabled();
+  await drawer.getByRole("checkbox", { name: /reviewed this request/ }).check();
+  await expect(approve).toBeEnabled();
+});
