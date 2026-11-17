@@ -8,7 +8,7 @@ import { capabilityById } from "@/platform/capability";
 import {
   ApplicantProfile, CandidateProfileOverlay, EmployeeDirectory, EmployeeProfile, InboxNote, LeaveApproval,
   LeaveForm, LeaveScreen, Learning, Onboarding, Payroll, PayrollReview, PeopleOverview, Performance,
-  PositionEditor, Recruitment, Scheduling, SegmentedInspector, StaffingSummary, computePayroll,
+  PositionEditor, Recruitment, Scheduling, SegmentedInspector, StaffingSummary,
 } from "./panels";
 import { RoleViewNote, submitFooter } from "./kit";
 import { kitOverlays, needsSelection } from "./opsKit";
