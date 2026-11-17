@@ -129,3 +129,31 @@ test("Policy acknowledgement preserves one version-specific record and matching 
   await expect(page.getByText("Already acknowledged").first()).toBeVisible();
   expect(await read()).toEqual({ aggregate: 1, linked: 1 });
 });
+
+
+test("Offboarding requires a reason and human confirmation and never claims external revocation", async ({ page }) => {
+  await page.goto("/o/northline/hr/employees");
+  const employeeId = await page.evaluate(async () => {
+    const repo = await import("../src/platform/repo");
+    const rows = await repo.listByCollection("org-northline", "employees");
+    return rows.find((row) => row.status !== "alumni")?.id ?? null;
+  });
+  expect(employeeId).toBeTruthy();
+  await page.goto(`/o/northline/hr/employees/${employeeId}`);
+  await page.locator("#main").getByRole("button", { name: "Offboard" }).first().click();
+  const modal = page.getByRole("dialog");
+  await expect(modal.getByRole("heading", { name: "Record a departure" })).toBeVisible();
+  await expect(modal.locator(".hr-dialog-section")).toHaveCount(3);
+  await expect(modal).toContainText("External access is not revoked");
+  const save = modal.getByRole("button", { name: "Record departure" });
+  await expect(save).toBeDisabled();
+  await modal.getByRole("textbox", { name: "Reason for offboarding" }).fill("Approved departure after handover review.");
+  await expect(save).toBeDisabled();
+  const checks = modal.getByRole("checkbox");
+  await expect(checks).toHaveCount(3);
+  await checks.nth(0).check();
+  await checks.nth(1).check();
+  await expect(save).toBeDisabled();
+  await checks.nth(2).check();
+  await expect(save).toBeEnabled();
+});
