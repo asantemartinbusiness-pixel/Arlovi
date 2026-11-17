@@ -54,3 +54,28 @@ for (const width of [390, 820, 1440]) {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 }
+
+
+test("Website editor exposes the current page and routes back into its connected tools", async ({ page }) => {
+  await page.goto("/o/northline/web/sites");
+  const editorPath = await page.locator(".web-library-card").first()
+    .getByRole("link", { name: "Editor" }).getAttribute("href");
+  expect(editorPath).toContain("/web/sites/");
+  await page.goto(editorPath!);
+  const main = page.locator("#main");
+  const editor = main.getByLabel("Website editor overview");
+  await expect(editor).toBeVisible();
+  await expect(editor).toContainText("PAGE EDITOR");
+  await expect(editor).toContainText("blocks");
+  await editor.getByRole("button", { name: "Quality" }).click();
+  await expect(page).toHaveURL(new RegExp(editorPath!.replace(/\/builder$/, "") + "/quality$"));
+  await expect(main).not.toContainText("Record not found");
+});
+
+test("Unknown website builder URLs cannot substitute a real site", async ({ page }) => {
+  await page.goto("/o/northline/web/sites");
+  await page.goto("/o/northline/web/sites/qa-unknown-site-id-2026/builder");
+  const main = page.locator("#main");
+  await expect(main).toContainText(/Record not found|No site in this workspace/);
+  await expect(main.getByLabel("Website editor overview")).toHaveCount(0);
+});
