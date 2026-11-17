@@ -12,6 +12,7 @@ import { addDays, clockIso, daysBetween, startOfMonth, startOfWeek } from "@/pla
 import type { Rec } from "@/domain/types";
 import { EmploymentPill, RoleViewNote, leaveBalance, salaryText } from "./kit";
 import { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
+import { leaveRequestDays, planLeaveDecision } from "./decisions";
 import { linkedPersonnelDocuments, scopedDetailRecord } from "@/platform/recordScope";
 
 /* ------------------------------------------------------------------ *
@@ -50,8 +51,7 @@ function days(count: number): string {
 }
 
 function leaveDays(record: Rec): number {
-  if (!record.startAt || !record.endAt) return Number(record.fields.days ?? 1);
-  return Math.max(1, daysBetween(new Date(record.startAt), new Date(record.endAt)));
+  return leaveRequestDays(record);
 }
 
 /* ------------------------------------------------------------------ *
@@ -1069,11 +1069,18 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
                   size="sm"
                   variant="primary"
                   onClick={async () => {
-                    await context.mutate.patch(request.id, { status: "approved", fields: { ...request.fields, decidedBy: context.actor, decidedAt: clockIso() } }, { expectRevision: request.revision, event: `Leave approved for ${leavePerson(request, data.employees)} by ${context.actor}` });
-                    if (employee) {
-                      await context.mutate.patch(employee.id, { fields: { ...employee.fields, leaveTaken: Number(employee.fields.leaveTaken ?? 0) + requested } }, { event: "Leave balance updated after approval" });
+                    try {
+                      const plan = planLeaveDecision({
+                        organizationId: context.org.id, currency: context.org.currency,
+                        actor: context.actor, now: clockIso(),
+                      }, request, employee, "approved");
+                      await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+                      context.toast("Leave approved", String(request.fields.type ?? "annual") === "annual"
+                        ? "The request and annual balance were updated together."
+                        : "The request was approved without changing annual leave.");
+                    } catch (error) {
+                      context.toast("Leave not approved", error instanceof Error ? error.message : "Reload this request before deciding.", "blocked");
                     }
-                    context.toast("Leave approved", `${days(requested)} booked${balance.known ? " and the balance has moved" : "; this person has no recorded allowance, so no balance moved"}.`);
                   }}
                 >
                   Approve
@@ -1082,8 +1089,16 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
                   size="sm"
                   variant="outline-danger"
                   onClick={async () => {
-                    await context.mutate.patch(request.id, { status: "declined", fields: { ...request.fields, decidedBy: context.actor, decidedAt: clockIso() } }, { expectRevision: request.revision, event: `Leave declined for ${leavePerson(request, data.employees)} by ${context.actor}` });
-                    context.toast("Leave declined", "The request is recorded as declined with the decision maker's name.");
+                    try {
+                      const plan = planLeaveDecision({
+                        organizationId: context.org.id, currency: context.org.currency,
+                        actor: context.actor, now: clockIso(),
+                      }, request, undefined, "declined");
+                      await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+                      context.toast("Leave declined", "The request is recorded as declined with the decision maker's name.");
+                    } catch (error) {
+                      context.toast("Leave not declined", error instanceof Error ? error.message : "Reload this request before deciding.", "blocked");
+                    }
                   }}
                 >
                   Decline
@@ -1095,7 +1110,11 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
               <Stack gap={3}>
                 <p>{request.summary}</p>
                 <Properties rows={[
-                  { label: "Balance after approval", value: employee && balance.known ? <span className="ds-num">{Math.max(0, balance.left - requested)} of {balance.allowance} days</span> : employee ? "Unavailable — no allowance recorded" : "Unavailable — no employee record" },
+                  { label: "Balance after approval", value: employee && balance.known
+                    ? balance.left >= requested
+                      ? <span className="ds-num">{balance.left - requested} of {balance.allowance} days</span>
+                      : "Insufficient allowance — approval blocked"
+                    : employee ? "Unavailable — no allowance recorded" : "Unavailable — no employee record" },
                   { label: "Overlapping approved leave", value: clash.length ? `${clash.length} other ${clash.length === 1 ? "person" : "people"} away` : "Nobody else is away" },
                 ]} />
                 {clash.length > 0 && <Notice tone="warning" title="Cover is thin on these days">Approving this leaves {clash.length + 1} people away at once. Check the roster before deciding.</Notice>}
