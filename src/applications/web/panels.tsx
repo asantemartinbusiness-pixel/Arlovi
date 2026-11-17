@@ -92,6 +92,32 @@ export function SiteDashboard({ context, lens }: { context: ScreenContext; lens:
   if (lens === "Overview") {
     return (
       <Stack gap={5}>
+        <section className="web-site-workspace" aria-label="Website working area">
+          <div className="web-site-workspace-head">
+            <div>
+              <span className="web-library-eyebrow">WEBSITES / SITE WORKSPACE</span>
+              <h2>{record.title}</h2>
+              <p>Continue editing, review quality and prepare a release without leaving this site.</p>
+            </div>
+            <div className="web-site-workspace-actions">
+              <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/builder`)}>Edit website</Button>
+              <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/quality`)}>Quality checks</Button>
+            </div>
+          </div>
+          <nav className="web-site-workflow" aria-label="Site work areas">
+            {([
+              ["Pages", "Edit layout and content", "builder"],
+              ["Content", "Collections and entries", "cms"],
+              ["Navigation", "Menus and redirects", "navigation"],
+              ["Publishing", "Domains and exports", "deploy"],
+            ] as const).map(([label, detail, route]) => (
+              <button type="button" key={route}
+                onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/${route}`)}>
+                <strong>{label}</strong><span>{detail}</span>
+              </button>
+            ))}
+          </nav>
+        </section>
         <StatRow>
           <Stat prov="posted" label="Pages" value={String(site.pages.length)} meta={`${site.pages.reduce((sum, page) => sum + page.blocks.length, 0)} blocks`} />
           <Stat prov="posted" label="Export size" value={`${(exportBytes(site) / 1024).toFixed(1)} kB`} meta="Measured by generating every page" />
