@@ -396,15 +396,59 @@ export function EmployeeDirectory({ context, lens }: { context: ScreenContext; l
   const data = useHrData();
   const { org } = useWorkspace();
   const team = useDirectoryTeam();
+  const [query, setQuery] = useState("");
+  const [unassignedOnly, setUnassignedOnly] = useState(false);
+  const current = data.employees.filter((employee) => employee.status !== "alumni");
+  const title = lens === "People" ? "People, with context."
+    : lens === "Teams" ? "Explore how teams connect."
+    : lens === "Contractors" ? "The extended workforce." : "People who helped build the work.";
+  const description = lens === "People"
+    ? "Find an employee by name, role, department or office. Open the complete record without exposing private payroll data in the directory."
+    : lens === "Teams"
+      ? "Understand departments, their recorded leads and the people assigned to them. AI contracts remain distinct from human headcount."
+      : lens === "Contractors"
+        ? "Review contractors as separate workforce records. Recorded engagements are not assumed to be active contracts."
+        : "Preserve former colleagues' historical records without representing them as current staff.";
+  const header = (
+    <OpsHeader eyebrow={`People / Employee Directory / ${lens}`} title={title} description={description}
+      actions={<>
+        <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/overview`)}>People overview</Button>
+        {context.can("edit_people") && <Button variant="primary" onClick={() => context.openOverlay("Invite employee")}>
+          Create employee record
+        </Button>}
+      </>}
+      note="Records and access rights shown here are local to this company workspace."
+    />
+  );
 
   if (lens === "Teams") {
+    const withoutDepartment = current.filter((employee) =>
+      !data.departments.some((department) => department.id === employee.fields.departmentId)).length;
     return (
+      <Stack gap={4}>
+        {header}
+        <OpsMetrics label="Team directory overview">
+          <OpsMetric label="Departments" value={data.departments.length} detail="Recorded teams" />
+          <OpsMetric label="Current people" value={current.length} detail="Human and contractor records" />
+          <OpsMetric label="Unassigned department" value={withoutDepartment} detail="People needing a team link" emphasis={withoutDepartment ? "attention" : "neutral"} />
+          <OpsMetric label="AI contracts" value={aiEmployees(data.members).length} detail="Not human headcount" />
+        </OpsMetrics>
+        {data.departments.length === 0 ? (
+          <Empty title="No departments defined" icon={<Users size={20} />}>
+            Teams appear when their department records are created. Employees without department links remain in the People directory.
+          </Empty>
+        ) : (
       <Grid>
         {data.departments.map((department) => {
           const people = data.employees.filter((employee) => employee.fields.departmentId === department.id && employee.status !== "alumni");
           const agents = aiEmployees(data.members).filter((member) => member.fields.departmentId === department.id);
           return (
-            <Card key={department.id} span={4} title={department.title} subtitle={department.summary} actions={<Pill>{people.length + agents.length}</Pill>}>
+            <Card key={department.id} span={4} title={department.title} subtitle={department.summary}
+              eyebrow="DEPARTMENT" actions={<Pill>{people.length} people</Pill>}
+              footer={<Button size="sm" variant="secondary" onClick={() => {
+                setDirectoryTeam(department.id);
+                context.setTab("People");
+              }}>Explore team</Button>}>
               <Stack gap={3}>
                 <Properties rows={[
                   { label: "Lead", value: String(department.fields.lead ?? "Unassigned") },
@@ -420,17 +464,46 @@ export function EmployeeDirectory({ context, lens }: { context: ScreenContext; l
           );
         })}
       </Grid>
+        )}
+        {withoutDepartment > 0 && <Notice tone="info" title="Some people have no recorded department">
+          Use the People tab to find employee profiles and verify their actual reporting line before assigning a team.
+        </Notice>}
+      </Stack>
     );
   }
 
   const allRows = lens === "Contractors"
-    ? data.employees.filter((employee) => employee.fields.employment === "contractor")
+    ? data.employees.filter((employee) => employee.fields.employment === "contractor" && employee.status !== "alumni")
     : lens === "Alumni"
       ? data.employees.filter((employee) => employee.status === "alumni")
       : humans(data.employees);
-  const rows = team ? allRows.filter((employee) => employee.fields.departmentId === team) : allRows;
-
+  const filteredToTeam = team ? allRows.filter((employee) => employee.fields.departmentId === team) : allRows;
+  const rows = filteredToTeam.filter((employee) => {
+    const dept = departmentName(data.departments, employee.fields.departmentId);
+    const searchable = [employee.title, employee.fields.title, dept, employee.fields.office, employee.fields.skills]
+      .map((value) => String(value ?? "")).join(" ").toLowerCase();
+    const hasDepartment = data.departments.some((department) => department.id === employee.fields.departmentId);
+    return (!unassignedOnly || !hasDepartment) && searchable.includes(query.trim().toLowerCase());
+  });
   const agents = aiEmployees(data.members);
+  const missingTeam = allRows.filter((employee) =>
+    !data.departments.some((department) => department.id === employee.fields.departmentId)).length;
+  const toolbar = (
+    <div className="ops-toolbar" aria-label="Employee directory filters">
+      <strong className="ops-toolbar-heading">{lens} records</strong>
+      <div className="hr-directory-search">
+        <TextInput aria-label="Search employee directory" placeholder="Name, role, location or skill"
+          value={query} onChange={(event) => setQuery(event.target.value)} />
+      </div>
+      <Select aria-label="Filter by department" value={team} onChange={(event) => setDirectoryTeam(event.target.value)}>
+        <option value="">All departments</option>
+        {data.departments.map((department) => <option key={department.id} value={department.id}>{department.title}</option>)}
+      </Select>
+      <Button size="sm" variant={unassignedOnly ? "secondary" : "ghost"} aria-pressed={unassignedOnly}
+        onClick={() => setUnassignedOnly((value) => !value)}>No department</Button>
+      <span className="ops-toolbar-note">{rows.length} of {allRows.length}</span>
+    </div>
+  );
 
   const grid = (
     <DataGrid
@@ -438,6 +511,16 @@ export function EmployeeDirectory({ context, lens }: { context: ScreenContext; l
       rowId={(row) => row.id}
       label={`${lens} directory`}
       selectedId={context.selectedId}
+      card={(person) => (
+        <div className="hr-directory-card">
+          <Avatar name={person.title} size="sm" />
+          <div className="hr-directory-card-copy">
+            <strong>{person.title}</strong>
+            <span>{String(person.fields.title || "No role recorded")} · {departmentName(data.departments, person.fields.departmentId)}</span>
+          </div>
+          <EmploymentPill record={person} />
+        </div>
+      )}
       columns={[
         { key: "name", header: "Name", primary: true, cell: (row) => <Row gap={2}><Avatar name={row.title} size="sm" /><span>{row.title}</span></Row>, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${String(row.fields.title ?? "")} ${String(row.fields.skills ?? "")}` },
         { key: "role", header: "Role", cell: (row) => String(row.fields.title ?? ""), sortValue: (row) => String(row.fields.title ?? ""), filterValue: (row) => String(row.fields.title ?? "") },
@@ -447,7 +530,10 @@ export function EmployeeDirectory({ context, lens }: { context: ScreenContext; l
         { key: "status", header: "Employment", align: "end", cell: (row) => <EmploymentPill record={row} />, sortValue: (row) => row.status },
       ]}
       onOpen={(id) => context.navigate(`/o/${org.slug}/hr/employees/${id}`)}
-      empty={<Empty title={`No ${lens.toLowerCase()} on record`} icon={<Users size={20} />}>{lens === "Alumni" ? "People who have left keep a record for payroll history and references." : "Add a person from the employee directory."}</Empty>}
+      empty={<Empty title={allRows.length ? "No matching people" : `No ${lens.toLowerCase()} on record`} icon={<Users size={20} />}>
+        {allRows.length ? "Clear the search or department filter to find another person." :
+          lens === "Alumni" ? "Former employees remain on record for historical purposes." : "Create an employee record to populate this directory."}
+      </Empty>}
     />
   );
 
@@ -457,18 +543,34 @@ export function EmployeeDirectory({ context, lens }: { context: ScreenContext; l
     </Notice>
   ) : null;
 
-  if (lens !== "People") return filterNote ? <Stack gap={3}>{filterNote}{grid}</Stack> : grid;
+  const summary = (
+    <OpsMetrics label={`${lens} directory metrics`}>
+      <OpsMetric label="Records" value={allRows.length} detail={`${lens} in this company`} />
+      <OpsMetric label="Currently shown" value={rows.length} detail="Matching the active filters" />
+      <OpsMetric label="Departments" value={data.departments.length} detail="Company teams" />
+      <OpsMetric label="Missing team link" value={missingTeam} detail="Verify department records" emphasis={missingTeam ? "attention" : "neutral"} />
+    </OpsMetrics>
+  );
+
+  if (lens !== "People") return (
+    <Stack gap={4}>{header}{summary}{toolbar}{filterNote}{grid}</Stack>
+  );
 
   return (
-    <Stack gap={5}>
+    <Stack gap={4}>
+      {header}
+      {summary}
+      {toolbar}
       {filterNote}
-      <Card title="People" subtitle={`${rows.length} employed · contact details follow each person's privacy setting`} flush>{grid}</Card>
+      <Card title="People" subtitle={`${rows.length} shown · private contact and pay details remain in individual profiles`} flush>{grid}</Card>
       <Card
         title="AI employees"
         subtitle={`${agents.length} local agent contracts · listed apart from people on purpose`}
         actions={<Pill tone="accent">Not headcount</Pill>}
       >
-        <Grid>
+        {agents.length === 0 ? <Empty title="No AI contracts recorded" icon={<Users size={20} />}>
+          AI employees are added as separate local contracts, not human staff members.
+        </Empty> : <Grid>
           {agents.map((agent) => (
             <Card key={agent.id} span={4} title={<Row gap={2}><Avatar name={agent.title} kind="ai" size="sm" />{agent.title}</Row>} subtitle={String(agent.fields.title ?? "")}>
               <Stack gap={2}>
@@ -481,7 +583,7 @@ export function EmployeeDirectory({ context, lens }: { context: ScreenContext; l
               </Stack>
             </Card>
           ))}
-        </Grid>
+        </Grid>}
         <Notice tone="info" title="An AI employee is not a person">
           Agents have no salary, no leave balance and no payroll line. They run from a local contract in this workspace;
           no model provider is connected, so nothing they draft leaves the browser on its own.
