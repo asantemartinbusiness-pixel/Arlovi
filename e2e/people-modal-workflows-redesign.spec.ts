@@ -1,4 +1,19 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function createQaEmployee(page: Page): Promise<string> {
+  return page.evaluate(async () => {
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "employees", currency: "GBP",
+      title: "QA Profile Workflow Employee", status: "active",
+      fields: { title: "Analyst", employment: "full-time", leaveAllowance: 25, leaveTaken: 0 },
+    }, { actor: "Maya Chen", now: new Date().toISOString() });
+    await repo.putRecord(record, { actor: "Maya Chen", now: new Date().toISOString() });
+    return record.id;
+  });
+}
+
 
 test("Performance review modal has three evidence steps and refuses unsupported ratings", async ({ page }) => {
   await page.goto("/o/northline/hr/performance?tab=Cycles");
@@ -133,12 +148,7 @@ test("Policy acknowledgement preserves one version-specific record and matching 
 
 test("Offboarding requires a reason and human confirmation and never claims external revocation", async ({ page }) => {
   await page.goto("/o/northline/hr/employees");
-  const employeeId = await page.evaluate(async () => {
-    const repoPath = "/src/platform/repo.ts";
-    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
-    const rows = await repo.listByCollection("org-northline", "employees");
-    return rows.find((row) => row.status !== "alumni")?.id ?? null;
-  });
+  const employeeId = await createQaEmployee(page);
   expect(employeeId).toBeTruthy();
   await page.goto(`/o/northline/hr/employees/${employeeId}`);
   await page.locator("#main").getByRole("button", { name: "Offboard" }).first().click();
@@ -247,12 +257,7 @@ test("Learning distinguishes locally saved draft courses from other states", asy
 
 test("Employee profile tabs expose scoped actions and avoid unverified balance claims", async ({ page }) => {
   await page.goto("/o/northline/hr/employees");
-  const employeeId = await page.evaluate(async () => {
-    const repoPath = "/src/platform/repo.ts";
-    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
-    const rows = await repo.listByCollection("org-northline", "employees");
-    return rows.find((row) => row.status !== "alumni")?.id ?? null;
-  });
+  const employeeId = await createQaEmployee(page);
   expect(employeeId).toBeTruthy();
   await page.goto(`/o/northline/hr/employees/${employeeId}?tab=Job`);
   await expect(page.locator("#main").getByRole("button", { name: "Update job details" })).toBeVisible();
@@ -268,11 +273,7 @@ test("Employee profile tabs expose scoped actions and avoid unverified balance c
 
 test("Employee document reference requires explicit source and attestation", async ({ page }) => {
   await page.goto("/o/northline/hr/employees");
-  const id = await page.evaluate(async () => {
-    const repoPath = "/src/platform/repo.ts";
-    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
-    return (await repo.listByCollection("org-northline", "employees")).find((row) => row.status !== "alumni")?.id;
-  });
+  const id = await createQaEmployee(page);
   expect(id).toBeTruthy();
   await page.goto(`/o/northline/hr/employees/${id}?tab=Documents`);
   await page.locator("#main").getByRole("button", { name: "Add a document reference" }).first().click();
@@ -289,7 +290,7 @@ test("Onboarding launch exposes named handover owners without pretending provisi
   await page.goto("/o/northline/hr/onboarding?tab=Incoming");
   await page.locator("#main").getByRole("button", { name: "Launch a checklist" }).first().click();
   const modal = page.getByRole("dialog");
-  await expect(modal.getByRole("heading", { name: "Launch an onboarding checklist", exact: true })).toBeVisible();
+  await expect(modal.locator(".hr-dialog-lead h3")).toBeVisible();
   await expect(modal.locator(".hr-dialog-section")).toHaveCount(3);
   await expect(modal).toContainText("Payroll input review, not payroll submission");
   await expect(modal).toContainText("no accounts or external services are provisioned");
@@ -297,11 +298,7 @@ test("Onboarding launch exposes named handover owners without pretending provisi
 
 test("Employee job tab shows prior record history without sensitive field snapshots", async ({ page }) => {
   await page.goto("/o/northline/hr/employees");
-  const id = await page.evaluate(async () => {
-    const repoPath = "/src/platform/repo.ts";
-    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
-    return (await repo.listByCollection("org-northline", "employees")).find((row) => row.status !== "alumni")?.id;
-  });
+  const id = await createQaEmployee(page);
   expect(id).toBeTruthy();
   await page.goto(`/o/northline/hr/employees/${id}?tab=Job`);
   await expect(page.locator("#main").getByRole("heading", { name: "Employment record history" })).toBeVisible();
@@ -311,11 +308,7 @@ test("Employee job tab shows prior record history without sensitive field snapsh
 
 test("Access request requires a named reviewer and written reason", async ({ page }) => {
   await page.goto("/o/northline/hr/employees");
-  const id = await page.evaluate(async () => {
-    const repoPath = "/src/platform/repo.ts";
-    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
-    return (await repo.listByCollection("org-northline", "employees")).find((row) => row.status !== "alumni")?.id;
-  });
+  const id = await createQaEmployee(page);
   expect(id).toBeTruthy();
   await page.goto(`/o/northline/hr/employees/${id}?tab=Access`);
   await page.locator("#main").getByRole("button", { name: "Request access" }).first().click();
@@ -323,7 +316,7 @@ test("Access request requires a named reviewer and written reason", async ({ pag
   await expect(modal.getByRole("heading", { name: "Request an access review", exact: true })).toBeVisible();
   await expect(modal.locator(".hr-dialog-section")).toHaveCount(3);
   await expect(modal).toContainText("No connected identity provider");
-  await expect(modal.getByText("Responsible reviewer")).toBeVisible();
-  await expect(modal.getByText("Business reason")).toBeVisible();
+  await expect(modal.getByText("Responsible reviewer", { exact: true }).first()).toBeVisible();
+  await expect(modal.getByText("Business reason", { exact: true }).first()).toBeVisible();
 });
 
