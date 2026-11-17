@@ -1438,7 +1438,8 @@ export function LeaveCalendar({ context, month, onPickDay }: { context: ScreenCo
               <span className="hr-cal-marks">
                 {onLeave.slice(0, 3).map((request) => (
                   <span key={request.id} className="hr-cal-chip" data-state={request.status}>
-                    {String(request.fields.employeeName ?? request.ownerName).split(" ")[0]}
+                    {String(request.fields.type ?? "") === "sick"
+                      ? "Unavailable" : leavePerson(request, data.employees).split(" ")[0]}
                   </span>
                 ))}
                 {onLeave.length > 3 && <span className="hr-cal-chip" data-state="more">+{onLeave.length - 3}</span>}
@@ -1450,7 +1451,7 @@ export function LeaveCalendar({ context, month, onPickDay }: { context: ScreenCo
       <Row gap={3} wrap style={{ marginBlockStart: "var(--space-3)" }}>
         <Row gap={1}><span className="hr-cal-chip" data-state="approved">Approved</span></Row>
         <Row gap={1}><span className="hr-cal-chip" data-state="requested">Requested</span></Row>
-        <span className="ds-subtle">Only the person and the type of leave are shown. A sickness record never shows a reason here.</span>
+        <span className="ds-subtle">Only recorded names and approval states appear here. Sickness is shown as unavailable without identifying a person or displaying health details.</span>
       </Row>
     </div>
   );
@@ -1642,18 +1643,29 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
   }
 
   if (lens === "Policy") {
-    const policy = data.policies.find((row) => row.title.includes("Leave"));
+    const policy = data.policies.find((row) => row.title.toLowerCase().includes("leave"));
+    const policyField = (key: string) => {
+      const value = policy?.fields[key];
+      return value === undefined || value === null || value === "" ? "Not specified in the recorded policy" : String(value);
+    };
     return (
+      <Stack gap={4}>
+        {header}
+        {metrics}
+        <Notice tone="info" title="Read the published policy record, not default assumptions">
+          Entitlement, notice and carry-over limits must be verified against the actual policy record and employment agreement.
+          This screen does not substitute undocumented defaults for missing information.
+        </Notice>
       <Grid>
         <Card span={7} title={policy?.title ?? "Leave and absence policy"} subtitle={policy ? `Version ${String(policy.fields.version ?? "")} · published ${context.date(policy.at)}` : undefined}>
           <Stack gap={3}>
             <p>{policy?.summary ?? "No leave policy is published in this workspace."}</p>
             <Properties rows={[
-              { label: "Standard allowance", value: "25 days plus bank holidays" },
-              { label: "Part time", value: "Pro rata by contracted days" },
-              { label: "Carry over", value: "Up to five days into the next year" },
-              { label: "Notice", value: "Twice the length of the leave requested" },
-              { label: "Sickness", value: "Recorded as an absence. No health detail is held in the calendar." },
+              { label: "Standard annual allowance", value: policyField("leaveAllowance") },
+              { label: "Part-time entitlement", value: policyField("partTimeLeave") },
+              { label: "Carry-over rule", value: policyField("carryOver") },
+              { label: "Notice period", value: policyField("noticePeriod") },
+              { label: "Sickness", value: "Sensitive absence reasons must not be displayed in the team calendar." },
             ]} />
           </Stack>
         </Card>
@@ -1664,11 +1676,25 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
           </Stack>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
   const balance = mine ? leaveBalance(mine) : { allowance: 0, taken: 0, left: 0, known: false };
+  const visibleRequests = myView === "pending" ? myRequests.filter((request) => request.status === "requested")
+    : myView === "decided" ? myRequests.filter((request) => request.status !== "requested") : myRequests;
   return (
+    <Stack gap={4}>
+      {header}
+      {metrics}
+      <div className="ops-toolbar" aria-label="Filter my leave">
+        <strong className="ops-toolbar-heading">My leave requests</strong>
+        {(["all", "pending", "decided"] as const).map((filter) =>
+          <Button key={filter} size="sm" aria-pressed={myView === filter}
+            variant={myView === filter ? "secondary" : "ghost"} onClick={() => setMyView(filter)}>
+            {filter === "all" ? "All" : filter === "pending" ? "Awaiting decision" : "Decided"}
+          </Button>)}
+      </div>
     <Grid>
       <Card span={4} eyebrow="BALANCE" prov={balance.known ? "human" : "unknown"} title="Your balance" subtitle={mine ? (balance.known ? `${balance.left} days left` : "No allowance recorded") : "No employee record for this role view"}>
         {mine && balance.known ? (
@@ -1699,9 +1725,13 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
         )}
       </Card>
       <Card span={8} eyebrow="REQUESTS" prov="human" title="Your requests" subtitle={`${myRequests.length} on record`} flush>
-        {myRequests.length === 0 ? <div className="ds-card-body"><Empty title="You have not asked for leave" icon={<CalendarDays size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Leave form")}>Request leave</Button>} /></div> : (
+        {visibleRequests.length === 0 ? <div className="ds-card-body"><Empty title={myRequests.length ? "No requests match this filter" : "You have not asked for leave"}
+          icon={<CalendarDays size={20} />}
+          action={!myRequests.length ? <Button variant="primary" onClick={() => context.openOverlay("Leave form")}>Request leave</Button> : undefined}>
+            {myRequests.length ? "Choose another filter to see your other requests." : "Recorded requests and their decision states appear here."}
+          </Empty></div> : (
           <DataGrid
-            rows={myRequests}
+            rows={visibleRequests}
             rowId={(row) => row.id}
             label="My leave requests"
             filterable={false}
@@ -1719,6 +1749,7 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
         <LeaveCalendar context={context} month={month} />
       </Card>
     </Grid>
+    </Stack>
   );
 }
 
