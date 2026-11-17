@@ -4,6 +4,7 @@ import { applications, appEntry, findScreen, screens } from "@/app/catalog";
 import { NAV_GROUPS } from "@/app/nav";
 import { canOpen } from "@/platform/policy";
 import { platformDestinations } from "@/app/platformDirectory";
+import { GROWTH_WORKFLOWS, growthDestinations, growthPeerDestination } from "@/app/growthDirectory";
 
 describe("the native application directory", () => {
   it("includes every registered app exactly once and retains the existing six groups", () => {
@@ -75,4 +76,41 @@ describe("the native application directory", () => {
     expect(clientApps).not.toContain("FIN");
     expect(clientApps).not.toContain("ADMIN");
   });
+  it("exposes all five Growth apps with real, company-scoped work area links", () => {
+    const codes = ["MARKET", "COMMERCE", "BOOK", "PROC", "PORTAL"] as const;
+    expect(Object.keys(GROWTH_WORKFLOWS)).toEqual(codes);
+    expect(findDirectoryApps(DIRECTORY_APPS, "", "Growth").map(app => app.code)).toEqual(codes);
+    for (const code of codes) {
+      const links = growthDestinations(code, "northline");
+      expect(links.length, code).toBeGreaterThan(0);
+      for (const { to } of links) {
+        expect(to, code).toMatch(/^\/o\/northline\//);
+        expect(to, code).not.toMatch(/:id|:slug|:org/);
+        expect(findScreen(to)?.screen.applicationCode).toBe(code);
+        expect(findScreen(to)?.params.id).toBeUndefined();
+      }
+      const peer = growthPeerDestination(code, "northline");
+      expect(peer.to).toBe(appEntry(peer.code, "northline"));
+      expect(findScreen(peer.to)?.params.id).toBeUndefined();
+    }
+    expect(growthDestinations("COMMERCE", "northline")).toContainEqual({
+      label: "Orders", to: "/o/northline/commerce/orders",
+    });
+    expect(growthDestinations("BOOK", "northline")).toContainEqual({
+      label: "Calendar", to: "/o/northline/book/calendar",
+    });
+    // No deep link to another portal can be provided without its real record.
+    expect(growthDestinations("PORTAL", "northline")).toEqual([
+      { label: "Portal directory", to: "/o/northline/portal/portals" },
+    ]);
+    expect(growthDestinations("FIN", "northline")).toEqual([]);
+  });
+
+  it("finds Growth apps by their actual native screen names", () => {
+    expect(findDirectoryApps(DIRECTORY_APPS, "Content Calendar", "Growth").map(app => app.code)).toContain("MARKET");
+    expect(findDirectoryApps(DIRECTORY_APPS, "Stock Movements", "Growth").map(app => app.code)).toContain("PROC");
+    expect(findDirectoryApps(DIRECTORY_APPS, "Booking Reports", "Growth").map(app => app.code)).toContain("BOOK");
+    expect(findDirectoryApps(DIRECTORY_APPS, "Shared Documents", "Growth").map(app => app.code)).toContain("PORTAL");
+  });
+
 });

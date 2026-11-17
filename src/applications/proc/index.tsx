@@ -1,6 +1,7 @@
 import { BarChart3, Boxes, FileText, PackageCheck, Truck, Warehouse } from "lucide-react";
 import { Empty, Notice, Pill, Properties, Row, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
+import { GrowthOverviewNav } from "@/app/GrowthOverviewNav";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { confirmOverlay, submitFooter } from "@/applications/market/kit";
 import {
@@ -63,6 +64,7 @@ export const procApp = registerApp({
     /* ------------------------------ 001 ------------------------------ */
     "ARL-PROC-001": {
       id: "ARL-PROC-001",
+      header: (context: ScreenContext) => <GrowthOverviewNav context={context} code="PROC" />,
       subtitle: (context) => `What ${context.org.shortName} has committed, what is due in, and what cannot be paid yet.`,
       tabs: ["Overview", "Approvals", "Suppliers", "Stock"].map((lens) => ({
         id: lens,

@@ -52,10 +52,12 @@ export function AppShell() {
   const activeCode = activeScreen?.applicationCode ?? "HQ";
   const appModule = getApp(activeCode);
   const activeGroup = NAV_GROUPS.find(group => group.apps.some(app => app.code === activeCode));
-  const appDirectoryPath = activeGroup?.label === "Platform"
-    ? `${workAreaPath(org.slug, "apps")}?category=Platform`
+  const contextualCategory = activeGroup && ["Platform", "Growth"].includes(activeGroup.label)
+    ? activeGroup.label : null;
+  const appDirectoryPath = contextualCategory
+    ? `${workAreaPath(org.slug, "apps")}?category=${contextualCategory}`
     : workAreaPath(org.slug, "apps");
-  const platformPeers = activeGroup?.label === "Platform"
+  const relatedPeers = contextualCategory && activeGroup
     ? activeGroup.apps.filter(app => app.code !== activeCode && canOpen(role, app.code))
     : [];
 
@@ -396,11 +398,11 @@ export function AppShell() {
                 const target = screens.find(screen => screen.id === item.screenId);
                 return target && /:id\b/.test(target.route);
               })) && <p className="hq-appnav-help">Open a record from this app to access its detail views.</p>}
-              {platformPeers.length > 0 && (
+              {relatedPeers.length > 0 && (
                 <details className="hq-appnav-related">
-                  <summary>Other Platform apps <ChevronDown size={15} aria-hidden="true" /></summary>
+                  <summary>Other {contextualCategory} apps <ChevronDown size={15} aria-hidden="true" /></summary>
                   <div className="hq-appnav-related-links">
-                    {platformPeers.map(peer => {
+                    {relatedPeers.map(peer => {
                       const PeerIcon = peer.icon;
                       return <Link key={peer.code} to={appEntry(peer.code, org.slug)} className="hq-navlink">
                         <PeerIcon size={15} />

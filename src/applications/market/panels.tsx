@@ -8,13 +8,15 @@ import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import { freshness } from "@/platform/clock";
 import { CalendarToolbar, ProviderBoundary, ScheduleCalendar } from "@/applications/market/kit";
-import { CalendarCheck, Mail, Megaphone, PenLine, Search, Users } from "lucide-react";
+import { CalendarCheck, Mail, Megaphone, PenLine, Search } from "lucide-react";
 import type { Rec } from "@/domain/types";
 import {
   bodyOf, evaluateSegment, networkOf, rollUp, useMarketData,
   type AudienceBody, type CampaignBody, type ChannelPlan, type PostBody, type SiteBody,
 } from "./data";
 import { attributionFilter, PageChecksCard, useAttributionFilter } from "./actions";
+import { CampaignLibraryWorkspace } from "./CampaignLibraryWorkspace";
+import { AudienceSegmentsLibrary } from "./AudienceSegmentsLibrary";
 
 /* ====================================================================== *
  * MARKET panels. Each tab in the approved contract renders its own panel.
@@ -253,72 +255,7 @@ export function MarketingOverview({ context, lens }: { context: ScreenContext; l
 /* ---------------------------- MARKET-002 ---------------------------- */
 
 export function CampaignLibrary({ context, state }: { context: ScreenContext; state: string }) {
-  const data = useMarketData();
-  const { org } = useWorkspace();
-  const map: Record<string, string[]> = { All: [], Draft: ["draft"], Approval: ["approval", "approved"], Active: ["active"], Completed: ["completed", "archived"] };
-  const wanted = map[state] ?? [];
-  const rows = wanted.length === 0 ? data.campaigns : data.campaigns.filter((campaign) => wanted.includes(campaign.status));
-
-  if (rows.length === 0) {
-    return (
-      <Empty title={`No ${state.toLowerCase()} campaigns`} icon={<Megaphone size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("campaign wizard")}>Create campaign</Button>}>
-        A campaign holds its objective, audience, channel plan and budget in one record.
-      </Empty>
-    );
-  }
-
-  return (
-    <DataGrid
-      rows={rows}
-      rowId={(row) => row.id}
-      label={`${state} campaigns`}
-      selectedId={context.selectedId}
-      onSelect={(id) => context.select(id)}
-      onOpen={(id) => context.navigate(`/o/${org.slug}/market/campaigns/${id}`)}
-      columns={[
-        { key: "title", header: "Campaign", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary} ${String(row.fields.objective ?? "")}` },
-        { key: "owner", header: "Owner", cell: (row) => row.ownerName, sortValue: (row) => row.ownerName, hideBelow: 900 },
-        { key: "objective", header: "Objective", cell: (row) => String(row.fields.objective ?? "—"), filterValue: (row) => String(row.fields.objective ?? "") },
-        { key: "channel", header: "Channels", cell: (row) => (
-          <Row gap={1} wrap>
-            {(bodyOf<CampaignBody>(row, {}).channels ?? []).map((channel) => <Pill key={channel.network}>{networkOf(channel.network).label}</Pill>)}
-          </Row>
-        ) },
-        { key: "budget", header: "Budget", align: "end", cell: (row) => context.money(Number(row.fields.budgetMinor ?? 0)), sortValue: (row) => Number(row.fields.budgetMinor ?? 0) },
-        { key: "spent", header: "Committed", align: "end", cell: (row) => context.money(Number(row.fields.spentMinor ?? 0)), sortValue: (row) => Number(row.fields.spentMinor ?? 0) },
-        { key: "window", header: "Window", cell: (row) => `${context.date(row.startAt)} – ${context.date(row.endAt)}`, sortValue: (row) => row.startAt ?? "", hideBelow: 1200 },
-        { key: "status", header: "Status", cell: (row) => <Pill tone={toneForStatus(row.status)} dot>{row.status === "approval" ? "Awaiting approval" : row.status}</Pill> },
-        { key: "delivery", header: "Delivery", cell: (row) => <Pill tone="warning">{String(row.fields.delivery) === "not_connected" ? "No provider" : String(row.fields.delivery)}</Pill>, hideBelow: 1200 },
-      ]}
-      bulkActions={[
-        {
-          label: "Duplicate as draft",
-          onRun: (selected) => selected.forEach(async (campaign) => {
-            const body = bodyOf<CampaignBody>(campaign, {});
-            await context.mutate.create({
-              collection: "campaigns",
-              title: `${campaign.title} (copy)`,
-              status: "draft",
-              summary: campaign.summary,
-              amountMinor: Number(campaign.fields.budgetMinor ?? 0),
-              fields: { ...campaign.fields, spentMinor: 0, approval: "draft", delivery: "not_connected" },
-              body: { ...body, channels: (body.channels ?? []).map((channel) => ({ ...channel, spentMinor: 0, impressions: 0, clicks: 0, conversions: 0, revenueMinor: 0 })) },
-            }, `Campaign ${campaign.title} duplicated as a draft`);
-            context.toast("Duplicated as draft", "Spend, results and any approval were reset. No external spend authorisation was copied.");
-          }),
-        },
-        {
-          label: "Archive",
-          tone: "danger",
-          disabled: (selected) => selected.some((campaign) => campaign.status === "active"),
-          onRun: (selected) => selected.forEach((campaign) => {
-            void context.mutate.patch(campaign.id, { status: "archived" }, { expectRevision: campaign.revision, event: `Campaign ${campaign.title} archived` });
-          }),
-        },
-      ]}
-      summary={<span>{rows.length} of {data.campaigns.length} campaigns</span>}
-    />
-  );
+  return <CampaignLibraryWorkspace context={context} state={state} />;
 }
 
 /* ---------------------------- MARKET-003 ---------------------------- */
@@ -326,7 +263,7 @@ export function CampaignLibrary({ context, state }: { context: ScreenContext; st
 export function CampaignDetail({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useMarketData();
   const { org, now } = useWorkspace();
-  const campaign = useRecord(context.params.id) ?? data.campaigns[0];
+  const campaign = useRecord(context.params.id) ?? data.campaigns.find((item) => item.id === context.params.id);
   const body = bodyOf<CampaignBody>(campaign, {});
   const channels = body.channels ?? [];
   const totals = channelTotals(channels);
@@ -515,12 +452,28 @@ export function ContentCalendar({ context, view }: { context: ScreenContext; vie
   const data = useMarketData();
   const { now, org } = useWorkspace();
   const [anchor, setAnchor] = useState(() => new Date(now));
-
-  const posts = data.socialPosts.filter((post) => post.startAt);
+  const [networkFilter, setNetworkFilter] = useState("all");
+  const [moveError, setMoveError] = useState("");
+  const datedPosts = data.socialPosts.filter(post => Boolean(post.startAt));
+  const channels = [...new Set(datedPosts.map(post => String(post.fields.network ?? "")).filter(Boolean))].sort();
+  const posts = datedPosts.filter(post => networkFilter === "all" || String(post.fields.network) === networkFilter);
+  const filters = <div className="t4-market-filters" role="group" aria-label="Content calendar filters">
+    <label>Channel
+      <Select aria-label="Filter calendar by channel" value={networkFilter}
+        onChange={event => { setNetworkFilter(event.target.value); context.select(undefined); }}>
+        <option value="all">All channels</option>
+        {channels.map(channel => <option key={channel} value={channel}>{networkOf(channel).label}</option>)}
+      </Select>
+    </label>
+    <span className="t4-market-filter-count" role="status" aria-live="polite">{posts.length} of {datedPosts.length} dated items · {org.timezone}</span>
+    {networkFilter !== "all" && <Button size="sm" variant="ghost" onClick={() => setNetworkFilter("all")}>Clear channel</Button>}
+  </div>;
 
   if (view === "List") {
     return (
-      <DataGrid
+      <Stack gap={4}>
+        {filters}
+        <DataGrid
         rows={[...posts].sort((a, b) => (a.startAt ?? "").localeCompare(b.startAt ?? ""))}
         rowId={(row) => row.id}
         label="Scheduled content"
@@ -535,12 +488,15 @@ export function ContentCalendar({ context, view }: { context: ScreenContext; vie
           { key: "status", header: "Delivery", cell: (row) => <Pill tone={row.status === "published" ? "success" : row.status === "failed" ? "danger" : "warning"} dot>{row.status === "scheduled" ? "Queued locally" : row.status}</Pill> },
         ]}
       />
+      </Stack>
     );
   }
 
   if (view === "By channel") {
     return (
-      <Grid>
+      <Stack gap={4}>
+        {filters}
+        <Grid>
         {[...new Set(posts.map((post) => String(post.fields.network)))].map((network) => {
           const list = posts.filter((post) => String(post.fields.network) === network).sort((a, b) => (a.startAt ?? "").localeCompare(b.startAt ?? ""));
           return (
@@ -556,14 +512,16 @@ export function ContentCalendar({ context, view }: { context: ScreenContext; vie
             </Card>
           );
         })}
-        {posts.length === 0 && <Empty title="Nothing scheduled" icon={<CalendarCheck size={20} />} />}
+        {posts.length === 0 && <Empty title="No content for this channel" icon={<CalendarCheck size={20} />} />}
       </Grid>
+      </Stack>
     );
   }
 
   const mode = view === "Week" ? "week" : "month";
   return (
     <Stack gap={4}>
+      {filters}
       <CalendarToolbar mode={mode} anchor={anchor} onAnchor={setAnchor} now={now} label="Content calendar" />
       <ScheduleCalendar
         mode={mode}
@@ -580,12 +538,24 @@ export function ContentCalendar({ context, view }: { context: ScreenContext; vie
         }))}
         onOpen={(id) => context.openOverlay("Post editor", { id })}
         onMove={async (id, nextIso) => {
-          const post = data.socialPosts.find((item) => item.id === id);
+          const post = data.socialPosts.find(item => item.id === id);
           if (!post) return;
-          await context.mutate.patch(id, { startAt: nextIso, at: nextIso }, { expectRevision: post.revision, event: `${post.title} rescheduled` });
-          context.toast("Rescheduled", `${post.title} is queued for ${context.dateTime(nextIso)} in ${org.timezone}. Nothing was sent to a provider.`);
+          if (post.status === "published") {
+            setMoveError("Published items cannot be rescheduled. Duplicate as a draft to create a new plan.");
+            return;
+          }
+          setMoveError("");
+          try {
+            const result = await context.mutate.patch(id, { startAt: nextIso, at: nextIso },
+              { expectRevision: post.revision, event: `${post.title} rescheduled` });
+            if (!result) throw new Error("Revision conflict");
+            context.toast("Schedule updated", `${post.title} is planned for ${context.dateTime(nextIso)} in ${org.timezone}. Nothing was sent to a provider.`);
+          } catch {
+            setMoveError("The schedule could not be saved, possibly because this post changed. Review it before trying again.");
+          }
         }}
       />
+      {moveError && <Notice tone="danger" title="Schedule change not saved">{moveError}</Notice>}
       <Notice tone="info" title={`Times are shown in ${org.timezone}`}>
         A scheduled item is a local record. When the time passes with no connected account the item is marked failed rather than silently dropped.
       </Notice>
@@ -598,30 +568,78 @@ export function ContentCalendar({ context, view }: { context: ScreenContext; vie
 export function SocialPublishing({ context, state }: { context: ScreenContext; state: string }) {
   const data = useMarketData();
   const { org } = useWorkspace();
+  const [networkFilter, setNetworkFilter] = useState("all");
+  const [busy, setBusy] = useState(false);
+  const [writeError, setWriteError] = useState("");
   const map: Record<string, string[]> = { Drafts: ["draft"], Schedule: ["scheduled"], Published: ["published"], Failed: ["failed"] };
-  const rows = data.socialPosts.filter((post) => (map[state] ?? ["draft"]).includes(post.status));
+  const inState = data.socialPosts.filter((post) => (map[state] ?? ["draft"]).includes(post.status));
+  const rows = inState.filter(post => networkFilter === "all" || String(post.fields.network) === networkFilter);
+  const channels = [...new Set(data.socialPosts.map(post => String(post.fields.network ?? "")).filter(Boolean))].sort();
+  const filterBar = <div className="t4-market-filters" role="group" aria-label="Social publishing filters">
+    <label>Channel
+      <Select aria-label="Filter social posts by channel" value={networkFilter}
+        onChange={event => { setNetworkFilter(event.target.value); context.select(undefined); }}>
+        <option value="all">All channels</option>
+        {channels.map(network => <option key={network} value={network}>{networkOf(network).label}</option>)}
+      </Select>
+    </label>
+    <span className="t4-market-filter-count" role="status" aria-live="polite">
+      {rows.length} of {inState.length} posts in {state.toLowerCase()}
+    </span>
+    {networkFilter !== "all" && <Button size="sm" variant="ghost" onClick={() => setNetworkFilter("all")}>Clear channel</Button>}
+  </div>;
+
+  async function returnToDrafts(selected: Rec[]) {
+    if (busy || selected.some(post => post.status === "published")) return;
+    setBusy(true);
+    setWriteError("");
+    try {
+      for (const post of selected) {
+        const result = await context.mutate.patch(post.id, { status: "draft", fields: { ...post.fields, delivery: "ready_local", error: "" } },
+          { expectRevision: post.revision, event: `${post.title} returned to drafts` });
+        if (!result) throw new Error("Record revision changed");
+      }
+      context.toast("Returned to drafts", `${selected.length} post${selected.length === 1 ? "" : "s"} updated locally. No provider was contacted.`);
+    } catch {
+      setWriteError("Not every post could be moved. Some may already have changed; check the Drafts tab before retrying.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const accounts = (
-    <Card title="Channel accounts" subtitle="Nothing is authorised, so nothing can publish">
-      <Stack gap={2}>
-        {["instagram", "facebook", "linkedin", "x"].map((network) => (
-          <Row key={network} gap={2} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-            <strong className="ds-grow">{networkOf(network).label}</strong>
-            <span className="ds-subtle">{networkOf(network).media}</span>
+    <details className="t4-social-accounts" aria-label="Social channel account connections">
+      <summary>
+        <strong>Channel accounts</strong>
+        <span>0 of 4 connected · Publishing unavailable until a provider is authorised</span>
+        <Pill tone="warning">Not connected</Pill>
+      </summary>
+      <div className="t4-social-account-list">
+        {["instagram", "facebook", "linkedin", "x"].map(network => (
+          <div key={network} className="t4-social-account-row">
+            <strong>{networkOf(network).label}</strong>
+            <span>{networkOf(network).media}</span>
             <Pill tone="warning" dot>Not connected</Pill>
-            <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Account authorization", { network })}>Connect</Button>
-          </Row>
+            <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Account authorization", { network })}>Review connection</Button>
+          </div>
         ))}
-      </Stack>
-    </Card>
+      </div>
+    </details>
   );
 
   if (rows.length === 0) {
     return (
       <Stack gap={4}>
         {accounts}
-        <Empty title={`No ${state.toLowerCase()} posts`} icon={<Megaphone size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("post composer")}>Create post</Button>}>
-          {state === "Failed" ? "A post is marked failed when its scheduled time passes without a connected account." : "Drafts and scheduled posts live here until a provider is connected."}
+        {filterBar}
+        <Empty title={networkFilter === "all" ? `No ${state.toLowerCase()} posts` : "No posts for this channel"}
+          icon={<Megaphone size={20} />}
+          action={networkFilter !== "all"
+            ? <Button variant="secondary" onClick={() => setNetworkFilter("all")}>Show all channels</Button>
+            : <Button variant="primary" onClick={() => context.openOverlay("post composer")}>Create post</Button>}>
+          {networkFilter !== "all" ? "Try another channel without changing your posts." : state === "Failed"
+            ? "A post can fail when its scheduled time passes without a connected account."
+            : "Drafts and scheduled posts remain local until a provider is connected."}
         </Empty>
       </Stack>
     );
@@ -630,6 +648,8 @@ export function SocialPublishing({ context, state }: { context: ScreenContext; s
   return (
     <Stack gap={4}>
       {accounts}
+      {filterBar}
+      {writeError && <Notice tone="danger" title="Some posts need review">{writeError}</Notice>}
       {state === "Failed" && (
         <Notice tone="danger" title="Retrying is blocked while the publication state is unknown">
           None of these posts reached a provider, so there is no external state to compare against. A retry would risk a duplicate if an account were connected in between, so each one must be re-approved individually from its composer.
@@ -658,10 +678,8 @@ export function SocialPublishing({ context, state }: { context: ScreenContext; s
           },
           {
             label: "Move to drafts",
-            disabled: (selected) => selected.some((post) => post.status === "published"),
-            onRun: (selected) => selected.forEach((post) => {
-              void context.mutate.patch(post.id, { status: "draft", fields: { ...post.fields, delivery: "ready_local", error: "" } }, { expectRevision: post.revision, event: `${post.title} returned to drafts` });
-            }),
+            disabled: selected => busy || selected.some(post => post.status === "published"),
+            onRun: selected => { void returnToDrafts(selected); },
           },
         ]}
         summary={<span>Accounts connected: 0 of 4 · workspace {org.shortName}</span>}
@@ -675,7 +693,17 @@ export function SocialPublishing({ context, state }: { context: ScreenContext; s
 export function EmailCampaigns({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useMarketData();
   const { now } = useWorkspace();
+  const [campaignFilter, setCampaignFilter] = useState<"all" | "draft" | "approval" | "active">("all");
   const emailCampaigns = data.campaigns.filter((campaign) => (bodyOf<CampaignBody>(campaign, {}).channels ?? []).some((channel) => channel.network === "email"));
+  const visibleEmailCampaigns = campaignFilter === "all" ? emailCampaigns
+    : emailCampaigns.filter(campaign => campaign.status === campaignFilter);
+  const campaignToolbar = <div className="t4-market-filters" role="group" aria-label="Email campaign status filters">
+    <Segmented label="Email campaign status" value={campaignFilter} onChange={value => { setCampaignFilter(value); context.select(undefined); }}
+      options={[{ value: "all", label: "All" }, { value: "draft", label: "Draft" }, { value: "approval", label: "Review" }, { value: "active", label: "Active" }]} />
+    <span className="t4-market-filter-count" role="status" aria-live="polite">
+      {visibleEmailCampaigns.length} of {emailCampaigns.length} campaign plans · no mail provider connected
+    </span>
+  </div>;
   const emailTemplates = data.templates.filter((template) => String(template.fields.kind) === "email");
 
   if (lens === "Templates") {
@@ -736,11 +764,18 @@ export function EmailCampaigns({ context, lens }: { context: ScreenContext; lens
     );
   }
 
-  return emailCampaigns.length === 0
-    ? <Empty title="No email campaigns" icon={<Mail size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("email builder")}>Build an email</Button>} />
-    : (
-      <DataGrid
-        rows={emailCampaigns}
+  return <Stack gap={4}>
+    {campaignToolbar}
+    {visibleEmailCampaigns.length === 0
+      ? <Empty title={campaignFilter === "all" ? "No email campaigns" : "No campaign plans in this status"}
+          icon={<Mail size={20} />}
+          action={campaignFilter === "all"
+            ? <Button variant="primary" onClick={() => context.openOverlay("email builder")}>Build an email</Button>
+            : <Button variant="secondary" onClick={() => setCampaignFilter("all")}>Show all campaign plans</Button>}>
+          Drafts, approval and launch status are workspace records; no email has been sent from this interface.
+        </Empty>
+      : <DataGrid
+        rows={visibleEmailCampaigns}
         rowId={(row) => row.id}
         label="Email campaigns"
         selectedId={context.selectedId}
@@ -754,15 +789,17 @@ export function EmailCampaigns({ context, lens }: { context: ScreenContext; lens
           { key: "state", header: "State", cell: (row) => <Pill tone={toneForStatus(row.status)} dot>{row.status}</Pill> },
           { key: "delivery", header: "Delivery", cell: () => <Pill tone="warning">Not connected</Pill> },
         ]}
-      />
-    );
+      />}
+    <Notice tone="info" title="Email preparation is local">
+      Campaign status, segment eligibility and send windows are stored in this workspace. No external email delivery, open-rate or click-rate evidence is available.
+    </Notice>
+  </Stack>;
 }
 
 /* ---------------------------- MARKET-007 ---------------------------- */
 
 export function AudienceSegments({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useMarketData();
-  const { now } = useWorkspace();
 
   if (lens === "Contacts") {
     return (
@@ -849,44 +886,7 @@ export function AudienceSegments({ context, lens }: { context: ScreenContext; le
     );
   }
 
-  return data.audiences.length === 0
-    ? <Empty title="No segments" icon={<Users size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Segment builder")}>Build a segment</Button>} />
-    : (
-      <Grid>
-        {data.audiences.map((audience) => {
-          const result = evaluateSegment(audience, data.contacts, now);
-          const body = bodyOf<AudienceBody>(audience, {});
-          return (
-            <Card key={audience.id} span={6} title={audience.title} subtitle={audience.summary}
-              actions={<Pill tone={result.members.length === 0 ? "warning" : "success"}>{result.members.length} eligible</Pill>}
-              footer={<>
-                <Button size="sm" variant={context.selectedId === audience.id ? "primary" : "secondary"} aria-pressed={context.selectedId === audience.id} onClick={() => context.select(context.selectedId === audience.id ? undefined : audience.id)}>{context.selectedId === audience.id ? "Selected" : "Select"}</Button>
-                <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Segment builder", { id: audience.id })}>Edit rules</Button>
-                <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Audience preview", { id: audience.id })}>Preview members</Button>
-                <span className="ds-grow" />
-                <span className="ds-subtle">Counted {context.relative(audience.updatedAt)}</span>
-              </>}>
-              <Stack gap={3}>
-                <Stack gap={1}>
-                  {(body.rules ?? []).map((rule, index) => (
-                    <code key={`${rule.field}-${index}`} style={{ fontSize: "var(--text-xs)" }}>{rule.field} {rule.op} {rule.value}</code>
-                  ))}
-                  {(body.rules ?? []).length === 0 && <span className="ds-subtle">No rules: this segment matches nobody.</span>}
-                </Stack>
-                <Properties rows={[
-                  { label: "Eligible", value: <strong>{result.members.length}</strong> },
-                  { label: "Held back", value: `${result.excluded.length} (${(body.exclusions ?? []).join(", ") || "no exclusions"})` },
-                  { label: "Counted from", value: `${data.contacts.length} contact records in this workspace` },
-                ]} />
-                {(body.exclusions ?? []).includes("suppressed")
-                  ? null
-                  : <Notice tone="danger" title="This segment does not exclude suppressed contacts">Add the exclusion before any send is approved.</Notice>}
-              </Stack>
-            </Card>
-          );
-        })}
-      </Grid>
-    );
+  return <AudienceSegmentsLibrary context={context} />;
 }
 
 /* ---------------------------- MARKET-008 ---------------------------- */

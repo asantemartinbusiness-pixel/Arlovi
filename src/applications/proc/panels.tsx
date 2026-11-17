@@ -46,7 +46,9 @@ export function ProcurementOverview({ context, lens }: { context: ScreenContext;
           <Empty title="Nothing is waiting for approval" icon={<FileText size={20} />}>A requisition appears here when it is submitted for a decision.</Empty>
         ) : (
           <DataGrid rows={awaiting} rowId={(row) => row.id} label="Requisitions awaiting approval" filterable={false}
+            selectedId={context.selectedId}
             onSelect={(id) => context.select(id)}
+            onOpen={(id) => { context.select(id); context.openOverlay("Requisition", { id }); }}
             columns={[
               { key: "title", header: "Requisition", primary: true, cell: (row) => <span className="ds-num">{row.title}</span> },
               { key: "requester", header: "Requester", cell: (row) => String(row.fields.requester ?? row.ownerName) },
@@ -215,7 +217,7 @@ export function SupplierDetail({ context, lens }: { context: ScreenContext; lens
   const data = useProcData();
   const { org, now } = useWorkspace();
   const routed = useRecord(context.params.id);
-  const supplier = findSupplier(data, routed?.id) ?? routed ?? data.suppliers[0];
+  const supplier = context.params.id ? (findSupplier(data, context.params.id) ?? (routed?.id === context.params.id ? routed : undefined)) : undefined;
   if (!supplier) return <Empty title="Supplier not found" />;
   const orders = data.purchaseOrders.filter((order) => String(order.fields.supplierId) === supplier.id && isPurchaseOrder(order));
   const bills = data.bills.filter((bill) => String(bill.fields.supplierId) === supplier.id);
