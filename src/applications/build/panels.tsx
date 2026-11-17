@@ -78,9 +78,11 @@ export function ProjectLibrary({ context, scope }: { context: ScreenContext; sco
   const rows = projects.filter((record) => {
     if (scope === "Archived") return record.status === "archived";
     if (record.status === "archived") return false;
-    if (scope === "Team" && record.status === "archived") return false;
     return true;
-  }).filter((record) => matching(`${record.title} ${record.summary} ${record.ownerName ?? ""} ${record.status} ${readApp(record).entities.map((entity) => entity.name).join(" ")}`));
+  }).filter((record) => matching(`${record.title} ${record.summary} ${record.ownerName ?? ""} ${record.status} ${readApp(record).entities.map((entity) => entity.name).join(" ")}`))
+    .sort((left, right) => scope === "Recent"
+      ? right.updatedAt.localeCompare(left.updatedAt)
+      : left.title.localeCompare(right.title));
 
   if (rows.length === 0) {
     return <Stack gap={4}>{libraryOverview}<Field label="Find a project"><TextInput type="search" aria-label="Find a project" value={search} placeholder="Search projects, owners and entities" onChange={(event) => setSearch(event.target.value)} /></Field><Empty title={search.trim() ? "No projects match this search" : scope === "Archived" ? "Nothing archived" : "No app projects"} icon={<Boxes size={20} />} action={<Button variant="secondary" onClick={() => search.trim() ? setSearch("") : context.openOverlay("Project setup")}>{search.trim() ? "Clear search" : "New project"}</Button>}>{search.trim() ? "Try searching by project name, owner or entity." : "An app project links its data model, screens and validated workflow."}</Empty></Stack>;
