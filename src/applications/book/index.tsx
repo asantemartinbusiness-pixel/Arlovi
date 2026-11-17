@@ -1,6 +1,7 @@
 import { BarChart3, CalendarClock, CalendarDays, Clock, Globe, Users } from "lucide-react";
 import { Empty, Notice, Pill, Properties, Row, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
+import { GrowthOverviewNav } from "@/app/GrowthOverviewNav";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { confirmOverlay, submitFooter } from "@/applications/market/kit";
 import {
@@ -54,6 +55,7 @@ export const bookApp = registerApp({
     /* ------------------------------ 001 ------------------------------ */
     "ARL-BOOK-001": {
       id: "ARL-BOOK-001",
+      header: (context: ScreenContext) => <GrowthOverviewNav context={context} code="BOOK" />,
       subtitle: (context) => `Today's appointments and capacity for ${context.org.shortName}, from the booking records in this browser.`,
       tabs: ["Today", "Week", "Capacity", "Insights"].map((lens) => ({
         id: lens,
