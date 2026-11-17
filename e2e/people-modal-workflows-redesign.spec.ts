@@ -134,7 +134,8 @@ test("Policy acknowledgement preserves one version-specific record and matching 
 test("Offboarding requires a reason and human confirmation and never claims external revocation", async ({ page }) => {
   await page.goto("/o/northline/hr/employees");
   const employeeId = await page.evaluate(async () => {
-    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts");
+    const repoPath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
     const rows = await repo.listByCollection("org-northline", "employees");
     return rows.find((row) => row.status !== "alumni")?.id ?? null;
   });
@@ -172,7 +173,8 @@ test("Employee intake is a three-step local record workflow and does not claim a
   await modal.getByRole("button", { name: "Create employee record" }).click();
   await expect(modal).toHaveCount(0);
   const created = await page.evaluate(async () => {
-    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts");
+    const repoPath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
     return (await repo.listByCollection("org-northline", "employees"))
       .filter((row) => row.title === "QA Intake Person")
       .map((row) => ({ invitationStatus: row.fields.invitationStatus, office: row.fields.office, summary: row.summary }));
@@ -246,7 +248,8 @@ test("Learning distinguishes locally saved draft courses from other states", asy
 test("Employee profile tabs expose scoped actions and avoid unverified balance claims", async ({ page }) => {
   await page.goto("/o/northline/hr/employees");
   const employeeId = await page.evaluate(async () => {
-    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts");
+    const repoPath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
     const rows = await repo.listByCollection("org-northline", "employees");
     return rows.find((row) => row.status !== "alumni")?.id ?? null;
   });
@@ -266,7 +269,8 @@ test("Employee profile tabs expose scoped actions and avoid unverified balance c
 test("Employee document reference requires explicit source and attestation", async ({ page }) => {
   await page.goto("/o/northline/hr/employees");
   const id = await page.evaluate(async () => {
-    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts");
+    const repoPath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
     return (await repo.listByCollection("org-northline", "employees")).find((row) => row.status !== "alumni")?.id;
   });
   expect(id).toBeTruthy();
@@ -294,7 +298,8 @@ test("Onboarding launch exposes named handover owners without pretending provisi
 test("Employee job tab shows prior record history without sensitive field snapshots", async ({ page }) => {
   await page.goto("/o/northline/hr/employees");
   const id = await page.evaluate(async () => {
-    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts");
+    const repoPath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
     return (await repo.listByCollection("org-northline", "employees")).find((row) => row.status !== "alumni")?.id;
   });
   expect(id).toBeTruthy();
@@ -307,7 +312,8 @@ test("Employee job tab shows prior record history without sensitive field snapsh
 test("Access request requires a named reviewer and written reason", async ({ page }) => {
   await page.goto("/o/northline/hr/employees");
   const id = await page.evaluate(async () => {
-    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts");
+    const repoPath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
     return (await repo.listByCollection("org-northline", "employees")).find((row) => row.status !== "alumni")?.id;
   });
   expect(id).toBeTruthy();
