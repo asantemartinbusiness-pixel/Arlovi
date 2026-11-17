@@ -55,6 +55,7 @@ export interface AttentionInput {
   invoices: Rec[];
   bills: Rec[];
   tasks: Rec[];
+  shifts?: Rec[];
   missions: Rec[];
   approvals: Rec[];
   workflowApprovals?: Rec[];
@@ -108,6 +109,28 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
       resolved: false,
       sourceId: record.id,
       group: "Approvals",
+    });
+  }
+
+  // Submitted timesheets are genuine People decisions. They disappear from
+  // Inbox as soon as a recorded approval succeeds, with no separate fake alert.
+  for (const entry of input.shifts ?? []) {
+    if (entry.collection !== "shifts" || entry.fields.kind !== "time"
+      || entry.fields.approved === true || entry.status === "approved"
+      || !["submitted", "pending", "ready"].includes(entry.status)) continue;
+    const hours = Number(entry.fields.hours ?? 0);
+    items.push({
+      id: `time-approval-${entry.id}`,
+      kind: "approval", priority: "P2",
+      title: `Approve time: ${String(entry.fields.employeeName ?? entry.ownerName)}`,
+      body: `${Number.isFinite(hours) ? hours : "Unverified"} hours submitted for human review. Payroll is not submitted by this approval.`,
+      route: `/o/${orgSlug}/hr/scheduling?tab=Timesheets`,
+      entityId: entry.id, at: entry.updatedAt,
+      audience: ["owner", "people"],
+      assignee: typeof entry.fields.approver === "string" && entry.fields.approver.trim()
+        ? entry.fields.approver : undefined,
+      read: false, acknowledged: false, resolved: false,
+      sourceId: entry.id, group: "Time approvals",
     });
   }
 
