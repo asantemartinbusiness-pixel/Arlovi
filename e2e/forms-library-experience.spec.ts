@@ -49,3 +49,38 @@ test("Form editor exposes question status and workflow navigation", async ({ pag
   await expect(page).toHaveURL(new RegExp(`/forms/forms/${id}/logic`));
   await expect(page.getByLabel("Conditional logic overview")).toBeVisible();
 });
+
+test("Forms submission inbox displays status counts and a recoverable search", async ({ page }) => {
+  await page.goto("/o/northline/forms/forms");
+  const id = await page.evaluate(async () => {
+    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts") as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({ organizationId: "org-northline", collection: "forms", currency: "GBP", title: "QA Response Inbox", status: "draft", fields: {} }, ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  });
+  await page.goto(`/o/northline/forms/forms/${id}/submissions`);
+  const main = page.locator("#main");
+  await expect(main.getByLabel("Submission inbox overview")).toBeVisible();
+  await expect(main.getByLabel("Submission workflow counts")).toBeVisible();
+  await main.getByRole("searchbox", { name: "Search responses" }).fill("no-such-respondent-qa");
+  await expect(main.getByText("No responses match this search")).toBeVisible();
+  await main.getByRole("button", { name: "Clear search" }).click();
+  await expect(main.getByRole("searchbox", { name: "Search responses" })).toHaveValue("");
+});
+
+test("Forms analytics and publishing keep measured context and local-only disclosure", async ({ page }) => {
+  await page.goto("/o/northline/forms/forms");
+  const id = await page.evaluate(async () => {
+    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts") as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({ organizationId: "org-northline", collection: "forms", currency: "GBP", title: "QA Form Publishing", status: "draft", fields: {} }, ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  });
+  await page.goto(`/o/northline/forms/forms/${id}/analytics`);
+  await expect(page.locator("#main").getByLabel("Form analytics overview")).toBeVisible();
+  await page.goto(`/o/northline/forms/forms/${id}/publish?tab=Access`);
+  await expect(page.locator("#main").getByLabel("Form publishing overview")).toBeVisible();
+  await expect(page.locator("#main")).toContainText("External hosting, public access controls and email delivery are not connected.");
+});
