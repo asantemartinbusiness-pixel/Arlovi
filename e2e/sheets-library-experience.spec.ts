@@ -75,3 +75,46 @@ test("Chart dashboard and export views expose the data source and calculation st
   await expect(page.locator("#main").getByRole("heading", { name: "Know exactly what you export." })).toBeVisible();
   await expect(page.locator("#main").getByLabel("Export overview")).toBeVisible();
 });
+
+test("Workbook collaboration exposes review context and keeps local sharing explicit", async ({ page }) => {
+  await page.goto("/o/northline/sheets/workbooks");
+  const id = await page.evaluate(async () => {
+    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts") as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "workbooks", currency: "GBP",
+      title: "QA Workbook Sharing Scope", status: "active", fields: { folder: "Operations" },
+    }, ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  });
+  await page.goto(`/o/northline/sheets/workbooks/${id}/collaboration?tab=Permissions`);
+  const main = page.locator("#main");
+  await expect(main.getByRole("heading", { name: "A clear record of changes." })).toBeVisible();
+  await expect(main.getByLabel("Workbook collaboration overview")).toBeVisible();
+  await main.getByRole("button", { name: "Sharing list" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("QA Workbook Sharing Scope");
+  await expect(dialog).toContainText("no invitations are sent");
+});
+
+test("CSV import requires acknowledgment before replacing an existing worksheet", async ({ page }) => {
+  await page.goto("/o/northline/sheets/workbooks");
+  const id = await page.evaluate(async () => {
+    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts") as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "workbooks", currency: "GBP",
+      title: "QA CSV Import Guard", status: "active", fields: { folder: "Operations" },
+    }, ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  });
+  await page.goto(`/o/northline/sheets/workbooks/${id}/io?tab=Imports`);
+  await page.locator("#main").getByRole("button", { name: "Choose a file" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("textbox", { name: "Paste CSV, or choose a file" }).fill("Name,Value\nTest,100");
+  await dialog.getByLabel("Where").selectOption("current");
+  await expect(dialog).toContainText("This replaces the active sheet's cell contents");
+  await expect(dialog.getByRole("checkbox", { name: /I understand that/ })).not.toBeChecked();
+});
