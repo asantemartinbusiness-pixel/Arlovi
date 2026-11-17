@@ -1410,6 +1410,9 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (!fullscreen) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
       if (event.key === "ArrowRight" || event.key === " " || event.key === "PageDown") { event.preventDefault(); advance(1); }
       if (event.key === "ArrowLeft" || event.key === "PageUp") { event.preventDefault(); advance(-1); }
       if (event.key === "Escape") { event.preventDefault(); setFullscreen(false); }
@@ -1450,6 +1453,18 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
   if (tab === "Audience") {
     return (
       <Stack gap={4}>
+        <div className="pr-library-heading">
+          <div><span className="pr-library-eyebrow">PRESENT / AUDIENCE VIEW</span>
+            <h2>What your audience will see.</h2>
+            <p>Preview the current slide without speaker notes. Hidden slides stay out of the visible presentation sequence.</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button>
+        </div>
+        <div className="pr-library-overview" aria-label="Audience session overview">
+          <div><span>Visible slides</span><strong>{visible.length}</strong></div>
+          <div><span>Hidden slides</span><strong>{editor.deck.slides.length - visible.length}</strong></div>
+          <div><span>Current position</span><strong>{position + 1}</strong></div>
+        </div>
         <Notice tone="warning" title="This is what the room sees">
           Speaker notes never render here. Opening the audience display asks for confirmation first, because a second screen is often already mirrored.
         </Notice>
