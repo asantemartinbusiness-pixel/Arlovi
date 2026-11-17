@@ -157,3 +157,25 @@ test("Offboarding requires a reason and human confirmation and never claims exte
   await checks.nth(2).check();
   await expect(save).toBeEnabled();
 });
+
+
+test("Employee intake is a three-step local record workflow and does not claim an invitation", async ({ page }) => {
+  await page.goto("/o/northline/hr/employees?tab=People");
+  await page.locator("#main").getByRole("button", { name: "Invite someone" }).first().click();
+  const modal = page.getByRole("dialog");
+  await expect(modal.getByRole("heading", { name: "Create an employee record" })).toBeVisible();
+  await expect(modal.locator(".hr-dialog-section")).toHaveCount(3);
+  await expect(modal).toContainText("No connected delivery or identity provisioning");
+  await expect(modal).toContainText("Not invited");
+  await modal.locator('input[name="name"]').fill("QA Intake Person");
+  await modal.locator('input[name="email"]').fill("qa-intake@example.test");
+  await modal.getByRole("button", { name: "Create employee record" }).click();
+  await expect(modal).toHaveCount(0);
+  const created = await page.evaluate(async () => {
+    const repo = await import("../src/platform/repo");
+    return (await repo.listByCollection("org-northline", "employees"))
+      .filter((row) => row.title === "QA Intake Person")
+      .map((row) => ({ invitationStatus: row.fields.invitationStatus, office: row.fields.office, summary: row.summary }));
+  });
+  expect(created).toEqual([{ invitationStatus: "not_sent", office: "", summary: expect.stringContaining("No invitation has been sent") }]);
+});
