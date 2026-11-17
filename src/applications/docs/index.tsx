@@ -26,6 +26,7 @@ import {
 import { DocumentCanvas, type EditIntent } from "./canvas";
 import { SAVE_LABEL, SAVE_TONE, activeDocEditor, useDocEditor, type DocEditor } from "./state";
 import { useGuardRefresh } from "@/applications/design/sharedDoc";
+import { scopedDetailRecord } from "@/platform/recordScope";
 import { createStore, useStore } from "@/applications/visual/kit";
 import "./docs.css";
 
@@ -42,8 +43,8 @@ import "./docs.css";
 function useDocument(context: ScreenContext): Rec | undefined {
   useGuardRefresh(context);
   const fromRoute = useRecord(context.params.id);
-  const all = useCollection("documents");
-  return fromRoute ?? all.find((record) => !record.tags.includes("recovered")) ?? all[0];
+  // An unknown or wrong-collection URL must never open an unrelated document.
+  return scopedDetailRecord(fromRoute, context.org.id, "documents");
 }
 
 /** The editor's contract actions, on its own bar (the full-chrome surface has no page header). */
@@ -299,8 +300,9 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
 }
 
 function LibraryInspector({ context }: { context: ScreenContext }) {
-  const record = useRecord(context.selectedId);
+  const selected = useRecord(context.selectedId);
   const { org } = useWorkspace();
+  const record = scopedDetailRecord(selected, org.id, "documents");
   if (!record) return <Empty title="Select a document" icon={<FileText size={18} />}>Its folder, access, tags and version history appear here.</Empty>;
   const model = readDoc(record.body, record.ownerName, record.updatedAt);
   const stats = documentStats(model);
