@@ -13,6 +13,8 @@ import type { Rec } from "@/domain/types";
 import { EmploymentPill, RoleViewNote, leaveBalance, salaryText } from "./kit";
 import { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 import { leaveRequestDays, planLeaveDecision } from "./decisions";
+import { planTimesheetApprovals } from "./workforce";
+import { intervalsOverlap, validShiftInterval } from "@/domain/scheduling";
 import { linkedPersonnelDocuments, scopedDetailRecord } from "@/platform/recordScope";
 
 /* ------------------------------------------------------------------ *
@@ -1212,7 +1214,7 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
  * ------------------------------------------------------------------ */
 
 export function Scheduling({ context, lens }: { context: ScreenContext; lens: "Roster" | "Timesheets" | "Availability" | "Exceptions" }) {
-  const data = useCollections(["shifts", "employees", "leaveRequests"]);
+  const data = useCollections(["shifts", "employees", "leaveRequests", "projects"]);
   const { now, org } = useWorkspace();
   const [weekOffset, setWeekOffset] = useState(0);
   const weekStart = useMemo(() => addDays(startOfWeek(now), weekOffset * 7), [now, weekOffset]);
@@ -1229,14 +1231,31 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
         columns={[
           { key: "who", header: "Person", primary: true, cell: (row) => String(row.fields.employeeName ?? row.ownerName), sortValue: (row) => String(row.fields.employeeName ?? row.ownerName), filterValue: (row) => String(row.fields.employeeName ?? row.ownerName) },
           { key: "day", header: "Day", cell: (row) => context.date(row.startAt), sortValue: (row) => row.startAt ?? "" },
-          { key: "detail", header: "Against", cell: (row) => row.summary, hideBelow: 900 },
+          { key: "detail", header: "Against", cell: (row) => {
+            const project = data.projects.find((record) => record.id === row.fields.projectId);
+            return project
+              ? <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/project/projects/${project.id}`)}>{project.title}</Button>
+              : <span className="ds-subtle">{row.fields.projectId ? "Project unavailable" : row.summary || "No project linked"}</span>;
+          }, hideBelow: 900 },
           { key: "hours", header: "Hours", align: "end", cell: (row) => <span className="ds-num">{String(row.fields.hours ?? 0)}</span>, sortValue: (row) => Number(row.fields.hours ?? 0) },
           { key: "state", header: "State", align: "end", cell: (row) => <Pill tone={row.fields.approved === true ? "success" : "warning"}>{row.fields.approved === true ? "approved" : "submitted"}</Pill> },
         ]}
         summary={<strong className="ds-num">{total.toFixed(1)} hours</strong>}
         bulkActions={[{
           label: "Approve hours",
-          onRun: (rows) => rows.forEach((row) => { void context.mutate.patch(row.id, { status: "approved", fields: { ...row.fields, approved: true } }, { event: `Hours approved for ${String(row.fields.employeeName ?? row.ownerName)}` }); }),
+          onRun: async (rows) => {
+            try {
+              const pending = rows.filter((row) => row.fields.approved !== true);
+              const plan = planTimesheetApprovals({
+                organizationId: context.org.id, currency: context.org.currency,
+                actor: context.actor, now: clockIso(), timezone: context.org.timezone,
+              }, pending, data.employees, data.projects);
+              await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+              context.toast("Hours approved", `${pending.length} time entr${pending.length === 1 ? "y" : "ies"} checked and approved together in Arlovi. No payroll was submitted.`);
+            } catch (error) {
+              context.toast("Hours not approved", error instanceof Error ? error.message : "Reload these entries before deciding.", "blocked");
+            }
+          },
           disabled: (rows) => rows.every((row) => row.fields.approved === true),
         }]}
         onSelect={(id) => context.select(id)}
@@ -1268,18 +1287,33 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
 
   if (lens === "Exceptions") {
     const overtime = roster.filter((shift) => shift.fields.overtime === true);
-    const clashes = roster.filter((shift) => data.leaveRequests.some((request) => request.status === "approved" && request.fields.employeeId === shift.fields.employeeId && request.startAt && request.endAt && shift.startAt && new Date(request.startAt) <= new Date(shift.startAt) && new Date(request.endAt) >= new Date(shift.startAt)));
+    const clashes = roster.filter((shift) => data.leaveRequests.some((request) => {
+      if (request.status !== "approved" || request.fields.employeeId !== shift.fields.employeeId || !request.startAt || !request.endAt || !shift.startAt || !shift.endAt) return false;
+      try {
+        return intervalsOverlap(validShiftInterval(shift), {
+          start: Date.parse(request.startAt), end: Date.parse(request.endAt) + 86_400_000,
+        });
+      } catch { return false; }
+    }));
+    const unlinked = timesheets.filter((entry) => !data.employees.some((person) => person.id === entry.fields.employeeId)
+      || (entry.fields.projectId && !data.projects.some((project) => project.id === entry.fields.projectId)));
+    const overlaps = roster.filter((shift) => roster.some((other) => {
+      if (shift.id === other.id || shift.fields.employeeId !== other.fields.employeeId || !shift.startAt || !other.startAt) return false;
+      try { return intervalsOverlap(validShiftInterval(shift), validShiftInterval(other)); }
+      catch { return false; }
+    }));
     const unapproved = timesheets.filter((entry) => entry.fields.approved !== true);
     const rows = [
       ...clashes.map((shift) => ({ id: `${shift.id}-clash`, kind: "Rostered while away", detail: `${String(shift.fields.employeeName ?? "")} on ${context.date(shift.startAt)}`, tone: "danger" as const })),
+      ...overlaps.map((shift) => ({ id: `${shift.id}-overlap`, kind: "Overlapping shifts", detail: `${String(shift.fields.employeeName ?? "")} on ${context.date(shift.startAt)}`, tone: "danger" as const })),
+      ...unlinked.map((entry) => ({ id: `${entry.id}-unlinked`, kind: "Unlinked time entry", detail: `${String(entry.fields.employeeName ?? "")} must be linked to an employee and a valid company project`, tone: "danger" as const })),
       ...overtime.map((shift) => ({ id: `${shift.id}-ot`, kind: "Over eight hours", detail: `${String(shift.fields.employeeName ?? "")} on ${context.date(shift.startAt)}`, tone: "warning" as const })),
       ...unapproved.map((entry) => ({ id: `${entry.id}-unapproved`, kind: "Hours not approved", detail: `${String(entry.fields.employeeName ?? "")} · ${String(entry.fields.hours ?? 0)}h`, tone: "warning" as const })),
     ];
     return rows.length === 0 ? <Empty title="No exceptions" icon={<AlertTriangle size={20} />}>Clashes, overtime and unapproved hours appear here.</Empty> : (
       <Stack gap={3}>
         <Notice tone="info" title="Checked against this organisation's rules">
-          Shifts are compared with approved leave and with the {org.timezone} working day. A shift crossing a location in another
-          time zone is flagged rather than silently converted.
+          Scheduling checks use stored UTC instants and approved leave records. The location time zone is {org.timezone}; working-time law, payroll and external calendars are not independently verified.
         </Notice>
         <DataGrid
           rows={rows}
@@ -1336,6 +1370,7 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
                           >
                             <strong>{String(shift.fields.place ?? "")}</strong>
                             <span className="ds-subtle">{String(shift.fields.hours ?? 0)}h</span>
+                            {shift.fields.projectId && <span className="ds-subtle">{data.projects.find((project) => project.id === shift.fields.projectId)?.title ?? "Project unavailable"}</span>}
                           </button>
                         ) : <span className="ds-subtle">—</span>}
                       </td>
