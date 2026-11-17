@@ -227,7 +227,7 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
             <Card key={record.id} span={4} eyebrow="TEMPLATE" prov="human" title={record.title} subtitle={record.summary}
               actions={<Pill tone={record.status === "published" ? "success" : "neutral"}>{record.status}</Pill>}
               footer={<>
-                <Button size="sm" variant="primary" onClick={() => context.openOverlay("New doc", { templateId: record.id })}>Use</Button>
+                <Button size="sm" variant="primary" disabled={record.status !== "published"} onClick={() => context.openOverlay("New doc", { templateId: record.id })}>Use</Button>
                 <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/docs/templates`)}>Open master</Button>
               </>}
             >
@@ -1318,7 +1318,7 @@ function TemplatesScreen({ context, tab }: { context: ScreenContext; tab: "All" 
             subtitle={record.summary}
             actions={<Pill tone={record.status === "published" ? "success" : record.status === "retired" ? "neutral" : "warning"}>{record.status}</Pill>}
             footer={<>
-              <Button size="sm" variant="primary" disabled={record.status === "retired"} onClick={() => context.openOverlay("Template editor", { id: record.id, mode: "use" })}>Use</Button>
+              <Button size="sm" variant="primary" disabled={record.status !== "published"} onClick={() => context.openOverlay("Template editor", { id: record.id, mode: "use" })}>Use</Button>
               <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Template editor", { id: record.id })}>Edit master</Button>
               <Button size="sm" variant="ghost" onClick={() => context.openOverlay("change impact", { id: record.id })}>Impact</Button>
             </>}
