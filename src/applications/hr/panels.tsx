@@ -1261,7 +1261,6 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
           <Button size="sm" variant={timeFilter === "all" ? "secondary" : "ghost"} aria-pressed={timeFilter === "all"} onClick={() => setTimeFilter("all")}>All</Button>
           <Button size="sm" variant={timeFilter === "pending" ? "secondary" : "ghost"} aria-pressed={timeFilter === "pending"} onClick={() => setTimeFilter("pending")}>Needs approval ({pending.length})</Button>
           <Button size="sm" variant={timeFilter === "approved" ? "secondary" : "ghost"} aria-pressed={timeFilter === "approved"} onClick={() => setTimeFilter("approved")}>Approved ({approved.length})</Button>
-        </Row>
         </div>
         <p className="ops-toolbar-note">
           Select a row and choose Open to see its approval evidence. Correct any mismatched or unlinked source before approval.
