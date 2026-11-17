@@ -3202,10 +3202,25 @@ function PreviewDocument({ context }: { context: ScreenContext }) {
   if (!record) return <Empty title="No document is open" />;
   const pages = paginate(editor.model).pages.length;
   return (
-    <Stack gap={3}>
-      <Properties rows={[{ label: "Pages", value: String(pages) }, { label: "Open tracked changes", value: String(openSuggestions(editor.model).length) }, { label: "Comments", value: "not included in the export" }]} />
-      <iframe title={`Export preview of ${record.title}`} srcDoc={toHtml(editor.model, record.title)} style={{ width: "100%", height: 420, border: "1px solid var(--border-default)", borderRadius: 6, background: "#fff" }} sandbox="" />
-      <p className="vx-mini">The same HTML the export writes, rendered in a sandboxed frame. A printer or PDF writer may break pages differently.</p>
+    <Stack gap={4}>
+      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENTS / EXPORT PREVIEW</span>
+        <h3>Inspect the rendered document</h3>
+        <p>Review the actual HTML rendering before creating a copy. This is not an approved, signed or externally published document.</p>
+      </div>
+      <Properties rows={[
+        { label: "Document", value: record.title },
+        { label: "Company status", value: record.status.replace("_", " ") },
+        { label: "Estimated pages", value: String(pages) },
+        { label: "Paper format", value: editor.model.page.size },
+        { label: "Open tracked changes", value: String(openSuggestions(editor.model).length) },
+        { label: "Comments", value: "Not included in HTML preview" },
+        { label: "Confidential", value: record.fields.confidential === true ? "Yes — handle exported copies carefully" : "Not marked confidential" },
+      ]} />
+      <div className="dx-export-preview-frame">
+        <iframe title={`Export preview of ${record.title}`} srcDoc={toHtml(editor.model, record.title)}
+          style={{ width: "100%", height: 460, border: 0, background: "#fff" }} sandbox="" />
+      </div>
+      <Notice tone="info" title="Preview and print are separate">The iframe is sandboxed and shows browser-rendered HTML. Pagination remains an estimate; another browser or printer may break pages differently.</Notice>
     </Stack>
   );
 }
