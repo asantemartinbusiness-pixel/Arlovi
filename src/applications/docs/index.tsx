@@ -2527,6 +2527,10 @@ function ChangeImpact({ context }: { context: ScreenContext }) {
   );
 }
 
+function escapeExportText(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/\x27/g, "&#39;");
+}
+
 function PdfSettings({ context, close }: { context: ScreenContext; close: () => void }) {
   const record = useDocument(context);
   const editor = useDocEditor(context, record);
@@ -2540,13 +2544,14 @@ function PdfSettings({ context, close }: { context: ScreenContext; close: () => 
         event.preventDefault();
         const html = toHtml(editor.model, record.title);
         const extra = includeComments && editor.model.comments.length
-          ? `<section><h2>Comments</h2><ol>${editor.model.comments.map((comment) => `<li><strong>${comment.author}</strong>: ${comment.body} <em>(on “${comment.quote}”)</em></li>`).join("")}</ol></section>`
+          ? `<section><h2>Comments</h2><ol>${editor.model.comments.map((comment) => `<li><strong>${escapeExportText(comment.author)}</strong>: ${escapeExportText(comment.body)} <em>(on “${escapeExportText(comment.quote)}”)</em></li>`).join("")}</ol></section>`
           : "";
         downloadFile(`${record.title}.print.html`, html.replace("</body>", `${extra}</body>`), "text/html");
         context.toast("Print-ready HTML written", "Open it and print to PDF from the browser. No PDF engine is bundled, so nothing is rendered server side.");
         close();
       }}
     >
+      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENTS / PRINT LAYOUT</span><h3>Prepare a print-ready document</h3><p>Review page settings, comment inclusion and document confidentiality before generating browser-printable HTML.</p></div>
       <Notice tone="warning" title="No PDF engine is connected">
         A PDF is produced by printing the exported HTML from the browser. Saying it is a native PDF renderer would be untrue, so the export is named for what it is.
       </Notice>
@@ -2557,6 +2562,8 @@ function PdfSettings({ context, close }: { context: ScreenContext; close: () => 
         { label: "Estimated pages", value: String(paginate(editor.model).pages.length) },
       ]} />
       <Checkbox label="Append the comment list" checked={includeComments} onChange={(event) => setIncludeComments(event.target.checked)} />
+      {record.fields.confidential === true && <Notice tone="warning" title="Confidential document">Printing or exporting creates a copy outside this browser-local document record. Handle it according to your organisation’s document policies.</Notice>}
+      <p className="ds-subtle">Comment text is escaped in generated HTML. Nothing is printed automatically and no server-side PDF is produced.</p>
     </form>
   );
 }
