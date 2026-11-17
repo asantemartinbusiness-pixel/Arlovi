@@ -340,11 +340,13 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
 
 function LibraryInspector({ context }: { context: ScreenContext }) {
   const record = useRecord(context.selectedId);
+  const templates = useCollection("templates");
   const { org } = useWorkspace();
   if (!record) return <Empty title="Select a document" icon={<FileText size={18} />}>Its folder, access, tags and version history appear here.</Empty>;
   const model = readDoc(record.body, record.ownerName, record.updatedAt);
   const stats = documentStats(model);
   const confidential = record.fields.confidential === true;
+  const master = templates.find((item) => item.id === record.fields.templateId);
   return (
     <Stack gap={5}>
       <InspectorSection title="Document">
@@ -354,12 +356,22 @@ function LibraryInspector({ context }: { context: ScreenContext }) {
           { label: "Status", value: <Pill tone={record.status === "published" ? "success" : "neutral"}>{record.status.replace("_", " ")}</Pill> },
           { label: "Words", value: String(stats.words) },
           { label: "Changed", value: context.dateTime(record.updatedAt) },
+          { label: "Source master", value: master?.title ?? "Blank or original document" },
+          { label: "Source revision", value: record.fields.templateSourceRevision ? String(record.fields.templateSourceRevision) : "Not linked" },
         ]} />
+      </InspectorSection>
+      <InspectorSection title="Continue working">
+        <Row gap={2} wrap>
+          <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${org.slug}/docs/documents/${record.id}`)}>Open editor</Button>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/docs/documents/${record.id}/review`)}>Review</Button>
+          <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/docs/documents/${record.id}/publish`)}>Export and publish</Button>
+        </Row>
+        {master && <p className="ds-subtle" style={{ marginBlockStart: "var(--space-2)" }}>Created from {master.title}. Changes to the master do not alter this document.</p>}
       </InspectorSection>
       <InspectorSection title="Access">
         {confidential
           ? <Notice tone="warning" title="Confidential">The body is excluded from search previews. Role views shape what the interface offers and are not an account security boundary.</Notice>
-          : <p className="ds-subtle">Visible to the workspace. No public link is active.</p>}
+          : <p className="ds-subtle">This browser-local workspace has no active public document host. Role views are not an account security boundary.</p>}
         <Row gap={2} style={{ marginBlockStart: "var(--space-2)" }}>
           <Button size="sm" variant="secondary" onClick={() => context.openOverlay("sharing", { id: record.id })}>Sharing</Button>
           <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/docs/documents/${record.id}/publish`)}>Publish</Button>
