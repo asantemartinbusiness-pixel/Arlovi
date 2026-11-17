@@ -43,7 +43,11 @@ function useDocument(context: ScreenContext): Rec | undefined {
   useGuardRefresh(context);
   const fromRoute = useRecord(context.params.id);
   const all = useCollection("documents");
-  return fromRoute ?? all.find((record) => !record.tags.includes("recovered")) ?? all[0];
+  if (context.params.id) {
+    return fromRoute?.collection === "documents" && fromRoute.organizationId === context.org.id
+      ? fromRoute : undefined;
+  }
+  return all.find((record) => !record.tags.includes("recovered")) ?? all[0];
 }
 
 /** The editor's contract actions, on its own bar (the full-chrome surface has no page header). */
