@@ -6,7 +6,7 @@ test("Present library displays search, deck counters and a recoverable empty sta
   await expect(main.getByRole("heading", { name: "Presentations in progress." })).toBeVisible();
   await expect(main.getByLabel("Presentation library overview")).toBeVisible();
   await main.getByRole("searchbox", { name: "Find a presentation" }).fill("present-qa-no-matching-deck");
-  await expect(main.getByText("No presentations match this view")).toBeVisible();
+  await expect(main.getByText("No presentations match this search")).toBeVisible();
   await main.getByRole("button", { name: "Clear search" }).click();
   await expect(main.getByRole("searchbox", { name: "Find a presentation" })).toHaveValue("");
 });
@@ -127,4 +127,12 @@ test("Review approval records do not imply identity verification or publish auto
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("Local review record, not verified approval");
   await expect(dialog.getByRole("checkbox", { name: "I understand this is a local, unverified review record" })).not.toBeChecked();
+});
+
+test("Present empty archive preserves overview and offers an actionable next step", async ({ page }) => {
+  await page.goto("/o/northline/present/decks?tab=Archived");
+  const main = page.locator("#main");
+  await expect(main.getByRole("heading", { name: "Presentation archive." })).toBeVisible();
+  await expect(main.getByLabel("Presentation library overview")).toBeVisible();
+  await expect(main.getByRole("searchbox", { name: "Find a presentation" })).toBeVisible();
 });
