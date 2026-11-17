@@ -281,39 +281,64 @@ export const hrApp = registerApp({
       ],
       overlays: [
         { id: "team filter", kind: "modal", title: "Filter the directory by team", width: 440, render: ({ close, ...context }) => <DirectoryFilter context={context} close={close} /> },
-        { id: "Invite employee", kind: "modal", title: "Invite someone to the workspace", width: 520,
+        { id: "Invite employee", kind: "modal", title: "Add an employee record", width: 560,
           render: ({ close, ...context }) => (
             <form id="hr-invite" className="ds-stack ds-gap-4" onSubmit={async (event) => {
               event.preventDefault();
               const form = new FormData(event.currentTarget);
-              await context.mutate.create({
-                collection: "employees",
-                title: String(form.get("name") ?? "New colleague"),
-                status: "probation",
-                summary: `Invited by ${context.actor}. The invitation is a local draft.`,
-                startAt: String(form.get("start") || "") || undefined,
-                fields: {
-                  kind: "human", title: String(form.get("role") ?? ""), employment: String(form.get("employment") ?? "full-time"),
-                  email: String(form.get("email") ?? ""), manager: context.actor, office: "Clerkenwell studio",
-                  leaveAllowance: 25, leaveTaken: 0, salaryMinor: 0, pensionPct: 5, phone: "Not shared",
-                },
-              }, `Employee record created for ${String(form.get("name") ?? "")}`);
-              context.toast("Record created", "The person is in the directory; the invitation itself has not been sent.");
-              close();
+              const name = String(form.get("name") ?? "").trim();
+              const email = String(form.get("email") ?? "").trim();
+              if (!name || !email) {
+                context.toast("Missing employee details", "Enter a name and work email before saving.", "blocked");
+                return;
+              }
+              try {
+                await context.mutate.create({
+                  collection: "employees",
+                  title: name,
+                  status: "probation",
+                  summary: `Employee draft recorded by ${context.actor}. No invitation has been sent.`,
+                  startAt: String(form.get("start") || "") || undefined,
+                  fields: {
+                    kind: "human", title: String(form.get("role") ?? ""), employment: String(form.get("employment") ?? "full-time"),
+                    email, manager: context.actor, office: "",
+                    leaveAllowance: 25, leaveTaken: 0, salaryMinor: 0, pensionPct: 5, phone: "Not shared",
+                    invitationStatus: "not_sent",
+                  },
+                }, `Employee record created for ${name}; invitation not sent`);
+                context.toast("Employee record created", "The employee is now in the directory. No email or workspace invitation was sent.");
+                close();
+              } catch (error) {
+                context.toast("Record was not created", error instanceof Error ? error.message : "Review the details and retry.", "blocked");
+              }
             }}>
-              <Field label="Name" required><TextInput name="name" required /></Field>
-              <Field label="Work email" required><TextInput name="email" type="email" required /></Field>
-              <Row gap={3}>
-                <Field label="Role"><TextInput name="role" /></Field>
-                <Field label="Employment">
-                  <Select name="employment">{["full-time", "part-time", "contractor"].map((option) => <option key={option}>{option}</option>)}</Select>
-                </Field>
-              </Row>
-              <Field label="Start date"><TextInput name="start" type="date" /></Field>
-              <InboxNote />
+              <PeopleDialogLead
+                eyebrow="PEOPLE / EMPLOYEE LIFECYCLE"
+                title="Create an employee record"
+                description="Capture the employee's identity and starting arrangement. Creating the record does not send an invitation or provision access."
+                status={<Pill tone="warning">Not invited</Pill>}
+              />
+              <PeopleDialogSection step="01" title="Identity" description="Enter the person's work identity in this company.">
+                <Field label="Full name" required><TextInput name="name" required /></Field>
+                <Field label="Work email" required><TextInput name="email" type="email" required /></Field>
+              </PeopleDialogSection>
+              <PeopleDialogSection step="02" title="Employment details" description="Choose the starting arrangement. Payroll and leave entitlements must be verified separately.">
+                <Field label="Job title"><TextInput name="role" /></Field>
+                <Row gap={3}>
+                  <Field label="Employment type">
+                    <Select name="employment">{["full-time", "part-time", "contractor"].map((option) => <option key={option}>{option}</option>)}</Select>
+                  </Field>
+                  <Field label="Start date"><TextInput name="start" type="date" /></Field>
+                </Row>
+              </PeopleDialogSection>
+              <PeopleDialogSection step="03" title="Invitation and access boundary" description="No connected delivery or identity provisioning takes place on save.">
+                <Notice tone="info" title="Record only — no message sent">
+                  This adds a local People record. Send any welcome email through a connected mailbox and complete access requests in the named workflow.
+                </Notice>
+              </PeopleDialogSection>
             </form>
           ),
-          footer: submitFooter("hr-invite", "Create the record") },
+          footer: submitFooter("hr-invite", "Create employee record") },
         { id: "directory card", kind: "drawer", title: "Roster", width: 420, render: ({ ...context }) => <SegmentedInspector context={context} /> },
         { id: "export permissions", kind: "modal", title: "Who can export this directory", width: 520, render: ({ ...context }) => (
           <Stack gap={3}>
