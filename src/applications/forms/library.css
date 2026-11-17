@@ -18,3 +18,8 @@
 .t6-workflow-title{margin:var(--space-2) 0;font-size:clamp(1.25rem,2.2vw,1.75rem);line-height:1.2;letter-spacing:-.035em}
 .t6-workflow-overview p{margin:0;max-width:65ch}
 .t6-workflow-overview .t6-directory-metrics>div{background:var(--bg-surface)}
+
+.t6-field-context{display:flex;flex-direction:column;gap:var(--space-2);padding:var(--space-3);border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--bg-surface)}
+.t6-field-context p{margin:0;line-height:1.5}
+.t6-field-context strong{min-width:0;overflow-wrap:anywhere}
+@media(max-width:720px){.t6-shell-bar .ds-row{flex-wrap:wrap}.t6-shell-bar button{max-width:100%}.t6-shell-tabs{min-width:0}.t6-field-context{padding:var(--space-3)}}
