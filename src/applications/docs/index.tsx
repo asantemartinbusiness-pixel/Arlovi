@@ -64,11 +64,12 @@ async function publishReviewedDocument(context: ScreenContext, record: Rec, edit
   const remaining = publicationBlockers(saved);
   if (remaining.length) throw new Error(remaining.join("; "));
   const approvals = String(fresh.fields.approvals ?? "").split("|").filter(Boolean);
-  const approvalFields = approvalNote !== undefined
-    ? { approvals: [...approvals, context.actor + " " + context.now.toISOString() + (approvalNote.trim() ? " " + approvalNote.trim() : "")].join("|") }
-    : {};
+  const nextFields: Rec["fields"] = { ...fresh.fields };
+  if (approvalNote !== undefined) {
+    nextFields.approvals = [...approvals, context.actor + " " + context.now.toISOString() + (approvalNote.trim() ? " " + approvalNote.trim() : "")].join("|");
+  }
   const result = await context.mutate.patch(fresh.id, {
-    status: "published", fields: { ...fresh.fields, ...approvalFields },
+    status: "published", fields: nextFields,
   }, { expectRevision: fresh.revision, event: approvalNote === undefined
     ? fresh.title + " published in the workspace"
     : fresh.title + " approved by " + context.actor });
