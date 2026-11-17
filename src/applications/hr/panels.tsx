@@ -73,16 +73,56 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
   const openRoles = data.positions.filter((position) => position.status === "open");
   const reviewsDue = data.reviews.filter((review) => ["draft", "scheduled", "submitted"].includes(review.status));
   const policiesDue = data.policies.filter((policy) => policy.fields.kind === "hr" && policy.fields.acknowledgementRequired === true);
+  const [teamQuery, setTeamQuery] = useState("");
+  const [taskFilter, setTaskFilter] = useState<"all" | "Leave approval" | "Onboarding" | "Review" | "Hiring">("all");
+  const dueCount = pendingLeave.length + openOnboarding.length + reviewsDue.length + openRoles.length;
 
   if (lens === "My team") {
-    const mine = data.employees.filter((employee) => String(employee.fields.manager ?? "") === actor);
-    return mine.length === 0 ? (
-      <Empty title={`Nobody reports to ${actor} in this workspace`} icon={<Users size={20} />}>
-        Reporting lines are recorded on each employee record. Change one from the employee profile.
-      </Empty>
-    ) : (
-      <Grid>
-        {mine.map((employee) => {
+    const mine = data.employees.filter((employee) => String(employee.fields.manager ?? "") === actor
+      && employee.status !== "alumni");
+    const results = mine.filter((employee) => [employee.title, employee.fields.title,
+      departmentName(data.departments, employee.fields.departmentId)].some((value) =>
+      String(value ?? "").toLowerCase().includes(teamQuery.trim().toLowerCase())));
+    const approvedLeave = data.leaveRequests.filter((request) => request.status === "approved"
+      && mine.some((employee) => employee.id === request.fields.employeeId));
+    const teamOnboarding = openOnboarding.filter((task) =>
+      mine.some((employee) => employee.id === task.fields.employeeId));
+    return (
+      <Stack gap={4}>
+        <OpsHeader
+          eyebrow="People / Overview / My team"
+          title="Your team, person by person."
+          description="Reporting lines, leave and onboarding progress in one place. Only staff explicitly assigned to you appear here."
+          actions={<Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees?tab=People`)}>Open directory</Button>}
+          note={`Showing direct reports whose manager field matches ${actor}.`}
+        />
+        <OpsMetrics label="My team status">
+          <OpsMetric label="Direct reports" value={mine.length} detail="Current records" />
+          <OpsMetric label="Approved leave" value={approvedLeave.length} detail="Leave request records" />
+          <OpsMetric label="Open onboarding" value={teamOnboarding.length} detail="Incomplete checklist items" />
+          <OpsMetric label="Without department" value={mine.filter((employee) =>
+            !data.departments.some((department) => department.id === employee.fields.departmentId)).length}
+            detail="Department link needs review" />
+        </OpsMetrics>
+        <div className="ops-toolbar">
+          <strong className="ops-toolbar-heading">People reporting to you</strong>
+          <div className="hr-directory-search">
+            <TextInput aria-label="Search my team" placeholder="Search by name, role or department"
+              value={teamQuery} onChange={(event) => setTeamQuery(event.target.value)} />
+          </div>
+          <span className="ops-toolbar-note">{results.length} of {mine.length}</span>
+        </div>
+        {mine.length === 0 ? (
+          <Empty title={`Nobody reports to ${actor} in this workspace`} icon={<Users size={20} />}>
+            Reporting lines come from employee records. Assign a manager on a person's profile to see them here.
+          </Empty>
+        ) : results.length === 0 ? (
+          <Empty title="Nobody matches this search" icon={<Users size={20} />}>
+            Clear the search to return to the team.
+          </Empty>
+        ) : (
+          <Grid>
+        {results.map((employee) => {
           const balance = leaveBalance(employee);
           const booked = data.leaveRequests.filter((request) => request.fields.employeeId === employee.id && request.status !== "declined");
           return (
@@ -105,7 +145,9 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
             </Card>
           );
         })}
-      </Grid>
+          </Grid>
+        )}
+      </Stack>
     );
   }
 
@@ -116,9 +158,38 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
       ...reviewsDue.map((review) => ({ id: review.id, kind: "Review", title: review.title, detail: review.summary, due: review.dueAt, to: `/o/${org.slug}/hr/performance` })),
       ...openRoles.map((position) => ({ id: position.id, kind: "Hiring", title: position.title, detail: position.summary, due: undefined, to: `/o/${org.slug}/hr/recruitment` })),
     ];
-    return rows.length === 0 ? <Empty title="No people work is outstanding" icon={<ClipboardCheck size={20} />} /> : (
+    const filtered = taskFilter === "all" ? rows : rows.filter((row) => row.kind === taskFilter);
+    return (
+      <Stack gap={4}>
+        <OpsHeader
+          eyebrow="People / Overview / HR tasks"
+          title="People decisions, in one queue."
+          description="Review leave, onboarding, performance and hiring tasks without losing sight of their owning workflow."
+          actions={<Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/scheduling?tab=Exceptions`)}>Scheduling exceptions</Button>}
+          note="A row opens its native workflow; no decision is taken automatically."
+        />
+        <OpsMetrics label="People task overview">
+          <OpsMetric label="Total outstanding" value={rows.length} detail="Recorded work items" />
+          <OpsMetric label="Leave requests" value={pendingLeave.length} detail="Awaiting a decision" emphasis={pendingLeave.length ? "attention" : "neutral"} />
+          <OpsMetric label="Onboarding tasks" value={openOnboarding.length} detail="Checklist steps to complete" />
+          <OpsMetric label="Hiring and reviews" value={openRoles.length + reviewsDue.length} detail="Open roles and recorded reviews" />
+        </OpsMetrics>
+        <div className="ops-toolbar" aria-label="Filter HR tasks">
+          <strong className="ops-toolbar-heading">Work queue</strong>
+          {(["all", "Leave approval", "Onboarding", "Review", "Hiring"] as const).map((filter) => (
+            <Button key={filter} size="sm" variant={taskFilter === filter ? "secondary" : "ghost"}
+              aria-pressed={taskFilter === filter} onClick={() => setTaskFilter(filter)}>
+              {filter === "all" ? "All" : filter}
+            </Button>
+          ))}
+        </div>
+        {filtered.length === 0 ? (
+          <Empty title={rows.length ? "No tasks match this filter" : "No people work is outstanding"} icon={<ClipboardCheck size={20} />}>
+            {rows.length ? "Choose another filter to see outstanding decisions." : "New leave, onboarding, hiring and review work appears here."}
+          </Empty>
+        ) : (
       <DataGrid
-        rows={rows}
+        rows={filtered}
         rowId={(row) => row.id}
         label="People work"
         columns={[
@@ -127,8 +198,10 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
           { key: "detail", header: "Detail", cell: (row) => <span className="ds-subtle">{row.detail}</span>, hideBelow: 900 },
           { key: "due", header: "Due", align: "end", cell: (row) => (row.due ? context.date(row.due) : "—"), sortValue: (row) => row.due ?? "~" },
         ]}
-        onOpen={(id) => { const row = rows.find((item) => item.id === id); if (row) context.navigate(row.to); }}
+        onOpen={(id) => { const row = filtered.find((item) => item.id === id); if (row) context.navigate(row.to); }}
       />
+        )}
+      </Stack>
     );
   }
 
@@ -145,6 +218,21 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
       return { label: month.toLocaleString(org.locale, { month: "short" }), value: taken.reduce((sum, request) => sum + leaveDays(request), 0) };
     });
     return (
+      <Stack gap={4}>
+        <OpsHeader
+          eyebrow="People / Overview / Trends"
+          title="Understand the shape of the team."
+          description="Department composition, employment mix and approved absence over time, grounded in the records in this workspace."
+          actions={<Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees?tab=Teams`)}>Browse departments</Button>}
+          note="This is a local record analysis, not an anonymised public report."
+        />
+        <OpsMetrics label="Workforce trends overview">
+          <OpsMetric label="Current employees" value={staff.length} detail="Excluding alumni and contractors" />
+          <OpsMetric label="Contractors" value={data.employees.filter((person) =>
+            person.fields.employment === "contractor" && person.status !== "alumni").length} detail="Separate employment category" />
+          <OpsMetric label="Departments" value={data.departments.length} detail="Organisational units" />
+          <OpsMetric label="Local AI contracts" value={agents.length} detail="Not human headcount" />
+        </OpsMetrics>
       <Grid>
         <Card span={7} eyebrow="WORKFORCE" prov="human" title="Workforce by department" subtitle="People and AI employees counted separately">
           <BarChart
@@ -174,17 +262,28 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
           />
         </Card>
         <Card span={7} title="What these figures are, and are not">
-          <Notice tone="info" title="Aggregated by the privacy policy">
-            Every figure here is a count of records in this browser. Pay, absence reasons and personal detail never appear in an
-            aggregate view, and a count smaller than three is shown as a range rather than a number so one person cannot be identified.
+          <Notice tone="info" title="Internal counts, not anonymised statistics">
+            The charts show actual local record counts, including small groups. They omit salaries, absence reasons and direct
+            identifiers, but small totals could still identify an individual. Do not share this page as an anonymised public report.
           </Notice>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
   return (
     <Stack gap={5}>
+      <OpsHeader
+        eyebrow="People / Overview"
+        title="A clearer view of the people behind the work."
+        description="Understand your team, the decisions waiting for attention and the work happening across hiring, onboarding, leave and scheduling."
+        actions={<>
+          <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)}>Explore directory</Button>
+          <Button variant="primary" onClick={() => context.setTab("HR tasks")}>Review people work</Button>
+        </>}
+        note={`${dueCount} recorded people work items · Local workspace records only`}
+      />
       <StatRow>
         <Stat label="People employed" value={String(staff.length)} prov="human" meta={`${data.employees.filter((employee) => employee.fields.employment === "contractor").length} contractors alongside`} onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)} />
         <Stat label="AI employees" value={String(agents.length)} prov="agent" meta="Local agent contracts" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)} />
