@@ -17,6 +17,7 @@ import { planTimesheetApprovals } from "./workforce";
 import { intervalsOverlap, validShiftInterval } from "@/domain/scheduling";
 import { linkedPersonnelDocuments, scopedDetailRecord } from "@/platform/recordScope";
 import { dailyCoverage, employeeOnLeave, rosterDateLabel, rosterShiftsForDay, rosterWeekDays, shiftDays } from "./rosterView";
+import { OpsHeader, OpsMetric, OpsMetrics } from "@/applications/shared/operational-surfaces";
 
 /* ------------------------------------------------------------------ *
  * Shared reads
@@ -1220,6 +1221,10 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
   const [weekOffset, setWeekOffset] = useState(0);
   const [showEveryone, setShowEveryone] = useState(false);
   const [timeFilter, setTimeFilter] = useState<"pending" | "approved" | "all">("all");
+  const [personQuery, setPersonQuery] = useState("");
+  const [hideAway, setHideAway] = useState(false);
+  const [exceptionFilter, setExceptionFilter] = useState<"all" | "critical" | "review">("all");
+  const [focusedDay, setFocusedDay] = useState<string | null>(null);
   const roster = data.shifts.filter((shift) => shift.fields.kind === "shift");
   const timesheets = data.shifts.filter((shift) => shift.fields.kind === "time");
 
@@ -1227,21 +1232,39 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
     const approved = timesheets.filter((entry) => entry.status === "approved" && entry.fields.approved === true);
     const pending = timesheets.filter((entry) => entry.status !== "approved" || entry.fields.approved !== true);
     const rows = timeFilter === "approved" ? approved : timeFilter === "pending" ? pending : timesheets;
+    const mismatched = timesheets.filter((entry) => (entry.status === "approved") !== (entry.fields.approved === true));
+    const billablePending = pending.filter((entry) => entry.fields.billable === true);
     const sumHours = (entries: Rec[]) => entries.reduce((sum, entry) => {
       const hours = Number(entry.fields.hours ?? 0);
       return sum + (Number.isFinite(hours) && hours > 0 ? hours : 0);
     }, 0);
     return (
-      <Stack gap={3}>
-        <Row gap={2} wrap>
-          <strong className="ds-grow">{timesheets.length} entries · {sumHours(timesheets).toFixed(2)} hours recorded</strong>
+      <Stack gap={4}>
+        <OpsHeader
+          eyebrow="People / Scheduling / Timesheets"
+          title="Review the work. Trust the hours."
+          description="Every time entry stays connected to its employee, project and approval history. Decide what needs attention before it reaches Finance."
+          actions={<>
+            <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/scheduling?tab=Exceptions`)}>View exceptions</Button>
+            <Button variant="primary" onClick={() => context.navigate(`/o/${org.slug}/project/time`)}>Log project time</Button>
+          </>}
+          note="Hours represent recorded time, not payroll or invoices."
+        />
+        <OpsMetrics label="Timesheet review overview">
+          <OpsMetric label="Recorded hours" value={sumHours(timesheets).toFixed(2)} detail={`${timesheets.length} time entries`} />
+          <OpsMetric label="Awaiting approval" value={pending.length} detail={`${sumHours(pending).toFixed(2)} hours`} emphasis={pending.length ? "attention" : "neutral"} />
+          <OpsMetric label="Approved hours" value={sumHours(approved).toFixed(2)} detail="Local human decisions" emphasis="positive" />
+          <OpsMetric label="Check source records" value={mismatched.length + billablePending.length} detail={`${mismatched.length} status mismatches · ${billablePending.length} billable pending`} />
+        </OpsMetrics>
+        <div className="ops-toolbar" aria-label="Filter timesheets">
+          <strong className="ops-toolbar-heading">Recorded time</strong>
           <Button size="sm" variant={timeFilter === "all" ? "secondary" : "ghost"} aria-pressed={timeFilter === "all"} onClick={() => setTimeFilter("all")}>All</Button>
           <Button size="sm" variant={timeFilter === "pending" ? "secondary" : "ghost"} aria-pressed={timeFilter === "pending"} onClick={() => setTimeFilter("pending")}>Needs approval ({pending.length})</Button>
           <Button size="sm" variant={timeFilter === "approved" ? "secondary" : "ghost"} aria-pressed={timeFilter === "approved"} onClick={() => setTimeFilter("approved")}>Approved ({approved.length})</Button>
         </Row>
-        <p className="ds-subtle">
-          {sumHours(approved).toFixed(2)} approved hours · {sumHours(pending).toFixed(2)} awaiting review.
-          Select an entry to check its employee, Project and approval evidence.
+        </div>
+        <p className="ops-toolbar-note">
+          Select a row and choose Open to see its approval evidence. Correct any mismatched or unlinked source before approval.
         </p>
         <DataGrid
           rows={rows}
