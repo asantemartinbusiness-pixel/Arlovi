@@ -7,7 +7,7 @@ import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { capabilityById } from "@/platform/capability";
 import {
-  ApplicantProfile, CandidateProfileOverlay, EmployeeDirectory, EmployeeProfile, InboxNote, LeaveApproval,
+  ApplicantProfile, CandidateProfileOverlay, EmployeeDirectory, EmployeeProfile, LeaveApproval,
   LeaveForm, LeaveScreen, Learning, Onboarding, Payroll, PayrollReview, PeopleOverview, Performance,
   PositionEditor, Recruitment, Scheduling, SegmentedInspector, StaffingSummary,
 } from "./panels";
