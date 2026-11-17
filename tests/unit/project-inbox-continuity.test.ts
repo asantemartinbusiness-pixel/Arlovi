@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Rec } from "@/domain/types";
 import { buildAttention, mineAttentionItems, filterForRole } from "@/platform/attention";
+import { positiveHours, taskMoveDecision } from "@/applications/project/progression";
 import {
   createProjectFromTemplate, duplicateProjectPlan, nextProjectCopyTitle, readProjectPhases,
   type CreationContext,
@@ -162,5 +163,49 @@ describe("Inbox: Projects assignee is the source of truth",()=>{
     });
     expect(mineAttentionItems(items,"Maya Chen").map(item=>item.title)).toEqual(["Approve mine"]);
     expect(mineAttentionItems(items,"Ella Graham").map(item=>item.title)).toEqual(["Approve theirs"]);
+  });
+});
+
+describe("Projects: identical move rules for task detail, mouse board and keyboard board", () => {
+  const projectId="project-moves";
+  const dependent={...rec("task-dependency","tasks",{stage:"doing",kind:"task"},"doing"),parentId:projectId,title:"Finish research"};
+  const target={...rec("task-target","tasks",{
+    stage:"doing",priority:"high",dependsOn:dependent.id,kind:"task",
+  },"doing"),parentId:projectId,title:"Deliver final review"};
+
+  it("blocks completion until every dependency is actually done",()=>{
+    const blocked=taskMoveDecision(target,"done",[dependent,target]);
+    expect(blocked.blocked).toMatch(/Finish research/);
+    expect(blocked.needsReviewDecision).toBe(false);
+    expect(taskMoveDecision(target,"review",[dependent,target]).blocked).toBeUndefined();
+  });
+
+  it("treats missing or cross-project dependencies as blockers, never as completed",()=>{
+    expect(taskMoveDecision(target,"done",[target]).blocked).toMatch(/Missing or unrelated task/);
+    expect(taskMoveDecision(target,"done",[{...dependent,parentId:"different-project"},target]).blocked)
+      .toMatch(/Missing or unrelated task/);
+  });
+
+  it("requires explicit review override for high-priority direct completion",()=>{
+    const ready={...dependent,status:"done",fields:{...dependent.fields,stage:"done"}};
+    const decision=taskMoveDecision(target,"done",[ready,target]);
+    expect(decision.blocked).toBeUndefined();
+    expect(decision.needsReviewDecision).toBe(true);
+    const reviewed={...target,status:"review",fields:{...target.fields,stage:"review"}};
+    expect(taskMoveDecision(reviewed,"done",[ready,reviewed]).needsReviewDecision).toBe(false);
+  });
+
+  it("does not declare an unchanged or foreign-collection record to be moved",()=>{
+    expect(taskMoveDecision(target,"doing",[target]).blocked).toMatch(/already/);
+    expect(taskMoveDecision({...target,collection:"invoices"},"done",[dependent]).blocked).toMatch(/valid task/);
+  });
+
+  it("rejects bad task capacity estimates before they can pollute the People workload view",()=>{
+    expect(positiveHours("8.5")).toBe(8.5);
+    expect(positiveHours("0")).toBe(0);
+    expect(()=>positiveHours("-1")).toThrow(/non-negative/);
+    expect(()=>positiveHours("Infinity")).toThrow(/non-negative/);
+    expect(()=>positiveHours("abc")).toThrow(/non-negative/);
+    expect(()=>positiveHours("")).toThrow(/Enter an estimate/);
   });
 });
