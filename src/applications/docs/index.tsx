@@ -1381,12 +1381,16 @@ function PublishScreen({ context, tab }: { context: ScreenContext; tab: "Export"
               { label: "Open comments", value: String(editor.model.comments.filter((comment) => !comment.resolved).length) },
               { label: "Open changes", value: String(openSuggestions(editor.model).length) },
             ]} />
+            <Notice tone="info" title="Publishing requires a named reviewer">
+              Resolve mandatory comments and decide tracked changes, then confirm publication in the approval dialog. This changes the local workspace record; it does not distribute the document.
+            </Notice>
             <Row gap={2}>
-              <Button variant="primary" disabled={record.status === "published"} onClick={async () => {
-                await context.mutate.patch(record.id, { status: "published" }, { expectRevision: record.revision, event: `${record.title} published in the workspace` });
-                context.toast("Published", "The document status changed on the record.");
-              }}>Publish</Button>
-              <Button variant="secondary" disabled={record.status !== "published"} onClick={async () => {
+              <Button variant="primary"
+                disabled={record.status === "published" || !context.can("edit_knowledge")
+                  || editor.model.comments.some((comment) => comment.mandatory && !comment.resolved)
+                  || openSuggestions(editor.model).length > 0}
+                onClick={() => context.openOverlay("approve document")}>Review and publish…</Button>
+              <Button variant="secondary" disabled={record.status !== "published" || !context.can("edit_knowledge")} onClick={async () => {
                 await context.mutate.patch(record.id, { status: "draft" }, { expectRevision: record.revision, event: `${record.title} unpublished` });
               }}>Unpublish</Button>
             </Row>
