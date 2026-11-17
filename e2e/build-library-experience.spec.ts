@@ -82,3 +82,31 @@ test("Build code, checks and releases expose their real readiness boundaries", a
   await expect(main.getByLabel("Build release status")).toBeVisible();
   await expect(main.getByLabel("Build release status")).toContainText("Connected runtimes");
 });
+
+test("Build API, access, integration and monitoring pages provide scoped status", async ({ page }) => {
+  await page.goto("/o/northline/build/projects");
+  const id = await page.evaluate(async () => {
+    const repoPath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "appProjects", currency: "GBP",
+      title: "QA Build Capability Views", status: "draft", fields: {},
+    }, ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  });
+  const main = page.locator("#main");
+  await page.goto(`/o/northline/build/projects/${id}/api`);
+  await expect(main.getByLabel("API contract overview")).toBeVisible();
+  await expect(main.getByLabel("API contract overview metrics")).toContainText("Open contracts");
+  await page.goto(`/o/northline/build/projects/${id}/auth?tab=Roles`);
+  await expect(main.getByLabel("Access policy overview")).toBeVisible();
+  await expect(main.getByLabel("Access policy overview metrics")).toContainText("Write grants");
+  await page.goto(`/o/northline/build/projects/${id}/integrations`);
+  await expect(main.getByLabel("Build integration overview")).toBeVisible();
+  await expect(main.getByLabel("Integration connection summary")).toContainText("Connected providers");
+  await page.goto(`/o/northline/build/projects/${id}/monitor`);
+  await expect(main.getByLabel("Build monitoring overview")).toBeVisible();
+  await expect(main.getByLabel("Monitoring diagnostic summary")).toContainText("Connected runtimes");
+});
