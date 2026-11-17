@@ -8,7 +8,7 @@ import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import { freshness } from "@/platform/clock";
 import { CalendarToolbar, ProviderBoundary, ScheduleCalendar } from "@/applications/market/kit";
-import { CalendarCheck, Mail, Megaphone, PenLine, Search, Users } from "lucide-react";
+import { CalendarCheck, Mail, Megaphone, PenLine, Search } from "lucide-react";
 import type { Rec } from "@/domain/types";
 import {
   bodyOf, evaluateSegment, networkOf, rollUp, useMarketData,
