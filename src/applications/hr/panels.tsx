@@ -2262,7 +2262,7 @@ export interface PayLine {
 /** Monthly pay computed from the employee record. Illustrative, not a tax engine. */
 export function computePayroll(employees: Rec[]): PayLine[] {
   return employees
-    .filter((employee) => employee.status !== "alumni" && employee.fields.employment !== "contractor")
+    .filter((employee) => !["alumni", "terminated"].includes(employee.status) && employee.fields.employment !== "contractor")
     .map((employee) => {
       const annual = Number(employee.fields.salaryMinor ?? 0);
       const gross = Math.round(annual / 12);
@@ -2287,9 +2287,10 @@ export function Payroll({ context, lens }: { context: ScreenContext; lens: "Runs
   const data = useCollections(["payrollRuns", "employees", "shifts"]);
   const [query, setQuery] = useState("");
   const [state, setState] = useState<"all" | "draft" | "approved">("all");
-  const eligible = data.employees.filter((employee) => employee.status !== "alumni"
+  const eligible = data.employees.filter((employee) => !["alumni", "terminated"].includes(employee.status)
     && employee.fields.employment !== "contractor");
   const hasSalary = (employee: Rec) => employee.fields.salaryMinor !== undefined
+    && employee.fields.salaryMinor !== null && String(employee.fields.salaryMinor).trim() !== ""
     && Number.isFinite(Number(employee.fields.salaryMinor)) && Number(employee.fields.salaryMinor) >= 0;
   const missingPay = eligible.filter((employee) => !hasSalary(employee));
   // Run totals in this preview are illustrative and calculated only from
@@ -3155,9 +3156,10 @@ export function PayrollReview({ context }: { context: ScreenContext }) {
   if (!run) return <Empty title={wantedId ? "Selected payroll run unavailable" : "No payroll run"}>
     Open a payroll run from this company. A missing selection never falls back to an unrelated record.
   </Empty>;
-  const eligible = data.employees.filter((employee) => employee.status !== "alumni"
+  const eligible = data.employees.filter((employee) => !["alumni", "terminated"].includes(employee.status)
     && employee.fields.employment !== "contractor");
   const salaryKnown = (employee: Rec) => employee.fields.salaryMinor !== undefined
+    && employee.fields.salaryMinor !== null && String(employee.fields.salaryMinor).trim() !== ""
     && Number.isFinite(Number(employee.fields.salaryMinor)) && Number(employee.fields.salaryMinor) >= 0;
   const missing = eligible.filter((employee) => !salaryKnown(employee));
   const lines = computePayroll(eligible.filter(salaryKnown));
