@@ -716,7 +716,25 @@ function periodKey(now: Date): string {
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+export function payrollSalaryGaps(employees: Rec[]): Rec[] {
+  return employees.filter((employee) => employee.status !== "alumni"
+    && employee.fields.employment !== "contractor"
+    && (employee.fields.salaryMinor === undefined || !Number.isFinite(Number(employee.fields.salaryMinor))
+      || Number(employee.fields.salaryMinor) < 0));
+}
+
 export async function prepareRun(context: ScreenContext, runs: Rec[], employees: Rec[]): Promise<void> {
+  if (!context.can("view_payroll")) {
+    context.toast("Payroll restricted", "An authorised payroll role is required.", "blocked");
+    return;
+  }
+  const gaps = payrollSalaryGaps(employees);
+  if (gaps.length) {
+    context.toast("Payroll input incomplete",
+      `${gaps.length} eligible employee${gaps.length === 1 ? "" : "s"} have no valid recorded salary. Verify the source records before preparing a run.`,
+      "blocked");
+    return;
+  }
   const period = periodKey(context.now);
   const lines = computePayroll(employees);
   const gross = lines.reduce((sum, line) => sum + line.grossMinor, 0);
@@ -738,13 +756,24 @@ export async function validateRun(context: ScreenContext, runs: Rec[], employees
   const run = runs.find((row) => row.status === "draft");
   if (!run) { context.toast("No draft run", "Prepare a run first; approved runs are not re-validated.", "blocked"); return; }
   const lines = computePayroll(employees);
-  const exceptions = lines.filter((line) => line.grossMinor === 0).length + shifts.filter((row) => row.fields.kind === "time" && row.fields.approved !== true).length;
+  const exceptions = payrollSalaryGaps(employees).length
+    + shifts.filter((row) => row.fields.kind === "time"
+      && (row.fields.approved !== true || row.status !== "approved")).length;
   await context.mutate.patch(run.id, { fields: { ...run.fields, validatedBy: context.actor, validatedAt: clockIso(), exceptions, jurisdictionValidated: false } }, { expectRevision: run.revision, event: `${run.title} validated by ${context.actor}: ${exceptions} data exceptions; ${context.org.jurisdiction} rules not validated` });
   context.toast(exceptions ? "Exceptions found" : "No data exceptions", `${exceptions} exception${exceptions === 1 ? "" : "s"} recorded on the run. ${context.org.jurisdiction} rules still need a payroll provider.`, exceptions ? "blocked" : "ok");
   context.openOverlay("exception report");
 }
 
 export async function exportRun(context: ScreenContext, runs: Rec[], employees: Rec[]): Promise<void> {
+  if (!context.can("view_payroll") || !context.can("export_data")) {
+    context.toast("Export unavailable", "The current role cannot export payroll inputs.", "blocked");
+    return;
+  }
+  const gaps = payrollSalaryGaps(employees);
+  if (gaps.length) {
+    context.toast("Export blocked", `${gaps.length} eligible employee salary records are incomplete. Verify them first.`, "blocked");
+    return;
+  }
   const run = runs.find((row) => row.status === "draft") ?? runs[0];
   const lines = computePayroll(employees);
   const header = "person,basis,gross,tax,ni,pension,net\n";
