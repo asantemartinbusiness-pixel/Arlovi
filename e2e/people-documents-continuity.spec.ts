@@ -27,8 +27,10 @@ test("a People file shows only actual linked references and persists a new refer
   await main.getByRole("button", { name: "Add a document reference" }).click();
   const dialog = page.getByRole("dialog", { name: "Add a people-file reference" });
   await expect(dialog).toBeVisible();
-  await dialog.getByLabel("Document").selectOption({ label: "Employment contract" });
-  await dialog.getByLabel("Internal note").fill("Reference recorded for QA; no file uploaded");
+  await dialog.getByLabel("Document category", { exact: true }).selectOption({ label: "Employment contract" });
+  await dialog.getByLabel("Existing document location or internal reference").fill("Restricted HR filing cabinet / QA reference");
+  await dialog.getByRole("checkbox").check();
+  await dialog.getByLabel("Internal filing note").fill("Reference recorded for QA; no file uploaded");
   await dialog.getByRole("button", { name: "Save reference" }).click();
 
   await expect(dialog).toHaveCount(0);
