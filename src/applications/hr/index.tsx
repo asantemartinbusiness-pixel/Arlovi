@@ -808,10 +808,16 @@ function OnboardingLaunch({ context, close }: { context: ScreenContext; close: (
 
 function ITAccess({ context }: { context: ScreenContext }) {
   const data = useCollections(["tasks"]);
+  const [confirmedId, setConfirmedId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [error, setError] = useState("");
   const payload = context.overlayPayload as { employeeId?: string } | undefined;
   const requests = data.tasks.filter((task) => task.fields.kind === "onboarding" && task.fields.group === "IT access" && (!payload?.employeeId || task.fields.employeeId === payload.employeeId));
   return requests.length === 0 ? <Empty title="No access requests" /> : (
     <Stack gap={3}>
+      <PeopleDialogLead eyebrow="PEOPLE / IT HANDOVER" title="Review local access tasks"
+        description="Inspect each request, name the local decision and track external provisioning separately."
+        status={<Pill tone="warning">External status unverified</Pill>} />
       {requests.map((request) => (
         <div key={request.id} className="ds-panel" style={{ padding: "var(--space-3)" }}>
           <Row gap={2}>
@@ -820,22 +826,37 @@ function ITAccess({ context }: { context: ScreenContext }) {
           </Row>
           <p className="ds-subtle">{request.summary}</p>
           {["waiting", "ready", "requested"].includes(request.status) && (
-            <Button size="sm" variant="primary" disabled={!context.can("edit_people")}
+            <Stack gap={2}>
+            <Checkbox label={`I reviewed ${request.title} and understand this does not grant external access.`}
+              checked={confirmedId === request.id} onChange={(event) => setConfirmedId(event.target.checked ? request.id : null)} />
+            <Button size="sm" variant="primary" disabled={!context.can("edit_people") || confirmedId !== request.id || savingId !== null}
               style={{ marginBlockStart: "var(--space-2)" }}
               onClick={async () => {
-                if (!context.can("edit_people")) return;
-                const saved = await context.mutate.patch(request.id, { status: "done", fields: {
-                  ...request.fields, stage: "done", grantedBy: context.actor, grantedAt: clockIso(),
-                } }, { expectRevision: request.revision,
-                  event: `${request.title} local access review recorded by ${context.actor}` });
-                if (saved) context.toast("Local decision recorded",
-                  `${request.title} was marked complete in the local checklist. External access remains unverified.`);
+                if (!context.can("edit_people") || confirmedId !== request.id) return;
+                setSavingId(request.id);
+                setError("");
+                try {
+                  await context.mutate.patch(request.id, { status: "done", fields: {
+                    ...request.fields, stage: "done", reviewedBy: context.actor, reviewedAt: clockIso(),
+                    externalProvisioning: "not_verified",
+                  } }, { expectRevision: request.revision,
+                    event: `${request.title} local review recorded by ${context.actor}; external access not verified` });
+                  context.toast("Local review recorded",
+                    `${request.title} was reviewed in Arlovi. Check external provisioning separately.`);
+                  setConfirmedId(null);
+                } catch (cause) {
+                  setError(cause instanceof Error ? cause.message : "The local decision was not saved.");
+                } finally {
+                  setSavingId(null);
+                }
               }}>
               Record local review
             </Button>
+            </Stack>
           )}
         </div>
       ))}
+      {error && <Notice tone="danger" title="Review not saved">{error}</Notice>}
       <Notice tone="warning" title="Recording is not provisioning">
         No identity provider is connected. Recording a grant says a person decided; somebody still has to make the account.
       </Notice>
