@@ -166,3 +166,47 @@
   .hr-availability-person { padding: var(--space-3); }
   .hr-availability-summary { gap: var(--space-2); }
 }
+
+/* People directory, profile and overview: per-page composition using the
+   approved Arlovi tokens, without changing global typography or colours. */
+.hr-directory-search { flex: 1 1 225px; min-width: min(210px, 100%); max-width: 420px; }
+.hr-directory-card { min-width: 0; width: 100%; display: flex; gap: var(--space-3); align-items: center; text-align: start; }
+.hr-directory-card-copy { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; }
+.hr-directory-card-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); }
+.hr-directory-card-copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-muted); font-size: var(--text-xs); }
+
+.hr-profile-identity {
+  padding: clamp(20px, 2.6vw, 34px);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  display: flex;
+  gap: var(--space-5);
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.hr-profile-identity-main { display: flex; gap: var(--space-4); min-width: 0; align-items: flex-start; flex: 1 1 390px; }
+.hr-profile-identity-copy { min-width: 0; }
+.hr-profile-identity-copy .ops-eyebrow { margin-bottom: var(--space-2); }
+.hr-profile-identity-copy h2 {
+  font-size: clamp(1.5rem, 3vw, 2.4rem);
+  line-height: 1.08;
+  letter-spacing: -.04em;
+  margin: 0;
+  font-weight: 680;
+}
+.hr-profile-identity-copy > p { margin: var(--space-2) 0 0; color: var(--fg-muted); font-size: var(--text-sm); line-height: 1.5; }
+.hr-profile-identifiers { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-4); }
+.hr-profile-identifiers > span:not(:first-child) { font-size: var(--text-xs); color: var(--fg-subtle); border-inline-start: 1px solid var(--border-default); padding-inline-start: var(--space-2); }
+.hr-profile-identity-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.hr-profile-section-description { max-width: 67ch; color: var(--fg-muted); font-size: var(--text-sm); line-height: 1.6; margin: 0; }
+
+@media (max-width: 640px) {
+  .hr-profile-identity { padding: var(--space-4); gap: var(--space-3); }
+  .hr-profile-identity-main { flex-basis: 100%; gap: var(--space-3); }
+  .hr-profile-identity-actions { justify-content: flex-start; width: 100%; }
+  .hr-profile-identifiers { gap: var(--space-2); }
+  .hr-directory-search { flex-basis: 100%; max-width: none; }
+  .hr-directory-card { align-items: flex-start; }
+}
