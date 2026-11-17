@@ -230,7 +230,7 @@ function WorkbookLibrary({ context, tab }: { context: ScreenContext; tab: "Recen
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [folder, setFolder] = useState("all");
-  const active = workbooks.filter((record) => record.status !== "archived");
+  const active = useMemo(() => workbooks.filter((record) => record.status !== "archived"), [workbooks]);
   const folders = [...new Set(workbooks.map((record) => String(record.fields.folder ?? "Unfiled")))];
   const templateCount = workbooks.filter((record) => record.fields.isTemplate === true || record.status === "template").length;
   const sharedCount = workbooks.filter((record) => String(record.fields.sharedWith ?? "").split("|").some((name) => name.trim().length > 0)).length;
@@ -525,6 +525,9 @@ function GridEditorScreen({ context }: { context: ScreenContext }) {
   const guarded = protectedSet(editor.workbook, editor.sheet);
   const hidden = hiddenRows(editor.sheet, editor.values, editor.format);
   const sheetComments = editor.workbook.comments.filter((comment) => comment.sheetId === editor.sheet.id);
+  const sheetErrors = editor.evaluation.errors.filter((error) => error.sheetName === editor.sheet.name);
+  const formulaCount = Object.values(editor.sheet.cells).filter((value) => value.startsWith("=")).length;
+  const populatedCells = Object.keys(editor.sheet.cells).length;
 
   function commitCell(address: string, raw: string) {
     if (guarded.has(address)) {
@@ -547,10 +550,27 @@ function GridEditorScreen({ context }: { context: ScreenContext }) {
         <Button size="sm" variant="secondary" disabled={editor.saveState === "clean" || editor.saveState === "saved"} onClick={() => void editor.saveNow()}>Save now</Button>
         <Button size="sm" variant="ghost" icon={<RefreshCw size={15} />} onClick={() => { editor.recalculate(); context.toast("Recalculated", "Formulas were re-evaluated in topological order."); }}>Recalculate</Button>
         <ButtonGroup label="Panels on narrow screens">
-          <Button size="sm" variant={mobilePanel === "aside" ? "secondary" : "ghost"} onClick={() => setMobilePanel(mobilePanel === "aside" ? "grid" : "aside")}>Inspector</Button>
+          <Button size="sm" variant={mobilePanel === "aside" ? "secondary" : "ghost"} aria-pressed={mobilePanel === "aside"} onClick={() => setMobilePanel(mobilePanel === "aside" ? "grid" : "aside")}>Inspector</Button>
         </ButtonGroup>
       </div>
 
+      <section className="sx-workflow-strip" aria-label="Workbook working status">
+        <div className="sx-workflow-context">
+          <span className="sx-library-eyebrow">ACTIVE SHEET</span>
+          <Row gap={2} wrap>
+            <Pill tone={record.status === "archived" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>
+            <strong>{editor.sheet.name}</strong>
+            <span className="ds-subtle">{populatedCells} populated cells · {formulaCount} formulas</span>
+            {sheetErrors.length > 0 && <Pill tone="danger">{sheetErrors.length} calculation error{sheetErrors.length === 1 ? "" : "s"}</Pill>}
+          </Row>
+          <span className="ds-subtle">Values are calculated locally. Editing and sharing do not imply a cloud spreadsheet session.</span>
+        </div>
+        <div className="sx-workflow-actions">
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/sheets/workbooks`)}>Library</Button>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(context.path("/o/:org/sheets/workbooks/:id/formulas", record.id))}>Formula audit</Button>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(context.path("/o/:org/sheets/workbooks/:id/charts", record.id))}>Charts</Button>
+        </div>
+      </section>
       <div className="sx-bar" style={{ minHeight: 40, paddingBlock: 0 }}>
         <Tabs
           label="Grid modes"
