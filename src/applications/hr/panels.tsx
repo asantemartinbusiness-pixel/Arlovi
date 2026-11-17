@@ -1219,49 +1219,79 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
   const { now, org } = useWorkspace();
   const [weekOffset, setWeekOffset] = useState(0);
   const [showEveryone, setShowEveryone] = useState(false);
-  const [timeFilter, setTimeFilter] = useState<"pending" | "approved" | "all">("pending");
+  const [timeFilter, setTimeFilter] = useState<"pending" | "approved" | "all">("all");
   const roster = data.shifts.filter((shift) => shift.fields.kind === "shift");
   const timesheets = data.shifts.filter((shift) => shift.fields.kind === "time");
 
   if (lens === "Timesheets") {
-    const total = timesheets.reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0);
+    const approved = timesheets.filter((entry) => entry.status === "approved" && entry.fields.approved === true);
+    const pending = timesheets.filter((entry) => entry.status !== "approved" || entry.fields.approved !== true);
+    const rows = timeFilter === "approved" ? approved : timeFilter === "pending" ? pending : timesheets;
+    const sumHours = (entries: Rec[]) => entries.reduce((sum, entry) => {
+      const hours = Number(entry.fields.hours ?? 0);
+      return sum + (Number.isFinite(hours) && hours > 0 ? hours : 0);
+    }, 0);
     return (
-      <DataGrid
-        rows={timesheets}
-        rowId={(row) => row.id}
-        label="Timesheets"
-        columns={[
-          { key: "who", header: "Person", primary: true, cell: (row) => String(row.fields.employeeName ?? row.ownerName), sortValue: (row) => String(row.fields.employeeName ?? row.ownerName), filterValue: (row) => String(row.fields.employeeName ?? row.ownerName) },
-          { key: "day", header: "Day", cell: (row) => context.date(row.startAt), sortValue: (row) => row.startAt ?? "" },
-          { key: "detail", header: "Against", cell: (row) => {
-            const project = data.projects.find((record) => record.id === row.fields.projectId);
-            return project
-              ? <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/project/projects/${project.id}`)}>{project.title}</Button>
-              : <span className="ds-subtle">{row.fields.projectId ? "Project unavailable" : row.summary || "No project linked"}</span>;
-          }, hideBelow: 900 },
-          { key: "hours", header: "Hours", align: "end", cell: (row) => <span className="ds-num">{String(row.fields.hours ?? 0)}</span>, sortValue: (row) => Number(row.fields.hours ?? 0) },
-          { key: "state", header: "State", align: "end", cell: (row) => <Pill tone={row.fields.approved === true ? "success" : "warning"}>{row.fields.approved === true ? "approved" : "submitted"}</Pill> },
-        ]}
-        summary={<strong className="ds-num">{total.toFixed(1)} hours</strong>}
-        bulkActions={[{
-          label: "Approve hours",
-          onRun: async (rows) => {
-            try {
-              const pending = rows.filter((row) => row.fields.approved !== true);
-              const plan = planTimesheetApprovals({
-                organizationId: context.org.id, currency: context.org.currency,
-                actor: context.actor, now: clockIso(), timezone: context.org.timezone,
-              }, pending, data.employees, data.projects);
-              await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
-              context.toast("Hours approved", `${pending.length} time entr${pending.length === 1 ? "y" : "ies"} checked and approved together in Arlovi. No payroll was submitted.`);
-            } catch (error) {
-              context.toast("Hours not approved", error instanceof Error ? error.message : "Reload these entries before deciding.", "blocked");
-            }
-          },
-          disabled: (rows) => rows.every((row) => row.fields.approved === true),
-        }]}
-        onSelect={(id) => context.select(id)}
-      />
+      <Stack gap={3}>
+        <Row gap={2} wrap>
+          <strong className="ds-grow">{timesheets.length} entries · {sumHours(timesheets).toFixed(2)} hours recorded</strong>
+          <Button size="sm" variant={timeFilter === "all" ? "secondary" : "ghost"} aria-pressed={timeFilter === "all"} onClick={() => setTimeFilter("all")}>All</Button>
+          <Button size="sm" variant={timeFilter === "pending" ? "secondary" : "ghost"} aria-pressed={timeFilter === "pending"} onClick={() => setTimeFilter("pending")}>Needs approval ({pending.length})</Button>
+          <Button size="sm" variant={timeFilter === "approved" ? "secondary" : "ghost"} aria-pressed={timeFilter === "approved"} onClick={() => setTimeFilter("approved")}>Approved ({approved.length})</Button>
+        </Row>
+        <p className="ds-subtle">
+          {sumHours(approved).toFixed(2)} approved hours · {sumHours(pending).toFixed(2)} awaiting review.
+          Select an entry to check its employee, Project and approval evidence.
+        </p>
+        <DataGrid
+          rows={rows}
+          rowId={(row) => row.id}
+          label="Timesheets"
+          onOpen={(id) => context.openOverlay("time review", { id })}
+          columns={[
+            { key: "who", header: "Person", primary: true, cell: (row) => {
+              const person = data.employees.find((employee) => employee.id === row.fields.employeeId);
+              return person ? person.title : <span className="ds-subtle">{String(row.fields.employeeName ?? "Unlinked person")} · verify ID</span>;
+            }, sortValue: (row) => String(row.fields.employeeName ?? row.ownerName), filterValue: (row) => String(row.fields.employeeName ?? row.ownerName) },
+            { key: "day", header: "Day", cell: (row) => context.date(row.startAt), sortValue: (row) => row.startAt ?? "" },
+            { key: "detail", header: "Against", cell: (row) => {
+              const project = data.projects.find((record) => record.id === row.fields.projectId);
+              return project
+                ? <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/project/projects/${project.id}`)}>{project.title}</Button>
+                : <span className="ds-subtle">{row.fields.projectId ? "Project unavailable" : row.summary || "No project linked"}</span>;
+            }, hideBelow: 900 },
+            { key: "hours", header: "Hours", align: "end", cell: (row) => <span className="ds-num">{String(row.fields.hours ?? 0)}</span>, sortValue: (row) => Number(row.fields.hours ?? 0) },
+            { key: "state", header: "State", align: "end", cell: (row) => {
+              const consistent = row.status === "approved" && row.fields.approved === true;
+              const mismatch = (row.status === "approved") !== (row.fields.approved === true);
+              return <Pill tone={mismatch ? "danger" : consistent ? "success" : "warning"}>{mismatch ? "Review mismatch" : consistent ? "Approved" : "Needs approval"}</Pill>;
+            }},
+          ]}
+          summary={<strong className="ds-num">{sumHours(rows).toFixed(2)} hours shown</strong>}
+          bulkActions={[{
+            label: "Approve hours",
+            onRun: async (selected) => {
+              try {
+                const chosen = selected.filter((row) => !(row.status === "approved" && row.fields.approved === true));
+                const plan = planTimesheetApprovals({
+                  organizationId: context.org.id, currency: context.org.currency,
+                  actor: context.actor, now: clockIso(), timezone: context.org.timezone,
+                }, chosen, data.employees, data.projects);
+                await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+                context.toast("Hours approved", `${chosen.length} time entr${chosen.length === 1 ? "y" : "ies"} reviewed together in Arlovi. No payroll was submitted.`);
+              } catch (error) {
+                context.toast("Hours not approved", error instanceof Error ? error.message : "Reload these entries before deciding.", "blocked");
+              }
+            },
+            disabled: (selected) => selected.every((row) => row.status === "approved" && row.fields.approved === true),
+          }]}
+          onSelect={(id) => context.select(id)}
+        />
+        <Notice tone="info" title="Approval evidence, not payroll output">
+          Approving records a local review decision. It does not pay anyone, calculate statutory deductions or issue an invoice.
+          Use the record drawer to inspect Project links and the reviewer first.
+        </Notice>
+      </Stack>
     );
   }
 
