@@ -1673,6 +1673,11 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
   if (tab === "Publish") {
     const active = editor.deck.exports.filter((entry) => entry.scope && !entry.revokedAt);
     return (
+      <Stack gap={4}>
+        {reviewOverview}
+        <Notice tone="info" title="Publication status is not a shared website">
+          This workspace records publishing status and link requests locally. No hosting or server-enforced access has been connected, so these actions do not make a deck publicly accessible.
+        </Notice>
       <Grid>
         <Card span={7} eyebrow="PUBLISHING" prov="human" title="Publish" subtitle={`Status: ${record.status.replace("_", " ")}`}>
           <Stack gap={3}>
@@ -1684,12 +1689,12 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
             <Row gap={2} wrap>
               <Button variant="primary" disabled={record.status === "published"} onClick={async () => {
                 await context.mutate.patch(record.id, { status: "published" }, { expectRevision: record.revision, event: `${record.title} published in the workspace` });
-                context.toast("Published", "The deck status changed on the record.");
-              }}>Publish in the workspace</Button>
+                context.toast("Status recorded", "This browser now lists the deck as published. No external access was granted.");
+              }}>Mark as published locally</Button>
               <Button variant="secondary" onClick={() => {
-                editor.commit({ ...editor.deck, exports: [{ id: nextId("ex"), at: context.now.toISOString(), format: "Link", note: "Workspace link", scope: "workspace" }, ...editor.deck.exports] }, "Create link");
-                context.toast("Link recorded", "It is listed below with a revoke button. Nothing is served outside this browser.");
-              }}>Create a workspace link</Button>
+                editor.commit({ ...editor.deck, exports: [{ id: nextId("ex"), at: context.now.toISOString(), format: "Link", note: "Workspace sharing intent (local only)", scope: "workspace" }, ...editor.deck.exports] }, "Create link");
+                context.toast("Sharing intent recorded", "The entry is listed below. No functioning link or external access was created.");
+              }}>Record sharing intent</Button>
             </Row>
             {active.length > 0 && (
               <Stack gap={2}>
@@ -1718,6 +1723,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
           <Button size="sm" variant="secondary" style={{ marginBlockStart: "var(--space-3)" }} onClick={() => context.openOverlay("approval")}>Record an approval</Button>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
