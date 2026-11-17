@@ -23,3 +23,13 @@
 .t6-field-context p{margin:0;line-height:1.5}
 .t6-field-context strong{min-width:0;overflow-wrap:anywhere}
 @media(max-width:720px){.t6-shell-bar .ds-row{flex-wrap:wrap}.t6-shell-bar button{max-width:100%}.t6-shell-tabs{min-width:0}.t6-field-context{padding:var(--space-3)}}
+
+/* Results table and per-question summary */
+.forms-results-wrap{overflow:auto;max-width:100%;border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--bg-surface)}
+.forms-results{border-collapse:collapse;width:max-content;min-width:100%;font-size:var(--text-sm)}
+.forms-results th,.forms-results td{padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--border-default);text-align:start;vertical-align:top;max-width:280px;overflow-wrap:anywhere}
+.forms-results th{position:sticky;top:0;background:var(--bg-surface);color:var(--fg-muted);font-weight:600;white-space:nowrap}
+.forms-results tbody tr:last-child td{border-bottom:0}
+.forms-bar{display:flex;flex-direction:column;gap:var(--space-1)}
+.forms-recent{margin:0;padding-inline-start:18px;display:flex;flex-direction:column;gap:var(--space-1);overflow-wrap:anywhere}
+.forms-condition{display:flex;flex-direction:column;gap:var(--space-2);padding:var(--space-3);border:1px dashed var(--border-default);border-radius:var(--radius-md)}
