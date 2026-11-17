@@ -52,7 +52,9 @@ export function AppShell() {
   const activeCode = activeScreen?.applicationCode ?? "HQ";
   const appModule = getApp(activeCode);
   const activeGroup = NAV_GROUPS.find(group => group.apps.some(app => app.code === activeCode));
-  const appDirectoryPath = `${workAreaPath(org.slug, "apps")}${activeGroup ? `?category=${encodeURIComponent(activeGroup.label)}` : ""}`;
+  const appDirectoryPath = activeGroup?.label === "Platform"
+    ? `${workAreaPath(org.slug, "apps")}?category=Platform`
+    : workAreaPath(org.slug, "apps");
   const platformPeers = activeGroup?.label === "Platform"
     ? activeGroup.apps.filter(app => app.code !== activeCode && canOpen(role, app.code))
     : [];
