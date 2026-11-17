@@ -133,7 +133,7 @@ test("onboarding starts with six complete tasks and refuses a duplicate launch",
     return { starter: starter.id, mentor: mentor.id };
   });
   await page.reload();
-  await page.getByRole("button", { name: "Launch a checklist" }).click();
+  await page.getByRole("button", { name: "Launch a checklist", exact: true }).first().click();
   const dialog = page.getByRole("dialog", { name: "Launch an onboarding checklist" });
   await dialog.getByLabel("Who is starting").selectOption(ids.starter);
   await dialog.getByLabel("Mentor").selectOption({ label: "QA Onboarding Mentor" });
@@ -160,7 +160,7 @@ test("onboarding starts with six complete tasks and refuses a duplicate launch",
     taskCount: 6, allLinked: true, waitingIT: 1, falselyGranted: false,
   });
 
-  await page.getByRole("button", { name: "Launch a checklist" }).click();
+  await page.getByRole("button", { name: "Launch a checklist", exact: true }).first().click();
   const repeat = page.getByRole("dialog", { name: "Launch an onboarding checklist" });
   await repeat.getByLabel("Who is starting").selectOption(ids.starter);
   await repeat.getByLabel("Mentor").selectOption({ label: "QA Onboarding Mentor" });
