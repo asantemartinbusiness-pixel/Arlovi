@@ -1272,64 +1272,129 @@ export function ApplicantProfile({ context, lens }: { context: ScreenContext; le
 
 export function Onboarding({ context, lens }: { context: ScreenContext; lens: "Incoming" | "In progress" | "Waiting" | "Completed" }) {
   const data = useHrData();
+  const { org } = useWorkspace();
+  const [query, setQuery] = useState("");
   const checklistTasks = data.tasks.filter((task) => task.fields.kind === "onboarding");
-  const employeeIds = [...new Set(checklistTasks.map((task) => String(task.fields.employeeId)))];
-
-  const groups = employeeIds.map((employeeId) => {
-    const employee = data.employees.find((row) => row.id === employeeId);
+  const ids = [...new Set(checklistTasks.map((task) => String(task.fields.employeeId ?? "")).filter(Boolean))];
+  const groups = ids.map((employeeId) => {
+    const employee = data.employees.find((record) => record.id === employeeId);
     const steps = checklistTasks.filter((task) => task.fields.employeeId === employeeId);
     const done = steps.filter((task) => task.status === "done").length;
     const waiting = steps.some((task) => task.status === "waiting");
     const state = done === steps.length ? "Completed" : waiting ? "Waiting" : done === 0 ? "Incoming" : "In progress";
-    return { employeeId, employee, steps, done, state };
-  }).filter((group) => group.state === lens);
-
-  if (groups.length === 0) {
-    return <Empty title={`Nothing is ${lens.toLowerCase()}`} icon={<UserPlus size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Onboarding template")}>Launch a checklist</Button>}>
-      Onboarding checklists coordinate People, the manager, IT access and Finance for one new starter.
-    </Empty>;
-  }
-
+    return { employeeId, employee, steps, done, waiting, state };
+  });
+  const incomingNoChecklist = data.employees.filter((employee) =>
+    employee.status === "probation" && !ids.includes(employee.id)
+    && !employee.fields.onboardingLaunchedAt);
+  const ready = groups.filter((group) => group.state === "Incoming").length + incomingNoChecklist.length;
+  const totalWaiting = groups.filter((group) => group.state === "Waiting").length;
+  const completed = groups.filter((group) => group.state === "Completed").length;
+  const selected = groups.filter((group) => group.state === lens && [group.employee?.title, group.employee?.fields.title]
+    .some((value) => String(value ?? "").toLowerCase().includes(query.toLowerCase())));
+  const incoming = lens === "Incoming" ? incomingNoChecklist.filter((employee) =>
+    [employee.title, employee.fields.title].some((value) =>
+      String(value ?? "").toLowerCase().includes(query.toLowerCase()))) : [];
+  const canEdit = context.can("edit_people");
   return (
     <Stack gap={4}>
-      {groups.map((group) => (
-        <Card
-          key={group.employeeId}
-          title={<Row gap={2}><Avatar name={group.employee?.title ?? "New hire"} size="sm" />{group.employee?.title ?? "New hire"}</Row>}
-          subtitle={`${String(group.employee?.fields.title ?? "")} · starts ${context.date(group.employee?.startAt)}`}
-          actions={<Pill tone={group.state === "Completed" ? "success" : group.state === "Waiting" ? "warning" : "info"} dot>{group.done} of {group.steps.length}</Pill>}
-          footer={<>
-            <Button size="sm" variant="secondary" onClick={() => context.openOverlay("IT access", { employeeId: group.employeeId })}>Access requests</Button>
-            <Button size="sm" variant="ghost" onClick={() => context.openOverlay("welcome preview", { employeeId: group.employeeId })}>Welcome note</Button>
-          </>}
-        >
-          <Stack gap={2}>
-            {group.steps.map((step) => (
-              <Row key={step.id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-                <Checkbox
-                  label={step.title}
-                  checked={step.status === "done"}
-                  onChange={async (event) => {
-                    await context.mutate.patch(step.id, {
-                      status: event.target.checked ? "done" : "ready",
-                      fields: { ...step.fields, stage: event.target.checked ? "done" : "ready" },
-                    }, { expectRevision: step.revision, event: `${step.title} ${event.target.checked ? "completed" : "reopened"}` });
-                  }}
-                />
-                <span className="ds-grow" />
-                <Pill tone={step.status === "waiting" ? "warning" : "neutral"}>{String(step.fields.group ?? "")}</Pill>
-                <span className="ds-subtle" style={{ minWidth: 110, textAlign: "end" }}>{String(step.fields.assignee ?? step.ownerName)}</span>
-              </Row>
-            ))}
-            {group.steps.some((step) => step.status === "waiting") && (
-              <Notice tone="warning" title="An access grant is still a decision">
-                A waiting step is waiting on a named person. Access is never granted because somebody's employment status changed:
-                each grant is requested, approved and recorded on its own.
-              </Notice>
-            )}
-          </Stack>
-        </Card>
-      ))}
+      <OpsHeader eyebrow={`People / Onboarding / ${lens}`}
+        title={({ Incoming: "Give every starter a clear first step.",
+          "In progress": "Keep the handoffs moving.",
+          Waiting: "Know exactly what is holding things up.",
+          Completed: "A record of work actually completed." } as const)[lens]}
+        description="An employee-centred checklist across People, managers, IT and Finance. Each step has a recorded state and responsible person."
+        actions={<>
+          <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)}>Employee directory</Button>
+          {canEdit && <Button variant="primary" onClick={() => context.openOverlay("Onboarding template")}>Launch a checklist</Button>}
+        </>}
+        note="Local checklist completion does not provision identity accounts, send welcome mail or execute payroll."
+      />
+      <OpsMetrics label="Onboarding handoffs">
+        <OpsMetric label="Incoming" value={ready} detail="Not yet started or new checklists" />
+        <OpsMetric label="In progress" value={groups.filter((group) => group.state === "In progress").length}
+          detail="Checklist work under way" />
+        <OpsMetric label="Waiting" value={totalWaiting} detail="At least one blocked step" emphasis={totalWaiting ? "attention" : "neutral"} />
+        <OpsMetric label="Completed" value={completed} detail="All recorded steps marked done" emphasis={completed ? "positive" : "neutral"} />
+      </OpsMetrics>
+      <div className="ops-toolbar">
+        <strong className="ops-toolbar-heading">{lens} starters</strong>
+        <div className="hr-directory-search">
+          <TextInput aria-label="Search onboarding starters" placeholder="Name or job title"
+            value={query} onChange={(event) => setQuery(event.target.value)} />
+        </div>
+        <span className="ops-toolbar-note">{selected.length + incoming.length} matching records</span>
+      </div>
+      {selected.length === 0 && incoming.length === 0 ? (
+        <Empty title={query ? "No starters match this search" : `Nothing is ${lens.toLowerCase()}`} icon={<UserPlus size={20} />}>
+          {query ? "Clear the search to see other starter records."
+            : "Checklists appear here when an actual employee is linked to the onboarding workflow."}
+        </Empty>
+      ) : (
+        <div className="hr-onboarding-grid">
+          {incoming.map((employee) => (
+            <Card key={employee.id} eyebrow="NOT LAUNCHED" title={employee.title}
+              subtitle={String(employee.fields.title || "New starter")} actions={<Pill tone="neutral">Needs a checklist</Pill>}
+              footer={<>
+                <Button size="sm" variant="secondary" onClick={() =>
+                  context.navigate(`/o/${org.slug}/hr/employees/${employee.id}`)}>Open employee</Button>
+                {canEdit && <Button size="sm" variant="primary" onClick={() =>
+                  context.openOverlay("Onboarding template", { employeeId: employee.id })}>Launch checklist</Button>}
+              </>}>
+              <p className="ds-subtle">No onboarding checklist is associated with this person. Their status alone does not imply that any onboarding action was completed.</p>
+            </Card>
+          ))}
+          {selected.map((group) => (
+            <Card key={group.employeeId} eyebrow="STARTER"
+              title={<Row gap={2}><Avatar name={group.employee?.title ?? "Unlinked starter"} size="sm" />{group.employee?.title ?? "Unlinked starter"}</Row>}
+              subtitle={`${String(group.employee?.fields.title || "Role not recorded")} · ${group.employee?.startAt ? `starts ${context.date(group.employee.startAt)}` : "start date not recorded"}`}
+              actions={<Pill tone={group.state === "Completed" ? "success" : group.waiting ? "warning" : "info"}>
+                {group.done} of {group.steps.length} steps
+              </Pill>}
+              footer={<>
+                {group.employee && <Button size="sm" variant="secondary" onClick={() =>
+                  context.navigate(`/o/${org.slug}/hr/employees/${group.employeeId}`)}>Open employee</Button>}
+                <Button size="sm" variant="secondary" onClick={() =>
+                  context.openOverlay("IT access", { employeeId: group.employeeId })}>Access requests</Button>
+                <Button size="sm" variant="ghost" onClick={() =>
+                  context.openOverlay("welcome preview", { employeeId: group.employeeId })}>Welcome draft</Button>
+              </>}>
+              <Stack gap={3}>
+                <Meter value={group.done} max={group.steps.length} label={`Onboarding completed for ${group.employee?.title ?? "starter"}`} />
+                <div className="hr-onboarding-step-list">
+                  {group.steps.map((step) => {
+                    const accessWaiting = step.fields.group === "IT access" && step.status !== "done";
+                    return (
+                      <div key={step.id} className="hr-onboarding-step">
+                        <Checkbox label={step.title} disabled={!canEdit || accessWaiting}
+                          checked={step.status === "done"}
+                          onChange={async (event) => {
+                            if (!canEdit || accessWaiting) return;
+                            const next = event.target.checked ? "done" : "ready";
+                            const saved = await context.mutate.patch(step.id, {
+                              status: next, fields: { ...step.fields, stage: next,
+                                reviewedBy: context.actor, reviewedAt: clockIso() },
+                            }, { expectRevision: step.revision, event: `${step.title} ${event.target.checked ? "completed" : "reopened"} by ${context.actor}` });
+                            if (saved) context.toast("Checklist updated", `${step.title} recorded as ${next}.`);
+                          }} />
+                        <div className="hr-onboarding-step-meta">
+                          <Pill tone={step.status === "waiting" ? "warning" : step.status === "done" ? "success" : "neutral"}>
+                            {step.status === "done" ? "Done" : step.status === "waiting" ? "Waiting" : "Ready"}
+                          </Pill>
+                          <span>{String(step.fields.group || "Task")} · {String(step.fields.assignee || step.ownerName || "Unassigned")}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {group.waiting && <Notice tone="warning" title="A waiting IT request is not an access grant">
+                  Use the access review workflow to record its decision. A checklist checkbox cannot grant, revoke or verify an external account.
+                </Notice>}
+              </Stack>
+            </Card>
+          ))}
+        </div>
+      )}
     </Stack>
   );
 }
