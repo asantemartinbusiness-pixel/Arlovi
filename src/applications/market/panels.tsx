@@ -294,21 +294,21 @@ export function CampaignLibrary({ context, state }: { context: ScreenContext; st
         {
           label: "Duplicate as draft",
           onRun: async (selected) => {
-          for (const campaign of selected) {
-            const body = bodyOf<CampaignBody>(campaign, {});
-            await context.mutate.create({
-              collection: "campaigns",
-              title: `${campaign.title} (copy)`,
-              status: "draft",
-              summary: campaign.summary,
-              amountMinor: Number(campaign.fields.budgetMinor ?? 0),
-              fields: { ...campaign.fields, spentMinor: 0, approval: "draft", delivery: "not_connected" },
-              body: { ...body, channels: (body.channels ?? []).map((channel) => ({ ...channel, spentMinor: 0, impressions: 0, clicks: 0, conversions: 0, revenueMinor: 0 })) },
-            }, `Campaign ${campaign.title} duplicated as a draft`);
-          }
-          context.toast("Duplicated as draft", `${selected.length} campaign${selected.length === 1 ? "" : "s"} copied. Spend, results and approvals were reset; no external spend authorisation was copied.`);
+            for (const campaign of selected) {
+              const body = bodyOf<CampaignBody>(campaign, {});
+              await context.mutate.create({
+                collection: "campaigns",
+                title: `${campaign.title} (copy)`,
+                status: "draft",
+                summary: campaign.summary,
+                amountMinor: Number(campaign.fields.budgetMinor ?? 0),
+                fields: { ...campaign.fields, spentMinor: 0, approval: "draft", delivery: "not_connected" },
+                body: { ...body, channels: (body.channels ?? []).map((channel) => ({ ...channel, spentMinor: 0, impressions: 0, clicks: 0, conversions: 0, revenueMinor: 0 })) },
+              }, `Campaign ${campaign.title} duplicated as a draft`);
+            }
+            context.toast("Duplicated as draft", `${selected.length} campaign${selected.length === 1 ? "" : "s"} copied. Spend, results and approvals were reset; no external spend authorisation was copied.`);
+          },
         },
-        }
         {
           label: "Archive",
           tone: "danger",
