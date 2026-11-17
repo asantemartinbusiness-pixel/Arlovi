@@ -1729,6 +1729,8 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
 
   const findings = reviewDeck(editor.deck);
   return (
+    <Stack gap={4}>
+      {reviewOverview}
     <Grid>
       <Card span={7} eyebrow="REVIEW" prov="human" title="Comments" subtitle={`${editor.deck.comments.filter((comment) => !comment.resolved).length} open of ${editor.deck.comments.length}`}>
         <Stack gap={3}>
@@ -1782,6 +1784,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
         </Row>
       </Card>
     </Grid>
+    </Stack>
   );
 }
 
