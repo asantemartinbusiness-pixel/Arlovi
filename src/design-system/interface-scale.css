@@ -1,0 +1,57 @@
+/*
+ * Platform-wide adaptive scaling, preserving the approved design palette.
+ * Token-driven layout changes are preferred to transform/zoom, so responsive
+ * measurements, focus outlines, overlays and sticky positioning stay native.
+ */
+:root {
+  --interface-scale: 1;
+  --space-1: calc(4px * var(--interface-scale));
+  --space-2: calc(8px * var(--interface-scale));
+  --space-3: calc(12px * var(--interface-scale));
+  --space-4: calc(16px * var(--interface-scale));
+  --space-5: calc(20px * var(--interface-scale));
+  --space-6: calc(24px * var(--interface-scale));
+  --space-7: calc(32px * var(--interface-scale));
+  --space-8: calc(40px * var(--interface-scale));
+  --space-9: calc(48px * var(--interface-scale));
+  --space-10: calc(64px * var(--interface-scale));
+  --text-2xs: calc(11px * var(--interface-scale));
+  --text-xs: calc(12px * var(--interface-scale));
+  --text-sm: calc(13.5px * var(--interface-scale));
+  --text-base: calc(15px * var(--interface-scale));
+  --text-md: calc(16px * var(--interface-scale));
+  --text-lg: calc(20px * var(--interface-scale));
+  --text-xl: calc(26px * var(--interface-scale));
+  --text-2xl: calc(30px * var(--interface-scale));
+  --text-3xl: calc(40px * var(--interface-scale));
+  --text-display: calc(54px * var(--interface-scale));
+  --header-h: calc(68px * var(--interface-scale));
+  --rail-w: calc(64px * var(--interface-scale));
+  --appnav-w: calc(232px * var(--interface-scale));
+  --inspector-w: calc(336px * var(--interface-scale));
+  --toolbar-h: calc(52px * var(--interface-scale));
+  --statusbar-h: calc(30px * var(--interface-scale));
+  --page-pad: calc(32px * var(--interface-scale));
+  --control-h: calc(40px * var(--interface-scale));
+  --control-h-sm: calc(30px * var(--interface-scale));
+  --control-h-lg: calc(46px * var(--interface-scale));
+}
+/* A large user-selected scale must not force off-screen secondary columns. */
+:root[data-scale-tier="large"] .pg-split { grid-template-columns: minmax(0, 1fr); }
+:root[data-scale-tier="large"] .pg-split > .ds-inspector { display: none; }
+:root[data-scale-tier="large"] .hq-search { width: min(240px, 22vw); }
+@media (max-width: 1250px) {
+  :root[data-scale-tier="large"] .hq-frame { grid-template-columns: minmax(0, 1fr); }
+  :root[data-scale-tier="large"] .hq-rail, :root[data-scale-tier="large"] .hq-appnav {
+    position: fixed; inset-block: var(--header-h) 0; z-index: 60;
+    transform: translateX(-100%); transition: transform var(--dur-drawer) var(--ease-out);
+  }
+  :root[data-scale-tier="large"] .hq-rail { inset-inline-start: 0; }
+  :root[data-scale-tier="large"] .hq-appnav { inset-inline-start: var(--rail-w); width: min(260px, calc(100vw - var(--rail-w))); transform: translateX(calc(-100% - var(--rail-w))); }
+  :root[data-scale-tier="large"] .hq[data-nav-open="true"] .hq-rail,
+  :root[data-scale-tier="large"] .hq[data-nav-open="true"] .hq-appnav { transform: none; }
+  :root[data-scale-tier="large"] .hq[data-nav-open="true"] .hq-scrim { display: block; position: fixed; inset: var(--header-h) 0 0; background: var(--bg-overlay); z-index: 50; }
+  :root[data-scale-tier="large"] .hq-only-mobile { display: inline-flex; }
+}
+@media (max-width: 700px) { :root { --page-pad: calc(16px * var(--interface-scale)); } }
+@media print { :root { --interface-scale: 1 !important; } }

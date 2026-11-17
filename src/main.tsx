@@ -9,6 +9,7 @@ import { WorkspaceProvider } from "@/platform/workspace";
 import { ensureSeed } from "@/runtime/db";
 import { useUi } from "@/runtime/ui";
 import "@/design-system";
+import "@/design-system/interface-scale.css";
 import { loadCoreApplications } from "@/applications";
 
 function WorkspaceEntry({ recoveredSlug }: { recoveredSlug: string | null }) {
@@ -25,6 +26,7 @@ function Boot() {
   const [failed, setFailed] = useState("");
   const theme = useUi((state) => state.theme);
   const density = useUi((state) => state.density);
+  const interfaceScale = useUi((state) => state.interfaceScale);
   const palette = useUi((state) => state.palette);
 
   useEffect(() => {
@@ -45,8 +47,10 @@ function Boot() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.dataset.density = density;
+    document.documentElement.style.setProperty("--interface-scale", String(interfaceScale / 100));
+    document.documentElement.dataset.scaleTier = interfaceScale >= 120 ? "large" : interfaceScale <= 85 ? "small" : "standard";
     document.documentElement.dataset.palette = palette;
-  }, [theme, density, palette]);
+  }, [theme, density, palette, interfaceScale]);
 
   if (failed) {
     return (
