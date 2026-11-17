@@ -280,3 +280,113 @@
 @media (max-width: 640px) {
   .hr-performance-grid, .hr-learning-grid, .hr-payroll-run-grid { gap: var(--space-2); }
 }
+
+/* People dialog system — local, editorial composition for detailed decisions.
+   Intentionally reuses existing Arlovi type, colour, spacing and state tokens. */
+.hr-dialog-lead {
+  padding: clamp(var(--space-4), 2vw, var(--space-6));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  position: relative;
+}
+.hr-dialog-lead::before {
+  content: "";
+  position: absolute;
+  top: -1px; left: var(--space-4);
+  width: 46px; height: 2px;
+  background: var(--fg-default);
+}
+.hr-dialog-eyebrow {
+  display: block;
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: .095em;
+  line-height: 1.45;
+  margin-bottom: var(--space-2);
+}
+.hr-dialog-title-row {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.hr-dialog-title-row h3 {
+  font-size: clamp(1.25rem, 2vw, 1.55rem);
+  letter-spacing: -.035em;
+  line-height: 1.16;
+  font-weight: 680;
+  margin: 0;
+  flex: 1 1 220px;
+}
+.hr-dialog-status { flex: 0 0 auto; }
+.hr-dialog-lead > p {
+  margin: var(--space-3) 0 0;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  max-width: 62ch;
+}
+.hr-dialog-section {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  padding: clamp(var(--space-3), 2vw, var(--space-5));
+  min-width: 0;
+}
+.hr-dialog-section-head {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-default);
+  margin-bottom: var(--space-4);
+}
+.hr-dialog-section-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px; height: 28px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-subtle);
+  background: var(--bg-inset);
+}
+.hr-dialog-section-head > div { min-width: 0; }
+.hr-dialog-section-head h4 {
+  margin: 3px 0 0;
+  font-size: var(--text-sm);
+  font-weight: 680;
+  line-height: 1.35;
+  color: var(--fg-default);
+}
+.hr-dialog-section-head p {
+  margin: var(--space-1) 0 0;
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+.hr-dialog-section-content { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.hr-dialog-evidence-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-default);
+  background: var(--bg-inset);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+.hr-dialog-evidence-row > span { min-width: 0; flex: 1 1 180px; }
+@media (max-width: 640px) {
+  .hr-dialog-lead, .hr-dialog-section { padding: var(--space-3); }
+  .hr-dialog-section-head { gap: var(--space-2); }
+  .hr-dialog-title-row h3 { flex-basis: 100%; }
+}
