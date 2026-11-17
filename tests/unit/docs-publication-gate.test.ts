@@ -13,7 +13,7 @@ describe("document approval and publish gates", () => {
     const model = emptyDoc();
     const ref = {
       id: "comment-1",
-      anchor: { blockId: model.blocks[0].id, from: 0, to: 0 },
+      anchor: { blockId: model.blocks[0].id, start: 0, end: 0 },
       quote: "", author: "Reviewer", at: "2026-11-17T01:00:00Z",
       body: "The contract needs this check", resolved: false,
       mandatory: true, replies: [],
@@ -45,7 +45,7 @@ describe("document approval and publish gates", () => {
     model.comments = [
       ...[1, 2].map((n) => ({
         id: "comment-" + n,
-        anchor: { blockId: model.blocks[0].id, from: 0, to: 0 },
+        anchor: { blockId: model.blocks[0].id, start: 0, end: 0 },
         quote: "", author: "Reviewer", at: "2026-11-17T01:00:00Z",
         body: "Review " + n, resolved: false, mandatory: true, replies: [],
       })),
