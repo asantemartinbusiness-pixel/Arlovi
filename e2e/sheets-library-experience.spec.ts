@@ -120,3 +120,23 @@ test("CSV import requires acknowledgment before replacing an existing worksheet"
   await expect(dialog).toContainText("This replaces the active sheet's cell contents");
   await expect(dialog.getByRole("checkbox", { name: /I understand that/ })).not.toBeChecked();
 });
+
+test("Publishing explains local-only status and requires confirmation", async ({ page }) => {
+  await page.goto("/o/northline/sheets/workbooks");
+  const id = await page.evaluate(async () => {
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "workbooks", currency: "GBP",
+      title: "QA Workbook Publication", status: "active", fields: { folder: "Operations" },
+    }, ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  });
+  await page.goto(`/o/northline/sheets/workbooks/${id}/io?tab=Exports`);
+  await page.getByRole("button", { name: "Publish…", exact: false }).first().click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Status only, not access enforcement");
+  await expect(dialog.getByRole("checkbox", { name: /records status without granting external access/ })).not.toBeChecked();
+});
