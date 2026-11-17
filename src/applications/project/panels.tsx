@@ -13,6 +13,8 @@ import { taskMoveDecision } from "./progression";
 import { filesForProject } from "./files";
 import { BoardFilterNotice, PortfolioFilterNotice, TaskComments, boardFilter, matchesBoard, matchesPortfolio, pinnedBy, portfolioFilter } from "./actions";
 import { Gantt, createsCycle, criticalPath, dependenciesOf } from "./timeline";
+import { OpsHeader, OpsMetric, OpsMetrics } from "@/applications/shared/operational-surfaces";
+import { planTimesheetApprovals } from "@/applications/hr/workforce";
 
 export function useProjectData() {
   return useCollections(["projects", "tasks", "templates", "objectives", "shifts", "members", "departments", "documents"]);
@@ -1040,90 +1042,185 @@ export function Goals({ context, lens }: { context: ScreenContext; lens: "Compan
 
 export function TimeAndCost({ context, lens }: { context: ScreenContext; lens: "My time" | "Team" | "Costs" | "Approvals" }) {
   const data = useProjectData();
-  const { actor } = useWorkspace();
+  const employees = useCollections(["employees"]).employees;
+  const { actor, org } = useWorkspace();
+  const [timeView, setTimeView] = useState<"all" | "pending" | "approved">("all");
   const entries = data.shifts.filter((entry) => entry.fields.kind === "time");
   const mine = entries.filter((entry) => String(entry.fields.employeeName ?? entry.ownerName) === actor);
+  const approved = entries.filter((entry) => entry.status === "approved" && entry.fields.approved === true);
+  const pending = entries.filter((entry) => entry.status !== "approved" || entry.fields.approved !== true);
+  const knownRate = (entry: Rec) => {
+    const rate = Number(entry.fields.rateMinor);
+    return entry.fields.rateMinor !== undefined && Number.isFinite(rate) && rate > 0;
+  };
+  const sumHours = (rows: Rec[]) => rows.reduce((sum, entry) => {
+    const hours = Number(entry.fields.hours);
+    return sum + (Number.isFinite(hours) && hours > 0 ? hours : 0);
+  }, 0);
+  const readyRated = approved.filter((entry) => entry.fields.billable === true && knownRate(entry));
+  const unrated = approved.filter((entry) => entry.fields.billable === true && !knownRate(entry));
+  const knownSubtotal = (rows: Rec[]) => rows.reduce((sum, entry) =>
+    sum + Number(entry.fields.hours ?? 0) * Number(entry.fields.rateMinor ?? 0), 0);
+  const intro = (section: string, title: string, description: string) => (
+    <OpsHeader eyebrow={`Projects / Time & Cost / ${section}`} title={title} description={description}
+      actions={<Button variant="primary" onClick={() => context.openOverlay("Timer")}>Log time</Button>}
+      note="Only manually recorded time appears here. No external timer, invoice or payroll is connected."
+    />
+  );
 
   if (lens === "Costs") {
+    const byProject = (id: string) => entries.filter((entry) => entry.fields.projectId === id);
     return (
-      <Grid>
-        <Card span={12} eyebrow="COST" prov="posted" title="Cost by project" subtitle="Logged hours at the recorded rate, against the project budget">
-          <DataGrid
-            rows={data.projects}
-            rowId={(row) => row.id}
-            label="Project costs"
-            columns={[
-              { key: "title", header: "Project", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => row.title },
-              { key: "hours", header: "Hours", align: "end", cell: (row) => <span className="ds-num">{entries.filter((entry) => entry.fields.projectId === row.id).reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0)}</span> },
-              { key: "labour", header: "Labour", align: "end", cell: (row) => <span className="ds-num">{context.money(entries.filter((entry) => entry.fields.projectId === row.id).reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0) * Number(entry.fields.rateMinor ?? 0), 0))}</span> },
-              { key: "budget", header: "Budget", align: "end", cell: (row) => <span className="ds-num">{context.money(Number(row.fields.budgetMinor ?? 0))}</span> },
-              { key: "committed", header: "Committed", align: "end", cell: (row) => {
-                const over = Number(row.fields.spentMinor ?? 0) > Number(row.fields.budgetMinor ?? 0);
-                return <strong className="ds-num" style={over ? { color: "var(--danger)" } : undefined}>{context.money(Number(row.fields.spentMinor ?? 0))}</strong>;
-              } },
-            ]}
-          />
-        </Card>
-        <Card span={12} title="What is not in this table">
-          <Notice tone="warning" title="Agent compute is not billable time">
-            Work done by an AI employee is not added to these hours and is never presented as somebody's billable time.
-            If agent cost is tracked, it belongs in the finance ledger as a cost line, not here.
-          </Notice>
-        </Card>
-      </Grid>
+      <Stack gap={4}>
+        {intro("Costs", "Project effort, without invented prices.", "Compare the time recorded on projects with explicit rated approvals and budgets. Unknown rates stay visibly unpriced.")}
+        <OpsMetrics label="Project time cost overview">
+          <OpsMetric label="Time recorded" value={sumHours(entries).toFixed(2)} detail="All project time records" />
+          <OpsMetric label="Approved & rated" value={readyRated.length} detail="Billable entries with a known rate" emphasis="positive" />
+          <OpsMetric label="Unpriced approvals" value={unrated.length} detail="Rate evidence is still required" emphasis={unrated.length ? "attention" : "neutral"} />
+          <OpsMetric label="Illustrative net" value={readyRated.length ? context.money(knownSubtotal(readyRated)) : "—"} detail="Approved rated entries only, before tax" />
+        </OpsMetrics>
+        <DataGrid
+          rows={data.projects}
+          rowId={(row) => row.id}
+          label="Project time and known costs"
+          onOpen={(id) => context.navigate(`/o/${org.slug}/project/projects/${id}`)}
+          columns={[
+            { key: "title", header: "Project", primary: true, cell: (row) => row.title,
+              sortValue: (row) => row.title, filterValue: (row) => row.title },
+            { key: "hours", header: "Recorded hours", align: "end", cell: (row) =>
+              <span className="ds-num">{sumHours(byProject(row.id)).toFixed(2)}</span> },
+            { key: "approved", header: "Approved hours", align: "end", cell: (row) =>
+              <span className="ds-num">{sumHours(byProject(row.id).filter((entry) => entry.status === "approved" && entry.fields.approved === true)).toFixed(2)}</span> },
+            { key: "labour", header: "Known rated net", align: "end", cell: (row) => {
+              const rated = byProject(row.id).filter((entry) => entry.status === "approved"
+                && entry.fields.approved === true && entry.fields.billable === true && knownRate(entry));
+              return rated.length ? <span className="ds-num">{context.money(knownSubtotal(rated))}</span>
+                : <span className="ds-subtle">No rated approvals</span>;
+            } },
+            { key: "unpriced", header: "Rate missing", align: "end", cell: (row) => {
+              const count = byProject(row.id).filter((entry) => entry.status === "approved"
+                && entry.fields.approved === true && entry.fields.billable === true && !knownRate(entry)).length;
+              return count ? <Pill tone="warning">{count} unpriced</Pill> : <span className="ds-subtle">—</span>;
+            } },
+            { key: "budget", header: "Budget", align: "end", cell: (row) =>
+              row.fields.budgetMinor === undefined ? <span className="ds-subtle">Not recorded</span>
+                : <span className="ds-num">{context.money(Number(row.fields.budgetMinor))}</span> },
+          ]}
+        />
+        <Notice tone="warning" title="Cost estimates are not invoices">
+          This screen never invents a rate, treats an unknown rate as zero or equates approved time with revenue.
+          Finance must verify the billable agreement, tax and customer independently. Agent compute is not employee billable time.
+        </Notice>
+      </Stack>
     );
   }
 
   if (lens === "Approvals") {
-    const pending = entries.filter((entry) => entry.fields.approved !== true);
-    return pending.length === 0 ? <Empty title="No hours waiting" icon={<Timer size={20} />} /> : (
-      <DataGrid
-        rows={pending}
-        rowId={(row) => row.id}
-        label="Hours waiting for approval"
-        columns={[
-          { key: "who", header: "Person", primary: true, cell: (row) => String(row.fields.employeeName ?? row.ownerName), filterValue: (row) => String(row.fields.employeeName ?? row.ownerName) },
-          { key: "day", header: "Day", cell: (row) => context.date(row.startAt), sortValue: (row) => row.startAt ?? "" },
-          { key: "against", header: "Against", cell: (row) => row.summary, hideBelow: 900 },
-          { key: "hours", header: "Hours", align: "end", cell: (row) => <span className="ds-num">{String(row.fields.hours ?? 0)}</span> },
-        ]}
-        bulkActions={[{
-          label: "Approve",
-          onRun: (rows) => rows.forEach((row) => { void context.mutate.patch(row.id, { status: "approved", fields: { ...row.fields, approved: true } }, { event: `Hours approved for ${String(row.fields.employeeName ?? row.ownerName)}` }); }),
-        }]}
-      />
+    const canApprove = context.can("edit_people");
+    return (
+      <Stack gap={4}>
+        {intro("Approvals", "Time decisions with a clear owner.", "Submitted entries stay linked to the employee and project they came from. Decisions are saved together or not at all.")}
+        <OpsMetrics label="Project time approvals">
+          <OpsMetric label="Needs review" value={pending.length} detail={`${sumHours(pending).toFixed(2)} submitted hours`} emphasis={pending.length ? "attention" : "neutral"} />
+          <OpsMetric label="Approved entries" value={approved.length} detail={`${sumHours(approved).toFixed(2)} approved hours`} emphasis="positive" />
+          <OpsMetric label="Missing employee" value={pending.filter((entry) =>
+            !employees.some((person) => person.id === entry.fields.employeeId)).length} detail="Correct the source link first" />
+          <OpsMetric label="Recorded entries" value={entries.length} detail="Across all company projects" />
+        </OpsMetrics>
+        {!canApprove && <Notice tone="info" title="People approval required">
+          Project members can review submitted work, but only the appropriate People role or owner can approve hours.
+        </Notice>}
+        {pending.length === 0 ? (
+          <Empty title="No hours waiting for approval" icon={<Timer size={20} />}>
+            A newly logged time entry appears here once submitted.
+          </Empty>
+        ) : (
+          <DataGrid
+            rows={pending}
+            rowId={(row) => row.id}
+            label="Hours waiting for approval"
+            columns={[
+              { key: "who", header: "Person", primary: true, cell: (row) => String(row.fields.employeeName ?? row.ownerName),
+                filterValue: (row) => String(row.fields.employeeName ?? row.ownerName) },
+              { key: "project", header: "Project", cell: (row) =>
+                data.projects.find((project) => project.id === row.fields.projectId)?.title ?? "Not linked" },
+              { key: "day", header: "Day", cell: (row) => context.date(row.startAt), sortValue: (row) => row.startAt ?? "" },
+              { key: "hours", header: "Hours", align: "end", cell: (row) =>
+                <span className="ds-num">{String(row.fields.hours ?? 0)}</span> },
+            ]}
+            bulkActions={[{
+              label: "Approve selected time",
+              disabled: () => !canApprove,
+              onRun: async (selected) => {
+                try {
+                  const plan = planTimesheetApprovals({
+                    organizationId: context.org.id, currency: context.org.currency,
+                    actor: context.actor, now: clockIso(), timezone: context.org.timezone,
+                  }, selected, employees, data.projects);
+                  await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+                  context.toast("Hours approved", `${selected.length} entries were approved together with source revision checks. No payroll was submitted.`);
+                } catch (error) {
+                  context.toast("Hours not approved", error instanceof Error ? error.message : "Reload and review the source records.", "blocked");
+                }
+              },
+            }]}
+          />
+        )}
+      </Stack>
     );
   }
 
-  const rows = lens === "My time" ? mine : entries;
-  const total = rows.reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0);
-  const missing = lens === "My time" && mine.length === 0;
-
+  const selected = lens === "My time" ? mine : entries;
+  const rows = timeView === "pending"
+    ? selected.filter((entry) => entry.status !== "approved" || entry.fields.approved !== true)
+    : timeView === "approved"
+      ? selected.filter((entry) => entry.status === "approved" && entry.fields.approved === true)
+      : selected;
   return (
     <Stack gap={4}>
-      <StatRow>
-        <Stat label="Hours logged" value={String(total)} prov="human" meta={lens === "My time" ? `By ${actor}` : "Across the team"} />
-        <Stat label="Billable" value={String(rows.filter((entry) => entry.fields.billable === true).reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0))} prov="human" meta="Marked billable on the entry" />
-        <Stat label="Waiting for approval" value={String(rows.filter((entry) => entry.fields.approved !== true).length)} prov="human" meta="Entries, not hours" />
-      </StatRow>
-      {missing ? (
-        <Empty title={`No time logged by ${actor}`} icon={<Timer size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Timer")}>Log time</Button>}>
-          Nothing is assumed from your calendar: an hour exists here only when somebody records it.
+      {intro(lens, lens === "My time" ? "Your work, recorded precisely." : "Time across the team.",
+        lens === "My time"
+          ? "A clean record of the hours attributed to you, ready for a human review. No calendar or background activity is assumed."
+          : "All recorded employee work, tied to real Projects and tasks, with approval states immediately visible.")}
+      <OpsMetrics label="Project time summary">
+        <OpsMetric label="Recorded hours" value={sumHours(selected).toFixed(2)} detail={`${selected.length} entries`} />
+        <OpsMetric label="Billable hours" value={sumHours(selected.filter((entry) => entry.fields.billable === true)).toFixed(2)}
+          detail="Marked potentially billable" />
+        <OpsMetric label="Awaiting review" value={selected.filter((entry) => entry.fields.approved !== true || entry.status !== "approved").length}
+          detail="Human approval outstanding" />
+        <OpsMetric label="Approved hours" value={sumHours(selected.filter((entry) => entry.status === "approved" && entry.fields.approved === true)).toFixed(2)}
+          detail="Approved local records" emphasis="positive" />
+      </OpsMetrics>
+      <div className="ops-toolbar" aria-label="Filter project time">
+        <strong className="ops-toolbar-heading">{lens === "My time" ? "My entries" : "Team entries"}</strong>
+        <Button size="sm" variant={timeView === "all" ? "secondary" : "ghost"} aria-pressed={timeView === "all"} onClick={() => setTimeView("all")}>All</Button>
+        <Button size="sm" variant={timeView === "pending" ? "secondary" : "ghost"} aria-pressed={timeView === "pending"} onClick={() => setTimeView("pending")}>Needs approval</Button>
+        <Button size="sm" variant={timeView === "approved" ? "secondary" : "ghost"} aria-pressed={timeView === "approved"} onClick={() => setTimeView("approved")}>Approved</Button>
+      </div>
+      {rows.length === 0 ? (
+        <Empty title={selected.length ? "No entries in this filter" : "No time recorded"} icon={<Timer size={20} />}
+          action={<Button variant="primary" onClick={() => context.openOverlay("Timer")}>Log time</Button>}>
+          {selected.length ? "Switch the review filter to view other entries." : "Only explicitly logged hours appear here, never estimated calendar activity."}
         </Empty>
       ) : (
         <DataGrid
           rows={rows}
           rowId={(row) => row.id}
-          label="Time entries"
+          label="Project time entries"
           columns={[
             { key: "day", header: "Day", primary: true, cell: (row) => context.date(row.startAt), sortValue: (row) => row.startAt ?? "" },
             { key: "who", header: "Person", cell: (row) => String(row.fields.employeeName ?? row.ownerName), hideBelow: 700 },
-            { key: "against", header: "Against", cell: (row) => row.summary, hideBelow: 900 },
-            { key: "hours", header: "Hours", align: "end", cell: (row) => <span className="ds-num">{String(row.fields.hours ?? 0)}</span>, sortValue: (row) => Number(row.fields.hours ?? 0) },
-            { key: "billable", header: "Billable", align: "end", cell: (row) => <Pill tone={row.fields.billable === true ? "accent" : "neutral"}>{row.fields.billable === true ? "yes" : "no"}</Pill> },
-            { key: "state", header: "State", align: "end", cell: (row) => <Pill tone={row.fields.approved === true ? "success" : "warning"}>{row.fields.approved === true ? "approved" : "submitted"}</Pill> },
+            { key: "against", header: "Project", cell: (row) => data.projects.find((project) => project.id === row.fields.projectId)?.title ?? "Not linked" },
+            { key: "hours", header: "Hours", align: "end", cell: (row) => <span className="ds-num">{String(row.fields.hours ?? 0)}</span>,
+              sortValue: (row) => Number(row.fields.hours ?? 0) },
+            { key: "billable", header: "Billable", align: "end", cell: (row) =>
+              <Pill tone={row.fields.billable === true ? "accent" : "neutral"}>{row.fields.billable === true ? "Marked" : "No"}</Pill> },
+            { key: "state", header: "State", align: "end", cell: (row) =>
+              <Pill tone={row.status === "approved" && row.fields.approved === true ? "success" : "warning"}>
+                {row.status === "approved" && row.fields.approved === true ? "Approved" : "Needs approval"}
+              </Pill> },
           ]}
-          summary={<strong className="ds-num">{total} hours</strong>}
+          summary={<strong className="ds-num">{sumHours(rows).toFixed(2)} hours shown</strong>}
           onSelect={(id) => context.select(id)}
         />
       )}
