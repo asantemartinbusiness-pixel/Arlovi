@@ -139,6 +139,27 @@ export function portalInvoices(portal: Rec | undefined, invoices: Rec[]): Rec[] 
     && ids.has(String(invoice.fields.portalId ?? "")));
 }
 
+/**
+ * A portal may show an invoice either through its explicit shared-record
+ * grant or an invoice's own portalId (including the canonical route alias).
+ * Billing and dashboard must use this same union so a grant cannot appear in
+ * the directory count but disappear from the client's invoice list.
+ */
+export function portalVisibleInvoices(
+  portal: Rec | undefined,
+  data: ReturnType<typeof usePortalData>,
+): Rec[] {
+  if (!portal) return [];
+  const invoiceIds = new Set(
+    sharedRecords(portal, data)
+      .filter((entry) => entry.collection === "invoices")
+      .map((entry) => entry.record.id),
+  );
+  for (const invoice of portalInvoices(portal, data.invoices)) invoiceIds.add(invoice.id);
+  return data.invoices.filter((invoice) =>
+    invoice.organizationId === portal.organizationId && invoiceIds.has(invoice.id));
+}
+
 /** The portal a client role view is allowed to see, and nothing else. */
 export function portalForRole(role: Role, portals: Rec[], actor: string, contacts: Rec[]): Rec | undefined {
   if (role !== "client") return undefined;
