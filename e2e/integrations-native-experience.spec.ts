@@ -1,0 +1,78 @@
+import { expect, test } from "@playwright/test";
+
+test("Integrations marketplace provides scoped discovery and recoverable search", async ({ page }) => {
+  await page.goto("/o/northline/connect/marketplace");
+  const main = page.locator("#main");
+  await expect(main.getByLabel("Integration catalogue overview")).toBeVisible();
+  await expect(main.getByLabel("Integration catalogue summary")).toBeVisible();
+  await expect(main.getByLabel("Integration catalogue").locator(".connect-marketplace-card").first()).toBeVisible();
+  const search = main.getByRole("searchbox", { name: "Search integration capabilities" });
+  await search.fill("this-is-not-a-provider-2026");
+  await expect(main.getByText("No integrations match")).toBeVisible();
+  await main.getByRole("button", { name: "Clear integration search" }).click();
+  await expect(search).toHaveValue("");
+  await expect(main.locator(".connect-marketplace-card").first()).toBeVisible();
+  await main.getByRole("button", { name: "Compare", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText("Compare connectors");
+});
+
+test("Marketplace categories show one manageable group at a time", async ({ page }) => {
+  await page.goto("/o/northline/connect/marketplace?tab=Categories");
+  const main = page.locator("#main");
+  const nav = main.getByRole("navigation", { name: "Integration categories" });
+  await expect(nav).toBeVisible();
+  await nav.getByRole("button", { name: /Money/ }).click();
+  await expect(nav.getByRole("button", { name: /Money/ })).toHaveAttribute("aria-current", "true");
+  const money = await main.locator(".connect-marketplace-card").count();
+  expect(money).toBeGreaterThan(0);
+  await nav.getByRole("button", { name: /All categories/ }).click();
+  await expect(main.locator(".connect-marketplace-card").first()).toBeVisible();
+  expect(await main.locator(".connect-marketplace-card").count()).toBeGreaterThan(money);
+});
+
+test("Connection records support search, recovery and strict connector identity", async ({ page }) => {
+  await page.goto("/o/northline/connect/connections");
+  const main = page.locator("#main");
+  await expect(main.getByLabel("Connection management overview")).toBeVisible();
+  await expect(main.getByLabel("Connection status summary")).toBeVisible();
+  const search = main.getByRole("searchbox", { name: "Find a connection" });
+  await search.fill("no-such-connector-request-2026");
+  await expect(main.getByText("No connections match your search")).toBeVisible();
+  await main.getByRole("button", { name: "Clear connection search" }).click();
+  await expect(search).toHaveValue("");
+  await page.goto("/o/northline/connect/connections/no-connector-with-this-id-2026");
+  await expect(main).toContainText(/No connection|Record not found/);
+  await expect(main).not.toContainText("Connection activity");
+});
+
+test("Sync centre shows work areas, real local conflict counts and meaningful empty states", async ({ page }) => {
+  await page.goto("/o/northline/connect/sync");
+  const main = page.locator("#main");
+  await expect(main.getByLabel("Synchronisation overview")).toBeVisible();
+  await expect(main.getByLabel("Synchronisation status summary")).toBeVisible();
+  const nav = main.getByRole("navigation", { name: "Synchronisation work areas" });
+  await nav.getByRole("button", { name: "Conflicts" }).click();
+  await expect(page).toHaveURL(/tab=Conflicts/);
+  const search = main.getByRole("searchbox", { name: "Search sync conflicts" });
+  await search.fill("unfindable-conflict-2026");
+  await expect(main.getByText("No conflicts match this search")).toBeVisible();
+  await main.getByRole("button", { name: "Clear conflict search" }).click();
+  await main.getByRole("group", { name: "Conflict status filter" }).getByRole("button", { name: "All" }).click();
+  await expect(main.getByRole("group", { name: "Conflict status filter" }).getByRole("button", { name: "All" }))
+    .toHaveAttribute("aria-pressed", "true");
+  await nav.getByRole("button", { name: "Schedules" }).click();
+  await expect(main).toContainText("Planned safeguards, not enabled settings");
+  await expect(main.getByRole("checkbox")).toHaveCount(0);
+});
+
+for (const width of [390, 820, 1440]) {
+  test("Integration marketplace has no horizontal page overflow at " + width + "px", async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/o/northline/connect/marketplace?tab=Categories");
+    const main = page.locator("#main");
+    await expect(main.getByRole("searchbox", { name: "Search integration capabilities" })).toBeVisible();
+    await expect(main.getByRole("navigation", { name: "Integration categories" })).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+}
