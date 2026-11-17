@@ -49,7 +49,8 @@ function useDeck(context: ScreenContext): Rec | undefined {
   const fromRoute = useRecord(context.params.id);
   const all = useCollection("decks");
   useGuardRefresh(context);
-  return fromRoute ?? all.find((record) => record.fields.isTemplate !== true) ?? all[0];
+  if (context.params.id) return fromRoute?.collection === "decks" ? fromRoute : all.find((record) => record.id === context.params.id);
+  return all.find((record) => record.fields.isTemplate !== true) ?? all[0];
 }
 
 /** The screen's contract actions, on the editor's own bar (the full-chrome surface has no page header). */
@@ -163,21 +164,45 @@ function SlideSorter({ editor, context }: { editor: DeckEditor; context: ScreenC
 
 function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" | "Shared" | "Templates" | "Archived" }) {
   const decks = useCollection("decks");
-  const { org, actor } = useWorkspace();
+  const { org } = useWorkspace();
+  const [query, setQuery] = useState("");
   const rows = useMemo(() => {
-    if (tab === "Recent") return [...decks].filter((record) => record.status !== "archived").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    if (tab === "Shared") return decks.filter((record) => record.ownerName !== actor && record.status !== "archived");
-    if (tab === "Templates") return decks.filter((record) => record.fields.isTemplate === true);
-    return decks.filter((record) => record.status === "archived");
-  }, [decks, tab, actor]);
-
-  if (rows.length === 0) {
-    return <Empty title={`No ${tab.toLowerCase()} decks`} icon={<Presentation size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("new deck")}>New deck</Button>}>
-      {tab === "Templates" ? "Mark a deck as a template to reuse its masters and theme." : "Create a deck, or import one."}
-    </Empty>;
-  }
+    const list = tab === "Recent"
+      ? [...decks].filter((record) => record.status !== "archived").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      : tab === "Shared"
+        ? decks.filter((record) => record.status !== "archived" && (String(record.fields.sharedWith ?? "").trim().length > 0 || readDeck(record.body).exports.some((entry) => Boolean(entry.scope) && !entry.revokedAt)))
+        : tab === "Templates"
+          ? decks.filter((record) => record.fields.isTemplate === true)
+          : decks.filter((record) => record.status === "archived");
+    const needle = query.trim().toLowerCase();
+    return needle ? list.filter((record) => `${record.title} ${record.summary} ${record.tags.join(" ")}`.toLowerCase().includes(needle)) : list;
+  }, [decks, tab, query]);
 
   return (
+    <Stack gap={4}>
+      <div className="pr-library-heading">
+        <div><span className="pr-library-eyebrow">PRESENT / DECK LIBRARY</span>
+          <h2>{tab === "Shared" ? "Recorded sharing." : tab === "Templates" ? "Reusable presentations." : tab === "Archived" ? "Presentation archive." : "Presentations in progress."}</h2>
+          <p>{tab === "Shared" ? "Decks with a locally recorded sharing list or active sharing-intent entry appear here. These records do not grant public or workspace access." : "Find and present the right deck with its source, review state and design context visible."}</p>
+        </div>
+        <Button variant="primary" onClick={() => context.openOverlay("new deck")}>New presentation</Button>
+      </div>
+      <div className="pr-library-overview" aria-label="Presentation library overview">
+        <div><span>Current decks</span><strong>{decks.filter((record) => record.status !== "archived").length}</strong></div>
+        <div><span>Templates</span><strong>{decks.filter((record) => record.fields.isTemplate === true).length}</strong></div>
+        <div><span>Archived</span><strong>{decks.filter((record) => record.status === "archived").length}</strong></div>
+      </div>
+      <Field label="Find a presentation"><TextInput type="search" aria-label="Find a presentation" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, summary or tags" /></Field>
+      {rows.length === 0 ? <Empty title={query.trim() ? "No presentations match this search" : `No ${tab.toLowerCase()} presentations`} icon={<Presentation size={20} />}
+        action={query.trim()
+          ? <Button variant="secondary" onClick={() => setQuery("")}>Clear search</Button>
+          : <Button variant="primary" onClick={() => context.openOverlay("new deck")}>Create presentation</Button>}>
+        {query.trim() ? "Try a different title, summary or tag." : tab === "Shared"
+          ? "No active sharing-intent entries are recorded. Sharing here is local, not a public link."
+          : tab === "Templates" ? "Create a presentation and mark it as a template to reuse its layouts and theme."
+          : tab === "Archived" ? "Archived presentations will appear here when there are any."
+          : "Create a presentation or import an outline to start."}
+      </Empty> : (
     <Grid>
       {rows.map((record) => {
         const deck = readDeck(record.body);
@@ -218,6 +243,8 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
         );
       })}
     </Grid>
+      )}
+    </Stack>
   );
 }
 
@@ -689,11 +716,27 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
         <Button size="sm" variant="secondary" disabled={editor.saveState === "clean" || editor.saveState === "saved"} onClick={() => void editor.saveNow()}>Save now</Button>
         <Button size="sm" variant="primary" icon={<Play size={15} />} onClick={() => context.navigate(context.path("/o/:org/present/decks/:id/present", record.id))}>Present</Button>
         <ButtonGroup label="Panels on narrow screens">
-          <Button size="sm" variant={mobilePanel === "sorter" ? "secondary" : "ghost"} onClick={() => setMobilePanel(mobilePanel === "sorter" ? "canvas" : "sorter")}>Slides</Button>
-          <Button size="sm" variant={mobilePanel === "aside" ? "secondary" : "ghost"} onClick={() => setMobilePanel(mobilePanel === "aside" ? "canvas" : "aside")}>Inspector</Button>
+          <Button size="sm" variant={mobilePanel === "sorter" ? "secondary" : "ghost"} aria-pressed={mobilePanel === "sorter"} onClick={() => setMobilePanel(mobilePanel === "sorter" ? "canvas" : "sorter")}>Slides</Button>
+          <Button size="sm" variant={mobilePanel === "aside" ? "secondary" : "ghost"} aria-pressed={mobilePanel === "aside"} onClick={() => setMobilePanel(mobilePanel === "aside" ? "canvas" : "aside")}>Inspector</Button>
         </ButtonGroup>
       </div>
 
+      <section className="pr-editor-context" aria-label="Active slide context">
+        <div className="pr-editor-context-main">
+          <span className="pr-library-eyebrow">PRESENT / SLIDE WORKSPACE</span>
+          <Row gap={2} wrap>
+            <strong>{editor.slide.title || `Slide ${editor.deck.index + 1}`}</strong>
+            <Pill tone={editor.slide.hidden ? "warning" : "neutral"}>{editor.slide.hidden ? "Hidden from presenting" : "Included in presentation"}</Pill>
+            <span className="ds-subtle">{editor.slide.objects.length} objects · {buildOrder(editor.slide).length} animated · {editor.deck.comments.filter((item) => !item.resolved).length} open comments</span>
+          </Row>
+          <span className="ds-subtle">Theme: {editor.deck.theme.name} · Layout: {layoutById(editor.deck, editor.slide.layoutId).name}</span>
+        </div>
+        <Row gap={2} wrap>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks`)}>Library</Button>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}/theme`)}>Theme</Button>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}/animation`)}>Animation</Button>
+        </Row>
+      </section>
       <div className="px-bar" style={{ minHeight: 40 }}>
         <Tabs
           label="Editor modes"
@@ -882,6 +925,16 @@ function ThemeScreen({ context, tab }: { context: ScreenContext; tab: "Masters" 
 
   return (
     <Stack gap={4}>
+      <div className="pr-library-heading">
+        <div><span className="pr-library-eyebrow">PRESENT / DESIGN GOVERNANCE</span><h2>One coherent visual language.</h2>
+          <p>Inspect master layouts, see which slides have been customised and resolve typography before applying changes across the deck.</p></div>
+        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button>
+      </div>
+      <div className="pr-library-overview" aria-label="Presentation theme overview">
+        <div><span>Slides</span><strong>{editor.deck.slides.length}</strong></div>
+        <div><span>Theme variants</span><strong>{editor.deck.themes.length}</strong></div>
+        <div><span>Customised slides</span><strong>{editor.deck.slides.filter((slide) => customisedObjects(editor.deck, slide).length > 0).length}</strong></div>
+      </div>
       <Row gap={3} wrap>
         <Field label="Theme">
           <Select aria-label="Theme"
@@ -1106,9 +1159,26 @@ function AnimationScreen({ context, tab }: { context: ScreenContext; tab: "Slide
 
   if (!record) return <Empty title="No deck is open" icon={<Presentation size={20} />} />;
 
+  const totalAnimations = editor.deck.slides.reduce((total, slide) => total + buildOrder(slide).length, 0);
+  const longTransitions = editor.deck.slides.filter((slide) => slide.transition.durationMs > 600).length;
+  const animationOverview = (
+    <section className="pr-workflow-overview" aria-label="Animation workflow overview">
+      <div className="pr-library-heading"><div><span className="pr-library-eyebrow">PRESENT / MOTION WORKSPACE</span>
+        <h2>Motion with purpose.</h2><p>Review every slide transition and object animation, including timing and reduced-motion behaviour before presenting.</p>
+      </div><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button></div>
+      <div className="pr-library-overview">
+        <div><span>Slide transitions</span><strong>{editor.deck.slides.filter((slide) => slide.transition.effect !== "none").length}</strong></div>
+        <div><span>Animated objects</span><strong>{totalAnimations}</strong></div>
+        <div><span>Transitions over 600ms</span><strong>{longTransitions}</strong></div>
+      </div>
+      {editor.deck.reduceMotion && <Notice tone="info">Reduced motion is enabled; builds should remain understandable when presented without animation.</Notice>}
+    </section>
+  );
+
   if (tab === "Slides") {
     return (
       <Stack gap={4}>
+        {animationOverview}
         <Notice tone="info" title="A transition belongs to the slide it moves into">
           Keep them short. Anything over 600ms is flagged in the accessibility review.
         </Notice>
@@ -1139,7 +1209,7 @@ function AnimationScreen({ context, tab }: { context: ScreenContext; tab: "Slide
                   aria-label={`Transition duration for ${row.title}`}
                   inputMode="numeric" align="end" style={{ width: 86 }}
                   value={String(row.transition.durationMs)}
-                  onChange={(event) => editor.commit({ ...editor.deck, slides: editor.deck.slides.map((slide) => (slide.id === row.id ? { ...slide, transition: { ...slide.transition, durationMs: Number(event.target.value) || 0 } } : slide)) }, "Transition duration")}
+                  onChange={(event) => editor.commit({ ...editor.deck, slides: editor.deck.slides.map((slide) => (slide.id === row.id ? { ...slide, transition: { ...slide.transition, durationMs: Math.max(0, Math.min(10000, Number(event.target.value) || 0)) } } : slide)) }, "Transition duration")}
                 />
               ),
             },
@@ -1153,6 +1223,7 @@ function AnimationScreen({ context, tab }: { context: ScreenContext; tab: "Slide
   if (tab === "Objects") {
     return (
       <Stack gap={4}>
+        {animationOverview}
         {editor.slide.objects.length === 0 ? <Empty title="This slide has no objects" /> : (
           <DataGrid
             rows={editor.slide.objects.map((object) => ({ ...object, id: object.id }))}
@@ -1343,6 +1414,9 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (!fullscreen) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
       if (event.key === "ArrowRight" || event.key === " " || event.key === "PageDown") { event.preventDefault(); advance(1); }
       if (event.key === "ArrowLeft" || event.key === "PageUp") { event.preventDefault(); advance(-1); }
       if (event.key === "Escape") { event.preventDefault(); setFullscreen(false); }
@@ -1383,6 +1457,18 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
   if (tab === "Audience") {
     return (
       <Stack gap={4}>
+        <div className="pr-library-heading">
+          <div><span className="pr-library-eyebrow">PRESENT / AUDIENCE VIEW</span>
+            <h2>What your audience will see.</h2>
+            <p>Preview the current slide without speaker notes. Hidden slides stay out of the visible presentation sequence.</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button>
+        </div>
+        <div className="pr-library-overview" aria-label="Audience session overview">
+          <div><span>Visible slides</span><strong>{visible.length}</strong></div>
+          <div><span>Hidden slides</span><strong>{editor.deck.slides.length - visible.length}</strong></div>
+          <div><span>Current position</span><strong>{position + 1}</strong></div>
+        </div>
         <Notice tone="warning" title="This is what the room sees">
           Speaker notes never render here. Opening the audience display asks for confirmation first, because a second screen is often already mirrored.
         </Notice>
@@ -1490,10 +1576,26 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
   const members = useCollection("members");
   const [note, setNote] = useState("");
   if (!record) return <Empty title="No deck is open" icon={<Presentation size={20} />} />;
+  const reviewFindings = reviewDeck(editor.deck);
+  const reviewOverview = (
+    <section className="pr-workflow-overview" aria-label="Presentation review overview">
+      <div className="pr-library-heading">
+        <div><span className="pr-library-eyebrow">PRESENT / REVIEW & DELIVERY</span><h2>Ready for the room.</h2>
+          <p>Review unresolved feedback, output quality and saved changes before distributing a presentation. Exports are generated locally.</p></div>
+        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button>
+      </div>
+      <div className="pr-library-overview">
+        <div><span>Open comments</span><strong>{editor.deck.comments.filter((comment) => !comment.resolved).length}</strong></div>
+        <div><span>Quality findings</span><strong>{reviewFindings.length}</strong></div>
+        <div><span>Saved versions</span><strong>{record.history.length}</strong></div>
+      </div>
+    </section>
+  );
 
   if (tab === "History") {
     return (
       <Stack gap={4}>
+        {reviewOverview}
         <Notice tone="info" title="Autosave does not create a version per drag">
           Object moves are written with history suppressed, so the version list holds deliberate saves.
         </Notice>
@@ -1517,6 +1619,8 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
 
   if (tab === "Export") {
     return (
+      <Stack gap={4}>
+        {reviewOverview}
       <Grid>
         <Card span={6} eyebrow="EXPORT" title="Export" subtitle="Deterministic renderers, run in this browser">
           <Stack gap={3}>
@@ -1566,12 +1670,18 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
           })()}
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
   if (tab === "Publish") {
     const active = editor.deck.exports.filter((entry) => entry.scope && !entry.revokedAt);
     return (
+      <Stack gap={4}>
+        {reviewOverview}
+        <Notice tone="info" title="Publication status is not a shared website">
+          This workspace records publishing status and link requests locally. No hosting or server-enforced access has been connected, so these actions do not make a deck publicly accessible.
+        </Notice>
       <Grid>
         <Card span={7} eyebrow="PUBLISHING" prov="human" title="Publish" subtitle={`Status: ${record.status.replace("_", " ")}`}>
           <Stack gap={3}>
@@ -1583,12 +1693,12 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
             <Row gap={2} wrap>
               <Button variant="primary" disabled={record.status === "published"} onClick={async () => {
                 await context.mutate.patch(record.id, { status: "published" }, { expectRevision: record.revision, event: `${record.title} published in the workspace` });
-                context.toast("Published", "The deck status changed on the record.");
-              }}>Publish in the workspace</Button>
+                context.toast("Status recorded", "This browser now lists the deck as published. No external access was granted.");
+              }}>Mark as published locally</Button>
               <Button variant="secondary" onClick={() => {
-                editor.commit({ ...editor.deck, exports: [{ id: nextId("ex"), at: context.now.toISOString(), format: "Link", note: "Workspace link", scope: "workspace" }, ...editor.deck.exports] }, "Create link");
-                context.toast("Link recorded", "It is listed below with a revoke button. Nothing is served outside this browser.");
-              }}>Create a workspace link</Button>
+                editor.commit({ ...editor.deck, exports: [{ id: nextId("ex"), at: context.now.toISOString(), format: "Link", note: "Workspace sharing intent (local only)", scope: "workspace" }, ...editor.deck.exports] }, "Create link");
+                context.toast("Sharing intent recorded", "The entry is listed below. No functioning link or external access was created.");
+              }}>Record sharing intent</Button>
             </Row>
             {active.length > 0 && (
               <Stack gap={2}>
@@ -1617,11 +1727,14 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
           <Button size="sm" variant="secondary" style={{ marginBlockStart: "var(--space-3)" }} onClick={() => context.openOverlay("approval")}>Record an approval</Button>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
   const findings = reviewDeck(editor.deck);
   return (
+    <Stack gap={4}>
+      {reviewOverview}
     <Grid>
       <Card span={7} eyebrow="REVIEW" prov="human" title="Comments" subtitle={`${editor.deck.comments.filter((comment) => !comment.resolved).length} open of ${editor.deck.comments.length}`}>
         <Stack gap={3}>
@@ -1675,6 +1788,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
         </Row>
       </Card>
     </Grid>
+    </Stack>
   );
 }
 
@@ -2684,6 +2798,7 @@ function ApprovalOverlay({ context, close }: { context: ScreenContext; close: ()
   const [reviewer, setReviewer] = useState(members[0]?.title ?? "");
   const [decision, setDecision] = useState<"approved" | "changes">("approved");
   const [note, setNote] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
   if (!record) return <Empty title="No deck is open" />;
   const openComments = editor.deck.comments.filter((comment) => !comment.resolved);
   return (
@@ -2692,15 +2807,12 @@ function ApprovalOverlay({ context, close }: { context: ScreenContext; close: ()
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!reviewer) return;
+        if (!reviewer || !confirmed) return;
         editor.commit({
           ...editor.deck,
-          approvals: [{ id: nextId("ap"), reviewer, at: context.now.toISOString(), decision, note }, ...editor.deck.approvals],
-        }, "Record approval");
-        if (decision === "approved") {
-          await context.mutate.patch(record.id, { status: "published" }, { event: `${record.title} approved by ${reviewer}` });
-        }
-        context.toast("Recorded", `${reviewer} ${decision === "approved" ? "approved" : "asked for changes to"} the deck. It is on the record, not just a toast.`);
+          approvals: [{ id: nextId("ap"), reviewer, at: context.now.toISOString(), decision, note: `Recorded by ${context.actor}. ${note.trim()}`.trim() }, ...editor.deck.approvals],
+        }, "Record review decision");
+        context.toast("Review decision recorded", `A local ${decision === "approved" ? "approval" : "changes-requested"} entry for ${reviewer} was recorded by ${context.actor}. This is not identity-verified and does not publish the deck.`, "info");
         close();
       }}
     >
@@ -2709,6 +2821,9 @@ function ApprovalOverlay({ context, close }: { context: ScreenContext; close: ()
           Approving does not resolve them. They stay listed under Comments so an approval cannot bury a reviewer's objection.
         </Notice>
       )}
+      <Notice tone="info" title="Local review record, not verified approval">
+        The selected reviewer is a reference on this local record. Their identity and decision have not been independently verified. Recording a decision does not publish the presentation.
+      </Notice>
       <Field label="Reviewer" required>
         <Select aria-label="Reviewer" value={reviewer} onChange={(event) => setReviewer(event.target.value)} required>
           {members.map((member) => <option key={member.id} value={member.title}>{member.title}</option>)}
@@ -2720,6 +2835,7 @@ function ApprovalOverlay({ context, close }: { context: ScreenContext; close: ()
         </Select>
       </Field>
       <Field label="Note"><TextArea aria-label="Note" rows={3} value={note} onChange={(event) => setNote(event.target.value)} /></Field>
+      <Checkbox label="I understand this is a local, unverified review record" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
     </form>
   );
 }

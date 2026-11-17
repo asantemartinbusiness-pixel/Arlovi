@@ -14,6 +14,7 @@ interface UiState {
   role: Role;
   theme: "light" | "dark";
   density: "comfortable" | "balanced" | "compact";
+  interfaceScale: number;
   palette: PaletteId;
   collapsed: boolean;
   mobileNav: boolean;
@@ -29,6 +30,7 @@ interface UiState {
   setRole: (role: Role) => void;
   setTheme: (theme: "light" | "dark") => void;
   setDensity: (density: UiState["density"]) => void;
+  setInterfaceScale: (scale: number) => void;
   setPalette: (palette: PaletteId) => void;
   setCollapsed: (collapsed: boolean) => void;
   setMobileNav: (open: boolean) => void;
@@ -56,6 +58,7 @@ export const useUi = create<UiState>((set) => ({
   role: initial.role ?? "owner",
   theme: initial.theme ?? "light",
   density: initial.density ?? "balanced",
+  interfaceScale: typeof initial.interfaceScale === "number" && Number.isFinite(initial.interfaceScale) ? Math.max(75, Math.min(150, Math.round(initial.interfaceScale / 5) * 5)) : 100,
   palette: initial.palette ?? "cobalt",
   collapsed: initial.collapsed ?? false,
   mobileNav: false,
@@ -76,6 +79,7 @@ export const useUi = create<UiState>((set) => ({
   setRole: (role) => set({ role }),
   setTheme: (theme) => set({ theme }),
   setDensity: (density) => set({ density }),
+  setInterfaceScale: (value) => set({ interfaceScale: Number.isFinite(value) ? Math.max(75, Math.min(150, Math.round(value / 5) * 5)) : 100 }),
   setPalette: (palette) => set({ palette }),
   setCollapsed: (collapsed) => set({ collapsed }),
   setMobileNav: (mobileNav) => set({ mobileNav }),
@@ -98,6 +102,7 @@ useUi.subscribe((state) => {
       role: state.role,
       theme: state.theme,
       density: state.density,
+      interfaceScale: state.interfaceScale,
       palette: state.palette,
       collapsed: state.collapsed,
       attentionReceipts: state.attentionReceipts,
