@@ -62,11 +62,11 @@ test("People, candidate and document detail URLs reject wrong collections and mi
   await page.goto("/o/northline/hr/candidates/nl-employees-001");
   await expect(main).toContainText("Candidate unavailable");
   await page.goto("/o/northline/hr/employees/does-not-exist");
-  await expect(main).toContainText("Employee unavailable");
+  await expect(main).toContainText("Record not found");
   await page.goto("/o/northline/docs/documents/nl-employees-001");
   await expect(main).toContainText("No document is open");
   await page.goto("/o/northline/docs/documents/does-not-exist");
-  await expect(main).toContainText("No document is open");
+  await expect(main).toContainText("Record not found");
   await page.goto("/o/harbor/hr/employees/nl-employees-001");
-  await expect(main).toContainText("Employee unavailable");
+  await expect(main).toContainText("Record not found");
 });
