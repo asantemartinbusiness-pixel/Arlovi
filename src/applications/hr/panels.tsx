@@ -1458,35 +1458,113 @@ export function LeaveCalendar({ context, month, onPickDay }: { context: ScreenCo
 
 export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "My leave" | "Team calendar" | "Approvals" | "Policy" }) {
   const data = useHrData();
-  const { now, actor } = useWorkspace();
+  const { now, actor, org } = useWorkspace();
   const [monthOffset, setMonthOffset] = useState(0);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [approvalView, setApprovalView] = useState<"all" | "annual" | "other">("all");
+  const [myView, setMyView] = useState<"all" | "pending" | "decided">("all");
   const month = useMemo(() => new Date(now.getFullYear(), now.getMonth() + monthOffset, 1), [now, monthOffset]);
   const mine = data.employees.find((employee) => employee.title === actor);
   const myRequests = data.leaveRequests.filter((request) => request.fields.employeeId === mine?.id || String(request.fields.employeeName ?? "") === actor);
   const pending = data.leaveRequests.filter((request) => request.status === "requested");
+  const approved = data.leaveRequests.filter((request) => request.status === "approved");
+  const pendingAnnual = pending.filter((request) => String(request.fields.type ?? "annual") === "annual");
+  const selectedRequests = selectedDay ? data.leaveRequests.filter((request) => request.startAt && request.endAt
+    && request.startAt.slice(0, 10) <= selectedDay && request.endAt.slice(0, 10) >= selectedDay
+    && ["approved", "requested"].includes(request.status)) : [];
+  const header = (
+    <OpsHeader eyebrow={`People / Leave & Absence / ${lens}`}
+      title={({ "My leave": "Time away, clearly recorded.", "Team calendar": "Leave in the context of the team.",
+        Approvals: "Leave decisions with an accountable owner.", Policy: "Know what the recorded policy says." } as const)[lens]}
+      description="Review actual leave requests, annual balances and available coverage evidence. Requests never automatically reduce a recorded entitlement."
+      actions={<>
+        <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/scheduling?tab=Roster`)}>Open roster</Button>
+        <Button variant="primary" onClick={() => context.openOverlay("Leave form")}>Request leave</Button>
+      </>}
+      note={`Company calendar: ${org.timezone}. Leave requests are local records, not external calendar bookings.`}
+    />
+  );
+  const metrics = (
+    <OpsMetrics label="Leave and absence overview">
+      <OpsMetric label="Requests awaiting review" value={pending.length} detail="No decision yet" emphasis={pending.length ? "attention" : "neutral"} />
+      <OpsMetric label="Approved requests" value={approved.length} detail="Local decisions on record" />
+      <OpsMetric label="Annual requests pending" value={pendingAnnual.length} detail="Allowance checked on approval" />
+      <OpsMetric label="Current employees" value={data.employees.filter((employee) =>
+        !["alumni", "terminated"].includes(employee.status)).length} detail="For team coverage context" />
+    </OpsMetrics>
+  );
 
   if (lens === "Team calendar") {
     return (
       <Stack gap={4}>
-        <Row gap={2}>
+        {header}
+        {metrics}
+        <div className="ops-toolbar">
+          <strong className="ops-toolbar-heading">Browse team leave</strong>
+          <span className="ops-toolbar-note">Choose a day to inspect its requests without disclosing private absence reasons.</span>
+        </div>
+        <Row gap={2} wrap>
           <Button size="sm" variant="secondary" onClick={() => setMonthOffset((value) => value - 1)}>Previous</Button>
           <strong className="ds-grow" style={{ fontSize: "var(--text-lg)" }}>{context.date(month, { month: "long", year: "numeric" })}</strong>
           <Button size="sm" variant="ghost" onClick={() => setMonthOffset(0)}>Today</Button>
           <Button size="sm" variant="secondary" onClick={() => setMonthOffset((value) => value + 1)}>Next</Button>
         </Row>
-        <Card flush><div className="ds-card-body"><LeaveCalendar context={context} month={month} onPickDay={() => context.openOverlay("conflict review")} /></div></Card>
+        <Card flush><div className="ds-card-body"><LeaveCalendar context={context} month={month}
+          onPickDay={(day) => setSelectedDay(day.toISOString().slice(0, 10))} /></div></Card>
+        {selectedDay && <Card title={`Requests on ${context.date(`${selectedDay}T12:00:00.000Z`)}`}
+          subtitle={`${selectedRequests.length} approved or pending requests on this date`}
+          actions={<Button size="sm" variant="ghost" onClick={() => setSelectedDay(null)}>Close detail</Button>}>
+          <Stack gap={2}>
+            {selectedRequests.length === 0 && <p className="ds-subtle">No approved or pending leave is recorded for this date.</p>}
+            {selectedRequests.map((request) => <Row key={request.id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
+              <span className="ds-grow">{String(request.fields.type ?? "annual") === "sick"
+                ? "Unavailable (private absence)" : leavePerson(request, data.employees)}</span>
+              <Pill tone={request.status === "approved" ? "success" : "warning"}>{request.status}</Pill>
+              {context.can("edit_people") && request.status === "requested" && <Button size="sm" variant="secondary"
+                onClick={() => { context.select(request.id); context.openOverlay("leave approval", { id: request.id }); }}>Review</Button>}
+            </Row>)}
+          </Stack>
+        </Card>}
+        <Notice tone="info" title="A calendar date is not a staffing decision">
+          Use the roster and Scheduling Exceptions to inspect coverage. Private health details are not shown here.
+        </Notice>
       </Stack>
     );
   }
 
   if (lens === "Approvals") {
-    return pending.length === 0 ? <Empty title="Nothing is waiting for a decision" icon={<ClipboardCheck size={20} />} /> : (
-      <Stack gap={3}>
-        {pending.map((request) => {
+    const selected = pending.filter((request) => approvalView === "all"
+      || (approvalView === "annual" ? String(request.fields.type ?? "annual") === "annual"
+        : String(request.fields.type ?? "annual") !== "annual"));
+    const canDecide = context.can("edit_people");
+    return (
+      <Stack gap={4}>
+        {header}
+        {metrics}
+        <div className="ops-toolbar" aria-label="Filter leave approvals">
+          <strong className="ops-toolbar-heading">Requests awaiting decision</strong>
+          {(["all", "annual", "other"] as const).map((filter) => <Button key={filter} size="sm"
+            variant={approvalView === filter ? "secondary" : "ghost"} aria-pressed={approvalView === filter}
+            onClick={() => setApprovalView(filter)}>{filter === "all" ? "All" : filter === "annual" ? "Annual" : "Other types"}</Button>)}
+          <span className="ops-toolbar-note">{selected.length} requests</span>
+        </div>
+        {!canDecide && <Notice tone="warning" title="A People reviewer role is required">
+          You can inspect these requests, but this role view cannot approve or decline them.
+        </Notice>}
+        {selected.length === 0 ? (
+          <Empty title={pending.length ? "No requests match this filter" : "Nothing is waiting for a decision"}
+            icon={<ClipboardCheck size={20} />}>Requests appear here when submitted for human review.</Empty>
+        ) : (
+        <div className="hr-leave-decision-grid">
+        {selected.map((request) => {
           const employee = data.employees.find((row) => row.id === request.fields.employeeId);
           const balance = employee ? leaveBalance(employee) : { allowance: 0, taken: 0, left: 0, known: false };
           const requested = leaveDays(request);
-          const clash = data.leaveRequests.filter((other) => other.id !== request.id && other.status === "approved" && other.startAt && other.endAt && request.startAt && request.endAt && new Date(other.startAt) <= new Date(request.endAt) && new Date(other.endAt) >= new Date(request.startAt));
+          const clash = data.leaveRequests.filter((other) => other.id !== request.id
+            && other.status === "approved" && other.fields.employeeId !== request.fields.employeeId
+            && other.startAt && other.endAt && request.startAt && request.endAt
+            && other.startAt.slice(0, 10) <= request.endAt.slice(0, 10)
+            && other.endAt.slice(0, 10) >= request.startAt.slice(0, 10));
           return (
             <Card
               key={request.id}
@@ -1499,6 +1577,7 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
                 <Button
                   size="sm"
                   variant="primary"
+                  disabled={!canDecide}
                   onClick={async () => {
                     try {
                       const plan = planLeaveDecision({
@@ -1519,6 +1598,7 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
                 <Button
                   size="sm"
                   variant="outline-danger"
+                  disabled={!canDecide}
                   onClick={async () => {
                     try {
                       const plan = planLeaveDecision({
@@ -1548,11 +1628,16 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
                     : employee ? "Unavailable — no allowance recorded" : "Unavailable — no employee record" },
                   { label: "Overlapping approved leave", value: clash.length ? `${clash.length} other ${clash.length === 1 ? "person" : "people"} away` : "Nobody else is away" },
                 ]} />
-                {clash.length > 0 && <Notice tone="warning" title="Cover is thin on these days">Approving this leaves {clash.length + 1} people away at once. Check the roster before deciding.</Notice>}
+                {clash.length > 0 && <Notice tone="warning" title="Other approved leave overlaps">
+                  {clash.length} other approved request{clash.length === 1 ? "" : "s"} overlap this period. Check actual roster coverage before deciding.
+                </Notice>}
               </Stack>
             </Card>
           );
         })}
+      </Stack>
+        </div>
+        )}
       </Stack>
     );
   }
