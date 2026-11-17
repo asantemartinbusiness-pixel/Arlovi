@@ -38,6 +38,12 @@ test("project template creates the complete task plan and survives reload",async
   expect(await validate()).toEqual({
     found:true,tasks:9,consistent:true,allBacklog:true,oneOrg:true,
   });
+  // A new project has no attachments. Generic documents carrying the
+  // "project" category tag must not be mistaken for this project's files.
+  await page.getByRole("tab",{name:"Files",exact:true}).click();
+  await expect(page.locator("#main")).toContainText("No files attached");
+  await page.getByRole("button",{name:"Attach a file",exact:true}).click();
+  await expect(page.getByRole("dialog",{name:"Attach a file"})).toBeVisible();
 });
 
 test("stale project duplication rolls back the new project and every child task",async({page})=>{
