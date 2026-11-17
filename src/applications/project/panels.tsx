@@ -10,6 +10,7 @@ import { addDays, clockIso, daysBetween, startOfWeek } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { LANES, TaskBoard, stageOf, type LaneId } from "./board";
 import { taskMoveDecision } from "./progression";
+import { filesForProject } from "./files";
 import { BoardFilterNotice, PortfolioFilterNotice, TaskComments, boardFilter, matchesBoard, matchesPortfolio, pinnedBy, portfolioFilter } from "./actions";
 import { Gantt, createsCycle, criticalPath, dependenciesOf } from "./timeline";
 
@@ -289,9 +290,9 @@ export function ProjectOverview({ context, lens }: { context: ScreenContext; len
   }
 
   if (lens === "Files") {
-    const files = data.documents.filter((document) => document.parentId === project.id || document.tags.includes("project"));
+    const files = filesForProject(project, data.documents);
     return files.length === 0 ? (
-      <Empty title="No files attached" icon={<FolderKanban size={20} />} action={<Button variant="secondary" onClick={() => context.openOverlay("project settings")}>Attach a file</Button>}>
+      <Empty title="No files attached" icon={<FolderKanban size={20} />} action={<Button variant="secondary" onClick={() => context.openOverlay("attach file")}>Attach a file</Button>}>
         A file here is a record of a document: its name, who attached it and when. No storage provider is connected.
       </Empty>
     ) : (
