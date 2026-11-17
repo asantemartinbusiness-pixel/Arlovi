@@ -717,9 +717,11 @@ function periodKey(now: Date): string {
 }
 
 export function payrollSalaryGaps(employees: Rec[]): Rec[] {
-  return employees.filter((employee) => employee.status !== "alumni"
+  return employees.filter((employee) => !["alumni", "terminated"].includes(employee.status)
     && employee.fields.employment !== "contractor"
-    && (employee.fields.salaryMinor === undefined || !Number.isFinite(Number(employee.fields.salaryMinor))
+    && (employee.fields.salaryMinor === undefined || employee.fields.salaryMinor === null
+      || String(employee.fields.salaryMinor).trim() === ""
+      || !Number.isFinite(Number(employee.fields.salaryMinor))
       || Number(employee.fields.salaryMinor) < 0));
 }
 
