@@ -140,3 +140,23 @@ test("Publishing explains local-only status and requires confirmation", async ({
   await expect(dialog).toContainText("Status only, not access enforcement");
   await expect(dialog.getByRole("checkbox", { name: /records status without granting external access/ })).not.toBeChecked();
 });
+
+test("Archived workbooks remain discoverable through the library status filter", async ({ page }) => {
+  await page.goto("/o/northline/sheets/workbooks");
+  const title = "QA Archived Workbook Finder";
+  await page.evaluate(async (name) => {
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "workbooks", currency: "GBP",
+      title: name, status: "archived", fields: { folder: "Archive" },
+    }, ctx);
+    await repo.putRecord(record, ctx);
+  }, title);
+  await page.reload();
+  const main = page.locator("#main");
+  await main.getByLabel("Workbook status").selectOption("archived");
+  await main.getByRole("searchbox", { name: "Search" }).fill(title);
+  await expect(main.getByText(title)).toBeVisible();
+});
