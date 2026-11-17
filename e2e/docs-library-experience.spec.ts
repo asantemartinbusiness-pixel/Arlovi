@@ -34,7 +34,7 @@ test("Documents library archive and search have distinct empty and filter reset 
   await expect(main.getByRole("heading", { name: "The document archive." })).toBeVisible();
   await main.getByRole("searchbox", { name: "Search" }).fill("unfindable-qa-archive-test-string");
   await expect(main.getByText("No documents match the filters")).toBeVisible();
-  await main.getByRole("button", { name: "Clear filters" }).click();
+  await main.getByRole("button", { name: "Clear filters" }).first().click();
   await expect(main.getByRole("searchbox", { name: "Search" })).toHaveValue("");
 });
 
@@ -92,7 +92,7 @@ test("Document review shows accountable readiness and toggles responsive panels"
 
 test("Documents never fall back to an unrelated record on an unknown document URL", async ({ page }) => {
   await page.goto("/o/northline/docs/documents/qa-doc-does-not-exist");
-  await expect(page.locator("#main")).toContainText("No document is open");
+  await expect(page.locator("#main")).toContainText("This record is unavailable");
   await expect(page.getByLabel("Document working status")).toHaveCount(0);
 });
 
