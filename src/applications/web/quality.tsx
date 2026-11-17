@@ -15,6 +15,7 @@ import {
 } from "./model";
 import { NoSite, useSiteRecord } from "./panels";
 import { saveSite } from "./state";
+import "./websites.css";
 
 /* ================================================================ *
  * ARL-WEB-008 — SEO & Accessibility
@@ -62,13 +63,26 @@ export function applyFix(site: SiteModel, issue: Issue): { next: SiteModel; labe
 export function QualityReport({ context, area }: { context: ScreenContext; area: Issue["area"] }) {
   const { record, site, formNames } = useSiteRecord(context);
   const { now } = useWorkspace();
+  const [checkFilter, setCheckFilter] = useState<"attention" | "all" | "failing">("attention");
   if (!record) return <NoSite />;
   const issues = auditSite(site, formNames).filter((issue) => issue.area === area);
   const counts = issueCounts(issues);
+  const shown = issues.filter(issue => checkFilter === "all" || (checkFilter === "failing" ? issue.level === "fail" : issue.level !== "pass"));
   const lastRun = String(record.fields.lastAuditAt ?? "");
 
   return (
     <Stack gap={5}>
+      <section className="web-quality-overview" aria-label="Website quality review">
+        <div>
+          <span className="web-library-eyebrow">WEBSITES / QUALITY REVIEW</span>
+          <h2>{area} checks</h2>
+          <p>{record.title} · Review the evidence, resolve issues and record the audit before preparing an export.</p>
+        </div>
+        <div className="web-quality-actions">
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/builder`)}>Open editor</Button>
+          <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/deploy`)}>Publishing</Button>
+        </div>
+      </section>
       <StatRow>
         <Stat prov="posted" label="Failing" value={String(counts.fail)} meta={`${area} checks that must change`} />
         <Stat prov="posted" label="To review" value={String(counts.warn)} meta="Judgement, not a defect" />
@@ -92,11 +106,21 @@ export function QualityReport({ context, area }: { context: ScreenContext; area:
         </Notice>
       )}
 
-      {issues.length === 0 ? (
-        <Empty title={`No ${area.toLowerCase()} checks apply`} icon={<CheckCircle2 size={20} />} />
+      <div className="web-quality-filters" role="group" aria-label="Quality issue filter">
+        {([
+          ["attention", `Needs attention (${counts.fail + counts.warn})`],
+          ["failing", `Failing (${counts.fail})`],
+          ["all", `All checks (${issues.length})`],
+        ] as const).map(([key, label]) => <button key={key} type="button"
+          aria-pressed={checkFilter === key} onClick={() => setCheckFilter(key)}>{label}</button>)}
+      </div>
+      {shown.length === 0 ? (
+        <Empty title={issues.length === 0 ? `No ${area.toLowerCase()} checks apply` : "No checks match this view"} icon={<CheckCircle2 size={20} />}>
+          {issues.length > 0 ? "Choose All checks to review the passing evidence." : "This check group has no applicable rules for the current site."}
+        </Empty>
       ) : (
         <Stack gap={2}>
-          {issues.map((issue) => (
+          {shown.map((issue) => (
             <div key={issue.id} className="t6-check" data-state={issue.level}>
               <span className="t6-check-dot" aria-hidden="true" />
               <div>
