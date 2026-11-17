@@ -906,6 +906,20 @@ export function TestsScreen({ context, lens }: { context: ScreenContext; lens: "
   const issues = validateApp(model);
   const totals = issueTotals(issues);
   const lastRun = String(record.fields.lastCheckAt ?? "");
+  const testOverview = (
+    <section className="t6-build-library-overview" aria-label="Build checks overview">
+      <Row gap={2} wrap>
+        <div className="ds-grow" style={{ minWidth: 220 }}><span className="ds-subtle">BUILD / MODEL CHECKS</span><h2>Understand readiness before release.</h2><p className="ds-subtle">Review design consistency, inspect failures and confirm what still requires a real runtime.</p></div>
+        <Row gap={2} wrap><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/builder`)}>Builder</Button><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/deploy`)}>Release review</Button></Row>
+      </Row>
+      <div className="t6-build-library-metrics" aria-label="Model check summary">
+        <div><span>Checks</span><strong>{issues.length}</strong></div>
+        <div><span>Passing</span><strong>{totals.pass}</strong></div>
+        <div><span>Failing</span><strong>{totals.fail}</strong></div>
+        <div><span>Warnings</span><strong>{totals.warn}</strong></div>
+      </div>
+    </section>
+  );
 
   const suites: { name: string; area: ModelIssue["area"]; description: string }[] = [
     { name: "Data model", area: "Data", description: "Entity names, duplicate fields, references and choice options." },
@@ -917,6 +931,7 @@ export function TestsScreen({ context, lens }: { context: ScreenContext; lens: "
   if (lens === "Suites") {
     return (
       <Stack gap={4}>
+        {testOverview}
         <StatRow>
           <Stat prov="posted" label="Checks" value={String(issues.length)} meta="Computed from the model" />
           <Stat prov="posted" label="Failing" value={String(totals.fail)} meta="Would block a release" />
@@ -1028,6 +1043,20 @@ export function DeployScreen({ context, lens }: { context: ScreenContext; lens: 
   const events = useEvents(record?.id);
   if (!record) return <NoProject />;
   const totals = issueTotals(validateApp(model));
+  const releaseOverview = (
+    <section className="t6-build-library-overview" aria-label="Build release overview">
+      <Row gap={2} wrap>
+        <div className="ds-grow" style={{ minWidth: 220 }}><span className="ds-subtle">BUILD / RELEASE MANAGEMENT</span><h2>Review the release, not just its label.</h2><p className="ds-subtle">Track model gates and local release attempts. A production runtime and hosting provider are not connected.</p></div>
+        <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>View checks</Button>
+      </Row>
+      <div className="t6-build-library-metrics" aria-label="Build release status">
+        <div><span>Model failures</span><strong>{totals.fail}</strong></div>
+        <div><span>Warnings</span><strong>{totals.warn}</strong></div>
+        <div><span>Release attempts</span><strong>{model.releases.length}</strong></div>
+        <div><span>Connected runtimes</span><strong>0</strong></div>
+      </div>
+    </section>
+  );
 
   if (lens === "Environments") {
     const environments: { name: Release["environment"]; purpose: string }[] = [
@@ -1036,6 +1065,8 @@ export function DeployScreen({ context, lens }: { context: ScreenContext; lens: 
       { name: "production", purpose: "What a runtime would serve. Nothing is connected." },
     ];
     return (
+      <Stack gap={4}>
+        {releaseOverview}
       <Grid>
         {environments.map((environment) => {
           const last = [...model.releases].filter((release) => release.environment === environment.name).sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""))[0];
@@ -1061,6 +1092,7 @@ export function DeployScreen({ context, lens }: { context: ScreenContext; lens: 
           </Notice>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
