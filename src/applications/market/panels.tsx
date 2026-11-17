@@ -800,7 +800,6 @@ export function EmailCampaigns({ context, lens }: { context: ScreenContext; lens
 
 export function AudienceSegments({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useMarketData();
-  const { now } = useWorkspace();
 
   if (lens === "Contacts") {
     return (
