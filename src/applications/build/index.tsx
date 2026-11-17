@@ -604,7 +604,7 @@ export const buildApp = registerApp({
           run: async (context) => {
             const repo = await import("@/platform/repo");
             const source = await repo.getRecord(context.selectedId ?? "");
-            if (!source) { context.toast("Nothing to clone", "Select a project row first.", "blocked"); return; }
+            if (!source || source.collection !== "appProjects" || source.organizationId !== context.org.id) { context.toast("Project unavailable", "Select an app project that belongs to the current company.", "blocked"); return; }
             const body = source.body && typeof source.body === "object" ? { ...(source.body as Record<string, unknown>), releases: [], versions: [] } : source.body;
             const created = await context.mutate.create({
               collection: "appProjects", title: `${source.title} copy`, status: "draft",
