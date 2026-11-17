@@ -744,7 +744,7 @@ export function PrivacyControl({ context }: { context: ScreenContext }) {
             ))}
           </Stack>
           <Notice tone="warning" title="Review before deleting">This will remove {overdue.length} stored response records from this workspace. Confirm the retention decision and any applicable holds before proceeding.</Notice>
-          <Checkbox label="I have reviewed the affected responses and authorise this deletion" checked={confirmed} onChange={setConfirmed} />
+          <Checkbox label="I have reviewed the affected responses and authorise this deletion" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
           <Button variant="outline-danger" disabled={!confirmed || deleting} onClick={async () => {
             setDeleting(true);
             try {
