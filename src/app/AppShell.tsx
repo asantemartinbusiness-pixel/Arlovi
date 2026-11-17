@@ -52,8 +52,8 @@ export function AppShell() {
   const activeCode = activeScreen?.applicationCode ?? "HQ";
   const appModule = getApp(activeCode);
   const activeGroup = NAV_GROUPS.find(group => group.apps.some(app => app.code === activeCode));
-  const contextualCategory = activeGroup && ["Platform", "Growth"].includes(activeGroup.label)
-    ? activeGroup.label : null;
+  // Native apps always return to their own category, without carrying record IDs.
+  const contextualCategory = activeGroup?.label ?? null;
   const appDirectoryPath = contextualCategory
     ? `${workAreaPath(org.slug, "apps")}?category=${contextualCategory}`
     : workAreaPath(org.slug, "apps");
