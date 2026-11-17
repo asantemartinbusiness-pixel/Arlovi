@@ -79,7 +79,8 @@ test("Chart dashboard and export views expose the data source and calculation st
 test("Workbook collaboration exposes review context and keeps local sharing explicit", async ({ page }) => {
   await page.goto("/o/northline/sheets/workbooks");
   const id = await page.evaluate(async () => {
-    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts") as typeof import("../src/platform/repo");
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
     const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
     const record = repo.newRecord({
       organizationId: "org-northline", collection: "workbooks", currency: "GBP",
@@ -101,7 +102,8 @@ test("Workbook collaboration exposes review context and keeps local sharing expl
 test("CSV import requires acknowledgment before replacing an existing worksheet", async ({ page }) => {
   await page.goto("/o/northline/sheets/workbooks");
   const id = await page.evaluate(async () => {
-    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts") as typeof import("../src/platform/repo");
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
     const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
     const record = repo.newRecord({
       organizationId: "org-northline", collection: "workbooks", currency: "GBP",
