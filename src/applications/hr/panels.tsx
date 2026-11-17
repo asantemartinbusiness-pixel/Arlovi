@@ -2285,67 +2285,148 @@ export function computePayroll(employees: Rec[]): PayLine[] {
 
 export function Payroll({ context, lens }: { context: ScreenContext; lens: "Runs" | "Inputs" | "Approvals" | "Payslips" }) {
   const data = useCollections(["payrollRuns", "employees", "shifts"]);
-  const lines = useMemo(() => computePayroll(data.employees), [data.employees]);
+  const [query, setQuery] = useState("");
+  const [state, setState] = useState<"all" | "draft" | "approved">("all");
+  const eligible = data.employees.filter((employee) => employee.status !== "alumni"
+    && employee.fields.employment !== "contractor");
+  const hasSalary = (employee: Rec) => employee.fields.salaryMinor !== undefined
+    && Number.isFinite(Number(employee.fields.salaryMinor)) && Number(employee.fields.salaryMinor) >= 0;
+  const missingPay = eligible.filter((employee) => !hasSalary(employee));
+  // Run totals in this preview are illustrative and calculated only from
+  // explicitly recorded annual salary. They are NOT historical payroll snapshots.
+  const lines = useMemo(() => computePayroll(eligible.filter(hasSalary)), [eligible]);
   const gross = lines.reduce((sum, line) => sum + line.grossMinor, 0);
   const net = lines.reduce((sum, line) => sum + line.netMinor, 0);
-
-  if (!context.can("view_payroll")) {
-    return (
-      <Stack gap={4}>
-        <Stat label="Payroll" value="Hidden in this role view" unavailable meta="Switch to the People or Owner view" />
-        <RoleViewNote what="Pay, deductions and payslips" />
-      </Stack>
-    );
-  }
-
-  const banner = (
-    <Notice tone="warning" title="Nothing here is filed or paid">
-      These figures are computed in this browser from the salaries on each employee record. No payroll provider, tax authority or
-      bank is connected, so a run can be prepared, checked and approved locally and then exported as a file for a person to use.
+  const pending = data.payrollRuns.filter((run) => run.status === "draft");
+  const canView = context.can("view_payroll");
+  if (!canView) return (
+    <Stack gap={4}>
+      <OpsHeader eyebrow="People / Payroll" title="Payroll is restricted."
+        description="Pay, deductions and employee financial data are available only in an authorised role view."
+        note="No payroll or personnel information is loaded into this page for an unauthorised view." />
+      <RoleViewNote what="Pay, deductions and payslips" />
+    </Stack>
+  );
+  const titles = {
+    Runs: "A controlled view of payroll runs.",
+    Inputs: "Know what every pay calculation uses.",
+    Approvals: "Decisions before any external submission.",
+    Payslips: "Illustrative pay, not issued payslips.",
+  };
+  const header = (
+    <OpsHeader eyebrow={`People / Payroll / ${lens}`} title={titles[lens]}
+      description="Review locally prepared records and pay inputs without presenting simplified deductions as compliant payroll."
+      actions={<>
+        <Button variant="secondary" onClick={() => context.openOverlay("exception report")}>Inspect exceptions</Button>
+        <Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/hr/employees`)}>Employee records</Button>
+      </>}
+      note="No connected tax authority, bank or payroll engine. Nothing on this page is filed or paid."
+    />
+  );
+  const metrics = (
+    <OpsMetrics label="Payroll input and review overview">
+      <OpsMetric label="Recorded salary inputs" value={lines.length} detail="Current, non-contractor employees" />
+      <OpsMetric label="Missing salary" value={missingPay.length} detail="Cannot be counted in estimates"
+        emphasis={missingPay.length ? "attention" : "neutral"} />
+      <OpsMetric label="Illustrative gross" value={lines.length ? context.money(gross) : "—"}
+        detail="Current recorded salary inputs only" />
+      <OpsMetric label="Draft runs" value={pending.length} detail="Local approval still needed" />
+    </OpsMetrics>
+  );
+  const warning = (
+    <Notice tone="warning" title="These are estimates, not verified payroll">
+      Deductions use simplified illustrative calculations, not the current rules for {context.org.jurisdiction}.
+      Salary inputs may be missing; totals reflect current employee values, not a run-specific historical payroll snapshot.
+      No tax, pension, bank or external payroll action is performed.
     </Notice>
   );
-
+  const search = (title: string) => (
+    <div className="ops-toolbar">
+      <strong className="ops-toolbar-heading">{title}</strong>
+      <div className="hr-directory-search">
+        <TextInput aria-label="Search payroll records" placeholder="Search employees, runs or periods"
+          value={query} onChange={(event) => setQuery(event.target.value)} />
+      </div>
+    </div>
+  );
+  const staffLines = lines.filter((line) => line.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const incomplete = missingPay.filter((employee) =>
+    employee.title.toLowerCase().includes(query.trim().toLowerCase()));
   if (lens === "Inputs") {
     return (
       <Stack gap={4}>
-        {banner}
+        {header}
+        {metrics}
+        {warning}
+        {search("Salary inputs and exclusions")}
+        {incomplete.length > 0 && <Card title="People with no usable salary input"
+          subtitle="Excluded from all illustrative payroll calculations">
+          <Stack gap={2}>
+            {incomplete.map((employee) => <Row key={employee.id} gap={2}>
+              <span className="ds-grow">{employee.title}</span>
+              <Pill tone="warning">Salary missing or invalid</Pill>
+              <Button size="sm" variant="secondary" onClick={() =>
+                context.navigate(`/o/${context.org.slug}/hr/employees/${employee.id}?tab=Job`)}>Review employee</Button>
+            </Row>)}
+          </Stack>
+        </Card>}
         <DataGrid
-          rows={lines}
-          rowId={(row) => row.employeeId}
-          label="Payroll inputs"
+          rows={staffLines} rowId={(row) => row.employeeId} label="Recorded employee salary inputs"
           columns={[
-            { key: "name", header: "Person", primary: true, cell: (row) => row.name, sortValue: (row) => row.name, filterValue: (row) => row.name },
-            { key: "basis", header: "Basis", cell: (row) => row.basis },
-            { key: "gross", header: "Gross this month", align: "end", cell: (row) => <span className="ds-num">{context.money(row.grossMinor)}</span>, sortValue: (row) => row.grossMinor },
-            { key: "pension", header: "Pension", align: "end", cell: (row) => <span className="ds-num">{context.money(row.pensionMinor)}</span> },
+            { key: "person", header: "Employee", primary: true, cell: (row) => row.name, sortValue: (row) => row.name, filterValue: (row) => row.name },
+            { key: "basis", header: "Employment basis", cell: (row) => row.basis },
+            { key: "gross", header: "Illustrative monthly gross", align: "end", cell: (row) =>
+              <span className="ds-num">{context.money(row.grossMinor)}</span>, sortValue: (row) => row.grossMinor },
+            { key: "pension", header: "Illustrative pension", align: "end", cell: (row) =>
+              <span className="ds-num">{context.money(row.pensionMinor)}</span> },
           ]}
-          summary={<strong className="ds-num">{context.money(gross)} gross</strong>}
+          summary={<strong className="ds-num">{context.money(staffLines.reduce((sum, row) => sum + row.grossMinor, 0))} shown gross</strong>}
+          empty={<Empty title="No recorded salary inputs match this view">Review employee salary records before estimating payroll.</Empty>}
         />
-        <Notice tone="info">Contractors are excluded: they invoice, and their invoices live in Finance rather than in a payroll run.</Notice>
+        <Notice tone="info">Contractors are excluded from this employee-pay illustration. Actual contractor invoices belong in Finance.</Notice>
       </Stack>
     );
   }
 
   if (lens === "Approvals") {
-    const pending = data.payrollRuns.filter((run) => run.status === "draft");
+    const shown = pending.filter((run) =>
+      [run.title, run.fields.period].some((value) =>
+        String(value ?? "").toLowerCase().includes(query.trim().toLowerCase())));
     return (
       <Stack gap={4}>
-        {banner}
-        {pending.length === 0 ? <Empty title="No run is waiting for approval" icon={<ClipboardCheck size={20} />} /> : pending.map((run) => (
-          <Card key={run.id} title={run.title} subtitle={`Period ${String(run.fields.period ?? "")}`} actions={<Pill tone="warning" dot>Draft</Pill>}
-            footer={<>
-              <Button size="sm" variant="primary" onClick={() => context.openOverlay("submission signoff", { id: run.id })}>Approve this run</Button>
-              <Button size="sm" variant="ghost" onClick={() => context.openOverlay("exception report", { id: run.id })}>Exceptions</Button>
-            </>}>
-            <Properties rows={[
-              { label: "People", value: String(lines.length) },
-              { label: "Gross", value: context.money(gross) },
-              { label: "Net", value: context.money(net) },
-              { label: "Filed with an authority", value: <Pill tone="warning">No connection</Pill> },
-              { label: "Bank file sent", value: <Pill tone="warning">No connection</Pill> },
-            ]} />
-          </Card>
-        ))}
+        {header}
+        {metrics}
+        {warning}
+        {search("Runs needing a human decision")}
+        {missingPay.length > 0 && <Notice tone="warning" title="Source salary records are incomplete">
+          {missingPay.length} eligible employee{missingPay.length === 1 ? "" : "s"} have no valid salary input. Reconcile actual
+          run inputs before approving; the illustrative figures above exclude them.
+        </Notice>}
+        {shown.length === 0 ? <Empty title={pending.length ? "No draft runs match the search" : "No draft runs await review"}
+          icon={<ClipboardCheck size={20} />}>Only actual draft payroll records appear in this approval queue.</Empty> : (
+          <div className="hr-payroll-run-grid">
+            {shown.map((run) => (
+              <Card key={run.id} eyebrow="DRAFT RUN" title={run.title}
+                subtitle={`Period ${String(run.fields.period || "not recorded")}`}
+                actions={<Pill tone="warning">Draft</Pill>}
+                footer={<>
+                  <Button size="sm" variant="primary" disabled={missingPay.length > 0}
+                    onClick={() => context.openOverlay("submission signoff", { id: run.id })}>Review sign-off</Button>
+                  <Button size="sm" variant="secondary" onClick={() =>
+                    context.openOverlay("exception report", { id: run.id })}>Exceptions</Button>
+                </>}
+              >
+                <Properties rows={[
+                  { label: "Recorded run amount", value: run.amountMinor === undefined
+                    ? "Not recorded" : context.money(run.amountMinor) },
+                  { label: "Inputs and tax", value: "Verify against the actual run source" },
+                  { label: "Bank transfer", value: "No connection" },
+                  { label: "Authority filing", value: "No connection" },
+                ]} />
+              </Card>
+            ))}
+          </div>
+        )}
       </Stack>
     );
   }
@@ -2353,50 +2434,65 @@ export function Payroll({ context, lens }: { context: ScreenContext; lens: "Runs
   if (lens === "Payslips") {
     return (
       <Stack gap={4}>
-        {banner}
-        <DataGrid
-          rows={lines}
-          rowId={(row) => row.employeeId}
-          label="Payslips"
-          columns={[
-            { key: "name", header: "Person", primary: true, cell: (row) => row.name, sortValue: (row) => row.name, filterValue: (row) => row.name },
-            { key: "gross", header: "Gross", align: "end", cell: (row) => <span className="ds-num">{context.money(row.grossMinor)}</span> },
-            { key: "tax", header: "Tax", align: "end", cell: (row) => <span className="ds-num">{context.money(row.taxMinor)}</span> },
-            { key: "ni", header: "NI", align: "end", cell: (row) => <span className="ds-num">{context.money(row.niMinor)}</span>, hideBelow: 700 },
-            { key: "pension", header: "Pension", align: "end", cell: (row) => <span className="ds-num">{context.money(row.pensionMinor)}</span>, hideBelow: 900 },
-            { key: "net", header: "Net", align: "end", cell: (row) => <strong className="ds-num">{context.money(row.netMinor)}</strong>, sortValue: (row) => row.netMinor },
-          ]}
-          summary={<strong className="ds-num">{context.money(net)} net</strong>}
-        />
-        <Notice tone="warning" title="A payslip here is an illustration">
-          Tax and national insurance use one flat illustrative rate, not the current jurisdiction rules. A real run needs a payroll
-          provider that knows this organisation's tax codes, thresholds and reliefs.
+        {header}
+        {metrics}
+        {warning}
+        {search("Illustrative pay breakdown")}
+        <Notice tone="info" title="These are not issued payslips">
+          A payslip requires final payroll calculations and an actual payroll/issuance workflow. The table below is an on-screen simulation only.
         </Notice>
+        <DataGrid rows={staffLines} rowId={(line) => line.employeeId} label="Illustrative pay breakdown"
+          columns={[
+            { key: "name", header: "Person", primary: true, cell: (line) => line.name, filterValue: (line) => line.name },
+            { key: "gross", header: "Gross estimate", align: "end", cell: (line) => context.money(line.grossMinor) },
+            { key: "tax", header: "Tax estimate", align: "end", cell: (line) => context.money(line.taxMinor) },
+            { key: "ni", header: "NI estimate", align: "end", cell: (line) => context.money(line.niMinor), hideBelow: 700 },
+            { key: "pension", header: "Pension estimate", align: "end", cell: (line) => context.money(line.pensionMinor), hideBelow: 900 },
+            { key: "net", header: "Net estimate", align: "end", cell: (line) =>
+              <strong className="ds-num">{context.money(line.netMinor)}</strong> },
+          ]}
+          empty={<Empty title="No recorded salary inputs to illustrate">
+            Fix missing pay records before viewing illustrative pay amounts.
+          </Empty>}
+        />
       </Stack>
     );
   }
 
+  const shown = data.payrollRuns.filter((run) =>
+    (state === "all" || (state === "draft" ? run.status === "draft" : run.status === "approved"))
+    && [run.title, run.fields.period].some((value) =>
+      String(value ?? "").toLowerCase().includes(query.trim().toLowerCase())));
   return (
     <Stack gap={4}>
-      {banner}
-      <StatRow>
-        <Stat label="People in the run" value={String(lines.length)} prov="human" meta="Contractors invoice separately" />
-        <Stat label="Gross" value={context.money(gross)} prov="human" meta="Computed from salaries in this browser" />
-        <Stat label="Net" value={context.money(net)} prov="human" meta="After the illustrative deductions" />
-        <Stat label="Filed" value="Not connected" unavailable meta="No tax authority connection" />
-      </StatRow>
-      <DataGrid
-        rows={data.payrollRuns}
-        rowId={(row) => row.id}
-        label="Payroll runs"
+      {header}
+      {metrics}
+      {warning}
+      {search("Payroll run register")}
+      <div className="ops-toolbar" aria-label="Filter payroll run states">
+        <strong className="ops-toolbar-heading">Run status</strong>
+        {(["all", "draft", "approved"] as const).map((option) => <Button key={option}
+          size="sm" aria-pressed={state === option} variant={state === option ? "secondary" : "ghost"}
+          onClick={() => setState(option)}>{option === "all" ? "All" : option === "draft" ? "Draft" : "Approved"}</Button>)}
+      </div>
+      <DataGrid rows={shown} rowId={(row) => row.id} label="Payroll runs"
+        onOpen={(id) => context.openOverlay("Payroll review", { id })}
+        card={(run) => <>
+          <strong>{run.title}</strong>
+          <span className="ds-subtle">{String(run.fields.period || "Period not recorded")}</span>
+          <Pill tone={run.status === "approved" ? "success" : "warning"}>{run.status}</Pill>
+        </>}
         columns={[
           { key: "title", header: "Run", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => row.title },
-          { key: "period", header: "Period", cell: (row) => String(row.fields.period ?? "") },
-          { key: "status", header: "Status", cell: (row) => <Pill tone={row.status === "approved" ? "success" : "warning"} dot>{row.status}</Pill> },
-          { key: "approver", header: "Approved by", cell: (row) => String(row.fields.approvedBy ?? "—"), hideBelow: 900 },
-          { key: "filed", header: "Filed", align: "end", cell: () => <Pill tone="warning">No</Pill> },
+          { key: "period", header: "Period", cell: (row) => String(row.fields.period || "Unspecified") },
+          { key: "status", header: "State", cell: (row) => <Pill tone={row.status === "approved" ? "success" : "warning"}>{row.status}</Pill> },
+          { key: "amount", header: "Recorded total", align: "end", cell: (row) =>
+            row.amountMinor !== undefined ? context.money(row.amountMinor) : <span className="ds-subtle">Not recorded</span> },
+          { key: "reviewer", header: "Approved by", cell: (row) => String(row.fields.approvedBy || "—"), hideBelow: 900 },
         ]}
-        onOpen={(id) => context.openOverlay("Payroll review", { id })}
+        empty={<Empty title={data.payrollRuns.length ? "No runs match the filters" : "No payroll runs recorded"}>
+          Select another status or create a reviewed local run from authorised payroll actions.
+        </Empty>}
       />
     </Stack>
   );
