@@ -403,7 +403,7 @@ export function AppShell() {
                     {platformPeers.map(peer => {
                       const PeerIcon = peer.icon;
                       return <Link key={peer.code} to={appEntry(peer.code, org.slug)} className="hq-navlink">
-                        <PeerIcon size={15} aria-hidden="true" />
+                        <PeerIcon size={15} />
                         <span className="ds-truncate">{peer.short}</span>
                       </Link>;
                     })}
