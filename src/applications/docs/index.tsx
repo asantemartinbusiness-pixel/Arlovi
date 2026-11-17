@@ -2291,10 +2291,11 @@ function ReviewerAssignment({ context, close }: { context: ScreenContext; close:
       onSubmit={async (event) => {
         event.preventDefault();
         if (chosen.length === 0) return;
-        await context.mutate.patch(record.id, {
+        const updated = await context.mutate.patch(record.id, {
           status: "in_review",
           fields: { ...record.fields, reviewers: chosen.join("|"), reviewMandatory: mandatory },
         }, { expectRevision: record.revision, event: `Reviewers assigned to ${record.title}: ${chosen.join(", ")}` });
+        if (!updated) return;
         context.toast("Reviewers assigned", `${chosen.length} reviewer${chosen.length === 1 ? "" : "s"} recorded on the document. No notification service is connected, so nobody was emailed.`);
         close();
       }}
