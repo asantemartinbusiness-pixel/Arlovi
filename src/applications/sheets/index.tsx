@@ -228,21 +228,30 @@ function WorkbookLibrary({ context, tab }: { context: ScreenContext; tab: "Recen
   const workbooks = useCollection("workbooks");
   const { org, actor } = useWorkspace();
   const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [folder, setFolder] = useState("all");
+  const active = workbooks.filter((record) => record.status !== "archived");
+  const folders = [...new Set(workbooks.map((record) => String(record.fields.folder ?? "Unfiled")))];
+  const templateCount = workbooks.filter((record) => record.fields.isTemplate === true || record.status === "template").length;
+  const sharedCount = workbooks.filter((record) => String(record.fields.sharedWith ?? "").split("|").some((name) => name.trim().length > 0)).length;
 
   const rows = useMemo(() => {
-    let list = workbooks;
-    if (tab === "Recent") list = [...workbooks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 12);
-    if (tab === "Mine") list = workbooks.filter((record) => record.ownerName === actor);
-    if (tab === "Shared") list = workbooks.filter((record) => record.ownerName !== actor);
+    let list = tab === "Templates" ? workbooks : active;
+    if (tab === "Recent") list = [...active].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 12);
+    if (tab === "Mine") list = active.filter((record) => record.ownerName === actor);
+    if (tab === "Shared") list = active.filter((record) => String(record.fields.sharedWith ?? "").split("|").some((name) => name.trim().length > 0));
     if (tab === "Templates") list = workbooks.filter((record) => record.fields.isTemplate === true || record.status === "template");
+    if (status !== "all") list = list.filter((record) => record.status === status);
+    if (folder !== "all") list = list.filter((record) => String(record.fields.folder ?? "Unfiled") === folder);
     if (query.trim()) {
       const needle = query.trim().toLowerCase();
       list = list.filter((record) => `${record.title} ${record.summary} ${record.tags.join(" ")}`.toLowerCase().includes(needle));
     }
     return list;
-  }, [workbooks, tab, actor, query]);
+  }, [workbooks, active, tab, actor, query, status, folder]);
 
-  if (rows.length === 0) {
+  const hasFilters = Boolean(query.trim()) || status !== "all" || folder !== "all";
+  if (rows.length === 0 && !hasFilters) {
     return (
       <Empty title={`No ${tab.toLowerCase()} workbooks`} icon={<FileSpreadsheet size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("new workbook")}>New workbook</Button>}>
         {tab === "Templates" ? "Mark a workbook as a template to reuse its sheets and formats." : "Create a workbook, or import a CSV."}
@@ -252,9 +261,33 @@ function WorkbookLibrary({ context, tab }: { context: ScreenContext; tab: "Recen
 
   return (
     <Stack gap={4}>
-      <Row gap={3} wrap>
-        <Field label="Search"><TextInput aria-label="Search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles and tags" /></Field>
-      </Row>
+      <div className="sx-library-header">
+        <div>
+          <span className="sx-library-eyebrow">SHEETS / WORKBOOK LIBRARY</span>
+          <h2>{tab === "Shared" ? "Recorded collaboration." : tab === "Templates" ? "Reusable workbook structures." : tab === "Mine" ? "Your models and data." : "Your workbook workspace."}</h2>
+          <p>{tab === "Shared" ? "Workbooks with a locally recorded sharing list. This is not an external permission or invitation." : "Find, review and open calculation models without losing the context of your company."}</p>
+        </div>
+        <Button variant="primary" onClick={() => context.openOverlay("new workbook")}>New workbook</Button>
+      </div>
+      <div className="sx-library-metrics" aria-label="Workbook library overview">
+        <div><span>Active workbooks</span><strong>{active.length}</strong><small>Available in this workspace</small></div>
+        <div><span>Owned by you</span><strong>{active.filter((record) => record.ownerName === actor).length}</strong><small>Your working models</small></div>
+        <div><span>Sharing recorded</span><strong>{sharedCount}</strong><small>Local record only</small></div>
+        <div><span>Templates</span><strong>{templateCount}</strong><small>Reusable structures</small></div>
+      </div>
+      <div className="sx-library-filters">
+        <Row gap={3} wrap>
+          <Field label="Search"><TextInput aria-label="Search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Title, summary or tag" /></Field>
+          <Field label="Status"><Select aria-label="Workbook status" value={status} onChange={(event) => setStatus(event.target.value)}>
+            <option value="all">All statuses</option><option value="active">Active</option><option value="draft">Draft</option><option value="archived">Archived</option><option value="template">Template</option>
+          </Select></Field>
+          <Field label="Folder"><Select aria-label="Workbook folder" value={folder} onChange={(event) => setFolder(event.target.value)}>
+            <option value="all">All folders</option>{folders.map((name) => <option key={name} value={name}>{name}</option>)}
+          </Select></Field>
+          {hasFilters && <Button size="sm" variant="ghost" onClick={() => { setQuery(""); setStatus("all"); setFolder("all"); }}>Clear filters</Button>}
+        </Row>
+      </div>
+      {rows.length === 0 && <Empty title="No workbooks match your filters" action={<Button variant="secondary" onClick={() => { setQuery(""); setStatus("all"); setFolder("all"); }}>Reset filters</Button>}>Try another title, folder or status.</Empty>}
       <DataGrid
         rows={rows}
         rowId={(row) => row.id}
