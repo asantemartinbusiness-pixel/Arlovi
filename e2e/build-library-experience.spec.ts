@@ -26,7 +26,8 @@ test("Build template search recovers from no results", async ({ page }) => {
 test("An invalid Build project URL does not open a different project's overview", async ({ page }) => {
   await page.goto("/o/northline/build/projects");
   await page.goto("/o/northline/build/projects/missing-build-project-qa-2026");
-  await expect(page.locator("#main")).toContainText("No app project in this workspace");
+  await expect(page.locator("#main")).toContainText("Record not found");
+  await expect(page.locator("#main")).toContainText("No other record was substituted.");
 });
 
 test("Build project overview and builder expose visible workflow context", async ({ page }) => {
