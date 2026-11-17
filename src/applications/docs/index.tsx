@@ -1747,8 +1747,11 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
   const [templateId, setTemplateId] = useState(payload?.templateId ?? "");
   const [folder, setFolder] = useState("Unfiled");
   const [confidential, setConfidential] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const existing = useCollection("documents");
   const duplicate = existing.some((record) => record.title.trim().toLowerCase() === title.trim().toLowerCase());
+  const selectedTemplate = templates.find((record) => record.id === templateId);
 
   return (
     <form
@@ -1756,26 +1759,39 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!title.trim() || duplicate) return;
-        const template = templates.find((record) => record.id === templateId);
-        const body = template ? readDoc(template.body, context.actor, context.now.toISOString()) : readDoc(undefined, context.actor, context.now.toISOString());
-        const created = await context.mutate.create({
-          collection: "documents",
-          title: title.trim(),
-          status: "draft",
-          summary: template ? `Started from ${template.title}.` : "New document.",
-          tags: confidential ? ["confidential"] : [],
-          fields: { folder, confidential, kind: template ? String(template.fields.kind ?? "document") : "document", templateId: templateId || "" },
-          body,
-        }, `Document ${title.trim()} created`);
-        if (template) {
-          await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true });
+        if (!title.trim() || duplicate || saving) return;
+        if (templateId && (!selectedTemplate || selectedTemplate.status !== "published")) {
+          setError("Select a published, available template or start blank.");
+          return;
         }
-        context.toast("Document created", `${created.title} is in ${folder}.`);
-        close();
-        context.navigate(`/o/${org.slug}/docs/documents/${created.id}`);
+        setSaving(true);
+        setError("");
+        try {
+          const template = selectedTemplate;
+          const body = template ? readDoc(template.body, context.actor, context.now.toISOString()) : readDoc(undefined, context.actor, context.now.toISOString());
+          const created = await context.mutate.create({
+            collection: "documents", title: title.trim(), status: "draft",
+            summary: template ? `Started from ${template.title}.` : "New document.",
+            tags: confidential ? ["confidential"] : [],
+            fields: { folder, confidential, kind: "document", templateId: template?.id ?? "", templateSourceRevision: template?.revision ?? null },
+            body,
+          }, `Document ${title.trim()} created`);
+          if (template) {
+            try {
+              await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true, expectRevision: template.revision });
+            } catch {
+              context.toast("Document created", "The document was saved. The template usage counter could not be updated.", "info");
+            }
+          }
+          context.toast("Document created", `${created.title} is in ${folder}.`);
+          close();
+          context.navigate(`/o/${org.slug}/docs/documents/${created.id}`);
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "The document could not be created.");
+        } finally { setSaving(false); }
       }}
     >
+      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENTS / CREATION</span><h3>Start a new company document</h3><p>Choose a published master or begin blank, then file the record in the appropriate workspace folder.</p></div>
       <Field label="Title" required hint="Shown in the library, the outline and every export.">
         <TextInput aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} invalid={duplicate} required autoFocus />
       </Field>
@@ -1783,7 +1799,7 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
       <Field label="Start from" hint="A template fills the sections and leaves the company fields as tokens.">
         <Select aria-label="Start from" value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
           <option value="">Blank document</option>
-          {templates.map((record) => <option key={record.id} value={record.id}>{record.title}</option>)}
+          {templates.filter((record) => record.status === "published").map((record) => <option key={record.id} value={record.id}>{record.title}</option>)}
         </Select>
       </Field>
       <Field label="Folder">
@@ -1792,6 +1808,10 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
         </Select>
       </Field>
       <Checkbox label="Confidential — keep the body out of search previews" checked={confidential} onChange={(event) => setConfidential(event.target.checked)} />
+      <Properties rows={[{ label: "Starting point", value: selectedTemplate?.title ?? "Blank document" }, { label: "Record state", value: "Draft" }, { label: "Folder", value: folder }, { label: "Distribution", value: "None — browser-local record" }]} />
+      {selectedTemplate && <Notice tone="info" title="The master stays independent">This document will receive a copy of the template content and preserve its source revision. Unresolved company-field tokens remain visible for human completion.</Notice>}
+      {error && <Notice tone="danger" title="Document not created">{error}</Notice>}
+      {saving && <p className="ds-subtle">Creating the document…</p>}
     </form>
   );
 }
