@@ -1434,9 +1434,10 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
   }
 
   if (lens === "Exceptions") {
-    const overtime = roster.filter((shift) => shift.fields.overtime === true);
+    const overtime = roster.filter((shift) => shift.fields.overtime === true && shift.fields.overtimeApproved !== true);
     const clashes = roster.filter((shift) => data.leaveRequests.some((request) => {
-      if (request.status !== "approved" || request.fields.employeeId !== shift.fields.employeeId || !request.startAt || !request.endAt || !shift.startAt || !shift.endAt) return false;
+      if (request.status !== "approved" || request.fields.employeeId !== shift.fields.employeeId
+        || !request.startAt || !request.endAt || !shift.startAt || !shift.endAt) return false;
       try {
         return intervalsOverlap(validShiftInterval(shift), {
           start: Date.parse(request.startAt), end: Date.parse(request.endAt) + 86_400_000,
@@ -1450,30 +1451,86 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
       try { return intervalsOverlap(validShiftInterval(shift), validShiftInterval(other)); }
       catch { return false; }
     }));
-    const unapproved = timesheets.filter((entry) => entry.fields.approved !== true);
+    const unapproved = timesheets.filter((entry) => entry.fields.approved !== true || entry.status !== "approved");
     const rows = [
-      ...clashes.map((shift) => ({ id: `${shift.id}-clash`, kind: "Rostered while away", detail: `${String(shift.fields.employeeName ?? "")} on ${context.date(shift.startAt)}`, tone: "danger" as const })),
-      ...overlaps.map((shift) => ({ id: `${shift.id}-overlap`, kind: "Overlapping shifts", detail: `${String(shift.fields.employeeName ?? "")} on ${context.date(shift.startAt)}`, tone: "danger" as const })),
-      ...unlinked.map((entry) => ({ id: `${entry.id}-unlinked`, kind: "Unlinked time entry", detail: `${String(entry.fields.employeeName ?? "")} must be linked to an employee and a valid company project`, tone: "danger" as const })),
-      ...overtime.map((shift) => ({ id: `${shift.id}-ot`, kind: "Over eight hours", detail: `${String(shift.fields.employeeName ?? "")} on ${context.date(shift.startAt)}`, tone: "warning" as const })),
-      ...unapproved.map((entry) => ({ id: `${entry.id}-unapproved`, kind: "Hours not approved", detail: `${String(entry.fields.employeeName ?? "")} · ${String(entry.fields.hours ?? 0)}h`, tone: "warning" as const })),
+      ...clashes.map((shift) => ({
+        id: `${shift.id}-leave`, recordId: shift.id, source: "shift" as const,
+        kind: "Rostered during approved leave", detail: `${String(shift.fields.employeeName ?? "Unlinked employee")} · ${context.date(shift.startAt)}`, tone: "danger" as const,
+      })),
+      ...overlaps.map((shift) => ({
+        id: `${shift.id}-overlap`, recordId: shift.id, source: "shift" as const,
+        kind: "Overlapping shift", detail: `${String(shift.fields.employeeName ?? "Unlinked employee")} · ${context.date(shift.startAt)}`, tone: "danger" as const,
+      })),
+      ...unlinked.map((entry) => ({
+        id: `${entry.id}-unlinked`, recordId: entry.id, source: "time" as const,
+        kind: "Unlinked time entry", detail: `${String(entry.fields.employeeName ?? "Person not linked")} · Verify the employee or Project source`, tone: "danger" as const,
+      })),
+      ...overtime.map((shift) => ({
+        id: `${shift.id}-overtime`, recordId: shift.id, source: "shift" as const,
+        kind: "Overtime review", detail: `${String(shift.fields.employeeName ?? "Unlinked employee")} · ${String(shift.fields.hours ?? "—")}h · ${context.date(shift.startAt)}`, tone: "warning" as const,
+      })),
+      ...unapproved.map((entry) => ({
+        id: `${entry.id}-time`, recordId: entry.id, source: "time" as const,
+        kind: "Time awaiting review", detail: `${String(entry.fields.employeeName ?? "Unlinked employee")} · ${String(entry.fields.hours ?? "—")}h`, tone: "warning" as const,
+      })),
     ];
-    return rows.length === 0 ? <Empty title="No exceptions" icon={<AlertTriangle size={20} />}>Clashes, overtime and unapproved hours appear here.</Empty> : (
-      <Stack gap={3}>
-        <Notice tone="info" title="Checked against this organisation's rules">
-          Scheduling checks use stored UTC instants and approved leave records. The location time zone is {org.timezone}; working-time law, payroll and external calendars are not independently verified.
-        </Notice>
-        <DataGrid
-          rows={rows}
-          rowId={(row) => row.id}
-          label="Scheduling exceptions"
-          filterable={false}
-          rowTone={(row) => row.tone}
-          columns={[
-            { key: "kind", header: "Exception", primary: true, cell: (row) => row.kind },
-            { key: "detail", header: "Detail", cell: (row) => row.detail },
-          ]}
+    const critical = rows.filter((row) => row.tone === "danger");
+    const review = rows.filter((row) => row.tone === "warning");
+    const filtered = rows.filter((row) =>
+      exceptionFilter === "all" || (exceptionFilter === "critical" ? row.tone === "danger" : row.tone === "warning"));
+    const openSource = (row: (typeof rows)[number]) => {
+      context.select(row.recordId);
+      context.openOverlay(row.source === "shift" ? "Shift edit" : "time review", { id: row.recordId });
+    };
+    return (
+      <Stack gap={4}>
+        <OpsHeader
+          eyebrow="People / Scheduling / Exceptions"
+          title="Issues with a next action."
+          description="A focused review queue for roster collisions, unlinked records and hours that still require a human decision."
+          actions={<Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/scheduling?tab=Roster`)}>Return to roster</Button>}
+          note="One record can appear more than once if it has separate issues."
         />
+        <OpsMetrics label="Scheduling exceptions overview">
+          <OpsMetric label="Critical checks" value={critical.length} detail="Leave, overlap or missing links" emphasis={critical.length ? "attention" : "neutral"} />
+          <OpsMetric label="Needs review" value={review.length} detail="Time or overtime decisions" />
+          <OpsMetric label="Time entries pending" value={unapproved.length} detail="People approval required" />
+          <OpsMetric label="Open overtime flags" value={overtime.length} detail="Not a payroll or compliance decision" />
+        </OpsMetrics>
+        <div className="ops-toolbar" aria-label="Filter scheduling exceptions">
+          <strong className="ops-toolbar-heading">Review queue</strong>
+          <Button size="sm" variant={exceptionFilter === "all" ? "secondary" : "ghost"} aria-pressed={exceptionFilter === "all"} onClick={() => setExceptionFilter("all")}>All ({rows.length})</Button>
+          <Button size="sm" variant={exceptionFilter === "critical" ? "secondary" : "ghost"} aria-pressed={exceptionFilter === "critical"} onClick={() => setExceptionFilter("critical")}>Critical ({critical.length})</Button>
+          <Button size="sm" variant={exceptionFilter === "review" ? "secondary" : "ghost"} aria-pressed={exceptionFilter === "review"} onClick={() => setExceptionFilter("review")}>Needs review ({review.length})</Button>
+        </div>
+        {filtered.length === 0 ? (
+          <Empty title={rows.length ? "Nothing in this filter" : "No scheduling exceptions"} icon={<ClipboardCheck size={20} />}>
+            {rows.length ? "Switch the queue filter to review other types of issues." : "No leave conflicts, overlapping shifts, unlinked time or pending decisions were found in the local records."}
+          </Empty>
+        ) : (
+          <DataGrid
+            rows={filtered}
+            rowId={(row) => row.id}
+            label="Scheduling exceptions"
+            rowTone={(row) => row.tone}
+            onOpen={(id) => {
+              const row = filtered.find((item) => item.id === id);
+              if (row) openSource(row);
+            }}
+            columns={[
+              { key: "kind", header: "Issue", primary: true, cell: (row) => <Pill tone={row.tone}>{row.kind}</Pill>, filterValue: (row) => row.kind },
+              { key: "detail", header: "Source and context", cell: (row) => row.detail, filterValue: (row) => row.detail },
+              { key: "action", header: "Next action", align: "end", cell: (row) => (
+                <Button size="sm" variant="secondary" onClick={() => openSource(row)}>
+                  {row.source === "shift" ? "Review shift" : "Review time"}
+                </Button>
+              ) },
+            ]}
+          />
+        )}
+        <Notice tone="info" title="These are operational checks, not compliance decisions">
+          Records are checked against saved shifts and approved leave. Resolve the real source and reassess; this screen does not independently establish legal working-time compliance or submit payroll.
+        </Notice>
       </Stack>
     );
   }
