@@ -14,6 +14,7 @@ import { capabilityById, CAPABILITY_LABELS, CAPABILITY_TONE } from "@/platform/c
 import { ROLE_LABELS, can as roleCan, type Capability } from "@/platform/policy";
 import { clockIso, clockNow, freshness } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
+import { mineAttentionItems } from "@/platform/attention";
 import {
   activeQueue, approvalRows, attentionBus, busItem, csv, groupBy, PRIORITIES, PRIORITY_LABEL, PRIORITY_TONE,
   routeReason, targetDrift, useInboxData, usePublishedItems, useSeeded, useSeededList, writeTriage,
@@ -175,7 +176,7 @@ function ForYou({ context }: { context: ScreenContext }) {
     if (lens === "snoozed") return items.filter((item) => item.snoozed);
     const live = activeQueue(items);
     if (lens === "unread") return live.filter((item) => !item.read);
-    if (lens === "mine") return live.filter((item) => item.assignee === actor || item.kind === "assignment" || item.kind === "approval");
+    if (lens === "mine") return mineAttentionItems(live, actor);
     if (lens === "urgent") return live.filter((item) => item.priority === "P0" || item.priority === "P1");
     return live;
   }, [items, lens, actor]);
