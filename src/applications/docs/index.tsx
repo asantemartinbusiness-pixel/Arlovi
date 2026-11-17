@@ -2245,6 +2245,8 @@ function DiffOverlay({ context }: { context: ScreenContext }) {
     const before = readDoc(snapshot.body, record.ownerName, snapshot.at);
     const beforeStats = documentStats(before);
     const afterStats = documentStats(editor.model);
+    const removedCount = before.blocks.filter((block) => !editor.model.blocks.some((item) => visibleText(item) === visibleText(block))).length;
+    const addedCount = editor.model.blocks.filter((block) => !before.blocks.some((item) => visibleText(item) === visibleText(block))).length;
     return (
       <Stack gap={4}>
         <Properties rows={[
@@ -2252,7 +2254,9 @@ function DiffOverlay({ context }: { context: ScreenContext }) {
           { label: "Words then / now", value: `${beforeStats.words} → ${afterStats.words}` },
           { label: "Blocks then / now", value: `${before.blocks.length} → ${editor.model.blocks.length}` },
           { label: "Headings then / now", value: `${beforeStats.headings} → ${afterStats.headings}` },
+          { label: "Blocks removed / added", value: `${removedCount} / ${addedCount}` },
         ]} />
+        <Notice tone="info" title="Comparison is a readable block-level summary">Text is compared by visible block content, not a cryptographic or legal redline. Reordered or repeated blocks can appear as changed.</Notice>
         <Card eyebrow="REMOVED" prov="posted" title="Blocks only in the stored version">
           <Stack gap={1}>
             {before.blocks.filter((block) => !editor.model.blocks.some((item) => visibleText(item) === visibleText(block))).slice(0, 8).map((block) => (
