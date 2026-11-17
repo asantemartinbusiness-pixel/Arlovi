@@ -451,12 +451,28 @@ export function ContentCalendar({ context, view }: { context: ScreenContext; vie
   const data = useMarketData();
   const { now, org } = useWorkspace();
   const [anchor, setAnchor] = useState(() => new Date(now));
-
-  const posts = data.socialPosts.filter((post) => post.startAt);
+  const [networkFilter, setNetworkFilter] = useState("all");
+  const [moveError, setMoveError] = useState("");
+  const datedPosts = data.socialPosts.filter(post => Boolean(post.startAt));
+  const channels = [...new Set(datedPosts.map(post => String(post.fields.network ?? "")).filter(Boolean))].sort();
+  const posts = datedPosts.filter(post => networkFilter === "all" || String(post.fields.network) === networkFilter);
+  const filters = <div className="t4-market-filters" role="group" aria-label="Content calendar filters">
+    <label>Channel
+      <Select aria-label="Filter calendar by channel" value={networkFilter}
+        onChange={event => { setNetworkFilter(event.target.value); context.select(undefined); }}>
+        <option value="all">All channels</option>
+        {channels.map(channel => <option key={channel} value={channel}>{networkOf(channel).label}</option>)}
+      </Select>
+    </label>
+    <span className="t4-market-filter-count" role="status" aria-live="polite">{posts.length} of {datedPosts.length} dated items · {org.timezone}</span>
+    {networkFilter !== "all" && <Button size="sm" variant="ghost" onClick={() => setNetworkFilter("all")}>Clear channel</Button>}
+  </div>;
 
   if (view === "List") {
     return (
-      <DataGrid
+      <Stack gap={4}>
+        {filters}
+        <DataGrid
         rows={[...posts].sort((a, b) => (a.startAt ?? "").localeCompare(b.startAt ?? ""))}
         rowId={(row) => row.id}
         label="Scheduled content"
@@ -471,12 +487,15 @@ export function ContentCalendar({ context, view }: { context: ScreenContext; vie
           { key: "status", header: "Delivery", cell: (row) => <Pill tone={row.status === "published" ? "success" : row.status === "failed" ? "danger" : "warning"} dot>{row.status === "scheduled" ? "Queued locally" : row.status}</Pill> },
         ]}
       />
+      </Stack>
     );
   }
 
   if (view === "By channel") {
     return (
-      <Grid>
+      <Stack gap={4}>
+        {filters}
+        <Grid>
         {[...new Set(posts.map((post) => String(post.fields.network)))].map((network) => {
           const list = posts.filter((post) => String(post.fields.network) === network).sort((a, b) => (a.startAt ?? "").localeCompare(b.startAt ?? ""));
           return (
@@ -492,14 +511,16 @@ export function ContentCalendar({ context, view }: { context: ScreenContext; vie
             </Card>
           );
         })}
-        {posts.length === 0 && <Empty title="Nothing scheduled" icon={<CalendarCheck size={20} />} />}
+        {posts.length === 0 && <Empty title="No content for this channel" icon={<CalendarCheck size={20} />} />}
       </Grid>
+      </Stack>
     );
   }
 
   const mode = view === "Week" ? "week" : "month";
   return (
     <Stack gap={4}>
+      {filters}
       <CalendarToolbar mode={mode} anchor={anchor} onAnchor={setAnchor} now={now} label="Content calendar" />
       <ScheduleCalendar
         mode={mode}
@@ -516,12 +537,24 @@ export function ContentCalendar({ context, view }: { context: ScreenContext; vie
         }))}
         onOpen={(id) => context.openOverlay("Post editor", { id })}
         onMove={async (id, nextIso) => {
-          const post = data.socialPosts.find((item) => item.id === id);
+          const post = data.socialPosts.find(item => item.id === id);
           if (!post) return;
-          await context.mutate.patch(id, { startAt: nextIso, at: nextIso }, { expectRevision: post.revision, event: `${post.title} rescheduled` });
-          context.toast("Rescheduled", `${post.title} is queued for ${context.dateTime(nextIso)} in ${org.timezone}. Nothing was sent to a provider.`);
+          if (post.status === "published") {
+            setMoveError("Published items cannot be rescheduled. Duplicate as a draft to create a new plan.");
+            return;
+          }
+          setMoveError("");
+          try {
+            const result = await context.mutate.patch(id, { startAt: nextIso, at: nextIso },
+              { expectRevision: post.revision, event: `${post.title} rescheduled` });
+            if (!result) throw new Error("Revision conflict");
+            context.toast("Schedule updated", `${post.title} is planned for ${context.dateTime(nextIso)} in ${org.timezone}. Nothing was sent to a provider.`);
+          } catch {
+            setMoveError("The schedule could not be saved, possibly because this post changed. Review it before trying again.");
+          }
         }}
       />
+      {moveError && <Notice tone="danger" title="Schedule change not saved">{moveError}</Notice>}
       <Notice tone="info" title={`Times are shown in ${org.timezone}`}>
         A scheduled item is a local record. When the time passes with no connected account the item is marked failed rather than silently dropped.
       </Notice>
