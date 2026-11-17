@@ -49,7 +49,8 @@ function useDeck(context: ScreenContext): Rec | undefined {
   const fromRoute = useRecord(context.params.id);
   const all = useCollection("decks");
   useGuardRefresh(context);
-  return fromRoute ?? all.find((record) => record.fields.isTemplate !== true) ?? all[0];
+  if (context.params.id) return fromRoute?.collection === "decks" ? fromRoute : all.find((record) => record.id === context.params.id);
+  return all.find((record) => record.fields.isTemplate !== true) ?? all[0];
 }
 
 /** The screen's contract actions, on the editor's own bar (the full-chrome surface has no page header). */
