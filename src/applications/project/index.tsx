@@ -22,6 +22,7 @@ import {
 import { getRecord } from "@/platform/repo";
 import { clockNow } from "@/platform/clock";
 import { createProjectFromTemplate, type ProjectPhase } from "./creation";
+import { positiveHours, taskMoveDecision } from "./progression";
 
 /** On project-scoped screens the initial selection is the project itself; a task action needs a task. */
 async function withTask(context: ScreenContext, what: string, then: (task: Rec) => void): Promise<void> {
@@ -268,7 +269,9 @@ function StatusNote({ context, close }: { context: ScreenContext; close: () => v
 function StageRule({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string; lane?: string } | undefined;
   const task = useRecord(payload?.id ?? context.selectedId);
-  if (!task) return <Empty title="No task" />;
+  const tasks = useProjectData().tasks;
+  if (!task || task.collection !== "tasks") return <Empty title="No task" />;
+  const decision = taskMoveDecision(task, "done", tasks);
   return (
     <Stack gap={4}>
       <p className="ds-prose">
@@ -280,16 +283,24 @@ function StageRule({ context, close }: { context: ScreenContext; close: () => vo
         { label: "Requested stage", value: String(payload?.lane ?? "done") },
         { label: "What the rule is for", value: "High priority work gets a reviewer before it is called finished" },
       ]} />
+      {decision.blocked && <Notice tone="danger" title="Task cannot be finished">{decision.blocked}</Notice>}
       <Row gap={2}>
         <Button variant="ghost" onClick={close}>Leave it where it is</Button>
         <span className="ds-grow" />
         <Button variant="secondary" onClick={async () => {
-          await context.mutate.patch(task.id, { status: "review", fields: { ...task.fields, stage: "review" } }, { expectRevision: task.revision, event: `${task.title} sent to review` });
+          const saved = await context.mutate.patch(task.id, {
+            status: "review", fields: { ...task.fields, stage: "review" },
+          }, { expectRevision: task.revision, event: `${task.title} sent to review` });
+          if (!saved) return;
           context.toast("Moved to Review", "The reviewer can move it on from there.");
           close();
         }}>Send to Review instead</Button>
-        <Button variant="primary" onClick={async () => {
-          await context.mutate.patch(task.id, { status: "done", fields: { ...task.fields, stage: "done", reviewSkippedBy: context.actor } }, { expectRevision: task.revision, event: `${task.title} marked done without review by ${context.actor}` });
+        <Button variant="primary" disabled={Boolean(decision.blocked) || !decision.needsReviewDecision} onClick={async () => {
+          if (decision.blocked || !decision.needsReviewDecision) return;
+          const saved = await context.mutate.patch(task.id, {
+            status: "done", fields: { ...task.fields, stage: "done", reviewSkippedBy: context.actor },
+          }, { expectRevision: task.revision, event: `${task.title} marked done without review by ${context.actor}` });
+          if (!saved) return;
           context.toast("Moved to Done", "The skipped review is recorded against your name on the task.");
           close();
         }}>Move anyway and record it</Button>
@@ -378,9 +389,17 @@ function AllocationEditor({ context, close }: { context: ScreenContext; close: (
       onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        await context.mutate.patch(task.id, {
-          fields: { ...task.fields, estimateHours: Number(form.get("estimate") ?? 0), assignee: String(form.get("assignee") ?? task.fields.assignee) },
+        let hours: number;
+        try {
+          hours = positiveHours(form.get("estimate"));
+        } catch (error) {
+          context.toast("Check estimated hours", error instanceof Error ? error.message : "Enter a valid non-negative number.", "blocked");
+          return;
+        }
+        const saved = await context.mutate.patch(task.id, {
+          fields: { ...task.fields, estimateHours: hours, assignee: String(form.get("assignee") ?? task.fields.assignee) },
         }, { expectRevision: task.revision, event: `Estimate and owner changed on ${task.title}` });
+        if (!saved) return;
         context.toast("Allocation saved", "The estimate and owner are on the task record.");
         close();
       }}
