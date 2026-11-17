@@ -1248,6 +1248,16 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
           rowId={(row) => row.id}
           label="Timesheets"
           onOpen={(id) => context.openOverlay("time review", { id })}
+          card={(entry) => {
+            const person = data.employees.find((record) => record.id === entry.fields.employeeId);
+            const project = data.projects.find((record) => record.id === entry.fields.projectId);
+            const approved = entry.status === "approved" && entry.fields.approved === true;
+            return <>
+              <strong>{person?.title ?? String(entry.fields.employeeName ?? "Unlinked person")}</strong>
+              <span className="ds-subtle">{project?.title ?? (entry.fields.projectId ? "Project unavailable" : "Internal work")} · {String(entry.fields.hours ?? "—")}h</span>
+              <Pill tone={approved ? "success" : "warning"}>{approved ? "Approved" : "Needs approval"}</Pill>
+            </>;
+          }}
           columns={[
             { key: "who", header: "Person", primary: true, cell: (row) => {
               const person = data.employees.find((employee) => employee.id === row.fields.employeeId);
