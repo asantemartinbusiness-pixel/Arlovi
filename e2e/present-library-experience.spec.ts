@@ -17,3 +17,23 @@ test("Present shared library never interprets another owner as external access",
   await expect(main.getByRole("heading", { name: "Recorded sharing." })).toBeVisible();
   await expect(main).toContainText("Public or workspace access is not implied.");
 });
+
+test("Present slide editor exposes slide status and contextual theme navigation", async ({ page }) => {
+  await page.goto("/o/northline/present/decks");
+  const id = await page.evaluate(async () => {
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "decks", currency: "GBP",
+      title: "QA Present Slide Context", status: "active", fields: { folder: "Marketing" },
+    }, ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  });
+  await page.goto(`/o/northline/present/decks/${id}`);
+  const main = page.locator("#main");
+  await expect(main.getByLabel("Active slide context")).toBeVisible();
+  await main.getByLabel("Active slide context").getByRole("button", { name: "Theme" }).click();
+  await expect(page).toHaveURL(new RegExp(`/present/decks/${id}/theme`));
+});
