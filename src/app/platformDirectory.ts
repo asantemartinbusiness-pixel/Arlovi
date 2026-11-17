@@ -27,7 +27,7 @@ export function platformDestinations(code: string, orgSlug: string): { label: st
   return (PLATFORM_LINKS[code] ?? []).flatMap(({ id, label }) => {
     const screen = screens.find(item => item.id === id && item.applicationCode === code);
     // Resolve the company only. Never manufacture a sample record identifier.
-    if (!screen || /:(?!org\\b)[a-z]+\\b/i.test(screen.route)) return [];
+    if (!screen || /:(?!org\b)[a-z]+\b/i.test(screen.route)) return [];
     return [{ label, to: screen.route.replace(":org", orgSlug) }];
   });
 }
