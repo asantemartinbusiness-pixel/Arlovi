@@ -16,7 +16,7 @@ import { leaveRequestDays, planLeaveDecision } from "./decisions";
 import { planTimesheetApprovals } from "./workforce";
 import { intervalsOverlap, validShiftInterval } from "@/domain/scheduling";
 import { linkedPersonnelDocuments, scopedDetailRecord } from "@/platform/recordScope";
-import { dailyCoverage, employeeOnLeave, rosterDateLabel, rosterShiftsForDay, rosterWeekDays, shiftDays } from "./rosterView";
+import { dailyCoverage, employeeOnLeave, localDayKey, rosterDateLabel, rosterShiftsForDay, rosterWeekDays, shiftDays } from "./rosterView";
 import { OpsHeader, OpsMetric, OpsMetrics } from "@/applications/shared/operational-surfaces";
 
 /* ------------------------------------------------------------------ *
@@ -366,24 +366,49 @@ export function PeopleOverview({ context, lens }: { context: ScreenContext; lens
 
 export function StaffingSummary({ context }: { context: ScreenContext }) {
   const data = useCollections(["shifts", "leaveRequests", "employees"]);
-  const { now } = useWorkspace();
-  const days = Array.from({ length: 7 }, (_, index) => addDays(now, index));
-  const rows = days.map((day) => {
-    const key = day.toDateString();
-    const onShift = data.shifts.filter((shift) => shift.fields.kind === "shift" && shift.startAt && new Date(shift.startAt).toDateString() === key);
-    const onLeave = data.leaveRequests.filter((request) => request.status === "approved" && request.startAt && request.endAt && new Date(request.startAt) <= day && new Date(request.endAt) >= day);
-    return { day, onShift: onShift.length, onLeave: onLeave.length, thin: onShift.length > 0 && onShift.length <= 2 };
+  const { now, org } = useWorkspace();
+  const startKey = localDayKey(now, org.timezone);
+  const localNoon = new Date(`${startKey}T12:00:00.000Z`);
+  const roster = data.shifts.filter((row) => row.fields.kind === "shift");
+  const employees = data.employees.filter((row) => !["alumni", "terminated"].includes(row.status));
+  const days = Array.from({ length: 7 }, (_, offset) => {
+    const date = new Date(localNoon);
+    date.setUTCDate(date.getUTCDate() + offset);
+    const key = date.toISOString().slice(0, 10);
+    const working = employees.filter((employee) =>
+      rosterShiftsForDay(roster, employee.id, key, org.timezone).length > 0);
+    const away = employees.filter((employee) =>
+      employeeOnLeave(data.leaveRequests, employee.id, key, org.timezone));
+    const conflicts = working.filter((employee) => away.some((person) => person.id === employee.id));
+    return { key, day: date, onShift: working.length, onLeave: away.length, conflicts: conflicts.length };
   });
   return (
-    <Stack gap={2}>
-      {rows.map((row) => (
-        <Row key={row.day.toISOString()} gap={3}>
-          <span style={{ width: 92 }} className="ds-subtle">{context.date(row.day, { weekday: "short", day: "numeric", month: "short" })}</span>
-          <div className="ds-grow"><Meter value={row.onShift} max={5} label={`People on shift ${context.date(row.day)}`} tone={row.thin ? "warning" : undefined} /></div>
-          <span className="ds-num" style={{ width: 96, textAlign: "end" }}>{row.onShift} on · {row.onLeave} away</span>
+    <Stack gap={3}>
+      {days.map((row) => (
+        <Row key={row.key} gap={3}>
+          <span style={{ width: 95 }} className="ds-subtle">{rosterDateLabel(row.key)}</span>
+          <div className="ds-grow">
+            <Meter value={row.onShift} max={Math.max(1, employees.length)}
+              label={`Rostered people on ${rosterDateLabel(row.key)}`}
+              tone={row.conflicts > 0 ? "warning" : undefined} />
+          </div>
+          <span className="ds-num" style={{ width: 130, textAlign: "end" }}>
+            {row.onShift} working · {row.onLeave} away
+          </span>
         </Row>
       ))}
-      <p className="ds-subtle">Counted from roster records and approved leave. A day with no roster entry is shown as empty rather than guessed.</p>
+      <p className="ds-subtle">
+        Counts use {org.timezone} calendar days, including overnight shifts, and distinguish employees from individual shifts.
+        No minimum staffing requirement is recorded here, so an unassigned or lightly rostered day is not automatically labelled unsafe.
+      </p>
+      {days.some((row) => row.conflicts > 0) && (
+        <Notice tone="warning" title="Roster and approved leave overlap">
+          Open Scheduling Exceptions to inspect people who appear both away and rostered on the same day.
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/scheduling?tab=Exceptions`)}>
+            Review exceptions
+          </Button>
+        </Notice>
+      )}
     </Stack>
   );
 }
@@ -395,7 +420,10 @@ export function StaffingSummary({ context }: { context: ScreenContext }) {
 export function EmployeeDirectory({ context, lens }: { context: ScreenContext; lens: "People" | "Teams" | "Contractors" | "Alumni" }) {
   const data = useHrData();
   const { org } = useWorkspace();
-  const team = useDirectoryTeam();
+  const selectedTeam = useDirectoryTeam();
+  // Team selection is shared within this browser: an ID from another
+  // company must not silently hide the entire directory after a switch.
+  const team = data.departments.some((department) => department.id === selectedTeam) ? selectedTeam : "";
   const [query, setQuery] = useState("");
   const [unassignedOnly, setUnassignedOnly] = useState(false);
   const current = data.employees.filter((employee) => employee.status !== "alumni");
