@@ -176,18 +176,24 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
   const { org, actor, now } = useWorkspace();
   const [query, setQuery] = useState("");
   const [folder, setFolder] = useState<string>("All folders");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const documents = data.documents.filter((record) => !record.tags.includes("recovered"));
   const folders = ["All folders", ...new Set(documents.map((record) => String(record.fields.folder ?? "Unfiled")))];
+  const activeDocuments = documents.filter((record) => record.status !== "archived");
+  const pendingReview = activeDocuments.filter((record) => record.status === "in_review");
+  const drafts = activeDocuments.filter((record) => record.status === "draft");
+  const confidentialCount = activeDocuments.filter((record) => record.fields.confidential === true).length;
 
   const rows = useMemo(() => {
     let list = documents;
     if (tab === "Recent") list = [...documents].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 12);
     if (tab === "My docs") list = documents.filter((record) => record.ownerName === actor);
-    if (tab === "Shared") list = documents.filter((record) => record.ownerName !== actor && record.status !== "archived");
+    if (tab === "Shared") list = documents.filter((record) => record.status !== "archived" && readDoc(record.body, record.ownerName, record.updatedAt).shares.some((share) => !share.revokedAt));
     if (tab === "Archive") list = documents.filter((record) => record.status === "archived");
     if (tab === "Templates") list = data.templates.filter((record) => record.fields.kind === "document");
-    if (tab !== "Archive") list = list.filter((record) => record.status !== "archived" || tab === "Recent");
+    if (tab !== "Archive") list = list.filter((record) => record.status !== "archived");
+    if (statusFilter !== "all" && tab !== "Templates" && tab !== "Archive") list = list.filter((record) => record.status === statusFilter);
     if (folder !== "All folders" && tab !== "Templates") list = list.filter((record) => String(record.fields.folder ?? "Unfiled") === folder);
     if (query.trim()) {
       const needle = query.trim().toLowerCase();
@@ -200,9 +206,11 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
       });
     }
     return list;
-  }, [documents, data.templates, tab, folder, query, actor]);
+  }, [documents, data.templates, tab, folder, query, actor, statusFilter]);
 
   const confidentialHidden = query.trim().length > 0 && documents.some((record) => record.fields.confidential === true);
+  const activeFilters = Boolean(query.trim()) || folder !== "All folders" || statusFilter !== "all";
+  const clearFilters = () => { setQuery(""); setFolder("All folders"); setStatusFilter("all"); };
 
   if (tab === "Templates") {
     return (
@@ -233,6 +241,21 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
 
   return (
     <Stack gap={4}>
+      <div className="dx-library-header">
+        <div>
+          <span className="dx-library-eyebrow">DOCUMENTS / {tab.toUpperCase()}</span>
+          <h2>{tab === "Recent" ? "Your document workspace." : tab === "My docs" ? "Work you've authored." : tab === "Shared" ? "Recorded sharing activity." : "The document archive."}</h2>
+          <p>{tab === "Shared" ? "Documents with a local sharing record are listed here. This does not mean a public link or external access exists." : tab === "Archive" ? "Archived records remain in the local library until explicitly removed." : "Find, review and continue working with company documents without losing their version history."}</p>
+        </div>
+        <Button variant="primary" onClick={() => context.openOverlay("New doc")}>New document</Button>
+      </div>
+      <div className="dx-library-metrics" aria-label="Document library summary">
+        <div><span>Active documents</span><strong>{activeDocuments.length}</strong><small>Excluding archive</small></div>
+        <div><span>Drafts</span><strong>{drafts.length}</strong><small>Not published</small></div>
+        <div><span>In review</span><strong>{pendingReview.length}</strong><small>Needs a human decision</small></div>
+        <div><span>Confidential</span><strong>{confidentialCount}</strong><small>Restricted previews only</small></div>
+      </div>
+      <div className="dx-library-filters">
       <Row gap={3} wrap>
         <Field label="Search" hint="Confidential documents match on title and tags only.">
           <TextInput aria-label="Search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles and text" />
@@ -243,6 +266,19 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
           </Select>
         </Field>
       </Row>
+      {tab !== "Archive" && (
+        <Row gap={2} wrap>
+          <span className="ds-subtle">Status</span>
+          {(["all", "draft", "in_review", "published"] as const).map((state) => (
+            <Button key={state} size="sm" variant={statusFilter === state ? "secondary" : "ghost"}
+              aria-pressed={statusFilter === state} onClick={() => setStatusFilter(state)}>
+              {state === "all" ? "All states" : state === "in_review" ? "In review" : state === "published" ? "Published" : "Drafts"}
+            </Button>
+          ))}
+        </Row>
+      )}
+      {activeFilters && <Button size="sm" variant="ghost" onClick={clearFilters}>Clear filters</Button>}
+      </div>
 
       {confidentialHidden && (
         <Notice tone="warning" title="Confidential documents are excluded from full-text preview">
@@ -252,11 +288,11 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
 
       {rows.length === 0 ? (
         <Empty
-          title={tab === "Archive" ? "Nothing archived" : "No documents here"}
+          title={activeFilters ? "No documents match the filters" : tab === "Archive" ? "Nothing archived" : "No documents here"}
           icon={<FileText size={20} />}
-          action={<Button variant="primary" onClick={() => context.openOverlay("New doc")}>New document</Button>}
+          action={activeFilters ? <Button variant="secondary" onClick={clearFilters}>Clear filters</Button> : <Button variant="primary" onClick={() => context.openOverlay("New doc")}>New document</Button>}
         >
-          {tab === "Shared" ? "Documents owned by someone else appear here." : "Create a document, or start from a governed template."}
+          {activeFilters ? "Try another status, folder or search term." : tab === "Shared" ? "No documents have local sharing records yet. Open a document to record a workspace share." : "Create a document, or start from a governed template."}
         </Empty>
       ) : (
         <DataGrid
@@ -280,7 +316,7 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
             { key: "folder", header: "Folder", cell: (row) => String(row.fields.folder ?? "Unfiled"), sortValue: (row) => String(row.fields.folder ?? ""), hideBelow: 900 },
             { key: "owner", header: "Owner", cell: (row) => row.ownerName, sortValue: (row) => row.ownerName, hideBelow: 1100 },
             { key: "status", header: "Status", cell: (row) => <Pill tone={row.status === "published" ? "success" : row.status === "in_review" ? "warning" : "neutral"}>{row.status.replace("_", " ")}</Pill> },
-            { key: "versions", header: "Versions", align: "end", cell: (row) => String(row.history.length), hideBelow: 1280 },
+            { key: "versions", header: "Earlier versions", align: "end", cell: (row) => String(row.history.length), hideBelow: 1280 },
             {
               key: "updated", header: "Changed", align: "end", sortValue: (row) => row.updatedAt,
               cell: (row) => <span title={context.dateTime(row.updatedAt)}>{context.relative(row.updatedAt)}</span>,
