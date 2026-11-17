@@ -580,6 +580,12 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
 
   const stats = documentStats(editor.model);
   const tab = context.tab || "Write";
+  const unresolvedComments = editor.model.comments.filter((comment) => !comment.resolved);
+  const mandatoryComments = unresolvedComments.filter((comment) => comment.mandatory);
+  const pendingChanges = openSuggestions(editor.model);
+  const readyForReview = mandatoryComments.length === 0 && pendingChanges.length === 0;
+  const navigateDocumentArea = (area: "review" | "publish" | "outline") =>
+    context.navigate(context.path(`/o/:org/docs/documents/:id/${area}`, record.id));
 
   function onEdit(intent: EditIntent) {
     editor.handleEdit(intent, {
@@ -621,6 +627,22 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
         <Button size="sm" variant="primary" onClick={() => context.openOverlay("export")} icon={<FileDown size={15} />}>Export</Button>
       </div>
 
+      <section className="dx-workflow-strip" aria-label="Document working status">
+        <div className="dx-workflow-context">
+          <span className="dx-workflow-eyebrow">CURRENT DOCUMENT</span>
+          <Row gap={2} wrap>
+            <Pill tone={record.status === "published" ? "success" : record.status === "in_review" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>
+            <span className="ds-subtle">{stats.words} words · {stats.readingMinutes} min read</span>
+            {editor.model.suggestMode && <Pill tone="info">Suggesting mode</Pill>}
+          </Row>
+          <span className="ds-subtle">{mandatoryComments.length} mandatory review{mandatoryComments.length === 1 ? "" : "s"} unresolved · {pendingChanges.length} pending change{pendingChanges.length === 1 ? "" : "s"}</span>
+        </div>
+        <div className="dx-workflow-actions">
+          <Button size="sm" variant="secondary" onClick={() => navigateDocumentArea("outline")}>Full outline</Button>
+          <Button size="sm" variant="secondary" onClick={() => navigateDocumentArea("review")}>Review history</Button>
+          <Button size="sm" variant="secondary" onClick={() => navigateDocumentArea("publish")}>Publishing</Button>
+        </div>
+      </section>
       <div className="dx-tabstrip">
         <Tabs
           label="Editor modes"
@@ -634,8 +656,10 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
           ]}
           trailing={
             <ButtonGroup label="Panels on narrow screens">
-              <Button size="sm" variant={mobilePanel === "side" ? "secondary" : "ghost"} onClick={() => setMobilePanel(mobilePanel === "side" ? "doc" : "side")}>Outline</Button>
-              <Button size="sm" variant={mobilePanel === "aside" ? "secondary" : "ghost"} onClick={() => setMobilePanel(mobilePanel === "aside" ? "doc" : "aside")}>Details</Button>
+              <Button size="sm" variant={mobilePanel === "side" ? "secondary" : "ghost"}
+                aria-pressed={mobilePanel === "side"} onClick={() => setMobilePanel(mobilePanel === "side" ? "doc" : "side")}>Outline</Button>
+              <Button size="sm" variant={mobilePanel === "aside" ? "secondary" : "ghost"}
+                aria-pressed={mobilePanel === "aside"} onClick={() => setMobilePanel(mobilePanel === "aside" ? "doc" : "aside")}>Details</Button>
             </ButtonGroup>
           }
         />
@@ -702,6 +726,15 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
         <div className="dx-scroll">
           <Stack gap={4}>
             <ConflictNotice editor={editor} />
+            {tab === "Review" && (
+              <div className="dx-editor-review-summary" aria-label="Document review readiness">
+                <div>
+                  <strong>{readyForReview ? "Ready for a human review decision" : "Review items remain open"}</strong>
+                  <p className="ds-subtle">The editor tracks {unresolvedComments.length} open comment{unresolvedComments.length === 1 ? "" : "s"} and {pendingChanges.length} undecided suggestion{pendingChanges.length === 1 ? "" : "s"}. This summary does not approve or publish the document.</p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => navigateDocumentArea("review")}>Open full review</Button>
+              </div>
+            )}
             {editor.model.suggestMode && (
               <Notice tone="info" title="Suggesting is on">
                 Your edits are recorded as tracked changes. Nothing is written into the text until a change is accepted in Review.
