@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Rec } from "@/domain/types";
 import { buildAttention, mineAttentionItems, filterForRole } from "@/platform/attention";
 import { positiveHours, taskMoveDecision } from "@/applications/project/progression";
+import { filesForProject } from "@/applications/project/files";
 import {
   createProjectFromTemplate, duplicateProjectPlan, nextProjectCopyTitle, readProjectPhases,
   type CreationContext,
@@ -207,5 +208,22 @@ describe("Projects: identical move rules for task detail, mouse board and keyboa
     expect(()=>positiveHours("Infinity")).toThrow(/non-negative/);
     expect(()=>positiveHours("abc")).toThrow(/non-negative/);
     expect(()=>positiveHours("")).toThrow(/Enter an estimate/);
+  });
+});
+
+describe("Projects ↔ Documents: file visibility is an explicit project link",()=>{
+  const project=rec("project-attachments","projects");
+  const attached={...rec("file-parent","documents"),parentId:project.id,tags:["project"]};
+  const tagged={...rec("file-category","documents"),tags:["project"]};
+  const viaField=rec("file-field","documents",{projectId:project.id});
+  const unrelated=rec("file-other","documents",{projectId:"another-project"});
+  const crossCompany={...rec("file-foreign","documents",{projectId:project.id},"active","org-harbor"),parentId:project.id};
+  it("includes parent links and explicit projectId links but excludes generic tags and other projects",()=>{
+    expect(filesForProject(project,[attached,tagged,viaField,unrelated,crossCompany])
+      .map(item=>item.id)).toEqual([attached.id,viaField.id]);
+  });
+  it("does not treat a document or unknown record as an authorized project",()=>{
+    expect(filesForProject(undefined,[attached])).toEqual([]);
+    expect(filesForProject({...project,collection:"contacts"},[attached])).toEqual([]);
   });
 });
