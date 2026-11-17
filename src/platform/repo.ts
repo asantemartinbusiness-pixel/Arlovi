@@ -58,15 +58,31 @@ function rosterChanged(next: Rec, previous?: Rec): boolean {
     || next.fields.hours !== previous.fields.hours || next.fields.projectId !== previous.fields.projectId;
 }
 
-async function validateRosterWrites(scopeId: string, proposed: Rec[]): Promise<void> {
+async function validateRosterWrites(scopeId: string, proposed: Rec[], pendingBatch: Rec[] = []): Promise<void> {
   if (!proposed.length) return;
-  const [roster, employees, approvedLeave, projects] = await Promise.all([
+  const [storedRoster, storedEmployees, storedLeave, storedProjects] = await Promise.all([
     db.records.where("[organizationId+collection]").equals([scopeId, "shifts"]).toArray(),
     db.records.where("[organizationId+collection]").equals([scopeId, "employees"]).toArray(),
     db.records.where("[organizationId+collection]").equals([scopeId, "leaveRequests"]).toArray(),
     db.records.where("[organizationId+collection]").equals([scopeId, "projects"]).toArray(),
   ]);
-  assertRosterIntegrity({ organizationId: scopeId, changes: proposed, roster, employees, approvedLeave, projects });
+  // A single atomic import may create an employee, project and their first
+  // shift together. Resolve linked records against the transaction's proposed
+  // post-write state, not just the pre-write database snapshot.
+  const overlay = (stored: Rec[], collection: string): Rec[] => {
+    const merged = new Map(stored.map((row) => [row.id, row]));
+    for (const row of pendingBatch) if (row.collection === collection && row.organizationId === scopeId) {
+      merged.set(row.id, row);
+    }
+    return [...merged.values()];
+  };
+  assertRosterIntegrity({
+    organizationId: scopeId, changes: proposed,
+    roster: overlay(storedRoster, "shifts"),
+    employees: overlay(storedEmployees, "employees"),
+    approvedLeave: overlay(storedLeave, "leaveRequests"),
+    projects: overlay(storedProjects, "projects"),
+  });
 }
 
 /* Last-read copy of every record this tab has seen. Forms seed their state
@@ -310,7 +326,7 @@ export async function putMany(records: Rec[], context: WriteContext, events: Omi
         await assertOpenJournalPeriod(record, existing[index]);
       }
       const proposedShifts = records.filter((record, index) => rosterChanged(record, existing[index]));
-      await validateRosterWrites(scopeId, proposedShifts);
+      await validateRosterWrites(scopeId, proposedShifts, records);
       await db.records.bulkPut(records);
     }
     if (events.length) {
