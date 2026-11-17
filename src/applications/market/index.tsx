@@ -2,6 +2,7 @@ import { CalendarDays, Images, LayoutTemplate, Mail, Megaphone, MousePointerClic
 import { Empty, Notice, Pill, Properties, Row, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { GrowthOverviewNav } from "@/app/GrowthOverviewNav";
+import { CampaignDetailContext } from "./CampaignDetailContext";
 import { useRecord } from "@/platform/workspace";
 import { confirmOverlay, submitFooter } from "@/applications/market/kit";
 import {
@@ -117,6 +118,7 @@ export const marketApp = registerApp({
     /* ------------------------------ 003 ------------------------------ */
     "ARL-MARKET-003": {
       id: "ARL-MARKET-003",
+      header: (context: ScreenContext) => <CampaignDetailContext context={context} />,
       title: () => "Campaign",
       subtitle: () => "Objectives, audience, creative, channel plan and the budget committed against it.",
       tabs: ["Overview", "Plan", "Assets", "Channels", "Results", "Activity"].map((lens) => ({
