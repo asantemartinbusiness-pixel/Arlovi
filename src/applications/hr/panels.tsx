@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   BookOpen, CalendarDays, ClipboardCheck, GraduationCap, Inbox, UserPlus, Users,
 } from "lucide-react";
@@ -616,9 +616,62 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
   const reviews = data.reviews.filter((review) => review.fields.employeeId === employee.id);
   const onboarding = data.tasks.filter((task) => task.fields.kind === "onboarding" && task.fields.employeeId === employee.id);
   const terminated = employee.status === "alumni";
+  const linkedDocs = linkedPersonnelDocuments(fileRecords, employee);
+  const openChecklist = onboarding.filter((task) => task.status !== "done");
+  const pendingAccess = data.tasks.filter((task) => task.fields.employeeId === employee.id
+    && task.fields.group === "IT access" && !["done", "rescinded", "cancelled"].includes(task.status));
+  const profileDescriptions: Record<string, string> = {
+    Overview: "An employee-centered workspace: identity, role, contact preferences and the next tasks that need attention.",
+    Job: "The recorded employment relationship, management line, skills and pay information available to your current role view.",
+    Documents: "Only real document records associated with this employee. References never claim a file was uploaded.",
+    Leave: "Recorded leave requests and balances, with unknown allowances clearly distinguished from zero.",
+    Performance: "Recorded performance cycles and named human review decisions; no automated personnel judgement.",
+    Access: "Local access requests and offboarding evidence. External accounts and permissions are not independently verified.",
+  };
+  const profileHeader = (
+    <section className="hr-profile-identity" aria-label={`Employee profile for ${employee.title}`}>
+      <div className="hr-profile-identity-main">
+        <Avatar name={employee.title} size="lg" />
+        <div className="hr-profile-identity-copy">
+          <span className="ops-eyebrow">People / Employee profile / {lens}</span>
+          <h2>{employee.title}</h2>
+          <p>{String(employee.fields.title || "No job title recorded")} · {departmentName(data.departments, employee.fields.departmentId)}</p>
+          <div className="hr-profile-identifiers">
+            <EmploymentPill record={employee} />
+            <span>{String(employee.fields.office || "Location not recorded")}</span>
+            <span>{employee.startAt ? `Started ${context.date(employee.startAt)}` : "Start date not recorded"}</span>
+          </div>
+        </div>
+      </div>
+      <div className="hr-profile-identity-actions">
+        <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)}>Employee directory</Button>
+        {context.can("edit_people") && !terminated && (
+          <Button variant="primary" onClick={() => context.openOverlay("profile editor")}>Edit profile</Button>
+        )}
+      </div>
+    </section>
+  );
+  const profileMetrics = (
+    <OpsMetrics label={`${employee.title} employee record overview`}>
+      <OpsMetric label="Leave balance" value={balance.known ? `${balance.left} days` : "Not recorded"}
+        detail={balance.known ? `${balance.allowance} annual allowance` : "Verify the allowance"} />
+      <OpsMetric label="Documents on record" value={linkedDocs.length} detail="Linked document records and references" />
+      <OpsMetric label="Onboarding actions" value={openChecklist.length} detail="Incomplete recorded checklist steps" />
+      <OpsMetric label="Pending access requests" value={pendingAccess.length}
+        detail="Local requests, not actual grants" emphasis={pendingAccess.length ? "attention" : "neutral"} />
+    </OpsMetrics>
+  );
+  const withProfileFrame = (body: ReactNode) => (
+    <Stack gap={4}>
+      {profileHeader}
+      <p className="hr-profile-section-description">{profileDescriptions[lens] ?? profileDescriptions.Overview}</p>
+      {profileMetrics}
+      {body}
+    </Stack>
+  );
 
   if (lens === "Job") {
-    return (
+    return withProfileFrame(
       <Grid>
         <Card span={6} eyebrow="JOB" prov="human" title="Job details">
           <Properties rows={[
@@ -660,7 +713,7 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
     // Personnel documents are real company records, not assumed contracts,
     // identity checks or letters generated from employment status.
     const documents = linkedPersonnelDocuments(fileRecords, employee);
-    return (
+    return withProfileFrame(
       <Stack gap={4}>
         {documents.length === 0 ? (
           <Empty title="No document references filed" icon={<BookOpen size={20} />}>
@@ -689,7 +742,7 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
   }
 
   if (lens === "Leave") {
-    return (
+    return withProfileFrame(
       <Grid>
         <Card span={5} eyebrow="BALANCE" prov={balance.known ? "human" : "unknown"} title="Balance" subtitle={balance.known ? `${balance.left} days left of ${balance.allowance}` : "No allowance recorded"}>
           <Stack gap={3}>
@@ -724,7 +777,7 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
   }
 
   if (lens === "Performance") {
-    return reviews.length === 0 ? <Empty title="No reviews recorded" icon={<ClipboardCheck size={20} />}>Reviews are created from the performance cycle.</Empty> : (
+    return withProfileFrame(reviews.length === 0 ? <Empty title="No reviews recorded" icon={<ClipboardCheck size={20} />}>Reviews are created from the performance cycle.</Empty> : (
       <Stack gap={3}>
         {reviews.map((review) => (
           <Card key={review.id} title={review.title} subtitle={`${String(review.fields.cycle ?? "")} · reviewer ${String(review.fields.reviewer ?? "")}`} actions={<Pill tone={review.status === "acknowledged" ? "success" : "info"}>{review.status}</Pill>}>
@@ -740,7 +793,7 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
           </Card>
         ))}
       </Stack>
-    );
+    ));
   }
 
   if (lens === "Access") {
@@ -750,7 +803,7 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
       .filter((task) => task.collection === "tasks"
         && task.fields.employeeId === employee.id && task.fields.group === "IT access")
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    return (
+    return withProfileFrame(
       <Stack gap={4}>
         {terminated && (
           <Notice tone="warning" title="Offboarding recorded locally">
@@ -787,7 +840,7 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
     );
   }
 
-  return (
+  return withProfileFrame(
     <Grid>
       <Card span={5} title={<Row gap={3}><Avatar name={employee.title} size="lg" /><span>{employee.title}</span></Row>} subtitle={String(employee.fields.title ?? "")} actions={<EmploymentPill record={employee} />}>
         <Stack gap={3}>
