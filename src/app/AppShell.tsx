@@ -27,6 +27,7 @@ import { useCollections, useWorkspace, useMutations } from "@/platform/workspace
 import { buildAttention, filterForRole, headerAttentionCounts } from "@/platform/attention";
 import { applyAttentionReceipts } from "@/platform/attentionReceipts";
 import { useUi } from "@/runtime/ui";
+import { DisplayPreferences } from "@/app/DisplayPreferences";
 import type { Role } from "@/domain/types";
 import "@/app/shell.css";
 
@@ -38,6 +39,7 @@ export function AppShell() {
   const { org, role, now } = useWorkspace();
   const mutate = useMutations();
   const [navOpen, setNavOpen] = useState(false);
+  const [displayOpen, setDisplayOpen] = useState(false);
   const [attentionView, setAttentionView] = useState<"for-you" | "approvals" | "updates">("for-you");
   const searchTrigger = useRef<HTMLButtonElement>(null);
   const keyboardHint = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.userAgent) ? "⌘K" : "Ctrl+K";
@@ -297,7 +299,8 @@ export function AppShell() {
               group: "Navigation", separatorBefore: true, onSelect: () => { void toggleFavourite(); },
             }] : []),
             ...(org.ownerName ? [{ label: "Review company setup", group: "Navigation", onSelect: () => navigate(`/o/${org.slug}/hq/home?gettingStarted=1`) }] : []),
-            { label: ui.theme === "light" ? "Dark appearance" : "Light appearance", group: "Appearance", separatorBefore: true, onSelect: () => ui.setTheme(ui.theme === "light" ? "dark" : "light") },
+            { label: `Display & scaling · ${ui.interfaceScale}%`, group: "Appearance", separatorBefore: true, onSelect: () => setDisplayOpen(true) },
+            { label: ui.theme === "light" ? "Dark appearance" : "Light appearance", group: "Appearance", onSelect: () => ui.setTheme(ui.theme === "light" ? "dark" : "light") },
             ...(["comfortable", "balanced", "compact"] as const).map((item) => ({
               label: item === ui.density ? `Density: ${item} · current` : `Density: ${item}`,
               group: "Appearance",
@@ -446,6 +449,7 @@ export function AppShell() {
         </NavLink>
       </nav>
 
+      {displayOpen && <DisplayPreferences onClose={() => setDisplayOpen(false)} />}
       {ui.command && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening search…</div>}><CommandPalette onClose={() => {ui.setCommand(false);searchTrigger.current?.focus();}} /></Suspense>}
       {ui.notes && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening attention centre…</div>}><AttentionCentre key={attentionView} initialView={attentionView} items={attention} onClose={() => ui.setNotes(false)} /></Suspense>}
       {ui.ask && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening assistant…</div>}><AskPanel onClose={() => ui.setAsk(false)} seed={ui.askSeed} /></Suspense>}
