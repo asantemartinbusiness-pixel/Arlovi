@@ -922,13 +922,54 @@ const STAGES = ["applied", "screening", "interview", "offer", "hired"];
 export function Recruitment({ context, lens }: { context: ScreenContext; lens: "Positions" | "Candidates" | "Interviews" | "Offers" }) {
   const data = useHrData();
   const { org } = useWorkspace();
+  const [query, setQuery] = useState("");
+  const [focusStage, setFocusStage] = useState("all");
+  const live = data.applicants.filter((row) => !["rejected", "withdrawn"].includes(row.status));
+  const interviews = live.filter((row) => row.fields.stage === "interview");
+  const dated = interviews.filter((row) => Number.isFinite(Date.parse(String(row.fields.interviewAt ?? ""))));
+  const offers = live.filter((row) => row.fields.stage === "offer");
+  const matches = (row: Rec) => [row.title, row.fields.role,
+    data.positions.find((position) => position.id === row.fields.positionId)?.title]
+    .some((value) => String(value ?? "").toLowerCase().includes(query.toLowerCase()));
+  const canEdit = context.can("edit_people");
+  const intro = (
+    <Stack gap={4}>
+      <OpsHeader eyebrow={`People / Recruitment / ${lens}`}
+        title={({ Positions: "Roles with a clear owner.", Candidates: "A pipeline for human decisions.",
+          Interviews: "Interviews, scheduled and unscheduled.", Offers: "Offers, with evidence attached." } as const)[lens]}
+        description="Review real application records, owners and next actions. No AI candidate ranking, automatic mailing or external calendar booking is implied."
+        actions={<>
+          <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/onboarding`)}>Open onboarding</Button>
+          {canEdit && <Button variant="primary" onClick={() => context.openOverlay("Job spec editor")}>Create a role</Button>}
+        </>} note="Applicant stage changes and offers require an accountable human decision." />
+      <OpsMetrics label="Recruitment workflow">
+        <OpsMetric label="Open roles" value={data.positions.filter((row) => row.status === "open").length} detail="Recorded positions" />
+        <OpsMetric label="Active candidates" value={live.length} detail="Excludes withdrawn and rejected" />
+        <OpsMetric label="Dated interviews" value={dated.length} detail={`${interviews.length - dated.length} need scheduling`} emphasis={interviews.length !== dated.length ? "attention" : "neutral"} />
+        <OpsMetric label="Offers in progress" value={offers.length} detail="Local offer-stage records" />
+      </OpsMetrics>
+      <div className="ops-toolbar">
+        <strong className="ops-toolbar-heading">Find records</strong>
+        <div className="hr-directory-search">
+          <TextInput aria-label="Search recruitment" value={query} onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search roles and candidates" />
+        </div>
+      </div>
+    </Stack>
+  );
 
   if (lens === "Positions") {
-    return data.positions.length === 0 ? (
-      <Empty title="No open positions" icon={<UserPlus size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Job spec editor")}>Create a role</Button>} />
+    const positions = data.positions.filter((row) => [row.title, row.summary, row.fields.hiringManager, row.fields.location]
+      .some((value) => String(value ?? "").toLowerCase().includes(query.toLowerCase())));
+    return (
+      <Stack gap={4}>
+        {intro}
+        {positions.length === 0 ? (
+      <Empty title={data.positions.length ? "No positions match this search" : "No positions recorded"} icon={<UserPlus size={20} />}
+        action={canEdit ? <Button variant="primary" onClick={() => context.openOverlay("Job spec editor")}>Create a role</Button> : undefined} />
     ) : (
       <Grid>
-        {data.positions.map((position) => {
+        {positions.map((position) => {
           const applicants = data.applicants.filter((applicant) => applicant.fields.positionId === position.id);
           return (
             <Card
@@ -947,7 +988,10 @@ export function Recruitment({ context, lens }: { context: ScreenContext; lens: "
                 <p className="ds-subtle">{position.summary}</p>
                 <Properties rows={[
                   { label: "Hiring manager", value: String(position.fields.hiringManager ?? "") },
-                  { label: "Range", value: context.can("view_payroll") ? `${context.money(Number(position.fields.salaryLowMinor ?? 0))} – ${context.money(Number(position.fields.salaryHighMinor ?? 0))}` : "Hidden in this role view" },
+                  { label: "Range", value: !context.can("view_payroll") ? "Hidden in this role view"
+                    : position.fields.salaryLowMinor !== undefined && position.fields.salaryHighMinor !== undefined
+                      ? `${context.money(Number(position.fields.salaryLowMinor))} – ${context.money(Number(position.fields.salaryHighMinor))}`
+                      : "Not recorded" },
                   { label: "Opened", value: context.relative(position.at) },
                 ]} />
                 <Row gap={1} wrap>
@@ -961,21 +1005,34 @@ export function Recruitment({ context, lens }: { context: ScreenContext; lens: "
           );
         })}
       </Grid>
+        )}
+      </Stack>
     );
   }
 
   if (lens === "Interviews") {
-    const interviews = data.applicants.filter((applicant) => applicant.fields.stage === "interview");
-    return interviews.length === 0 ? <Empty title="No interviews booked" icon={<CalendarDays size={20} />}>Move a candidate to the interview stage to schedule one.</Empty> : (
+    const shown = interviews.filter(matches).sort((a, b) =>
+      String(a.fields.interviewAt || "~").localeCompare(String(b.fields.interviewAt || "~")));
+    return <Stack gap={4}>
+      {intro}
+      <div className="ops-toolbar"><strong className="ops-toolbar-heading">Interview stage</strong>
+        <span className="ops-toolbar-note">{dated.length} dated · {interviews.length - dated.length} without a date</span>
+      </div>
+      {shown.length === 0 ? <Empty title="No candidates in the interview stage" icon={<CalendarDays size={20} />}>
+        A candidate can enter the interview stage without having a meeting booked.
+      </Empty> : (
       <Stack gap={3}>
-        {interviews.map((applicant) => (
+        {shown.map((applicant) => (
           <Card
             key={applicant.id}
             title={applicant.title}
             subtitle={`${String(applicant.fields.role ?? "")} · interview ${applicant.fields.interviewAt ? context.date(String(applicant.fields.interviewAt)) : "not scheduled"}`}
-            actions={<Pill tone="info">Interview</Pill>}
+            actions={<Pill tone={Number.isFinite(Date.parse(String(applicant.fields.interviewAt ?? ""))) ? "info" : "warning"}>
+              {Number.isFinite(Date.parse(String(applicant.fields.interviewAt ?? ""))) ? "Date recorded" : "Not scheduled"}
+            </Pill>}
             footer={<>
               <Button size="sm" variant="secondary" onClick={() => { context.select(applicant.id); context.openOverlay("candidate profile", { id: applicant.id }); }}>Scorecard</Button>
+              {canEdit && <Button size="sm" variant="ghost" onClick={() => { context.select(applicant.id); context.openOverlay("schedule interview", { id: applicant.id }); }}>Review schedule</Button>}
               <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/hr/candidates/${applicant.id}`)}>Open candidate</Button>
             </>}
           >
@@ -988,22 +1045,34 @@ export function Recruitment({ context, lens }: { context: ScreenContext; lens: "
           </Card>
         ))}
       </Stack>
-    );
+      )}
+      <Notice tone="info" title="Stage is not a confirmed booking">
+        Dates are local application records; verify the actual calendar independently before confirming attendance.
+      </Notice>
+    </Stack>;
   }
 
   if (lens === "Offers") {
-    const offers = data.applicants.filter((applicant) => applicant.fields.stage === "offer");
-    return offers.length === 0 ? <Empty title="No offers outstanding" icon={<ClipboardCheck size={20} />} /> : (
+    const shown = offers.filter(matches);
+    return <Stack gap={4}>
+      {intro}
+      {shown.length === 0 ? <Empty title="No matching offers" icon={<ClipboardCheck size={20} />}>
+        Offers appear here when a human reviewer records the candidate's offer stage.
+      </Empty> : (
       <Stack gap={3}>
-        {offers.map((applicant) => {
+        {shown.map((applicant) => {
           const position = data.positions.find((row) => row.id === applicant.fields.positionId);
           return (
-            <Card key={applicant.id} title={applicant.title} subtitle={String(applicant.fields.role ?? "")} actions={<Pill tone="accent">Offer drafted</Pill>}
+            <Card key={applicant.id} title={applicant.title} subtitle={String(applicant.fields.role ?? "")} actions={<Pill tone={applicant.fields.offerIssuedBy ? "info" : "warning"}>
+                {applicant.fields.offerIssuedBy ? "Local offer recorded" : "Offer not issued"}
+              </Pill>}
               footer={<Button size="sm" variant="primary" onClick={() => { context.select(applicant.id); context.openOverlay("offer approval", { id: applicant.id }); }}>Review the offer</Button>}>
               <Stack gap={3}>
                 <Properties rows={[
                   { label: "Role", value: position?.title ?? String(applicant.fields.role ?? "") },
-                  { label: "Range", value: context.can("view_payroll") && position ? `${context.money(Number(position.fields.salaryLowMinor ?? 0))} – ${context.money(Number(position.fields.salaryHighMinor ?? 0))}` : "Hidden in this role view" },
+                  { label: "Range", value: !context.can("view_payroll") ? "Hidden in this role view" :
+                    position?.fields.salaryLowMinor !== undefined && position.fields.salaryHighMinor !== undefined
+                      ? `${context.money(Number(position.fields.salaryLowMinor))} – ${context.money(Number(position.fields.salaryHighMinor))}` : "Not recorded" },
                   { label: "Hiring manager", value: String(position?.fields.hiringManager ?? "") },
                 ]} />
                 <Notice tone="warning" title="Nothing has been sent to the candidate">
@@ -1014,15 +1083,26 @@ export function Recruitment({ context, lens }: { context: ScreenContext; lens: "
           );
         })}
       </Stack>
-    );
+      )}
+    </Stack>;
   }
 
-  const live = data.applicants.filter((applicant) => !["rejected", "withdrawn"].includes(applicant.status));
+  const stages = STAGES.filter((stage) => focusStage === "all" || focusStage === stage);
+  const visible = live.filter(matches);
   return (
     <Stack gap={4}>
-      <Row gap={3} wrap>
-        {STAGES.map((stage) => (
-          <Card key={stage} className="ds-grow" title={stage.charAt(0).toUpperCase() + stage.slice(1)} subtitle={`${live.filter((applicant) => applicant.fields.stage === stage).length} candidates`}>
+      {intro}
+      <div className="hr-hiring-stage-filters" role="group" aria-label="Filter recruitment stages">
+        <Button size="sm" variant={focusStage === "all" ? "secondary" : "ghost"} aria-pressed={focusStage === "all"}
+          onClick={() => setFocusStage("all")}>All stages</Button>
+        {STAGES.map((stage) => <Button key={stage} size="sm" variant={focusStage === stage ? "secondary" : "ghost"}
+          aria-pressed={focusStage === stage} onClick={() => setFocusStage(stage)}>
+          {stage.charAt(0).toUpperCase() + stage.slice(1)}
+        </Button>)}
+      </div>
+      <div className="hr-hiring-pipeline">
+        {stages.map((stage) => (
+          <Card key={stage} className="hr-hiring-stage" title={stage.charAt(0).toUpperCase() + stage.slice(1)} subtitle={`${visible.filter((applicant) => applicant.fields.stage === stage).length} candidates`}>
             <Stack gap={2}>
               {live.filter((applicant) => applicant.fields.stage === stage).map((applicant) => (
                 <button
@@ -1043,7 +1123,7 @@ export function Recruitment({ context, lens }: { context: ScreenContext; lens: "
             </Stack>
           </Card>
         ))}
-      </Row>
+      </div>
       <Notice tone="info" title="Bias controls on this board">
         Candidates are listed in the order they applied, never ranked by a model. A rating is a person's score from a written
         scorecard. Nothing on this board moves a candidate on its own.
