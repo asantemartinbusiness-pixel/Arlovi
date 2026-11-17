@@ -493,6 +493,7 @@ export const hrApp = registerApp({
       ],
       overlays: [
         ...kitOverlays,
+        { id: "leave approval", kind: "drawer", title: "Review leave decision", width: 560, render: ({ ...context }) => <LeaveApproval context={context} /> },
         { id: "balance adjustment", kind: "modal", title: "Adjust a leave balance", width: 500, render: ({ close, ...context }) => <BalanceAdjust context={context} close={close} />, footer: submitFooter("hr-balance", "Adjust the balance") },
         { id: "Leave form", kind: "modal", title: "Request leave", width: 560, render: ({ close, ...context }) => <LeaveForm context={context} close={close} />, footer: submitFooter("hr-leave-form", "Send the request") },
         { id: "policy explanation", kind: "drawer", title: "How this balance is worked out", width: 480, render: ({ ...context }) => <BalanceExplainer context={context} /> },
