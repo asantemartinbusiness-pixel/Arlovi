@@ -52,14 +52,14 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
   return (
     <Stack gap={4}>
       <p className="ds-prose">
-        Offboarding {employee.title} sets the record to alumni, dates the leaving day and marks every access grant as revoked.
-        A queued grant is rescinded rather than left pending, so nothing is granted after the last day by accident.
+        Offboarding {employee.title} records the person as alumni and dates their leaving day.
+        Any pending IT access requests are rescinded in Arlovi. External account and door access must be checked separately.
       </p>
       <Properties rows={[
         { label: "Record", value: employee.title },
         { label: "Current status", value: employee.status },
-        { label: "Access grants affected", value: "All recorded grants" },
-        { label: "Queued grants rescinded", value: String(queued.length) },
+        { label: "External access", value: "Not connected — manual follow-up required" },
+        { label: "Pending requests to rescind", value: String(queued.length) },
       ]} />
       <Notice tone="warning" title="What this does not do">
         No identity provider is connected, so this records the decision. Someone still has to turn off the real accounts.
@@ -74,9 +74,9 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
               status: "alumni",
               endAt: clockIso(),
               fields: { ...employee.fields, accessRevoked: true },
-            }, { expectRevision: employee.revision, event: `${employee.title} offboarded by ${context.actor}; access grants recorded as revoked` });
+            }, { expectRevision: employee.revision, event: `${employee.title} offboarded locally by ${context.actor}; external access not verified` });
             const rescinded = await rescindQueuedGrants(context, employee.id, tasks);
-            context.toast("Offboarding recorded", `${employee.title} is now alumni, every grant is marked revoked and ${rescinded} queued grant${rescinded === 1 ? " was" : "s were"} rescinded.`);
+            context.toast("Offboarding recorded", `${employee.title} is now alumni in Arlovi. ${rescinded} pending IT access request${rescinded === 1 ? " was" : "s were"} rescinded locally; check external access separately.`);
             close();
           }}
         >
