@@ -48,8 +48,8 @@ describe("the native application directory", () => {
       const routes = platformDestinations(code, "northline");
       expect(routes.length, code).toBeGreaterThan(0);
       for (const route of routes) {
-        expect(route.to).toMatch(/^\\/o\\/northline\\//);
-        expect(route.to).not.toMatch(/:(org|id|slug)\\b/);
+        expect(route.to.startsWith("/o/northline/")).toBe(true);
+        expect(route.to.includes(":")).toBe(false);
         expect(findScreen(route.to)?.screen.applicationCode).toBe(code);
         expect(findScreen(route.to)?.params.id).toBeUndefined();
       }
