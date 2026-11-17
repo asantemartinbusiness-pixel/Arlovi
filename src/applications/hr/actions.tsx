@@ -9,6 +9,7 @@ import { RoleViewNote, leaveBalance } from "./kit";
 import { recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 import { scopedDetailRecord } from "@/platform/recordScope";
 import { planHireApplicant, planLeaveDecision } from "./decisions";
+import { newRecord } from "@/platform/repo";
 import { planShiftSwap, planTimesheetApprovals } from "./workforce";
 export { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 import { Boundary, askFirst, boundaryText, logBoundary, pickRecord, recordOf } from "./opsKit";
@@ -169,20 +170,49 @@ export function ScheduleInterview({ context, close }: { context: ScreenContext; 
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!applicant || past || Number.isNaN(startAt.getTime())) return;
-        const meeting = await context.mutate.create({
-          collection: "meetings",
+        const reviewer = data.employees.find((employee) => employee.title === interviewer
+          && employee.organizationId === context.org.id && !["alumni", "terminated"].includes(employee.status));
+        if (!applicant || applicant.organizationId !== context.org.id || !open.some((row) => row.id === applicant.id)
+          || past || Number.isNaN(startAt.getTime()) || !Number.isInteger(minutes) || minutes < 15 || minutes > 180
+          || !reviewer) {
+          context.toast("Interview not recorded", "Select an active applicant, company interviewer and future date with a 15–180 minute duration.", "blocked");
+          return;
+        }
+        const stamp = clockIso();
+        const meeting = newRecord({
+          organizationId: context.org.id, currency: context.org.currency, collection: "meetings",
           title: `Interview · ${applicant.title}`,
           status: clashes.length ? "tentative" : "scheduled",
-          summary: `Interview for ${String(applicant.fields.role ?? "the role")}. Scorecard to be recorded by ${interviewer}.`,
+          summary: `Local interview record for ${String(applicant.fields.role || "the role")}. Reviewer: ${interviewer}.`,
           startAt: startAt.toISOString(), endAt: endAt.toISOString(), at: startAt.toISOString(),
           parentId: applicant.id,
-          fields: { where: "Studio table", organizer: context.actor, attendees: [interviewer, context.actor].filter((name, index, all) => all.indexOf(name) === index).join(","), minutes, kind: "interview", applicantId: applicant.id, conferencing: "not_connected", accepted: 0 },
-        }, `Interview with ${applicant.title} scheduled by ${context.actor}`);
-        await context.mutate.patch(applicant.id, { fields: { ...applicant.fields, stage: "interview", interviewAt: startAt.toISOString(), interviewId: meeting.id } }, { expectRevision: applicant.revision, event: `${applicant.title} moved to interview` });
-        await logBoundary(context, "calendar.sync", `Interview invitation for ${applicant.title} kept locally`, meeting.id);
-        context.toast("Interview scheduled", `${context.dateTime(startAt)} is on the calendar${clashes.length ? " as tentative because of a clash" : ""}. No invitation left this browser.`);
-        close();
+          fields: { where: "Studio table", organizer: context.actor,
+            attendees: [interviewer, context.actor].filter((name, index, all) => all.indexOf(name) === index).join(","),
+            minutes, kind: "interview", applicantId: applicant.id, conferencing: "not_connected", accepted: 0 },
+        }, { actor: context.actor, now: stamp });
+        const revised: Rec = {
+          ...applicant, revision: applicant.revision + 1, updatedAt: stamp, updatedBy: context.actor,
+          fields: { ...applicant.fields, stage: "interview", interviewAt: startAt.toISOString(), interviewId: meeting.id },
+          history: [{
+            title: applicant.title, status: applicant.status, summary: applicant.summary,
+            fields: { ...applicant.fields }, body: applicant.body,
+            amountMinor: applicant.amountMinor, at: stamp,
+          }, ...applicant.history].slice(0, 25),
+        };
+        try {
+          await context.mutate.putMany([meeting, revised],
+            [`Interview with ${applicant.title} recorded by ${context.actor}`,
+              `${applicant.title} linked to the local interview by ${context.actor}`],
+            { [applicant.id]: applicant.revision }, ["create", "update"]);
+          await logBoundary(context, "calendar.sync",
+            `Interview invitation for ${applicant.title} kept locally`, meeting.id);
+          context.toast("Interview recorded locally",
+            `${context.dateTime(startAt)} is stored${clashes.length ? " tentatively because of a conflict" : ""}. No external calendar or invitation was updated.`);
+          close();
+        } catch (error) {
+          context.toast("Interview not saved", error instanceof Error
+            ? error.message : "Reload the candidate and check the schedule before trying again.", "blocked");
+        }
       }}
     >
       <Field label="Candidate" required>
@@ -194,7 +224,7 @@ export function ScheduleInterview({ context, close }: { context: ScreenContext; 
       <Row gap={3}>
         <Field label="Date"><TextInput type="date" value={date} onChange={(event) => setDate(event.target.value)} invalid={past} /></Field>
         <Field label="Start (UTC)"><TextInput type="time" value={start} onChange={(event) => setStart(event.target.value)} /></Field>
-        <Field label="Minutes"><TextInput inputMode="numeric" align="end" value={String(minutes)} onChange={(event) => setMinutes(Number(event.target.value) || 45)} /></Field>
+        <Field label="Minutes"><TextInput inputMode="numeric" align="end" value={String(minutes)} onChange={(event) => setMinutes(Number(event.target.value))} /></Field>
       </Row>
       <Field label="Interviewer">
         <Select value={interviewer} onChange={(event) => setInterviewer(event.target.value)}>
