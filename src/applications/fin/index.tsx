@@ -17,6 +17,7 @@ import {
 import {
   ApproveInvoice, BulkActionPreview, DocumentPreview, EmailPreview, exportInvoices, InvoiceActivity, InvoiceHeader,
   InvoiceInspector, InvoiceLineItems, InvoiceList, InvoiceOverview, InvoicePayments, LineEditor, NewInvoice,
+  FinanceTimeInputs, FinanceTimeReview,
   PaymentForm, ReminderApproval, VoidReason,
 } from "./invoices";
 import {
@@ -181,9 +182,11 @@ export const finApp = registerApp({
     "ARL-FIN-004": {
       id: "ARL-FIN-004",
       subtitle: (context) => `Every invoice in ${context.org.name}, with the tax code each line resolved to.`,
-      tabs: ["Draft", "Awaiting payment", "Overdue", "Paid", "Void"].map((tab) => ({
+      tabs: ["Draft", "Awaiting payment", "Overdue", "Paid", "Void", "Time inputs"].map((tab) => ({
         id: tab,
-        render: (context: ScreenContext) => <InvoiceList context={context} tab={tab} />,
+        render: (context: ScreenContext) => tab === "Time inputs"
+          ? <FinanceTimeInputs context={context} />
+          : <InvoiceList context={context} tab={tab} />,
         count: () => undefined,
       })),
       actions: [
@@ -195,6 +198,8 @@ export const finApp = registerApp({
         { id: "export", label: "Export", placement: "overflow", capability: "export_data", run: (context) => context.openOverlay("export invoices") },
       ],
       overlays: [
+        { id: "finance time review", kind: "drawer", title: "Review billable time input", width: 580,
+          render: ({ close, ...context }) => <FinanceTimeReview context={context} close={close} /> },
         { id: "New invoice", kind: "modal", title: "New invoice", width: 720, render: ({ close, ...context }) => <NewInvoice context={context} close={close} /> },
         { id: "bulk action preview", kind: "modal", title: "Reminders to be drafted", width: 680, render: ({ close, ...context }) => <BulkActionPreview context={context} close={close} /> },
         { id: "reminder approval", kind: "modal", title: "Approve reminders", width: 620, render: ({ close, ...context }) => <ReminderApproval context={context} close={close} /> },
