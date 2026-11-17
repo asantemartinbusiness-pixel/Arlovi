@@ -2619,107 +2619,187 @@ export function Performance({ context, lens }: { context: ScreenContext; lens: "
 
 export function Learning({ context, lens }: { context: ScreenContext; lens: "Courses" | "Policies" | "Compliance" | "My learning" }) {
   const data = useHrData();
+  const { org } = useWorkspace();
+  const [query, setQuery] = useState("");
+  const [requiredOnly, setRequiredOnly] = useState(false);
   const courses = data.courses;
   const policies = data.policies.filter((policy) => policy.fields.kind === "hr");
   const staff = humans(data.employees);
-
+  const required = courses.filter((course) => course.fields.required === true);
+  const acknowledging = policies.filter((policy) => policy.fields.acknowledgementRequired === true);
+  const canEdit = context.can("edit_people");
+  const matches = (record: Rec) =>
+    [record.title, record.summary, record.fields.version].some((field) =>
+      String(field ?? "").toLowerCase().includes(query.trim().toLowerCase()));
+  const titles = {
+    Courses: "Learning people can actually follow.",
+    Policies: "Policies that can be read and acknowledged.",
+    Compliance: "Requirements, evidence and outstanding work.",
+    "My learning": "Your learning record, in context.",
+  };
+  const header = (
+    <OpsHeader eyebrow={`People / Learning & Policies / ${lens}`}
+      title={titles[lens]}
+      description="Find the recorded courses, required acknowledgements and training obligations without inventing certificates or completed assessments."
+      actions={<>
+        <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)}>Employee directory</Button>
+        {canEdit && <Button variant="primary" onClick={() => context.openOverlay("Course builder")}>Create course</Button>}
+      </>}
+      note="Local training and policy records are not independently verified legal compliance or externally issued certification."
+    />
+  );
+  const metrics = (
+    <OpsMetrics label="Learning and policy summary">
+      <OpsMetric label="Recorded courses" value={courses.length} detail="Company learning content" />
+      <OpsMetric label="Required courses" value={required.length} detail="Marked mandatory" />
+      <OpsMetric label="HR policies" value={policies.length} detail="Policy records and revisions" />
+      <OpsMetric label="Acknowledgement required" value={acknowledging.length} detail="Policies with required sign-off"
+        emphasis={acknowledging.length ? "attention" : "neutral"} />
+    </OpsMetrics>
+  );
+  const toolbar = (title: string, showRequired = false) => (
+    <div className="ops-toolbar">
+      <strong className="ops-toolbar-heading">{title}</strong>
+      <div className="hr-directory-search">
+        <TextInput aria-label="Search learning and policies" placeholder="Search courses, policies or versions"
+          value={query} onChange={(event) => setQuery(event.target.value)} />
+      </div>
+      {showRequired && <Button size="sm" variant={requiredOnly ? "secondary" : "ghost"} aria-pressed={requiredOnly}
+        onClick={() => setRequiredOnly((value) => !value)}>Required only</Button>}
+    </div>
+  );
   if (lens === "Policies") {
-    return policies.length === 0 ? <Empty title="No policies published" icon={<BookOpen size={20} />} /> : (
-      <Stack gap={3}>
-        {policies.map((policy) => (
-          <Card
-            key={policy.id}
-            title={policy.title}
-            subtitle={`Version ${String(policy.fields.version ?? "")} · published ${context.date(policy.at)} · review ${context.date(policy.dueAt)}`}
-            actions={<Pill tone={policy.fields.acknowledgementRequired === true ? "warning" : "neutral"}>{policy.fields.acknowledgementRequired === true ? "Acknowledgement required" : "Read when needed"}</Pill>}
-            footer={<>
-              <Button size="sm" variant="secondary" onClick={() => context.openOverlay("policy publication", { id: policy.id })}>Publish a revision</Button>
-              {policy.fields.acknowledgementRequired === true && (
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => recordAcknowledgement(context, policy)}
+    const shown = policies.filter((policy) => matches(policy)
+      && (!requiredOnly || policy.fields.acknowledgementRequired === true));
+    return (
+      <Stack gap={4}>
+        {header}
+        {metrics}
+        {toolbar("Policy register", true)}
+        {shown.length === 0 ? <Empty title={policies.length ? "No policies match the filters" : "No HR policies recorded"}
+          icon={<BookOpen size={20} />}>Clear the filters or publish the actual policy record before requesting acknowledgement.</Empty> : (
+          <div className="hr-learning-grid">
+            {shown.map((policy) => {
+              const recorded = Number(policy.fields.acknowledged);
+              const hasCount = Number.isFinite(recorded) && recorded >= 0 && policy.fields.acknowledged !== undefined;
+              return (
+                <Card key={policy.id} eyebrow="HR POLICY" title={policy.title}
+                  subtitle={`Version ${String(policy.fields.version || "not recorded")} · ${context.date(policy.at)}`}
+                  actions={<Pill tone={policy.fields.acknowledgementRequired === true ? "warning" : "neutral"}>
+                    {policy.fields.acknowledgementRequired === true ? "Sign-off required" : "Read when needed"}
+                  </Pill>}
+                  footer={<>
+                    {canEdit && <Button size="sm" variant="secondary" onClick={() =>
+                      context.openOverlay("policy publication", { id: policy.id })}>Review revision</Button>}
+                    {policy.fields.acknowledgementRequired === true && <Button size="sm" variant="primary"
+                      onClick={() => recordAcknowledgement(context, policy)}>Acknowledge</Button>}
+                  </>}
                 >
-                  Acknowledge
-                </Button>
-              )}
-            </>}
-          >
-            <Stack gap={2}>
-              <p>{policy.summary}</p>
-              <Row gap={3}>
-                <div className="ds-grow"><Meter value={Number(policy.fields.acknowledged ?? 0)} max={Math.max(1, staff.length)} label={`${policy.title} acknowledgements`} /></div>
-                <span className="ds-subtle ds-num">{String(policy.fields.acknowledged ?? 0)} of {staff.length}</span>
-              </Row>
-            </Stack>
-          </Card>
-        ))}
-        <Notice tone="info" title="A revision never erases an acknowledgement">
-          Publishing a new version starts a fresh acknowledgement count and keeps the old version, so a decision made under the
-          previous wording can still be read in context.
-        </Notice>
+                  <Stack gap={3}>
+                    <p className="ds-subtle">{policy.summary || "No policy summary recorded."}</p>
+                    <Properties rows={[
+                      { label: "Recorded acknowledgements", value: hasCount
+                        ? `${recorded} aggregate entries` : "Not recorded" },
+                      { label: "Review due", value: policy.dueAt ? context.date(policy.dueAt) : "No review date set" },
+                    ]} />
+                    <span className="ds-subtle">The aggregate is not proof that every current staff member acknowledged this version.</span>
+                  </Stack>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </Stack>
     );
   }
 
   if (lens === "Compliance") {
-    const required = courses.filter((course) => course.fields.required === true);
-    const rows = required.map((course) => ({
-      id: course.id,
-      title: course.title,
-      completions: Number(course.fields.completions ?? 0),
-      outstanding: Math.max(0, staff.length - Number(course.fields.completions ?? 0)),
-    }));
+    const rows = required.filter(matches).map((course) => {
+      const recorded = Number(course.fields.completions);
+      const verified = course.fields.completions !== undefined && Number.isFinite(recorded) && recorded >= 0;
+      return { id: course.id, title: course.title, recorded: verified ? recorded : null,
+        audience: staff.length, status: verified ? "Aggregate recorded" : "No completion aggregate" };
+    });
     return (
       <Stack gap={4}>
-        <StatRow>
-          <Stat label="Required courses" value={String(required.length)} prov="human" meta="Everyone employed must complete these" />
-          <Stat label="Outstanding completions" value={String(rows.reduce((sum, row) => sum + row.outstanding, 0))} prov="human" meta="Across all required courses" />
-          <Stat label="Policies needing acknowledgement" value={String(policies.filter((policy) => policy.fields.acknowledgementRequired === true).length)} prov="human" />
-        </StatRow>
+        {header}
+        {metrics}
+        {toolbar("Required training checks")}
+        <Notice tone="warning" title="Aggregate totals do not establish individual compliance">
+          Required status and completion aggregates are stored on course records. Without individual learner evidence, an aggregate
+          cannot prove that a specific person completed the current requirement, or that every employee was assigned it.
+        </Notice>
         <DataGrid
-          rows={rows}
-          rowId={(row) => row.id}
-          label="Compliance"
-          filterable={false}
+          rows={rows} rowId={(row) => row.id} label="Required course evidence"
           columns={[
-            { key: "title", header: "Course", primary: true, cell: (row) => row.title },
-            { key: "done", header: "Completed", align: "end", cell: (row) => <span className="ds-num">{row.completions} of {staff.length}</span> },
-            { key: "outstanding", header: "Outstanding", align: "end", cell: (row) => <Pill tone={row.outstanding === 0 ? "success" : "warning"}>{row.outstanding}</Pill> },
+            { key: "course", header: "Requirement", primary: true, cell: (row) => row.title, filterValue: (row) => row.title },
+            { key: "recorded", header: "Recorded completions", align: "end", cell: (row) =>
+              row.recorded === null ? "Not recorded" : <span className="ds-num">{row.recorded}</span> },
+            { key: "audience", header: "Current human staff", align: "end", cell: (row) => <span className="ds-num">{row.audience}</span> },
+            { key: "state", header: "Evidence", cell: (row) => <Pill tone={row.recorded === null ? "warning" : "info"}>{row.status}</Pill> },
           ]}
+          empty={<Empty title={required.length ? "No requirements match the search" : "No required courses recorded"}
+            icon={<GraduationCap size={20} />}>Choose a different search or mark an actual course required.</Empty>}
         />
       </Stack>
     );
   }
 
   if (lens === "My learning") {
-    return <MyLearning context={context} />;
+    return (
+      <Stack gap={4}>
+        {header}
+        {metrics}
+        <Notice tone="info" title="Personal progress belongs to the individual learner">
+          Only the local learner records that match your active role are shown below. Company aggregate totals are not a substitute for personal completion evidence.
+        </Notice>
+        <MyLearning context={context} />
+      </Stack>
+    );
   }
 
-  return courses.length === 0 ? <Empty title="No courses" icon={<GraduationCap size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Course builder")}>Build a course</Button>} /> : (
-    <Grid>
-      {courses.map((course) => (
-        <Card
-          key={course.id}
-          span={4}
-          title={course.title}
-          subtitle={`${String(course.fields.minutes ?? 0)} minutes`}
-          actions={course.fields.required === true ? <Pill tone="warning">Required</Pill> : <Pill tone="neutral">Optional</Pill>}
-          footer={<>
-            <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Course builder", { id: course.id })}>Edit</Button>
-            <Button size="sm" variant="ghost" onClick={() => context.openOverlay("quiz", { id: course.id })}>Preview quiz</Button>
-          </>}
-        >
-          <Stack gap={3}>
-            <p className="ds-subtle">{course.summary}</p>
-            <Row gap={2}>
-              <div className="ds-grow"><Meter value={Number(course.fields.completions ?? 0)} max={Math.max(1, staff.length)} label={`${course.title} completions`} /></div>
-              <span className="ds-subtle ds-num">{String(course.fields.completions ?? 0)}/{staff.length}</span>
-            </Row>
-          </Stack>
-        </Card>
-      ))}
-    </Grid>
+  const shown = courses.filter((course) => matches(course) && (!requiredOnly || course.fields.required === true));
+  return (
+    <Stack gap={4}>
+      {header}
+      {metrics}
+      {toolbar("Course library", true)}
+      {shown.length === 0 ? (
+        <Empty title={courses.length ? "No courses match the filters" : "No courses recorded"} icon={<GraduationCap size={20} />}
+          action={canEdit ? <Button variant="primary" onClick={() => context.openOverlay("Course builder")}>Create course</Button> : undefined}>
+          {courses.length ? "Change the search or show optional courses." : "Create a course to add it to the company learning library."}
+        </Empty>
+      ) : (
+        <div className="hr-learning-grid">
+          {shown.map((course) => {
+            const total = Number(course.fields.completions);
+            const hasAggregate = course.fields.completions !== undefined && Number.isFinite(total) && total >= 0;
+            return (
+              <Card key={course.id} eyebrow="LEARNING" title={course.title}
+                subtitle={course.fields.minutes ? `${String(course.fields.minutes)} minutes recorded` : "Duration not recorded"}
+                actions={<Pill tone={course.fields.required === true ? "warning" : "neutral"}>
+                  {course.fields.required === true ? "Required" : "Optional"}
+                </Pill>}
+                footer={<>
+                  {canEdit && <Button size="sm" variant="secondary" onClick={() =>
+                    context.openOverlay("Course builder", { id: course.id })}>Edit course</Button>}
+                  <Button size="sm" variant="ghost" onClick={() =>
+                    context.openOverlay("quiz", { id: course.id })}>Preview quiz</Button>
+                </>}
+              >
+                <Stack gap={2}>
+                  <p className="ds-subtle">{course.summary || "No course summary recorded."}</p>
+                  <Properties rows={[
+                    { label: "Completion aggregate", value: hasAggregate ? `${total} recorded` : "Not recorded" },
+                    { label: "Individual evidence", value: "Review in learner records" },
+                  ]} />
+                </Stack>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </Stack>
   );
 }
 
