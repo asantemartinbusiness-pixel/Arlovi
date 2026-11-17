@@ -72,9 +72,10 @@ test("People timesheet detail drawer shows Project evidence and approves only th
   await page.getByRole("button", { name: /Needs approval \(/ }).click();
   const mobile = await page.evaluate(() => window.matchMedia("(max-width: 767px)").matches);
   if (mobile) {
-    const card = page.locator("#main .ds-record-card").filter({ hasText: "QA Drawer Employee" }).first();
-    await expect(card).toBeVisible();
-    await card.getByRole("button", { name: "Open", exact: true }).click();
+    const wrapper = page.locator("#main .ds-card-list > .ds-stack").filter({ hasText: "QA Drawer Employee" }).first();
+    await expect(wrapper.locator("button.ds-record-card")).toBeVisible();
+    await wrapper.locator("button.ds-record-card").click();
+    await wrapper.getByRole("button", { name: "Open", exact: true }).click();
   } else {
     const row = page.getByRole("row", { name: /QA Drawer Employee/ });
     await expect(row).toBeVisible();
