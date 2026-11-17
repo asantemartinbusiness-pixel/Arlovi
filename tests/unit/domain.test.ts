@@ -215,7 +215,7 @@ describe("registry routes", () => {
   it("matches every registered route and keeps static segments first", () => {
     expect(catalog.screens).toHaveLength(316);
     expect(catalog.screens.reduce((sum, screen) => sum + screen.tabs.length, 0)).toBe(catalog.counts.tabs);
-    expect(catalog.screens.reduce((sum, screen) => sum + screen.actions.length, 0)).toBe(catalog.counts.actions ?? catalog.counts.primary_actions);
+    expect(catalog.screens.reduce((sum, screen) => sum + screen.actions.length, 0)).toBe(catalog.counts.primary_actions);
     expect(catalog.screens.reduce((sum, screen) => sum + screen.overlays.length, 0)).toBe(catalog.counts.overlays);
     for (const screen of catalog.screens) {
       const path = screen.route.replace(":org", "northline").replace(":id", screen.sampleId).replace(":slug", "showroom-consult");
