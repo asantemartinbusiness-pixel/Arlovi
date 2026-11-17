@@ -523,7 +523,7 @@ export function BalanceAdjust({ context, close }: { context: ScreenContext; clos
 export async function approveHours(context: ScreenContext): Promise<void> {
   const approve = (entry: Rec) => askFirst(context, {
     title: "Approve hours",
-    body: `${String(entry.fields.employeeName ?? entry.ownerName)} · ${String(entry.fields.hours ?? 0)} hours on ${context.date(entry.startAt)}. Approved hours feed the payroll inputs.`,
+    body: `${String(entry.fields.employeeName ?? entry.ownerName)} · ${String(entry.fields.hours ?? 0)} hours on ${context.date(entry.startAt)}. Approval records evidence for Finance review; it does not calculate or submit payroll.`,
     confirm: "Approve hours",
     run: async () => {
       try {
