@@ -33,7 +33,8 @@ test("Unknown form URLs never display another form's builder", async ({ page }) 
 test("Form editor exposes question status and workflow navigation", async ({ page }) => {
   await page.goto("/o/northline/forms/forms");
   const id = await page.evaluate(async () => {
-    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts") as typeof import("../src/platform/repo");
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
     const context = { actor: "Maya Chen", now: new Date().toISOString() };
     const record = repo.newRecord({
       organizationId: "org-northline", collection: "forms", currency: "GBP",
@@ -53,7 +54,8 @@ test("Form editor exposes question status and workflow navigation", async ({ pag
 test("Forms submission inbox displays status counts and a recoverable search", async ({ page }) => {
   await page.goto("/o/northline/forms/forms");
   const id = await page.evaluate(async () => {
-    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts") as typeof import("../src/platform/repo");
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
     const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
     const record = repo.newRecord({ organizationId: "org-northline", collection: "forms", currency: "GBP", title: "QA Response Inbox", status: "draft", fields: {} }, ctx);
     await repo.putRecord(record, ctx);
@@ -72,7 +74,8 @@ test("Forms submission inbox displays status counts and a recoverable search", a
 test("Forms analytics and publishing keep measured context and local-only disclosure", async ({ page }) => {
   await page.goto("/o/northline/forms/forms");
   const id = await page.evaluate(async () => {
-    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts") as typeof import("../src/platform/repo");
+    const modulePath = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ modulePath) as typeof import("../src/platform/repo");
     const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
     const record = repo.newRecord({ organizationId: "org-northline", collection: "forms", currency: "GBP", title: "QA Form Publishing", status: "draft", fields: {} }, ctx);
     await repo.putRecord(record, ctx);
