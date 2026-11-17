@@ -731,6 +731,8 @@ function OfferApproval({ context, close }: { context: ScreenContext; close: () =
 function OnboardingLaunch({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCollections(["employees", "members", "tasks"]);
   const starters = data.employees.filter((employee) => employee.status === "probation" || employee.status === "active");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const payload = context.overlayPayload as { employeeId?: string } | undefined;
   const selectedStarter = starters.some((employee) => employee.id === payload?.employeeId) ? payload?.employeeId : "";
   return (
@@ -739,6 +741,7 @@ function OnboardingLaunch({ context, close }: { context: ScreenContext; close: (
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
+        if (saving) return;
         const form = new FormData(event.currentTarget);
         const employeeId = String(form.get("employee") ?? "");
         const mentor = String(form.get("mentor") ?? "");
@@ -748,6 +751,8 @@ function OnboardingLaunch({ context, close }: { context: ScreenContext; close: (
           context.toast("Checklist not launched", "Choose a current employee and an active mentor.", "blocked");
           return;
         }
+        setSaving(true);
+        setError("");
         try {
           const plan = planOnboardingLaunch({
             organizationId: context.org.id, currency: context.org.currency,
@@ -756,11 +761,19 @@ function OnboardingLaunch({ context, close }: { context: ScreenContext; close: (
           await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
           context.toast("Checklist launched", "All six onboarding steps were saved together for " + employee.title + ".");
           close();
-        } catch (error) {
-          context.toast("Checklist not launched", error instanceof Error ? error.message : "Reload the employee record and try again.", "blocked");
+        } catch (cause) {
+          const message = cause instanceof Error ? cause.message : "Reload the employee record and try again.";
+          setError(message);
+          context.toast("Checklist not launched", message, "blocked");
+        } finally {
+          setSaving(false);
         }
       }}
     >
+      <PeopleDialogLead eyebrow="PEOPLE / STARTER HANDOVER" title="Launch an onboarding checklist"
+        description="Assign a starter and human mentor before recording the full cross-team handover checklist."
+        status={<Pill tone="info">Six local tasks</Pill>} />
+      <PeopleDialogSection step="01" title="Starter identity and assignment">
       <Field label="Who is starting" required>
         <Select name="employee" required defaultValue={selectedStarter}>
           <option value="">Choose the employee</option>
@@ -773,9 +786,22 @@ function OnboardingLaunch({ context, close }: { context: ScreenContext; close: (
           {data.employees.filter((row) => row.status === "active").map((row) => <option key={row.id}>{row.title}</option>)}
         </Select>
       </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Cross-team handover" description="People, mentor, IT and Finance own distinct tasks.">
+      <Properties rows={[
+        { label: "People", value: "Document and starter checks" },
+        { label: "Mentor", value: "Introduction and induction" },
+        { label: "IT", value: "Human access review" },
+        { label: "Finance", value: "Payroll input review, not payroll submission" },
+      ]} />
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Record boundaries and launch">
       <Notice tone="info" title="Six steps, one complete checklist">
         People verify documents, the mentor completes the introduction, IT access waits for a human decision, and Finance reviews payroll inputs. A launch is saved atomically; no accounts or external services are provisioned.
       </Notice>
+      {error && <Notice tone="danger" title="Checklist could not be launched">{error}</Notice>}
+      {saving && <p className="ds-subtle">Saving the checklist…</p>}
+      </PeopleDialogSection>
     </form>
   );
 }
