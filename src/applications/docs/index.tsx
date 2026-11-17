@@ -1133,16 +1133,10 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
             <Row gap={2}>
               <Button
                 variant="primary"
-                disabled={mandatoryOpen.length > 0 || record.status === "published"}
-                title={mandatoryOpen.length > 0 ? "Resolve the mandatory reviews first" : undefined}
-                onClick={async () => {
-                  await context.mutate.patch(record.id, {
-                    status: "published",
-                    fields: { ...record.fields, approvals: [...approvals, `${context.actor} ${context.now.toISOString()}`].join("|") },
-                  }, { expectRevision: record.revision, event: `${record.title} approved by ${context.actor}` });
-                  context.toast("Approved", `${record.title} is published in this workspace and the approval is on the record.`);
-                }}
-              >Approve</Button>
+                disabled={mandatoryOpen.length > 0 || openSuggestions(editor.model).length > 0 || record.status === "published" || !context.can("edit_knowledge")}
+                title={mandatoryOpen.length > 0 ? "Resolve mandatory comments first" : openSuggestions(editor.model).length > 0 ? "Decide tracked changes before approving" : undefined}
+                onClick={() => context.openOverlay("approve document")}
+              >Review and approve…</Button>
               <Button variant="secondary" onClick={() => context.openOverlay("reviewer assignment")}>Assign reviewers</Button>
             </Row>
           </Stack>
