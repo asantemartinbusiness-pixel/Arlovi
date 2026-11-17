@@ -942,56 +942,96 @@ function PayrollExceptions({ context }: { context: ScreenContext }) {
 function PayrollSignoff({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCollections(["payrollRuns", "employees"]);
   const payload = context.overlayPayload as { id?: string } | undefined;
+  const [checkedSources, setCheckedSources] = useState(false);
+  const [checkedBoundary, setCheckedBoundary] = useState(false);
+  const [error, setError] = useState("");
   const wantedId = payload?.id ?? context.selectedId;
   const run = wantedId
     ? data.payrollRuns.find((row) => row.id === wantedId && row.organizationId === context.org.id && row.status === "draft")
     : data.payrollRuns.find((row) => row.status === "draft");
   const gaps = payrollSalaryGaps(data.employees);
   if (!context.can("view_payroll")) return <RoleViewNote what="Payroll approval" />;
-  if (!run) return <Empty title={wantedId ? "Selected draft run unavailable" : "No draft run to approve"}>
-    Open the actual draft from this company's payroll register; approved or missing runs cannot be re-signed.
-  </Empty>;
-  const recordedGross = run.fields.grossMinor;
+  if (!run) return (
+    <Empty title={wantedId ? "Selected draft run unavailable" : "No draft run to approve"}>
+      Open an actual company payroll draft; a missing or approved run cannot silently be substituted.
+    </Empty>
+  );
+  const grossMinor = Number(run.fields.grossMinor);
+  const hasGross = run.fields.grossMinor !== undefined && Number.isFinite(grossMinor) && grossMinor >= 0;
+  const exceptions = Number(run.fields.exceptions ?? 0);
+  const flagged = Number.isFinite(exceptions) && exceptions > 0 ? exceptions : 0;
+  const blocked = gaps.length > 0 || !hasGross || flagged > 0;
+  const ready = !blocked && checkedSources && checkedBoundary;
   return (
     <Stack gap={4}>
-      <p className="ds-prose">
-        This records that {context.actor} reviewed {run.title}, for period {String(run.fields.period || "not recorded")}.
-        The saved gross is {recordedGross === undefined ? "not recorded" : context.money(Number(recordedGross))},
-        not a recalculation of the current employee roster.
-      </p>
-      {gaps.length > 0 && <Notice tone="danger" title="Salary inputs missing — approval blocked">
-        {gaps.length} current employee{gaps.length === 1 ? "" : "s"} have missing or invalid salary inputs.
-        Review those source records and reconcile this run before signing off.
-      </Notice>}
-      <Properties rows={[
-        { label: "Filed with an authority", value: <Pill tone="warning">No connection</Pill> },
-        { label: "Bank file sent", value: <Pill tone="warning">No connection</Pill> },
-        { label: "What approval changes", value: "The run status, the approver's name and the audit entry" },
-      ]} />
-      <Checkbox label={`I have checked this run and I am ${context.actor}`} id="payroll-confirm" />
-      <Row gap={2}>
+      <PeopleDialogLead eyebrow="PEOPLE / PAYROLL / HUMAN SIGN-OFF" title="Approve this recorded draft"
+        description="Review the saved run and its source evidence. Approval records a human decision in this workspace; it never files, pays or issues payslips."
+        status={<Pill tone="warning">Draft review</Pill>} />
+      <PeopleDialogSection step="01" title="Selected run" description="The figures below are saved on the run, not recomputed from today's roster.">
+        <Properties rows={[
+          { label: "Payroll run", value: run.title },
+          { label: "Period", value: String(run.fields.period || "Not recorded") },
+          { label: "Recorded gross", value: hasGross ? context.money(grossMinor) : "Not recorded" },
+          { label: "Recorded people", value: run.fields.people === undefined ? "Not recorded" : String(run.fields.people) },
+          { label: "Prepared by", value: String(run.fields.preparedBy || "Not recorded") },
+          { label: "Validation", value: run.fields.validatedAt
+            ? `Local check by ${String(run.fields.validatedBy || "unknown reviewer")}`
+            : "No local validation recorded" },
+        ]} />
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Outstanding review exceptions"
+        description="Resolve known source problems before a local human sign-off.">
+        <div className="hr-dialog-evidence-row">
+          <span>Employees missing valid salary</span>
+          <Pill tone={gaps.length ? "warning" : "success"}>{gaps.length} flagged</Pill>
+        </div>
+        <div className="hr-dialog-evidence-row">
+          <span>Recorded validation exceptions</span>
+          <Pill tone={flagged ? "warning" : "neutral"}>{flagged}</Pill>
+        </div>
+        {!hasGross && <Notice tone="danger" title="No valid gross recorded">
+          Prepare and verify the original run before it can be approved.
+        </Notice>}
+        {(gaps.length > 0 || flagged > 0) && <Notice tone="danger" title="Sign-off blocked by source evidence">
+          Correct the missing pay inputs and recorded exceptions, then reopen the latest draft before deciding.
+        </Notice>}
+        <Button size="sm" variant="secondary" onClick={() =>
+          context.openOverlay("exception report", { id: run.id })}>Review exception report</Button>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Accountable approval"
+        description="Both confirmations are necessary. The saved audit will identify the reviewer and the time.">
+        <Checkbox checked={checkedSources} disabled={blocked}
+          onChange={(event) => setCheckedSources(event.target.checked)}
+          label={`I, ${context.actor}, have verified the recorded run inputs and any required exceptions`} />
+        <Checkbox checked={checkedBoundary} disabled={blocked}
+          onChange={(event) => setCheckedBoundary(event.target.checked)}
+          label="I understand this approval does not submit payroll, transfer money, issue payslips or certify tax compliance" />
+        <Notice tone="info" title="No external systems connected">
+          Bank payments, HMRC or other jurisdiction filings, pension providers and payroll distributions remain separate processes.
+        </Notice>
+        {error && <Notice tone="danger" title="Run not approved">{error}</Notice>}
+      </PeopleDialogSection>
+      <Row gap={2} wrap>
         <Button variant="ghost" onClick={close}>Cancel</Button>
         <span className="ds-grow" />
-        <Button
-          variant="primary"
-          disabled={gaps.length > 0}
-          onClick={async () => {
-            if (gaps.length > 0 || !context.can("view_payroll")) return;
-            const confirmed = document.querySelector<HTMLInputElement>("#payroll-confirm")?.checked;
-            if (!confirmed) { context.toast("Not approved", "Tick the confirmation first.", "blocked"); return; }
-            const saved = await context.mutate.patch(run.id, { status: "approved",
-              fields: { ...run.fields, approvedBy: context.actor, approvedAt: clockIso() } },
-              { expectRevision: run.revision, event: `Payroll run ${run.title} locally approved by ${context.actor}` });
-            if (!saved) {
-              context.toast("Approval not saved", "The draft changed. Reload it before deciding.", "blocked");
-              return;
-            }
-            context.toast("Local approval recorded", "The run changed. Nothing was filed, issued or paid.");
+        <Button variant="primary" disabled={!ready} onClick={async () => {
+          setError("");
+          if (!ready || !context.can("view_payroll")) return;
+          try {
+            const saved = await context.mutate.patch(run.id, {
+              status: "approved", fields: {
+                ...run.fields, approvedBy: context.actor, approvedAt: clockIso(),
+              },
+            }, { expectRevision: run.revision,
+              event: `Payroll run ${run.title} locally approved by ${context.actor} after two explicit confirmations` });
+            if (!saved) { setError("This payroll run changed; reopen its latest draft before approving."); return; }
+            context.toast("Local approval recorded",
+              "The draft's review status and human approver were saved. No tax filing, payslip or payment was sent.");
             close();
-          }}
-        >
-          Approve the run
-        </Button>
+          } catch (reason) {
+            setError(reason instanceof Error ? reason.message : "The selected draft could not be signed off.");
+          }
+        }}>Approve local draft</Button>
       </Row>
     </Stack>
   );
