@@ -160,3 +160,24 @@
   .sx-body[data-mobile="aside"] .sx-aside { display: flex; border-inline-start: 0; }
   .sx-body[data-mobile="aside"] .sx-main { display: none; }
 }
+
+/* Sheets: library and workbook context, using the existing interface tokens. */
+.sx-library-header,.sx-workflow-strip {
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-3);
+  padding:var(--space-4);border:1px solid var(--border-default);border-radius:var(--radius-md);
+}
+.sx-library-header>div,.sx-workflow-context{flex:1 1 260px;min-width:0}
+.sx-library-header h2{font-size:clamp(1.2rem,2vw,1.65rem);letter-spacing:-.035em;line-height:1.2;margin:var(--space-2) 0}
+.sx-library-header p{color:var(--fg-muted);max-width:65ch;line-height:1.5;margin:0}
+.sx-library-eyebrow{font-size:var(--text-xs);font-weight:700;letter-spacing:.08em;color:var(--fg-subtle)}
+.sx-library-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-2)}
+.sx-library-metrics>div{display:flex;flex-direction:column;gap:var(--space-1);padding:var(--space-4);border:1px solid var(--border-default);border-radius:var(--radius-md)}
+.sx-library-metrics strong{font-size:clamp(1.4rem,2.5vw,2rem);font-variant-numeric:tabular-nums;letter-spacing:-.04em}
+.sx-library-metrics span{font-weight:600;font-size:var(--text-sm)}
+.sx-library-metrics small{font-size:var(--text-xs);color:var(--fg-muted)}
+.sx-library-filters{padding:var(--space-3) 0}
+.sx-workflow-strip{border-radius:0;border-inline:0;border-block-start:0;padding-block:var(--space-3)}
+.sx-workflow-context{display:flex;flex-direction:column;align-items:flex-start;gap:var(--space-2)}
+.sx-workflow-actions{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2)}
+@media(max-width:900px){.sx-library-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.sx-library-header,.sx-workflow-strip{padding:var(--space-3)}.sx-workflow-actions{width:100%}.sx-workflow-actions button{flex:1 1 90px}}
