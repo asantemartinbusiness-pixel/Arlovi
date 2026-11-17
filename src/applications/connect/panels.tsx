@@ -1412,18 +1412,31 @@ function ValidateDeclaration({ draft }: { draft: string }) {
 export function ActionReceipts({ context, lens }: { context: ScreenContext; lens: "All" | "Confirmed" | "Pending" | "Failed" | "Blocked" }) {
   const events = useEvents();
   const { org } = useWorkspace();
+  const [search, setSearch] = useState("");
   const receipts = events.filter((event) => event.type === "capability" || event.capability !== undefined);
   const rows = receipts.filter((event) => {
     const state = event.capability ?? "not_connected";
-    if (lens === "Confirmed") return state === "verified_external";
-    if (lens === "Pending") return state === "queued_local" || state === "awaiting_external_confirmation";
-    if (lens === "Failed") return state === "failed";
-    if (lens === "Blocked") return state === "not_connected" || state === "blocked" || state === "configuration_required";
-    return true;
-  });
+    if (lens === "Blocked" && !(state === "not_connected" || state === "blocked" || state === "configuration_required")) return false;
+    if (lens === "Confirmed" && state !== "verified_external") return false;
+    if (lens === "Pending" && !(state === "queued_local" || state === "awaiting_external_confirmation")) return false;
+    if (lens === "Failed" && state !== "failed") return false;
+    const needle = search.trim().toLocaleLowerCase();
+    return !needle || [event.actor, event.message, event.screenId ?? "", CAPABILITY_LABELS[state]]
+      .join(" ").toLocaleLowerCase().includes(needle);
+  }).sort((left, right) => right.at.localeCompare(left.at));
 
   return (
     <Stack gap={4}>
+      <section className="connect-receipts-overview" aria-label="Action receipt overview">
+        <div className="connect-receipts-head">
+          <div>
+            <span className="connect-eyebrow">INTEGRATIONS / AUDIT RECEIPTS</span>
+            <h2>Trace every request at the provider boundary.</h2>
+            <p>Review which actions were attempted, blocked or confirmed. A local log entry is not proof that an external provider completed an operation.</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/connect/sync`)}>Synchronisation</Button>
+        </div>
+      </section>
       <StatRow>
         <Stat label="Receipts" value={String(receipts.length)} prov="posted" meta="Audit entries about a provider boundary" />
         <Stat label="Confirmed by a provider" value="0" prov="posted" meta="None, and the tab says so" />
@@ -1431,9 +1444,23 @@ export function ActionReceipts({ context, lens }: { context: ScreenContext; lens
         <Stat label="Delivery proof" value="Unavailable" unavailable meta="Proof comes from a provider's response" />
       </StatRow>
 
+      <div className="connect-connections-toolbar">
+        <label className="connect-connections-search">
+          <Search size={17} aria-hidden="true" />
+          <span className="ds-sr-only">Search action receipts</span>
+          <input type="search" aria-label="Search action receipts" value={search}
+            placeholder="Search actions, actors and outcomes"
+            onChange={event => setSearch(event.target.value)} />
+          {search && <button type="button" aria-label="Clear receipt search" onClick={() => setSearch("")}>
+            <X size={15} aria-hidden="true" />
+          </button>}
+        </label>
+      </div>
       {rows.length === 0 ? (
-        <Empty title={`No ${lens === "All" ? "" : lens.toLowerCase() + " "}receipts`} icon={<Activity size={20} />}>
-          A receipt is written whenever something reaches a provider boundary. Attempt an authorisation and one appears here.
+        <Empty title={search.trim() ? "No receipts match your search" : `No ${lens === "All" ? "" : lens.toLowerCase() + " "}receipts`} icon={<Activity size={20} />}
+          action={search.trim() ? <Button variant="secondary" onClick={() => setSearch("")}>Clear search</Button> : undefined}>
+          {search.trim() ? "Try another actor, operation or outcome." :
+            "A receipt is written whenever an action reaches a provider boundary. Attempt an authorisation and one appears here."}
         </Empty>
       ) : (
         <DataGrid
@@ -1469,7 +1496,10 @@ export function ActionReceipts({ context, lens }: { context: ScreenContext; lens
 export function ReceiptDetail({ context }: { context: ScreenContext }) {
   const events = useEvents();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const event = events.find((item) => item.id === payload?.id) ?? events.find((item) => item.type === "capability");
+  // A specified receipt identifier never falls back to unrelated audit evidence.
+  const event = payload?.id
+    ? events.find(item => item.id === payload.id && (item.type === "capability" || item.capability !== undefined))
+    : undefined;
   if (!event) return <Empty title="No receipt selected" icon={<Activity size={20} />} />;
   return (
     <Stack gap={3}>
