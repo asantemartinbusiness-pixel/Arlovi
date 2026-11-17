@@ -183,3 +183,57 @@ export function planHireApplicant(
     eventTypes: ["update", existing ? "update" : "create"],
   };
 }
+
+/** Create exactly one complete onboarding checklist and bind the employee's
+ * launch marker in the same transaction. A concurrent second launch must fail
+ * its employee revision check instead of creating duplicate child tasks. */
+export function planOnboardingLaunch(
+  ctx: PeopleDecisionContext,
+  employeeInput: Rec,
+  mentorInput: Rec,
+  existingTasks: Rec[],
+): PeopleDecisionPlan {
+  ensureContext(ctx);
+  const employee = scoped(employeeInput, "employees", ctx);
+  const mentor = scoped(mentorInput, "employees", ctx);
+  if (!["active", "probation"].includes(employee.status)) {
+    throw new Error("Only a current employee can start an onboarding checklist.");
+  }
+  if (mentor.status !== "active" || mentor.id === employee.id) {
+    throw new Error("Choose an active mentor other than the new starter.");
+  }
+  if (employee.fields.onboardingLaunchedAt ||
+      existingTasks.some((task) => task.organizationId === ctx.organizationId &&
+        task.collection === "tasks" && task.fields.kind === "onboarding" &&
+        task.fields.employeeId === employee.id)) {
+    throw new Error("This employee already has an onboarding checklist. Open the existing steps instead.");
+  }
+  const roles = [
+    { label: "Signed contract reference reviewed", group: "People", assignee: ctx.actor, status: "ready" },
+    { label: "Right to work record checked", group: "People", assignee: ctx.actor, status: "ready" },
+    { label: "Request workspace sign-in access", group: "IT access", assignee: ctx.actor, status: "waiting" },
+    { label: "Payroll inputs reviewed", group: "Finance", assignee: ctx.actor, status: "ready" },
+    { label: "Mentor introduction with " + mentor.title, group: "Manager", assignee: mentor.title, status: "ready" },
+    { label: "Health and safety learning", group: "Learning", assignee: employee.title, status: "ready" },
+  ] as const;
+  const updatedEmployee = revision(employee, ctx, {
+    fields: { ...employee.fields, mentor: mentor.title, mentorId: mentor.id, onboardingLaunchedAt: ctx.now },
+  });
+  const tasks = roles.map((step) => newRecord({
+    organizationId: ctx.organizationId, currency: ctx.currency,
+    collection: "tasks", title: step.label, status: step.status,
+    summary: step.group + " checklist step for " + employee.title + ". Completion must be verified on the actual record.",
+    parentId: employee.id,
+    fields: {
+      kind: "onboarding", employeeId: employee.id, stage: step.status,
+      assignee: step.assignee, group: step.group,
+    },
+  }, { actor: ctx.actor, now: ctx.now }));
+  return {
+    records: [updatedEmployee, ...tasks],
+    messages: ["Onboarding checklist launched for " + employee.title + " by " + ctx.actor,
+      ...tasks.map((task) => "Onboarding step created: " + task.title)],
+    expectedRevisions: { [employee.id]: employee.revision, [mentor.id]: mentor.revision },
+    eventTypes: ["update", ...tasks.map(() => "create" as const)],
+  };
+}
