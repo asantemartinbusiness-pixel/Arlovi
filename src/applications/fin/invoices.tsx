@@ -199,6 +199,17 @@ export function FinanceTimeInputs({ context }: { context: ScreenContext }) {
           label="Billable time source records"
           filterable
           onOpen={(id) => context.openOverlay("finance time review", { id })}
+          card={(entry) => {
+            const person = data.employees.find((record) => record.id === entry.fields.employeeId);
+            const project = data.projects.find((record) => record.id === entry.fields.projectId);
+            const state = assess(entry);
+            return <>
+              <strong>{person?.title ?? String(entry.fields.employeeName ?? "Unlinked person")}</strong>
+              <span className="ds-subtle">{project?.title ?? "Unlinked Project"} · {String(entry.fields.hours ?? "—")}h · {state.netEstimateMinor !== undefined
+                ? context.money(state.netEstimateMinor) + " illustrative net" : "Rate not recorded"}</span>
+              <Pill tone={state.state === "reviewed" ? "success" : state.state === "ready" ? "info" : "warning"}>{state.label}</Pill>
+            </>;
+          }}
           rowTone={(entry) => ["identity_missing", "project_missing", "invoice_missing", "invalid_hours"].includes(assess(entry).state)
             ? "danger" : ["unapproved", "rate_missing"].includes(assess(entry).state) ? "warning" : undefined}
           columns={[
