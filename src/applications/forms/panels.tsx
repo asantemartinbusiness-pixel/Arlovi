@@ -72,82 +72,104 @@ export function FormsDirectory({ context, scope }: { context: ScreenContext; sco
   const forms = useCollection("forms");
   const submissions = useCollection("submissions");
   const { org } = useWorkspace();
-
-  if (scope === "Templates") {
-    return (
-      <Grid>
-        {TEMPLATES.map((template) => (
-          <Card key={template.id} span={6} title={template.title} subtitle={template.summary}
-            footer={<Button size="sm" variant="primary" onClick={async () => {
-              const model: FormModel = {
-                ...readForm(undefined),
-                fields: template.fields.map((field) => {
-                  const made = makeField(field.type);
-                  return { ...made, label: field.label, required: field.required ?? false, options: field.options ?? made.options };
-                }),
-              };
-              const created = await context.mutate.create({
-                collection: "forms",
-                title: `${template.title} form`,
-                status: "draft",
-                summary: template.summary,
-                body: model,
-              }, `Form created from the ${template.title} template`);
-              context.toast("Form created", `${created.title} has ${model.fields.length} fields and is a draft.`);
-              context.navigate(`/o/${org.slug}/forms/forms/${created.id}`);
-            }}>Start from this</Button>}>
-            <Stack gap={1}>
-              {template.fields.map((field) => (
-                <Row key={field.label} gap={2}>
-                  <span className="ds-grow">{field.label}</span>
-                  <Pill tone="neutral">{FIELD_LABELS[field.type]}</Pill>
-                  {field.required && <Pill tone="warning">required</Pill>}
-                </Row>
-              ))}
-            </Stack>
-          </Card>
-        ))}
-      </Grid>
-    );
-  }
-
-  const rows = forms.filter((record) => {
-    if (scope === "Live") return record.status === "live";
-    if (scope === "Draft") return record.status !== "live" && record.status !== "archived";
-    return record.status !== "archived";
-  });
-
-  if (rows.length === 0) {
-    return (
-      <Empty title={scope === "All" ? "No forms yet" : `No ${scope.toLowerCase()} forms`} icon={<ClipboardList size={20} />}
-        action={<Button variant="primary" onClick={() => context.openOverlay("New form")}>Create a form</Button>}>
-        A form is a list of typed questions with its own validation and rules. Answers become records in this workspace.
-      </Empty>
-    );
-  }
-
+  const [query, setQuery] = useState("");
+  const active = forms.filter((record) => record.status !== "archived");
+  const live = active.filter((record) => record.status === "live");
+  const draft = active.filter((record) => record.status !== "live");
+  const rowsInScope = scope === "Live" ? live : scope === "Draft" ? draft : active;
+  const needle = query.trim().toLocaleLowerCase();
+  const rows = rowsInScope.filter((record) => !needle || [record.title, record.summary, record.ownerName, ...record.tags].join(" ").toLocaleLowerCase().includes(needle));
+  const templateRows = TEMPLATES.filter((template) => !needle || [template.title, template.summary, ...template.fields.map((field) => field.label)].join(" ").toLocaleLowerCase().includes(needle));
+  const formIds = new Set(active.map((record) => record.id));
+  const totalResponses = submissions.filter((record) => record.parentId && formIds.has(record.parentId)).length;
+  const heading = scope === "Templates" ? "Start from a proven structure." : scope === "Live" ? "Forms accepting responses." : scope === "Draft" ? "Prepare the next form." : "Forms and their responses.";
   return (
-    <DataGrid
-      rows={rows}
-      rowId={(row) => row.id}
-      label="Forms"
-      columns={[
-        { key: "title", header: "Form", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
-        { key: "fields", header: "Questions", align: "end", cell: (row) => String(readForm(row).fields.filter((field) => !STRUCTURAL.includes(field.type)).length), sortValue: (row) => readForm(row).fields.length },
-        { key: "status", header: "State", cell: (row) => <Pill tone={row.status === "live" ? "success" : "neutral"} dot>{row.status}</Pill> },
-        { key: "access", header: "Audience", cell: (row) => readForm(row).settings.access === "link" ? "Anyone with the link" : "This workspace" },
-        { key: "subs", header: "Submissions", align: "end", cell: (row) => String(submissions.filter((item) => item.parentId === row.id).length), sortValue: (row) => submissions.filter((item) => item.parentId === row.id).length },
-        { key: "sensitive", header: "Sensitive", cell: (row) => readForm(row).fields.some((field) => field.sensitive) ? <Pill tone="danger">flagged</Pill> : <span className="ds-subtle">No</span> },
-        { key: "owner", header: "Owner", cell: (row) => row.ownerName },
-      ]}
-      onOpen={(id) => context.navigate(`/o/${org.slug}/forms/forms/${id}`)}
-      onSelect={(id) => context.select(id)}
-      selectedId={context.selectedId}
-      summary={<span>A form flagged sensitive keeps its answers redacted in the submissions table until someone chooses to reveal them, and the choice is recorded.</span>}
-      bulkActions={[
-        { label: "Archive", tone: "danger", onRun: (selected) => selected.forEach((row) => void context.mutate.patch(row.id, { status: "archived" }, { event: `Form ${row.title} archived` })) },
-      ]}
-    />
+    <Stack gap={4}>
+      <section aria-label="Forms library overview" className="t6-directory-intro">
+        <Row gap={3} wrap>
+          <div className="ds-grow" style={{ minWidth: 220 }}>
+            <span className="ds-subtle">FORMS / {scope.toUpperCase()}</span>
+            <h2 style={{ margin: "var(--space-2) 0", fontSize: "clamp(1.3rem, 2.5vw, 1.8rem)", letterSpacing: "-.03em" }}>{heading}</h2>
+            <p className="ds-subtle" style={{ maxWidth: "65ch", margin: 0 }}>
+              {scope === "Templates" ? "Choose a starting point, then customise every question and validation rule." : "Find the right form, inspect its response activity, and continue editing without losing context."}
+            </p>
+          </div>
+          <Button variant="primary" onClick={() => context.openOverlay("New form")}>New form</Button>
+        </Row>
+      </section>
+      <div className="t6-directory-metrics" aria-label="Forms activity summary">
+        <div><span>Active forms</span><strong>{active.length}</strong></div>
+        <div><span>Live forms</span><strong>{live.length}</strong></div>
+        <div><span>Draft forms</span><strong>{draft.length}</strong></div>
+        <div><span>Stored responses</span><strong>{totalResponses}</strong></div>
+      </div>
+      <Field label={scope === "Templates" ? "Find a template" : "Find a form"}>
+        <TextInput type="search" aria-label={scope === "Templates" ? "Find a template" : "Find a form"} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={scope === "Templates" ? "Search templates or questions" : "Search name, description, owner or tags"} />
+      </Field>
+      {scope === "Templates" ? (
+        templateRows.length === 0 ? (
+          <Empty title="No templates match this search" icon={<ClipboardList size={20} />} action={<Button variant="secondary" onClick={() => setQuery("")}>Clear search</Button>}>Try a different keyword to browse the available templates.</Empty>
+        ) : (
+          <Grid>
+            {templateRows.map((template) => (
+              <Card key={template.id} span={6} title={template.title} subtitle={template.summary}
+                footer={<Button size="sm" variant="primary" onClick={async () => {
+                  const model: FormModel = {
+                    ...readForm(undefined),
+                    fields: template.fields.map((field) => {
+                      const made = makeField(field.type);
+                      return { ...made, label: field.label, required: field.required ?? false, options: field.options ?? made.options };
+                    }),
+                  };
+                  const created = await context.mutate.create({
+                    collection: "forms", title: `${template.title} form`, status: "draft",
+                    summary: template.summary, body: model,
+                  }, `Form created from the ${template.title} template`);
+                  context.toast("Form created", `${created.title} has ${model.fields.length} fields and is a draft.`);
+                  context.navigate(`/o/${org.slug}/forms/forms/${created.id}`);
+                }}>Start from this</Button>}>
+                <Stack gap={1}>
+                  {template.fields.map((field) => (
+                    <Row key={field.label} gap={2}>
+                      <span className="ds-grow">{field.label}</span>
+                      <Pill tone="neutral">{FIELD_LABELS[field.type]}</Pill>
+                      {field.required && <Pill tone="warning">required</Pill>}
+                    </Row>
+                  ))}
+                </Stack>
+              </Card>
+            ))}
+          </Grid>
+        )
+      ) : rows.length === 0 ? (
+        <Empty title={needle ? "No forms match this search" : scope === "All" ? "No forms yet" : `No ${scope.toLowerCase()} forms`} icon={<ClipboardList size={20} />}
+          action={needle ? <Button variant="secondary" onClick={() => setQuery("")}>Clear search</Button> : <Button variant="primary" onClick={() => context.openOverlay("New form")}>Create a form</Button>}>
+          {needle ? "Try a different name, owner, description or tag." : "Forms start as drafts. Add questions, test the logic and publish when ready."}
+        </Empty>
+      ) : (
+        <DataGrid
+          rows={rows}
+          rowId={(row) => row.id}
+          label="Forms"
+          columns={[
+            { key: "title", header: "Form", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
+            { key: "fields", header: "Questions", align: "end", cell: (row) => String(readForm(row).fields.filter((field) => !STRUCTURAL.includes(field.type)).length), sortValue: (row) => readForm(row).fields.length },
+            { key: "status", header: "State", cell: (row) => <Pill tone={row.status === "live" ? "success" : "neutral"} dot>{row.status}</Pill> },
+            { key: "access", header: "Access setting", cell: (row) => readForm(row).settings.access === "link" ? "Link option (local)" : "Workspace option (local)" },
+            { key: "subs", header: "Submissions", align: "end", cell: (row) => String(submissions.filter((item) => item.parentId === row.id).length), sortValue: (row) => submissions.filter((item) => item.parentId === row.id).length },
+            { key: "sensitive", header: "Sensitive", cell: (row) => readForm(row).fields.some((field) => field.sensitive) ? <Pill tone="danger">flagged</Pill> : <span className="ds-subtle">No</span> },
+            { key: "owner", header: "Owner", cell: (row) => row.ownerName },
+          ]}
+          onOpen={(id) => context.navigate(`/o/${org.slug}/forms/forms/${id}`)}
+          onSelect={(id) => context.select(id)}
+          selectedId={context.selectedId}
+          summary={<span>Access options are stored locally, not server-enforced invitations or hosted public links. Sensitive answers remain redacted until explicitly revealed.</span>}
+          bulkActions={[
+            { label: "Archive", tone: "danger", onRun: (selected) => selected.forEach((row) => void context.mutate.patch(row.id, { status: "archived" }, { event: `Form ${row.title} archived` })) },
+          ]}
+        />
+      )}
+    </Stack>
   );
 }
 
