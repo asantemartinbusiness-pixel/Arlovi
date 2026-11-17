@@ -104,10 +104,16 @@ test("Inbox Needs me follows live Project assignments and not other colleagues' 
   const mineButton=page.getByRole("button",{name:"Needs me",exact:true});
   await expect(mineButton).toBeVisible();
   await mineButton.click();
-  const queue=page.locator("#main").getByRole("row",{name:/QA Maya overdue task/});
-  await expect(queue).toBeVisible();
-  await expect(page.locator("#main").getByRole("row",{name:/QA colleague overdue task/})).toHaveCount(0);
+  // The shared DataGrid renders a visible record card below 768px and a
+  // semantic table row at wider widths. Assert the actual visible layout,
+  // rather than accidentally treating a hidden desktop row as a mobile item.
+  const isMobile=await page.evaluate(()=>window.matchMedia("(max-width: 767px)").matches);
+  const queueRecord=(title:RegExp)=>isMobile
+    ? page.locator("#main .ds-card-list .ds-record-card").filter({hasText:title})
+    : page.locator("#main").getByRole("row",{name:title});
+  await expect(queueRecord(/QA Maya overdue task/)).toBeVisible();
+  await expect(queueRecord(/QA colleague overdue task/)).toHaveCount(0);
   await expect(page.getByRole("button",{name:"Everything",exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Everything",exact:true}).click();
-  await expect(page.locator("#main").getByRole("row",{name:/QA colleague overdue task/})).toBeVisible();
+  await expect(queueRecord(/QA colleague overdue task/)).toBeVisible();
 });
