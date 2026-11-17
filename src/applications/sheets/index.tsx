@@ -1218,6 +1218,16 @@ function ChartsScreen({ context, tab }: { context: ScreenContext; tab: "Charts" 
   if (tab === "Dashboard") {
     return (
       <Stack gap={4}>
+        <div className="sx-formula-overview">
+          <div className="sx-formula-header"><span className="sx-library-eyebrow">SHEETS / VISUAL ANALYSIS</span><h2>Dashboard from your data.</h2>
+            <p>Every chart reads a workbook range. Review each source and return to the grid to correct values or formulas.</p></div>
+          <div className="sx-formula-metrics" aria-label="Chart dashboard overview">
+            <div><span>Charts</span><strong>{editor.workbook.charts.length}</strong><small>Linked to workbook ranges</small></div>
+            <div><span>Sheets</span><strong>{editor.workbook.sheets.length}</strong><small>Available sources</small></div>
+            <div><span>Formula errors</span><strong>{editor.evaluation.errors.length}</strong><small>Review before distribution</small></div>
+          </div>
+          <Row gap={2} wrap><Button size="sm" variant="primary" onClick={() => context.openOverlay("Series editor", { mode: "create" })}>New chart</Button><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/sheets/workbooks/${record.id}`)}>Back to grid</Button></Row>
+        </div>
         <Notice tone="info" title="Every tile reads a live range">
           A tile is a range and a renderer, so editing a cell changes the tile on the next recalculation. Nothing is cached behind a figure.
         </Notice>
