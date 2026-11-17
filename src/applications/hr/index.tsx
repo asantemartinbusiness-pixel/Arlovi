@@ -1162,31 +1162,89 @@ function Calibration({ context }: { context: ScreenContext }) {
 
 function CourseBuilder({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const existing = useRecord(payload?.id);
+  const raw = useRecord(payload?.id);
+  const existing = scopedDetailRecord(raw, context.org.id, "courses");
+  const [error, setError] = useState("");
+  const canEdit = context.can("edit_knowledge");
+  if (payload?.id && !existing) return (
+    <Empty title="Selected course unavailable">
+      The course was not found in this company. A broken edit link cannot create a replacement course.
+    </Empty>
+  );
   return (
-    <form
-      id="hr-course"
-      className="ds-stack ds-gap-4"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        const form = new FormData(event.currentTarget);
-        const fields = { minutes: Number(form.get("minutes") ?? 30), required: form.get("required") === "on", completions: Number(existing?.fields.completions ?? 0), format: "Recorded in this workspace" };
+    <form id="hr-course" className="ds-stack ds-gap-4" onSubmit={async (event) => {
+      event.preventDefault();
+      setError("");
+      if (!canEdit) { setError("This role cannot create or edit learning content."); return; }
+      const form = new FormData(event.currentTarget);
+      const title = String(form.get("title") ?? "").trim();
+      const summary = String(form.get("summary") ?? "").trim();
+      const rawMinutes = String(form.get("minutes") ?? "").trim();
+      const minutes = Number(rawMinutes);
+      if (title.length < 3) { setError("Enter a course title of at least three characters."); return; }
+      if (!/^\d+$/.test(rawMinutes) || !Number.isInteger(minutes) || minutes < 5 || minutes > 600) {
+        setError("Estimated duration must be a whole number between 5 and 600 minutes.");
+        return;
+      }
+      const required = form.get("required") === "on";
+      try {
         if (existing) {
-          await context.mutate.patch(existing.id, { title: String(form.get("title") ?? existing.title), summary: String(form.get("summary") ?? ""), fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Course updated: ${existing.title}` });
+          const saved = await context.mutate.patch(existing.id, {
+            title, summary,
+            fields: { ...existing.fields, minutes, required },
+          }, { expectRevision: existing.revision, event: `Learning record ${existing.title} updated by ${context.actor}` });
+          if (!saved) { setError("The course has changed. Reopen the latest record before saving."); return; }
         } else {
-          await context.mutate.create({ collection: "courses", title: String(form.get("title") ?? "Course"), status: "published", summary: String(form.get("summary") ?? ""), fields }, `Course created: ${String(form.get("title") ?? "")}`);
+          await context.mutate.create({
+            collection: "courses", title, status: "draft", summary,
+            fields: { minutes, required, format: "Local course metadata — content not hosted" },
+          }, `Draft course record created by ${context.actor}: ${title}`);
         }
-        context.toast("Course saved", "It is in the course list with its completion count.");
+        context.toast("Course record saved",
+          "The local course metadata was saved. No lesson, video, learner completion or external publication was created.");
         close();
-      }}
-    >
-      <Field label="Course title" required><TextInput name="title" defaultValue={existing?.title ?? ""} required /></Field>
-      <Field label="What it covers"><TextArea name="summary" rows={3} defaultValue={existing?.summary ?? ""} /></Field>
-      <Row gap={3}>
-        <Field label="Minutes"><TextInput name="minutes" inputMode="numeric" align="end" defaultValue={String(existing?.fields.minutes ?? 30)} /></Field>
-      </Row>
-      <Checkbox name="required" label="Everyone employed must complete this" defaultChecked={existing?.fields.required === true} />
-      <Notice tone="info">A course here is a record with a completion count. No video or document is hosted by this workspace.</Notice>
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "The course record could not be saved.");
+      }
+    }}>
+      <PeopleDialogLead eyebrow="PEOPLE / LEARNING" title={existing ? "Refine the course record" : "Build a new learning record"}
+        description="Define the subject, expected duration and required status. Actual teaching material and learner evidence must be supplied separately."
+        status={<Pill tone={existing?.status === "published" ? "info" : "neutral"}>
+          {existing?.status ?? "New draft"}
+        </Pill>} />
+      <PeopleDialogSection step="01" title="Course identity" description="A title that tells employees what they are expected to learn.">
+        <Field label="Course title" required>
+          <TextInput name="title" defaultValue={existing?.title ?? ""} required
+            placeholder="e.g. Account access and security" disabled={!canEdit} />
+        </Field>
+        <Field label="What this course covers">
+          <TextArea name="summary" rows={4} defaultValue={existing?.summary ?? ""}
+            disabled={!canEdit} />
+        </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Duration and assignment" description="Keep an estimate distinct from confirmed learner progress.">
+        <Field label="Estimated duration (minutes)" required hint="Whole minutes from 5 to 600.">
+          <TextInput name="minutes" inputMode="numeric" required
+            defaultValue={String(existing?.fields.minutes ?? 30)} disabled={!canEdit} />
+        </Field>
+        <Checkbox name="required" label="Mark as required — learners must still be assigned explicitly"
+          defaultChecked={existing?.fields.required === true} disabled={!canEdit} />
+        <Properties rows={[
+          { label: "Recorded completions", value: existing?.fields.completions === undefined
+            ? "Not recorded" : String(existing.fields.completions) },
+          { label: "Hosted course content", value: "No hosting connection" },
+        ]} />
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Publication boundary"
+        description="A course record does not imply lessons have been hosted, a quiz completed or a certificate issued.">
+        <Notice tone="info" title="Saving does not complete or publish a learning module">
+          This action stores company-scoped metadata. It does not change an existing completion count or generate a learner assignment.
+        </Notice>
+        {!canEdit && <Notice tone="warning" title="Role permission required">
+          Your current role cannot edit learning content.
+        </Notice>}
+        {error && <Notice tone="danger" title="Course not saved">{error}</Notice>}
+      </PeopleDialogSection>
     </form>
   );
 }
