@@ -7,6 +7,7 @@ import type { Rec } from "@/domain/types";
 import { askFirst, Boundary, logBoundary, selectedOf } from "@/applications/hr/opsKit";
 import { LANES, stageOf, type LaneId } from "./board";
 import { clockIso } from "@/platform/clock";
+import { duplicateProjectPlan, nextProjectCopyTitle } from "./creation";
 
 /* ------------------------------------------------------------------ *
  * Contract actions for the Projects module that change records.
@@ -136,29 +137,31 @@ export function PortfolioReport({ context, close }: { context: ScreenContext; cl
 export async function duplicateProject(context: ScreenContext): Promise<void> {
   const project = await selectedOf(context, "projects", "a project");
   if (!project) return;
-  const tasks = ownTasks(await listByCollection(context.org.id, "tasks"), project.id);
+  const [allTasks, allProjects] = await Promise.all([
+    listByCollection(context.org.id, "tasks"),
+    listByCollection(context.org.id, "projects"),
+  ]);
+  const tasks = ownTasks(allTasks, project.id);
+  const proposed = nextProjectCopyTitle(project.title, allProjects.map((item) => item.title));
   askFirst(context, {
     title: `Duplicate ${project.title}`,
-    body: `Creates a new project with the same ${tasks.length} tasks, reset to Backlog. Attachments, comments, approvals and time entries are not copied.`,
+    body: `Creates ${proposed} with ${tasks.length} backlog tasks and internal dependency links. Existing assignees, approvals, review history, AI delegation, worklogs, comments and attachments are not copied. The entire copy is saved together.`,
     confirm: "Duplicate the project",
     run: async () => {
-      const copy = await context.mutate.create({
-        collection: "projects",
-        title: `${project.title} (copy)`,
-        status: "planning",
-        summary: `Duplicated from ${project.title}.`,
-        startAt: project.startAt, endAt: project.endAt, dueAt: project.dueAt, amountMinor: 0,
-        fields: { ...project.fields, spentMinor: 0, automationPaused: false, pinnedBy: "", duplicatedFrom: project.id },
-      }, `${project.title} duplicated by ${context.actor}`);
-      for (const task of tasks) {
-        await context.mutate.create({
-          collection: "tasks", title: task.title, status: "backlog", summary: task.summary, parentId: copy.id,
-          startAt: task.startAt, endAt: task.endAt, dueAt: task.dueAt,
-          fields: { ...task.fields, stage: "backlog", loggedHours: 0, dependsOn: "", completedBy: "", reviewSkippedBy: "" },
-        }, `Task copied into ${copy.title}: ${task.title}`);
+      try {
+        const plan = duplicateProjectPlan({
+          organizationId: context.org.id, currency: context.org.currency,
+          actor: context.actor, now: new Date(clockIso()),
+        }, project, tasks, proposed);
+        await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+        context.toast("Project duplicated",
+          `${plan.project.title} has ${plan.tasks.length} new backlog tasks. All dependencies point to copied tasks in this project.`);
+        context.select(plan.project.id);
+        context.navigate(`/o/${context.org.slug}/project/projects/${plan.project.id}`);
+      } catch (error) {
+        context.toast("Project was not duplicated",
+          error instanceof Error ? error.message : "The source changed. Reopen this project and retry.", "failed");
       }
-      context.toast("Project duplicated", `${copy.title} has ${tasks.length} tasks and nothing confidential from the source.`);
-      context.select(copy.id);
     },
   });
 }
