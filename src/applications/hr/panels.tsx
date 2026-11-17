@@ -1247,6 +1247,7 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
           rows={rows}
           rowId={(row) => row.id}
           label="Timesheets"
+          selectedId={context.selectedId}
           onOpen={(id) => context.openOverlay("time review", { id })}
           card={(entry) => {
             const person = data.employees.find((record) => record.id === entry.fields.employeeId);
