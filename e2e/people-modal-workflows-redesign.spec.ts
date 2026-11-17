@@ -261,3 +261,44 @@ test("Employee profile tabs expose scoped actions and avoid unverified balance c
   await page.goto(`/o/northline/hr/employees/${employeeId}?tab=Access`);
   await expect(page.locator("#main")).toContainText("No connected identity provider");
 });
+
+
+test("Employee document reference requires explicit source and attestation", async ({ page }) => {
+  await page.goto("/o/northline/hr/employees");
+  const id = await page.evaluate(async () => {
+    const repo = await import("../src/platform/repo");
+    return (await repo.listByCollection("org-northline", "employees")).find((row) => row.status !== "alumni")?.id;
+  });
+  expect(id).toBeTruthy();
+  await page.goto(`/o/northline/hr/employees/${id}?tab=Documents`);
+  await page.locator("#main").getByRole("button", { name: "Add a document reference" }).first().click();
+  const modal = page.getByRole("dialog");
+  await expect(modal.getByRole("heading", { name: "Record a personnel document reference" })).toBeVisible();
+  await expect(modal.locator(".hr-dialog-section")).toHaveCount(3);
+  await expect(modal).toContainText("No file uploaded or verified");
+  await modal.getByRole("textbox", { name: "Existing document location or internal reference" }).fill("Restricted HR cabinet / entry 12");
+  await modal.getByRole("checkbox").check();
+  await expect(modal.getByRole("checkbox")).toBeChecked();
+});
+
+test("Onboarding launch exposes named handover owners without pretending provisioning", async ({ page }) => {
+  await page.goto("/o/northline/hr/onboarding?tab=Incoming");
+  await page.locator("#main").getByRole("button", { name: "Launch a checklist" }).first().click();
+  const modal = page.getByRole("dialog");
+  await expect(modal.getByRole("heading", { name: "Launch an onboarding checklist" })).toBeVisible();
+  await expect(modal.locator(".hr-dialog-section")).toHaveCount(3);
+  await expect(modal).toContainText("Payroll input review, not payroll submission");
+  await expect(modal).toContainText("no accounts or external services are provisioned");
+});
+
+test("Employee job tab shows prior record history without sensitive field snapshots", async ({ page }) => {
+  await page.goto("/o/northline/hr/employees");
+  const id = await page.evaluate(async () => {
+    const repo = await import("../src/platform/repo");
+    return (await repo.listByCollection("org-northline", "employees")).find((row) => row.status !== "alumni")?.id;
+  });
+  expect(id).toBeTruthy();
+  await page.goto(`/o/northline/hr/employees/${id}?tab=Job`);
+  await expect(page.locator("#main").getByRole("heading", { name: "Employment record history" })).toBeVisible();
+  await expect(page.locator("#main")).toContainText("This shows locally saved record snapshots");
+});
