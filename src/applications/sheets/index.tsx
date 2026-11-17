@@ -1344,7 +1344,7 @@ function ImportExport({ context, tab }: { context: ScreenContext; tab: "Imports"
             <div><span>Formula errors</span><strong>{editor.evaluation.errors.length}</strong><small>Inspect before distribution</small></div>
           </div>
           <Row gap={2} wrap><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/sheets/workbooks/${record.id}`)}>Back to grid</Button>
-            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/sheets/workbooks/${record.id}/formulas`)}>Formula audit</Button></Row>
+            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/sheets/workbooks/${record.id}/formulas`)}>Formula audit</Button><Button size="sm" variant="primary" onClick={() => context.openOverlay("publish workbook")}>Publish workbook</Button></Row>
         </div>
       <Grid>
         <Card span={6} eyebrow="EXPORT" title="Export this sheet" subtitle={`${editor.sheet.name} · ${rowsRaw.length} rows`}>
