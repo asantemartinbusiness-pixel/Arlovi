@@ -883,6 +883,7 @@ export const projectApp = registerApp({
         { id: "Milestone editor", kind: "modal", title: "Add a milestone", width: 520, render: ({ close, ...context }) => <MilestoneEditor context={context} close={close} />, footer: submitFooter("pj-milestone", "Add milestone") },
         { id: "project settings", kind: "modal", title: "Project settings", width: 560, render: ({ close, ...context }) => <ProjectSettings context={context} close={close} />, footer: submitFooter("pj-settings", "Save settings") },
         { id: "status note", kind: "modal", title: "Post a status update", width: 560, render: ({ close, ...context }) => <StatusNote context={context} close={close} />, footer: submitFooter("pj-status", "Record the update") },
+        { id: "stage rule", kind: "modal", title: "This move skips a review", tone: "danger", width: 540, render: ({ close, ...context }) => <StageRule context={context} close={close} /> },
       ],
     },
 
