@@ -1624,7 +1624,13 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
         <h3 className="ops-section-title">{visibleDays.length === 1 ? rosterDateLabel(visibleDays[0]) : "Weekly assignment grid"}</h3>
         <span className="ops-toolbar-note">Select any shift to change its person, place, time or Project.</span>
       </div>
-            <div className="ds-grid-wrap hr-roster-table">
+      {people.length === 0 ? (
+        <Empty title="No shifts this week" icon={<CalendarDays size={20} />}>
+          Change week or show everyone to inspect employees without assignments.
+        </Empty>
+      ) : (
+        <>
+          <div className="ds-grid-wrap hr-roster-table">
             <div className="ds-grid-scroll">
               <table className="ds-table">
                 <caption className="ds-sr-only">Roster beginning {rosterDateLabel(days[0])} in {org.timezone}. Each cell lists all shifts for the day.</caption>
