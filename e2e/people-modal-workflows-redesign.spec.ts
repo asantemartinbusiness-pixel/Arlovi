@@ -96,3 +96,36 @@ test("Policy revision requires changed wording, a reason and human confirmation"
   expect(versioned[0].previous).toBeTruthy();
   expect(versioned[0].reason).toContain("named access approver");
 });
+
+test("Policy acknowledgement preserves one version-specific record and matching aggregate", async ({ page }) => {
+  await page.goto("/o/northline/hr/learning?tab=Policies");
+  const id = await page.evaluate(async () => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    const now = new Date().toISOString();
+    const policy = repo.newRecord({
+      organizationId: "org-northline", currency: "GBP", collection: "policies",
+      title: "QA Atomic Policy Acknowledgement", status: "published",
+      summary: "Policy acknowledgement consistency test",
+      fields: { kind: "hr", version: "1.0", acknowledged: 0, acknowledgementRequired: true },
+    }, { actor: "Maya Chen", now });
+    await repo.putMany([policy], { actor: "Maya Chen", now }, [], "org-northline");
+    return policy.id;
+  });
+  await page.reload();
+  const card = page.locator("#main .ds-card").filter({ hasText: "QA Atomic Policy Acknowledgement" }).first();
+  await expect(card).toBeVisible();
+  await card.getByRole("button", { name: "Acknowledge", exact: true }).click();
+  const read = async () => page.evaluate(async (policyId) => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    const policy = await repo.getRecord(policyId);
+    const linked = (await repo.listChildren("org-northline", policyId))
+      .filter((entry) => entry.collection === "acknowledgements" && entry.fields.version === "1.0");
+    return { aggregate: policy?.fields.acknowledged, linked: linked.length };
+  }, id);
+  await expect.poll(read).toEqual({ aggregate: 1, linked: 1 });
+  await card.getByRole("button", { name: "Acknowledge", exact: true }).click();
+  await expect(page.getByText("Already acknowledged").first()).toBeVisible();
+  expect(await read()).toEqual({ aggregate: 1, linked: 1 });
+});
