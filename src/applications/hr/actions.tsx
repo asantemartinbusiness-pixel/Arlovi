@@ -252,10 +252,11 @@ export function StageDecision({ context, close }: { context: ScreenContext; clos
           }
           return;
         }
-        await context.mutate.patch(applicant.id, {
+        const updated = await context.mutate.patch(applicant.id, {
           status: stage === "rejected" ? "rejected" : applicant.status === "rejected" ? "active" : applicant.status,
           fields: { ...applicant.fields, stage, decidedBy: context.actor, decisionReason: reason.trim(), decidedAt: at },
         }, { expectRevision: applicant.revision, event: `${applicant.title} moved to ${stage} by ${context.actor}: ${reason.trim()}` });
+        if (!updated) return;
         context.toast("Decision recorded", `${applicant.title} is at ${stage}, decided by ${context.actor} with a reason on the record.`);
         close();
       }}
