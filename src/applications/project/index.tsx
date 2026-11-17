@@ -4,7 +4,7 @@ import {
   Button, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
-import { useRecord, useWorkspace } from "@/platform/workspace";
+import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { stageOf } from "./board";
 import {
@@ -582,9 +582,13 @@ function GoalRevision({ context, close }: { context: ScreenContext; close: () =>
 
 function TimerOverlay({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useProjectData();
-  const [running, setRunning] = useState(false);
+  const employees = useCollection("employees").filter((row) =>
+    !["alumni", "terminated"].includes(row.status));
   const [minutes, setMinutes] = useState(30);
-  const tasks = data.tasks.filter((task) => stageOf(task) !== "done" && task.fields.kind !== "onboarding");
+  const tasks = data.tasks.filter((task) =>
+    stageOf(task) !== "done" && task.fields.kind !== "onboarding"
+    && data.projects.some((project) => project.id === task.parentId
+      && !["archived", "deleted", "cancelled"].includes(project.status)));
   return (
     <form
       id="pj-timer"
@@ -593,50 +597,68 @@ function TimerOverlay({ context, close }: { context: ScreenContext; close: () =>
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         const taskId = String(form.get("task") ?? "");
-        const task = data.tasks.find((row) => row.id === taskId);
-        const hours = Math.round((minutes / 60) * 4) / 4;
+        const employeeId = String(form.get("employee") ?? "");
+        const task = tasks.find((row) => row.id === taskId);
+        const project = data.projects.find((row) => row.id === task?.parentId);
+        const employee = employees.find((row) => row.id === employeeId);
+        if (!task || !project || !employee || !Number.isFinite(minutes) ||
+          minutes < 15 || minutes > 1440 || minutes % 15 !== 0) {
+          context.toast("Time not logged", "Choose a current employee, an open project task and a valid duration in 15-minute increments.", "blocked");
+          return;
+        }
+        const hours = minutes / 60;
         const now = clockNow();
+        const rate = Number(project.fields.billingRateMinor ?? project.fields.rateMinor);
+        const knownRate = Number.isFinite(rate) && rate > 0;
         await context.mutate.create({
           collection: "shifts",
-          title: `${context.actor.split(" ")[0]} · ${hours}h`,
+          title: `${employee.title.split(" ")[0]} · ${hours}h`,
           status: "submitted",
-          summary: `Logged against ${task?.title ?? "a task"}.`,
+          summary: `Logged for ${employee.title} against ${project.title} / ${task.title} by ${context.actor}. Rate ${knownRate ? "inherited from the project" : "not recorded"}.`,
           startAt: new Date(now.getTime() - minutes * 60_000).toISOString(),
           endAt: now.toISOString(),
           fields: {
-            kind: "time", employeeName: context.actor, taskId, projectId: task?.parentId ?? "",
-            hours, billable: form.get("billable") === "on", approved: false, rateMinor: 6_500,
+            kind: "time", employeeId: employee.id, employeeName: employee.title,
+            taskId: task.id, projectId: project.id, filedBy: context.actor,
+            hours, billable: form.get("billable") === "on", approved: false,
+            ...(knownRate ? { rateMinor: rate } : {}),
           },
-        }, `Time logged by ${context.actor}`);
-        context.toast("Time logged", `${hours} hours are on the timesheet, waiting for approval.`);
+        }, `Time logged by ${context.actor} for ${employee.title} on ${project.title}`);
+        context.toast("Time logged", `${hours} hours recorded for ${employee.title} on ${project.title}. It is awaiting approval in People and Inbox; no payroll or invoice was created.`);
         close();
       }}
     >
-      <Field label="Against which task" required>
-        <Select name="task" required>
-          <option value="">Choose a task</option>
-          {tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
+      <Field label="Person who did the work" required>
+        <Select name="employee" required defaultValue="">
+          <option value="">Choose an employee</option>
+          {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.title}</option>)}
         </Select>
       </Field>
-      <Row gap={3}>
-        <Field label="Minutes"><TextInput inputMode="numeric" align="end" value={String(minutes)} onChange={(event) => setMinutes(Number(event.target.value) || 0)} /></Field>
-        <Field label=" ">
-          <Button variant={running ? "outline-danger" : "secondary"} onClick={() => setRunning((value) => !value)}>{running ? "Stop the timer" : "Start a timer"}</Button>
-        </Field>
-      </Row>
-      {running && <Notice tone="info">The timer is a local stopwatch. The entry is created when you save, with the minutes shown above.</Notice>}
-      <Checkbox name="billable" label="Billable to a customer" />
-      <Notice tone="warning" title="Only a person's time goes here">
-        Work done by an AI employee is not logged as billable hours. It belongs in the finance ledger as a cost, not on a timesheet.
+      <Field label="Project task" required>
+        <Select name="task" required defaultValue="">
+          <option value="">Choose a task</option>
+          {tasks.map((task) => {
+            const project = data.projects.find((row) => row.id === task.parentId);
+            return <option key={task.id} value={task.id}>{project?.title ?? "Project"} · {task.title}</option>;
+          })}
+        </Select>
+      </Field>
+      <Field label="Minutes worked" required hint="Enter a real duration in 15-minute increments, from 15 minutes to 24 hours.">
+        <TextInput inputMode="numeric" align="end" value={String(minutes)} onChange={(event) => setMinutes(Number(event.target.value))} required />
+      </Field>
+      <Checkbox name="billable" label="Mark this time as potentially billable" />
+      <Notice tone="info" title="Manual time entry, not a running stopwatch">
+        This records the hours you enter, the employee, task and Project. A person must approve the entry in People; Finance must separately review any rate, tax and invoice.
       </Notice>
     </form>
   );
 }
 
 function TimesheetCorrection({ context, close }: { context: ScreenContext; close: () => void }) {
-  const data = useProjectData();
-  const entry = useRecord(context.selectedId) ?? data.shifts.find((row) => row.fields.kind === "time");
-  if (!entry) return <Empty title="Select a time entry" icon={<Timer size={20} />} />;
+  const candidate = useRecord(context.selectedId);
+  const entry = candidate?.organizationId === context.org.id && candidate.collection === "shifts"
+    && candidate.fields.kind === "time" ? candidate : undefined;
+  if (!entry) return <Empty title="Time entry unavailable" icon={<Timer size={20} />}>Select a time entry from this company before correcting it.</Empty>;
   return (
     <form
       id="pj-correction"
@@ -644,22 +666,30 @@ function TimesheetCorrection({ context, close }: { context: ScreenContext; close
       onSubmit={async (event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
-        await context.mutate.patch(entry.id, {
+        const hours = Number(form.get("hours"));
+        const reason = String(form.get("reason") ?? "").trim();
+        if (!Number.isFinite(hours) || hours <= 0 || hours > 24 || !reason) {
+          context.toast("Correction blocked", "Enter valid positive hours and the reason for the correction.", "blocked");
+          return;
+        }
+        const updated = await context.mutate.patch(entry.id, {
           status: "submitted",
-          fields: { ...entry.fields, hours: Number(form.get("hours") ?? 0), approved: false, correctedBy: context.actor, correctionReason: String(form.get("reason") ?? "") },
-        }, { expectRevision: entry.revision, event: `Time entry corrected by ${context.actor}: ${String(form.get("reason") ?? "")}` });
-        context.toast("Correction saved", "The entry is back to submitted so it is approved again.");
+          fields: { ...entry.fields, hours, approved: false, approvedBy: "", approvedAt: "",
+            correctedBy: context.actor, correctionReason: reason, correctedFrom: Number(entry.fields.hours ?? 0) },
+        }, { expectRevision: entry.revision, event: `Time corrected by ${context.actor}: ${reason}` });
+        if (!updated) return;
+        context.toast("Correction saved", "Prior approval was cleared; the corrected time must be approved again in People.");
         close();
       }}
     >
       <Properties rows={[
         { label: "Person", value: String(entry.fields.employeeName ?? entry.ownerName) },
-        { label: "Day", value: context.date(entry.startAt) },
+        { label: "Project", value: String(entry.fields.projectId ?? "Not linked") },
         { label: "Currently", value: `${String(entry.fields.hours ?? 0)} hours` },
       ]} />
       <Field label="Corrected hours" required><TextInput name="hours" inputMode="decimal" align="end" defaultValue={String(entry.fields.hours ?? 0)} required /></Field>
-      <Field label="Why" required><TextArea name="reason" rows={3} required /></Field>
-      <Notice tone="warning">A correction clears the approval, so somebody approves the corrected figure rather than the old one.</Notice>
+      <Field label="Reason" required><TextArea name="reason" rows={3} required /></Field>
+      <Notice tone="warning">Corrections are audited and require a new human approval. No invoice, timesheet payment or external service is updated.</Notice>
     </form>
   );
 }
@@ -667,19 +697,27 @@ function TimesheetCorrection({ context, close }: { context: ScreenContext; close
 function BillingLink({ context }: { context: ScreenContext }) {
   const data = useProjectData();
   const billable = data.shifts.filter((entry) => entry.fields.kind === "time" && entry.fields.billable === true);
-  const total = billable.reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0) * Number(entry.fields.rateMinor ?? 0), 0);
+  const approved = billable.filter((entry) => entry.status === "approved" && entry.fields.approved === true);
+  const rated = approved.filter((entry) => Number.isFinite(Number(entry.fields.rateMinor))
+    && Number(entry.fields.rateMinor) > 0 && entry.fields.rateMinor !== undefined);
+  const unknownRate = approved.length - rated.length;
+  const total = rated.reduce((sum, entry) =>
+    sum + Number(entry.fields.hours ?? 0) * Number(entry.fields.rateMinor), 0);
   return (
     <Stack gap={4}>
       <Properties rows={[
-        { label: "Billable entries", value: String(billable.length) },
-        { label: "Hours", value: String(billable.reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0)) },
-        { label: "At the recorded rate", value: context.money(total) },
+        { label: "Billable time entries recorded", value: String(billable.length) },
+        { label: "Approved and ready for Finance review", value: String(approved.length) },
+        { label: "Awaiting approval", value: String(billable.length - approved.length) },
+        { label: "Approved entries without a recorded rate", value: String(unknownRate) },
+        { label: "Illustrative subtotal at known recorded rates", value: rated.length ? context.money(total) : "No rated approvals" },
       ]} />
-      <Notice tone="info" title="Billing happens in Finance">
-        This screen can total billable time. Turning it into an invoice is a finance decision with tax on it, which belongs in
-        the finance application rather than here.
+      <Notice tone="warning" title="No invoice or payroll is created from this total">
+        Only approved entries with an explicit recorded rate contribute to the illustrative subtotal.
+        Entries missing a rate are not priced at zero or given a fabricated default.
+        Finance must review contracts, billability, tax and invoice decisions separately.
       </Notice>
-      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/invoices`)}>Open invoices</Button>
+      <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/invoices`)}>Open Finance invoices</Button>
     </Stack>
   );
 }
