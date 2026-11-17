@@ -21,3 +21,31 @@ test("Forms templates retain overview when a search finds no templates", async (
   await main.getByRole("button", { name: "Clear search" }).click();
   await expect(main.getByRole("searchbox", { name: "Find a template" })).toHaveValue("");
 });
+
+test("Unknown form URLs never display another form's builder", async ({ page }) => {
+  await page.goto("/o/northline/forms/forms");
+  await page.goto(`/o/northline/forms/forms/missing-form-${Date.now()}`);
+  const main = page.locator("#main");
+  await expect(main).toContainText("No form in this workspace");
+  await expect(page.getByLabel("Form editor overview")).toHaveCount(0);
+});
+
+test("Form editor exposes question status and workflow navigation", async ({ page }) => {
+  await page.goto("/o/northline/forms/forms");
+  const id = await page.evaluate(async () => {
+    const repo = await import(/* @vite-ignore */ "/src/platform/repo.ts") as typeof import("../src/platform/repo");
+    const context = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "forms", currency: "GBP",
+      title: "QA Forms Editor Overview", status: "draft", fields: {},
+    }, context);
+    await repo.putRecord(record, context);
+    return record.id;
+  });
+  await page.goto(`/o/northline/forms/forms/${id}`);
+  await expect(page.getByLabel("Form editor overview")).toBeVisible();
+  await expect(page.getByLabel("Form editor health")).toBeVisible();
+  await page.getByLabel("Form editor overview").getByRole("button", { name: "Logic" }).click();
+  await expect(page).toHaveURL(new RegExp(`/forms/forms/${id}/logic`));
+  await expect(page.getByLabel("Conditional logic overview")).toBeVisible();
+});
