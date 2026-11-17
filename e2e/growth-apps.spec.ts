@@ -104,3 +104,30 @@ for (const width of [390, 820, 1440]) {
     await expect(page.getByRole("region", { name: "Campaign portfolio" })).toBeVisible();
   });
 }
+
+test("Marketing campaign detail keeps record identity, budget and navigation across tabs", async ({ page }) => {
+  await page.goto("/o/northline/market/campaigns");
+  await page.getByRole("group", { name: "Campaign layout" }).getByRole("button", { name: "Cards" }).click();
+  await page.getByRole("link", { name: "Winter trade list 2026" }).click();
+  const summary = page.getByRole("region", { name: "Campaign plan summary" });
+  await expect(summary).toBeVisible();
+  await expect(summary.getByRole("heading", { name: "Winter trade list 2026" })).toBeVisible();
+  await expect(summary.getByText("Delivery provider not connected")).toBeVisible();
+  await page.getByRole("tab", { name: "Results" }).click();
+  await expect(summary).toBeVisible();
+  await expect(summary.getByRole("link", { name: "All campaigns" }))
+    .toHaveAttribute("href", "/o/northline/market/campaigns");
+  await summary.getByRole("link", { name: "All campaigns" }).click();
+  await expect(page).toHaveURL(/\/o\/northline\/market\/campaigns$/);
+});
+
+test("Marketing portfolio filter recovery retains the complete screen hierarchy", async ({ page }) => {
+  await page.goto("/o/northline/market/campaigns?tab=Approval");
+  await expect(page.getByRole("heading", { name: "Every campaign, one place" })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Search campaigns" }).fill("no matching campaign name 47291");
+  await expect(page.getByText("No campaigns match these filters")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Every campaign, one place" })).toBeVisible();
+  await page.getByRole("button", { name: "Clear search and channel" }).click();
+  await expect(page.getByRole("heading", { name: "Every campaign, one place" })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "Search campaigns" })).toHaveValue("");
+});
