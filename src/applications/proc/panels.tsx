@@ -217,7 +217,7 @@ export function SupplierDetail({ context, lens }: { context: ScreenContext; lens
   const data = useProcData();
   const { org, now } = useWorkspace();
   const routed = useRecord(context.params.id);
-  const supplier = findSupplier(data, routed?.id) ?? routed ?? data.suppliers[0];
+  const supplier = context.params.id ? (findSupplier(data, context.params.id) ?? (routed?.id === context.params.id ? routed : undefined)) : undefined;
   if (!supplier) return <Empty title="Supplier not found" />;
   const orders = data.purchaseOrders.filter((order) => String(order.fields.supplierId) === supplier.id && isPurchaseOrder(order));
   const bills = data.bills.filter((bill) => String(bill.fields.supplierId) === supplier.id);
