@@ -142,3 +142,59 @@ test("Document reviewer assignment exposes reason, existing state, and no email 
   await expect(dialog.getByText("Reason for review assignment")).toBeVisible();
   await expect(dialog).toContainText("Not sent");
 });
+
+
+test("Template governance offers discoverable status and search filters", async ({ page }) => {
+  await page.goto("/o/northline/docs/templates");
+  const main = page.locator("#main");
+  await expect(main.getByRole("heading", { name: "Masters that keep work consistent." })).toBeVisible();
+  await expect(main.getByLabel("Template governance summary")).toBeVisible();
+  await main.getByRole("searchbox", { name: "Search masters" }).fill("unfindable-qa-template-reference");
+  await expect(main).toContainText("No templates match");
+  await main.getByRole("button", { name: "Clear filters" }).first().click();
+  await expect(main.getByRole("searchbox", { name: "Search masters" })).toHaveValue("");
+});
+
+test("Document publishing cannot bypass an approval confirmation", async ({ page }) => {
+  await page.goto("/o/northline/docs/files");
+  const id = await page.evaluate(async () => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "documents", currency: "GBP",
+      title: "QA Publishing Review Gate", status: "draft", fields: { kind: "document", folder: "Operations" },
+    }, ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  });
+  await page.goto(`/o/northline/docs/documents/${id}/publish?tab=Publish`);
+  const button = page.locator("#main").getByRole("button", { name: "Review and publish…" });
+  await expect(button).toBeVisible();
+  await button.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Approve and publish locally");
+  await expect(dialog.getByRole("checkbox", { name: /reviewed this version/ })).not.toBeChecked();
+  await expect(page.locator("#main")).toContainText("Publishing requires a named reviewer");
+});
+
+test("Documents brand insights show grounded company context and template handoff", async ({ page }) => {
+  await page.goto("/o/northline/docs/files");
+  const id = await page.evaluate(async () => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "documents", currency: "GBP",
+      title: "QA Brand Evidence", status: "draft", fields: { kind: "document" },
+    }, ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  });
+  await page.goto(`/o/northline/docs/documents/${id}/insights?tab=Brand`);
+  const main = page.locator("#main");
+  await expect(main.getByRole("heading", { name: "Brand alignment, with evidence." })).toBeVisible();
+  await expect(main).toContainText("Brand assets are not automatically embedded");
+  await main.getByRole("button", { name: "Open templates" }).click();
+  await expect(page).toHaveURL(/\/docs\/templates/);
+});
