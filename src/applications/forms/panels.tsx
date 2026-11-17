@@ -794,9 +794,27 @@ export function PublishScreen({ context, lens }: { context: ScreenContext; lens:
   const { record, model } = useFormRecord(context);
   const [device, setDevice] = useState<"mobile" | "desktop">("desktop");
   if (!record) return <NoForm />;
+  const publishOverview = (
+    <section className="t6-workflow-overview" aria-label="Form publishing overview">
+      <Row gap={3} wrap><div className="ds-grow" style={{ minWidth: 220 }}>
+        <span className="ds-subtle">FORMS / DESIGN & DELIVERY</span>
+        <h2 className="t6-workflow-title">Prepare the form people will answer.</h2>
+        <p className="ds-subtle">Review appearance, response experience, versions and access boundaries before recording publication.</p>
+      </div><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}`)}>Back to builder</Button></Row>
+      <div className="t6-directory-metrics">
+        <div><span>Version</span><strong>{model.settings.version}</strong></div>
+        <div><span>Questions</span><strong>{model.fields.filter((field) => !STRUCTURAL.includes(field.type)).length}</strong></div>
+        <div><span>Logic rules</span><strong>{model.logic.length}</strong></div>
+        <div><span>Logic issues</span><strong>{logicIssues(model).length}</strong></div>
+      </div>
+      <Notice tone="info">Publication status is local to this workspace. External hosting, public access controls and email delivery are not connected.</Notice>
+    </section>
+  );
 
   if (lens === "Design") {
     return (
+      <Stack gap={4}>
+      {publishOverview}
       <Grid>
         <Card span={5} title="Appearance" subtitle="Saved on the form record">
           <FormThemeEditorBridge context={context} record={record} model={model} />
@@ -808,12 +826,15 @@ export function PublishScreen({ context, lens }: { context: ScreenContext; lens:
           </div>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
   if (lens === "Embed") {
     const snippet = embedSnippet(record.id, record.title, model.theme);
     return (
+      <Stack gap={4}>
+      {publishOverview}
       <Grid>
         <Card span={6} eyebrow="LIVE FORM" prov="human" title="The live form" subtitle={`Version ${model.settings.version} · a submission here writes a record`}>
           <Stack gap={3}>
@@ -838,23 +859,26 @@ export function PublishScreen({ context, lens }: { context: ScreenContext; lens:
           </Stack>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
   if (lens === "Access") {
     return (
+      <Stack gap={4}>
+      {publishOverview}
       <Grid>
         <Card span={6} eyebrow="ACCESS" prov="human" title="Who can answer" subtitle="Shapes the interface; it is not an account security boundary">
           <Stack gap={3}>
             <Properties rows={[
-              { label: "Audience", value: model.settings.access === "link" ? "Anyone with the link" : "People in this workspace" },
+              { label: "Audience preference", value: model.settings.access === "link" ? "Link mode (local only)" : "Workspace mode (local only)" },
               { label: "State", value: <Pill tone={model.settings.closed ? "warning" : "success"} dot>{model.settings.closed ? "Closed" : "Open"}</Pill> },
               { label: "Version", value: String(model.settings.version) },
-              { label: "Link", value: <code>/o/{context.org.slug}/forms/forms/{record.id}/publish</code> },
+              { label: "Editor route", value: <code>/o/{context.org.slug}/forms/forms/{record.id}/publish</code> },
             ]} />
             <Row gap={2} wrap>
               <Button size="sm" variant="secondary" onClick={() => void saveForm(context, record, { ...model, settings: { ...model.settings, access: model.settings.access === "link" ? "workspace" : "link" } }, "Form audience changed")}>
-                Switch to {model.settings.access === "link" ? "this workspace only" : "anyone with the link"}
+                Switch preference to {model.settings.access === "link" ? "workspace" : "link"} mode
               </Button>
               <Button size="sm" variant={model.settings.closed ? "primary" : "outline-danger"} onClick={() => void saveForm(context, record, { ...model, settings: { ...model.settings, closed: !model.settings.closed } }, model.settings.closed ? "Form reopened" : "Form closed")}>
                 {model.settings.closed ? "Reopen the form" : "Close the form"}
@@ -879,10 +903,11 @@ export function PublishScreen({ context, lens }: { context: ScreenContext; lens:
           </Stack>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
-  return <FormAnalytics context={context} lens="Funnel" />;
+  return <Stack gap={4}>{publishOverview}<FormAnalytics context={context} lens="Funnel" /></Stack>;
 }
 
 function FormThemeEditorBridge({ context, record, model }: { context: ScreenContext; record: Rec; model: FormModel }) {
@@ -992,10 +1017,26 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
   if (!record) return <NoForm />;
   const answerable = model.fields.filter((field) => !STRUCTURAL.includes(field.type));
   const enough = children.length >= 20;
+  const analyticsOverview = (
+    <section className="t6-workflow-overview" aria-label="Form analytics overview">
+      <Row gap={3} wrap><div className="ds-grow" style={{ minWidth: 220 }}>
+        <span className="ds-subtle">FORMS / ANALYTICS</span>
+        <h2 className="t6-workflow-title">Insights grounded in answers.</h2>
+        <p className="ds-subtle">Understand recorded submissions and question coverage without inventing views, visits or conversion rates.</p>
+      </div><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/forms/forms/${record.id}/submissions`)}>Review responses</Button></Row>
+      <div className="t6-directory-metrics">
+        <div><span>Responses</span><strong>{children.length}</strong></div>
+        <div><span>Reviewed or routed</span><strong>{children.filter((row) => row.status !== "new").length}</strong></div>
+        <div><span>Questions</span><strong>{answerable.length}</strong></div>
+        <div><span>Versions answered</span><strong>{new Set(children.map((row) => String(row.fields.formVersion ?? "?"))).size}</strong></div>
+      </div>
+    </section>
+  );
 
   if (lens === "Funnel") {
     return (
       <Stack gap={5}>
+        {analyticsOverview}
         <StatRow>
           <Stat label="Views" value="Unavailable" unavailable meta="Nothing counts an impression" onClick={() => context.openOverlay("Metric methods")} />
           <Stat label="Starts" value="Unavailable" unavailable meta="A start needs a view to compare against" />
@@ -1024,6 +1065,7 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
     }));
     return (
       <Stack gap={4}>
+        {analyticsOverview}
         {children.length === 0 ? (
           <Empty title="No responses yet" icon={<Inbox size={20} />}>Answer the form on its publish screen and the counts appear here.</Empty>
         ) : (
@@ -1059,6 +1101,7 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
   if (lens === "Sources") {
     return (
       <Stack gap={4}>
+        {analyticsOverview}
         <Notice tone="warning" title="A source needs a referrer">
           Where a person came from is in the request headers of a hosted page. There is no hosted page, so no source is recorded and none is guessed.
         </Notice>
@@ -1083,6 +1126,7 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
   const days = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
   return (
     <Stack gap={4}>
+      {analyticsOverview}
       {days.length === 0 ? (
         <Empty title="Nothing to time yet" icon={<Inbox size={20} />}>Submission timestamps are the only timing signal available here.</Empty>
       ) : (
