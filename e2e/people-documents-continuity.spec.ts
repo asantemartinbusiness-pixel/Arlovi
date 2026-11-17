@@ -16,6 +16,9 @@ test("a People file shows only actual linked references and persists a new refer
     return employee.id;
   });
   await page.goto(`/o/northline/hr/employees/${employeeId}`);
+  await page.getByRole("tab", { name: "Access", exact: true }).click();
+  await expect(page.locator("#main")).toContainText("No access requests recorded");
+  await expect(page.locator("#main")).not.toContainText("Workspace sign-in");
   await page.getByRole("tab", { name: "Documents", exact: true }).click();
   const main = page.locator("#main");
   await expect(main).toContainText("No document references filed");
