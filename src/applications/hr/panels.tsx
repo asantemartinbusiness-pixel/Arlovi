@@ -1577,45 +1577,9 @@ export function LeaveScreen({ context, lens }: { context: ScreenContext; lens: "
               subtitle={`${context.date(request.startAt)} – ${context.date(request.endAt)} · ${days(requested)} · ${String(request.fields.type ?? "annual")}`}
               actions={<Pill tone="warning" dot>Requested {context.relative(request.at)}</Pill>}
               footer={<>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  disabled={!canDecide}
-                  onClick={async () => {
-                    try {
-                      const plan = planLeaveDecision({
-                        organizationId: context.org.id, currency: context.org.currency,
-                        actor: context.actor, now: clockIso(),
-                      }, request, employee, "approved");
-                      await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
-                      context.toast("Leave approved", String(request.fields.type ?? "annual") === "annual"
-                        ? "The request and annual balance were updated together."
-                        : "The request was approved without changing annual leave.");
-                    } catch (error) {
-                      context.toast("Leave not approved", error instanceof Error ? error.message : "Reload this request before deciding.", "blocked");
-                    }
-                  }}
-                >
-                  Approve
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline-danger"
-                  disabled={!canDecide}
-                  onClick={async () => {
-                    try {
-                      const plan = planLeaveDecision({
-                        organizationId: context.org.id, currency: context.org.currency,
-                        actor: context.actor, now: clockIso(),
-                      }, request, undefined, "declined");
-                      await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
-                      context.toast("Leave declined", "The request is recorded as declined with the decision maker's name.");
-                    } catch (error) {
-                      context.toast("Leave not declined", error instanceof Error ? error.message : "Reload this request before deciding.", "blocked");
-                    }
-                  }}
-                >
-                  Decline
+                <Button size="sm" variant="primary" disabled={!canDecide}
+                  onClick={() => { context.select(request.id); context.openOverlay("leave approval", { id: request.id }); }}>
+                  Review decision
                 </Button>
                 <span className="ds-grow" />
                 <Button size="sm" variant="ghost" onClick={() => { context.select(request.id); context.openOverlay("conflict review", { id: request.id }); }}>Check cover</Button>
