@@ -88,3 +88,10 @@ test("Document review shows accountable readiness and toggles responsive panels"
   await details.click();
   await expect(details).toHaveAttribute("aria-pressed", "true");
 });
+
+
+test("Documents never fall back to an unrelated record on an unknown document URL", async ({ page }) => {
+  await page.goto("/o/northline/docs/documents/qa-doc-does-not-exist");
+  await expect(page.locator("#main")).toContainText("No document is open");
+  await expect(page.getByLabel("Document working status")).toHaveCount(0);
+});
