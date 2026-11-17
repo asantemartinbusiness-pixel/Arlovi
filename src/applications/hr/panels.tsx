@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  AlertTriangle, BookOpen, CalendarDays, ClipboardCheck, GraduationCap, Inbox, UserPlus, Users,
+  BookOpen, CalendarDays, ClipboardCheck, GraduationCap, Inbox, UserPlus, Users,
 } from "lucide-react";
 import {
   Avatar, BarChart, Button, Card, Checkbox, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice,
