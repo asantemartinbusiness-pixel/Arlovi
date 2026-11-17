@@ -1818,9 +1818,9 @@ function ImportMapper({ context, close }: { context: ScreenContext; close: () =>
 }
 
 function ShareWorkbook({ context, close }: { context: ScreenContext; close: () => void }) {
-  const selected = useRecord(context.selectedId);
   const workbooks = useCollection("workbooks");
-  const record = selected ?? (context.params.id ? workbooks.find((item) => item.id === context.params.id) : undefined);
+  const targetId = context.params.id ?? context.selectedId;
+  const record = workbooks.find((item) => item.id === targetId);
   const members = useCollection("members");
   const [chosen, setChosen] = useState<string[]>(String(record?.fields.sharedWith ?? "").split("|").filter(Boolean));
   const [error, setError] = useState("");
