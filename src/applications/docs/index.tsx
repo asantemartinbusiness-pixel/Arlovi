@@ -2306,8 +2306,12 @@ function DiffOverlay({ context }: { context: ScreenContext }) {
 function ReviewerAssignment({ context, close }: { context: ScreenContext; close: () => void }) {
   const record = useDocument(context);
   const members = useCollection("members").filter((member) => member.fields.kind === "human");
-  const [chosen, setChosen] = useState<string[]>([]);
-  const [mandatory, setMandatory] = useState(true);
+  const existingReviewers = String(record?.fields.reviewers ?? "").split("|").filter(Boolean);
+  const [chosen, setChosen] = useState<string[]>(existingReviewers);
+  const [reviewReason, setReviewReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [mandatory, setMandatory] = useState(record?.fields.reviewMandatory !== false);
   if (!record) return <Empty title="No document is open" />;
   return (
     <form
@@ -2315,15 +2319,23 @@ function ReviewerAssignment({ context, close }: { context: ScreenContext; close:
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (chosen.length === 0) return;
-        await context.mutate.patch(record.id, {
-          status: "in_review",
-          fields: { ...record.fields, reviewers: chosen.join("|"), reviewMandatory: mandatory },
-        }, { expectRevision: record.revision, event: `Reviewers assigned to ${record.title}: ${chosen.join(", ")}` });
-        context.toast("Reviewers assigned", `${chosen.length} reviewer${chosen.length === 1 ? "" : "s"} recorded on the document. No notification service is connected, so nobody was emailed.`);
-        close();
+        if (saving || chosen.length === 0 || reviewReason.trim().length < 10 || !context.can("edit_knowledge")) return;
+        setSaving(true);
+        setError("");
+        try {
+          await context.mutate.patch(record.id, {
+            status: "in_review",
+            fields: { ...record.fields, reviewers: chosen.join("|"), reviewMandatory: mandatory, reviewReason: reviewReason.trim(),
+              reviewAssignedBy: context.actor, reviewAssignedAt: context.now.toISOString(), notificationStatus: "not_sent" },
+          }, { expectRevision: record.revision, event: `Reviewers assigned to ${record.title} by ${context.actor}: ${chosen.join(", ")}` });
+          context.toast("Reviewers recorded", `${chosen.length} local reviewer assignment${chosen.length === 1 ? "" : "s"} saved. No invitations or emails were sent.`);
+          close();
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "Could not save reviewer assignments.");
+        } finally { setSaving(false); }
       }}
     >
+      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENT REVIEW / ASSIGNMENT</span><h3>Assign accountable reviewers</h3><p>Existing reviewers remain selected. Choose people responsible for reviewing this particular document.</p></div>
       <Stack gap={2}>
         {members.map((member) => (
           <Checkbox
@@ -2334,7 +2346,14 @@ function ReviewerAssignment({ context, close }: { context: ScreenContext; close:
           />
         ))}
       </Stack>
+      {members.length === 0 && <Notice tone="warning" title="No human reviewers available">A human team member must be present in the workspace roster.</Notice>}
+      <Field label="Reason for review assignment" required hint="At least 10 characters.">
+        <TextArea value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} rows={3} required />
+      </Field>
       <Checkbox label="Their review is mandatory before approval" checked={mandatory} onChange={(event) => setMandatory(event.target.checked)} />
+      <Properties rows={[{ label: "Assigned reviewers", value: String(chosen.length) }, { label: "Status after save", value: "In review (local record)" }, { label: "Notifications", value: "Not sent" }]} />
+      {error && <Notice tone="danger" title="Assignment not saved">{error}</Notice>}
+      {saving && <p className="ds-subtle">Saving assignments…</p>}
       <Notice tone="neutral">Assignment changes the document status to in review and records the names. Role views shape the interface and are not an account security boundary.</Notice>
     </form>
   );
