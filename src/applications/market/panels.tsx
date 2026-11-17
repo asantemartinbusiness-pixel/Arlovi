@@ -331,7 +331,7 @@ export function CampaignLibrary({ context, state }: { context: ScreenContext; st
 export function CampaignDetail({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useMarketData();
   const { org, now } = useWorkspace();
-  const campaign = useRecord(context.params.id) ?? data.campaigns[0];
+  const campaign = useRecord(context.params.id) ?? data.campaigns.find((item) => item.id === context.params.id);
   const body = bodyOf<CampaignBody>(campaign, {});
   const channels = body.channels ?? [];
   const totals = channelTotals(channels);
