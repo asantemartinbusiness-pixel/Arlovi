@@ -48,43 +48,88 @@ function MailBoundary() {
 }
 
 function OffboardingConfirmation({ context, close }: { context: ScreenContext; close: () => void }) {
+  const [reason, setReason] = useState("");
+  const [assetsReviewed, setAssetsReviewed] = useState(false);
+  const [accessFollowUp, setAccessFollowUp] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const fromRoute = useRecord(context.params.id);
   const employee = scopedDetailRecord(fromRoute, context.org.id, "employees");
   const tasks = useCollections(["tasks"]).tasks;
   if (!employee) return <Empty title="Employee unavailable">Open a valid employee record before offboarding.</Empty>;
+  if (employee.status === "alumni") return <Empty title="Already offboarded">This employee is already marked as alumni. Review their history instead of repeating the action.</Empty>;
   const queued = tasks.filter((task) => task.fields.employeeId === employee.id && task.fields.group === "IT access" && task.status !== "done" && task.status !== "rescinded");
+  const canSubmit = reason.trim().length >= 10 && assetsReviewed && accessFollowUp && confirmed && !saving;
   return (
     <Stack gap={4}>
-      <p className="ds-prose">
-        Offboarding {employee.title} records the person as alumni and dates their leaving day.
-        Any pending IT access requests are rescinded in Arlovi. External account and door access must be checked separately.
-      </p>
-      <Properties rows={[
-        { label: "Record", value: employee.title },
-        { label: "Current status", value: employee.status },
-        { label: "External access", value: "Not connected — manual follow-up required" },
-        { label: "Pending requests to rescind", value: String(queued.length) },
-      ]} />
-      <Notice tone="warning" title="What this does not do">
-        No identity provider is connected, so this records the decision. Someone still has to turn off the real accounts.
-      </Notice>
+      <PeopleDialogLead
+        eyebrow="PEOPLE / EMPLOYEE LIFECYCLE"
+        title="Record a departure"
+        description="Review the employee, record the human decision and identify the work that still has to happen outside Arlovi."
+        status={<Pill tone="warning">Local record only</Pill>}
+      />
+      <PeopleDialogSection step="01" title="Employee and pending requests" description="Confirm the person and the requests affected by this decision.">
+        <Properties rows={[
+          { label: "Employee", value: employee.title },
+          { label: "Employment status", value: employee.status },
+          { label: "Pending IT requests", value: String(queued.length) },
+          { label: "Recorded departure date", value: "Today — at time of saving" },
+        ]} />
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Reason and handover" description="The reason is recorded in the employee history. This does not generate a departure letter.">
+        <Field label="Reason for offboarding" required hint="At least 10 characters. Avoid unnecessary personal or medical details.">
+          <TextArea value={reason} onChange={(value) => setReason(value)} />
+        </Field>
+        <Checkbox checked={assetsReviewed} onChange={setAssetsReviewed} label="I have reviewed the equipment and document handover requirements." />
+        <Checkbox checked={accessFollowUp} onChange={setAccessFollowUp} label="I will ensure external accounts, building access and other systems are separately reviewed and revoked where appropriate." />
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Human authorisation" description="This changes the employee record; external revocation remains a separate responsibility.">
+        <Notice tone="warning" title="External access is not revoked">
+          Arlovi will mark this employee as alumni and attempt to rescind pending local IT requests. It cannot disable identity-provider, email, payroll or building-access accounts.
+        </Notice>
+        <Checkbox checked={confirmed} onChange={setConfirmed} label={`I, ${context.actor}, authorise recording this departure for ${employee.title}.`} />
+      </PeopleDialogSection>
+      {error && <Notice tone="danger" title="Departure could not be completed">{error}</Notice>}
       <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
+        <Button variant="ghost" onClick={close} disabled={saving}>Cancel</Button>
         <span className="ds-grow" />
         <Button
           variant="danger"
+          disabled={!canSubmit}
           onClick={async () => {
-            await context.mutate.patch(employee.id, {
-              status: "alumni",
-              endAt: clockIso(),
-              fields: { ...employee.fields, accessRevoked: true },
-            }, { expectRevision: employee.revision, event: `${employee.title} offboarded locally by ${context.actor}; external access not verified` });
-            const rescinded = await rescindQueuedGrants(context, employee.id, tasks);
-            context.toast("Offboarding recorded", `${employee.title} is now alumni in Arlovi. ${rescinded} pending IT access request${rescinded === 1 ? " was" : "s were"} rescinded locally; check external access separately.`);
-            close();
+            if (!canSubmit) return;
+            setSaving(true);
+            setError("");
+            try {
+              const recordedAt = clockIso();
+              await context.mutate.patch(employee.id, {
+                status: "alumni",
+                endAt: recordedAt,
+                fields: {
+                  ...employee.fields,
+                  offboardingReason: reason.trim(),
+                  offboardingApprovedBy: context.actor,
+                  offboardingApprovedAt: recordedAt,
+                  offboardingAssetsReviewed: true,
+                  externalAccessRevocation: "manual_follow_up_required",
+                },
+              }, { expectRevision: employee.revision, event: `${employee.title} departure authorised by ${context.actor}; external access revocation not verified` });
+              try {
+                const rescinded = await rescindQueuedGrants(context, employee.id, tasks);
+                context.toast("Departure recorded", `${employee.title} is now alumni. ${rescinded} pending local IT request${rescinded === 1 ? " was" : "s were"} rescinded. External access still requires follow-up.`);
+              } catch {
+                context.toast("Departure saved; IT follow-up needed", "Employee marked alumni, but one or more pending IT requests could not be rescinded. Review them manually.", "blocked");
+              }
+              close();
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : "The employee record may have changed. Review it and try again.");
+            } finally {
+              setSaving(false);
+            }
           }}
         >
-          Offboard {employee.title.split(" ")[0]}
+          {saving ? "Recording…" : "Record departure"}
         </Button>
       </Row>
     </Stack>
