@@ -4,7 +4,7 @@ test("workspace remains navigable while optional resource and people panels load
   await page.goto("/o/northline/workspace/home");
   await expect(page.getByRole("heading", { name: "Your day, in one place." })).toBeVisible();
   await page.goto("/o/northline/workspace/resources");
-  await expect(page.getByRole("heading", { name: "Files & resources" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Files & resources", exact: true }).last()).toBeVisible();
   await expect(page.getByRole("region",{name:"Company resources"})).toBeVisible();
   await page.goto("/o/northline/workspace/people");
   await expect(page.getByRole("heading", { name: "Company directory & collaboration" })).toBeVisible();
