@@ -1,4 +1,5 @@
 import { useState } from "react";
+import "./library.css";
 import { Activity, Boxes, Code2, GitBranch, KeyRound, Rocket, ShieldCheck, TestTube2 } from "lucide-react";
 import {
   BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties,
@@ -25,11 +26,33 @@ import { saveApp, useBuildUi } from "./state";
 export function ProjectLibrary({ context, scope }: { context: ScreenContext; scope: "Recent" | "Team" | "Templates" | "Archived" }) {
   const projects = useCollection("appProjects");
   const { org, now } = useWorkspace();
+  const [search, setSearch] = useState("");
+  const active = projects.filter((project) => project.status !== "archived");
+  const matching = (text: string) => text.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
+  const libraryOverview = (
+    <section className="t6-build-library-overview" aria-label="Build project overview">
+      <Row gap={3} wrap><div className="ds-grow" style={{ minWidth: 220 }}>
+        <span className="ds-subtle">BUILD / APP PROJECTS</span>
+        <h2>Build an application, not just a screen.</h2>
+        <p className="ds-subtle">Shape data, design workflows and validate releases from one connected project workspace.</p>
+      </div><Button size="sm" variant="primary" onClick={() => context.openOverlay("Project setup")}>New project</Button></Row>
+      <div className="t6-build-library-metrics" aria-label="Build project activity">
+        <div><span>Active projects</span><strong>{active.length}</strong></div>
+        <div><span>Drafts</span><strong>{active.filter((project) => project.status === "draft").length}</strong></div>
+        <div><span>Entities</span><strong>{active.reduce((count, project) => count + readApp(project).entities.length, 0)}</strong></div>
+        <div><span>Screens</span><strong>{active.reduce((count, project) => count + readApp(project).screens.length, 0)}</strong></div>
+      </div>
+    </section>
+  );
 
   if (scope === "Templates") {
+    const templates = PROJECT_TEMPLATES.filter((template) => matching(`${template.title} ${template.summary} ${template.build().entities.map((entity) => entity.name).join(" ")}`));
     return (
-      <Grid>
-        {PROJECT_TEMPLATES.map((template) => (
+      <Stack gap={4}>
+        {libraryOverview}
+        <Field label="Find a template"><TextInput type="search" aria-label="Find a template" value={search} placeholder="Search templates or business use cases" onChange={(event) => setSearch(event.target.value)} /></Field>
+        {templates.length === 0 ? <Empty title="No templates match this search" icon={<Boxes size={20} />} action={<Button variant="secondary" onClick={() => setSearch("")}>Clear search</Button>}>Try a different industry, entity or workflow.</Empty> : <Grid>
+        {templates.map((template) => (
           <Card key={template.id} span={6} title={template.title} subtitle={template.summary}
             footer={<Button size="sm" variant="primary" onClick={async () => {
               const created = await context.mutate.create({
@@ -47,27 +70,26 @@ export function ProjectLibrary({ context, scope }: { context: ScreenContext; sco
             ]} />
           </Card>
         ))}
-      </Grid>
+      </Grid>}
+      </Stack>
     );
   }
 
   const rows = projects.filter((record) => {
     if (scope === "Archived") return record.status === "archived";
     if (record.status === "archived") return false;
-    if (scope === "Team") return true;
+    if (scope === "Team" && record.status === "archived") return false;
     return true;
-  });
+  }).filter((record) => matching(`${record.title} ${record.summary} ${record.ownerName ?? ""} ${record.status} ${readApp(record).entities.map((entity) => entity.name).join(" ")}`));
 
   if (rows.length === 0) {
-    return (
-      <Empty title={scope === "Archived" ? "Nothing archived" : "No app projects"} icon={<Boxes size={20} />}
-        action={<Button variant="primary" onClick={() => context.openOverlay("Project setup")}>New project</Button>}>
-        An app project is a data model, screens bound to it and the readable TypeScript that falls out of both.
-      </Empty>
-    );
+    return <Stack gap={4}>{libraryOverview}<Field label="Find a project"><TextInput type="search" aria-label="Find a project" value={search} placeholder="Search projects, owners and entities" onChange={(event) => setSearch(event.target.value)} /></Field><Empty title={search.trim() ? "No projects match this search" : scope === "Archived" ? "Nothing archived" : "No app projects"} icon={<Boxes size={20} />} action={<Button variant="secondary" onClick={() => search.trim() ? setSearch("") : context.openOverlay("Project setup")}>{search.trim() ? "Clear search" : "New project"}</Button>}>{search.trim() ? "Try searching by project name, owner or entity." : "An app project links its data model, screens and validated workflow."}</Empty></Stack>;
   }
 
   return (
+    <Stack gap={4}>
+      {libraryOverview}
+      <Field label="Find a project"><TextInput type="search" aria-label="Find a project" value={search} placeholder="Search projects, owners and entities" onChange={(event) => setSearch(event.target.value)} /></Field>
     <DataGrid
       rows={rows}
       rowId={(row) => row.id}
@@ -91,6 +113,7 @@ export function ProjectLibrary({ context, scope }: { context: ScreenContext; sco
       selectedId={context.selectedId}
       summary={<span>Runtime is blank for every project: nothing is deployed from this browser, so no project is described as running.</span>}
     />
+    </Stack>
   );
 }
 
