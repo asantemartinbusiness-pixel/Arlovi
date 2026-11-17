@@ -18,6 +18,7 @@ import { intervalsOverlap, validShiftInterval } from "@/domain/scheduling";
 import { linkedPersonnelDocuments, scopedDetailRecord } from "@/platform/recordScope";
 import { dailyCoverage, employeeOnLeave, localDayKey, rosterDateLabel, rosterShiftsForDay, rosterWeekDays, shiftDays } from "./rosterView";
 import { OpsHeader, OpsMetric, OpsMetrics } from "@/applications/shared/operational-surfaces";
+import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
 
 /* ------------------------------------------------------------------ *
  * Shared reads
@@ -1763,7 +1764,7 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
   const { now, org } = useWorkspace();
   const [weekOffset, setWeekOffset] = useState(0);
   const [showEveryone, setShowEveryone] = useState(false);
-  const [timeFilter, setTimeFilter] = useState<"pending" | "approved" | "all">("all");
+  const [timeFilter, setTimeFilter] = useState<"pending" | "approved" | "mismatch" | "all">("all");
   const [personQuery, setPersonQuery] = useState("");
   const [hideAway, setHideAway] = useState(false);
   const [exceptionFilter, setExceptionFilter] = useState<"all" | "critical" | "review">("all");
@@ -1774,8 +1775,8 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
   if (lens === "Timesheets") {
     const approved = timesheets.filter((entry) => entry.status === "approved" && entry.fields.approved === true);
     const pending = timesheets.filter((entry) => entry.status !== "approved" || entry.fields.approved !== true);
-    const rows = timeFilter === "approved" ? approved : timeFilter === "pending" ? pending : timesheets;
     const mismatched = timesheets.filter((entry) => (entry.status === "approved") !== (entry.fields.approved === true));
+    const rows = timeFilter === "approved" ? approved : timeFilter === "pending" ? pending : timeFilter === "mismatch" ? mismatched : timesheets;
     const billablePending = pending.filter((entry) => entry.fields.billable === true);
     const sumHours = (entries: Rec[]) => entries.reduce((sum, entry) => {
       const hours = Number(entry.fields.hours ?? 0);
@@ -1804,6 +1805,7 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
           <Button size="sm" variant={timeFilter === "all" ? "secondary" : "ghost"} aria-pressed={timeFilter === "all"} onClick={() => setTimeFilter("all")}>All</Button>
           <Button size="sm" variant={timeFilter === "pending" ? "secondary" : "ghost"} aria-pressed={timeFilter === "pending"} onClick={() => setTimeFilter("pending")}>Needs approval ({pending.length})</Button>
           <Button size="sm" variant={timeFilter === "approved" ? "secondary" : "ghost"} aria-pressed={timeFilter === "approved"} onClick={() => setTimeFilter("approved")}>Approved ({approved.length})</Button>
+          <Button size="sm" variant={timeFilter === "mismatch" ? "secondary" : "ghost"} aria-pressed={timeFilter === "mismatch"} onClick={() => setTimeFilter("mismatch")}>Review mismatches ({mismatched.length})</Button>
         </div>
         <p className="ops-toolbar-note">
           Select a row and choose Open to see its approval evidence. Correct any mismatched or unlinked source before approval.
@@ -1847,6 +1849,10 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
           bulkActions={[{
             label: "Approve hours",
             onRun: async (selected) => {
+              if (!context.can("edit_people")) {
+                context.toast("Approval unavailable", "You need an authorised People role to approve timesheets.", "blocked");
+                return;
+              }
               try {
                 const chosen = selected.filter((row) => !(row.status === "approved" && row.fields.approved === true));
                 const plan = planTimesheetApprovals({
@@ -1859,7 +1865,7 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
                 context.toast("Hours not approved", error instanceof Error ? error.message : "Reload these entries before deciding.", "blocked");
               }
             },
-            disabled: (selected) => selected.every((row) => row.status === "approved" && row.fields.approved === true),
+            disabled: (selected) => !context.can("edit_people") || selected.every((row) => row.status === "approved" && row.fields.approved === true),
           }]}
           onSelect={(id) => context.select(id)}
         />
@@ -2914,6 +2920,8 @@ export function LeaveForm({ context, close }: { context: ScreenContext; close: (
   const [from, setFrom] = useState(addDays(now, 7).toISOString().slice(0, 10));
   const [to, setTo] = useState(addDays(now, 9).toISOString().slice(0, 10));
   const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const employee = currentEmployees.find((row) => row.id === employeeId);
   const validDates = /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)
     && Number.isFinite(Date.parse(from)) && Number.isFinite(Date.parse(to));
@@ -2922,6 +2930,9 @@ export function LeaveForm({ context, close }: { context: ScreenContext; close: (
   const validDuration = Number.isFinite(dayCount) && dayCount > 0;
   const balance = employee ? leaveBalance(employee) : undefined;
   const overBalance = type === "annual" && balance?.known === true && dayCount > balance.left;
+  const overlapping = data.leaveRequests.filter((request) => request.fields.employeeId === employeeId && ["requested", "approved"].includes(request.status)
+    && request.startAt && request.endAt && validDates && !backwards
+    && request.startAt.slice(0, 10) <= to && request.endAt.slice(0, 10) >= from);
 
   return (
     <form
@@ -2933,6 +2944,13 @@ export function LeaveForm({ context, close }: { context: ScreenContext; close: (
           context.toast("Leave request not saved", "Choose a current employee and valid dates in chronological order.", "blocked");
           return;
         }
+        if (overlapping.length) {
+          setError("This employee already has a pending or approved request overlapping these dates. Review the existing request before creating another.");
+          return;
+        }
+        setSaving(true);
+        setError("");
+        try {
         await context.mutate.create({
           collection: "leaveRequests",
           title: `${employee.title.split(" ")[0]} · ${type}`,
@@ -2946,8 +2964,17 @@ export function LeaveForm({ context, close }: { context: ScreenContext; close: (
         }, `Leave requested by ${employee.title}`);
         context.toast("Leave requested", `${dayCount} days recorded locally for a review by ${String(employee.fields.manager || "a manager")}.`);
         close();
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "The request could not be saved. Check the details and retry.");
+        } finally {
+          setSaving(false);
+        }
       }}
     >
+      <PeopleDialogLead eyebrow="PEOPLE / LEAVE & ABSENCE" title="Request time away"
+        description="Identify the employee, check the dates and recorded balance, then submit a request for a human decision."
+        status={<Pill tone="warning">Awaiting review</Pill>} />
+      <PeopleDialogSection step="01" title="Person and absence type" description="Select the employee and the category to be reviewed.">
       <Field label="Who is away" required>
         <Select value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}>
           {currentEmployees.length === 0 && <option value="">No current employees</option>}
@@ -2959,6 +2986,8 @@ export function LeaveForm({ context, close }: { context: ScreenContext; close: (
           {["annual", "sick", "parental", "unpaid", "compassionate"].map((option) => <option key={option} value={option}>{option}</option>)}
         </Select>
       </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="02" title="Dates and explanation" description="Check the period and provide only the information needed for review.">
       <Row gap={3}>
         <Field label="From" required><TextInput type="date" value={from} onChange={(event) => setFrom(event.target.value)} required /></Field>
         <Field label="To" required><TextInput type="date" value={to} onChange={(event) => setTo(event.target.value)} invalid={backwards} required /></Field>
@@ -2969,6 +2998,8 @@ export function LeaveForm({ context, close }: { context: ScreenContext; close: (
       <Field label="Note for your manager" hint={type === "sick" ? "Do not record health detail here: it would appear in the absence record." : undefined}>
         <TextArea value={note} onChange={(event) => setNote(event.target.value)} rows={3} />
       </Field>
+      </PeopleDialogSection>
+      <PeopleDialogSection step="03" title="Recorded balance and conflicts" description="A submitted request does not reserve time, update a calendar or deduct leave.">
       <Properties rows={[
         { label: "Days requested", value: validDuration ? String(dayCount) : "Check dates" },
         { label: "Balance now", value: balance?.known ? `${balance.left} of ${balance.allowance}` : "No verified allowance" },
@@ -2976,12 +3007,18 @@ export function LeaveForm({ context, close }: { context: ScreenContext; close: (
           : balance?.known && validDuration && !overBalance ? `${balance.left - dayCount} of ${balance.allowance}`
           : "Cannot confirm until the allowance and dates are valid" },
       ]} />
+      {overlapping.length > 0 && <Notice tone="danger" title="Existing leave overlaps this period">
+        {overlapping.length} pending or approved request{overlapping.length === 1 ? "" : "s"} already cover part of this period. Review those requests before submitting another.
+      </Notice>}
       {overBalance && <Notice tone="warning" title="Annual leave exceeds the recorded balance">
         The request may be recorded, but it cannot be approved as annual leave without an amended, verified allowance. Review unpaid leave separately.
       </Notice>}
       {type === "annual" && !balance?.known && <Notice tone="warning" title="Leave allowance has not been recorded">
         The request can still be submitted for review; approval remains blocked until People verifies the employee's annual allowance.
       </Notice>}
+      {error && <Notice tone="danger" title="Request could not be saved">{error}</Notice>}
+      {saving && <Notice tone="info">Saving this request…</Notice>}
+      </PeopleDialogSection>
     </form>
   );
 }
