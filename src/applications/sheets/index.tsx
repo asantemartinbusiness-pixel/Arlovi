@@ -1695,6 +1695,7 @@ function ImportMapper({ context, close }: { context: ScreenContext; close: () =>
   const [headerRow, setHeaderRow] = useState(true);
   const [target, setTarget] = useState("new");
   const [types, setTypes] = useState<Record<number, NumberFormat>>({});
+  const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const rows = useMemo(() => (text.trim() ? parseCsv(text) : []), [text]);
   const plans = useMemo(() => (rows.length ? planImport(rows, headerRow) : []), [rows, headerRow]);
   if (!record) return <Empty title="No workbook is open" />;
@@ -1705,7 +1706,7 @@ function ImportMapper({ context, close }: { context: ScreenContext; close: () =>
       className="ds-stack ds-gap-4"
       onSubmit={(event) => {
         event.preventDefault();
-        if (rows.length === 0) return;
+        if (rows.length === 0 || (target === "current" && !confirmOverwrite)) return;
         const warnings = plans.filter((plan) => plan.warning).map((plan) => plan.warning!);
         const base = target === "new" ? emptySheet(`Imported ${editor.workbook.sheets.length + 1}`) : editor.sheet;
         const filled = rowsToSheet(base, rows);
@@ -1745,11 +1746,20 @@ function ImportMapper({ context, close }: { context: ScreenContext; close: () =>
       />
       <Checkbox label="The first row is a header" checked={headerRow} onChange={(event) => setHeaderRow(event.target.checked)} />
       <Field label="Where">
-        <Select aria-label="Where" value={target} onChange={(event) => setTarget(event.target.value)}>
+        <Select aria-label="Where" value={target} onChange={(event) => { setTarget(event.target.value); setConfirmOverwrite(false); }}>
           <option value="new">A new sheet</option>
           <option value="current">Overwrite {editor.sheet.name} from A1</option>
         </Select>
       </Field>
+      {target === "current" && (
+        <div className="ds-stack ds-gap-2">
+          <Notice tone="warning" title="This replaces the active sheet's cell contents">
+            Importing into {editor.sheet.name} overwrites its existing grid from A1, including existing formulas in that sheet. Choose a new sheet to retain the original.
+          </Notice>
+          <Checkbox label={`I understand that ${editor.sheet.name} will be replaced`} checked={confirmOverwrite} onChange={(event) => setConfirmOverwrite(event.target.checked)} />
+          {!confirmOverwrite && <p className="ds-subtle">Confirm replacement to enable import, or switch to a new sheet.</p>}
+        </div>
+      )}
       {plans.length > 0 && (
         <>
           <p className="ds-subtle">{rows.length} rows, {plans.length} columns. Choose a type per column; nothing is converted unless you choose.</p>
