@@ -712,11 +712,27 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
         <Button size="sm" variant="secondary" disabled={editor.saveState === "clean" || editor.saveState === "saved"} onClick={() => void editor.saveNow()}>Save now</Button>
         <Button size="sm" variant="primary" icon={<Play size={15} />} onClick={() => context.navigate(context.path("/o/:org/present/decks/:id/present", record.id))}>Present</Button>
         <ButtonGroup label="Panels on narrow screens">
-          <Button size="sm" variant={mobilePanel === "sorter" ? "secondary" : "ghost"} onClick={() => setMobilePanel(mobilePanel === "sorter" ? "canvas" : "sorter")}>Slides</Button>
-          <Button size="sm" variant={mobilePanel === "aside" ? "secondary" : "ghost"} onClick={() => setMobilePanel(mobilePanel === "aside" ? "canvas" : "aside")}>Inspector</Button>
+          <Button size="sm" variant={mobilePanel === "sorter" ? "secondary" : "ghost"} aria-pressed={mobilePanel === "sorter"} onClick={() => setMobilePanel(mobilePanel === "sorter" ? "canvas" : "sorter")}>Slides</Button>
+          <Button size="sm" variant={mobilePanel === "aside" ? "secondary" : "ghost"} aria-pressed={mobilePanel === "aside"} onClick={() => setMobilePanel(mobilePanel === "aside" ? "canvas" : "aside")}>Inspector</Button>
         </ButtonGroup>
       </div>
 
+      <section className="pr-editor-context" aria-label="Active slide context">
+        <div className="pr-editor-context-main">
+          <span className="pr-library-eyebrow">PRESENT / SLIDE WORKSPACE</span>
+          <Row gap={2} wrap>
+            <strong>{editor.slide.title || `Slide ${editor.deck.index + 1}`}</strong>
+            <Pill tone={editor.slide.hidden ? "warning" : "neutral"}>{editor.slide.hidden ? "Hidden from presenting" : "Included in presentation"}</Pill>
+            <span className="ds-subtle">{editor.slide.objects.length} objects · {buildOrder(editor.slide).length} animated · {editor.deck.comments.filter((item) => !item.resolved).length} open comments</span>
+          </Row>
+          <span className="ds-subtle">Theme: {editor.deck.theme.name} · Layout: {layoutById(editor.deck, editor.slide.layoutId).name}</span>
+        </div>
+        <Row gap={2} wrap>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks`)}>Library</Button>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}/theme`)}>Theme</Button>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}/animations`)}>Animation</Button>
+        </Row>
+      </section>
       <div className="px-bar" style={{ minHeight: 40 }}>
         <Tabs
           label="Editor modes"
