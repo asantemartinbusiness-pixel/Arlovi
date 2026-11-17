@@ -675,6 +675,7 @@ function TimesheetCorrection({ context, close }: { context: ScreenContext; close
         const updated = await context.mutate.patch(entry.id, {
           status: "submitted",
           fields: { ...entry.fields, hours, approved: false, approvedBy: "", approvedAt: "",
+            billingReviewStatus: "", billingReviewedBy: "", billingReviewedAt: "",
             correctedBy: context.actor, correctionReason: reason, correctedFrom: Number(entry.fields.hours ?? 0) },
         }, { expectRevision: entry.revision, event: `Time corrected by ${context.actor}: ${reason}` });
         if (!updated) return;
