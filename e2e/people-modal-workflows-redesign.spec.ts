@@ -1,0 +1,98 @@
+import { expect, test } from "@playwright/test";
+
+test("Performance review modal has three evidence steps and refuses unsupported ratings", async ({ page }) => {
+  await page.goto("/o/northline/hr/performance?tab=Cycles");
+  const action = page.locator("#main").getByRole("button", { name: "Create a review" }).first();
+  await expect(action).toBeVisible();
+  await action.click();
+  const modal = page.getByRole("dialog");
+  await expect(modal.getByRole("heading", { name: "Create an evidence-led review" })).toBeVisible();
+  await expect(modal.locator(".hr-dialog-section")).toHaveCount(3);
+  await modal.locator("select[name='employee']").selectOption({ index: 1 });
+  await modal.locator("select[name='rating']").selectOption("meeting");
+  await page.getByRole("button", { name: "Save review" }).click();
+  await expect(modal).toContainText("A rating needs at least 20 characters");
+  await modal.locator("textarea[name='evidence']").fill(
+    "The documented work met the agreed criteria, with project delivery evidence reviewed by a person.");
+  await page.getByRole("button", { name: "Save review" }).click();
+  await expect(modal).toHaveCount(0);
+  const created = await page.evaluate(async () => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    const records = await repo.listByCollection("org-northline", "reviews");
+    return records.filter((row) => row.summary.startsWith("The documented work met the agreed criteria"))
+      .map((row) => ({ status: row.status, reviewer: row.fields.reviewer, aiAssisted: row.fields.aiAssisted }));
+  });
+  expect(created).toContainEqual({ status: "draft", reviewer: "Maya Chen", aiAssisted: false });
+});
+
+test("Course builder saves a validated local draft, not a fabricated published lesson", async ({ page }) => {
+  await page.goto("/o/northline/hr/learning?tab=Courses");
+  await page.locator("#main").getByRole("button", { name: "Create course" }).first().click();
+  const modal = page.getByRole("dialog");
+  await expect(modal.getByRole("heading", { name: "Build a new learning record" })).toBeVisible();
+  await expect(modal.locator(".hr-dialog-section")).toHaveCount(3);
+  await modal.locator("input[name='title']").fill("QA Evidence Handling Course");
+  await modal.locator("input[name='minutes']").fill("0");
+  await page.getByRole("button", { name: "Save course" }).click();
+  await expect(modal).toContainText("Estimated duration must be a whole number");
+  await modal.locator("input[name='minutes']").fill("35");
+  await page.getByRole("button", { name: "Save course" }).click();
+  await expect(modal).toHaveCount(0);
+  const saved = await page.evaluate(async () => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    return (await repo.listByCollection("org-northline", "courses"))
+      .filter((row) => row.title === "QA Evidence Handling Course")
+      .map((row) => ({ status: row.status, minutes: row.fields.minutes, completions: row.fields.completions }));
+  });
+  expect(saved).toContainEqual({ status: "draft", minutes: 35, completions: undefined });
+});
+
+test("Quiz remains an interactive preview and makes no completion claim", async ({ page }) => {
+  await page.goto("/o/northline/hr/learning?tab=Courses");
+  await page.locator("#main").getByRole("button", { name: "Preview quiz" }).first().click();
+  const modal = page.getByRole("dialog");
+  await expect(modal.getByRole("heading", { name: "Preview the knowledge check" })).toBeVisible();
+  const button = modal.getByRole("button", { name: "Check preview answers" });
+  await expect(button).toBeDisabled();
+  await modal.locator(".hr-dialog-section select").nth(0).selectOption("named-approver");
+  await modal.locator(".hr-dialog-section select").nth(1).selectOption("human-draft");
+  await button.click();
+  await expect(modal).toContainText("Both sample answers are correct");
+  await expect(modal).toContainText("No completion is recorded");
+});
+
+test("Policy revision requires changed wording, a reason and human confirmation", async ({ page }) => {
+  await page.goto("/o/northline/hr/learning?tab=Policies");
+  const action = page.locator("#main").getByRole("button", { name: "Review revision" }).first();
+  await expect(action).toBeVisible();
+  await action.click();
+  const modal = page.getByRole("dialog");
+  await expect(modal.getByRole("heading", { name: "Publish a reviewed record revision" })).toBeVisible();
+  const publish = modal.getByRole("button", { name: /Publish version/ });
+  await expect(publish).toBeDisabled();
+  await modal.locator("textarea").nth(0).fill(
+    "Updated QA policy summary: all employees should read the latest security and access handling instructions.");
+  await modal.locator("textarea").nth(1).fill(
+    "The revision clarifies the responsibilities of the named access approver.");
+  await expect(publish).toBeDisabled();
+  await modal.getByRole("checkbox").check();
+  await expect(publish).toBeEnabled();
+  await publish.click();
+  await expect(modal).toHaveCount(0);
+  const versioned = await page.evaluate(async () => {
+    const path = "/src/platform/repo.ts";
+    const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");
+    return (await repo.listByCollection("org-northline", "policies"))
+      .filter((row) => row.summary.startsWith("Updated QA policy summary"))
+      .map((row) => ({
+        version: row.fields.version, count: row.fields.acknowledged,
+        previous: row.history[0]?.summary, reason: row.fields.revisionReason,
+      }));
+  });
+  expect(versioned.length).toBe(1);
+  expect(versioned[0].count).toBe(0);
+  expect(versioned[0].previous).toBeTruthy();
+  expect(versioned[0].reason).toContain("named access approver");
+});
