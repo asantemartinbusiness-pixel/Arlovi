@@ -1315,6 +1315,15 @@ export function IntegrationsScreen({ context, lens }: { context: ScreenContext; 
 
   return (
     <Stack gap={4}>
+      <section className="t6-build-library-overview" aria-label="Build integration overview">
+        <Row gap={2} wrap><div className="ds-grow" style={{ minWidth: 220 }}><span className="ds-subtle">BUILD / INTEGRATIONS</span><h2>Understand every connection boundary.</h2><p className="ds-subtle">Explore workspace connector records and their declared state. No external service is represented as connected without a provider.</p></div></Row>
+        <div className="t6-build-library-metrics" aria-label="Integration connection summary">
+          <div><span>Recorded connectors</span><strong>{connectors.length}</strong></div>
+          <div><span>Connected providers</span><strong>0</strong></div>
+          <div><span>API contracts</span><strong>{model.endpoints.length}</strong></div>
+          <div><span>Notify workflows</span><strong>{model.automations.filter((automation) => automation.steps.some((step) => step.kind === "notify")).length}</strong></div>
+        </div>
+      </section>
       {connectors.length === 0 ? <Empty title="No connectors recorded" icon={<KeyRound size={20} />} /> : (
         <DataGrid
           rows={connectors}
@@ -1350,6 +1359,15 @@ export function MonitorScreen({ context, lens }: { context: ScreenContext; lens:
   if (lens === "Errors") {
     return (
       <Stack gap={5}>
+        <section className="t6-build-library-overview" aria-label="Build monitoring overview">
+          <Row gap={2} wrap><div className="ds-grow" style={{ minWidth: 220 }}><span className="ds-subtle">BUILD / DIAGNOSTICS</span><h2>Separate verified model health from runtime monitoring.</h2><p className="ds-subtle">Review local model findings and project activity. Runtime errors, latency and production usage remain unavailable until a deployed runtime is connected.</p></div><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>Open checks</Button></Row>
+          <div className="t6-build-library-metrics" aria-label="Monitoring diagnostic summary">
+            <div><span>Model failures</span><strong>{totals.fail}</strong></div>
+            <div><span>Warnings</span><strong>{totals.warn}</strong></div>
+            <div><span>Project events</span><strong>{events.length}</strong></div>
+            <div><span>Connected runtimes</span><strong>0</strong></div>
+          </div>
+        </section>
         <StatRow>
           <Stat label="Runtime errors" value="Unavailable" unavailable meta="The app does not run anywhere" onClick={() => context.openOverlay("Trace viewer")} />
           <Stat prov="posted" label="Model failures" value={String(totals.fail)} meta="Measured from the design" />
