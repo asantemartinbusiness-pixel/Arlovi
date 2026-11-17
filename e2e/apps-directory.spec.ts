@@ -55,3 +55,35 @@ for (const width of [390, 820, 1440]) {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 }
+
+
+test("Platform category offers real work-area shortcuts and preserves category navigation", async ({ page }) => {
+  await page.goto("/o/northline/workspace/apps?category=Platform");
+  await expect(page.locator(".apps-directory-open")).toHaveCount(5);
+  await expect(page.getByRole("heading", { name: "Build, connect and operate" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "App Builder: Projects" })).toHaveAttribute("href", "/o/northline/build/projects");
+  await expect(page.getByRole("link", { name: "Integrations: Sync centre" })).toHaveAttribute("href", "/o/northline/connect/sync");
+  await page.getByRole("link", { name: "Integrations: Sync centre" }).click();
+  await expect(page).toHaveURL(/\\/o\\/northline\\/connect\\/sync$/);
+  const sidebar = page.getByRole("navigation", { name: "Integrations navigation" });
+  await expect(sidebar).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: "All applications" })).toHaveAttribute(
+    "href", "/o/northline/workspace/apps?category=Platform",
+  );
+  await sidebar.getByText("Other Platform apps").click();
+  await expect(sidebar.getByRole("link", { name: "IT Operations" })).toBeVisible();
+  await sidebar.getByRole("link", { name: "IT Operations" }).click();
+  await expect(page).toHaveURL(/\\/o\\/northline\\/it\\/home$/);
+  await page.getByRole("navigation", { name: "IT Operations navigation" })
+    .getByRole("link", { name: "All applications" }).click();
+  await expect(page).toHaveURL(/category=Platform/);
+  await expect(page.locator(".apps-directory-open")).toHaveCount(5);
+});
+
+test("Platform shortcuts fit at compact mobile widths", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/o/northline/workspace/apps?category=Platform");
+  await expect(page.getByRole("link", { name: "IT Operations: Security" })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
