@@ -12,6 +12,7 @@ import { addDays, clockIso, daysBetween, startOfMonth, startOfWeek } from "@/pla
 import type { Rec } from "@/domain/types";
 import { EmploymentPill, RoleViewNote, leaveBalance, salaryText } from "./kit";
 import { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
+import { linkedPersonnelDocuments, scopedDetailRecord } from "@/platform/recordScope";
 
 /* ------------------------------------------------------------------ *
  * Shared reads
@@ -394,10 +395,16 @@ export function EmployeeDirectory({ context, lens }: { context: ScreenContext; l
 export function EmployeeProfile({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useHrData();
   const record = useRecord(context.params.id);
-  const employee = record ?? data.employees[0];
+  const fileRecords = useCollection("documents");
   const { org } = useWorkspace();
+  const employee = scopedDetailRecord(record, org.id, "employees");
 
-  if (!employee) return <Empty title="No employee record" icon={<Users size={20} />}>Open a person from the employee directory.</Empty>;
+  if (!employee) return (
+    <Empty title="Employee unavailable" icon={<Users size={20} />}>
+      This employee was not found in this company. Open a person from the employee directory.
+      <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)}>Open directory</Button>
+    </Empty>
+  );
 
   const balance = leaveBalance(employee);
   const leave = data.leaveRequests.filter((request) => request.fields.employeeId === employee.id);
@@ -445,29 +452,33 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
   }
 
   if (lens === "Documents") {
-    const documents = [
-      { id: `${employee.id}-contract`, title: "Employment contract", status: "filed", at: employee.startAt },
-      { id: `${employee.id}-rtw`, title: "Right to work check", status: "filed", at: employee.startAt },
-      ...(employee.status === "probation" ? [{ id: `${employee.id}-probation`, title: "Probation letter", status: "filed", at: employee.startAt }] : []),
-      ...(terminated ? [{ id: `${employee.id}-leaver`, title: "Leaver letter", status: "filed", at: employee.endAt }] : []),
-    ];
+    // Personnel documents are real company records, not assumed contracts,
+    // identity checks or letters generated from employment status.
+    const documents = linkedPersonnelDocuments(fileRecords, employee);
     return (
       <Stack gap={4}>
-        <DataGrid
-          rows={documents}
-          rowId={(row) => row.id}
-          label="Employee documents"
-          filterable={false}
-          columns={[
-            { key: "title", header: "Document", primary: true, cell: (row) => row.title },
-            { key: "status", header: "Status", cell: (row) => <Pill tone="success">{row.status}</Pill> },
-            { key: "at", header: "Dated", align: "end", cell: (row) => context.date(row.at) },
-          ]}
-        />
-        <Notice tone="info">
-          Documents are references held in this workspace. Nothing is uploaded anywhere; a file added here is kept as a record with its name, date and who filed it.
+        {documents.length === 0 ? (
+          <Empty title="No document references filed" icon={<BookOpen size={20} />}>
+            No document record is linked to this employee. Add a reference only for a document that actually exists.
+          </Empty>
+        ) : (
+          <DataGrid
+            rows={documents}
+            rowId={(row) => row.id}
+            label="Employee document references"
+            filterable={false}
+            onOpen={(id) => context.navigate(`/o/${org.slug}/docs/documents/${id}`)}
+            columns={[
+              { key: "title", header: "Document", primary: true, cell: (row) => row.title },
+              { key: "status", header: "Record", cell: (row) => <Pill tone={row.status === "archived" ? "neutral" : "info"}>{row.fields.kind === "peopleFile" ? "Reference only" : row.status.replace("_", " ")}</Pill> },
+              { key: "at", header: "Updated", align: "end", cell: (row) => context.date(row.updatedAt), sortValue: (row) => row.updatedAt },
+            ]}
+          />
+        )}
+        <Notice tone="info" title="Only linked records appear here">
+          A reference records a document's name and filing details; it does not upload the file itself. No connected storage or identity service is implied.
         </Notice>
-        <Button variant="secondary" onClick={() => context.openOverlay("Contract upload")}>Add a document</Button>
+        <Button variant="secondary" onClick={() => context.openOverlay("Contract upload")}>Add a document reference</Button>
       </Stack>
     );
   }
@@ -752,27 +763,42 @@ export function Recruitment({ context, lens }: { context: ScreenContext; lens: "
 export function ApplicantProfile({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useHrData();
   const record = useRecord(context.params.id);
-  const applicant = record ?? data.applicants[0];
-  if (!applicant) return <Empty title="No candidate selected" icon={<Users size={20} />} />;
+  const fileRecords = useCollection("documents");
+  const applicant = scopedDetailRecord(record, context.org.id, "applicants");
+  if (!applicant) return <Empty title="Candidate unavailable" icon={<Users size={20} />}>This candidate was not found in this company. Open a candidate from Recruitment.</Empty>;
   const position = data.positions.find((row) => row.id === applicant.fields.positionId);
   const consentUntil = String(applicant.fields.consentUntil ?? "");
   const consentExpired = consentUntil ? new Date(consentUntil) < context.now : false;
 
   if (lens === "Documents") {
+    const documents = linkedPersonnelDocuments(fileRecords, applicant);
     return (
       <Stack gap={4}>
-        <Card title="Application documents">
-          <Properties rows={[
-            { label: "CV", value: "Held as a record in this workspace" },
-            { label: "Covering note", value: applicant.summary },
-            { label: "Portfolio", value: String(applicant.fields.source ?? "") === "Craft guild" ? "Linked from the application" : "Not supplied" },
-          ]} />
+        <Card title="Application document references" subtitle={`${documents.length} linked to this candidate`}>
+          {documents.length ? (
+            <DataGrid
+              rows={documents}
+              rowId={(row) => row.id}
+              label="Candidate document references"
+              filterable={false}
+              onOpen={(id) => context.navigate(`/o/${context.org.slug}/docs/documents/${id}`)}
+              columns={[
+                { key: "title", header: "Document", primary: true, cell: (row) => row.title },
+                { key: "status", header: "Status", cell: (row) => <Pill tone="neutral">{row.status.replace("_", " ")}</Pill> },
+                { key: "updated", header: "Updated", cell: (row) => context.date(row.updatedAt), sortValue: (row) => row.updatedAt },
+              ]}
+            />
+          ) : (
+            <Empty title="No application files linked" icon={<BookOpen size={20} />}>
+              A CV or portfolio is not assumed to exist. Only documents explicitly attached to this candidate appear here.
+            </Empty>
+          )}
         </Card>
         <Notice tone={consentExpired ? "danger" : "info"} title={consentExpired ? "Consent has expired" : "Retention and consent"}>
           This candidate consented to their data being held until {consentUntil || "an unrecorded date"}.
           {consentExpired
-            ? " The record is past that date and should be removed in the next retention sweep."
-            : " After that date the record is removed unless the candidate agrees to be kept on file."}
+            ? " The record is past that date and must be reviewed under the retention policy."
+            : " Retention should be reviewed at that date; this browser-local view does not erase files automatically."}
         </Notice>
       </Stack>
     );
