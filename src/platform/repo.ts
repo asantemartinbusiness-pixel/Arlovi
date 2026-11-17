@@ -225,6 +225,34 @@ export async function putMany(records: Rec[], context: WriteContext, events: Omi
           throw new ConflictError(record.id, 0, original.revision);
         }
       }
+      // Creating a parent and children in one batch must be create-only.
+      // A colliding id cannot replace an existing record even when this batch
+      // does not need compare-and-swap revisions for another source.
+      const createIds = new Set(events
+        .filter((event) => event.type === "create")
+        .map((event) => event.entityId)
+        .filter((id): id is string => typeof id === "string"));
+      for (const [index, record] of records.entries()) {
+        if (createIds.has(record.id) && existing[index]) {
+          throw new ConflictError(record.id, 0, existing[index].revision);
+        }
+      }
+      // Project names must remain unique per organisation even when two
+      // open tabs submit the same title. Check inside the write transaction.
+      const newProjects = records.filter((record) =>
+        record.collection === "projects" && createIds.has(record.id));
+      if (newProjects.length) {
+        const knownProjects = await db.records.where("[organizationId+collection]")
+          .equals([scopeId, "projects"]).toArray();
+        const claimed = new Set(knownProjects.map((row) => row.title.trim().toLocaleLowerCase()));
+        for (const project of newProjects) {
+          const title = project.title.trim().toLocaleLowerCase();
+          if (!title || claimed.has(title)) {
+            throw new Error(`A project named "${project.title}" already exists in this company. Choose a different name.`);
+          }
+          claimed.add(title);
+        }
+      }
       // Also verify source documents read by a cross-app handoff, even if
       // the source record itself is not changed (e.g. an accepted quote).
       const written = new Set(records.map((record) => record.id));
