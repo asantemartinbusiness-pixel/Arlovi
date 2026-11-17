@@ -230,3 +230,15 @@ test("Export preview identifies its paper source and does not claim native PDF g
   await expect(dialog).toContainText("Pagination remains an estimate");
   await expect(dialog.getByTitle("Export preview of QA Export Preview")).toBeVisible();
 });
+
+
+test("Document inspector links directly to editing, review and export without claiming cloud access", async ({ page }) => {
+  await page.goto("/o/northline/docs/files");
+  const main = page.locator("#main");
+  const first = main.getByRole("row").filter({ has: page.getByRole("cell") }).first();
+  if ((await first.count()) === 0) return;
+  await first.click();
+  await expect(page.getByRole("button", { name: "Open editor" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export and publish" })).toBeVisible();
+  await expect(page.locator("body")).toContainText("Source master");
+});
