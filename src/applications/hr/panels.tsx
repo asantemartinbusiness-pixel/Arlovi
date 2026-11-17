@@ -2502,17 +2502,21 @@ export function Learning({ context, lens }: { context: ScreenContext; lens: "Cou
 export function LeaveForm({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCollections(["employees", "leaveRequests"]);
   const { actor, now } = useWorkspace();
-  const mine = data.employees.find((employee) => employee.title === actor);
-  const [employeeId, setEmployeeId] = useState(mine?.id ?? data.employees[0]?.id ?? "");
+  const mine = data.employees.find((employee) => employee.title === actor && employee.status !== "alumni");
+  const currentEmployees = data.employees.filter((employee) => !["alumni", "terminated"].includes(employee.status));
+  const [employeeId, setEmployeeId] = useState(mine?.id ?? currentEmployees[0]?.id ?? "");
   const [type, setType] = useState("annual");
   const [from, setFrom] = useState(addDays(now, 7).toISOString().slice(0, 10));
   const [to, setTo] = useState(addDays(now, 9).toISOString().slice(0, 10));
   const [note, setNote] = useState("");
-  const employee = data.employees.find((row) => row.id === employeeId);
-  const days = Math.max(1, daysBetween(new Date(from), new Date(to)));
-  const balance = employee ? leaveBalance(employee) : { allowance: 0, taken: 0, left: 0 };
-  const overBalance = type === "annual" && days > balance.left;
-  const backwards = new Date(to) < new Date(from);
+  const employee = currentEmployees.find((row) => row.id === employeeId);
+  const validDates = /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)
+    && Number.isFinite(Date.parse(from)) && Number.isFinite(Date.parse(to));
+  const backwards = validDates && new Date(to) < new Date(from);
+  const dayCount = validDates && !backwards ? Math.max(1, daysBetween(new Date(from), new Date(to))) : 0;
+  const validDuration = Number.isFinite(dayCount) && dayCount > 0;
+  const balance = employee ? leaveBalance(employee) : undefined;
+  const overBalance = type === "annual" && balance?.known === true && dayCount > balance.left;
 
   return (
     <form
@@ -2520,7 +2524,10 @@ export function LeaveForm({ context, close }: { context: ScreenContext; close: (
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (backwards || !employee) return;
+        if (!validDates || backwards || !validDuration || !employee) {
+          context.toast("Leave request not saved", "Choose a current employee and valid dates in chronological order.", "blocked");
+          return;
+        }
         await context.mutate.create({
           collection: "leaveRequests",
           title: `${employee.title.split(" ")[0]} · ${type}`,
@@ -2529,15 +2536,17 @@ export function LeaveForm({ context, close }: { context: ScreenContext; close: (
           startAt: new Date(`${from}T00:00:00.000Z`).toISOString(),
           endAt: new Date(`${to}T00:00:00.000Z`).toISOString(),
           at: clockIso(),
-          fields: { employeeId: employee.id, employeeName: employee.title, type, days, approver: String(employee.fields.manager ?? "Elena Voss"), halfDay: false },
+          fields: { employeeId: employee.id, employeeName: employee.title, type, days: dayCount,
+            approver: String(employee.fields.manager || "Unassigned"), halfDay: false },
         }, `Leave requested by ${employee.title}`);
-        context.toast("Leave requested", `${days} days are waiting for ${String(employee.fields.manager ?? "a manager")} to decide.`);
+        context.toast("Leave requested", `${dayCount} days recorded locally for a review by ${String(employee.fields.manager || "a manager")}.`);
         close();
       }}
     >
       <Field label="Who is away" required>
         <Select value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}>
-          {data.employees.filter((row) => row.status !== "alumni").map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
+          {currentEmployees.length === 0 && <option value="">No current employees</option>}
+          {currentEmployees.map((row) => <option key={row.id} value={row.id}>{row.title}</option>}
         </Select>
       </Field>
       <Field label="Type">
@@ -2549,16 +2558,25 @@ export function LeaveForm({ context, close }: { context: ScreenContext; close: (
         <Field label="From" required><TextInput type="date" value={from} onChange={(event) => setFrom(event.target.value)} required /></Field>
         <Field label="To" required><TextInput type="date" value={to} onChange={(event) => setTo(event.target.value)} invalid={backwards} required /></Field>
       </Row>
-      {backwards && <Notice tone="danger" title="The end date is before the start date">A request has to finish after it starts.</Notice>}
+      {(!validDates || backwards) && <Notice tone="danger" title="Check the date range">
+        Choose valid start and end dates with the end date on or after the start date.
+      </Notice>}
       <Field label="Note for your manager" hint={type === "sick" ? "Do not record health detail here: it would appear in the absence record." : undefined}>
         <TextArea value={note} onChange={(event) => setNote(event.target.value)} rows={3} />
       </Field>
       <Properties rows={[
-        { label: "Days requested", value: String(days) },
-        { label: "Balance now", value: employee ? `${balance.left} of ${balance.allowance}` : "No employee record" },
-        { label: "Balance if approved", value: employee && type === "annual" ? `${Math.max(0, balance.left - days)} of ${balance.allowance}` : "Unchanged — this type does not use the annual balance" },
+        { label: "Days requested", value: validDuration ? String(dayCount) : "Check dates" },
+        { label: "Balance now", value: balance?.known ? `${balance.left} of ${balance.allowance}` : "No verified allowance" },
+        { label: "Balance if approved", value: type !== "annual" ? "Annual balance unaffected"
+          : balance?.known && validDuration && !overBalance ? `${balance.left - dayCount} of ${balance.allowance}`
+          : "Cannot confirm until the allowance and dates are valid" },
       ]} />
-      {overBalance && <Notice tone="warning" title="This is more than the balance left">The request can still be made; the manager decides whether to allow unpaid days.</Notice>}
+      {overBalance && <Notice tone="warning" title="Annual leave exceeds the recorded balance">
+        The request may be recorded, but it cannot be approved as annual leave without an amended, verified allowance. Review unpaid leave separately.
+      </Notice>}
+      {type === "annual" && !balance?.known && <Notice tone="warning" title="Leave allowance has not been recorded">
+        The request can still be submitted for review; approval remains blocked until People verifies the employee's annual allowance.
+      </Notice>}
     </form>
   );
 }
