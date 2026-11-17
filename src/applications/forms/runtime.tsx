@@ -157,7 +157,7 @@ export function FormRuntime({
         event.preventDefault();
         const found = validate(model, answers);
         const currentIds = new Set(current.map((field) => field.id));
-        const currentErrors = last ? found : found.filter((error) => currentIds.has(error.fieldId));
+        const currentErrors = found.filter((error) => currentIds.has(error.fieldId));
         setErrors(currentErrors);
         if (currentErrors.length > 0) return;
         if (!last) { setPage((value) => value + 1); return; }
