@@ -76,3 +76,24 @@ for (const width of [390, 820, 1440]) {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 }
+
+
+test("Connector details and authorisation preview preserve capability and permissions context", async ({ page }) => {
+  await page.goto("/o/northline/connect/marketplace");
+  const main = page.locator("#main");
+  const card = main.locator(".connect-marketplace-card").first();
+  await card.getByRole("button", { name: "View details" }).click();
+  const detailUrl = page.url();
+  const detail = main.getByLabel("Connector details overview");
+  await expect(detail).toBeVisible();
+  await expect(detail.getByLabel("Connector scope summary")).toBeVisible();
+  await detail.getByRole("button", { name: "Review permissions" }).click();
+  await expect(page).toHaveURL(/tab=Permissions/);
+  await detail.getByRole("button", { name: "Connection requirements" }).click();
+  await expect(page).not.toHaveURL(detailUrl);
+  const authorisation = main.getByLabel("Connector authorisation overview");
+  await expect(authorisation).toBeVisible();
+  await expect(authorisation).toContainText("redirect and callback are not available");
+  await authorisation.getByRole("button", { name: "Connector details" }).click();
+  await expect(main.getByLabel("Connector details overview")).toBeVisible();
+});
