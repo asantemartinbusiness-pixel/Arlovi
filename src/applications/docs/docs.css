@@ -414,3 +414,19 @@ ol.dx-list { list-style: decimal outside; margin: 0 0 var(--space-4); padding-in
   .dx-workflow-actions > button { flex: 1 1 110px; }
   .dx-editor-review-summary > button { width: 100%; }
 }
+
+/* Docs governance dialogs — in keeping with the approved interface language. */
+.dx-review-lead {
+  padding: clamp(var(--space-3), 2vw, var(--space-5));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-inset);
+}
+.dx-review-lead h3 {
+  margin: var(--space-2) 0;
+  font-size: clamp(1.15rem, 2vw, 1.4rem);
+  letter-spacing: -.025em;
+  font-weight: 650;
+  line-height: 1.25;
+}
+.dx-review-lead p { margin: 0; color: var(--fg-muted); line-height: 1.55; }
