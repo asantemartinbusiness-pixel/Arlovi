@@ -755,7 +755,6 @@ export async function prepareRun(context: ScreenContext, runs: Rec[], employees:
 export async function validateRun(context: ScreenContext, runs: Rec[], employees: Rec[], shifts: Rec[]): Promise<void> {
   const run = runs.find((row) => row.status === "draft");
   if (!run) { context.toast("No draft run", "Prepare a run first; approved runs are not re-validated.", "blocked"); return; }
-  const lines = computePayroll(employees);
   const exceptions = payrollSalaryGaps(employees).length
     + shifts.filter((row) => row.fields.kind === "time"
       && (row.fields.approved !== true || row.status !== "approved")).length;
