@@ -68,5 +68,5 @@ test("People, candidate and document detail URLs reject wrong collections and mi
   await page.goto("/o/northline/docs/documents/does-not-exist");
   await expect(main).toContainText("Record not found");
   await page.goto("/o/harbor/hr/employees/nl-employees-001");
-  await expect(main).toContainText("Record not found");
+  await expect(main).toContainText("This record belongs to another organisation");
 });
