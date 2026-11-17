@@ -20,7 +20,7 @@ import {
 } from "./actions";
 import { listByCollection } from "@/platform/repo";
 import { planOnboardingLaunch } from "./decisions";
-import { planShiftMove } from "./workforce";
+import { planShiftMove, planTimesheetApprovals } from "./workforce";
 import { scopedDetailRecord } from "@/platform/recordScope";
 
 function payrollRecords(context: ScreenContext, collection: string) {
@@ -446,6 +446,7 @@ export const hrApp = registerApp({
       overlays: [
         ...kitOverlays,
         { id: "Shift edit", kind: "modal", title: "Shift", width: 520, render: ({ close, ...context }) => <ShiftEdit context={context} close={close} />, footer: submitFooter("hr-shift", "Save shift") },
+        { id: "time review", kind: "drawer", title: "Review recorded time", width: 560, render: ({ close, ...context }) => <TimeReview context={context} close={close} /> },
         { id: "time correction", kind: "modal", title: "Correct a time entry", width: 520, render: ({ close, ...context }) => <TimeCorrection context={context} close={close} />, footer: submitFooter("hr-time-correction", "Save the correction") },
         { id: "export hours", kind: "modal", title: "Export hours", width: 520, render: ({ ...context }) => <ExportHours context={context} /> },
         { id: "overtime approval", kind: "drawer", title: "Overtime", width: 480, render: ({ ...context }) => <Overtime context={context} /> },
@@ -748,6 +749,69 @@ function ShiftEdit({ context, close }: { context: ScreenContext; close: () => vo
         An overlapping shift or approved leave blocks a change. More than eight hours is flagged as overtime for human review; no external calendar or payroll is updated automatically.
       </Notice>
     </form>
+  );
+}
+
+/** A full record review is available from every Timesheet row and is not
+ * restricted to the desktop table. Decisions use the shared CAS plan. */
+function TimeReview({ context, close }: { context: ScreenContext; close: () => void }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const candidate = useRecord(payload?.id ?? context.selectedId);
+  const entry = scopedDetailRecord(candidate, context.org.id, "shifts");
+  const data = useCollections(["employees", "projects", "tasks"]);
+  if (!entry || entry.fields.kind !== "time") {
+    return <Empty title="Time entry unavailable">Choose a time entry from this company to review.</Empty>;
+  }
+  const person = data.employees.find((row) => row.id === entry.fields.employeeId);
+  const project = data.projects.find((row) => row.id === entry.fields.projectId);
+  const task = data.tasks.find((row) => row.id === entry.fields.taskId && row.parentId === project?.id);
+  const done = entry.status === "approved" && entry.fields.approved === true;
+  const inconsistent = (entry.status === "approved") !== (entry.fields.approved === true);
+  const validHours = Number.isFinite(Number(entry.fields.hours)) && Number(entry.fields.hours) > 0
+    && Number(entry.fields.hours) <= 24;
+  return (
+    <Stack gap={4}>
+      <Properties rows={[
+        { label: "Person", value: person?.title ?? "Unlinked — needs verified employee" },
+        { label: "Work date", value: context.date(entry.startAt) },
+        { label: "Time recorded", value: `${String(entry.fields.hours ?? "Not recorded")} hours` },
+        { label: "Project", value: project?.title ?? (entry.fields.projectId ? "Project unavailable" : "Internal / no project") },
+        { label: "Project task", value: task?.title ?? (entry.fields.taskId ? "Task unavailable" : "Not linked") },
+        { label: "Submitted by", value: String(entry.fields.filedBy ?? entry.ownerName ?? "Not recorded") },
+        { label: "State", value: inconsistent ? "Approval record mismatch" : done ? "Approved in Arlovi" : "Awaiting review" },
+        { label: "Approved by", value: String(entry.fields.approvedBy || "Not yet approved") },
+        { label: "Approved at", value: entry.fields.approvedAt ? context.dateTime(String(entry.fields.approvedAt)) : "Not recorded" },
+        { label: "Last correction", value: entry.fields.correctionReason ? String(entry.fields.correctionReason) : "None recorded" },
+      ]} />
+      {!person && <Notice tone="warning" title="Employee association must be verified">This entry contains a name but no matching current company employee record. Link the correct employee in Time Correction before approval.</Notice>}
+      {entry.fields.projectId && !project && <Notice tone="warning" title="Project is unavailable">The linked Project could not be found in this company. Resolve its reference before approval.</Notice>}
+      {inconsistent && <Notice tone="danger" title="Approval state needs reconciliation">The record's status and approval flag disagree. Do not count these hours as approved until this entry has been reviewed.</Notice>}
+      <Notice tone="info" title="Human decision, no external payment">
+        Reviewing this entry can change its local approval state and audit history. No connected payroll, invoicing or banking provider is updated.
+      </Notice>
+      <Row gap={2} wrap>
+        {project && <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${context.org.slug}/project/projects/${project.id}`); }}>Open Project</Button>}
+        {!done && <Button variant="secondary" onClick={() => {
+          close(); context.select(entry.id); context.openOverlay("time correction");
+        }}>Correct entry</Button>}
+        <span className="ds-grow" />
+        <Button variant="ghost" onClick={close}>Close</Button>
+        {!done && <Button variant="primary" disabled={!person || !validHours || (Boolean(entry.fields.projectId) && !project)}
+          onClick={async () => {
+            try {
+              const plan = planTimesheetApprovals({
+                organizationId: context.org.id, currency: context.org.currency,
+                actor: context.actor, now: clockIso(), timezone: context.org.timezone,
+              }, [entry], data.employees, data.projects);
+              await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+              context.toast("Hours approved", "The employee and Project were verified and the local approval was recorded.");
+              close();
+            } catch (error) {
+              context.toast("Hours not approved", error instanceof Error ? error.message : "Reload the entry and retry.", "blocked");
+            }
+          }}>Approve hours</Button>}
+      </Row>
+    </Stack>
   );
 }
 
