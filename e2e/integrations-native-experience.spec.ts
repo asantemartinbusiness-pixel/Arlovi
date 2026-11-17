@@ -115,3 +115,20 @@ test("Connector health provides real diagnostic context across all tabs", async 
   await overview.getByRole("button", { name: "Review connections" }).click();
   await expect(page).toHaveURL(/\/connect\/connections$/);
 });
+
+
+test("Action receipts expose audit provenance with searchable empty-state recovery", async ({ page }) => {
+  await page.goto("/o/northline/connect/receipts");
+  const main = page.locator("#main");
+  const overview = main.getByLabel("Action receipt overview");
+  await expect(overview).toBeVisible();
+  await expect(overview).toContainText("A local log entry is not proof");
+  const search = main.getByRole("searchbox", { name: "Search action receipts" });
+  await search.fill("no-receipt-matches-this-2026");
+  await expect(main.getByText("No receipts match your search")).toBeVisible();
+  await main.getByRole("button", { name: "Clear receipt search" }).click();
+  await expect(search).toHaveValue("");
+  await overview.getByRole("button", { name: "Synchronisation" }).click();
+  await expect(page).toHaveURL(/\/connect\/sync$/);
+  await expect(main.getByLabel("Synchronisation overview")).toBeVisible();
+});
