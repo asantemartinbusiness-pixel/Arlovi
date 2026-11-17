@@ -6,3 +6,11 @@
 .t6-directory-metrics strong{font-size:clamp(1.3rem,2.3vw,2rem);font-variant-numeric:tabular-nums;letter-spacing:-.035em;line-height:1.2}
 @media(max-width:900px){.t6-directory-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.t6-directory-intro,.t6-directory-metrics>div{padding:var(--space-3)}}
+
+.t6-editor-overview{display:flex;flex-direction:column;gap:var(--space-3);padding:var(--space-4);border-bottom:1px solid var(--border-default);background:var(--bg-surface)}
+.t6-editor-overview-heading{display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap}
+.t6-editor-overview-heading>div:first-child{flex:1 1 280px;min-width:0}
+.t6-editor-overview h2{font-size:clamp(1.25rem,2.2vw,1.75rem);line-height:1.2;letter-spacing:-.035em;margin:var(--space-2) 0}
+.t6-editor-overview p{margin:0;max-width:65ch}
+.t6-workflow-overview{display:flex;flex-direction:column;gap:var(--space-3);padding:var(--space-4);border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--bg-surface)}
+@media(max-width:560px){.t6-editor-overview,.t6-workflow-overview{padding:var(--space-3)}.t6-editor-overview-heading>div:last-child{width:100%}}
