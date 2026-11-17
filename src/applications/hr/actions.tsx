@@ -637,6 +637,7 @@ export function TimeCorrection({ context, close }: { context: ScreenContext; clo
         const updated = await context.mutate.patch(entry.id, { status: "submitted", fields: {
           ...entry.fields, hours: value, employeeId: employee.id, employeeName: employee.title,
           projectId, approved: false, approvedBy: "", approvedAt: "",
+          billingReviewStatus: "", billingReviewedBy: "", billingReviewedAt: "",
           correctedFrom: Number(entry.fields.hours ?? 0), correctedBy: context.actor, correctionReason: reason.trim(),
         } }, { expectRevision: entry.revision,
           event: `Time corrected for ${employee.title} from ${String(entry.fields.hours ?? 0)} to ${value} hours by ${context.actor}: ${reason.trim()}` });
