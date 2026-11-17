@@ -2578,6 +2578,9 @@ function RestoreConfirmation({ context, close }: { context: ScreenContext; close
   const snapshot = record.history[index];
   if (!snapshot) return <Empty title="Version not found" />;
   const stored = readWorkbook(snapshot.body);
+  const [confirmed, setConfirmed] = useState(false);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const nowCells = editor.workbook.sheets.reduce((total, sheet) => total + Object.keys(sheet.cells).length, 0);
   const thenCells = stored.sheets.reduce((total, sheet) => total + Object.keys(sheet.cells).length, 0);
   return (
@@ -2586,20 +2589,31 @@ function RestoreConfirmation({ context, close }: { context: ScreenContext; close
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await context.mutate.patch(record.id, { body: stored }, { expectRevision: record.revision, event: `Workbook restored to the version saved ${snapshot.at}` });
-        context.toast("Restored", `The workbook is back to ${context.dateTime(snapshot.at)}. The version you were on is kept in the history.`);
-        close();
+        if (!confirmed || saving) return;
+        setSaving(true);
+        setError("");
+        try {
+          await context.mutate.patch(record.id, { body: stored }, { expectRevision: record.revision, event: `Workbook restored to the version saved ${snapshot.at}` });
+          context.toast("Version restored", `Replaced the workbook content with the version saved ${context.dateTime(snapshot.at)}.`);
+          close();
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "The workbook could not be restored.");
+        } finally { setSaving(false); }
       }}
     >
-      <Notice tone="warning" title="Restoring replaces every sheet">
-        The current state is written to the version history first, so this is reversible. Nothing is merged: the stored version wins entirely.
+      <Notice tone="warning" title="Restoring replaces the whole workbook">
+        This operation replaces sheets, formulas, charts, comments and workbook structure with the selected stored version. It does not merge changes. Check the save history before proceeding.
       </Notice>
+      {error && <Notice tone="danger" title="Restore failed">{error}</Notice>}
+      {saving && <p className="ds-subtle">Restoring saved version…</p>}
       <Properties rows={[
         { label: "Version", value: context.dateTime(snapshot.at) },
         { label: "Sheets then / now", value: `${stored.sheets.length} → ${editor.workbook.sheets.length}` },
         { label: "Cells then / now", value: `${thenCells} → ${nowCells}` },
         { label: "Charts then / now", value: `${stored.charts.length} → ${editor.workbook.charts.length}` },
       ]} />
+      <Checkbox label="I understand this will replace the current workbook contents" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+      {!confirmed && <p className="ds-subtle">Confirm replacement before restoring this version.</p>}
     </form>
   );
 }
