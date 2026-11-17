@@ -583,6 +583,8 @@ function OfferApproval({ context, close }: { context: ScreenContext; close: () =
 function OnboardingLaunch({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCollections(["employees", "members", "tasks"]);
   const starters = data.employees.filter((employee) => employee.status === "probation" || employee.status === "active");
+  const payload = context.overlayPayload as { employeeId?: string } | undefined;
+  const selectedStarter = starters.some((employee) => employee.id === payload?.employeeId) ? payload?.employeeId : "";
   return (
     <form
       id="hr-onboarding"
@@ -612,10 +614,16 @@ function OnboardingLaunch({ context, close }: { context: ScreenContext; close: (
       }}
     >
       <Field label="Who is starting" required>
-        <Select name="employee" required>{starters.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}</Select>
+        <Select name="employee" required defaultValue={selectedStarter}>
+          <option value="">Choose the employee</option>
+          {starters.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
+        </Select>
       </Field>
       <Field label="Mentor" required>
-        <Select name="mentor" required>{data.employees.filter((row) => row.status === "active").map((row) => <option key={row.id}>{row.title}</option>)}</Select>
+        <Select name="mentor" required defaultValue="">
+          <option value="">Choose an active mentor</option>
+          {data.employees.filter((row) => row.status === "active").map((row) => <option key={row.id}>{row.title}</option>)}
+        </Select>
       </Field>
       <Notice tone="info" title="Six steps, one complete checklist">
         People verify documents, the mentor completes the introduction, IT access waits for a human decision, and Finance reviews payroll inputs. A launch is saved atomically; no accounts or external services are provisioned.
@@ -638,16 +646,18 @@ function ITAccess({ context }: { context: ScreenContext }) {
           </Row>
           <p className="ds-subtle">{request.summary}</p>
           {request.status !== "done" && (
-            <Button
-              size="sm"
-              variant="primary"
+            <Button size="sm" variant="primary" disabled={!context.can("edit_people")}
               style={{ marginBlockStart: "var(--space-2)" }}
               onClick={async () => {
-                await context.mutate.patch(request.id, { status: "done", fields: { ...request.fields, stage: "done", grantedBy: context.actor } }, { expectRevision: request.revision, event: `${request.title} granted by ${context.actor}` });
-                context.toast("Grant recorded", `${request.title} is recorded as granted by ${context.actor}.`);
-              }}
-            >
-              Record the grant
+                if (!context.can("edit_people")) return;
+                const saved = await context.mutate.patch(request.id, { status: "done", fields: {
+                  ...request.fields, stage: "done", grantedBy: context.actor, grantedAt: clockIso(),
+                } }, { expectRevision: request.revision,
+                  event: `${request.title} local access review recorded by ${context.actor}` });
+                if (saved) context.toast("Local decision recorded",
+                  `${request.title} was marked complete in the local checklist. External access remains unverified.`);
+              }}>
+              Record local review
             </Button>
           )}
         </div>
@@ -662,21 +672,33 @@ function ITAccess({ context }: { context: ScreenContext }) {
 function BalanceExplainer({ context: _context }: { context: ScreenContext }) {
   const data = useCollections(["employees", "leaveRequests"]);
   const { actor } = useWorkspace();
-  const employee = data.employees.find((row) => row.title === actor) ?? data.employees[0];
-  if (!employee) return <Empty title="No employee record" />;
-  const approved = data.leaveRequests.filter((request) => request.fields.employeeId === employee.id && request.status === "approved");
+  const employee = data.employees.find((row) => row.title === actor && row.status !== "alumni");
+  if (!employee) return <Empty title="No matching employee record">
+    The signed-in local role view has no matching employee. Select the correct person in People before showing a personal balance.
+  </Empty>;
+  const annual = data.leaveRequests.filter((request) =>
+    request.fields.employeeId === employee.id && request.status === "approved"
+    && String(request.fields.type ?? "annual") === "annual");
+  const allowance = employee.fields.leaveAllowance === undefined ? null : Number(employee.fields.leaveAllowance);
+  const taken = Number(employee.fields.leaveTaken ?? 0);
+  const known = allowance !== null && Number.isFinite(allowance) && allowance >= 0 && Number.isFinite(taken);
+  const recordedDays = annual.reduce((sum, request) => {
+    const count = Number(request.fields.days);
+    return sum + (Number.isFinite(count) && count > 0 ? count : 0);
+  }, 0);
   return (
     <Stack gap={3}>
       <h3>{employee.title}</h3>
       <Properties rows={[
-        { label: "Allowance from the policy", value: `${String(employee.fields.leaveAllowance ?? 0)} days` },
-        { label: "Approved days on record", value: `${approved.reduce((sum, request) => sum + Number(request.fields.days ?? 1), 0)} days` },
-        { label: "Recorded as taken", value: `${String(employee.fields.leaveTaken ?? 0)} days` },
-        { label: "Remaining", value: `${Math.max(0, Number(employee.fields.leaveAllowance ?? 0) - Number(employee.fields.leaveTaken ?? 0))} days` },
+        { label: "Allowance on employee record", value: known ? `${allowance} days` : "Not recorded" },
+        { label: "Approved annual requests", value: `${annual.length} on record` },
+        { label: "Approved request days explicitly recorded", value: `${recordedDays} days` },
+        { label: "Recorded as taken", value: `${taken} days` },
+        { label: "Remaining", value: known ? `${Math.max(0, allowance - taken)} days` : "Unavailable until allowance is recorded" },
       ]} />
-      <Notice tone="info">
-        The balance moves when a request is approved, never when it is made. If the two figures above disagree, the approved
-        requests are the source and the balance needs an adjustment with a reason recorded against it.
+      <Notice tone={known ? "info" : "warning"} title={known ? "A recorded balance, not a statutory ruling" : "An entitlement has not been recorded"}>
+        The balance changes only when an annual leave request is approved through a reviewed transaction. Verify the allowance and
+        any mismatches with the published policy and the employee record before adjusting them; missing values are never treated as zero.
       </Notice>
     </Stack>
   );
