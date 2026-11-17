@@ -252,7 +252,7 @@ function WorkbookLibrary({ context, tab }: { context: ScreenContext; tab: "Recen
   }, [workbooks, active, tab, actor, query, status, folder]);
 
   const hasFilters = Boolean(query.trim()) || status !== "all" || folder !== "all";
-  if (rows.length === 0 && !hasFilters) {
+  if (rows.length === 0 && !hasFilters && tab !== "Shared") {
     return (
       <Empty title={`No ${tab.toLowerCase()} workbooks`} icon={<FileSpreadsheet size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("new workbook")}>New workbook</Button>}>
         {tab === "Templates" ? "Mark a workbook as a template to reuse its sheets and formats." : "Create a workbook, or import a CSV."}
@@ -1485,7 +1485,7 @@ function Collaboration({ context, tab }: { context: ScreenContext; tab: "Comment
       </div>
       <Row gap={2} wrap>
         <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/sheets/workbooks/${record.id}`)}>Back to grid</Button>
-        <Button size="sm" variant="secondary" onClick={() => context.openOverlay("share workbook")}>Sharing list</Button>
+        <Button size="sm" variant="secondary" onClick={() => context.openOverlay("share")}>Sharing list</Button>
       </Row>
     </div>
   );
