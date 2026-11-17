@@ -25,9 +25,7 @@ import {
 } from "./model";
 import { DocumentCanvas, type EditIntent } from "./canvas";
 import { SAVE_LABEL, SAVE_TONE, activeDocEditor, useDocEditor, type DocEditor } from "./state";
-import { publicationBlockers } from "./reviewGate";
 import { useGuardRefresh } from "@/applications/design/sharedDoc";
-import { scopedDetailRecord } from "@/platform/recordScope";
 import { createStore, useStore } from "@/applications/visual/kit";
 import "./docs.css";
 
@@ -44,36 +42,12 @@ import "./docs.css";
 function useDocument(context: ScreenContext): Rec | undefined {
   useGuardRefresh(context);
   const fromRoute = useRecord(context.params.id);
-  // An unknown or wrong-collection URL must never open an unrelated document.
-  return scopedDetailRecord(fromRoute, context.org.id, "documents");
-}
-
-/** Publish only the editor revision we can verify was saved in this company.
- * A stale write or unresolved required review never becomes a published record. */
-async function publishReviewedDocument(context: ScreenContext, record: Rec, editor: DocEditor, approvalNote?: string): Promise<void> {
-  const proposedBlockers = publicationBlockers(editor.model);
-  if (proposedBlockers.length) throw new Error(proposedBlockers.join("; "));
-  await editor.saveNow();
-  const { getRecordInOrg } = await import("@/platform/repo");
-  const fresh = await getRecordInOrg(context.org.id, record.id);
-  if (!fresh || fresh.collection !== "documents") throw new Error("The original document is unavailable in this company.");
-  const saved = readDoc(fresh.body, fresh.ownerName, fresh.updatedAt);
-  if (JSON.stringify(saved) !== JSON.stringify(editor.model)) {
-    throw new Error("The latest editor content is not saved. Resolve the edit conflict before publishing.");
+  const all = useCollection("documents");
+  if (context.params.id) {
+    return fromRoute?.collection === "documents" && fromRoute.organizationId === context.org.id
+      ? fromRoute : undefined;
   }
-  const remaining = publicationBlockers(saved);
-  if (remaining.length) throw new Error(remaining.join("; "));
-  const approvals = String(fresh.fields.approvals ?? "").split("|").filter(Boolean);
-  const nextFields: Rec["fields"] = { ...fresh.fields };
-  if (approvalNote !== undefined) {
-    nextFields.approvals = [...approvals, context.actor + " " + context.now.toISOString() + (approvalNote.trim() ? " " + approvalNote.trim() : "")].join("|");
-  }
-  const result = await context.mutate.patch(fresh.id, {
-    status: "published", fields: nextFields,
-  }, { expectRevision: fresh.revision, event: approvalNote === undefined
-    ? fresh.title + " published in the workspace"
-    : fresh.title + " approved by " + context.actor });
-  if (!result) throw new Error("The document changed while publishing. Reload and review it again.");
+  return all.find((record) => !record.tags.includes("recovered")) ?? all[0];
 }
 
 /** The editor's contract actions, on its own bar (the full-chrome surface has no page header). */
@@ -206,18 +180,24 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
   const { org, actor, now } = useWorkspace();
   const [query, setQuery] = useState("");
   const [folder, setFolder] = useState<string>("All folders");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const documents = data.documents.filter((record) => !record.tags.includes("recovered"));
   const folders = ["All folders", ...new Set(documents.map((record) => String(record.fields.folder ?? "Unfiled")))];
+  const activeDocuments = documents.filter((record) => record.status !== "archived");
+  const pendingReview = activeDocuments.filter((record) => record.status === "in_review");
+  const drafts = activeDocuments.filter((record) => record.status === "draft");
+  const confidentialCount = activeDocuments.filter((record) => record.fields.confidential === true).length;
 
   const rows = useMemo(() => {
     let list = documents;
     if (tab === "Recent") list = [...documents].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 12);
     if (tab === "My docs") list = documents.filter((record) => record.ownerName === actor);
-    if (tab === "Shared") list = documents.filter((record) => record.ownerName !== actor && record.status !== "archived");
+    if (tab === "Shared") list = documents.filter((record) => record.status !== "archived" && readDoc(record.body, record.ownerName, record.updatedAt).shares.some((share) => !share.revokedAt));
     if (tab === "Archive") list = documents.filter((record) => record.status === "archived");
     if (tab === "Templates") list = data.templates.filter((record) => record.fields.kind === "document");
-    if (tab !== "Archive") list = list.filter((record) => record.status !== "archived" || tab === "Recent");
+    if (tab !== "Archive") list = list.filter((record) => record.status !== "archived");
+    if (statusFilter !== "all" && tab !== "Templates" && tab !== "Archive") list = list.filter((record) => record.status === statusFilter);
     if (folder !== "All folders" && tab !== "Templates") list = list.filter((record) => String(record.fields.folder ?? "Unfiled") === folder);
     if (query.trim()) {
       const needle = query.trim().toLowerCase();
@@ -230,9 +210,11 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
       });
     }
     return list;
-  }, [documents, data.templates, tab, folder, query, actor]);
+  }, [documents, data.templates, tab, folder, query, actor, statusFilter]);
 
   const confidentialHidden = query.trim().length > 0 && documents.some((record) => record.fields.confidential === true);
+  const activeFilters = Boolean(query.trim()) || folder !== "All folders" || statusFilter !== "all";
+  const clearFilters = () => { setQuery(""); setFolder("All folders"); setStatusFilter("all"); };
 
   if (tab === "Templates") {
     return (
@@ -245,7 +227,7 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
             <Card key={record.id} span={4} eyebrow="TEMPLATE" prov="human" title={record.title} subtitle={record.summary}
               actions={<Pill tone={record.status === "published" ? "success" : "neutral"}>{record.status}</Pill>}
               footer={<>
-                <Button size="sm" variant="primary" onClick={() => context.openOverlay("New doc", { templateId: record.id })}>Use</Button>
+                <Button size="sm" variant="primary" disabled={record.status !== "published"} onClick={() => context.openOverlay("New doc", { templateId: record.id })}>Use</Button>
                 <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/docs/templates`)}>Open master</Button>
               </>}
             >
@@ -263,6 +245,21 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
 
   return (
     <Stack gap={4}>
+      <div className="dx-library-header">
+        <div>
+          <span className="dx-library-eyebrow">DOCUMENTS / {tab.toUpperCase()}</span>
+          <h2>{tab === "Recent" ? "Your document workspace." : tab === "My docs" ? "Work you've authored." : tab === "Shared" ? "Recorded sharing activity." : "The document archive."}</h2>
+          <p>{tab === "Shared" ? "Documents with a local sharing record are listed here. This does not mean a public link or external access exists." : tab === "Archive" ? "Archived records remain in the local library until explicitly removed." : "Find, review and continue working with company documents without losing their version history."}</p>
+        </div>
+        <Button variant="primary" onClick={() => context.openOverlay("New doc")}>New document</Button>
+      </div>
+      <div className="dx-library-metrics" aria-label="Document library summary">
+        <div><span>Active documents</span><strong>{activeDocuments.length}</strong><small>Excluding archive</small></div>
+        <div><span>Drafts</span><strong>{drafts.length}</strong><small>Not published</small></div>
+        <div><span>In review</span><strong>{pendingReview.length}</strong><small>Needs a human decision</small></div>
+        <div><span>Confidential</span><strong>{confidentialCount}</strong><small>Restricted previews only</small></div>
+      </div>
+      <div className="dx-library-filters">
       <Row gap={3} wrap>
         <Field label="Search" hint="Confidential documents match on title and tags only.">
           <TextInput aria-label="Search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles and text" />
@@ -273,6 +270,19 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
           </Select>
         </Field>
       </Row>
+      {tab !== "Archive" && (
+        <Row gap={2} wrap>
+          <span className="ds-subtle">Status</span>
+          {(["all", "draft", "in_review", "published"] as const).map((state) => (
+            <Button key={state} size="sm" variant={statusFilter === state ? "secondary" : "ghost"}
+              aria-pressed={statusFilter === state} onClick={() => setStatusFilter(state)}>
+              {state === "all" ? "All states" : state === "in_review" ? "In review" : state === "published" ? "Published" : "Drafts"}
+            </Button>
+          ))}
+        </Row>
+      )}
+      {activeFilters && <Button size="sm" variant="ghost" onClick={clearFilters}>Clear filters</Button>}
+      </div>
 
       {confidentialHidden && (
         <Notice tone="warning" title="Confidential documents are excluded from full-text preview">
@@ -282,11 +292,11 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
 
       {rows.length === 0 ? (
         <Empty
-          title={tab === "Archive" ? "Nothing archived" : "No documents here"}
+          title={activeFilters ? "No documents match the filters" : tab === "Archive" ? "Nothing archived" : "No documents here"}
           icon={<FileText size={20} />}
-          action={<Button variant="primary" onClick={() => context.openOverlay("New doc")}>New document</Button>}
+          action={activeFilters ? <Button variant="secondary" onClick={clearFilters}>Clear filters</Button> : <Button variant="primary" onClick={() => context.openOverlay("New doc")}>New document</Button>}
         >
-          {tab === "Shared" ? "Documents owned by someone else appear here." : "Create a document, or start from a governed template."}
+          {activeFilters ? "Try another status, folder or search term." : tab === "Shared" ? "No documents have local sharing records yet. Open a document to record a workspace share." : "Create a document, or start from a governed template."}
         </Empty>
       ) : (
         <DataGrid
@@ -310,7 +320,7 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
             { key: "folder", header: "Folder", cell: (row) => String(row.fields.folder ?? "Unfiled"), sortValue: (row) => String(row.fields.folder ?? ""), hideBelow: 900 },
             { key: "owner", header: "Owner", cell: (row) => row.ownerName, sortValue: (row) => row.ownerName, hideBelow: 1100 },
             { key: "status", header: "Status", cell: (row) => <Pill tone={row.status === "published" ? "success" : row.status === "in_review" ? "warning" : "neutral"}>{row.status.replace("_", " ")}</Pill> },
-            { key: "versions", header: "Versions", align: "end", cell: (row) => String(row.history.length), hideBelow: 1280 },
+            { key: "versions", header: "Earlier versions", align: "end", cell: (row) => String(row.history.length), hideBelow: 1280 },
             {
               key: "updated", header: "Changed", align: "end", sortValue: (row) => row.updatedAt,
               cell: (row) => <span title={context.dateTime(row.updatedAt)}>{context.relative(row.updatedAt)}</span>,
@@ -329,13 +339,14 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
 }
 
 function LibraryInspector({ context }: { context: ScreenContext }) {
-  const selected = useRecord(context.selectedId);
+  const record = useRecord(context.selectedId);
+  const templates = useCollection("templates");
   const { org } = useWorkspace();
-  const record = scopedDetailRecord(selected, org.id, "documents");
   if (!record) return <Empty title="Select a document" icon={<FileText size={18} />}>Its folder, access, tags and version history appear here.</Empty>;
   const model = readDoc(record.body, record.ownerName, record.updatedAt);
   const stats = documentStats(model);
   const confidential = record.fields.confidential === true;
+  const master = templates.find((item) => item.id === record.fields.templateId);
   return (
     <Stack gap={5}>
       <InspectorSection title="Document">
@@ -345,12 +356,22 @@ function LibraryInspector({ context }: { context: ScreenContext }) {
           { label: "Status", value: <Pill tone={record.status === "published" ? "success" : "neutral"}>{record.status.replace("_", " ")}</Pill> },
           { label: "Words", value: String(stats.words) },
           { label: "Changed", value: context.dateTime(record.updatedAt) },
+          { label: "Source master", value: master?.title ?? "Blank or original document" },
+          { label: "Source revision", value: record.fields.templateSourceRevision ? String(record.fields.templateSourceRevision) : "Not linked" },
         ]} />
+      </InspectorSection>
+      <InspectorSection title="Continue working">
+        <Row gap={2} wrap>
+          <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${org.slug}/docs/documents/${record.id}`)}>Open editor</Button>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/docs/documents/${record.id}/review`)}>Review</Button>
+          <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/docs/documents/${record.id}/publish`)}>Export and publish</Button>
+        </Row>
+        {master && <p className="ds-subtle" style={{ marginBlockStart: "var(--space-2)" }}>Created from {master.title}. Changes to the master do not alter this document.</p>}
       </InspectorSection>
       <InspectorSection title="Access">
         {confidential
           ? <Notice tone="warning" title="Confidential">The body is excluded from search previews. Role views shape what the interface offers and are not an account security boundary.</Notice>
-          : <p className="ds-subtle">Visible to the workspace. No public link is active.</p>}
+          : <p className="ds-subtle">This browser-local workspace has no active public document host. Role views are not an account security boundary.</p>}
         <Row gap={2} style={{ marginBlockStart: "var(--space-2)" }}>
           <Button size="sm" variant="secondary" onClick={() => context.openOverlay("sharing", { id: record.id })}>Sharing</Button>
           <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/docs/documents/${record.id}/publish`)}>Publish</Button>
@@ -575,6 +596,12 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
 
   const stats = documentStats(editor.model);
   const tab = context.tab || "Write";
+  const unresolvedComments = editor.model.comments.filter((comment) => !comment.resolved);
+  const mandatoryComments = unresolvedComments.filter((comment) => comment.mandatory);
+  const pendingChanges = openSuggestions(editor.model);
+  const readyForReview = mandatoryComments.length === 0 && pendingChanges.length === 0;
+  const navigateDocumentArea = (area: "review" | "publish" | "outline") =>
+    context.navigate(context.path(`/o/:org/docs/documents/:id/${area}`, record.id));
 
   function onEdit(intent: EditIntent) {
     editor.handleEdit(intent, {
@@ -616,6 +643,22 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
         <Button size="sm" variant="primary" onClick={() => context.openOverlay("export")} icon={<FileDown size={15} />}>Export</Button>
       </div>
 
+      <section className="dx-workflow-strip" aria-label="Document working status">
+        <div className="dx-workflow-context">
+          <span className="dx-workflow-eyebrow">CURRENT DOCUMENT</span>
+          <Row gap={2} wrap>
+            <Pill tone={record.status === "published" ? "success" : record.status === "in_review" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>
+            <span className="ds-subtle">{stats.words} words · {stats.readingMinutes} min read</span>
+            {editor.model.suggestMode && <Pill tone="info">Suggesting mode</Pill>}
+          </Row>
+          <span className="ds-subtle">{mandatoryComments.length} mandatory review{mandatoryComments.length === 1 ? "" : "s"} unresolved · {pendingChanges.length} pending change{pendingChanges.length === 1 ? "" : "s"}</span>
+        </div>
+        <div className="dx-workflow-actions">
+          <Button size="sm" variant="secondary" onClick={() => navigateDocumentArea("outline")}>Full outline</Button>
+          <Button size="sm" variant="secondary" onClick={() => navigateDocumentArea("review")}>Review history</Button>
+          <Button size="sm" variant="secondary" onClick={() => navigateDocumentArea("publish")}>Publishing</Button>
+        </div>
+      </section>
       <div className="dx-tabstrip">
         <Tabs
           label="Editor modes"
@@ -629,8 +672,10 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
           ]}
           trailing={
             <ButtonGroup label="Panels on narrow screens">
-              <Button size="sm" variant={mobilePanel === "side" ? "secondary" : "ghost"} onClick={() => setMobilePanel(mobilePanel === "side" ? "doc" : "side")}>Outline</Button>
-              <Button size="sm" variant={mobilePanel === "aside" ? "secondary" : "ghost"} onClick={() => setMobilePanel(mobilePanel === "aside" ? "doc" : "aside")}>Details</Button>
+              <Button size="sm" variant={mobilePanel === "side" ? "secondary" : "ghost"}
+                aria-pressed={mobilePanel === "side"} onClick={() => setMobilePanel(mobilePanel === "side" ? "doc" : "side")}>Outline</Button>
+              <Button size="sm" variant={mobilePanel === "aside" ? "secondary" : "ghost"}
+                aria-pressed={mobilePanel === "aside"} onClick={() => setMobilePanel(mobilePanel === "aside" ? "doc" : "aside")}>Details</Button>
             </ButtonGroup>
           }
         />
@@ -697,6 +742,15 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
         <div className="dx-scroll">
           <Stack gap={4}>
             <ConflictNotice editor={editor} />
+            {tab === "Review" && (
+              <div className="dx-editor-review-summary" aria-label="Document review readiness">
+                <div>
+                  <strong>{readyForReview ? "Ready for a human review decision" : "Review items remain open"}</strong>
+                  <p className="ds-subtle">The editor tracks {unresolvedComments.length} open comment{unresolvedComments.length === 1 ? "" : "s"} and {pendingChanges.length} undecided suggestion{pendingChanges.length === 1 ? "" : "s"}. This summary does not approve or publish the document.</p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => navigateDocumentArea("review")}>Open full review</Button>
+              </div>
+            )}
             {editor.model.suggestMode && (
               <Notice tone="info" title="Suggesting is on">
                 Your edits are recorded as tracked changes. Nothing is written into the text until a change is accepted in Review.
@@ -1091,16 +1145,10 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
             <Row gap={2}>
               <Button
                 variant="primary"
-                disabled={mandatoryOpen.length > 0 || record.status === "published"}
-                title={mandatoryOpen.length > 0 ? "Resolve the mandatory reviews first" : undefined}
-                onClick={async () => {
-                  await context.mutate.patch(record.id, {
-                    status: "published",
-                    fields: { ...record.fields, approvals: [...approvals, `${context.actor} ${context.now.toISOString()}`].join("|") },
-                  }, { expectRevision: record.revision, event: `${record.title} approved by ${context.actor}` });
-                  context.toast("Approved", `${record.title} is published in this workspace and the approval is on the record.`);
-                }}
-              >Approve</Button>
+                disabled={mandatoryOpen.length > 0 || openSuggestions(editor.model).length > 0 || record.status === "published" || !context.can("edit_knowledge")}
+                title={mandatoryOpen.length > 0 ? "Resolve mandatory comments first" : openSuggestions(editor.model).length > 0 ? "Decide tracked changes before approving" : undefined}
+                onClick={() => context.openOverlay("approve document")}
+              >Review and approve…</Button>
               <Button variant="secondary" onClick={() => context.openOverlay("reviewer assignment")}>Assign reviewers</Button>
             </Row>
           </Stack>
@@ -1223,20 +1271,50 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
 function TemplatesScreen({ context, tab }: { context: ScreenContext; tab: "All" | "Company" | "Department" | "My templates" }) {
   const data = useCollections(["templates", "documents"]);
   const { actor } = useWorkspace();
+  const [query, setQuery] = useState("");
+  const [state, setState] = useState("all");
   const templates = data.templates.filter((record) => record.fields.kind === "document");
-  const rows = tab === "All" ? templates
+  const scoped = tab === "All" ? templates
     : tab === "Company" ? templates.filter((record) => record.fields.scope === "company")
       : tab === "Department" ? templates.filter((record) => record.fields.scope === "department")
         : templates.filter((record) => record.ownerName === actor);
+  const rows = scoped.filter((record) =>
+    (state === "all" || record.status === state)
+    && (!query.trim() || `${record.title} ${record.summary} ${String(record.fields.tokens ?? "")}`.toLowerCase().includes(query.trim().toLowerCase())));
+  const filtered = state !== "all" || Boolean(query.trim());
 
-  if (rows.length === 0) {
+  if (rows.length === 0 && !filtered) {
     return <Empty title={`No ${tab.toLowerCase()} templates`} icon={<FileText size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Template editor")}>Create template</Button>}>
       A template carries the sections and the company fields a document should start from.
     </Empty>;
   }
 
   return (
-    <Grid>
+    <Stack gap={4}>
+      <div className="dx-library-header">
+        <div><span className="dx-library-eyebrow">DOCUMENTS / TEMPLATE GOVERNANCE</span>
+          <h2>Masters that keep work consistent.</h2>
+          <p>Choose a company, department or personal template. A master supplies starting content; existing documents remain independent, including signed copies.</p>
+        </div>
+        <Button variant="primary" onClick={() => context.openOverlay("Template editor")}>New template</Button>
+      </div>
+      <div className="dx-library-metrics" aria-label="Template governance summary">
+        <div><span>Masters</span><strong>{templates.length}</strong><small>All scopes</small></div>
+        <div><span>Published</span><strong>{templates.filter((record) => record.status === "published").length}</strong><small>Available for reuse</small></div>
+        <div><span>Drafts</span><strong>{templates.filter((record) => record.status === "draft").length}</strong><small>Still in preparation</small></div>
+        <div><span>Retired</span><strong>{templates.filter((record) => record.status === "retired").length}</strong><small>No longer selectable</small></div>
+      </div>
+      <div className="dx-library-filters">
+        <Row gap={3} wrap>
+          <Field label="Search masters"><TextInput type="search" aria-label="Search masters" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, purpose or field" /></Field>
+          <Field label="Publication state"><Select aria-label="Publication state" value={state} onChange={(event) => setState(event.target.value)}>
+            <option value="all">All states</option><option value="published">Published</option><option value="draft">Draft</option><option value="retired">Retired</option>
+          </Select></Field>
+          {filtered && <Button size="sm" variant="ghost" onClick={() => { setQuery(""); setState("all"); }}>Clear filters</Button>}
+        </Row>
+      </div>
+      {rows.length === 0 && <Empty title="No templates match" action={<Button variant="secondary" onClick={() => { setQuery(""); setState("all"); }}>Clear filters</Button>}>Try a different name or publication state.</Empty>}
+      <Grid>
       {rows.map((record) => {
         const model = readDoc(record.body, record.ownerName, record.updatedAt);
         const tokens = String(record.fields.tokens ?? "").split(",").map((token) => token.trim()).filter(Boolean);
@@ -1252,7 +1330,7 @@ function TemplatesScreen({ context, tab }: { context: ScreenContext; tab: "All" 
             subtitle={record.summary}
             actions={<Pill tone={record.status === "published" ? "success" : record.status === "retired" ? "neutral" : "warning"}>{record.status}</Pill>}
             footer={<>
-              <Button size="sm" variant="primary" disabled={record.status === "retired"} onClick={() => context.openOverlay("Template editor", { id: record.id, mode: "use" })}>Use</Button>
+              <Button size="sm" variant="primary" disabled={record.status !== "published"} onClick={() => context.openOverlay("Template editor", { id: record.id, mode: "use" })}>Use</Button>
               <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Template editor", { id: record.id })}>Edit master</Button>
               <Button size="sm" variant="ghost" onClick={() => context.openOverlay("change impact", { id: record.id })}>Impact</Button>
             </>}
@@ -1275,7 +1353,8 @@ function TemplatesScreen({ context, tab }: { context: ScreenContext; tab: "All" 
           </Card>
         );
       })}
-    </Grid>
+      </Grid>
+    </Stack>
   );
 }
 
@@ -1336,7 +1415,6 @@ function PublishScreen({ context, tab }: { context: ScreenContext; tab: "Export"
 
   if (tab === "Publish") {
     const signature = String(record.fields.signatureStatus ?? "not_requested");
-    const blockers = publicationBlockers(editor.model);
     return (
       <Grid>
         <Card span={6} eyebrow="PUBLISHING" prov="human" title="Publish in the workspace" subtitle={`Current status: ${record.status.replace("_", " ")}`}>
@@ -1346,23 +1424,17 @@ function PublishScreen({ context, tab }: { context: ScreenContext; tab: "Export"
               { label: "Open comments", value: String(editor.model.comments.filter((comment) => !comment.resolved).length) },
               { label: "Open changes", value: String(openSuggestions(editor.model).length) },
             ]} />
-            {blockers.length > 0 && (
-              <Notice tone="warning" title="Review required before publishing">
-                {blockers.join("; ")}. Resolve these in Review & comments, then publish the saved revision.
-              </Notice>
-            )}
+            <Notice tone="info" title="Publishing requires a named reviewer">
+              Resolve mandatory comments and decide tracked changes, then confirm publication in the approval dialog. This changes the local workspace record; it does not distribute the document.
+            </Notice>
             <Row gap={2}>
-              <Button variant="primary" disabled={record.status === "published" || blockers.length > 0} onClick={async () => {
-                try {
-                  await publishReviewedDocument(context, record, editor);
-                  context.toast("Published", "Reviewed document status and saved content were confirmed on the record.");
-                } catch (error) {
-                  context.toast("Publication blocked", error instanceof Error ? error.message : "Review the document and retry.", "blocked");
-                }
-              }}>Publish</Button>
-              <Button variant="secondary" disabled={record.status !== "published"} onClick={async () => {
-                const result = await context.mutate.patch(record.id, { status: "draft" }, { expectRevision: record.revision, event: `${record.title} unpublished` });
-                if (result) context.toast("Unpublished", "Document returned to draft status in this workspace.");
+              <Button variant="primary"
+                disabled={record.status === "published" || !context.can("edit_knowledge")
+                  || editor.model.comments.some((comment) => comment.mandatory && !comment.resolved)
+                  || openSuggestions(editor.model).length > 0}
+                onClick={() => context.openOverlay("approve document")}>Review and publish…</Button>
+              <Button variant="secondary" disabled={record.status !== "published" || !context.can("edit_knowledge")} onClick={async () => {
+                await context.mutate.patch(record.id, { status: "draft" }, { expectRevision: record.revision, event: `${record.title} unpublished` });
               }}>Unpublish</Button>
             </Row>
           </Stack>
@@ -1495,6 +1567,7 @@ function InsightsScreen({ context, tab }: { context: ScreenContext; tab: "Writin
   const editor = useDocEditor(context, record);
   const pool = useCollections(["workbooks", "invoices", "products", "documents"]);
   const model = capabilityById("model.inference");
+  const { org } = useWorkspace();
 
   if (!record) return <Empty title="No document is open" icon={<FileText size={20} />} />;
 
@@ -1606,6 +1679,23 @@ function InsightsScreen({ context, tab }: { context: ScreenContext; tab: "Writin
     const headingStyle = editor.model.blocks.filter((block) => headingLevel(block) && /[.!?]$/.test(visibleText(block).trim()));
     const sentenceCase = editor.model.blocks.filter((block) => headingLevel(block) && visibleText(block).trim().split(/\s+/).filter((word) => /^[A-Z]/.test(word)).length > 2);
     return (
+      <Stack gap={4}>
+        <div className="dx-library-header">
+          <div><span className="dx-library-eyebrow">DOCUMENTS / COMPANY EXPRESSION</span><h2>Brand alignment, with evidence.</h2>
+            <p>Review how this document reflects the selected company. Checks are local rules, not a certified brand audit or an applied print identity.</p>
+          </div>
+          <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/docs/templates`)}>Open templates</Button>
+        </div>
+        <Card eyebrow="COMPANY CONTEXT" prov="human" title={org.name} subtitle="Information available to this document workspace">
+          <Properties rows={[
+            { label: "Company", value: org.name },
+            { label: "Jurisdiction", value: org.jurisdiction || "Not recorded" },
+            { label: "Currency", value: org.currency },
+            { label: "Document", value: record.title },
+            { label: "Template source", value: String(record.fields.templateId || "No master linked") },
+          ]} />
+          <Notice tone="info" title="Brand assets are not automatically embedded">This view checks document language and structure. It does not imply a verified logo, font licence, registered letterhead or exported corporate identity.</Notice>
+        </Card>
       <Grid>
         <Card span={6} eyebrow="BRAND" prov="human" title="House style" subtitle="Checked against the rules kept in this workspace">
           <Stack gap={3}>
@@ -1626,6 +1716,7 @@ function InsightsScreen({ context, tab }: { context: ScreenContext; tab: "Writin
           <Button size="sm" variant="secondary" style={{ marginBlockStart: "var(--space-3)" }} onClick={() => context.openOverlay("style settings")}>Style settings</Button>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
@@ -1668,8 +1759,11 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
   const [templateId, setTemplateId] = useState(payload?.templateId ?? "");
   const [folder, setFolder] = useState("Unfiled");
   const [confidential, setConfidential] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const existing = useCollection("documents");
   const duplicate = existing.some((record) => record.title.trim().toLowerCase() === title.trim().toLowerCase());
+  const selectedTemplate = templates.find((record) => record.id === templateId);
 
   return (
     <form
@@ -1677,26 +1771,39 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!title.trim() || duplicate) return;
-        const template = templates.find((record) => record.id === templateId);
-        const body = template ? readDoc(template.body, context.actor, context.now.toISOString()) : readDoc(undefined, context.actor, context.now.toISOString());
-        const created = await context.mutate.create({
-          collection: "documents",
-          title: title.trim(),
-          status: "draft",
-          summary: template ? `Started from ${template.title}.` : "New document.",
-          tags: confidential ? ["confidential"] : [],
-          fields: { folder, confidential, kind: template ? String(template.fields.kind ?? "document") : "document", templateId: templateId || "" },
-          body,
-        }, `Document ${title.trim()} created`);
-        if (template) {
-          await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true });
+        if (!title.trim() || duplicate || saving) return;
+        if (templateId && (!selectedTemplate || selectedTemplate.status !== "published")) {
+          setError("Select a published, available template or start blank.");
+          return;
         }
-        context.toast("Document created", `${created.title} is in ${folder}.`);
-        close();
-        context.navigate(`/o/${org.slug}/docs/documents/${created.id}`);
+        setSaving(true);
+        setError("");
+        try {
+          const template = selectedTemplate;
+          const body = template ? readDoc(template.body, context.actor, context.now.toISOString()) : readDoc(undefined, context.actor, context.now.toISOString());
+          const created = await context.mutate.create({
+            collection: "documents", title: title.trim(), status: "draft",
+            summary: template ? `Started from ${template.title}.` : "New document.",
+            tags: confidential ? ["confidential"] : [],
+            fields: { folder, confidential, kind: "document", templateId: template?.id ?? "", templateSourceRevision: template?.revision ?? 0 },
+            body,
+          }, `Document ${title.trim()} created`);
+          if (template) {
+            try {
+              await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true, expectRevision: template.revision });
+            } catch {
+              context.toast("Document created", "The document was saved. The template usage counter could not be updated.", "info");
+            }
+          }
+          context.toast("Document created", `${created.title} is in ${folder}.`);
+          close();
+          context.navigate(`/o/${org.slug}/docs/documents/${created.id}`);
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "The document could not be created.");
+        } finally { setSaving(false); }
       }}
     >
+      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENTS / CREATION</span><h3>Start a new company document</h3><p>Choose a published master or begin blank, then file the record in the appropriate workspace folder.</p></div>
       <Field label="Title" required hint="Shown in the library, the outline and every export.">
         <TextInput aria-label="Title" value={title} onChange={(event) => setTitle(event.target.value)} invalid={duplicate} required autoFocus />
       </Field>
@@ -1704,7 +1811,7 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
       <Field label="Start from" hint="A template fills the sections and leaves the company fields as tokens.">
         <Select aria-label="Start from" value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
           <option value="">Blank document</option>
-          {templates.map((record) => <option key={record.id} value={record.id}>{record.title}</option>)}
+          {templates.filter((record) => record.status === "published").map((record) => <option key={record.id} value={record.id}>{record.title}</option>)}
         </Select>
       </Field>
       <Field label="Folder">
@@ -1713,6 +1820,10 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
         </Select>
       </Field>
       <Checkbox label="Confidential — keep the body out of search previews" checked={confidential} onChange={(event) => setConfidential(event.target.checked)} />
+      <Properties rows={[{ label: "Starting point", value: selectedTemplate?.title ?? "Blank document" }, { label: "Record state", value: "Draft" }, { label: "Folder", value: folder }, { label: "Distribution", value: "None — browser-local record" }]} />
+      {selectedTemplate && <Notice tone="info" title="The master stays independent">This document will receive a copy of the template content and preserve its source revision. Unresolved company-field tokens remain visible for human completion.</Notice>}
+      {error && <Notice tone="danger" title="Document not created">{error}</Notice>}
+      {saving && <p className="ds-subtle">Creating the document…</p>}
     </form>
   );
 }
@@ -2220,6 +2331,8 @@ function DiffOverlay({ context }: { context: ScreenContext }) {
     const before = readDoc(snapshot.body, record.ownerName, snapshot.at);
     const beforeStats = documentStats(before);
     const afterStats = documentStats(editor.model);
+    const removedCount = before.blocks.filter((block) => !editor.model.blocks.some((item) => visibleText(item) === visibleText(block))).length;
+    const addedCount = editor.model.blocks.filter((block) => !before.blocks.some((item) => visibleText(item) === visibleText(block))).length;
     return (
       <Stack gap={4}>
         <Properties rows={[
@@ -2227,7 +2340,9 @@ function DiffOverlay({ context }: { context: ScreenContext }) {
           { label: "Words then / now", value: `${beforeStats.words} → ${afterStats.words}` },
           { label: "Blocks then / now", value: `${before.blocks.length} → ${editor.model.blocks.length}` },
           { label: "Headings then / now", value: `${beforeStats.headings} → ${afterStats.headings}` },
+          { label: "Blocks removed / added", value: `${removedCount} / ${addedCount}` },
         ]} />
+        <Notice tone="info" title="Comparison is a readable block-level summary">Text is compared by visible block content, not a cryptographic or legal redline. Reordered or repeated blocks can appear as changed.</Notice>
         <Card eyebrow="REMOVED" prov="posted" title="Blocks only in the stored version">
           <Stack gap={1}>
             {before.blocks.filter((block) => !editor.model.blocks.some((item) => visibleText(item) === visibleText(block))).slice(0, 8).map((block) => (
@@ -2281,8 +2396,12 @@ function DiffOverlay({ context }: { context: ScreenContext }) {
 function ReviewerAssignment({ context, close }: { context: ScreenContext; close: () => void }) {
   const record = useDocument(context);
   const members = useCollection("members").filter((member) => member.fields.kind === "human");
-  const [chosen, setChosen] = useState<string[]>([]);
-  const [mandatory, setMandatory] = useState(true);
+  const existingReviewers = String(record?.fields.reviewers ?? "").split("|").filter(Boolean);
+  const [chosen, setChosen] = useState<string[]>(existingReviewers);
+  const [reviewReason, setReviewReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [mandatory, setMandatory] = useState(record?.fields.reviewMandatory !== false);
   if (!record) return <Empty title="No document is open" />;
   return (
     <form
@@ -2290,16 +2409,23 @@ function ReviewerAssignment({ context, close }: { context: ScreenContext; close:
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (chosen.length === 0) return;
-        const updated = await context.mutate.patch(record.id, {
-          status: "in_review",
-          fields: { ...record.fields, reviewers: chosen.join("|"), reviewMandatory: mandatory },
-        }, { expectRevision: record.revision, event: `Reviewers assigned to ${record.title}: ${chosen.join(", ")}` });
-        if (!updated) return;
-        context.toast("Reviewers assigned", `${chosen.length} reviewer${chosen.length === 1 ? "" : "s"} recorded on the document. No notification service is connected, so nobody was emailed.`);
-        close();
+        if (saving || chosen.length === 0 || reviewReason.trim().length < 10 || !context.can("edit_knowledge")) return;
+        setSaving(true);
+        setError("");
+        try {
+          await context.mutate.patch(record.id, {
+            status: "in_review",
+            fields: { ...record.fields, reviewers: chosen.join("|"), reviewMandatory: mandatory, reviewReason: reviewReason.trim(),
+              reviewAssignedBy: context.actor, reviewAssignedAt: context.now.toISOString(), notificationStatus: "not_sent" },
+          }, { expectRevision: record.revision, event: `Reviewers assigned to ${record.title} by ${context.actor}: ${chosen.join(", ")}` });
+          context.toast("Reviewers recorded", `${chosen.length} local reviewer assignment${chosen.length === 1 ? "" : "s"} saved. No invitations or emails were sent.`);
+          close();
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "Could not save reviewer assignments.");
+        } finally { setSaving(false); }
       }}
     >
+      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENT REVIEW / ASSIGNMENT</span><h3>Assign accountable reviewers</h3><p>Existing reviewers remain selected. Choose people responsible for reviewing this particular document.</p></div>
       <Stack gap={2}>
         {members.map((member) => (
           <Checkbox
@@ -2310,7 +2436,14 @@ function ReviewerAssignment({ context, close }: { context: ScreenContext; close:
           />
         ))}
       </Stack>
+      {members.length === 0 && <Notice tone="warning" title="No human reviewers available">A human team member must be present in the workspace roster.</Notice>}
+      <Field label="Reason for review assignment" required hint="At least 10 characters.">
+        <TextArea value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} rows={3} required />
+      </Field>
       <Checkbox label="Their review is mandatory before approval" checked={mandatory} onChange={(event) => setMandatory(event.target.checked)} />
+      <Properties rows={[{ label: "Assigned reviewers", value: String(chosen.length) }, { label: "Status after save", value: "In review (local record)" }, { label: "Notifications", value: "Not sent" }]} />
+      {error && <Notice tone="danger" title="Assignment not saved">{error}</Notice>}
+      {saving && <p className="ds-subtle">Saving assignments…</p>}
       <Notice tone="neutral">Assignment changes the document status to in review and records the names. Role views shape the interface and are not an account security boundary.</Notice>
     </form>
   );
@@ -2326,6 +2459,9 @@ function TemplateEditor({ context, close }: { context: ScreenContext; close: () 
   const [scope, setScope] = useState(String(template?.fields.scope ?? "company"));
   const [tokens, setTokens] = useState(String(template?.fields.tokens ?? ""));
   const [documentTitle, setDocumentTitle] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const existingTitle = documents.some((record) => record.title.trim().toLowerCase() === documentTitle.trim().toLowerCase());
 
   if (payload?.mode === "use" && template) {
     return (
@@ -2334,23 +2470,34 @@ function TemplateEditor({ context, close }: { context: ScreenContext; close: () 
         className="ds-stack ds-gap-4"
         onSubmit={async (event) => {
           event.preventDefault();
-          if (!documentTitle.trim()) return;
+          if (!documentTitle.trim() || saving || existingTitle) return;
+          if (template.status !== "published") { setError("This master must be published before it can be used."); return; }
+          setSaving(true);
+          setError("");
+          try {
           const created = await context.mutate.create({
             collection: "documents",
             title: documentTitle.trim(),
             status: "draft",
             summary: `Created from ${template.title}.`,
-            fields: { folder: "Unfiled", templateId: template.id, kind: String(template.fields.kind ?? "document"), confidential: false },
+            fields: { folder: "Unfiled", templateId: template.id, templateSourceRevision: template.revision, kind: "document", confidential: false },
             body: readDoc(template.body, context.actor, context.now.toISOString()),
           }, `Document created from ${template.title}`);
-          await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true });
+          try { await context.mutate.patch(template.id, { fields: { ...template.fields, usedBy: Number(template.fields.usedBy ?? 0) + 1 } }, { skipHistory: true, expectRevision: template.revision }); }
+          catch { context.toast("Document saved", "Template usage count could not be refreshed.", "info"); }
           close();
           context.navigate(`/o/${org.slug}/docs/documents/${created.id}`);
+          } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not create document."); }
+          finally { setSaving(false); }
         }}
       >
+        <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENTS / TEMPLATE APPLICATION</span><h3>Create a document from {template.title}</h3><p>The new document will be a draft copy, linked to this master and its current revision. Existing documents are never overwritten.</p></div>
         <Field label="New document title" required>
           <TextInput aria-label="New document title" value={documentTitle} onChange={(event) => setDocumentTitle(event.target.value)} required autoFocus />
         </Field>
+        {existingTitle && <Notice tone="warning" title="A document already uses this name">Choose a distinct title so people can identify the correct record.</Notice>}
+        {error && <Notice tone="danger" title="Document not created">{error}</Notice>}
+        {saving && <p className="ds-subtle">Creating the document…</p>}
         <Notice tone="info" title="Tokens stay as tokens">
           {String(template.fields.tokens ?? "No tokens mapped")}. They are left in the text so a person fills them in deliberately rather than finding a wrong figure already there.
         </Notice>
@@ -2484,6 +2631,10 @@ function ChangeImpact({ context }: { context: ScreenContext }) {
   );
 }
 
+function escapeExportText(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/\x27/g, "&#39;");
+}
+
 function PdfSettings({ context, close }: { context: ScreenContext; close: () => void }) {
   const record = useDocument(context);
   const editor = useDocEditor(context, record);
@@ -2497,13 +2648,14 @@ function PdfSettings({ context, close }: { context: ScreenContext; close: () => 
         event.preventDefault();
         const html = toHtml(editor.model, record.title);
         const extra = includeComments && editor.model.comments.length
-          ? `<section><h2>Comments</h2><ol>${editor.model.comments.map((comment) => `<li><strong>${comment.author}</strong>: ${comment.body} <em>(on “${comment.quote}”)</em></li>`).join("")}</ol></section>`
+          ? `<section><h2>Comments</h2><ol>${editor.model.comments.map((comment) => `<li><strong>${escapeExportText(comment.author)}</strong>: ${escapeExportText(comment.body)} <em>(on “${escapeExportText(comment.quote)}”)</em></li>`).join("")}</ol></section>`
           : "";
         downloadFile(`${record.title}.print.html`, html.replace("</body>", `${extra}</body>`), "text/html");
         context.toast("Print-ready HTML written", "Open it and print to PDF from the browser. No PDF engine is bundled, so nothing is rendered server side.");
         close();
       }}
     >
+      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENTS / PRINT LAYOUT</span><h3>Prepare a print-ready document</h3><p>Review page settings, comment inclusion and document confidentiality before generating browser-printable HTML.</p></div>
       <Notice tone="warning" title="No PDF engine is connected">
         A PDF is produced by printing the exported HTML from the browser. Saying it is a native PDF renderer would be untrue, so the export is named for what it is.
       </Notice>
@@ -2514,6 +2666,8 @@ function PdfSettings({ context, close }: { context: ScreenContext; close: () => 
         { label: "Estimated pages", value: String(paginate(editor.model).pages.length) },
       ]} />
       <Checkbox label="Append the comment list" checked={includeComments} onChange={(event) => setIncludeComments(event.target.checked)} />
+      {record.fields.confidential === true && <Notice tone="warning" title="Confidential document">Printing or exporting creates a copy outside this browser-local document record. Handle it according to your organisation’s document policies.</Notice>}
+      <p className="ds-subtle">Comment text is escaped in generated HTML. Nothing is printed automatically and no server-side PDF is produced.</p>
     </form>
   );
 }
@@ -2936,34 +3090,58 @@ function ApproveDocument({ context, close }: { context: ScreenContext; close: ()
   const record = useDocument(context);
   const editor = useDocEditor(context, record);
   const [note, setNote] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   if (!record) return <Empty title="No document is open" />;
-  const blockers = publicationBlockers(editor.model);
+  const mandatoryOpen = editor.model.comments.filter((comment) => comment.mandatory && !comment.resolved);
   const approvals = record.fields.approvals ? String(record.fields.approvals).split("|").filter(Boolean) : [];
+  const pendingChanges = openSuggestions(editor.model);
+  const blocked = mandatoryOpen.length > 0 || pendingChanges.length > 0 || record.status === "published" || !context.can("edit_knowledge");
   return (
     <form
       id="docs-approve"
       className="ds-stack ds-gap-3"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (blockers.length > 0) return;
+        if (blocked || !confirmed || saving) return;
+        setSaving(true);
+        setError("");
         try {
-          await publishReviewedDocument(context, record, editor, note);
-          context.toast("Approved", record.title + " was approved by " + context.actor + " and published in this workspace.");
+          await editor.saveNow();
+          const fresh = await import("@/platform/repo").then((module) => module.getRecord(record.id));
+          if (!fresh || fresh.organizationId !== context.org.id || fresh.collection !== "documents") throw new Error("The document is no longer available in this workspace.");
+          if (fresh.status === "published") throw new Error("This document has already been published.");
+          await context.mutate.patch(record.id, {
+            status: "published",
+            fields: { ...fresh.fields, approvals: [...approvals, `${context.actor} ${context.now.toISOString()}${note.trim() ? ` ${note.trim()}` : ""}`].join("|") },
+          }, { expectRevision: fresh.revision, event: `${record.title} approved by ${context.actor}` });
+          context.toast("Approved in Arlovi", `${record.title} is published in this local workspace. No external distribution was performed.`);
           close();
-        } catch (error) {
-          context.toast("Approval blocked", error instanceof Error ? error.message : "Reload the document and try again.", "blocked");
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "The approval could not be recorded.");
+        } finally {
+          setSaving(false);
         }
       }}
     >
-      {blockers.length > 0 ? (
-        <Notice tone="danger" title="Review requirements are still open">
-          Approval is blocked until mandatory comments and tracked edits are resolved: {blockers.join("; ")}.
+      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENT REVIEW / HUMAN DECISION</span><h3>Approve and publish locally</h3><p>Inspect outstanding changes and mandatory review comments before accepting responsibility for publication.</p></div>
+      {mandatoryOpen.length > 0 ? (
+        <Notice tone="danger" title={`${mandatoryOpen.length} mandatory review${mandatoryOpen.length === 1 ? " is" : "s are"} still open`}>
+          Approval is blocked until each “must resolve” comment is resolved, so a reviewer's objection is never erased by an approval. {mandatoryOpen.map((comment) => `${comment.author}: “${comment.body.slice(0, 60)}”`).join(" · ")}
         </Notice>
       ) : (
-        <Notice tone="info" title="Approving publishes the document in this workspace">The saved document revision and the named human approval are recorded together. Nothing is sent outside this browser.</Notice>
+        <Notice tone="info" title="Approving publishes the document in this workspace">The approval records who approved and when. Nothing is sent outside this browser.</Notice>
       )}
-      <Properties rows={[{ label: "Status now", value: record.status.replace("_", " ") }, { label: "Earlier approvals", value: String(approvals.length) }, { label: "Open tracked changes", value: String(openSuggestions(editor.model).length) }]} />
-      <Field label="Note"><TextInput value={note} onChange={(event) => setNote(event.target.value)} disabled={blockers.length > 0} placeholder="Approved for the trade launch" /></Field>
+      {pendingChanges.length > 0 && <Notice tone="danger" title={`${pendingChanges.length} tracked change${pendingChanges.length === 1 ? "" : "s"} awaiting a decision`}>Accept or reject the pending suggestions before publication. The approval cannot silently resolve proposed edits.</Notice>}
+      {record.status === "published" && <Notice tone="warning" title="Already published">A new version needs a separate review rather than a duplicate approval.</Notice>}
+      <Properties rows={[{ label: "Status now", value: record.status.replace("_", " ") }, { label: "Earlier approvals", value: String(approvals.length) }, { label: "Open tracked changes", value: String(pendingChanges.length) }, { label: "Open mandatory comments", value: String(mandatoryOpen.length) }, { label: "Approver", value: context.actor }]} />
+      <Field label="Note"><TextInput value={note} onChange={(event) => setNote(event.target.value)} disabled={blocked || saving} placeholder="Approved for the trade launch" /></Field>
+      <Checkbox label="I have reviewed this version and confirm the document is ready to publish in Arlovi." checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+      {!context.can("edit_knowledge") && <Notice tone="warning" title="Insufficient role permissions">Your current role cannot record document approvals.</Notice>}
+      {error && <Notice tone="danger" title="Approval not saved">{error}</Notice>}
+      {saving && <p className="ds-subtle">Recording the approval…</p>}
+      <p className="ds-subtle">The dialog’s Approve action is only valid after acknowledgement and resolution of all mandatory comments and tracked changes.</p>
     </form>
   );
 }
@@ -3036,10 +3214,25 @@ function PreviewDocument({ context }: { context: ScreenContext }) {
   if (!record) return <Empty title="No document is open" />;
   const pages = paginate(editor.model).pages.length;
   return (
-    <Stack gap={3}>
-      <Properties rows={[{ label: "Pages", value: String(pages) }, { label: "Open tracked changes", value: String(openSuggestions(editor.model).length) }, { label: "Comments", value: "not included in the export" }]} />
-      <iframe title={`Export preview of ${record.title}`} srcDoc={toHtml(editor.model, record.title)} style={{ width: "100%", height: 420, border: "1px solid var(--border-default)", borderRadius: 6, background: "#fff" }} sandbox="" />
-      <p className="vx-mini">The same HTML the export writes, rendered in a sandboxed frame. A printer or PDF writer may break pages differently.</p>
+    <Stack gap={4}>
+      <div className="dx-review-lead"><span className="dx-workflow-eyebrow">DOCUMENTS / EXPORT PREVIEW</span>
+        <h3>Inspect the rendered document</h3>
+        <p>Review the actual HTML rendering before creating a copy. This is not an approved, signed or externally published document.</p>
+      </div>
+      <Properties rows={[
+        { label: "Document", value: record.title },
+        { label: "Company status", value: record.status.replace("_", " ") },
+        { label: "Estimated pages", value: String(pages) },
+        { label: "Paper format", value: editor.model.page.size },
+        { label: "Open tracked changes", value: String(openSuggestions(editor.model).length) },
+        { label: "Comments", value: "Not included in HTML preview" },
+        { label: "Confidential", value: record.fields.confidential === true ? "Yes — handle exported copies carefully" : "Not marked confidential" },
+      ]} />
+      <div className="dx-export-preview-frame">
+        <iframe title={`Export preview of ${record.title}`} srcDoc={toHtml(editor.model, record.title)}
+          style={{ width: "100%", height: 460, border: 0, background: "#fff" }} sandbox="" />
+      </div>
+      <Notice tone="info" title="Preview and print are separate">The iframe is sandboxed and shows browser-rendered HTML. Pagination remains an estimate; another browser or printer may break pages differently.</Notice>
     </Stack>
   );
 }
@@ -3239,6 +3432,7 @@ registerApp({
         { id: "revoke link", label: "Revoke a link…", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("revoke links") },
       ],
       overlays: [
+        { id: "approve document", kind: "modal", title: "Approve the document", width: 540, footer: docFooter("docs-approve", "Approve"), render: (context) => <ApproveDocument context={context} close={context.close} /> },
         { id: "preview", kind: "modal", title: "Export preview", width: 760, render: (context) => <PreviewDocument context={context} /> },
         { id: "revoke links", kind: "modal", title: "Revoke a link", width: 560, tone: "danger", render: (context) => <RevokeLinks context={context} close={context.close} /> },
         { id: "PDF settings", kind: "modal", title: "PDF settings", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="pdf-settings">Write print HTML</Button></>, render: (context) => <PdfSettings context={context} close={context.close} /> },
