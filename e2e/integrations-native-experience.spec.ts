@@ -97,3 +97,21 @@ test("Connector details and authorisation preview preserve capability and permis
   await authorisation.getByRole("button", { name: "Connector details" }).click();
   await expect(main.getByLabel("Connector details overview")).toBeVisible();
 });
+
+
+test("Connector health provides real diagnostic context across all tabs", async ({ page }) => {
+  await page.goto("/o/northline/connect/health");
+  const main = page.locator("#main");
+  const overview = main.getByLabel("Connector health overview");
+  await expect(overview).toBeVisible();
+  const nav = overview.getByRole("navigation", { name: "Connector health areas" });
+  await nav.getByRole("button", { name: "Rate limits" }).click();
+  await expect(page).toHaveURL(/tab=Rate/);
+  await expect(main).toContainText("A quota figure would have to come from a provider");
+  await nav.getByRole("button", { name: "Deprecations" }).click();
+  await expect(main).toContainText("No provider version is being tracked");
+  await nav.getByRole("button", { name: "Overview" }).click();
+  await expect(main.getByRole("button", { name: "Run the health test" })).toBeVisible();
+  await overview.getByRole("button", { name: "Review connections" }).click();
+  await expect(page).toHaveURL(/\/connect\/connections$/);
+});
