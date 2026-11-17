@@ -730,7 +730,7 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
         <Row gap={2} wrap>
           <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks`)}>Library</Button>
           <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}/theme`)}>Theme</Button>
-          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}/animations`)}>Animation</Button>
+          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}/animation`)}>Animation</Button>
         </Row>
       </section>
       <div className="px-bar" style={{ minHeight: 40 }}>
