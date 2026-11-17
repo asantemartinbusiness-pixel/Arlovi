@@ -16,6 +16,7 @@ import { leaveRequestDays, planLeaveDecision } from "./decisions";
 import { planTimesheetApprovals } from "./workforce";
 import { intervalsOverlap, validShiftInterval } from "@/domain/scheduling";
 import { linkedPersonnelDocuments, scopedDetailRecord } from "@/platform/recordScope";
+import { dailyCoverage, employeeOnLeave, rosterDateLabel, rosterShiftsForDay, rosterWeekDays, shiftDays } from "./rosterView";
 
 /* ------------------------------------------------------------------ *
  * Shared reads
@@ -1217,7 +1218,8 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
   const data = useCollections(["shifts", "employees", "leaveRequests", "projects"]);
   const { now, org } = useWorkspace();
   const [weekOffset, setWeekOffset] = useState(0);
-  const weekStart = useMemo(() => addDays(startOfWeek(now), weekOffset * 7), [now, weekOffset]);
+  const [showEveryone, setShowEveryone] = useState(false);
+  const [timeFilter, setTimeFilter] = useState<"pending" | "approved" | "all">("pending");
   const roster = data.shifts.filter((shift) => shift.fields.kind === "shift");
   const timesheets = data.shifts.filter((shift) => shift.fields.kind === "time");
 
@@ -1330,61 +1332,128 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
     );
   }
 
-  const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
-  const people = [...new Set(roster.map((shift) => String(shift.fields.employeeName ?? "")))].filter(Boolean);
+  const days = rosterWeekDays(now, org.timezone, weekOffset);
+  const rosterWeek = roster.filter((shift) =>
+    days.some((day) => rosterShiftsForDay([shift], String(shift.fields.employeeId ?? ""), day, org.timezone).length > 0));
+  const scheduledIds = new Set(rosterWeek.map((shift) => String(shift.fields.employeeId ?? "")));
+  const people = data.employees
+    .filter((employee) => scheduledIds.has(employee.id) || (showEveryone && !["alumni", "terminated"].includes(employee.status)))
+    .sort((a, b) => a.title.localeCompare(b.title));
+  const dayShifts = (employee: Rec, day: string) => rosterShiftsForDay(rosterWeek, employee.id, day, org.timezone);
+  const dayAway = (employee: Rec, day: string) => employeeOnLeave(data.leaveRequests, employee.id, day, org.timezone);
+  const shiftButton = (shift: Rec, day: string) => {
+    const project = data.projects.find((row) => row.id === shift.fields.projectId);
+    const continues = shiftDays(shift, org.timezone)?.startKey !== day;
+    const start = shift.startAt ? context.dateTime(shift.startAt) : "Unknown start";
+    return (
+      <button key={shift.id} type="button" className="hr-shift"
+        aria-label={`Edit ${shift.fields.place || "shift"} for ${shift.fields.employeeName || "employee"}, ${start}`}
+        onClick={() => { context.select(shift.id); context.openOverlay("Shift edit", { id: shift.id }); }}>
+        <strong>{String(shift.fields.place ?? "Unassigned place")}</strong>
+        <span className="ds-subtle">{continues ? "Continues · " : ""}{shift.startAt
+          ? new Intl.DateTimeFormat("en-GB", { timeZone: org.timezone, hour: "2-digit", minute: "2-digit" }).format(new Date(shift.startAt))
+          : "Unknown time"} · {String(shift.fields.hours ?? 0)}h</span>
+        {project && <span className="ds-subtle">{project.title}</span>}
+        {shift.fields.projectId && !project && <span className="ds-subtle">Project unavailable</span>}
+        {shift.fields.overtime === true && <span className="ds-subtle">Overtime review</span>}
+      </button>
+    );
+  };
 
   return (
     <Stack gap={4}>
-      <Row gap={2}>
+      <Row gap={2} wrap>
         <Button size="sm" variant="secondary" onClick={() => setWeekOffset((value) => value - 1)}>Previous week</Button>
-        <strong className="ds-grow">{context.date(days[0], { day: "numeric", month: "short" })} – {context.date(days[6], { day: "numeric", month: "short" })}</strong>
+        <strong className="ds-grow">{rosterDateLabel(days[0])} – {rosterDateLabel(days[6])}</strong>
         <Button size="sm" variant="ghost" onClick={() => setWeekOffset(0)}>This week</Button>
         <Button size="sm" variant="secondary" onClick={() => setWeekOffset((value) => value + 1)}>Next week</Button>
+        <Button size="sm" variant="secondary" onClick={() => setShowEveryone((value) => !value)}>
+          {showEveryone ? "Scheduled people" : "Show everyone"}
+        </Button>
       </Row>
-      <div className="ds-grid-wrap">
-        <div className="ds-grid-scroll">
-          <table className="ds-table">
-            <caption className="ds-sr-only">Shift roster for the week beginning {context.date(days[0])}</caption>
-            <thead>
-              <tr>
-                <th scope="col">Person</th>
-                {days.map((day) => <th key={day.toISOString()} scope="col">{context.date(day, { weekday: "short", day: "numeric" })}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {people.map((person) => (
-                <tr key={person}>
-                  <th scope="row" style={{ textAlign: "start", padding: "var(--space-2) var(--space-3)" }}>
-                    <Row gap={2}><Avatar name={person} size="sm" />{person}</Row>
-                  </th>
-                  {days.map((day) => {
-                    const shift = roster.find((item) => item.fields.employeeName === person && item.startAt && new Date(item.startAt).toDateString() === day.toDateString());
-                    const away = data.leaveRequests.some((request) => request.status === "approved" && String(request.fields.employeeName ?? "") === person && request.startAt && request.endAt && new Date(request.startAt) <= day && new Date(request.endAt) >= day);
-                    return (
-                      <td key={day.toISOString()}>
-                        {away ? <Pill tone="neutral">Away</Pill> : shift ? (
-                          <button
-                            type="button"
-                            className="hr-shift"
-                            onClick={() => { context.select(shift.id); context.openOverlay("Shift edit", { id: shift.id }); }}
-                          >
-                            <strong>{String(shift.fields.place ?? "")}</strong>
-                            <span className="ds-subtle">{String(shift.fields.hours ?? 0)}h</span>
-                            {shift.fields.projectId && <span className="ds-subtle">{data.projects.find((project) => project.id === shift.fields.projectId)?.title ?? "Project unavailable"}</span>}
-                          </button>
-                        ) : <span className="ds-subtle">—</span>}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <Notice tone="info" title="Moving a shift">
-        Open a shift to change its person, place or hours; the change is saved on the record. A keyboard user reaches every shift
-        in reading order, so there is no drag-only path through this roster.
+      <p className="ds-subtle">
+        {rosterWeek.length} shift{rosterWeek.length === 1 ? "" : "s"} across {scheduledIds.size} assigned
+        employee{scheduledIds.size === 1 ? "" : "s"}. Times are displayed for {org.timezone};
+        UTC timestamps are preserved on each record.
+      </p>
+      {people.length === 0 ? (
+        <Empty title="No shifts this week" icon={<CalendarDays size={20} />}>
+          Change week or show everyone to review the team's availability.
+        </Empty>
+      ) : (
+        <>
+          <div className="ds-grid-wrap hr-roster-table">
+            <div className="ds-grid-scroll">
+              <table className="ds-table">
+                <caption className="ds-sr-only">Roster beginning {rosterDateLabel(days[0])} in {org.timezone}. Each cell lists all shifts for the day.</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Person</th>
+                    {days.map((day) => {
+                      const count = dailyCoverage(rosterWeek, data.employees, day, org.timezone);
+                      return <th key={day} scope="col">
+                        <span>{rosterDateLabel(day)}</span>
+                        <span className="ds-subtle hr-roster-coverage">{count.people} people · {count.shifts} shifts</span>
+                      </th>;
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {people.map((person) => (
+                    <tr key={person.id}>
+                      <th scope="row" style={{ textAlign: "start", padding: "var(--space-2) var(--space-3)" }}>
+                        <Row gap={2}><Avatar name={person.title} size="sm" />{person.title}</Row>
+                      </th>
+                      {days.map((day) => {
+                        const shifts = dayShifts(person, day);
+                        const away = dayAway(person, day);
+                        return (
+                          <td key={day} className="hr-roster-cell">
+                            <div className="hr-roster-stack">
+                              {away && <Pill tone={shifts.length ? "danger" : "neutral"}>{shifts.length ? "Leave conflict" : "Away"}</Pill>}
+                              {shifts.map((shift) => shiftButton(shift, day))}
+                              {!away && shifts.length === 0 && <span className="ds-subtle">—</span>}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="hr-roster-cards">
+            {people.map((person) => {
+              const scheduled = days.filter((day) => dayShifts(person, day).length > 0 || dayAway(person, day));
+              return (
+                <Card key={person.id} title={<Row gap={2}><Avatar name={person.title} size="sm" />{person.title}</Row>}
+                  subtitle={String(person.fields.title ?? "Employee")}>
+                  <Stack gap={3}>
+                    {scheduled.length === 0 && <p className="ds-subtle">No shifts or approved leave this week.</p>}
+                    {scheduled.map((day) => {
+                      const shifts = dayShifts(person, day);
+                      const away = dayAway(person, day);
+                      return (
+                        <div key={day} className="hr-roster-mobile-day">
+                          <strong>{rosterDateLabel(day)}</strong>
+                          <div className="hr-roster-stack">
+                            {away && <Pill tone={shifts.length ? "danger" : "neutral"}>{shifts.length ? "Leave conflict" : "Away"}</Pill>}
+                            {shifts.map((shift) => shiftButton(shift, day))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </Stack>
+                </Card>
+              );
+            })}
+          </div>
+        </>
+      )}
+      <Notice tone="info" title="Each shift remains separately editable">
+        Open any shift to edit its assignment, place, hours or Project. Multiple and overnight shifts remain visible;
+        overlaps and approved leave are checked on save. Keyboard controls work without drag and drop.
       </Notice>
     </Stack>
   );
