@@ -1155,9 +1155,26 @@ function AnimationScreen({ context, tab }: { context: ScreenContext; tab: "Slide
 
   if (!record) return <Empty title="No deck is open" icon={<Presentation size={20} />} />;
 
+  const totalAnimations = editor.deck.slides.reduce((total, slide) => total + buildOrder(slide).length, 0);
+  const longTransitions = editor.deck.slides.filter((slide) => slide.transition.durationMs > 600).length;
+  const animationOverview = (
+    <section className="pr-workflow-overview" aria-label="Animation workflow overview">
+      <div className="pr-library-heading"><div><span className="pr-library-eyebrow">PRESENT / MOTION WORKSPACE</span>
+        <h2>Motion with purpose.</h2><p>Review every slide transition and object animation, including timing and reduced-motion behaviour before presenting.</p>
+      </div><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button></div>
+      <div className="pr-library-overview">
+        <div><span>Slide transitions</span><strong>{editor.deck.slides.filter((slide) => slide.transition.effect !== "none").length}</strong></div>
+        <div><span>Animated objects</span><strong>{totalAnimations}</strong></div>
+        <div><span>Transitions over 600ms</span><strong>{longTransitions}</strong></div>
+      </div>
+      {editor.deck.reduceMotion && <Notice tone="info">Reduced motion is enabled; builds should remain understandable when presented without animation.</Notice>}
+    </section>
+  );
+
   if (tab === "Slides") {
     return (
       <Stack gap={4}>
+        {animationOverview}
         <Notice tone="info" title="A transition belongs to the slide it moves into">
           Keep them short. Anything over 600ms is flagged in the accessibility review.
         </Notice>
@@ -1188,7 +1205,7 @@ function AnimationScreen({ context, tab }: { context: ScreenContext; tab: "Slide
                   aria-label={`Transition duration for ${row.title}`}
                   inputMode="numeric" align="end" style={{ width: 86 }}
                   value={String(row.transition.durationMs)}
-                  onChange={(event) => editor.commit({ ...editor.deck, slides: editor.deck.slides.map((slide) => (slide.id === row.id ? { ...slide, transition: { ...slide.transition, durationMs: Number(event.target.value) || 0 } } : slide)) }, "Transition duration")}
+                  onChange={(event) => editor.commit({ ...editor.deck, slides: editor.deck.slides.map((slide) => (slide.id === row.id ? { ...slide, transition: { ...slide.transition, durationMs: Math.max(0, Math.min(10000, Number(event.target.value) || 0)) } } : slide)) }, "Transition duration")}
                 />
               ),
             },
@@ -1202,6 +1219,7 @@ function AnimationScreen({ context, tab }: { context: ScreenContext; tab: "Slide
   if (tab === "Objects") {
     return (
       <Stack gap={4}>
+        {animationOverview}
         {editor.slide.objects.length === 0 ? <Empty title="This slide has no objects" /> : (
           <DataGrid
             rows={editor.slide.objects.map((object) => ({ ...object, id: object.id }))}
