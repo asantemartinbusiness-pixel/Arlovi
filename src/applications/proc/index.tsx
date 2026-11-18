@@ -80,7 +80,7 @@ export const procApp = registerApp({
       ],
       overlays: [
         { id: "Requisition form", kind: "drawer", title: "Raise a requisition", width: 720, render: ({ close, ...context }) => <RequisitionForm context={context} close={close} />, footer: submitFooter("requisition-form", "Submit for approval") },
-        { id: "Requisition", kind: "drawer", title: "Requisition review", width: 700, render: ({ close, ...context }) => <RequisitionReview context={context} close={close} /> },
+        { id: "Requisition", kind: "drawer", title: "Requisition review", width: 740, presentation: { noRecordContext: true, guidance: "Choose an actual submitted requisition, inspect the budget and approval limit, and decide with a named reviewer and a recorded reason." }, render: ({ close, ...context }) => <RequisitionReview context={context} close={close} /> },
         { id: "stock alert", kind: "drawer", title: "Stock risk", width: 620, render: ({ ...context }) => <StockAlert context={context} /> },
         { id: "cost inspector", kind: "drawer", title: "Invoice", width: 620, render: ({ ...context }) => <CostInspector context={context} /> },
         { id: "three-way match", kind: "drawer", title: "Three-way match", width: 780, render: ({ close, ...context }) => <ThreeWayMatch context={context} close={close} /> },
