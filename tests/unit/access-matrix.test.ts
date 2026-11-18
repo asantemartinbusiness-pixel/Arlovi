@@ -34,6 +34,17 @@ describe("editable access matrix — proposal only",()=>{
     expect(plannedPermission("company_owner","FIN",page!.id,"edit",draft).allowed).toBe(false);
     expect(draft.appRules.FIN.edit).toBeUndefined();
   });
+  it("preserves explicit deny exceptions when view access is turned off and back on",()=>{
+    let draft=emptyRolePermissionDraft("company_owner");
+    draft=updateRolePermission(draft,"application","FIN","approve","deny");
+    draft=updateRolePermission(draft,"application","FIN","edit","allow");
+    draft=updateRolePermission(draft,"application","FIN","view","deny");
+    expect(draft.appRules.FIN.approve).toBe("deny");
+    expect(draft.appRules.FIN.edit).toBeUndefined();
+    draft=updateRolePermission(draft,"application","FIN","view","allow");
+    expect(draft.appRules.FIN.approve).toBe("deny");
+    expect(plannedPermission("company_owner","FIN",undefined,"approve",draft).allowed).toBe(false);
+  });
   it("requires a view grant before a page can be edited",()=>{
     const page=screens.find(s=>s.applicationCode==="HR")!;
     let draft=emptyRolePermissionDraft("client");
