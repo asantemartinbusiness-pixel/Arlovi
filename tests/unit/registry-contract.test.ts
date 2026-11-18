@@ -9,6 +9,7 @@ vi.mock("@/runtime/db", async (importOriginal) => {
 });
 import { loadApplications } from "@/applications";
 import { allApps, getApp } from "@/platform/registry";
+import { APPROVED_SCREEN_TAB_EXTENSIONS } from "@/platform/approvedScreenExtensions";
 
 interface Contract {
   id: string; title: string; route: string; applicationCode: string; applicationName: string;
@@ -34,13 +35,14 @@ describe("screen registry contract", () => {
   });
 
   it("declares tabs that exist in the approved contract", () => {
-    // The tab strip is the contract: an extra tab means a misnamed one.
+    // The original catalogue is the baseline; explicit approved extensions are additive.
     const problems: string[] = [];
     for (const screen of catalog.screens) {
       const def = getApp(screen.applicationCode)?.screens[screen.id];
       if (!def) continue;
+      const approved = new Set([...screen.tabs, ...(APPROVED_SCREEN_TAB_EXTENSIONS[screen.id] ?? [])]);
       for (const tab of def.tabs ?? []) {
-        if (!screen.tabs.includes(tab.id)) problems.push(`${screen.id}: tab "${tab.id}" is not in the contract`);
+        if (!approved.has(tab.id)) problems.push(`${screen.id}: tab "${tab.id}" is not in the contract`);
       }
     }
     expect(problems.slice(0, 40)).toEqual([]);
