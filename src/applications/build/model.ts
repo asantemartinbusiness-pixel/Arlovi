@@ -1,5 +1,9 @@
 import type { Rec } from "@/domain/types";
 import { wallMs } from "@/platform/clock";
+import {
+  NO_INTERACTION, bindingProblems, describeQuery, readFilters, readInteraction, readLimit, readSort,
+  type Interaction, type QueryFilter, type QuerySort,
+} from "./binding";
 
 /* ====================================================================== *
  * App model. An app project is an entity model, a set of screens bound to
@@ -69,6 +73,13 @@ export interface ScreenComponent {
   aggregate: "count" | "sum";
   text: string;
   span: 4 | 6 | 8 | 12;
+  /** Records shown: every filter must match (AND). */
+  filters: QueryFilter[];
+  sort: QuerySort | null;
+  /** 0 shows every matching record. */
+  limit: number;
+  /** What choosing a row (table, list) or saving (form) does. */
+  interaction: Interaction;
 }
 
 export interface AppScreen {
@@ -168,6 +179,7 @@ export function makeComponent(kind: ComponentKind): ScreenComponent {
     id: nextId("cp"), kind, title: COMPONENT_LABELS[kind], entityId: "", fieldIds: [],
     aggregate: "count", text: kind === "text" ? "Write the copy this screen needs." : "",
     span: kind === "stat" ? 4 : kind === "text" ? 12 : 6,
+    filters: [], sort: null, limit: 0, interaction: NO_INTERACTION,
   };
 }
 
@@ -255,6 +267,10 @@ export function readApp(record: Rec | undefined): AppModel {
             aggregate: str(component.aggregate) === "sum" ? "sum" : "count",
             text: str(component.text, base.text),
             span: ([4, 6, 8, 12].includes(num(component.span, 6)) ? num(component.span, 6) : 6) as ScreenComponent["span"],
+            filters: readFilters(component.filters),
+            sort: readSort(component.sort),
+            limit: readLimit(component.limit),
+            interaction: readInteraction(component.interaction),
           };
         }),
       };
@@ -417,6 +433,9 @@ export function validateApp(model: AppModel): ModelIssue[] {
           issues.push({ id: `bindfield-${component.id}`, level: "fail", area: "Screens", title: `${component.title} uses ${missing.length} fields that no longer exist`, detail: `They were removed from ${entity.name}. The component would render blank columns.` });
         }
       }
+      bindingProblems(component, entity?.fields.map((field) => field.id), model.screens, screen.id).forEach((problem, index) => {
+        issues.push({ id: `binding-${component.id}-${index}`, level: problem.level, area: "Screens", title: problem.title, detail: problem.detail });
+      });
     }
   }
   for (const [route, count] of routes) {
@@ -568,7 +587,22 @@ export function generateScreens(model: AppModel): string {
     lines.push("  components: [");
     for (const component of screen.components) {
       const entity = model.entities.find((item) => item.id === component.entityId);
-      lines.push(`    { kind: ${JSON.stringify(component.kind)}, title: ${JSON.stringify(component.title)}, entity: ${JSON.stringify(entity ? pascal(entity.name) : null)}, fields: ${JSON.stringify(component.fieldIds.map((id) => entity?.fields.find((field) => field.id === id)?.name ?? id))} },`);
+      const fieldName = (id: string) => entity?.fields.find((field) => field.id === id)?.name;
+      const query = { filters: component.filters, sort: component.sort, limit: component.limit };
+      const extras: string[] = [];
+      if (component.filters.length || component.sort || component.limit) {
+        extras.push(`query: ${JSON.stringify({
+          where: component.filters.filter((filter) => fieldName(filter.fieldId)).map((filter) => ({ field: fieldName(filter.fieldId), op: filter.operator, value: filter.value })),
+          orderBy: component.sort && fieldName(component.sort.fieldId) ? { field: fieldName(component.sort.fieldId), direction: component.sort.direction } : null,
+          limit: component.limit || null,
+        })}`);
+      }
+      if (component.interaction.kind !== "none") {
+        const target = model.screens.find((item) => item.id === component.interaction.screenId);
+        extras.push(`on${component.kind === "form" ? "Saved" : "Choose"}: ${JSON.stringify({ action: component.interaction.kind, route: target?.route ?? null })}`);
+      }
+      if (extras.length) lines.push(`    // ${component.title}: ${describeQuery(query, fieldName)}`);
+      lines.push(`    { kind: ${JSON.stringify(component.kind)}, title: ${JSON.stringify(component.title)}, entity: ${JSON.stringify(entity ? pascal(entity.name) : null)}, fields: ${JSON.stringify(component.fieldIds.map((id) => entity?.fields.find((field) => field.id === id)?.name ?? id))}${extras.map((extra) => `, ${extra}`).join("")} },`);
     }
     lines.push("  ],");
     lines.push("};");

@@ -270,6 +270,7 @@ export function PageBuilder({ context }: { context: ScreenContext }) {
           <p>{page.path} · {page.blocks.length} {page.blocks.length === 1 ? "block" : "blocks"} · {BREAKPOINTS[breakpoint].label} preview</p>
         </div>
         <div className="web-editor-overview-actions">
+          <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Manage pages")}>Pages</Button>
           <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/navigation`)}>Navigation</Button>
           <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/quality`)}>Quality</Button>
           <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/deploy`)}>Publishing</Button>

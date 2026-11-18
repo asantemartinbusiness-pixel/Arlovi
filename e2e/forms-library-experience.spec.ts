@@ -26,7 +26,8 @@ test("Unknown form URLs never display another form's builder", async ({ page }) 
   await page.goto("/o/northline/forms/forms");
   await page.goto(`/o/northline/forms/forms/missing-form-${Date.now()}`);
   const main = page.locator("#main");
-  await expect(main).toContainText("No form in this workspace");
+  // The shell record guard answers before the builder mounts (same as documents).
+  await expect(main).toContainText("This record is unavailable");
   await expect(page.getByLabel("Form editor overview")).toHaveCount(0);
 });
 

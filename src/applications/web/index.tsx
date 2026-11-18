@@ -7,6 +7,7 @@ import { BoundaryNotice, CapabilityCard, closeFooter, submitFooter } from "@/app
 import { capabilityById } from "@/platform/capability";
 import { readSite, type SiteModel } from "./model";
 import { PageBuilder } from "./builder";
+import { PageManager } from "./pagesPanel";
 import {
   BrokenLinkScan, CmsEditor, ComponentLibrary, ComponentPropertyForm,
   EntryDetailForm, LinkPickerForm, MigrationPreview, NoSite, RedirectForm, SchemaEditorForm,
@@ -260,6 +261,7 @@ export const webApp = registerApp({
         { id: "deploy", label: "Deploy", placement: "overflow", run: (context) => context.openOverlay("Publish review", { environment: "production" }) },
       ],
       overlays: [
+        { id: "Manage pages", kind: "drawer", title: "Pages", width: 560, render: ({ ...context }) => <PageManager context={context} /> },
         { id: "Deploy inspector", kind: "drawer", title: "Deployment", width: 520, render: ({ ...context }) => <DeployInspector context={context} /> },
         { id: "domain check", kind: "modal", title: "Domain check", width: 540, render: ({ ...context }) => <DomainCheck context={context} />, footer: closeFooter() },
         {
@@ -285,6 +287,7 @@ export const webApp = registerApp({
       })),
       actions: [
         { id: "Drag component", label: "Place a component (drag or insert)", placement: "primary", run: (context) => context.openOverlay("insert panel") },
+        { id: "manage pages", label: "Manage pages", placement: "overflow", run: (context) => context.openOverlay("Manage pages") },
         {
           id: "edit text", label: "Edit the selection", placement: "secondary",
           guard: () => (StateModule.useWebUi.getState().selectedBlockId ? undefined : "Select a block on the canvas first"),
@@ -320,6 +323,7 @@ export const webApp = registerApp({
       ],
       overlays: [
         { id: "Element inspector", kind: "drawer", title: "Element", width: 460, render: ({ ...context }) => <ElementInspectorOverlay context={context} /> },
+        { id: "Manage pages", kind: "drawer", title: "Pages", width: 560, render: ({ ...context }) => <PageManager context={context} /> },
         insertBlock, resizeBlock, reorderBlock,
         { id: "AI edit diff", kind: "drawer", title: "Proposed edit", width: 520, render: ({ ...context }) => <AiEditDiff context={context} /> },
       ],

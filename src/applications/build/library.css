@@ -23,3 +23,11 @@
 .build-device-box{display:flex;flex-direction:column;gap:2px;min-width:0;padding:var(--space-2);border:1px dashed var(--border-default);border-radius:var(--radius-sm, 6px);font-size:var(--text-xs);overflow-wrap:anywhere}
 .build-device-box span{color:var(--fg-muted);font-variant-numeric:tabular-nums}
 @media(max-width:560px){.build-device-frame{width:100% !important}}
+
+/* Component binding and interaction editors */
+.t6-build-binding{display:grid;gap:var(--space-2);padding:var(--space-3);border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--bg-inset);min-width:0}
+.t6-build-binding p{margin:0}
+.t6-build-filter{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}
+.t6-build-filter > select,.t6-build-filter > input{flex:1 1 110px;min-width:0;width:auto}
+.t6-build-preview-trail{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}
+.t6-build-row-action{cursor:pointer}

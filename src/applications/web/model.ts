@@ -380,6 +380,9 @@ body{margin:0;font-family:${FONT_STACKS[theme.font]};font-size:${base}px;line-he
 .wrap{max-width:1040px;margin:0 auto;padding:0 20px}
 nav.site{display:flex;gap:16px;flex-wrap:wrap;padding:16px 20px;border-bottom:1px solid rgba(0,0,0,.1)}
 nav.site a{color:var(--ink);text-decoration:none;font-weight:600}
+nav.site .nav-group{display:inline-flex;flex-direction:column;gap:4px}
+nav.site .nav-sub{display:flex;flex-wrap:wrap;gap:10px}
+nav.site .nav-sub a{font-weight:400;font-size:.9em}
 section{padding:40px 0}
 section[data-pad=tight]{padding:20px 0}
 section[data-pad=roomy]{padding:64px 0}
@@ -442,7 +445,12 @@ export function blockHtml(block: Block): string {
 
 export function pageHtml(site: SiteModel, page: Page): string {
   const nav = site.nav.header.length
-    ? `<nav class="site">${site.nav.header.map((link) => `<a href="${escapeHtml(link.target)}"${link.kind === "external" ? ' rel="noreferrer"' : ""}>${escapeHtml(link.label)}</a>`).join("")}</nav>`
+    ? `<nav class="site">${site.nav.header.map((link) => {
+      const anchor = (item: NavLink) => `<a href="${escapeHtml(item.target)}"${item.kind === "external" ? ' rel="noreferrer"' : ""}>${escapeHtml(item.label)}</a>`;
+      return link.children.length
+        ? `<span class="nav-group">${anchor(link)}<span class="nav-sub">${link.children.map(anchor).join("")}</span></span>`
+        : anchor(link);
+    }).join("")}</nav>`
     : "";
   return `<!doctype html>
 <html lang="en">

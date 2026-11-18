@@ -17,8 +17,10 @@ import {
   type AppModel, type ComponentKind, type Entity, type EntityField, type ScreenComponent,
 } from "./model";
 import { ScreenPreview } from "./preview";
+import { BindingEditor } from "./bindingEditor";
+import { describeQuery } from "./binding";
 import { DeviceLayoutPreview } from "./devicePreview";
-import { saveApp, useBuildUi } from "./state";
+import { editComponent, saveApp, useBuildUi, type ComponentPatch } from "./state";
 import { wallMs } from "@/platform/clock";
 
 const COMPONENT_ICONS: Record<ComponentKind, React.ReactNode> = {
@@ -151,6 +153,8 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
                           <Pill tone="neutral">{COMPONENT_LABELS[item.kind]}</Pill>
                           <Pill tone={entity ? "success" : "danger"}>{entity ? entity.name : "not bound"}</Pill>
                           {entity && !entity.collection && <Pill tone="warning">no collection</Pill>}
+                          {entity && (item.filters.length > 0 || item.sort || item.limit > 0) && <Pill tone="info">{describeQuery(item, (id) => entity.fields.find((field) => field.id === id)?.name)}</Pill>}
+                          {item.interaction.kind !== "none" && <Pill tone="accent">opens {model.screens.find((candidate) => candidate.id === item.interaction.screenId)?.name ?? "a missing screen"}</Pill>}
                         </Row>
                         <span className="ds-subtle">
                           {item.kind === "text" ? item.text.slice(0, 70) : item.fieldIds.length ? item.fieldIds.map((id) => entity?.fields.find((field) => field.id === id)?.name ?? "missing").join(", ") : "all fields"}
@@ -172,7 +176,7 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
   const inspector = (
     <div className="t6-pane" data-kind="inspector" key="inspector">
       {component
-        ? <ComponentInspector component={component} model={model} onEdit={(patch) => setComponents(screen!.components.map((item) => (item.id === component.id ? { ...item, ...patch } : item)), `Edited ${component.title}`)} onRemove={() => { setComponents(screen!.components.filter((item) => item.id !== component.id), `Removed ${component.title}`); ui.selectComponent(""); }} />
+        ? <ComponentInspector component={component} model={model} onEdit={(patch) => void editComponent(context, record.id, component.id, patch, `Edited ${component.title}`)} onRemove={() => { setComponents(screen!.components.filter((item) => item.id !== component.id), `Removed ${component.title}`); ui.selectComponent(""); }} />
         : <Empty title="No component selected" icon={<LayoutList size={18} />}>Select one on the canvas to bind it to an entity and choose its fields.</Empty>}
     </div>
   );
@@ -360,7 +364,7 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
 
 export function ComponentInspector({
   component, model, onEdit, onRemove,
-}: { component: ScreenComponent; model: AppModel; onEdit: (patch: Partial<ScreenComponent>) => void; onRemove?: () => void }) {
+}: { component: ScreenComponent; model: AppModel; onEdit: (patch: ComponentPatch) => void; onRemove?: () => void }) {
   const entity = model.entities.find((item) => item.id === component.entityId);
   const [removeId, setRemoveId] = useState<string | null>(null);
   return (
@@ -406,6 +410,10 @@ export function ComponentInspector({
                 <option value="sum">Add up the chosen field</option>
               </Select>
             </Field>
+          )}
+          {entity && (
+            <BindingEditor component={component} entity={entity} model={model} onEdit={onEdit}
+              screenId={model.screens.find((item) => item.components.some((entry) => entry.id === component.id))?.id ?? ""} />
           )}
         </>
       )}

@@ -16,9 +16,20 @@ import "./integrations.css";
 import { ConnectionStatePill, MappingPanel, capabilityIdOf } from "./mappingPanel";
 import { STATE_LABELS, connectionState, readMapping } from "./mapping";
 import {
-  CATEGORIES, CONNECTOR_ENTRIES, adapterChecks, adapterOperations, authorisationSteps, entryById, entryForRecord,
+  CATEGORIES, CONNECTOR_ENTRIES, adapterChecks, adapterOperations, authorisationSteps, connectorPath, entryById, entryForRecord,
   type ConnectorEntry,
 } from "./catalog";
+
+/**
+ * Open a connector's detail or authorisation screen by the workspace's own
+ * connector record. When the workspace holds no record for the capability,
+ * the requirements drawer opens instead of a link to a record that does not exist.
+ */
+export function openConnector(context: ScreenContext, records: Rec[], entry: ConnectorEntry, screen: "marketplace" | "connect") {
+  const path = connectorPath(context.org.slug, records, entry, screen);
+  if (path) context.navigate(path);
+  else context.openOverlay("Connector preview", { id: entry.capability.id });
+}
 
 /* ---------------------------------------------------------------- *
  * Shared resolution
@@ -153,13 +164,13 @@ export function Marketplace({ context, lens }: { context: ScreenContext; lens: "
       action={<Button variant="secondary" onClick={() => { setQuery(""); setCategory("All"); }}>Clear filters</Button>}>
       Search by provider, capability or operation, or choose another category.
     </Empty> : <div className="connect-marketplace-grid" aria-label="Integration catalogue">
-      {matched.map(entry => <ConnectorCard key={entry.capability.id} entry={entry} context={context} />)}
+      {matched.map(entry => <ConnectorCard key={entry.capability.id} entry={entry} context={context} records={records} />)}
     </div>}
-    <p className="connect-marketplace-boundary">Every provider is currently not connected. Reviewing an integration or recording an install request does not grant access, send data or activate a sync.</p>
+    <p className="connect-marketplace-boundary"><strong>Every provider here is not connected.</strong> Reviewing an integration or recording an install request does not grant access, send data or activate a sync.</p>
   </Stack>;
 }
 
-function ConnectorCard({ entry, context }: { entry: ConnectorEntry; context: ScreenContext }) {
+function ConnectorCard({ entry, context, records }: { entry: ConnectorEntry; context: ScreenContext; records: Rec[] }) {
   const actions = entry.operations.filter(operation => operation.direction === "action").length;
   const reads = entry.operations.filter(operation => operation.direction === "read").length;
   const writes = entry.scopes.filter(scope => scope.kind === "write").length;
@@ -179,8 +190,8 @@ function ConnectorCard({ entry, context }: { entry: ConnectorEntry; context: Scr
     </div>
     <div className="connect-card-fallback"><strong>Available locally</strong><span>{entry.capability.localEquivalent}</span></div>
     <div className="connect-marketplace-card-foot">
-      <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/marketplace/${entry.capability.id}`)}>View details</Button>
-      <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Connector preview", { id: entry.capability.id })}>Requirements</Button>
+      <Button size="sm" variant="secondary" onClick={() => openConnector(context, records, entry, "marketplace")}>View details</Button>
+      <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Connector preview", { id: entry.capability.id })}>What it needs</Button>
       <Pill tone={entry.risk.level === "high" ? "danger" : entry.risk.level === "medium" ? "warning" : "neutral"}>{entry.risk.level} risk</Pill>
     </div>
   </article>;
@@ -188,8 +199,10 @@ function ConnectorCard({ entry, context }: { entry: ConnectorEntry; context: Scr
 
 export function ConnectorPreview({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
+  const records = useCollection("connectors");
   const [chosen, setChosen] = useState(payload?.id ?? CONNECTOR_ENTRIES[0]?.capability.id ?? "");
   const entry = entryById(chosen) ?? CONNECTOR_ENTRIES[0];
+  const authorisationPath = connectorPath(context.org.slug, records, entry, "connect");
   return (
     <Stack gap={3}>
       <Field label="Connector" htmlFor="preview-connector">
@@ -214,9 +227,15 @@ export function ConnectorPreview({ context }: { context: ScreenContext }) {
         {entry.scopes.length === 0 && <span className="ds-subtle">No scope model is published for this capability.</span>}
       </Stack>
       <Notice tone="warning" title="What happens instead">{entry.capability.localEquivalent}</Notice>
-      <Button variant="secondary" onClick={() => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/connect/connect/${entry.capability.id}`); }}>
-        Open the authorisation flow
-      </Button>
+      {authorisationPath ? (
+        <Button variant="secondary" onClick={() => { context.closeOverlay(); context.navigate(authorisationPath); }}>
+          Open the authorisation flow
+        </Button>
+      ) : (
+        <Notice tone="info" title="No connector record in this workspace">
+          Record an install request from the directory first; the authorisation preview opens from that record.
+        </Notice>
+      )}
     </Stack>
   );
 }
@@ -251,7 +270,7 @@ export function RiskSummary({ context }: { context: ScreenContext }) {
 type ConnectorLens = "Overview" | "Capabilities" | "Permissions" | "Versions" | "Help";
 
 export function ConnectorDetail({ context, lens }: { context: ScreenContext; lens: ConnectorLens }) {
-  const { entry } = useConnector(context);
+  const { entry, records } = useConnector(context);
   if (!entry) return <Empty title="No connector" icon={<Plug size={20} />}>
     This connector does not exist in the catalogue or this company's connection records.
   </Empty>;
@@ -259,7 +278,7 @@ export function ConnectorDetail({ context, lens }: { context: ScreenContext; len
     <section className="connect-connector-overview" aria-label="Connector details overview">
       <div className="connect-connector-head">
         <div>
-          <span className="connect-eyebrow">INTEGRATIONS / ${entry.category.toUpperCase()}</span>
+          <span className="connect-eyebrow">INTEGRATIONS / {entry.category.toUpperCase()}</span>
           <h2>{entry.capability.label}</h2>
           <p>{entry.capability.provider} · {entry.capability.note}</p>
         </div>
@@ -274,14 +293,14 @@ export function ConnectorDetail({ context, lens }: { context: ScreenContext; len
       <div className="connect-connector-actions">
         <Button size="sm" variant="secondary" onClick={() => context.setTab("Permissions")}>Review permissions</Button>
         <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/connect/marketplace`)}>All integrations</Button>
-        <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connect/${entry.capability.id}`)}>Connection requirements</Button>
+        <Button size="sm" variant="primary" onClick={() => openConnector(context, records, entry, "connect")}>Connection requirements</Button>
       </div>
     </section>
-    <ConnectorDetailBody context={context} lens={lens} entry={entry} />
+    <ConnectorDetailBody context={context} lens={lens} entry={entry} records={records} />
   </Stack>;
 }
 
-function ConnectorDetailBody({ context, lens, entry }: { context: ScreenContext; lens: ConnectorLens; entry: ConnectorEntry }) {
+function ConnectorDetailBody({ context, lens, entry, records }: { context: ScreenContext; lens: ConnectorLens; entry: ConnectorEntry; records: Rec[] }) {
   if (lens === "Capabilities") {
     return (
       <Stack gap={4}>
@@ -405,7 +424,7 @@ function ConnectorDetailBody({ context, lens, entry }: { context: ScreenContext;
           <Notice tone="warning" title="What it cannot do">
             {entry.operations.filter((operation) => operation.direction === "action").map((operation) => operation.summary).join(" ") || "Nothing outside this browser."}
           </Notice>
-          <Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connect/${entry.capability.id}`)}>Try to connect it</Button>
+          <Button variant="primary" onClick={() => openConnector(context, records, entry, "connect")}>Try to connect it</Button>
         </Stack>
       </Card>
       <Card span={12} eyebrow="LIMITS" prov="unknown" title="Provider limits">
@@ -420,7 +439,7 @@ function ConnectorDetailBody({ context, lens, entry }: { context: ScreenContext;
  * ================================================================ */
 
 export function ConnectionWizard({ context, lens }: { context: ScreenContext; lens: "Account" | "Permissions" | "Test" | "Confirm" }) {
-  const { entry } = useConnector(context);
+  const { entry, records } = useConnector(context);
   const [attempted, setAttempted] = useState(false);
   if (!entry) return <Empty title="No connector" icon={<Plug size={20} />} />;
   const steps = authorisationSteps(entry);
@@ -438,7 +457,7 @@ export function ConnectionWizard({ context, lens }: { context: ScreenContext; le
         </div>
         <div className="connect-connector-actions">
           <Button size="sm" variant="secondary" onClick={() => context.setTab("Permissions")}>Review scopes</Button>
-          <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/connect/marketplace/${entry.capability.id}`)}>Connector details</Button>
+          <Button size="sm" variant="ghost" onClick={() => openConnector(context, records, entry, "marketplace")}>Connector details</Button>
         </div>
       </section>
       <ul className="t6-steps">
