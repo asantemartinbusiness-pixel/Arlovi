@@ -1,32 +1,22 @@
 import { expect, test } from "@playwright/test";
 
-test("a company can be created with departments, AI drafts and a mission", async ({ page }) => {
+test("company creation preserves departments, AI drafts, knowledge, permissions and the first objective", async ({ page }) => {
   const slug = "fresh-studio-" + Math.floor(Math.random() * 900000 + 100000);
   await page.goto("/setup");
-  await expect(page.getByRole("heading", { name: "Bring your organization together." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tell us about your company." })).toBeVisible();
   await page.getByRole("textbox", { name: "Company name" }).fill(slug);
   await page.getByRole("textbox", { name: "Your name" }).fill("Workspace Owner");
+  await page.getByRole("textbox", { name: "What does your company do?" }).fill("Independent creative and operations studio.");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("textbox", { name: "Company overview" }).fill("Independent creative and operations studio.");
+  await page.getByRole("combobox", { name: "Main type of business" }).selectOption("creative");
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Introduce your company to Arlovi." })).toBeVisible();
-  await page.getByRole("textbox", { name: "Company knowledge" }).fill("We value transparent service and accessible design.");
+  await page.getByRole("textbox", { name: /Colleagues/ }).fill("Sam Rivera");
+  await page.getByText("Company Brain knowledge", { exact: true }).click();
+  await page.getByRole("textbox", { name: "Key company knowledge or operating instructions" }).fill("We value transparent service and accessible design.");
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Organize your headquarters." })).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Bring your people into the plan." })).toBeVisible();
-  await page.getByRole("textbox", { name: "Colleagues" }).fill("Sam Rivera");
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Plan your AI workforce." })).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Design your everyday workspace." })).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Give your team a place to work." })).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Decide how your AI team works." })).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("textbox", { name: "First mission" }).fill("Plan next-quarter client growth.");
-  await page.getByRole("button", { name: "Enter headquarters" }).click();
+  await expect(page.getByRole("heading", { name: "Your headquarters is taking shape." })).toBeVisible();
+  await page.getByRole("textbox", { name: "Your first business objective (optional)" }).fill("Plan next-quarter client growth.");
+  await page.getByRole("button", { name: "Create my headquarters" }).click();
   await expect(page).toHaveURL(new RegExp("/o/" + slug + "/workspace/home"));
   await expect(page.locator(".hq-orgswitch")).toContainText(slug);
 
@@ -39,10 +29,12 @@ test("a company can be created with departments, AI drafts and a mission", async
       request.onsuccess = () => {
         type Item = { id: string; organizationId: string; collection: string; fields: Record<string, unknown> };
         const all = request.result as Item[];
-        const orgId = all.find((record) => record.fields.slug === companySlug && record.collection === "organizations")?.id;
-        const records = all.filter((record) => record.organizationId === orgId);
+        const orgId = all.find(record => record.fields.slug === companySlug && record.collection === "organizations")?.id;
+        const records = all.filter(record => record.organizationId === orgId);
         const out: Record<string, number> = {};
-        for (const name of ["organizations", "departments", "agents", "missions", "sources", "channels", "policies", "preferences"]) out[name] = records.filter((r) => r.collection === name).length;
+        for (const name of ["organizations","departments","agents","missions","sources","channels","policies","preferences","members"]) {
+          out[name] = records.filter(record => record.collection === name).length;
+        }
         resolve(out);
         database.close();
       };
@@ -57,20 +49,23 @@ test("a company can be created with departments, AI drafts and a mission", async
   expect(counts.channels).toBeGreaterThan(0);
   expect(counts.policies).toBe(1);
   expect(counts.preferences).toBeGreaterThan(0);
+  expect(counts.members).toBeGreaterThan(1);
+
+  await page.goto("/o/" + slug + "/workspace/setup");
+  await expect(page.getByRole("heading", { name: "Company Setup Centre" })).toBeVisible();
+  await expect(page.getByText("invitations not sent")).toBeVisible();
 
   await page.reload();
   await expect(page.locator(".hq-orgswitch")).toContainText(slug);
   await page.goto("/");
   await expect(page).toHaveURL(new RegExp("/o/" + slug + "/workspace/home"));
 
-  // Recover IndexedDB company even after the localStorage catalogue disappears.
   await page.evaluate(() => {
     localStorage.removeItem("arlovi-last-workspace");
     localStorage.removeItem("arlovi-local-organizations-v1");
   });
   await page.goto("/");
   await expect(page).toHaveURL(new RegExp("/o/" + slug + "/workspace/home"));
-  await expect(page.locator(".hq-orgswitch")).toContainText(slug);
   const catalogue = await page.evaluate(() => localStorage.getItem("arlovi-local-organizations-v1"));
   expect(catalogue).toContain(slug);
 });
