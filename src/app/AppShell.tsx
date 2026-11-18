@@ -30,6 +30,7 @@ import { normalizeNotificationPreferences, notificationPreferenceKey } from "@/p
 import { useUi } from "@/runtime/ui";
 import { DisplayPreferences } from "@/app/DisplayPreferences";
 import { NotificationToastStack } from "@/app/NotificationToastStack";
+import { PlatformBanner } from "@/app/PlatformBanner";
 import "@/app/notification-experience.css";
 import type { Role } from "@/domain/types";
 import "@/app/shell.css";
@@ -437,34 +438,27 @@ export function AppShell() {
           <div className="hq-scroll">
           {applicationLoadFailures().length > 0 && (
             <div className="hq-banners">
-              <div className="ds-notice" data-tone="danger" role="alert">
-                <div>
-                  <strong className="ds-notice-title">Some applications could not be loaded</strong>
-                  {applicationLoadFailures().map((failure) => `${failure.group}: ${failure.message}`).join(" · ")}
-                  {" "}Every other application is working normally.
-                </div>
-              </div>
+              <PlatformBanner priority="P1" title="Some applications could not be loaded">
+                {applicationLoadFailures().map(failure => failure.group + ": " + failure.message).join(" · ")}
+                {" "}Other applications remain available.
+              </PlatformBanner>
             </div>
           )}
           {(ui.offline || paused) && (
             <div className="hq-banners">
               {ui.offline && (
-                <div className="ds-notice" data-tone="info" role="status">
-                  <div><strong className="ds-notice-title">Offline</strong>This workspace is in your browser, so it keeps working. Nothing is sent anywhere.</div>
-                </div>
+                <PlatformBanner priority="P3" title="Working offline">
+                  Local workspace activity remains available. Changes cannot reach external services until connectivity returns.
+                </PlatformBanner>
               )}
               {paused && (
-                <div className="ds-notice" data-tone="warning" role="status">
-                  <div className="ds-grow">
-                    <strong className="ds-notice-title">Mission dispatch is paused</strong>
-                    New autonomous steps will not start. Actions already accepted elsewhere cannot be confirmed from here.
-                  </div>
-                  {role === "owner" && (
-                    <Button size="sm" onClick={() => mutate.patch(org.id, { fields: { ...data.organizations.find((item) => item.id === org.id)?.fields, executionPaused: false } }, { event: "Mission dispatch resumed" })}>
-                      Resume dispatch
-                    </Button>
-                  )}
-                </div>
+                <PlatformBanner priority="P2" title="Mission dispatch is paused"
+                  actionLabel={role === "owner" ? "Resume dispatch" : undefined}
+                  action={role === "owner" ? () => { void mutate.patch(org.id, {
+                    fields: { ...data.organizations.find(item => item.id === org.id)?.fields, executionPaused: false },
+                  }, { event: "Mission dispatch resumed" }); } : undefined}>
+                  New autonomous steps will not start. Accepted external actions cannot be confirmed here.
+                </PlatformBanner>
               )}
             </div>
           )}
