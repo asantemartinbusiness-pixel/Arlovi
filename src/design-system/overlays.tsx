@@ -13,9 +13,43 @@ function fromToast(event: { target: EventTarget | null }): boolean {
 }
 
 /**
- * Modal — one focused decision. Title, consequence copy, a single principal
- * action. Focus is trapped and returned by Radix; Escape always dismisses
- * unless the caller marks the overlay as blocking.
+ * Application modals use a stable heading, scrollable work area, and one
+ * persistent action region. Existing footer props remain supported.
+ */
+const ModalFooterTarget = createContext<HTMLElement | null>(null);
+const ModalDirtyRegistrar = createContext<((dirty: boolean) => void) | null>(null);
+const ModalBusyRegistrar = createContext<((busy: boolean) => void) | null>(null);
+
+/** Portal form actions into the modal footer without changing overlay contracts. */
+export function ModalActions({ children }: { children: ReactNode }) {
+  const target = useContext(ModalFooterTarget);
+  const actions = <div className="ds-modal-action-row">{children}</div>;
+  return target ? createPortal(actions, target) : actions;
+}
+
+/** Opt-in dirty guard for editable forms; parent controls final save and close. */
+export function ModalUnsavedChanges({ when }: { when: boolean }) {
+  const register = useContext(ModalDirtyRegistrar);
+  useEffect(() => {
+    register?.(when);
+    return () => register?.(false);
+  }, [register, when]);
+  return null;
+}
+
+/** Prevent dismissal while an asynchronous modal operation is underway. */
+export function ModalInFlight({ when }: { when: boolean }) {
+  const register = useContext(ModalBusyRegistrar);
+  useEffect(() => {
+    register?.(when);
+    return () => register?.(false);
+  }, [register, when]);
+  return null;
+}
+
+/**
+ * Modal — one focused transaction or decision. Radix manages keyboard focus,
+ * Escape and focus return. Dismissal of edited forms requires confirmation.
  */
 export function Modal({
   open, onOpenChange, title, description, children, footer, width = 560, tone, blocking,
@@ -30,28 +64,79 @@ export function Modal({
   tone?: "danger";
   blocking?: boolean;
 }) {
+  const [footerTarget, setFooterTarget] = useState<HTMLElement | null>(null);
+  const [isDirty, setDirty] = useState(false);
+  const [inFlight, setInFlight] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const requestOpenChange = (next: boolean) => {
+    if (!next && (blocking || inFlight)) return;
+    if (!next && isDirty) {
+      setConfirmDiscard(true);
+      return;
+    }
+    onOpenChange(next);
+  };
+
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="ds-overlay" />
-        <Dialog.Content
-          className="ds-modal"
-          style={{ ["--modal-w" as string]: `${width}px` }}
-          onEscapeKeyDown={(event) => { if (blocking) event.preventDefault(); }}
-          onInteractOutside={(event) => { if (blocking || fromToast(event)) event.preventDefault(); }}
-        >
-          <header className="ds-overlay-head">
-            <div className="ds-grow">
-              <Dialog.Title asChild><h2 style={tone === "danger" ? { color: "var(--danger)" } : undefined}>{title}</h2></Dialog.Title>
-              {description && <Dialog.Description className="ds-card-sub">{description}</Dialog.Description>}
-            </div>
-            <Dialog.Close asChild><Button variant="ghost" size="sm" iconOnly aria-label="Close">✕</Button></Dialog.Close>
-          </header>
-          {children !== undefined && <div className="ds-overlay-body">{children}</div>}
-          {footer && <footer className="ds-overlay-foot">{footer}</footer>}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <ModalDirtyRegistrar.Provider value={setDirty}>
+      <ModalBusyRegistrar.Provider value={setInFlight}>
+      <ModalFooterTarget.Provider value={footerTarget}>
+        <Dialog.Root open={open} onOpenChange={requestOpenChange}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="ds-overlay" />
+            <Dialog.Content
+              className="ds-modal"
+              style={{ ["--modal-w" as string]: `${width}px` }}
+              onEscapeKeyDown={(event) => { if (blocking || inFlight) event.preventDefault(); }}
+              onInteractOutside={(event) => { if (blocking || inFlight || fromToast(event)) event.preventDefault(); }}
+            >
+              <header className="ds-overlay-head">
+                <div className="ds-grow">
+                  <Dialog.Title asChild>
+                    <h2 style={tone === "danger" ? { color: "var(--danger)" } : undefined}>{title}</h2>
+                  </Dialog.Title>
+                  {description
+                    ? <Dialog.Description className="ds-card-sub">{description}</Dialog.Description>
+                    : <Dialog.Description className="ds-overlay-visually-hidden">Review the details and available actions in this dialog.</Dialog.Description>}
+                </div>
+                <Dialog.Close asChild>
+                  <Button variant="ghost" size="sm" iconOnly aria-label="Close" title="Close dialog" disabled={blocking || inFlight}>
+                    <X size={16} aria-hidden="true" />
+                  </Button>
+                </Dialog.Close>
+              </header>
+              {children !== undefined && <div className="ds-overlay-body">{children}</div>}
+              <footer className="ds-overlay-foot ds-modal-foot" ref={setFooterTarget}>{footer}</footer>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
+        <Dialog.Root open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="ds-overlay ds-discard-overlay" />
+            <Dialog.Content className="ds-modal ds-discard-modal" aria-describedby={undefined}>
+              <header className="ds-overlay-head">
+                <div className="ds-grow">
+                  <Dialog.Title asChild><h2>Discard unsaved changes?</h2></Dialog.Title>
+                  <Dialog.Description className="ds-card-sub">The edits in this dialog have not been saved.</Dialog.Description>
+                </div>
+                <Dialog.Close asChild>
+                  <Button variant="ghost" iconOnly size="sm" aria-label="Keep editing"><X size={16} aria-hidden="true" /></Button>
+                </Dialog.Close>
+              </header>
+              <div className="ds-overlay-body">
+                <p className="ds-prose">You can return later, but these changes will be lost.</p>
+              </div>
+              <footer className="ds-overlay-foot ds-modal-foot">
+                <Button variant="secondary" onClick={() => setConfirmDiscard(false)}>Keep editing</Button>
+                <span className="ds-grow" />
+                <Button variant="danger" onClick={() => { setConfirmDiscard(false); onOpenChange(false); }}>Discard changes</Button>
+              </footer>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
+      </ModalFooterTarget.Provider>
+      </ModalBusyRegistrar.Provider>
+    </ModalDirtyRegistrar.Provider>
   );
 }
 
@@ -229,6 +314,7 @@ export function ConfirmModal({
       title={title}
       width={460}
       tone={tone === "danger" ? "danger" : undefined}
+      blocking={busy}
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
