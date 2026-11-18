@@ -9,7 +9,6 @@ import {
   evaluateAccess, screenAccessCatalogue, isSensitiveScreen, type AccessAction,
   type AccessPrincipal, type AccessScope, type AccessResource, type ResourceClassification,
 } from "@/platform/accessModel";
-import type { Role } from "@/domain/types";
 import "./access-workspace.css";
 
 type Lens = "applications" | "pages" | "simulation";
@@ -34,7 +33,7 @@ export function AccessWorkspace({ detailed = false }: { detailed?: boolean }) {
   const appNames=useMemo(()=>new Map(applications.map(app=>[app.code,app.name])),[]);
   const catalogue=useMemo(()=>screenAccessCatalogue(),[]);
   const filtered=useMemo(()=>applications.filter(app=>
-    (category==="All"||NAV_GROUPS.some(g=>g.label===category&&g.codes.includes(app.code))) &&
+    (category==="All"||NAV_GROUPS.some(g=>g.label===category&&g.apps.some(entry=>entry.code===app.code))) &&
     `${app.code} ${app.name} ${app.purpose}`.toLowerCase().includes(query.toLowerCase())
   ),[category,query]);
   const screenRows=useMemo(()=>catalogue.filter(page=>page.app===selectedApp &&
@@ -89,7 +88,7 @@ export function AccessWorkspace({ detailed = false }: { detailed?: boolean }) {
     </div>}
     {lens==="applications"&&<div className="aw-app-groups">
       {NAV_GROUPS.filter(g=>category==="All"||g.label===category).map(group=>{
-        const rows=filtered.filter(app=>group.codes.includes(app.code));
+        const rows=filtered.filter(app=>group.apps.some(entry=>entry.code===app.code));
         if(!rows.length)return null;
         return <div className="aw-app-group" key={group.label}>
           <div className="aw-group-heading"><strong>{group.label}</strong><span>{rows.length} applications</span></div>
