@@ -9,7 +9,7 @@ import { clockIso } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { requestMailboxConnection } from "./actions";
 import { useCommsData } from "./panels";
-import { configuredIdentities, signaturePreview, validateIdentity } from "./mailIdentities";
+import { configuredIdentities, validateIdentity } from "./mailIdentities";
 import { filterMailView, relatedMailContext, type MailView } from "./mailViews";
 import {
   MAIL_FOLDERS, checkDraft, draftInput, draftRecord, folderCounts, folderOf, searchThreads, senderAddress,
