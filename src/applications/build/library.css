@@ -14,3 +14,12 @@
 .t6-build-component-context{display:flex;flex-direction:column;gap:var(--space-2);padding:var(--space-3);border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--bg-surface)}
 .t6-build-component-context strong{overflow-wrap:anywhere;min-width:0}
 @media(max-width:700px){.t6-build-editor-overview{padding:var(--space-3)}.t6-build-editor-overview .ds-row{flex-wrap:wrap}}
+
+/* Responsive device layout preview */
+.build-device{display:flex;flex-direction:column;gap:var(--space-3)}
+.build-device-stage{padding:var(--space-4);border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--bg-canvas, var(--bg-surface));overflow:hidden}
+.build-device-frame{margin-inline:auto;min-width:0;display:flex;flex-direction:column;gap:var(--space-2);padding:var(--space-3);border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--bg-surface);transition:width .2s ease}
+.build-device-row{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:var(--space-2)}
+.build-device-box{display:flex;flex-direction:column;gap:2px;min-width:0;padding:var(--space-2);border:1px dashed var(--border-default);border-radius:var(--radius-sm, 6px);font-size:var(--text-xs);overflow-wrap:anywhere}
+.build-device-box span{color:var(--fg-muted);font-variant-numeric:tabular-nums}
+@media(max-width:560px){.build-device-frame{width:100% !important}}
