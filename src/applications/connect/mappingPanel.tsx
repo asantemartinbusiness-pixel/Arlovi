@@ -49,9 +49,11 @@ export function MappingPanel({ context, record, capabilityId, capabilityState }:
     setDraft({ ...draft, rows: draft.rows.map((row, at) => (at === index ? { ...row, ...patch } : row)) });
   }
 
-  async function write(next: Mapping, event: string) {
+  /** Resolves to whether the write landed; a revision conflict has already been reported. */
+  async function write(next: Mapping, event: string): Promise<boolean> {
     const body = record.body && typeof record.body === "object" ? record.body as Record<string, unknown> : {};
-    await context.mutate.patch(record.id, { body: { ...body, mapping: next } }, { expectRevision: record.revision, event });
+    const written = await context.mutate.patch(record.id, { body: { ...body, mapping: next } }, { expectRevision: record.revision, event });
+    return written !== null;
   }
 
   return (
@@ -103,11 +105,11 @@ export function MappingPanel({ context, record, capabilityId, capabilityState }:
             <Button variant="primary" disabled={disabled || !dirty} onClick={() => void write(
               { ...draft, savedAt: clockIso(), savedBy: context.actor, simulatedAt: "" },
               `Data mapping for ${record.title} saved: ${draft.rows.filter((row) => row.target).length} fields into ${draft.collection}${blocking.length ? " (incomplete)" : ""}`,
-            ).then(() => context.toast("Mapping saved", blocking.length ? "Saved, but setup stays pending until the required fields are mapped." : "The connection is configured. Nothing was read from the provider."))}>Save mapping</Button>
+            ).then((ok) => ok && context.toast("Mapping saved", blocking.length ? "Saved, but setup stays pending until the required fields are mapped." : "The connection is configured. Nothing was read from the provider."))}>Save mapping</Button>
             <Button variant="secondary" disabled={disabled || dirty || !saved.savedAt || blocking.length > 0}
               title={dirty ? "Save the mapping first" : blocking.length ? "Fix the required items first" : undefined}
               onClick={() => void write({ ...saved, simulatedAt: clockIso() }, `Simulated run of the ${record.title} mapping against the documented sample row; no provider data read`)
-                .then(() => context.toast("Simulation recorded", "The sample row was mapped locally. No provider was contacted."))}>Simulate with the sample row</Button>
+                .then((ok) => ok && context.toast("Simulation recorded", "The sample row was mapped locally. No provider was contacted."))}>Simulate with the sample row</Button>
             {dirty && <Button variant="ghost" onClick={() => setDraft(saved)}>Discard changes</Button>}
           </Row>
         </Stack>
