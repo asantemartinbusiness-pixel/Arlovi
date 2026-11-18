@@ -855,7 +855,7 @@ export const legalApp = registerApp({
         { id: "draft contract", kind: "modal", title: "Draft a contract", width: 640, render: ({ close, ...context }) => <DraftContract context={context} close={close} />, footer: submitFooter("lg-draft", "Create the draft") },
         { id: "Contract upload", kind: "modal", title: "Add a contract", width: 680, render: ({ close, ...context }) => <ContractUpload context={context} close={close} />, footer: submitFooter("lg-contract", "Add contract") },
         { id: "reviewer picker", kind: "modal", title: "Send for review", width: 560, render: ({ close, ...context }) => <ReviewerPicker context={context} close={close} />, footer: submitFooter("lg-reviewer", "Request review") },
-        { id: "e-sign request", kind: "modal", title: "Signature request", tone: "danger", width: 580, capability: "view_legal", presentation: { guidance: "Review the contract, signing parties and provider readiness before recording a request." }, render: ({ close, ...context }) => <ESignRequest context={context} close={close} /> },
+        { id: "e-sign request", kind: "modal", title: "Signature handover", width: 600, capability: "view_legal", presentation: { noRecordContext: true, guidance: "Select an approved contract and record an awaiting-signature handover; nothing is delivered to a signing provider." }, render: ({ close, ...context }) => <ESignRequest context={context} close={close} /> },
       ],
     },
 
