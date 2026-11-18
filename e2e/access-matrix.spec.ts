@@ -8,7 +8,7 @@ test("administrator can inspect and save view/edit policy drafts without changin
   await expect(matrix.getByText("Proposed permissions only — not applied to employees")).toBeVisible();
   await matrix.getByLabel("Application FIN view rule").selectOption("deny");
   await expect(matrix.getByLabel("Application FIN view rule")).toHaveValue("deny");
-  await expect(matrix.getByText("Unsaved changes")).toBeVisible();
+  await expect(matrix.getByText("Unsaved changes",{exact:true})).toBeVisible();
   await matrix.getByRole("button",{name:"Save permission draft"}).click();
   await expect(matrix.getByText("Saved draft",{exact:true})).toBeVisible();
   await page.reload();
