@@ -42,7 +42,7 @@ describe("mailbox drafts", () => {
     const fields = draftRecord({ to: "leo@martins.example", cc: "", subject: "Quote", body: "Attached." }, "maya@northline.example", "2026-11-18T10:00:00.000Z");
     expect(fields.fields).toMatchObject({ folder: "drafts", delivery: "not_connected", to: "leo@martins.example" });
     const back = draftInput(rec({ id: "t1", collection: "emailThreads", ...fields }));
-    expect(back).toEqual({ to: "leo@martins.example", cc: "", subject: "Quote", body: "Attached." });
+    expect(back).toEqual({ to: "leo@martins.example", cc: "", bcc: "", subject: "Quote", body: "Attached." });
   });
 
   it("searches every folder by subject, address and message text", () => {
