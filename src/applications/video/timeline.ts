@@ -255,6 +255,23 @@ function replaceClips(doc: VideoDoc, clips: Clip[]): VideoDoc {
   return { ...doc, clips, duration: Math.max(doc.duration, clips.reduce((longest, clip) => Math.max(longest, clipEnd(clip)), 0)) };
 }
 
+/** A clip can be edited unless it, or the track it sits on, is locked. */
+export function isEditable(doc: VideoDoc, clip: Clip | undefined): clip is Clip {
+  if (!clip || clip.locked) return false;
+  return !doc.tracks.find((track) => track.id === clip.trackId)?.locked;
+}
+
+/** Why a clip cannot be edited, or undefined when it can. */
+export function lockReason(doc: VideoDoc, clip: Clip): string | undefined {
+  if (clip.locked) return "This clip is locked.";
+  const track = doc.tracks.find((item) => item.id === clip.trackId);
+  return track?.locked ? `The ${track.name} track is locked.` : undefined;
+}
+
+export function trackLocked(doc: VideoDoc, trackId: string): boolean {
+  return Boolean(doc.tracks.find((track) => track.id === trackId)?.locked);
+}
+
 export function patchClip(doc: VideoDoc, id: string, patch: Partial<Clip>): VideoDoc {
   return replaceClips(doc, doc.clips.map((clip) => (clip.id === id ? { ...clip, ...patch } : clip)));
 }
@@ -272,7 +289,7 @@ export function trimClip(
   options: { ripple?: boolean } = {},
 ): VideoDoc {
   const clip = doc.clips.find((item) => item.id === clipId);
-  if (!clip || clip.locked) return doc;
+  if (!isEditable(doc, clip)) return doc;
   const fps = doc.fps;
   const source = sourceOf(doc, clip);
   const minimum = 1 / fps;
@@ -314,7 +331,7 @@ export function trimClip(
 export function rollEdit(doc: VideoDoc, leftId: string, rightId: string, deltaSeconds: number): VideoDoc {
   const left = doc.clips.find((clip) => clip.id === leftId);
   const right = doc.clips.find((clip) => clip.id === rightId);
-  if (!left || !right) return doc;
+  if (!isEditable(doc, left) || !isEditable(doc, right)) return doc;
   const fps = doc.fps;
   const minimum = 1 / fps;
   const leftSource = sourceOf(doc, left);
@@ -343,7 +360,7 @@ export function rollEdit(doc: VideoDoc, leftId: string, rightId: string, deltaSe
 /** Slip a clip: the picture moves inside the clip, its position does not. */
 export function slipClip(doc: VideoDoc, clipId: string, deltaSeconds: number): VideoDoc {
   const clip = doc.clips.find((item) => item.id === clipId);
-  if (!clip) return doc;
+  if (!isEditable(doc, clip)) return doc;
   const source = sourceOf(doc, clip);
   const max = source ? source.duration - clip.duration : Number.POSITIVE_INFINITY;
   return patchClip(doc, clipId, { sourceIn: snapFrame(clamp(clip.sourceIn + deltaSeconds, 0, Math.max(0, max)), doc.fps) });
@@ -352,7 +369,7 @@ export function slipClip(doc: VideoDoc, clipId: string, deltaSeconds: number): V
 /** Split a clip at a time, keeping both halves on the same source. */
 export function splitClip(doc: VideoDoc, clipId: string, time: number): { doc: VideoDoc; newClipId?: string } {
   const clip = doc.clips.find((item) => item.id === clipId);
-  if (!clip) return { doc };
+  if (!isEditable(doc, clip)) return { doc };
   const cut = snapFrame(time, doc.fps);
   if (cut <= clip.start + 1 / doc.fps || cut >= clipEnd(clip) - 1 / doc.fps) return { doc };
   const left: Clip = { ...clip, duration: snapFrame(cut - clip.start, doc.fps) };
@@ -372,8 +389,9 @@ export function splitClip(doc: VideoDoc, clipId: string, time: number): { doc: V
 /** Move a clip, keeping it on frame and refusing to overlap a neighbour. */
 export function moveClip(doc: VideoDoc, clipId: string, toStart: number, toTrackId?: string): VideoDoc {
   const clip = doc.clips.find((item) => item.id === clipId);
-  if (!clip || clip.locked) return doc;
+  if (!isEditable(doc, clip)) return doc;
   const trackId = toTrackId ?? clip.trackId;
+  if (trackLocked(doc, trackId)) return doc;
   const fps = doc.fps;
   let start = Math.max(0, snapFrame(toStart, fps));
   const neighbours = doc.clips.filter((item) => item.trackId === trackId && item.id !== clipId).sort((a, b) => a.start - b.start);
@@ -391,7 +409,7 @@ export function moveClip(doc: VideoDoc, clipId: string, toStart: number, toTrack
 /** Remove a clip and close the gap it leaves on its track. */
 export function rippleDelete(doc: VideoDoc, clipId: string): VideoDoc {
   const clip = doc.clips.find((item) => item.id === clipId);
-  if (!clip) return doc;
+  if (!isEditable(doc, clip)) return doc;
   const after = clipEnd(clip);
   const clips = doc.clips
     .filter((item) => item.id !== clipId)
@@ -402,6 +420,89 @@ export function rippleDelete(doc: VideoDoc, clipId: string): VideoDoc {
     ...replaceClips(doc, clips),
     transitions: doc.transitions.filter((transition) => transition.fromClipId !== clipId && transition.toClipId !== clipId),
   };
+}
+
+/**
+ * Cut every clip the playhead crosses, on every track that is not locked
+ * (or only the given clips). Clips within a frame of an edge are left whole.
+ */
+export function splitAllAt(doc: VideoDoc, time: number, onlyClipIds?: string[]): { doc: VideoDoc; count: number; newClipIds: string[] } {
+  let next = doc;
+  const newClipIds: string[] = [];
+  for (const clip of doc.clips) {
+    if (onlyClipIds && !onlyClipIds.includes(clip.id)) continue;
+    if (time <= clip.start || time >= clipEnd(clip)) continue;
+    const result = splitClip(next, clip.id, time);
+    if (result.newClipId) { next = result.doc; newClipIds.push(result.newClipId); }
+  }
+  return { doc: next, count: newClipIds.length, newClipIds };
+}
+
+/** Trim the head or the tail of a clip to a time on the timeline (the playhead). */
+export function trimToTime(doc: VideoDoc, clipId: string, edge: "start" | "end", time: number, options: { ripple?: boolean } = {}): VideoDoc {
+  const clip = doc.clips.find((item) => item.id === clipId);
+  if (!clip) return doc;
+  const delta = edge === "start" ? time - clip.start : time - clipEnd(clip);
+  return trimClip(doc, clipId, edge, delta, options);
+}
+
+/** Lock or unlock a track: its clips cannot be moved, trimmed, split or deleted while locked. */
+export function toggleTrackLock(doc: VideoDoc, trackId: string): VideoDoc {
+  return { ...doc, tracks: doc.tracks.map((track) => (track.id === trackId ? { ...track, locked: !track.locked } : track)) };
+}
+
+/* ------------------------------ caption cues ------------------------------ */
+
+function cueNeighbours(doc: VideoDoc, caption: Caption): { before?: Caption; after?: Caption } {
+  const same = doc.captions.filter((item) => item.language === caption.language && item.id !== caption.id).sort((a, b) => a.start - b.start);
+  return {
+    before: [...same].reverse().find((item) => item.end <= caption.start + 1e-9),
+    after: same.find((item) => item.start >= caption.end - 1e-9),
+  };
+}
+
+function withCaption(doc: VideoDoc, id: string, patch: Partial<Caption>): VideoDoc {
+  return { ...doc, captions: doc.captions.map((item) => (item.id === id ? { ...item, ...patch } : item)).sort((a, b) => a.start - b.start) };
+}
+
+/**
+ * Move a cue, keeping its length, on frame, inside the sequence and clear
+ * of the cues either side of it in the same language.
+ */
+export function moveCaption(doc: VideoDoc, id: string, toStart: number): VideoDoc {
+  const caption = doc.captions.find((item) => item.id === id);
+  if (!caption) return doc;
+  const length = caption.end - caption.start;
+  const { before, after } = cueNeighbours(doc, caption);
+  const low = before ? before.end : 0;
+  const high = (after ? after.start : doc.duration) - length;
+  const start = snapFrame(clamp(toStart, low, Math.max(low, high)), doc.fps);
+  return withCaption(doc, id, { start, end: snapFrame(start + length, doc.fps) });
+}
+
+/** Move the in or out point of a cue, at least one frame long and clear of its neighbours. */
+export function retimeCaption(doc: VideoDoc, id: string, edge: "start" | "end", time: number): VideoDoc {
+  const caption = doc.captions.find((item) => item.id === id);
+  if (!caption) return doc;
+  const frame = 1 / doc.fps;
+  const { before, after } = cueNeighbours(doc, caption);
+  if (edge === "start") {
+    return withCaption(doc, id, { start: snapFrame(clamp(time, before ? before.end : 0, caption.end - frame), doc.fps) });
+  }
+  return withCaption(doc, id, { end: snapFrame(clamp(time, caption.start + frame, after ? after.start : doc.duration), doc.fps) });
+}
+
+/**
+ * Add an empty cue at a time: two and a half seconds, or up to the next cue
+ * in the language. Refused (null) when the time is already inside a cue.
+ */
+export function addCaptionAt(doc: VideoDoc, time: number, language: string, id: string): VideoDoc | null {
+  const start = snapFrame(clamp(time, 0, doc.duration), doc.fps);
+  if (captionAt(doc, start, language)) return null;
+  const next = doc.captions.filter((item) => item.language === language && item.start > start).sort((a, b) => a.start - b.start)[0];
+  const end = snapFrame(Math.min(start + 2.5, next ? next.start : doc.duration, doc.duration), doc.fps);
+  if (end - start < 1 / doc.fps) return null;
+  return { ...doc, captions: [...doc.captions, { id, start, end, text: "", reviewed: false, language }].sort((a, b) => a.start - b.start) };
 }
 
 /** Gaps on a track, which an editor needs to see. */

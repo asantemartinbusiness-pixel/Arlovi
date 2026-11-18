@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { Lock, LockOpen } from "lucide-react";
 import { Pill } from "@/design-system";
 import { clamp } from "@/applications/visual/geometry";
 import { dragPointer, useMeasure, useStore, type DocHandle } from "@/applications/visual/kit";
 import {
-  clipEnd, clipsOnTrack, gapsOnTrack, mixAudio, moveClip, renderSamples, rollEdit,
-  snapFrame, splitClip, timecode, trimClip, waveformPeaks,
+  addCaptionAt, clipEnd, clipsOnTrack, gapsOnTrack, mixAudio, moveCaption, moveClip, renderSamples, retimeCaption, rollEdit,
+  snapFrame, splitClip, timecode, toggleTrackLock, trimClip, waveformPeaks,
   type Clip, type Track, type VideoDoc,
 } from "./timeline";
 import { renderFrame } from "./render";
@@ -126,10 +127,29 @@ export function MixWaveform({ doc, from = 0, seconds, height = 90, label }: { do
 export interface TimelineProps {
   handle: DocHandle<VideoDoc>;
   onSelect?: (clipId: string) => void;
+  /** A caption cue was picked on the caption lane. */
+  onCaptionSelect?: (captionId: string) => void;
+  /** A cue was double-clicked or Enter was pressed on it. */
+  onCaptionOpen?: (captionId: string) => void;
   height?: number;
 }
 
-export function TimelineView({ handle, onSelect, height = 260 }: TimelineProps) {
+const CAPTION_ROW = 30;
+
+/** Add an empty cue at the playhead in the language being edited, and select it. */
+export function addCueHere(handle: DocHandle<VideoDoc>): string | undefined {
+  const doc = handle.doc;
+  if (!doc) return "Open a sequence first";
+  const ui = videoUi.get();
+  const id = `cap-${Math.round(ui.playhead * 1000).toString(36)}-${doc.captions.length + 1}`;
+  const next = addCaptionAt(doc, ui.playhead, ui.language, id);
+  if (!next) return "A cue already covers the playhead, or there is no room before the next cue.";
+  handle.edit(next, "Add a cue");
+  videoUi.set((current) => ({ ...current, selectedCaptionId: id }));
+  return undefined;
+}
+
+export function TimelineView({ handle, onSelect, onCaptionSelect, onCaptionOpen, height = 260 }: TimelineProps) {
   const ui = useStore(videoUi);
   const [frameRef, size] = useMeasure<HTMLDivElement>();
   const doc = handle.doc;
@@ -216,6 +236,22 @@ export function TimelineView({ handle, onSelect, height = 260 }: TimelineProps) 
     });
   };
 
+  const startCueDrag = (event: ReactPointerEvent, id: string, mode: "move" | "start" | "end") => {
+    event.stopPropagation();
+    const caption = doc.captions.find((item) => item.id === id);
+    if (!caption) return;
+    videoUi.set((current) => ({ ...current, selectedCaptionId: id, playing: false, playhead: mode === "end" ? current.playhead : snapFrame(caption.start, doc.fps) }));
+    onCaptionSelect?.(id);
+    const from = mode === "end" ? caption.end : caption.start;
+    dragPointer(event, {
+      move: (point, _modifiers, origin) => {
+        const time = from + (point.x - origin.x) / pxPerSecond;
+        handle.live((current) => (mode === "move" ? moveCaption(current, id, time) : retimeCaption(current, id, mode, time)));
+      },
+      end: (moved) => { if (moved) handle.beginGesture(); },
+    });
+  };
+
   const ticks = Math.max(2, Math.floor(doc.duration));
   const tickStep = doc.duration > 90 ? 10 : doc.duration > 30 ? 5 : 1;
 
@@ -248,8 +284,31 @@ export function TimelineView({ handle, onSelect, height = 260 }: TimelineProps) 
             >
               S
             </button>
+            <button
+              type="button"
+              className="vx-node-btn"
+              aria-label={`${track.locked ? "Unlock" : "Lock"} ${track.name}`}
+              aria-pressed={track.locked}
+              data-on={track.locked ? "true" : undefined}
+              title={track.locked ? "Locked: clips on this track cannot be moved, trimmed, split or deleted" : "Lock the track"}
+              onClick={() => handle.edit((current) => toggleTrackLock(current, track.id), track.locked ? `Unlock ${track.name}` : `Lock ${track.name}`)}
+            >
+              {track.locked ? <Lock size={12} /> : <LockOpen size={12} />}
+            </button>
           </div>
         ))}
+        <div className="vx-tl-rowhead" style={{ height: CAPTION_ROW }}>
+          <span className="ds-grow ds-truncate">Captions · {ui.language.toUpperCase()}</span>
+          <button
+            type="button"
+            className="vx-node-btn"
+            aria-label="Add a caption cue at the playhead"
+            title="Add a cue at the playhead"
+            onClick={() => addCueHere(handle)}
+          >
+            +
+          </button>
+        </div>
       </div>
 
       <div className="vx-tl-scroll">
@@ -281,7 +340,16 @@ export function TimelineView({ handle, onSelect, height = 260 }: TimelineProps) 
           </div>
 
           {tracks.map((track) => (
-            <div key={track.id} className="vx-tl-row" style={{ height: track.height, opacity: track.muted ? 0.45 : 1 }}>
+            <div
+              key={track.id}
+              className="vx-tl-row"
+              data-locked={track.locked || undefined}
+              style={{
+                height: track.height,
+                opacity: track.muted ? 0.45 : 1,
+                backgroundImage: track.locked ? "repeating-linear-gradient(135deg, transparent, transparent 8px, var(--bg-inset) 8px, var(--bg-inset) 10px)" : undefined,
+              }}
+            >
               {gapsOnTrack(doc, track.id).map((gap) => (
                 <div
                   key={`${track.id}-gap-${gap.start}`}
@@ -301,11 +369,13 @@ export function TimelineView({ handle, onSelect, height = 260 }: TimelineProps) 
                     role="button"
                     tabIndex={0}
                     aria-label={`${clip.name}, ${timecode(clip.start, doc.fps)} to ${timecode(clipEnd(clip), doc.fps)}`}
+                    data-locked={track.locked || clip.locked || undefined}
                     style={{
                       insetInlineStart: clip.start * pxPerSecond,
                       width: clipWidth,
                       background: colour,
-                      opacity: dragging === clip.id ? 0.75 : 1,
+                      opacity: dragging === clip.id ? 0.75 : track.locked ? 0.6 : 1,
+                      cursor: track.locked || clip.locked ? "not-allowed" : undefined,
                     }}
                     onPointerDown={(event) => startClipDrag(event, clip)}
                     onKeyDown={(event) => {
@@ -356,6 +426,46 @@ export function TimelineView({ handle, onSelect, height = 260 }: TimelineProps) 
               })}
             </div>
           ))}
+
+          <div className="vx-tl-row" style={{ height: CAPTION_ROW }} aria-label={`Caption cues, ${ui.language}`} role="group">
+            {doc.captions.filter((caption) => caption.language === ui.language).map((caption) => {
+              const selected = ui.selectedCaptionId === caption.id;
+              return (
+                <div
+                  key={caption.id}
+                  className="vd-cue"
+                  data-selected={selected || undefined}
+                  data-reviewed={caption.reviewed || undefined}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Caption ${timecode(caption.start, doc.fps)} to ${timecode(caption.end, doc.fps)}: ${caption.text || "empty"}`}
+                  style={{ insetInlineStart: caption.start * pxPerSecond, width: Math.max(6, (caption.end - caption.start) * pxPerSecond) }}
+                  onPointerDown={(event) => startCueDrag(event, caption.id, "move")}
+                  onDoubleClick={() => onCaptionOpen?.(caption.id)}
+                  onKeyDown={(event) => {
+                    const step = (event.shiftKey ? doc.fps : 1) / doc.fps;
+                    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      const delta = event.key === "ArrowLeft" ? -step : step;
+                      handle.edit((current) => (event.altKey ? retimeCaption(current, caption.id, "end", caption.end + delta) : moveCaption(current, caption.id, caption.start + delta)), event.altKey ? "Retime the cue" : "Move the cue");
+                    }
+                    if (event.key === "Enter") { event.preventDefault(); onCaptionOpen?.(caption.id); }
+                    if (event.key === "Delete" || event.key === "Backspace") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      handle.edit((current) => ({ ...current, captions: current.captions.filter((item) => item.id !== caption.id) }), "Delete the cue");
+                      videoUi.set((current) => ({ ...current, selectedCaptionId: undefined }));
+                    }
+                  }}
+                >
+                  <span className="ds-truncate">{caption.text || "(empty)"}</span>
+                  <span className="vx-clip-grip" data-edge="start" role="separator" aria-label={`Move the in point of the cue at ${timecode(caption.start, doc.fps)}`} onPointerDown={(event) => startCueDrag(event, caption.id, "start")} />
+                  <span className="vx-clip-grip" data-edge="end" role="separator" aria-label={`Move the out point of the cue at ${timecode(caption.start, doc.fps)}`} onPointerDown={(event) => startCueDrag(event, caption.id, "end")} />
+                </div>
+              );
+            })}
+          </div>
 
           {doc.markers.map((marker) => (
             <div
