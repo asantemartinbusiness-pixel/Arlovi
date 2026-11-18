@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { findScreen } from "@/app/catalog";
 import { workspaceDestination } from "@/app/workspaceSidebarModel";
-import { ArrowUp, Clock3, FileText, Landmark, ListChecks, MessageSquarePlus, Sparkles, Target, Info } from "lucide-react";
+import { ArrowUp, CalendarDays, FileText, Landmark, Boxes, MessageSquarePlus, Sparkles, Headset, Info, History } from "lucide-react";
 import { Button, Drawer, TextArea } from "@/design-system";
 import { brand } from "@/app/brand";
 import { localAssistantReply } from "@/domain/assistant";
@@ -19,11 +19,29 @@ interface Turn {
 }
 
 const PROMPTS = [
-  { title: "Priorities", detail: "What needs attention today?", icon: ListChecks },
-  { title: "Finance", detail: "How much are we owed, and by whom?", icon: Landmark },
-  { title: "Missions", detail: "Which missions are waiting on a decision?", icon: Target },
-  { title: "Commitments", detail: "Summarise this week's commitments.", icon: Clock3 },
+  { title: "Finance", detail: "Which invoices are awaiting payment?", icon: Landmark },
+  { title: "Inventory", detail: "What stock is currently on hand?", icon: Boxes },
+  { title: "Bookings", detail: "What appointments are on the calendar?", icon: CalendarDays },
+  { title: "Customer care", detail: "Which service tickets are open?", icon: Headset },
 ] as const;
+
+interface Conversation {
+  id: string;
+  title: string;
+  turns: Turn[];
+  updatedAt: string;
+}
+function restoreConversations(key: string): Conversation[] {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is Conversation =>
+      Boolean(item && typeof item === "object" && typeof item.id === "string"
+        && typeof item.title === "string" && Array.isArray(item.turns) && typeof item.updatedAt === "string")).slice(0, 20);
+  } catch { return []; }
+}
 
 /** Local, cited workspace answers. No AI provider is connected. */
 export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string }) {
@@ -33,10 +51,18 @@ export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string 
   const { org, now, relative } = useWorkspace();
   const records = useOrgRecords();
   const [prompt, setPrompt] = useState(seed);
+  const historyKey = `arlovi-ask-history:${org.id}`;
+  const [history, setHistory] = useState<Conversation[]>(() => restoreConversations(historyKey));
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  useEffect(() => {
+    try { sessionStorage.setItem(historyKey, JSON.stringify(history.slice(0, 20))); }
+    catch { /* Temporary browser storage may be unavailable. */ }
+  }, [history, historyKey]);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const recordCount = useMemo(() => records.length, [records]);
+  const recordCount = useMemo(() => records.filter((record) => record.orgId === org.id).length, [records, org.id]);
   const replyContext = context === "Workspace" ? org.name : context;
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -50,16 +76,26 @@ export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string 
       .filter((record) => reply.text.includes(record.title))
       .slice(0, 4)
       .map((record) => ({ id: record.id, title: record.title, route: routeForRecord(record, org.slug) }));
-    setTurns((current) => [
-      ...current,
-      { id: crypto.randomUUID(), role: "person", text: question, at: now.toISOString() },
-      { id: crypto.randomUUID(), role: "arlovi", text: reply.text, sources: cited, at: now.toISOString() },
-    ]);
+    const updatedAt = new Date().toISOString();
+    const nextTurns: Turn[] = [
+      ...turns,
+      { id: crypto.randomUUID(), role: "person", text: question, at: updatedAt },
+      { id: crypto.randomUUID(), role: "arlovi", text: reply.text, sources: cited, at: updatedAt },
+    ];
+    const nextId = conversationId ?? crypto.randomUUID();
+    setConversationId(nextId);
+    setTurns(nextTurns);
+    setHistory((current) => [
+      { id: nextId, title: current.find((item) => item.id === nextId)?.title ?? question.slice(0, 72), turns: nextTurns, updatedAt },
+      ...current.filter((item) => item.id !== nextId),
+    ].slice(0, 20));
     setPrompt("");
   }
 
   function newConversation() {
     setTurns([]);
+    setConversationId(null);
+    setHistoryOpen(false);
     setPrompt("");
     document.querySelector<HTMLTextAreaElement>(".ask-composer textarea")?.focus();
   }
@@ -99,8 +135,23 @@ export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string 
       <section className="ask-panel" aria-label="Ask Arlovi conversation">
         <div className="ask-panel-toolbar">
           <span className="ask-context"><span className="ask-context-dot" /> {replyContext} <span className="ask-context-count">· {recordCount} records available</span></span>
-          <Button size="sm" variant="ghost" icon={<MessageSquarePlus size={15} />} onClick={newConversation} disabled={turns.length === 0 && !prompt} aria-label="New conversation">New</Button>
+          <div className="ask-toolbar-actions">
+            <Button size="sm" variant="ghost" icon={<History size={15} />} onClick={() => setHistoryOpen((value) => !value)} aria-label="Conversation history" aria-expanded={historyOpen}>History</Button>
+            <Button size="sm" variant="ghost" icon={<MessageSquarePlus size={15} />} onClick={newConversation} disabled={turns.length === 0 && !prompt} aria-label="New conversation">New</Button>
+          </div>
         </div>
+        {historyOpen && (
+          <div className="ask-history" aria-label="Recent local conversations">
+            <div className="ask-suggestion-heading">Recent conversations · this browser session</div>
+            {history.length === 0 ? <p className="ask-history-empty">No conversations saved in this session.</p> : history.map((item) => (
+              <button key={item.id} type="button" className="ask-history-item"
+                aria-current={conversationId === item.id ? "true" : undefined}
+                onClick={() => { setConversationId(item.id); setTurns(item.turns); setHistoryOpen(false); setPrompt(""); }}>
+                <span>{item.title}</span><small>{new Date(item.updatedAt).toLocaleString()}</small>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="ask-connection" role="status">
           <Info size={16} aria-hidden="true" />
           <div><strong>Using local workspace records</strong><p>No language model is connected. Answers come from records in {org.name}, not from an AI model.</p></div>
@@ -110,7 +161,7 @@ export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string 
           <div className="ask-welcome">
             <div className="ask-welcome-mark"><Sparkles size={25} strokeWidth={1.7} aria-hidden="true" /></div>
             <h2>How can I help?</h2>
-            <p>Find the details, decisions and activity that matter in your workspace.</p>
+            <p>Explore invoices, stock, bookings and service records available in your workspace.</p>
             <div className="ask-suggestion-heading">Explore your workspace</div>
             <div className="ask-suggestions">
               {PROMPTS.map(({ title, detail, icon: Icon }) => (
