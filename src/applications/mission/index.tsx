@@ -18,6 +18,7 @@ import {
 import type { Rec } from "@/domain/types";
 import { clockIso } from "@/platform/clock";
 
+import { ExecutionStatusCard, MilestoneTimeline, MilestonesCard, MissionBriefCard, ParticipantsPanel } from "./BriefPanels";
 /* ====================================================================== *
  * MISSION — Missions & Autonomous Execution
  *
@@ -446,29 +447,7 @@ function MissionOverview({ context, view }: { context: ScreenContext; view: stri
     return <PlanDependencies context={context} view="List" />;
   }
   if (view === "Team") {
-    const assigned = data.agents.filter((agent) => tasks.some((task) => String(task.fields.assignee) === agent.title) || mission.fields.agentId === agent.id);
-    const people = data.members.filter((member) => tasks.some((task) => String(task.fields.assignee) === member.title));
-    return (
-      <Grid>
-        {[...assigned, ...people].map((member) => {
-          const isAgent = member.collection === "agents";
-          const held = tasks.filter((task) => String(task.fields.assignee) === member.title);
-          return (
-            <Card key={member.id} span={4} eyebrow={isAgent ? "AI EMPLOYEE" : "PERSON"} prov={isAgent ? "agent" : "human"}
-              title={<Row gap={2}><Avatar name={member.title} kind={isAgent ? "ai" : "human"} size="sm" />{member.title}</Row>}
-              subtitle={String(member.fields.role ?? member.fields.title ?? "")}
-              footer={<Button size="sm" variant="ghost" onClick={() => context.navigate(isAgent ? `/o/${context.org.slug}/team/agents/${member.id}` : `/o/${context.org.slug}/team/organization`)}>Profile</Button>}>
-              <Properties rows={[
-                { label: "Items held", value: String(held.length) },
-                { label: "Verified", value: String(held.filter((task) => String(task.fields.stage) === "verified").length) },
-                ...(isAgent ? [{ label: "Model", value: <Pill tone="warning">Not connected</Pill> }] : []),
-              ]} />
-            </Card>
-          );
-        })}
-        {assigned.length + people.length === 0 && <Empty title="Nobody is assigned" icon={<Rocket size={20} />} />}
-      </Grid>
-    );
+    return <ParticipantsPanel context={context} mission={mission} tasks={tasks} members={data.members} agents={data.agents} />;
   }
   if (view === "Deliverables") return <Deliverables context={context} view="All" />;
   if (view === "Results") return <MissionResults context={context} view="Outcomes" />;
@@ -504,6 +483,11 @@ function MissionOverview({ context, view }: { context: ScreenContext; view: stri
         <Stat label="Spent" value={context.money(spent)} prov="posted" meta="Money that has left the ledger" />
         <Stat label="Steps stopped" value={String(blockedSteps.length)} prov={blockedSteps.length ? "unknown" : "posted"} meta={blockedSteps.length ? "At a provider boundary" : "Nothing is stuck"} onClick={() => context.navigate(`/o/${context.org.slug}/mission/missions/${mission.id}/execution`)} />
       </StatRow>
+
+      <Grid>
+        <MissionBriefCard context={context} mission={mission} />
+        <ExecutionStatusCard context={context} mission={mission} steps={steps} tasks={tasks} />
+      </Grid>
 
       <Grid>
         <Card span={7} eyebrow="GOAL" prov="human" title={mission.title} subtitle={mission.summary}>
@@ -552,6 +536,8 @@ function MissionOverview({ context, view }: { context: ScreenContext; view: stri
             </Row>
           </Stack>
         </Card>
+
+        <MilestonesCard context={context} mission={mission} tasks={tasks} />
 
         <Card span={12} eyebrow="DELIVERABLES" prov="agent" title="What has been produced" subtitle={`${deliverables.length} records`}>
           {deliverables.length === 0 ? <Empty title="Nothing produced yet" icon={<FileText size={20} />} /> : (
@@ -609,6 +595,7 @@ function PlanDependencies({ context, view }: { context: ScreenContext; view: str
     const withDates = ordered.filter((task) => task.dueAt || mission.dueAt);
     return (
       <Stack gap={4}>
+        <MilestoneTimeline context={context} mission={mission} tasks={tasks} />
         <Card eyebrow="TIMELINE" prov="human" title="Sequence by dependency" subtitle={`${ordered.length} tasks, ${withDates.length} with a date`}>
           <Stack gap={2}>
             {ordered.map((task, index) => {

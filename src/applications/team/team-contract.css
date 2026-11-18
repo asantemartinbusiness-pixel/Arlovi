@@ -1,0 +1,38 @@
+/* TEAM-003 contract panels. Layout only; colours come from design tokens. */
+
+.team-avail { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-4); }
+.team-avail h3 { margin: 0 0 var(--space-2); }
+.team-avail-list { margin: 0; padding-inline-start: var(--space-4); display: flex; flex-direction: column; gap: var(--space-1); }
+.team-avail-list[data-tone="blocked"] li::marker { color: var(--warning); }
+.team-avail-list[data-tone="ok"] li::marker { color: var(--success); }
+
+.team-levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-2); }
+.team-level {
+  display: flex; gap: var(--space-2); align-items: flex-start; padding: var(--space-3);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md); cursor: pointer; background: var(--bg-surface);
+}
+.team-level[data-selected="true"] { border-color: var(--blush-edge); background: var(--bg-selected); }
+.team-level > span { display: flex; flex-direction: column; gap: 2px; }
+.team-level input { margin-top: 3px; }
+
+.team-scopes { display: flex; flex-direction: column; }
+.team-scope {
+  display: grid; grid-template-columns: minmax(0, 1fr) 130px auto; gap: var(--space-3); align-items: center;
+  padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border-subtle);
+}
+.team-scope:first-child { border-top: 0; }
+.team-scope-main { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.team-scope-main code { font-size: var(--text-xs); }
+.team-scope-new { grid-template-columns: repeat(4, minmax(0, 1fr)) auto; align-items: end; background: var(--bg-inset); }
+.team-scope-new > [role="alert"] { grid-column: 1 / -1; }
+.team-savebar { position: sticky; bottom: 0; padding: var(--space-3) 0; background: var(--bg-canvas); border-top: 1px solid var(--border-subtle); z-index: 1; }
+
+@media (max-width: 899px) {
+  .team-scope-new { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .team-scope-new > button { grid-column: 1 / -1; justify-self: start; }
+}
+@media (max-width: 599px) {
+  .team-scope { grid-template-columns: minmax(0, 1fr) auto; padding: var(--space-3); }
+  .team-scope > .ds-select { grid-column: 1 / 2; grid-row: 2; }
+  .team-scope-new { grid-template-columns: minmax(0, 1fr); }
+}

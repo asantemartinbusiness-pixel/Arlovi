@@ -360,5 +360,103 @@ registerSeed("brain", (ctx) => {
     }),
   ];
 
+  /* ---------------- Knowledge workspace: collections and records ---------------- */
+  const collection = (n: number, title: string, summary: string, owner: string, reviewIntervalDays: number) => ctx.rec({
+    org: "nl", collection: "knowledgeCollections", n, title, status: "active", owner, summary, fields: { reviewIntervalDays },
+  });
+  const review = (id: string, days: number, by: string, action: string, note = "", extra: Record<string, string> = {}) => ({ id, at: at(days), by, action, note, ...extra });
+  const knowledge = (n: number, title: string, input: {
+    status: "draft" | "needs_review" | "verified" | "archived";
+    collectionId: string;
+    owner: string;
+    summary: string;
+    content: string;
+    provenance?: "human" | "model_generated" | "imported";
+    reviewer?: string;
+    lastReviewedDays?: number;
+    dueDays?: number;
+    tags?: string[];
+    sources?: { id: string; sourceId?: string; label: string; locator?: string }[];
+    related?: string[];
+    reviews: ReturnType<typeof review>[];
+  }) => ctx.rec({
+    org: "nl", collection: "knowledge", n, title, status: input.status, owner: input.owner, summary: input.summary,
+    tags: input.tags ?? [], dueAt: input.dueDays === undefined ? undefined : at(input.dueDays),
+    createdAt: input.reviews[0]?.at,
+    fields: {
+      collectionId: input.collectionId,
+      provenance: input.provenance ?? "human",
+      reviewer: input.reviewer ?? "",
+      ...(input.lastReviewedDays === undefined ? {} : { lastReviewedAt: at(input.lastReviewedDays), lastReviewedBy: input.reviewer ?? input.owner }),
+    },
+    body: { content: input.content, sources: input.sources ?? [], related: input.related ?? [], reviews: input.reviews },
+  });
+
+  records.push(
+    collection(1, "Customer care answers", "Approved answers the care team gives about shades, lead times and warranty.", "Priya Shah", 60),
+    collection(2, "Operations procedures", "How the workshop and showroom run day to day.", "Theo Marsh", 120),
+    collection(3, "Trade and pricing", "How trade pricing works and who approves a change.", "Maya Chen", 45),
+    knowledge(1, "Shade warranty: what we cover", {
+      status: "verified", collectionId: "nl-knowledgeCollections-001", owner: "Priya Shah", reviewer: "Maya Chen", lastReviewedDays: -20,
+      summary: "Shades carry a 24-month warranty from delivery. Fittings and bulbs are excluded.",
+      content: "Every shade carries a 24-month warranty from the delivery date.\n\nCovered: glaze crazing, seam failure, fixing collar defects.\nNot covered: bulbs, accidental damage, fittings installed by a third party.\n\nAsk for the order number and a photograph before promising a replacement.",
+      tags: ["warranty", "care"],
+      sources: [{ id: "s1", sourceId: "nl-sources-067", label: "Customer care article set", locator: "Article 3" }],
+      related: ["nl-facts-065", "nl-knowledge-002"],
+      reviews: [review("k1a", -40, "Priya Shah", "created"), review("k1b", -21, "Priya Shah", "requested", "", { reviewer: "Maya Chen" }), review("k1c", -20, "Maya Chen", "approved", "Checked against the article set.")],
+    }),
+    knowledge(2, "Replacement shade lead time", {
+      status: "needs_review", collectionId: "nl-knowledgeCollections-001", owner: "Priya Shah", reviewer: "Theo Marsh", dueDays: 3,
+      summary: "Three weeks for a replacement shade, pending confirmation from the workshop.",
+      content: "Quote three weeks for a replacement shade from the day the order is confirmed.\n\nThe workshop has not yet confirmed this against the current production schedule.",
+      tags: ["lead time", "care"],
+      sources: [{ id: "s1", sourceId: "nl-sources-067", label: "Customer care article set", locator: "Article 5" }],
+      related: ["nl-facts-066", "nl-knowledge-001"],
+      reviews: [review("k2a", -6, "Priya Shah", "created"), review("k2b", -4, "Priya Shah", "requested", "Please confirm against the winter run.", { reviewer: "Theo Marsh", dueAt: at(3) })],
+    }),
+    knowledge(3, "Answering a trade price question", {
+      status: "needs_review", collectionId: "nl-knowledgeCollections-003", owner: "Maya Chen", provenance: "model_generated", reviewer: "Maya Chen", dueDays: -2,
+      summary: "Draft reply pasted in from an assistant outside this workspace. No source cited yet.",
+      content: "Thank you for asking about trade pricing. Our trade prices are shown excluding VAT and are available to registered trade accounts. Please contact the studio for the current price list.",
+      tags: ["trade", "pricing"],
+      reviews: [review("k3a", -9, "Jonah Adeyemi", "created", "Pasted in as model-generated text."), review("k3b", -8, "Jonah Adeyemi", "requested", "", { reviewer: "Maya Chen", dueAt: at(-2) })],
+    }),
+    knowledge(4, "Who approves a trade price change", {
+      status: "verified", collectionId: "nl-knowledgeCollections-003", owner: "Maya Chen", reviewer: "Jonah Adeyemi", lastReviewedDays: -70,
+      summary: "Maya Chen approves trade price changes; finance records the effective date.",
+      content: "A trade price change is proposed in the price list, approved by Maya Chen and given an effective date by finance.\n\nNo price is quoted to a customer before its effective date.",
+      tags: ["pricing", "approval"],
+      sources: [{ id: "s1", sourceId: "nl-sources-060", label: "Trade price list — November" }],
+      related: ["nl-decisions-060", "nl-facts-060"],
+      reviews: [review("k4a", -95, "Maya Chen", "created"), review("k4b", -70, "Jonah Adeyemi", "approved")],
+    }),
+    knowledge(5, "Opening the showroom on a Saturday", {
+      status: "draft", collectionId: "nl-knowledgeCollections-002", owner: "Theo Marsh",
+      summary: "Checklist for the Saturday opener. Closing time is disputed and left out.",
+      content: "1. Disarm the alarm and switch on the display lighting.\n2. Check the board by the door shows the correct hours.\n3. Open the till and count the float.\n\nClosing time: not written here until the open conflict on Saturday hours is resolved.",
+      tags: ["showroom"],
+      sources: [{ id: "s1", sourceId: "nl-sources-061", label: "Showroom opening hours board" }],
+      related: ["nl-facts-062"],
+      reviews: [review("k5a", -3, "Theo Marsh", "created")],
+    }),
+    knowledge(6, "Receiving a brass delivery", {
+      status: "verified", collectionId: "nl-knowledgeCollections-002", owner: "Theo Marsh", reviewer: "Maya Chen", lastReviewedDays: -30,
+      summary: "Count, check the batch number, and record the goods receipt the same day.",
+      content: "Count the collars against the delivery note.\nCheck the batch number matches the approved batch.\nRecord the goods receipt the same day. Payment terms are 30 days from invoice.",
+      tags: ["supplier", "workshop"],
+      sources: [{ id: "s1", sourceId: "nl-sources-063", label: "Thames Brass supply agreement", locator: "Clause 4" }, { id: "s2", label: "Bench notes, winter run", locator: "Batch 42" }],
+      related: ["nl-facts-063"],
+      reviews: [review("k6a", -60, "Theo Marsh", "created"), review("k6b", -30, "Maya Chen", "approved")],
+    }),
+    knowledge(7, "Retail prices including VAT", {
+      status: "archived", collectionId: "nl-knowledgeCollections-003", owner: "Maya Chen",
+      summary: "Superseded: retail prices are no longer shown including VAT in trade material.",
+      content: "Show retail prices including VAT on every price list.",
+      tags: ["pricing"],
+      related: ["nl-decisions-063"],
+      reviews: [review("k7a", -210, "Maya Chen", "created"), review("k7b", -190, "Maya Chen", "archived", "Superseded by the trade pricing decision.")],
+    }),
+  );
+
   return { records, events: [] };
 });

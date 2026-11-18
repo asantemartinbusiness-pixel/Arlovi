@@ -13,6 +13,7 @@ import { useAgentBuilder } from "@/applications/t2_shared/store";
 import { SAFETY_SCORE, activationBlockers, assertionsOf, latestRunFor, runScenario, type RunResult } from "./evaluator";
 import type { Rec } from "@/domain/types";
 import { clockIso } from "@/platform/clock";
+import { AssignmentHistory, ContractEditor, ExecutionAvailabilityCard } from "./ContractPanels";
 
 /* ====================================================================== *
  * TEAM — AI Workforce & Agent Academy
@@ -35,7 +36,7 @@ function agentBody(agent: Rec | undefined): AgentBody {
 }
 
 function useWorkforce() {
-  return useCollections(["agents", "skills", "evaluations", "members", "departments", "missionTasks", "missions", "connectors", "courses", "sources", "tasks"]);
+  return useCollections(["agents", "skills", "evaluations", "members", "departments", "missionTasks", "missions", "connectors", "courses", "sources", "tasks", "agentWorkAssignments", "agentExecutionRequests"]);
 }
 
 /* ---------------------------- TEAM-001 ---------------------------- */
@@ -306,42 +307,24 @@ function AgentProfile({ context, view }: { context: ScreenContext; view: "Overvi
   }
 
   if (view === "Work") {
-    return work.length === 0
-      ? <Empty title={`Nothing is assigned to ${agent.title}`} icon={<Bot size={20} />} />
-      : <DataGrid rows={work} rowId={(row) => row.id} label="Assigned work" columns={[
-        { key: "title", header: "Item", primary: true, cell: (row) => row.title, filterValue: (row) => row.title },
-        { key: "stage", header: "Stage", cell: (row) => <Pill>{String(row.fields.stage ?? row.status)}</Pill> },
-        { key: "mission", header: "Mission", cell: (row) => data.missions.find((mission) => mission.id === row.parentId)?.title ?? "—" },
-        { key: "gate", header: "Approval gate", cell: (row) => row.fields.approvalRequired === true ? <Pill tone="warning">Yes</Pill> : "No" },
-      ]} />;
+    return (
+      <Stack gap={4}>
+        {work.length === 0
+          ? <Empty title={`Nothing is assigned to ${agent.title} right now`} icon={<Bot size={20} />} />
+          : <DataGrid rows={work} rowId={(row) => row.id} label="Assigned work" columns={[
+            { key: "title", header: "Item", primary: true, cell: (row) => row.title, filterValue: (row) => row.title },
+            { key: "stage", header: "Stage", cell: (row) => <Pill>{String(row.fields.stage ?? row.status)}</Pill> },
+            { key: "mission", header: "Mission", cell: (row) => data.missions.find((mission) => mission.id === row.parentId)?.title ?? "—" },
+            { key: "gate", header: "Approval gate", cell: (row) => row.fields.approvalRequired === true ? <Pill tone="warning">Yes</Pill> : "No" },
+          ]} />}
+        <AssignmentHistory context={context} agent={agent} data={data} />
+      </Stack>
+    );
   }
 
   if (view === "Permissions") {
     const queued = work.filter((task) => !["verified", "done"].includes(String(task.fields.stage ?? task.status)));
-    return (
-      <Stack gap={4}>
-        <Card title="Tools" subtitle={`${(body.tools ?? []).filter((tool) => tool.granted).length} granted`}>
-          <Stack gap={2}>
-            {(body.tools ?? []).map((tool) => (
-              <Row key={tool.id} gap={2} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-                <div className="ds-grow"><strong>{tool.label}</strong><div className="ds-subtle">{tool.id}</div></div>
-                <Pill tone={tool.granted ? "success" : "warning"}>{tool.granted ? "Granted" : tool.capability ? "Provider not connected" : "Not granted"}</Pill>
-              </Row>
-            ))}
-            {(body.tools ?? []).length === 0 && <span className="ds-subtle">No tool is recorded on this contract.</span>}
-          </Stack>
-        </Card>
-        <Card title="Authority" subtitle="What the contract says it may do">
-          <ul className="ds-prose" style={{ paddingInlineStart: "1.1rem" }}>
-            {(body.authority ?? ["Nothing recorded"]).map((line) => <li key={line}>{line}</li>)}
-          </ul>
-        </Card>
-        <Notice tone="warning" title="A permission change re-authorises queued work">
-          {queued.length} item{queued.length === 1 ? " is" : "s are"} queued for {agent.title}. Changing its tools or sources marks each one as needing re-authorisation before it runs, so nothing executes under a grant that has been taken away.
-        </Notice>
-        <Button variant="secondary" onClick={() => context.openOverlay("permission inspector", { id: agent.id })}>Change permissions</Button>
-      </Stack>
-    );
+    return <ContractEditor context={context} agent={agent} queued={queued} />;
   }
 
   if (view === "Performance") {
@@ -408,6 +391,7 @@ function AgentProfile({ context, view }: { context: ScreenContext; view: "Overvi
             { label: "Autonomy", value: String(agent.fields.autonomy ?? "draft") },
             { label: "Spend ceiling", value: context.money(Number(agent.fields.spendCapMinor ?? 0)) },
             { label: "Model", value: <Pill tone="warning">Not connected</Pill> },
+            { label: "Permitted actions", value: String((body.authority ?? []).length) },
           ]} />
         </Stack>
       </Card>
@@ -420,6 +404,7 @@ function AgentProfile({ context, view }: { context: ScreenContext; view: "Overvi
           </Stack>
         )}
       </Card>
+      <ExecutionAvailabilityCard context={context} agent={agent} activation={blockers} />
       <Card span={12} eyebrow="GRANTS" prov="human" title="Knowledge grants" subtitle={`${(body.sources ?? []).length} named sources`}>
         {(body.sources ?? []).length === 0 ? <span className="ds-subtle">No named source. It reads what its skills name, inside this organisation.</span> : (
           <Row gap={2} wrap>
