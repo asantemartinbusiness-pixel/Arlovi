@@ -1,5 +1,6 @@
 import type { Rec, Role } from "@/domain/types";
 import { daysBetween } from "./clock";
+import { nativeNotificationContract } from "@/platform/notificationContracts";
 
 /* ------------------------------------------------------------------ *
  * Attention engine.
@@ -67,15 +68,25 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
   const { orgSlug, now } = input;
   const items: AttentionItem[] = [];
 
+  const knownKinds: AttentionKind[] = ["approval", "overdue", "mention", "assignment", "update", "system", "interruption"];
   for (const record of input.notifications) {
+    const native = nativeNotificationContract(record.fields.appCode);
     const priority = (typeof record.fields.priority === "string" && /^P[0-5]$/.test(record.fields.priority)
-      ? record.fields.priority : "P3") as Priority;
-    const audience = typeof record.fields.audience === "string"
+      ? record.fields.priority : native?.defaultPriority ?? "P3") as Priority;
+    const declaredAudience = typeof record.fields.audience === "string"
       ? record.fields.audience.split(",").map((value) => value.trim()).filter(Boolean) as Role[]
       : [];
+    // Missing recipient policy on sensitive sources must never default to every role view.
+    const restrictedAudience: Role[] = record.fields.appCode === "HR" ? ["owner", "people"]
+      : record.fields.appCode === "FIN" ? ["owner", "finance"]
+      : ["ADMIN", "IT", "LEGAL"].includes(String(record.fields.appCode ?? "")) ? ["owner"]
+      : [];
+    const audience = declaredAudience.length ? declaredAudience : restrictedAudience;
+    const kind = typeof record.fields.kind === "string" && knownKinds.includes(record.fields.kind as AttentionKind)
+      ? record.fields.kind as AttentionKind : native?.kind ?? "update";
     items.push({
       id: record.id,
-      kind: (record.fields.kind as AttentionKind) ?? "update",
+      kind,
       priority,
       title: record.title,
       body: record.summary,
@@ -87,7 +98,8 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
       acknowledged: boolField(record, "acknowledged"),
       resolved: record.status === "resolved" || boolField(record, "resolved"),
       sourceId: record.id,
-      group: "Updates",
+      group: typeof record.fields.group === "string" && record.fields.group.trim()
+        ? record.fields.group : native?.name ?? "Updates",
     });
   }
 
