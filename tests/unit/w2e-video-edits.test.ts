@@ -21,6 +21,29 @@ describe("W2E video: split and trim at the playhead", () => {
     expect(right.sourceIn).toBeCloseTo(3);
   });
 
+  it("moves the fade out to the right half and keeps the fade in on the left", () => {
+    const { doc, newClipId } = splitClip(base(), "a1", 8);
+    const left = clip(doc, "a1");
+    const right = clip(doc, newClipId!);
+    expect(left).toMatchObject({ fadeIn: 1, fadeOut: 0 });
+    expect(right).toMatchObject({ fadeIn: 0, fadeOut: 2 });
+    /* Splitting the music bed at every cut adds no fades in the middle. */
+    const all = splitAllAt(base(), 3).doc.clips.filter((item) => item.trackId === "tr-a1").sort((a, b) => a.start - b.start);
+    expect(all.map((item) => [item.fadeIn, item.fadeOut])).toEqual([[1, 0], [0, 2]]);
+  });
+
+  it("gives the right half a unique id even when the same clip is cut at the same time twice", () => {
+    const first = splitClip(base(), "c1", 3);
+    /* Move the right half away and give c1 its length back, then cut at 3s again. */
+    let doc = moveClip(first.doc, first.newClipId!, 0, "tr-v2");
+    doc = { ...doc, clips: doc.clips.map((item) => (item.id === "c1" ? { ...item, duration: 7 } : item)) };
+    const second = splitClip(doc, "c1", 3);
+    expect(second.newClipId).toBeDefined();
+    expect(second.newClipId).not.toBe(first.newClipId);
+    const ids = second.doc.clips.map((item) => item.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
   it("splits only the given clip when asked", () => {
     const result = splitAllAt(base(), 3, ["t1"]);
     expect(result.count).toBe(1);
