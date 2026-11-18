@@ -44,7 +44,8 @@ export interface DeliveryRow {
   promisedAt?: string;
   /** Whole days after the promised date; zero when on time or early. */
   lateDays: number;
-  onTime: boolean;
+  /** Null when the order has no promised date, so the receipt is not scored. */
+  onTime: boolean | null;
 }
 
 export interface VarianceRow {
@@ -82,6 +83,8 @@ export interface SupplierPerformance {
 }
 
 const COMMITTED = new Set(["approved", "sent", "received", "closed"]);
+/** Receipt states in which goods have physically arrived (drafts and expected deliveries have not). */
+const ARRIVED = new Set(["receiving", "exception", "complete"]);
 
 function dayDiff(later: string, earlier: string): number {
   const a = new Date(later); const b = new Date(earlier);
@@ -111,15 +114,16 @@ export function supplierPerformance(
   const committed = orders.filter((order) => COMMITTED.has(order.status));
   const orderIds = new Set(orders.map((order) => order.id));
   const received = data.receipts
-    .filter((receipt) => orderIds.has(String(receipt.fields.purchaseOrderId)) && receipt.status !== "expected" && receipt.at)
+    .filter((receipt) => orderIds.has(String(receipt.fields.purchaseOrderId)) && ARRIVED.has(receipt.status) && receipt.at)
     .sort((a, b) => a.at!.localeCompare(b.at!));
 
   const deliveries: DeliveryRow[] = received.map((receipt) => {
     const order = orders.find((item) => item.id === String(receipt.fields.purchaseOrderId))!;
     const late = order.dueAt ? Math.max(0, dayDiff(receipt.at!, order.dueAt)) : 0;
-    return { receiptId: receipt.id, receipt: receipt.title, orderId: order.id, order: order.title, receivedAt: receipt.at!, promisedAt: order.dueAt, lateDays: late, onTime: late === 0 };
+    return { receiptId: receipt.id, receipt: receipt.title, orderId: order.id, order: order.title, receivedAt: receipt.at!, promisedAt: order.dueAt, lateDays: late, onTime: order.dueAt ? late === 0 : null };
   });
 
+  const scored = deliveries.filter((row) => row.onTime !== null);
   const overdueOrders = committed
     .filter((order) => order.status !== "closed" && order.dueAt && order.dueAt < now.toISOString())
     .map((order) => ({
@@ -132,6 +136,7 @@ export function supplierPerformance(
 
   let unitsReceived = 0;
   let unitsDamaged = 0;
+  let rejected = 0;
   const returns: SupplierPerformance["returns"] = [];
   for (const receipt of received) {
     const earlier = received.filter((other) => other.id !== receipt.id
@@ -140,14 +145,16 @@ export function supplierPerformance(
     const body = bodyOf<ReceiptBodyWithReturns>(receipt, {});
     for (const line of body.lines ?? []) {
       const count = units.get(line.lineId) ?? 0;
+      const damaged = line.condition && line.condition !== "good" ? count : 0;
+      const returnedHere = (body.returns ?? []).filter((item) => item.lineId === line.lineId).reduce((sum, item) => sum + item.quantity, 0);
       unitsReceived += count;
-      if (line.condition && line.condition !== "good") unitsDamaged += count;
+      unitsDamaged += damaged;
+      // A returned unit that was also flagged damaged on arrival is counted once per receipt line.
+      rejected += Math.min(count, Math.max(damaged, returnedHere));
     }
     for (const item of body.returns ?? []) returns.push({ ...item, receiptId: receipt.id, receipt: receipt.title });
   }
   const unitsReturned = returns.reduce((sum, item) => sum + item.quantity, 0);
-  // A returned unit that was also flagged damaged on arrival is counted once.
-  const rejected = Math.min(unitsReceived, Math.max(unitsDamaged, unitsReturned));
 
   const variances: VarianceRow[] = [];
   let billedLines = 0;
@@ -173,7 +180,7 @@ export function supplierPerformance(
     ordersPlaced: committed.length,
     committedNetMinor: committed.reduce((sum, order) => sum + (bodyOf<PoBody>(order, {}).lines ?? []).reduce((total, line) => total + line.quantity * line.unitPriceMinor, 0), 0),
     deliveries,
-    onTimePct: deliveries.length ? Math.round((deliveries.filter((row) => row.onTime).length / deliveries.length) * 100) : null,
+    onTimePct: scored.length ? Math.round((scored.filter((row) => row.onTime).length / scored.length) * 100) : null,
     overdueOrders,
     unitsReceived,
     unitsReturned,
@@ -215,7 +222,7 @@ export function suppliedItems(
       item.ordered += line.quantity;
       item.received += line.receivedQuantity;
       if (!item.orders.includes(order.title)) item.orders.push(order.title);
-      const receipts = data.receipts.filter((receipt) => String(receipt.fields.purchaseOrderId) === order.id && receipt.status !== "expected");
+      const receipts = data.receipts.filter((receipt) => String(receipt.fields.purchaseOrderId) === order.id && ARRIVED.has(receipt.status));
       for (const receipt of receipts) {
         const body = bodyOf<ReceiptBodyWithReturns>(receipt, {});
         if ((body.lines ?? []).some((row) => row.lineId === line.id) && receipt.at && (!item.lastReceivedAt || receipt.at > item.lastReceivedAt)) item.lastReceivedAt = receipt.at;

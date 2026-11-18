@@ -43,7 +43,7 @@ export function ShipmentsPanel({ context, order }: { context: ScreenContext; ord
             { key: "allocated", header: "On shipments", align: "end", cell: (row) => <span className="ds-num">{row.allocated}</span> },
             { key: "shipped", header: "Shipped", align: "end", cell: (row) => <span className="ds-num">{row.shipped}</span> },
             { key: "remaining", header: "Remaining", align: "end", cell: (row) => row.remaining ? <strong className="ds-num">{row.remaining}</strong> : <span className="ds-subtle">0</span> },
-            { key: "stock", header: "Available", align: "end", hideBelow: 700, cell: (row) => row.line.productId
+            { key: "stock", header: "On hand here", align: "end", hideBelow: 700, cell: (row) => row.line.productId
               ? <span className="ds-num">{onHandFor(data.stockMoves, row.line.productId, String(order.fields.warehouseId ?? "") || undefined)}</span>
               : <span className="ds-subtle">Not stocked</span> },
           ]} />
@@ -408,8 +408,10 @@ export function StockAdjustmentForm({ context, close }: { context: ScreenContext
   const { now, actor } = useWorkspace();
   const payload = context.overlayPayload as { productId?: string; warehouseId?: string } | undefined;
   const selected = (context.selectedId ?? "").match(/^(.*)-((?:[a-z]+-)?warehouses-\d+)$/);
-  const [productId, setProductId] = useState(payload?.productId ?? selected?.[1] ?? data.products[0]?.id ?? "");
-  const [warehouseId, setWarehouseId] = useState(payload?.warehouseId ?? selected?.[2] ?? data.warehouses[0]?.id ?? "");
+  const [chosenProduct, setProductId] = useState(payload?.productId ?? selected?.[1] ?? "");
+  const [chosenWarehouse, setWarehouseId] = useState(payload?.warehouseId ?? selected?.[2] ?? "");
+  const productId = chosenProduct || data.products[0]?.id || "";
+  const warehouseId = chosenWarehouse || data.warehouses[0]?.id || "";
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("count");
   const [note, setNote] = useState("");
@@ -461,9 +463,11 @@ export function StockHistory({ context }: { context: ScreenContext }) {
   const { org } = useWorkspace();
   const payload = context.overlayPayload as { productId?: string; warehouseId?: string } | undefined;
   const selected = (context.selectedId ?? "").match(/^(.*)-((?:[a-z]+-)?warehouses-\d+)$/);
-  const [productId, setProductId] = useState(payload?.productId ?? selected?.[1] ?? data.products[0]?.id ?? "");
+  const [chosenProduct, setProductId] = useState(payload?.productId ?? selected?.[1] ?? "");
   const [warehouseId, setWarehouseId] = useState(payload?.warehouseId ?? selected?.[2] ?? "");
   const [kind, setKind] = useState("");
+  // Collections can arrive after the drawer opens: fall back to the first product that has movements.
+  const productId = chosenProduct || data.products.find((item) => data.stockMoves.some((move) => String(move.fields.productId) === item.id))?.id || data.products[0]?.id || "";
   const history = stockHistory(data.stockMoves, productId, warehouseId || undefined);
   const kinds = [...new Set(history.map((row) => String(row.move.fields.kind ?? "move")))].sort();
   const shown = [...history].reverse().filter((row) => !kind || String(row.move.fields.kind ?? "move") === kind);

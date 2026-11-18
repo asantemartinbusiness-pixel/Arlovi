@@ -23,20 +23,20 @@ export function SupplierPerformanceCard({ context, supplier }: { context: Screen
   const data = useProcData();
   const { now } = useWorkspace();
   const perf = supplierPerformance(supplier.id, data, now);
-  const late = perf.deliveries.filter((row) => !row.onTime);
+  const late = perf.deliveries.filter((row) => row.onTime === false);
+  const scored = perf.deliveries.filter((row) => row.onTime !== null);
   const stated = supplier.fields.onTimeRatePct;
   return (
-    <Card span={7} eyebrow="PERFORMANCE" prov="posted" title="Delivery performance"
-      subtitle={`Measured from ${perf.deliveries.length} goods receipt${perf.deliveries.length === 1 ? "" : "s"} against ${perf.ordersPlaced} committed order${perf.ordersPlaced === 1 ? "" : "s"}`}>
+    <Card span={12} eyebrow="PERFORMANCE" prov="posted" title="Delivery performance"
+      subtitle={`Measured from ${perf.deliveries.length} goods receipt${perf.deliveries.length === 1 ? "" : "s"} against ${perf.ordersPlaced} committed order${perf.ordersPlaced === 1 ? "" : "s"} worth ${context.money(perf.committedNetMinor)} net (drafts and cancellations excluded)`}>
       <Stack gap={3}>
         <StatRow>
           <Stat label="On time" value={pct(perf.onTimePct)} prov="posted"
-            meta={perf.deliveries.length ? `${perf.deliveries.length - late.length} of ${perf.deliveries.length} receipts by the promised date` : "Nothing received yet"} />
+            meta={scored.length ? `${scored.length - late.length} of ${scored.length} receipts by the promised date` : perf.deliveries.length ? "No promised dates to measure against" : "Nothing received yet"} />
           <Stat label="Quality accepted" value={pct(perf.qualityPct)} prov="posted"
             meta={perf.unitsReceived ? `${perf.unitsReturned} returned, ${perf.unitsDamaged} flagged of ${perf.unitsReceived} units` : "No units received"} />
           <Stat label="Price variance" value={perf.billedLines ? context.money(perf.priceVarianceMinor) : "—"} prov="posted"
             meta={perf.billedLines ? `${perf.priceVariancePct ?? 0}% against ordered prices on ${perf.billedLines} billed line${perf.billedLines === 1 ? "" : "s"}` : "No invoice matched to an order"} />
-          <Stat label="Committed" value={context.money(perf.committedNetMinor)} prov="posted" meta={`${perf.ordersPlaced} order${perf.ordersPlaced === 1 ? "" : "s"} net of tax, drafts and cancellations excluded`} />
         </StatRow>
         {perf.overdueOrders.length > 0 && (
           <Notice tone="warning" title={`${perf.overdueOrders.length} order${perf.overdueOrders.length === 1 ? " is" : "s are"} past the promised date`}>
@@ -58,7 +58,7 @@ export function SupplierPerformanceCard({ context, supplier }: { context: Screen
               { key: "order", header: "Order", cell: (row) => <span className="ds-num">{row.order}</span> },
               { key: "promised", header: "Promised", cell: (row) => <span className="ds-num">{row.promisedAt ? context.date(row.promisedAt) : "Not set"}</span>, hideBelow: 700 },
               { key: "received", header: "Received", cell: (row) => <span className="ds-num">{context.date(row.receivedAt)}</span>, sortValue: (row) => row.receivedAt },
-              { key: "late", header: "Result", cell: (row) => row.onTime ? <Pill tone="success">On time</Pill> : <Pill tone="warning">{row.lateDays}d late</Pill> },
+              { key: "late", header: "Result", cell: (row) => row.onTime === null ? <Pill>No promised date</Pill> : row.onTime ? <Pill tone="success">On time</Pill> : <Pill tone="warning">{row.lateDays}d late</Pill> },
             ]} />
         )}
         {perf.variances.length > 0 && (

@@ -95,6 +95,8 @@ function NavigationEditorForm({ context, portal, saved }: { context: ScreenConte
   const [note, setNote] = useState("");
   // Pointer drag state, and the keyboard "picked up" page with the order to restore on Escape.
   const [dragId, setDragId] = useState<string | null>(null);
+  // A row only becomes draggable while its handle is pressed, so text in its fields stays selectable.
+  const [armed, setArmed] = useState<string | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const [grabbed, setGrabbed] = useState<{ id: string; before: PortalPage[] } | null>(null);
   const handles = useRef(new Map<string, HTMLButtonElement>());
@@ -171,26 +173,29 @@ function NavigationEditorForm({ context, portal, saved }: { context: ScreenConte
         <ol className="t4-nav-list" aria-label="Portal pages in navigation order">
           {pages.map((page, index) => (
             <li key={page.id} className="t4-nav-item"
+              draggable={armed === page.id}
+              onDragStart={(event) => {
+                if (armed !== page.id) { event.preventDefault(); return; }
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", page.id);
+                setDragId(page.id);
+              }}
+              onDragEnd={() => { setDragId(null); setOverIndex(null); setArmed(null); }}
               data-dragging={dragId === page.id || grabbed?.id === page.id ? "true" : undefined}
               data-over={dragId && dragId !== page.id && overIndex === index ? "true" : undefined}
               onDragOver={(event) => { if (!dragId) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setOverIndex(index); }}
               onDrop={(event) => { event.preventDefault(); const id = event.dataTransfer.getData("text/plain") || dragId; if (id) dropAt(id, index); setDragId(null); setOverIndex(null); }}>
               <span className="t4-nav-grip">
-                <button type="button" className="t4-nav-handle" draggable
+                <button type="button" className="t4-nav-handle"
+                  onPointerDown={() => setArmed(page.id)}
+                  onPointerUp={() => setArmed(null)}
                   ref={(node) => { if (node) handles.current.set(page.id, node); else handles.current.delete(page.id); }}
                   aria-label={`Reorder ${page.name}, position ${index + 1} of ${pages.length}`}
                   aria-describedby="t4-nav-reorder-help"
                   aria-pressed={grabbed?.id === page.id}
                   onKeyDown={(event) => onHandleKey(event, page, index)}
                   onBlur={() => { if (grabbed?.id === page.id && refocus.current !== page.id) { setGrabbed(null); } }}
-                  onDragStart={(event) => {
-                    event.dataTransfer.effectAllowed = "move";
-                    event.dataTransfer.setData("text/plain", page.id);
-                    const row = event.currentTarget.closest("li");
-                    if (row) event.dataTransfer.setDragImage(row, 24, 24);
-                    setDragId(page.id);
-                  }}
-                  onDragEnd={() => { setDragId(null); setOverIndex(null); }}>
+>
                   <GripVertical size={16} aria-hidden="true" />
                 </button>
                 <span className="ds-num t4-nav-index">{index + 1}</span>

@@ -329,9 +329,7 @@ export function SupplierDetail({ context, lens }: { context: ScreenContext; lens
           { label: "Approved by", value: String(supplier.fields.approvedBy || "Not approved") },
         ]} />
       </Card>
-      <SupplierPerformanceCard context={context} supplier={supplier} />
-      <SuppliedItemsCard context={context} supplier={supplier} />
-      <Card span={12} eyebrow="BANK DETAIL" prov={String(supplier.fields.bankLast4) ? "posted" : "unknown"} title="Payment details" subtitle="Changed only through a separate verification">
+      <Card span={7} eyebrow="BANK DETAIL" prov={String(supplier.fields.bankLast4) ? "posted" : "unknown"} title="Payment details" subtitle="Changed only through a separate verification">
         <Stack gap={3}>
           <Properties rows={[
             { label: "Account on file", value: String(supplier.fields.bankLast4) ? <span className="ds-num">ends ···{String(supplier.fields.bankLast4)}</span> : "None recorded" },
@@ -343,6 +341,8 @@ export function SupplierDetail({ context, lens }: { context: ScreenContext; lens
           </Notice>
         </Stack>
       </Card>
+      <SupplierPerformanceCard context={context} supplier={supplier} />
+      <SuppliedItemsCard context={context} supplier={supplier} />
     </Grid>
   );
 }

@@ -211,8 +211,7 @@ export function AvailabilityGrid({
                     const minutes = booking.endAt ? (new Date(booking.endAt).getTime() - new Date(booking.startAt!).getTime()) / 60_000 : slotMinutes;
                     const top = (new Date(booking.startAt!).getMinutes() / 60) * HOUR_PX;
                     const lane = lanes.get(booking.id) ?? { lane: 0, lanes: 1 };
-                    const reserve = roomLeft ? 30 : 0;
-                    const laneWidth = `(100% - ${4 + reserve}px) / ${lane.lanes}`;
+                    const laneWidth = `(100% - 4px - ${roomLeft ? "var(--t4-seat-reserve, 30px)" : "0px"}) / ${lane.lanes}`;
                     const clash = conflictsWithLinks(bookings, resources, orgId, resourceId, booking.startAt!, booking.endAt ?? booking.startAt!, booking.id).length > 0;
                     return (
                       <button
