@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { findScreen } from "@/app/catalog";
 import { workspaceDestination } from "@/app/workspaceSidebarModel";
 import { ArrowUp, CalendarDays, FileText, Landmark, Boxes, MessageSquarePlus, Sparkles, Headset, Info, History } from "lucide-react";
-import { Button, Drawer, TextArea } from "@/design-system";
+import { Button, Drawer, DrawerUnsavedChanges, TextArea } from "@/design-system";
 import { brand } from "@/app/brand";
 import { localAssistantReply } from "@/domain/assistant";
 import { clockIso } from "@/platform/clock";
@@ -133,6 +133,7 @@ export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string 
         </div>
       }
     >
+      <DrawerUnsavedChanges when={Boolean(prompt.trim())} />
       <section className="ask-panel" aria-label="Ask Arlovi conversation">
         <div className="ask-panel-toolbar">
           <span className="ask-context"><span className="ask-context-dot" /> {replyContext} <span className="ask-context-count">· {recordCount} records available</span></span>
