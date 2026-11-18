@@ -19,6 +19,7 @@ import { PageView } from "./render";
 import { ThemeEditor } from "./builder";
 import { saveSite, useWebUi } from "./state";
 import { findLink, moveChild, placeLink, removeLink, targetProblem } from "./nav";
+import { redirectId } from "./pages";
 import { SiteLibrary } from "./siteLibrary";
 
 /* ---------------------------------------------------------------- *
@@ -1106,7 +1107,7 @@ export function RedirectForm({ context, close }: { context: ScreenContext; close
         if (!from.trim() || loop) return;
         await saveSite(context, record, {
           ...site,
-          nav: { ...site.nav, redirects: [...site.nav.redirects, { id: `r-${wallMs().toString(36)}`, from: from.trim(), to: to.trim(), code: code === "302" ? 302 : 301 }] },
+          nav: { ...site.nav, redirects: [...site.nav.redirects, { id: redirectId(), from: from.trim(), to: to.trim(), code: code === "302" ? 302 : 301 }] },
         }, `Redirect ${from.trim()} added`);
         context.toast("Redirect added", `${from.trim()} will answer with a ${code}.`);
         close();

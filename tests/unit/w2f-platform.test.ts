@@ -111,9 +111,41 @@ describe("WEB page management", () => {
     expect(next.nav.header.map((link) => link.id)).toEqual(["n1"]);
     expect(next.nav.footer).toEqual([]);
     expect(next.pages[0].blocks[0].props.ctaTarget).toBe("/");
-    expect(next.nav.redirects).toEqual([expect.objectContaining({ from: "/about", to: "/" })]);
+    // /team → /about follows the deleted page to its redirect target instead of being dropped.
+    expect(next.nav.redirects).toEqual([
+      expect.objectContaining({ id: "r0", from: "/team", to: "/" }),
+      expect.objectContaining({ from: "/about", to: "/" }),
+    ]);
     const single = readSite(rec({ collection: "sites", body: { pages: [{ id: "only", name: "Home", path: "/", blocks: [] }] } }));
     expect(() => deletePage(single, "only", { redirectTo: "" })).toThrow(/at least one page/);
+  });
+
+  it("deleting a page without a redirect drops redirects into it, and never leaves a self-redirect", () => {
+    expect(deletePage(site(), "about", { redirectTo: "" }).site.nav.redirects).toEqual([]);
+    const base = site();
+    const withHome: SiteModel = { ...base, nav: { ...base.nav, redirects: [...base.nav.redirects, { id: "r9", from: "/", to: "/about", code: 301 }] } };
+    const { site: next } = deletePage(withHome, "about", { redirectTo: "/" });
+    expect(next.nav.redirects.some((redirect) => redirect.from === redirect.to)).toBe(false);
+    expect(next.nav.redirects.map((redirect) => `${redirect.from}>${redirect.to}`)).toEqual(["/team>/", "/about>/"]);
+  });
+
+  it("gives every generated redirect a unique id, even for paths that differ only by punctuation", () => {
+    const first = updatePage(site(), "contact", { name: "Contact", path: "/a-b", status: "published" }).site;
+    const second = updatePage(first, "contact", { name: "Contact", path: "/ab", status: "published" }).site;
+    const third = updatePage(second, "contact", { name: "Contact", path: "/a-b", status: "published" }).site;
+    const ids = third.nav.redirects.map((redirect) => redirect.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const removed = third.nav.redirects.filter((redirect) => redirect.id !== third.nav.redirects.at(-1)!.id);
+    expect(removed).toHaveLength(third.nav.redirects.length - 1);
+  });
+
+  it("reads stored duplicate redirect ids as distinct rows", () => {
+    const stored = readSite(rec({ collection: "sites", body: { pages: [{ id: "h", name: "Home", path: "/", blocks: [] }], nav: { redirects: [
+      { id: "r-x", from: "/a-b", to: "/" }, { id: "r-x", from: "/ab", to: "/" },
+    ] } } }));
+    const ids = stored.nav.redirects.map((redirect) => redirect.id);
+    expect(ids[0]).toBe("r-x");
+    expect(new Set(ids).size).toBe(2);
   });
 
   it("reorders pages within bounds", () => {
