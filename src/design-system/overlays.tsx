@@ -18,6 +18,7 @@ function fromToast(event: { target: EventTarget | null }): boolean {
  */
 const ModalFooterTarget = createContext<HTMLElement | null>(null);
 const ModalDirtyRegistrar = createContext<((dirty: boolean) => void) | null>(null);
+const ModalBusyRegistrar = createContext<((busy: boolean) => void) | null>(null);
 
 /** Portal form actions into the modal footer without changing overlay contracts. */
 export function ModalActions({ children }: { children: ReactNode }) {
@@ -29,6 +30,16 @@ export function ModalActions({ children }: { children: ReactNode }) {
 /** Opt-in dirty guard for editable forms; parent controls final save and close. */
 export function ModalUnsavedChanges({ when }: { when: boolean }) {
   const register = useContext(ModalDirtyRegistrar);
+  useEffect(() => {
+    register?.(when);
+    return () => register?.(false);
+  }, [register, when]);
+  return null;
+}
+
+/** Prevent dismissal while an asynchronous modal operation is underway. */
+export function ModalInFlight({ when }: { when: boolean }) {
+  const register = useContext(ModalBusyRegistrar);
   useEffect(() => {
     register?.(when);
     return () => register?.(false);
@@ -55,9 +66,10 @@ export function Modal({
 }) {
   const [footerTarget, setFooterTarget] = useState<HTMLElement | null>(null);
   const [isDirty, setDirty] = useState(false);
+  const [inFlight, setInFlight] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const requestOpenChange = (next: boolean) => {
-    if (!next && blocking) return;
+    if (!next && (blocking || inFlight)) return;
     if (!next && isDirty) {
       setConfirmDiscard(true);
       return;
@@ -67,6 +79,7 @@ export function Modal({
 
   return (
     <ModalDirtyRegistrar.Provider value={setDirty}>
+      <ModalBusyRegistrar.Provider value={setInFlight}>
       <ModalFooterTarget.Provider value={footerTarget}>
         <Dialog.Root open={open} onOpenChange={requestOpenChange}>
           <Dialog.Portal>
@@ -74,8 +87,8 @@ export function Modal({
             <Dialog.Content
               className="ds-modal"
               style={{ ["--modal-w" as string]: `${width}px` }}
-              onEscapeKeyDown={(event) => { if (blocking) event.preventDefault(); }}
-              onInteractOutside={(event) => { if (blocking || fromToast(event)) event.preventDefault(); }}
+              onEscapeKeyDown={(event) => { if (blocking || inFlight) event.preventDefault(); }}
+              onInteractOutside={(event) => { if (blocking || inFlight || fromToast(event)) event.preventDefault(); }}
             >
               <header className="ds-overlay-head">
                 <div className="ds-grow">
@@ -87,7 +100,7 @@ export function Modal({
                     : <Dialog.Description className="ds-overlay-visually-hidden">Review the details and available actions in this dialog.</Dialog.Description>}
                 </div>
                 <Dialog.Close asChild>
-                  <Button variant="ghost" size="sm" iconOnly aria-label="Close dialog" disabled={blocking}>
+                  <Button variant="ghost" size="sm" iconOnly aria-label="Close dialog" disabled={blocking || inFlight}>
                     <X size={16} aria-hidden="true" />
                   </Button>
                 </Dialog.Close>
@@ -122,6 +135,7 @@ export function Modal({
           </Dialog.Portal>
         </Dialog.Root>
       </ModalFooterTarget.Provider>
+      </ModalBusyRegistrar.Provider>
     </ModalDirtyRegistrar.Provider>
   );
 }
