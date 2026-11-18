@@ -439,6 +439,74 @@ function rangeOf(arg: Node, env: EvalEnv): { sheet?: string; from: string; to: s
   throw new EvalError("#VALUE!");
 }
 
+/* Values of a range argument, row-major, for the *IFS family. */
+function rangeValues(arg: Node, env: EvalEnv): Scalar[] {
+  const target = rangeOf(arg, env);
+  return env.range(target.sheet, target.from, target.to);
+}
+
+/* A one-row or one-column range as a list; a block is refused. */
+function vectorValues(arg: Node, env: EvalEnv): Scalar[] {
+  const target = rangeOf(arg, env);
+  const grid = env.grid(target.sheet, target.from, target.to);
+  if (grid.length > 1 && (grid[0]?.length ?? 0) > 1) throw new EvalError("#VALUE!");
+  return grid.flat();
+}
+
+/* Pairs of (range, criterion): true where every pair matches. Sizes must agree. */
+function criteriaMask(pairs: Node[], env: EvalEnv, evaluate: (node: Node) => Scalar, size: number): boolean[] {
+  const mask = new Array<boolean>(size).fill(true);
+  for (let index = 0; index < pairs.length; index += 2) {
+    const keys = rangeValues(pairs[index], env);
+    if (keys.length !== size) throw new EvalError("#VALUE!");
+    const criterion = evaluate(pairs[index + 1]);
+    keys.forEach((key, at) => { if (mask[at] && !matchesCriterion(key, criterion)) mask[at] = false; });
+  }
+  return mask;
+}
+
+function sameKey(a: Scalar, b: Scalar): boolean {
+  if (typeof a !== "boolean" && typeof b !== "boolean" && isNumeric(a) && isNumeric(b)) return toNumber(a) === toNumber(b);
+  return toText(a).toUpperCase() === toText(b).toUpperCase();
+}
+
+function compareScalars(a: Scalar, b: Scalar): number {
+  if (isNumeric(a) && isNumeric(b)) return toNumber(a) - toNumber(b);
+  const left = toText(a).toUpperCase();
+  const right = toText(b).toUpperCase();
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+/* HLOOKUP reads the transposed table: find the key in the first column. */
+function lookupRow(grid: Scalar[][], needle: Scalar, column: number, approximate: boolean): Scalar {
+  if (column < 1) throw new EvalError("#VALUE!");
+  let best: Scalar[] | undefined;
+  for (const row of grid) {
+    if (column > row.length) throw new EvalError("#REF!");
+    const keyValue = row[0];
+    if (!approximate) {
+      if (sameKey(keyValue, needle)) return row[column - 1] ?? null;
+      continue;
+    }
+    if (isNumeric(keyValue) && isNumeric(needle)) {
+      if (toNumber(keyValue) <= toNumber(needle)) best = row;
+      else break;
+    } else if (sameKey(keyValue, needle)) {
+      return row[column - 1] ?? null;
+    }
+  }
+  if (best) return best[column - 1] ?? null;
+  throw new EvalError("#N/A");
+}
+
+function roundAway(value: number, places: number, direction: "up" | "down"): number {
+  const factor = 10 ** places;
+  const scaled = Math.abs(value) * factor;
+  const cleaned = Math.abs(scaled - Math.round(scaled)) < 1e-9 ? Math.round(scaled) : scaled;
+  const magnitude = direction === "up" ? Math.ceil(cleaned) : Math.floor(cleaned);
+  return (Math.sign(value) * magnitude) / factor;
+}
+
 export const FUNCTIONS: Record<string, Fn> = {
   SUM: (args, env, ev) => numbers(flatten(args, env, ev)).reduce((total, value) => total + value, 0),
   AVERAGE: (args, env, ev) => {
@@ -552,6 +620,157 @@ export const FUNCTIONS: Record<string, Fn> = {
   YEAR: (args, _env, ev) => serialToDate(toNumber(ev(args[0]))).getUTCFullYear(),
   MONTH: (args, _env, ev) => serialToDate(toNumber(ev(args[0]))).getUTCMonth() + 1,
   DAY: (args, _env, ev) => serialToDate(toNumber(ev(args[0]))).getUTCDate(),
+  /* --- conditional aggregates over several criteria --- */
+  SUMIFS: (args, env, ev) => {
+    if (args.length < 3 || args.length % 2 === 0) throw new EvalError("#VALUE!");
+    const values = rangeValues(args[0], env);
+    const mask = criteriaMask(args.slice(1), env, ev, values.length);
+    return numbers(values.filter((_value, index) => mask[index])).reduce((total, value) => total + value, 0);
+  },
+  COUNTIFS: (args, env, ev) => {
+    if (args.length < 2 || args.length % 2 === 1) throw new EvalError("#VALUE!");
+    const first = rangeValues(args[0], env);
+    return criteriaMask(args, env, ev, first.length).filter(Boolean).length;
+  },
+  AVERAGEIF: (args, env, ev) => {
+    if (args.length < 2) throw new EvalError("#VALUE!");
+    const keys = rangeValues(args[0], env);
+    const values = args[2] ? rangeValues(args[2], env) : keys;
+    const criterion = ev(args[1]);
+    const picked = numbers(values.filter((_value, index) => matchesCriterion(keys[index] ?? null, criterion)));
+    if (picked.length === 0) throw new EvalError("#DIV/0!");
+    return picked.reduce((total, value) => total + value, 0) / picked.length;
+  },
+  AVERAGEIFS: (args, env, ev) => {
+    if (args.length < 3 || args.length % 2 === 0) throw new EvalError("#VALUE!");
+    const values = rangeValues(args[0], env);
+    const mask = criteriaMask(args.slice(1), env, ev, values.length);
+    const picked = numbers(values.filter((_value, index) => mask[index]));
+    if (picked.length === 0) throw new EvalError("#DIV/0!");
+    return picked.reduce((total, value) => total + value, 0) / picked.length;
+  },
+  MAXIFS: (args, env, ev) => {
+    if (args.length < 3 || args.length % 2 === 0) throw new EvalError("#VALUE!");
+    const values = rangeValues(args[0], env);
+    const mask = criteriaMask(args.slice(1), env, ev, values.length);
+    const picked = numbers(values.filter((_value, index) => mask[index]));
+    return picked.length === 0 ? 0 : Math.max(...picked);
+  },
+  MINIFS: (args, env, ev) => {
+    if (args.length < 3 || args.length % 2 === 0) throw new EvalError("#VALUE!");
+    const values = rangeValues(args[0], env);
+    const mask = criteriaMask(args.slice(1), env, ev, values.length);
+    const picked = numbers(values.filter((_value, index) => mask[index]));
+    return picked.length === 0 ? 0 : Math.min(...picked);
+  },
+  /* --- lookup --- */
+  HLOOKUP: (args, env, ev) => {
+    if (args.length < 3) throw new EvalError("#VALUE!");
+    const table = rangeOf(args[1], env);
+    const grid = env.grid(table.sheet, table.from, table.to);
+    const transposed = grid[0]?.map((_cell, col) => grid.map((row) => row[col])) ?? [];
+    return lookupRow(transposed, ev(args[0]), Math.trunc(toNumber(ev(args[2]))), args[3] ? toBoolean(ev(args[3])) : true);
+  },
+  MATCH: (args, env, ev) => {
+    if (args.length < 2) throw new EvalError("#VALUE!");
+    const needle = ev(args[0]);
+    const list = vectorValues(args[1], env);
+    const mode = args[2] ? Math.trunc(toNumber(ev(args[2]))) : 1;
+    if (mode === 0) {
+      const index = list.findIndex((value) => sameKey(value, needle));
+      if (index < 0) throw new EvalError("#N/A");
+      return index + 1;
+    }
+    let found = -1;
+    for (let index = 0; index < list.length; index += 1) {
+      const cmp = compareScalars(list[index], needle);
+      if (mode > 0 ? cmp <= 0 : cmp >= 0) found = index;
+      else break;
+    }
+    if (found < 0) throw new EvalError("#N/A");
+    return found + 1;
+  },
+  INDEX: (args, env, ev) => {
+    if (args.length < 2) throw new EvalError("#VALUE!");
+    const table = rangeOf(args[0], env);
+    const grid = env.grid(table.sheet, table.from, table.to);
+    let row = Math.trunc(toNumber(ev(args[1])));
+    let col = args[2] ? Math.trunc(toNumber(ev(args[2]))) : 1;
+    /* A single row given one index is read along the row. */
+    if (!args[2] && grid.length === 1) { col = row; row = 1; }
+    if (row < 1 || col < 1 || row > grid.length || col > (grid[0]?.length ?? 0)) throw new EvalError("#REF!");
+    return grid[row - 1][col - 1] ?? "";
+  },
+  XLOOKUP: (args, env, ev) => {
+    if (args.length < 3) throw new EvalError("#VALUE!");
+    const needle = ev(args[0]);
+    const keys = vectorValues(args[1], env);
+    const results = vectorValues(args[2], env);
+    if (keys.length !== results.length) throw new EvalError("#VALUE!");
+    const index = keys.findIndex((value) => sameKey(value, needle));
+    if (index >= 0) return results[index];
+    if (args[3]) return ev(args[3]);
+    throw new EvalError("#N/A");
+  },
+  IFS: (args, _env, ev) => {
+    if (args.length < 2 || args.length % 2 === 1) throw new EvalError("#VALUE!");
+    for (let index = 0; index < args.length; index += 2) if (toBoolean(ev(args[index]))) return ev(args[index + 1]);
+    throw new EvalError("#N/A");
+  },
+  /* --- maths --- */
+  ROUNDUP: (args, _env, ev) => roundAway(toNumber(ev(args[0])), args[1] ? Math.trunc(toNumber(ev(args[1]))) : 0, "up"),
+  ROUNDDOWN: (args, _env, ev) => roundAway(toNumber(ev(args[0])), args[1] ? Math.trunc(toNumber(ev(args[1]))) : 0, "down"),
+  INT: (args, _env, ev) => Math.floor(toNumber(ev(args[0]))),
+  MOD: (args, _env, ev) => {
+    const a = toNumber(ev(args[0]));
+    const b = toNumber(ev(args[1]));
+    if (b === 0) throw new EvalError("#DIV/0!");
+    return a - b * Math.floor(a / b);
+  },
+  POWER: (args, _env, ev) => {
+    const result = toNumber(ev(args[0])) ** toNumber(ev(args[1]));
+    if (!Number.isFinite(result)) throw new EvalError("#VALUE!");
+    return result;
+  },
+  SQRT: (args, _env, ev) => {
+    const value = toNumber(ev(args[0]));
+    if (value < 0) throw new EvalError("#VALUE!");
+    return Math.sqrt(value);
+  },
+  PRODUCT: (args, env, ev) => numbers(flatten(args, env, ev)).reduce((total, value) => total * value, 1),
+  MEDIAN: (args, env, ev) => {
+    const list = numbers(flatten(args, env, ev)).sort((a, b) => a - b);
+    if (list.length === 0) throw new EvalError("#VALUE!");
+    const middle = Math.floor(list.length / 2);
+    return list.length % 2 ? list[middle] : (list[middle - 1] + list[middle]) / 2;
+  },
+  COUNTBLANK: (args, env, ev) => flatten(args, env, ev).filter((value) => value === null || value === "").length,
+  /* --- text --- */
+  MID: (args, _env, ev) => {
+    if (args.length < 3) throw new EvalError("#VALUE!");
+    const start = Math.trunc(toNumber(ev(args[1])));
+    const count = Math.trunc(toNumber(ev(args[2])));
+    if (start < 1 || count < 0) throw new EvalError("#VALUE!");
+    return toText(ev(args[0])).slice(start - 1, start - 1 + count);
+  },
+  SUBSTITUTE: (args, _env, ev) => {
+    if (args.length < 3) throw new EvalError("#VALUE!");
+    const text = toText(ev(args[0]));
+    const from = toText(ev(args[1]));
+    const to = toText(ev(args[2]));
+    if (!from) return text;
+    if (!args[3]) return text.split(from).join(to);
+    const nth = Math.trunc(toNumber(ev(args[3])));
+    let seen = 0;
+    return text.replace(new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), (match) => { seen += 1; return seen === nth ? to : match; });
+  },
+  /* --- information --- */
+  ISBLANK: (args, _env, ev) => { const value = ev(args[0]); return value === null || value === ""; },
+  ISNUMBER: (args, _env, ev) => typeof ev(args[0]) === "number",
+  ISTEXT: (args, _env, ev) => { const value = ev(args[0]); return typeof value === "string" && value !== ""; },
+  ISERROR: (args, _env, ev) => {
+    try { ev(args[0]); return false; } catch (error) { if (error instanceof EvalError) return true; throw error; }
+  },
 };
 
 export const FUNCTION_HELP: { name: string; signature: string; summary: string }[] = [
@@ -584,6 +803,32 @@ export const FUNCTION_HELP: { name: string; signature: string; summary: string }
   { name: "YEAR", signature: "YEAR(serial)", summary: "Year of a date serial." },
   { name: "MONTH", signature: "MONTH(serial)", summary: "Month of a date serial." },
   { name: "DAY", signature: "DAY(serial)", summary: "Day of a date serial." },
+  { name: "SUMIFS", signature: "SUMIFS(sum range, range1, criterion1, …)", summary: "Adds the cells whose row matches every criterion." },
+  { name: "COUNTIFS", signature: "COUNTIFS(range1, criterion1, …)", summary: "Counts the rows matching every criterion." },
+  { name: "AVERAGEIF", signature: "AVERAGEIF(range, criterion, [average range])", summary: "Mean of the cells whose key matches the criterion." },
+  { name: "AVERAGEIFS", signature: "AVERAGEIFS(average range, range1, criterion1, …)", summary: "Mean of the cells whose row matches every criterion." },
+  { name: "MAXIFS", signature: "MAXIFS(max range, range1, criterion1, …)", summary: "Largest number whose row matches every criterion." },
+  { name: "MINIFS", signature: "MINIFS(min range, range1, criterion1, …)", summary: "Smallest number whose row matches every criterion." },
+  { name: "HLOOKUP", signature: "HLOOKUP(key, table, row, [approximate])", summary: "Finds the key in the first row and returns another row of that column." },
+  { name: "MATCH", signature: "MATCH(key, range, [type])", summary: "Position of the key in a row or column; 0 is exact, 1 the largest not above, -1 the smallest not below." },
+  { name: "INDEX", signature: "INDEX(range, row, [column])", summary: "The value at a row and column of the range." },
+  { name: "XLOOKUP", signature: "XLOOKUP(key, lookup range, return range, [if not found])", summary: "Exact-match lookup that returns the matching item of a second range." },
+  { name: "IFS", signature: "IFS(test1, value1, …)", summary: "The value of the first test that is true; #N/A when none is." },
+  { name: "ROUNDUP", signature: "ROUNDUP(number, places)", summary: "Rounds away from zero." },
+  { name: "ROUNDDOWN", signature: "ROUNDDOWN(number, places)", summary: "Rounds towards zero." },
+  { name: "INT", signature: "INT(number)", summary: "Rounds down to the nearest integer." },
+  { name: "MOD", signature: "MOD(number, divisor)", summary: "Remainder with the sign of the divisor; #DIV/0! for zero." },
+  { name: "POWER", signature: "POWER(number, power)", summary: "Raises a number to a power." },
+  { name: "SQRT", signature: "SQRT(number)", summary: "Square root; #VALUE! for a negative number." },
+  { name: "PRODUCT", signature: "PRODUCT(range, …)", summary: "Multiplies every number in the arguments." },
+  { name: "MEDIAN", signature: "MEDIAN(range, …)", summary: "Middle value of the numbers." },
+  { name: "COUNTBLANK", signature: "COUNTBLANK(range)", summary: "How many cells are empty." },
+  { name: "MID", signature: "MID(text, start, count)", summary: "Characters from the middle of the text." },
+  { name: "SUBSTITUTE", signature: "SUBSTITUTE(text, old, new, [instance])", summary: "Replaces text, every time or only the nth time." },
+  { name: "ISBLANK", signature: "ISBLANK(value)", summary: "True for an empty cell." },
+  { name: "ISNUMBER", signature: "ISNUMBER(value)", summary: "True for a number." },
+  { name: "ISTEXT", signature: "ISTEXT(value)", summary: "True for text." },
+  { name: "ISERROR", signature: "ISERROR(value)", summary: "True when the value is an error; a formula fed by a circular reference stays #CYCLE!." },
 ];
 
 /* ----------------------------- Dependencies ----------------------------- */

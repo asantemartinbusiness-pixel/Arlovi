@@ -212,7 +212,7 @@ registerSeed("sheets", (context) => {
             A2: "Uplift", B2: "=B4*0.1",
             A3: "Subtotal", B3: "=B1+B2",
             A4: "Total", B4: "=B3+B2",
-            A6: "Unsupported", B6: "=XLOOKUP(A1,A1:A4,B1:B4)",
+            A6: "Unsupported", B6: "=GROWTH(B1:B4,A1:A4)",
             A7: "Bad reference", B7: "=Missing!A1",
             A8: "Divide", B8: "=B1/0",
           })],
