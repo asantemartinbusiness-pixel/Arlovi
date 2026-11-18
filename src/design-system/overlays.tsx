@@ -100,7 +100,7 @@ export function Modal({
                     : <Dialog.Description className="ds-overlay-visually-hidden">Review the details and available actions in this dialog.</Dialog.Description>}
                 </div>
                 <Dialog.Close asChild>
-                  <Button variant="ghost" size="sm" iconOnly aria-label="Close dialog" disabled={blocking || inFlight}>
+                  <Button variant="ghost" size="sm" iconOnly aria-label="Close" title="Close dialog" disabled={blocking || inFlight}>
                     <X size={16} aria-hidden="true" />
                   </Button>
                 </Dialog.Close>
