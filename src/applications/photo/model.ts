@@ -4,6 +4,7 @@
 
 import { createStore, type Store } from "@/applications/visual/kit";
 import { uid, type Rect } from "@/applications/visual/geometry";
+import { withMaskFrames } from "./maskSpace";
 import {
   NEUTRAL_ADJUST, generateBasePixels, newAdjustmentLayer,
   type BrushSettings, type PhotoLayer, type RasterDoc,
@@ -82,7 +83,7 @@ export function parsePhoto(body: unknown): RasterDoc {
   if (isRasterDoc(body)) {
     return {
       ...body,
-      layers: body.layers.map((layer, index) => (index === 0 && layer.kind === "pixel" && !layer.src && typeof document !== "undefined"
+      layers: withMaskFrames(body.layers).map((layer, index) => (index === 0 && layer.kind === "pixel" && !layer.src && typeof document !== "undefined"
         ? { ...layer, src: generatedBase(layer.w || body.width, layer.h || body.height), naturalWidth: layer.w || body.width, naturalHeight: layer.h || body.height }
         : layer)),
       presets: body.presets ?? defaultPresets(),

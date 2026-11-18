@@ -9,29 +9,93 @@ import type { PhotoLayer, RasterDoc } from "./raster";
 
 export type ImageTransform = "rotate-cw" | "rotate-ccw" | "flip-x" | "flip-y";
 
-/** Why the whole image cannot be transformed, if it cannot. */
-export function transformBlocked(doc: RasterDoc): string | undefined {
-  if (doc.layers.some((layer) => layer.mask && layer.maskEnabled)) {
-    return "A layer has a mask painted at the current orientation. Apply or disable the mask first.";
+/**
+ * Why the whole image cannot be transformed, if it cannot. Masks are no
+ * longer a reason: they are turned with the image (see `maskMatrix`). Only a
+ * mask whose pixels could not be decoded blocks, because it could not be
+ * carried to the new orientation.
+ */
+export function transformBlocked(doc: RasterDoc, undecodable: string[] = []): string | undefined {
+  const broken = doc.layers.filter((layer) => layer.mask && undecodable.includes(layer.id));
+  if (broken.length > 0) {
+    return `The mask on ${broken.map((layer) => layer.name).join(", ")} could not be decoded, so it cannot be turned with the image. Delete or repaint it first.`;
   }
   return undefined;
 }
 
+/** A 2D affine matrix in canvas `setTransform(a, b, c, d, e, f)` order. */
+export type Affine = [number, number, number, number, number, number];
+
+/**
+ * The matrix that carries a point of a W × H image to the same point of the
+ * transformed image: x' = a·x + c·y + e, y' = b·x + d·y + f. Masks are
+ * greyscale images in document space, so redrawing them through this matrix
+ * keeps every masked pixel over the same picture pixel.
+ */
+export function maskMatrix(width: number, height: number, transform: ImageTransform): Affine {
+  switch (transform) {
+    case "rotate-cw": return [0, 1, -1, 0, height, 0];
+    case "rotate-ccw": return [0, -1, 1, 0, 0, width];
+    case "flip-x": return [-1, 0, 0, 1, width, 0];
+    case "flip-y": return [1, 0, 0, -1, 0, height];
+  }
+}
+
+export function applyAffine(m: Affine, x: number, y: number): { x: number; y: number } {
+  return { x: m[0] * x + m[2] * y + m[4], y: m[1] * x + m[3] * y + m[5] };
+}
+
+/** The canvas size after a transform: a quarter turn swaps the sides. */
+export function transformedSize(width: number, height: number, transform: ImageTransform): { width: number; height: number } {
+  return transform === "rotate-cw" || transform === "rotate-ccw" ? { width: height, height: width } : { width, height };
+}
+
+/**
+ * Redraw a mask for the transformed image, in this browser, as a PNG data
+ * URL. The source is stretched to the document size first, which is how the
+ * compositor draws it.
+ */
+export function transformMaskImage(
+  source: CanvasImageSource,
+  doc: { width: number; height: number },
+  transform: ImageTransform,
+  makeCanvas: (width: number, height: number) => HTMLCanvasElement,
+): string {
+  const size = transformedSize(doc.width, doc.height, transform);
+  const canvas = makeCanvas(size.width, size.height);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("This browser gave no 2D canvas for the mask.");
+  ctx.setTransform(...maskMatrix(doc.width, doc.height, transform));
+  ctx.drawImage(source, 0, 0, doc.width, doc.height);
+  return canvas.toDataURL("image/png");
+}
+
 const normalise = (angle: number) => ((angle % 360) + 360) % 360;
 
-function moveLayer(layer: PhotoLayer, center: (cx: number, cy: number) => { x: number; y: number }, patch: Partial<PhotoLayer>): PhotoLayer {
+type Placement = Pick<PhotoLayer, "x" | "y" | "w" | "h" | "rotation" | "flipX">;
+type Turn = (cx: number, cy: number) => { x: number; y: number };
+
+function movePlacement<T extends Placement>(item: T, center: Turn, patch: (item: Placement) => Partial<Placement>): T {
+  const next = center(item.x + item.w / 2, item.y + item.h / 2);
+  return { ...item, ...patch(item), x: next.x - item.w / 2, y: next.y - item.h / 2 };
+}
+
+/* The layer and the frame its mask was painted for move together, so the
+   mask's placement relative to the layer is unchanged by the turn. */
+function moveLayer(layer: PhotoLayer, center: Turn, patch: (item: Placement) => Partial<Placement>): PhotoLayer {
   if (layer.kind === "adjustment") return layer;
-  const next = center(layer.x + layer.w / 2, layer.y + layer.h / 2);
-  return { ...layer, ...patch, x: next.x - layer.w / 2, y: next.y - layer.h / 2 };
+  const moved = movePlacement(layer, center, patch);
+  return layer.maskFrame ? { ...moved, maskFrame: movePlacement(layer.maskFrame, center, patch) } : moved;
 }
 
 /**
  * Rotate the image by 90° or flip it. Each layer's centre is carried to its
  * new place and its rotation and mirroring are updated; the canvas swaps its
- * width and height for a quarter turn. A selection or a pending crop belongs
- * to the old orientation, so both are cleared.
+ * width and height for a quarter turn. Masks are redrawn by the caller with
+ * `transformMaskImage` and passed in by layer id. A selection or a pending
+ * crop belongs to the old orientation, so both are cleared.
  */
-export function transformImage(doc: RasterDoc, transform: ImageTransform): RasterDoc {
+export function transformImage(doc: RasterDoc, transform: ImageTransform, masks: Record<string, string> = {}): RasterDoc {
   const { width: W, height: H } = doc;
   let layers: PhotoLayer[];
   let width = W;
@@ -39,20 +103,23 @@ export function transformImage(doc: RasterDoc, transform: ImageTransform): Raste
   switch (transform) {
     case "rotate-cw":
       width = H; height = W;
-      layers = doc.layers.map((layer) => moveLayer(layer, (cx, cy) => ({ x: H - cy, y: cx }), { rotation: normalise(layer.rotation + 90) }));
+      layers = doc.layers.map((layer) => moveLayer(layer, (cx, cy) => ({ x: H - cy, y: cx }), (item) => ({ rotation: normalise(item.rotation + 90) })));
       break;
     case "rotate-ccw":
       width = H; height = W;
-      layers = doc.layers.map((layer) => moveLayer(layer, (cx, cy) => ({ x: cy, y: W - cx }), { rotation: normalise(layer.rotation - 90) }));
+      layers = doc.layers.map((layer) => moveLayer(layer, (cx, cy) => ({ x: cy, y: W - cx }), (item) => ({ rotation: normalise(item.rotation - 90) })));
       break;
     case "flip-x":
-      layers = doc.layers.map((layer) => moveLayer(layer, (cx, cy) => ({ x: W - cx, y: cy }), { flipX: !layer.flipX, rotation: normalise(-layer.rotation) }));
+      layers = doc.layers.map((layer) => moveLayer(layer, (cx, cy) => ({ x: W - cx, y: cy }), (item) => ({ flipX: !item.flipX, rotation: normalise(-item.rotation) })));
       break;
     case "flip-y":
       /* A vertical mirror is a horizontal mirror turned half way round. */
-      layers = doc.layers.map((layer) => moveLayer(layer, (cx, cy) => ({ x: cx, y: H - cy }), { flipX: !layer.flipX, rotation: normalise(180 - layer.rotation) }));
+      layers = doc.layers.map((layer) => moveLayer(layer, (cx, cy) => ({ x: cx, y: H - cy }), (item) => ({ flipX: !item.flipX, rotation: normalise(180 - item.rotation) })));
       break;
   }
+  /* Each mask turned with the picture replaces the old one; a mask without a
+     turned copy is left as it was (the caller blocks that case). */
+  layers = layers.map((layer) => (layer.mask && masks[layer.id] ? { ...layer, mask: masks[layer.id] } : layer));
   return { ...doc, width, height, layers, selection: undefined, crop: undefined };
 }
 

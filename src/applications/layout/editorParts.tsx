@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical,
-  AlignStartHorizontal, AlignStartVertical, ArrowDown, ArrowUp, BringToFront, Copy,
-  Lock, LockOpen, SendToBack, Trash2,
+  AlignHorizontalSpaceAround, AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround,
+  ArrowDown, ArrowUp, BringToFront, Copy, Lock, LockOpen, SendToBack, Trash2,
 } from "lucide-react";
 import { Button, Checkbox, Field, Notice, Row, Select, Stack, TextArea, Tool, Toolbar } from "@/design-system";
 import { NumberBox, PanelGroup, downloadText, slug, useStore, type DocHandle } from "@/applications/visual/kit";
@@ -13,7 +13,8 @@ import {
   nudgeFrame, pageArea, removeFrame, restackFrame, setGrid, updateFrame,
   type Alignment, type StackMove,
 } from "./arrange";
-import { layoutUi, selectFrame, setLayoutTool } from "./model";
+import { layoutUi, selectFrame, selectFrames, selectedFrameIds, setLayoutTool, toggleFrameSelection } from "./model";
+import { alignFrames, distributeFrames, framesById, lockFrames, moveFrames, removeFrames } from "./multi";
 
 /* ====================================================================== *
  * The publication editor's arranging surfaces: the layers list, the
@@ -37,10 +38,20 @@ export function LayersPanel({ handle }: { handle: DocHandle<PublicationDoc> }) {
       {frames.length === 0 ? (
         <p className="vx-mini">No frames yet. Pick the text, image or shape tool and click on the page.</p>
       ) : (
+        <>
         <ul className="lx-layers" aria-label="Frames on this page, top first">
           {frames.map((frame) => (
-            <li key={frame.id} className="lx-layer" data-selected={frame.id === ui.selectedFrameId}>
-              <button type="button" className="lx-layer-name" onClick={() => selectFrame(frame.id)} aria-pressed={frame.id === ui.selectedFrameId}>
+            <li key={frame.id} className="lx-layer" data-selected={selectedFrameIds(ui).includes(frame.id)}>
+              <button
+                type="button"
+                className="lx-layer-name"
+                title="Shift-click to add to the selection"
+                onClick={(event) => {
+                  if (event.shiftKey) toggleFrameSelection(frame.id, () => true);
+                  else selectFrame(frame.id);
+                }}
+                aria-pressed={selectedFrameIds(ui).includes(frame.id)}
+              >
                 {frameLabel(doc, frame)}
               </button>
               <button
@@ -56,6 +67,12 @@ export function LayersPanel({ handle }: { handle: DocHandle<PublicationDoc> }) {
             </li>
           ))}
         </ul>
+        <Row gap={1} wrap>
+          <Button size="sm" variant="ghost" onClick={() => selectFrames(page.frames.map((frame) => frame.id))}>Select all (⌘A)</Button>
+          {selectedFrameIds(ui).length > 1 && <Button size="sm" variant="ghost" onClick={() => selectFrame(undefined)}>Clear the selection</Button>}
+        </Row>
+        <p className="vx-mini">Shift-click frames on the page or here to select several.</p>
+        </>
       )}
     </PanelGroup>
   );
@@ -159,6 +176,107 @@ export function ArrangePanel({ handle, frame, target, onTarget }: {
       </Toolbar>
       {locked && <p className="vx-mini">Locked frames cannot be moved, resized or aligned. Unlock to change them.</p>}
     </PanelGroup>
+  );
+}
+
+/* ------------------------------ several frames ------------------------------ */
+
+export type MultiAlignTarget = AlignTarget | "selection";
+
+export function MultiArrangePanel({ handle, target, onTarget }: {
+  handle: DocHandle<PublicationDoc>;
+  target: AlignTarget;
+  onTarget: (next: AlignTarget) => void;
+}) {
+  const ui = useStore(layoutUi);
+  const doc = handle.doc;
+  if (!doc) return null;
+  const ids = selectedFrameIds(ui);
+  const found = framesById(doc, ids);
+  if (found.length === 0) return null;
+  const pageIndex = found[0].pageIndex;
+  const relativeTo: MultiAlignTarget = ui.alignTo ?? "selection";
+  const setRelativeTo = (next: MultiAlignTarget) => {
+    layoutUi.set((current) => ({ ...current, alignTo: next }));
+    /* Keep the single-frame panel's choice in step with the edge chosen here. */
+    if (next !== "selection" && next !== target) onTarget(next);
+  };
+  const area = relativeTo === "selection" ? undefined
+    : relativeTo === "page" ? { x: 0, y: 0, w: doc.size.width, h: doc.size.height }
+      : pageArea(doc, pageIndex);
+  const locked = found.filter(({ frame }) => frame.locked).length;
+  const allLocked = locked === found.length;
+  const count = found.length;
+
+  return (
+    <Stack gap={3}>
+      <PanelGroup title={`${count} frames selected`}>
+        <p className="vx-mini">
+          Drag any of them to move them together. Arrows nudge all of them; Delete removes all.
+          {locked > 0 ? ` ${locked} locked frame${locked === 1 ? " stays" : "s stay"} put.` : ""}
+        </p>
+        <ul className="lx-layers" aria-label="Selected frames">
+          {found.map(({ frame }) => (
+            <li key={frame.id} className="lx-layer">
+              <span className="lx-layer-name">{frameLabel(doc, frame)}</span>
+              {frame.locked && <Lock size={13} aria-label="locked" />}
+            </li>
+          ))}
+        </ul>
+      </PanelGroup>
+      <PanelGroup title="Align">
+        <Field label="Relative to">
+          <Select value={relativeTo} onChange={(event) => setRelativeTo(event.target.value as MultiAlignTarget)} aria-label="Align the selection relative to">
+            <option value="selection">The selection</option>
+            <option value="margins">The margins (live area)</option>
+            <option value="page">The page edge (trim)</option>
+          </Select>
+        </Field>
+        <Toolbar label="Align the selected frames">
+          {ALIGNMENTS.map((item) => (
+            <Tool
+              key={item.id}
+              label={item.label}
+              icon={item.icon}
+              disabled={allLocked}
+              onClick={() => handle.edit((current) => alignFrames(current, ids, item.id, area), `${item.label}: ${count} frames`)}
+            />
+          ))}
+        </Toolbar>
+      </PanelGroup>
+      <PanelGroup title="Distribute">
+        <Toolbar label="Distribute the selected frames">
+          <Tool
+            label="Distribute horizontally"
+            icon={<AlignHorizontalSpaceAround size={15} />}
+            disabled={count < 3 || allLocked}
+            onClick={() => handle.edit((current) => distributeFrames(current, ids, "x"), `Distribute ${count} frames horizontally`)}
+          />
+          <Tool
+            label="Distribute vertically"
+            icon={<AlignVerticalSpaceAround size={15} />}
+            disabled={count < 3 || allLocked}
+            onClick={() => handle.edit((current) => distributeFrames(current, ids, "y"), `Distribute ${count} frames vertically`)}
+          />
+        </Toolbar>
+        <p className="vx-mini">{count < 3 ? "Select three or more frames to space them evenly." : "The outermost frames stay; the gaps between all of them become equal."}</p>
+      </PanelGroup>
+      <PanelGroup title="Selection">
+        <Toolbar label="Selected frames">
+          <Tool
+            label={allLocked ? "Unlock all" : "Lock all"}
+            icon={allLocked ? <Lock size={15} /> : <LockOpen size={15} />}
+            pressed={allLocked}
+            onClick={() => handle.edit((current) => lockFrames(current, ids, !allLocked), allLocked ? `Unlock ${count} frames` : `Lock ${count} frames`)}
+          />
+          <Tool
+            label={`Delete ${count} frames (⌫)`}
+            icon={<Trash2 size={15} />}
+            onClick={() => { handle.edit((current) => removeFrames(current, ids), `Delete ${count} frames`); selectFrame(undefined); }}
+          />
+        </Toolbar>
+      </PanelGroup>
+    </Stack>
   );
 }
 
@@ -302,6 +420,31 @@ export function useLayoutKeys(handle: DocHandle<PublicationDoc>): void {
       if (meta && key === "y") { event.preventDefault(); handle.redo(); return; }
       const selected = layoutUi.get().selectedFrameId;
       const found = locateFrame(doc, selected);
+      const ids = selectedFrameIds();
+      if (meta && key === "a") {
+        const page = doc.pages.find((item) => item.id === doc.activePageId);
+        if (!page || page.frames.length === 0) return;
+        event.preventDefault();
+        selectFrames(page.frames.map((frame) => frame.id));
+        return;
+      }
+      if (ids.length > 1) {
+        if (meta || event.altKey) return;
+        if (event.key.startsWith("Arrow")) {
+          event.preventDefault();
+          const step = event.shiftKey ? 10 : 1;
+          const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
+          const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
+          handle.edit((current) => moveFrames(current, ids, dx, dy), `Nudge ${ids.length} frames`);
+          return;
+        }
+        if (event.key === "Delete" || event.key === "Backspace") {
+          event.preventDefault();
+          handle.edit((current) => removeFrames(current, ids), `Delete ${ids.length} frames`);
+          selectFrame(undefined);
+          return;
+        }
+      }
       if (meta && key === "d" && found) {
         event.preventDefault();
         const result = duplicateFrame(doc, found.frame.id, uid("fr"));

@@ -9,3 +9,9 @@
 .vd-monitor > .ds-row { gap: var(--space-1); }
 .vd-monitor .ds-btn[data-variant="ghost"] { color: var(--paper-200); }
 .vd-monitor .ds-btn[data-variant="ghost"]:disabled { color: var(--paper-300); opacity: 0.45; }
+
+/* Caption lane on the timeline: cues as blocks that move and retime like clips. */
+.vd-cue { position: absolute; inset-block: 4px; display: flex; align-items: center; padding-inline: 6px; border-radius: 3px; background: var(--bg-inset); border: 1px solid var(--border-strong); color: var(--fg-default); font-size: var(--text-xs); cursor: grab; overflow: hidden; touch-action: none; }
+.vd-cue[data-reviewed] { border-color: var(--success); }
+.vd-cue[data-selected] { outline: 2px solid var(--accent); outline-offset: -1px; z-index: 3; }
+.vd-cue:focus-visible { outline: none; box-shadow: var(--focus-ring); }

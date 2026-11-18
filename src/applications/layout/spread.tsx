@@ -4,8 +4,9 @@ import {
   canvasMetrics, composeStory, fitImage, masterFrames, threadFrames, toMm,
   type Composition, type Frame, type Page, type PublicationDoc,
 } from "./flow";
-import { layoutUi, selectFrame } from "./model";
+import { layoutUi, selectFrame, selectedFrameIds } from "./model";
 import { HANDLES, handlePoint, locateFrame, resizeBox, snapLines, snapMove, type Handle } from "./arrange";
+import { boundsOf, framesById, moveFrames, resizeRotated, rotationFromPointer, visualBox } from "./multi";
 
 /* ====================================================================== *
  * Page rendering. One component draws a page for the editor, the preview,
@@ -40,6 +41,8 @@ export interface PageViewProps {
   onFrameDown?: (frame: Frame, event: ReactPointerEvent) => void;
   /** A selection handle was pressed: resize the frame from it. */
   onHandleDown?: (frame: Frame, handle: Handle, event: ReactPointerEvent) => void;
+  /** The rotate handle above the selected frame was pressed. */
+  onRotateDown?: (frame: Frame, event: ReactPointerEvent) => void;
   showGuides?: boolean;
   showBleed?: boolean;
   showBaseline?: boolean;
@@ -48,7 +51,7 @@ export interface PageViewProps {
 }
 
 export function PageView({
-  doc, page, index, compositions, zoom, interactive, onFrameDown, onHandleDown,
+  doc, page, index, compositions, zoom, interactive, onFrameDown, onHandleDown, onRotateDown,
   showGuides = true, showBleed = true, showBaseline = false, proof = false,
 }: PageViewProps) {
   const ui = useStore(layoutUi);
@@ -123,7 +126,7 @@ export function PageView({
         </g>
       )}
 
-      {frames.map((frame) => {
+      {frames.map((frame) => turned(frame, (() => {
         const selected = ui.selectedFrameId === frame.id;
         const common = {
           onPointerDown: interactive && onFrameDown ? (event: ReactPointerEvent) => onFrameDown(frame, event) : undefined,
@@ -218,16 +221,37 @@ export function PageView({
             )}
           </g>
         );
-      })}
+      })()))}
 
       {interactive && (() => {
+        if (selectedFrameIds(ui).length > 1) return null;
         const selectedFrame = page.frames.find((frame) => frame.id === ui.selectedFrameId);
         if (!selectedFrame) return null;
         const box = selectedFrame.box;
         const size = 7 / zoom;
+        const deg = selectedFrame.rotation ?? 0;
+        const knob = { x: box.x + box.w / 2, y: box.y - 18 / zoom };
         return (
-          <g data-selection={selectedFrame.id} data-editor-only="">
+          <g data-selection={selectedFrame.id} data-editor-only="" transform={deg ? `rotate(${deg} ${box.x + box.w / 2} ${box.y + box.h / 2})` : undefined}>
             <rect x={box.x} y={box.y} width={box.w} height={Math.max(box.h, 0.4)} fill="none" stroke="#234FE8" strokeWidth={1.2 / zoom} pointerEvents="none" />
+            {!selectedFrame.locked && onRotateDown && selectedFrame.kind !== "folio" && (
+              <>
+                <line x1={knob.x} y1={box.y} x2={knob.x} y2={knob.y} stroke="#234FE8" strokeWidth={1 / zoom} pointerEvents="none" />
+                <circle
+                  data-handle="rotate"
+                  cx={knob.x}
+                  cy={knob.y}
+                  r={4.5 / zoom}
+                  fill="#FFFFFF"
+                  stroke="#234FE8"
+                  strokeWidth={1 / zoom}
+                  style={{ cursor: "grab" }}
+                  onPointerDown={(event) => { event.stopPropagation(); onRotateDown(selectedFrame, event); }}
+                >
+                  <title>Rotate (Shift snaps to 15°)</title>
+                </circle>
+              </>
+            )}
             {!selectedFrame.locked && onHandleDown && HANDLES.map((handle) => {
               const point = handlePoint(box, handle);
               return (
@@ -246,6 +270,27 @@ export function PageView({
                 />
               );
             })}
+          </g>
+        );
+      })()}
+
+      {interactive && (() => {
+        const ids = selectedFrameIds(ui);
+        if (ids.length < 2) return null;
+        const chosen = framesById(doc, ids).map(({ frame }) => frame).filter((frame) => page.frames.some((item) => item.id === frame.id));
+        if (chosen.length === 0) return null;
+        const union = boundsOf(chosen.map((frame) => visualBox(frame)));
+        return (
+          <g data-multiselect={chosen.length} data-editor-only="" pointerEvents="none">
+            {chosen.map((frame) => (
+              <rect
+                key={frame.id}
+                x={frame.box.x} y={frame.box.y} width={frame.box.w} height={Math.max(frame.box.h, 0.4)}
+                transform={frame.rotation ? `rotate(${frame.rotation} ${frame.box.x + frame.box.w / 2} ${frame.box.y + frame.box.h / 2})` : undefined}
+                fill="rgba(35,79,232,0.06)" stroke="#234FE8" strokeWidth={1.2 / zoom}
+              />
+            ))}
+            <rect x={union.x} y={union.y} width={union.w} height={union.h} fill="none" stroke="#234FE8" strokeWidth={0.8 / zoom} strokeDasharray={`${4 / zoom} ${3 / zoom}`} />
           </g>
         );
       })()}
@@ -274,6 +319,15 @@ export function PageView({
       )}
     </svg>
   );
+}
+
+/** Draw a frame turned about its centre when it has a rotation. */
+function turned(frame: Frame, element: React.ReactElement): React.ReactElement {
+  const deg = frame.rotation ?? 0;
+  if (!deg) return element;
+  const cx = frame.box.x + frame.box.w / 2;
+  const cy = frame.box.y + frame.box.h / 2;
+  return <g key={frame.id} transform={`rotate(${deg} ${cx} ${cy})`} data-rotation={deg}>{element}</g>;
 }
 
 const HANDLE_CURSOR: Record<Handle, string> = {
@@ -338,6 +392,17 @@ export function resizeFrame(
   const start = { ...frame.box };
   const { pageId, lines } = linesFor(doc, frame);
   const tolerance = 6 / zoom;
+  const deg = frame.rotation ?? 0;
+  if (deg) {
+    /* A turned frame resizes in its own axes; the page guides do not apply. */
+    dragPointer(event, {
+      move: (point, modifiers, origin) => apply(resizeRotated(start, deg, handle, (point.x - origin.x) / zoom, (point.y - origin.y) / zoom, {
+        keepRatio: modifiers.shift || (frame.kind === "image" && Boolean(frame.src) && !modifiers.alt),
+      }), false),
+      end: (moved) => { if (moved) apply({ ...start }, true); },
+    });
+    return;
+  }
   dragPointer(event, {
     move: (point, modifiers, origin) => {
       const box = resizeBox(start, handle, (point.x - origin.x) / zoom, (point.y - origin.y) / zoom, {
@@ -358,5 +423,64 @@ export function resizeFrame(
       apply(box, false);
     },
     end: (moved) => { clearGuide(); if (moved) apply({ ...start }, true); },
+  });
+}
+
+/**
+ * Turn a frame with the rotate handle: the angle of the pointer around the
+ * frame's centre, measured from straight up. Shift snaps to 15°.
+ */
+export function rotateFrameDrag(
+  event: ReactPointerEvent,
+  frame: Frame,
+  apply: (rotation: number, committed: boolean) => void,
+): void {
+  if (frame.locked) return;
+  const svg = (event.currentTarget as SVGElement).ownerSVGElement;
+  const matrix = svg?.getScreenCTM();
+  if (!matrix) return;
+  const inverse = matrix.inverse();
+  dragPointer(event, {
+    move: (point, modifiers) => {
+      const local = new DOMPoint(point.x, point.y).matrixTransform(inverse);
+      apply(rotationFromPointer(frame.box, { x: local.x, y: local.y }, modifiers.shift ? 15 : 0), false);
+    },
+    end: (moved) => { if (moved) apply(frame.rotation ?? 0, true); },
+  });
+}
+
+/**
+ * Drag a multi-selection together. The selection's outline snaps like a
+ * single frame does, to the page grid and the frames that are not selected.
+ */
+export function dragFrames(
+  event: ReactPointerEvent,
+  ids: string[],
+  doc: PublicationDoc,
+  zoom: number,
+  apply: (next: PublicationDoc | null) => void,
+): void {
+  const chosen = framesById(doc, ids);
+  if (chosen.length === 0) return;
+  const pageIndex = chosen[0].pageIndex;
+  const pageId = doc.pages[pageIndex]?.id ?? "";
+  const others = (doc.pages[pageIndex]?.frames ?? []).filter((item) => !ids.includes(item.id)).map((item) => visualBox(item));
+  const lines = snapLines(doc, pageIndex, others);
+  const start = boundsOf(chosen.map(({ frame }) => visualBox(frame)));
+  const tolerance = 6 / zoom;
+  dragPointer(event, {
+    move: (point, modifiers, origin) => {
+      let dx = (point.x - origin.x) / zoom;
+      let dy = (point.y - origin.y) / zoom;
+      if (modifiers.shift) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+      if (!modifiers.meta) {
+        const snapped = snapMove({ ...start, x: start.x + dx, y: start.y + dy }, lines, tolerance);
+        dx = snapped.box.x - start.x;
+        dy = snapped.box.y - start.y;
+        layoutUi.set((current) => ({ ...current, snapGuide: { pageId, x: snapped.guideX, y: snapped.guideY } }));
+      } else clearGuide();
+      apply(moveFrames(doc, ids, dx, dy));
+    },
+    end: (moved) => { clearGuide(); if (moved) apply(null); },
   });
 }

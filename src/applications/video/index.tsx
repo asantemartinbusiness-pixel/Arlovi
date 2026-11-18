@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Film, Clapperboard, FolderOpen, SlidersHorizontal, Captions, Palette,
   Download, MessageSquare, Scissors, MousePointer2, MoveHorizontal, Split, ZoomIn, ZoomOut,
+  SquareSplitHorizontal, ArrowLeftToLine, ArrowRightToLine,
 } from "lucide-react";
 import {
   Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill, Properties,
@@ -20,10 +21,11 @@ import {
   captionIssues, captionsToSrt, captionsToVtt, clipEnd, clipsOnTrack, dbToGain,
   measureLoudness, mixAudio, patchClip, renderSamples, rippleDelete, sequenceDuration,
   moveClip, snapFrame, sourceOf, splitClip, timecode, trimClip, splitCaption, captionAt,
+  isEditable, lockReason, moveCaption, retimeCaption, splitAllAt, trimToTime,
   type Clip, type MediaSource, type RenderJob, type VideoDoc,
 } from "./timeline";
 import { contactSheet, frameDataUrl, frameScopes, playSamples, recorderSupport } from "./render";
-import { FittedMonitor, MixWaveform, PreviewMonitor, TimelineView, TransportBar, transportKeys, useTransport } from "./parts";
+import { FittedMonitor, MixWaveform, PreviewMonitor, TimelineView, TransportBar, addCueHere, transportKeys, useTransport } from "./parts";
 import "./video.css";
 import { parseVideo, setPlayhead, setVideoTool, starterVideo, videoUi, type VideoTool } from "./model";
 import { clockIso, wallMs } from "@/platform/clock";
@@ -174,6 +176,33 @@ function TimelineScreen({ context, actions }: { context: ScreenContext; actions:
   const tab = context.tab;
   const clip = doc?.clips.find((item) => item.id === ui.selectedClipId);
 
+  /* Split at the playhead: the selected clip when the playhead is inside it,
+     otherwise every clip the playhead crosses on an unlocked track. */
+  const splitHere = () => {
+    const current = handle.doc;
+    if (!current) return;
+    const at = videoUi.get().playhead;
+    const selected = current.clips.find((item) => item.id === videoUi.get().selectedClipId);
+    const only = selected && at > selected.start && at < clipEnd(selected) ? [selected.id] : undefined;
+    const result = splitAllAt(current, at, only);
+    if (result.count === 0) {
+      context.toast("Nothing to split", "No clip on an unlocked track crosses the playhead, or it sits within a frame of an edge.", "blocked");
+      return;
+    }
+    handle.edit(result.doc, result.count === 1 ? "Split at the playhead" : `Split ${result.count} clips at the playhead`);
+    videoUi.set((currentUi) => ({ ...currentUi, selectedClipId: result.newClipIds[0] }));
+  };
+
+  const trimHere = (edge: "start" | "end") => {
+    const current = handle.doc;
+    const selected = current?.clips.find((item) => item.id === videoUi.get().selectedClipId);
+    if (!current || !selected) { context.toast("Select a clip first", "Trimming to the playhead works on the selected clip.", "blocked"); return; }
+    if (!isEditable(current, selected)) { context.toast("The clip is locked", "Unlock the clip or its track to trim it.", "blocked"); return; }
+    const next = trimToTime(current, selected.id, edge, videoUi.get().playhead, { ripple: videoUi.get().tool === "ripple" });
+    if (next === current) { context.toast("Nothing trimmed", "The playhead is outside what this clip's source can reach.", "blocked"); return; }
+    handle.edit(next, edge === "start" ? "Trim the head to the playhead" : "Trim the tail to the playhead");
+  };
+
   return (
     <EditorFrame
       context={context}
@@ -188,6 +217,11 @@ function TimelineScreen({ context, actions }: { context: ScreenContext; actions:
             {VIDEO_TOOLS.map((item) => (
               <Tool key={item.tool} label={`${item.label} (${item.key})`} icon={item.icon} active={ui.tool === item.tool} onClick={() => setVideoTool(item.tool)} />
             ))}
+          </Toolbar>
+          <Toolbar label="Cut">
+            <Tool label="Split at the playhead (S)" icon={<SquareSplitHorizontal size={15} />} disabled={!doc} onClick={splitHere} />
+            <Tool label="Trim the head to the playhead (Q)" icon={<ArrowLeftToLine size={15} />} disabled={!clip} onClick={() => trimHere("start")} />
+            <Tool label="Trim the tail to the playhead (W)" icon={<ArrowRightToLine size={15} />} disabled={!clip} onClick={() => trimHere("end")} />
           </Toolbar>
           <Toolbar label="View">
             <Tool label="Snap to clip edges" active={ui.snapToClips} onClick={() => videoUi.set((c) => ({ ...c, snapToClips: !c.snapToClips }))}>Snap</Tool>
@@ -227,7 +261,7 @@ function TimelineScreen({ context, actions }: { context: ScreenContext; actions:
           <span>Tool: {ui.tool}</span>
           {clip && <span>{clip.name}: <span className="ds-num">{timecode(clip.start, doc?.fps ?? 25)}</span> → <span className="ds-num">{timecode(clipEnd(clip), doc?.fps ?? 25)}</span></span>}
           <span className="ds-grow" />
-          <span>J K L shuttle · arrows step a frame, Shift a second · I and O set in and out · ⌘Z undo, ⇧⌘Z redo</span>
+          <span>J K L shuttle · arrows step a frame · S split · Q W trim to the playhead · V T R N C tools · ⌘Z undo</span>
         </>
       }
     >
@@ -241,6 +275,15 @@ function TimelineScreen({ context, actions }: { context: ScreenContext; actions:
             if (event.shiftKey) handle.redo(); else handle.undo();
             return;
           }
+          const typing = (event.target as HTMLElement).closest?.("input, textarea, select, [contenteditable='true']");
+          if (!typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
+            const key = event.key.toLowerCase();
+            if (key === "s") { event.preventDefault(); splitHere(); return; }
+            if (key === "q") { event.preventDefault(); trimHere("start"); return; }
+            if (key === "w") { event.preventDefault(); trimHere("end"); return; }
+            const tool = VIDEO_TOOLS.find((item) => item.key.toLowerCase() === key);
+            if (tool) { event.preventDefault(); setVideoTool(tool.tool); return; }
+          }
           if (doc && transportKeys(event, doc)) event.preventDefault();
         }}
         style={{ position: "absolute", inset: 0, display: "grid", gridTemplateRows: "minmax(0, 1fr) auto", outline: "none" }}
@@ -248,12 +291,25 @@ function TimelineScreen({ context, actions }: { context: ScreenContext; actions:
         <div style={{ position: "relative", background: "#07070A", minHeight: 0 }}>
           {doc && <FittedMonitor doc={doc} handle={handle} time={ui.playhead} captions={ui.showCaptions} guides={ui.showGuides} bypassEffects={ui.bypassEffects} />}
         </div>
-        <div style={{ borderTop: "1px solid var(--border-default)", background: "var(--bg-surface)" }}>
-          {doc && <TimelineView handle={handle} height={240} onSelect={(id) => videoUi.set((current) => ({ ...current, selectedClipId: id }))} />}
+        <div style={{ borderTop: "1px solid var(--border-default)", background: "var(--bg-surface)", maxHeight: 270, overflowY: "auto" }}>
+          {doc && (
+            <TimelineView
+              handle={handle}
+              height={timelineHeight(doc)}
+              onSelect={(id) => videoUi.set((current) => ({ ...current, selectedClipId: id }))}
+              onCaptionSelect={() => { if (context.tab !== "Captions") context.setTab("Captions"); }}
+              onCaptionOpen={() => { if (context.tab !== "Captions") context.setTab("Captions"); }}
+            />
+          )}
         </div>
       </div>
     </EditorFrame>
   );
+}
+
+/** The timeline's full height: the ruler, every track and the caption lane. It scrolls when taller than its room. */
+function timelineHeight(doc: VideoDoc): number {
+  return 26 + doc.tracks.reduce((sum, track) => sum + track.height, 0) + 32;
 }
 
 function ClipPanel({ handle, context }: { handle: DocHandle<VideoDoc>; context: ScreenContext }) {
@@ -289,6 +345,11 @@ function ClipPanel({ handle, context }: { handle: DocHandle<VideoDoc>; context: 
           { label: "Source", value: source ? `${source.name} (${timecode(source.duration, doc.fps)})` : "none" },
         ]} />
       </PanelGroup>
+      {lockReason(doc, clip) && (
+        <Notice tone="warning" title="Locked">
+          {lockReason(doc, clip)} It cannot be moved, trimmed, split or deleted until it is unlocked.
+        </Notice>
+      )}
       <PanelGroup title="Trim by the frame">
         <Row gap={1} wrap>
           {([["start", -1], ["start", 1], ["end", -1], ["end", 1]] as const).map(([edge, direction]) => (
@@ -303,7 +364,11 @@ function ClipPanel({ handle, context }: { handle: DocHandle<VideoDoc>; context: 
           ))}
         </Row>
         <Row gap={1} wrap>
-          <Button size="sm" variant="secondary" onClick={() => { const result = splitClip(doc, clip.id, ui.playhead); if (result.newClipId) handle.edit(() => result.doc, "Split at the playhead"); else context.toast("Nothing to split", "The playhead is not inside this clip, or it is within a frame of an edge.", "blocked"); }}>Split at the playhead</Button>
+          <Button size="sm" variant="ghost" disabled={Boolean(lockReason(doc, clip))} onClick={() => handle.edit((current) => trimToTime(current, clip.id, "start", ui.playhead), "Trim the head to the playhead")}>Head to playhead</Button>
+          <Button size="sm" variant="ghost" disabled={Boolean(lockReason(doc, clip))} onClick={() => handle.edit((current) => trimToTime(current, clip.id, "end", ui.playhead), "Trim the tail to the playhead")}>Tail to playhead</Button>
+        </Row>
+        <Row gap={1} wrap>
+          <Button size="sm" variant="secondary" onClick={() => { const result = splitClip(doc, clip.id, ui.playhead); if (result.newClipId) handle.edit(() => result.doc, "Split at the playhead"); else context.toast("Nothing to split", lockReason(doc, clip) ?? "The playhead is not inside this clip, or it is within a frame of an edge.", "blocked"); }}>Split at the playhead</Button>
           <Button size="sm" variant="ghost" onClick={() => { handle.edit((current) => rippleDelete(current, clip.id), "Ripple delete"); videoUi.set((current) => ({ ...current, selectedClipId: undefined })); }}>Ripple delete</Button>
         </Row>
       </PanelGroup>
@@ -444,8 +509,45 @@ function CaptionPanel({ handle, context }: { handle: DocHandle<VideoDoc>; contex
   const doc = handle.doc;
   if (!doc) return null;
   const live = doc.captions.find((caption) => ui.playhead >= caption.start && ui.playhead < caption.end);
+  const picked = doc.captions.find((caption) => caption.id === ui.selectedCaptionId);
+  const frame = 1 / doc.fps;
   return (
     <Stack gap={3}>
+      {picked && (
+        <PanelGroup title="Selected cue" actions={<Button size="sm" variant="ghost" onClick={() => videoUi.set((current) => ({ ...current, selectedCaptionId: undefined }))}>Done</Button>}>
+          <Stack gap={2}>
+            <TextArea
+              rows={3}
+              aria-label="Selected cue text"
+              value={picked.text}
+              onChange={(event) => handle.live((current) => ({ ...current, captions: current.captions.map((item) => (item.id === picked.id ? { ...item, text: event.target.value, reviewed: false } : item)) }))}
+              onBlur={handle.beginGesture}
+            />
+            <Properties rows={[
+              { label: "In", value: <span className="ds-num">{timecode(picked.start, doc.fps)}</span> },
+              { label: "Out", value: <span className="ds-num">{timecode(picked.end, doc.fps)}</span> },
+              { label: "Reading speed", value: <><span className="ds-num">{Math.round(picked.text.length / Math.max(0.1, picked.end - picked.start))}</span> characters a second</> },
+            ]} />
+            <Row gap={1} wrap>
+              <Button size="sm" variant="ghost" onClick={() => handle.edit((current) => retimeCaption(current, picked.id, "start", picked.start - frame), "Retime the cue")}>in −1</Button>
+              <Button size="sm" variant="ghost" onClick={() => handle.edit((current) => retimeCaption(current, picked.id, "start", picked.start + frame), "Retime the cue")}>in +1</Button>
+              <Button size="sm" variant="ghost" onClick={() => handle.edit((current) => retimeCaption(current, picked.id, "end", picked.end - frame), "Retime the cue")}>out −1</Button>
+              <Button size="sm" variant="ghost" onClick={() => handle.edit((current) => retimeCaption(current, picked.id, "end", picked.end + frame), "Retime the cue")}>out +1</Button>
+            </Row>
+            <Row gap={1} wrap>
+              <Button size="sm" variant="secondary" onClick={() => handle.edit((current) => retimeCaption(current, picked.id, "start", ui.playhead), "Set the cue in point")}>In at playhead</Button>
+              <Button size="sm" variant="secondary" onClick={() => handle.edit((current) => retimeCaption(current, picked.id, "end", ui.playhead), "Set the cue out point")}>Out at playhead</Button>
+              <Button size="sm" variant="ghost" onClick={() => handle.edit((current) => moveCaption(current, picked.id, ui.playhead), "Move the cue to the playhead")}>Move to playhead</Button>
+            </Row>
+            <Row gap={1} wrap>
+              <Pill tone={picked.reviewed ? "success" : "warning"}>{picked.reviewed ? "checked" : "not checked"}</Pill>
+              <Button size="sm" variant="ghost" onClick={() => handle.edit((current) => ({ ...current, captions: current.captions.map((item) => (item.id === picked.id ? { ...item, reviewed: !item.reviewed } : item)) }), "Mark the caption")}>{picked.reviewed ? "Unmark" : "Mark as checked"}</Button>
+              <Button size="sm" variant="ghost" onClick={() => { handle.edit((current) => ({ ...current, captions: current.captions.filter((item) => item.id !== picked.id) }), "Delete the cue"); videoUi.set((current) => ({ ...current, selectedCaptionId: undefined })); }}>Delete the cue</Button>
+            </Row>
+            <p className="vx-mini">Drag the cue on the caption lane to move it, or its ends to retime it. It never overlaps the cues beside it.</p>
+          </Stack>
+        </PanelGroup>
+      )}
       <PanelGroup title="At the playhead">
         {live ? (
           <Stack gap={2}>
@@ -462,10 +564,7 @@ function CaptionPanel({ handle, context }: { handle: DocHandle<VideoDoc>; contex
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => handle.edit((current) => ({
-                ...current,
-                captions: [...current.captions, { id: `cap-${wallMs().toString(36)}`, start: ui.playhead, end: Math.min(current.duration, ui.playhead + 2.5), text: "", reviewed: false, language: ui.language }].sort((a, b) => a.start - b.start),
-              }), "Add a cue")}
+              onClick={() => { const blocked = addCueHere(handle); if (blocked) context.toast("No cue added", blocked, "blocked"); }}
             >
               Add a cue here
             </Button>
