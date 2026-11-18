@@ -10,7 +10,8 @@ import {
   DirectMessages, EmailThread, MailBoundary,
   MemberManagement, Preferences, PhishingReport, QuickSwitcher, useCommsData,
 } from "./panels";
-import { DraftComposer, MailWorkspace } from "./mail";
+import { DraftComposer } from "./mail";
+import { EmailExperience, type EmailArea } from "./EmailExperience";
 import { EventForm, MeetingWorkspace } from "./meetings";
 import "./comms.css";
 import { kitOverlays, needsSelection } from "@/applications/hr/opsKit";
@@ -538,9 +539,9 @@ export const commsApp = registerApp({
 
     "ARL-COMMS-005": {
       id: "ARL-COMMS-005",
-      subtitle: () => "Threads kept in this browser. Composing works; delivery needs a provider.",
-      tabs: (["Inbox", "Sent", "Drafts", "Archive", "Spam"] as const).map((lens) => ({
-        id: lens, render: (context: ScreenContext) => <MailWorkspace context={context} lens={lens} />,
+      subtitle: () => "One place for conversations, sender identities, and provider setup. External delivery requires a connection.",
+      tabs: (["Inbox", "Sent", "Drafts", "Archive", "Spam", "Shared inboxes", "Accounts & domains", "Sender identities"] as EmailArea[]).map((lens) => ({
+        id: lens, render: (context: ScreenContext) => <EmailExperience context={context} lens={lens} />,
       })),
       actions: [
         { id: "Compose", label: "Compose", placement: "primary", run: (context) => context.openOverlay("Compose window") },
