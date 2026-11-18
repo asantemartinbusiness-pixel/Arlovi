@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { GitCompareArrows, Target } from "lucide-react";
 import {
-  BarChart, Button, Card, DataGrid, Empty, Field, Grid, LineChart, MoneyInput, Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  BarChart, Button, Card, DataGrid, DrawerActions, DrawerUnsavedChanges, Empty, Field, Grid, LineChart, MoneyInput, Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -12,6 +12,7 @@ import { useFinData } from "./data";
 import type { FinData } from "./data";
 import { Amount, BooksLoading, SourceNote, StatementRow } from "./parts";
 import { clockIso, wallMs } from "@/platform/clock";
+import "./variance.css";
 
 /* ---------------------------- FIN-010 ---------------------------- */
 
@@ -439,30 +440,58 @@ export function VarianceDrilldown({ context }: { context: ScreenContext }) {
   const row = budget ? budgetVariance([budget], scoped.rows, data.accounts)[0] : undefined;
   const movements = accountMovements(data.accounts, data.journals, code, period);
   const actual = movements.reduce((sum, item) => sum + item.netMinor, 0);
-  const savedNote = String(budget?.fields.varianceNote ?? "");
-  const [draft, setNote] = useState<string>();
-  const note = draft ?? savedNote;
+  const originalNote = String(budget?.fields.varianceNote ?? "");
+  const [saved, setSaved] = useState<{ budgetId: string; value: string } | null>(null);
+  const savedNote = saved?.budgetId === budget?.id ? saved.value : originalNote;
+  const [draft, setDraft] = useState<{ budgetId: string; value: string } | null>(null);
+  const note = draft?.budgetId === budget?.id ? draft.value : savedNote;
   const [busy, setBusy] = useState(false);
+  const dirty = note.trim() !== savedNote.trim();
 
   if (!data.ready) return <BooksLoading />;
   if (!account) return <Empty title="That account is not in the chart">Choose a line from the budget table.</Empty>;
   const pct = row ? variancePercent(row) : undefined;
 
   return (
-    <Stack gap={4}>
-      <Properties rows={[
-        { label: "Account", value: `${code} ${account.title}` },
-        { label: "Period", value: periodLabel(period, org.locale) },
-        { label: "Budget", value: row ? <Amount minor={row.budgetMinor} context={context} /> : "No approved budget line" },
-        { label: "Actual", value: <Amount minor={actual} context={context} bold /> },
-        ...(row ? [
-          { label: "Variance", value: <Row gap={2}><Amount minor={row.varianceMinor} context={context} bold tone={row.favourable ? "success" : "danger"} />{pct !== undefined && <span className="ds-num ds-subtle">{pct > 0 ? "+" : ""}{pct}%</span>}</Row> },
-          { label: "Verdict", value: row.varianceMinor === 0 ? <Pill>On budget</Pill> : <Pill tone={row.favourable ? "success" : "danger"} dot>{row.favourable ? "Favourable" : "Adverse"}</Pill> },
-        ] : []),
-      ]} />
+    <div className="fin-variance-flow">
+      <DrawerUnsavedChanges when={dirty || busy} />
+
+      <section className="fin-variance-overview" aria-label="Budget variance overview">
+        <div className="fin-variance-overview-head">
+          <div>
+            <span className="fin-variance-eyebrow">Budget line</span>
+            <strong className="fin-variance-account">{code} {account.title}</strong>
+          </div>
+          <span className="fin-variance-period">{periodLabel(period, org.locale)}</span>
+        </div>
+        <div className="fin-variance-metrics" role="group" aria-label="Budget versus actual">
+          <div className="fin-variance-metric">
+            <span className="fin-variance-metric-label">Budget</span>
+            <div className="fin-variance-metric-value">{row ? <Amount minor={row.budgetMinor} context={context} /> : "Not budgeted"}</div>
+          </div>
+          <div className="fin-variance-metric">
+            <span className="fin-variance-metric-label">Posted actual</span>
+            <div className="fin-variance-metric-value"><Amount minor={actual} context={context} bold /></div>
+          </div>
+          <div className="fin-variance-metric">
+            <span className="fin-variance-metric-label">Variance</span>
+            {row ? (
+              <>
+                <div className="fin-variance-change">
+                  <span className="fin-variance-metric-value"><Amount minor={row.varianceMinor} context={context} bold tone={row.favourable ? "success" : "danger"} /></span>
+                  {pct !== undefined && <span className="ds-num ds-subtle">{pct > 0 ? "+" : ""}{pct}%</span>}
+                </div>
+                {row.varianceMinor === 0
+                  ? <Pill>On budget</Pill>
+                  : <Pill tone={row.favourable ? "success" : "danger"} dot>{row.favourable ? "Favourable" : "Adverse"}</Pill>}
+              </>
+            ) : <span className="ds-subtle">No approved comparison</span>}
+          </div>
+        </div>
+      </section>
 
       <Card prov="posted" eyebrow="WHAT MAKES UP THE ACTUAL" title={`${movements.length} posted journal${movements.length === 1 ? "" : "s"}`}
-        subtitle="Largest first. Their total is the actual above, to the penny." flush>
+        subtitle="Largest first. These posted movements reconcile to the actual above." flush>
         {movements.length === 0 ? (
           <div className="ds-card-body"><span className="ds-subtle">Nothing was posted to {code} in {periodLabel(period, org.locale)}, so the actual is zero rather than unknown.</span></div>
         ) : (
@@ -488,37 +517,57 @@ export function VarianceDrilldown({ context }: { context: ScreenContext }) {
       </Card>
 
       {budget ? (
-        <Stack gap={2}>
-          <Field label="Variance explanation" hint="Kept on the approved budget line with your name, for the month-end pack.">
-            <TextArea aria-label="Variance explanation" rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Timing: the January rent was invoiced early" />
+        <section className="fin-variance-note" aria-label="Month-end explanation">
+          <Field label="Variance explanation" hint="Saved against the approved budget line with your name for the month-end pack.">
+            <TextArea
+              aria-label="Variance explanation"
+              rows={4}
+              value={note}
+              onChange={(event) => setDraft({ budgetId: budget.id, value: event.target.value })}
+              placeholder="Describe what drove the difference, whether it is one-off, and any action required."
+            />
           </Field>
           {budget.fields.varianceNoteBy && (
             <SourceNote>Last explained by {String(budget.fields.varianceNoteBy)} {budget.fields.varianceNoteAt ? `on ${context.date(String(budget.fields.varianceNoteAt))}` : ""}.</SourceNote>
           )}
-          <Row gap={2}>
-            <Button variant="primary" size="sm" busy={busy} disabled={note.trim() === savedNote.trim()}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  await context.mutate.patch(budget.id, {
-                    fields: { ...budget.fields, varianceNote: note.trim(), varianceNoteBy: context.actor, varianceNoteAt: clockIso() },
-                  }, { expectRevision: budget.revision, event: `Variance on ${budget.title} explained by ${context.actor}` });
-                  context.toast("Explanation saved", `${budget.title} now carries the explanation. No figure changed.`);
-                } catch (error) {
-                  context.toast("Explanation not saved", error instanceof Error ? error.message : "Reload and retry.", "failed");
-                } finally {
-                  setBusy(false);
-                }
-              }}>Save the explanation</Button>
-            <Button variant="ghost" size="sm" onClick={() => context.navigate(`/o/${org.slug}/fin/ledger?tab=Entries`)}>Open the General Ledger</Button>
-          </Row>
-        </Stack>
+        </section>
       ) : (
         <Notice tone="info" title="No budget line to explain against">
-          Add {code} to next period's budget from the Approval tab if this spending is expected to recur.
+          Add {code} to next period's budget from the Approval tab if this movement is expected to recur.
         </Notice>
       )}
-    </Stack>
+
+      <DrawerActions>
+        {budget && (
+          <Button variant="primary" size="sm" busy={busy} disabled={busy || !dirty}
+            onClick={async () => {
+              if (busy) return;
+              setBusy(true);
+              try {
+                const value = note.trim();
+                await context.mutate.patch(budget.id, {
+                  fields: { ...budget.fields, varianceNote: value, varianceNoteBy: context.actor, varianceNoteAt: clockIso() },
+                }, { expectRevision: budget.revision, event: `Variance on ${budget.title} explained by ${context.actor}` });
+                setSaved({ budgetId: budget.id, value });
+                setDraft(null);
+                context.toast("Explanation saved", `${budget.title} now carries the explanation. No figure changed.`);
+              } catch (error) {
+                context.toast("Explanation not saved", error instanceof Error ? error.message : "Reload and retry.", "failed");
+              } finally {
+                setBusy(false);
+              }
+            }}>Save explanation</Button>
+        )}
+        <Button variant="secondary" size="sm" disabled={dirty || busy}
+          title={dirty ? "Save or discard your changes before leaving" : undefined}
+          onClick={() => context.navigate(`/o/${org.slug}/fin/ledger?tab=Entries`)}>
+          Open General Ledger
+        </Button>
+        {budget && <span className="fin-variance-status" role="status" aria-live="polite">
+          {busy ? "Saving…" : dirty ? "Unsaved changes" : saved?.budgetId === budget.id ? "Saved" : ""}
+        </span>}
+      </DrawerActions>
+    </div>
   );
 }
 
