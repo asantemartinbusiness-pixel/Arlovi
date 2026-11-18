@@ -21,7 +21,7 @@ test("finance drawer keeps account evidence and its own application context", as
 });
 
 test("an unselected automation cannot activate an arbitrary first workflow", async ({ page }) => {
-  await page.goto("/o/northline/auto/library?overlay=activation%20review");
+  await page.goto("/o/northline/auto/workflows?overlay=activation%20review");
   const dialog = page.getByRole("dialog", { name: "Activation review" });
   await expect(dialog).toHaveAttribute("data-native-app", "AUTO");
   await expect(dialog).toContainText("Choose a record first");
