@@ -106,6 +106,7 @@ test("COMMERCE ships part of an order, then records a return and a refund", asyn
   await row.click();
   await action(page, "Review and approve");
   await dialog(page).getByRole("button", { name: "Approve the return" }).click();
+  await expect(page.getByText("Return approved")).toBeVisible();
   await page.goto(`${ORG}/commerce/returns?tab=Approved`);
   await main(page).getByRole("row", { name: /ORD-404.*Drift Pendant/ }).first().click();
   await action(page, "Record a refund");
