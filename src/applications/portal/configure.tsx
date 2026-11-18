@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { ArrowDown, ArrowUp, Eye, EyeOff, GripVertical, Plus, Trash2 } from "lucide-react";
 import {
   Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Segmented, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
@@ -14,7 +14,7 @@ import {
 } from "./data";
 import {
   acceptedRequestTypes, accentWarning, addPage, brandingProblems, exposureRows, initialsOf, markTextColour, movePage, normaliseRole,
-  pagesForRole, PORTAL_ROLES, removePage, REQUEST_TYPES, roleLabel, setExposure, sharingState, updatePage, validatePageName,
+  pagesForRole, PORTAL_ROLES, removePage, reorderPage, REQUEST_TYPES, roleLabel, setExposure, sharingState, updatePage, validatePageName,
   type ExposureRow, type PortalRole,
 } from "./config";
 import { testPortal } from "./actions";
@@ -93,6 +93,56 @@ function NavigationEditorForm({ context, portal, saved }: { context: ScreenConte
   const [pages, setPages] = useState<PortalPage[]>(saved);
   const [newName, setNewName] = useState("");
   const [note, setNote] = useState("");
+  // Pointer drag state, and the keyboard "picked up" page with the order to restore on Escape.
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [grabbed, setGrabbed] = useState<{ id: string; before: PortalPage[] } | null>(null);
+  const handles = useRef(new Map<string, HTMLButtonElement>());
+  const refocus = useRef<string | null>(null);
+  useEffect(() => {
+    if (!refocus.current) return;
+    handles.current.get(refocus.current)?.focus();
+    refocus.current = null;
+  });
+
+  const dropAt = (id: string, to: number) => {
+    const from = pages.findIndex((page) => page.id === id);
+    if (from < 0 || from === to) return;
+    const page = pages[from];
+    setPages(reorderPage(pages, from, to));
+    setNote(`${page.name} moved to position ${to + 1} of ${pages.length}. Save to apply.`);
+  };
+
+  const onHandleKey = (event: KeyboardEvent<HTMLButtonElement>, page: PortalPage, index: number) => {
+    if (event.key === " " || event.key === "Enter") {
+      event.preventDefault();
+      if (grabbed?.id === page.id) {
+        setGrabbed(null);
+        setNote(`${page.name} dropped at position ${index + 1} of ${pages.length}. Save to apply.`);
+      } else {
+        setGrabbed({ id: page.id, before: pages });
+        setNote(`${page.name} picked up at position ${index + 1}. Use the up and down arrows to move it, Space to drop, Escape to cancel.`);
+      }
+      return;
+    }
+    if (grabbed?.id !== page.id) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setPages(grabbed.before);
+      setGrabbed(null);
+      refocus.current = page.id;
+      setNote(`Move cancelled. ${page.name} is back at position ${grabbed.before.findIndex((item) => item.id === page.id) + 1}.`);
+      return;
+    }
+    const delta = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : event.key === "Home" ? -index : event.key === "End" ? pages.length - 1 - index : 0;
+    if (!delta) return;
+    event.preventDefault();
+    const to = Math.max(0, Math.min(pages.length - 1, index + delta));
+    if (to === index) return;
+    setPages(reorderPage(pages, index, to));
+    refocus.current = page.id;
+    setNote(`${page.name} is now at position ${to + 1} of ${pages.length}.`);
+  };
   const dirty = JSON.stringify(pages) !== JSON.stringify(saved);
   const nameErrors = Object.fromEntries(pages.map((page) => [page.id, validatePageName(pages, page.name, page.id)]));
   const newError = newName ? validatePageName(pages, newName) : undefined;
@@ -117,10 +167,34 @@ function NavigationEditorForm({ context, portal, saved }: { context: ScreenConte
         <Button size="sm" variant="primary" disabled={!dirty || invalid} onClick={save}>Save navigation</Button>
       </div>}>
       <Stack gap={3}>
+        <p id="t4-nav-reorder-help" className="ds-subtle">Drag a page by its handle to reorder it. From the keyboard, focus a handle, press Space to pick the page up, move it with the arrow keys and press Space again to drop it.</p>
         <ol className="t4-nav-list" aria-label="Portal pages in navigation order">
           {pages.map((page, index) => (
-            <li key={page.id} className="t4-nav-item">
-              <span className="ds-num t4-nav-index">{index + 1}</span>
+            <li key={page.id} className="t4-nav-item"
+              data-dragging={dragId === page.id || grabbed?.id === page.id ? "true" : undefined}
+              data-over={dragId && dragId !== page.id && overIndex === index ? "true" : undefined}
+              onDragOver={(event) => { if (!dragId) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setOverIndex(index); }}
+              onDrop={(event) => { event.preventDefault(); const id = event.dataTransfer.getData("text/plain") || dragId; if (id) dropAt(id, index); setDragId(null); setOverIndex(null); }}>
+              <span className="t4-nav-grip">
+                <button type="button" className="t4-nav-handle" draggable
+                  ref={(node) => { if (node) handles.current.set(page.id, node); else handles.current.delete(page.id); }}
+                  aria-label={`Reorder ${page.name}, position ${index + 1} of ${pages.length}`}
+                  aria-describedby="t4-nav-reorder-help"
+                  aria-pressed={grabbed?.id === page.id}
+                  onKeyDown={(event) => onHandleKey(event, page, index)}
+                  onBlur={() => { if (grabbed?.id === page.id && refocus.current !== page.id) { setGrabbed(null); } }}
+                  onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", page.id);
+                    const row = event.currentTarget.closest("li");
+                    if (row) event.dataTransfer.setDragImage(row, 24, 24);
+                    setDragId(page.id);
+                  }}
+                  onDragEnd={() => { setDragId(null); setOverIndex(null); }}>
+                  <GripVertical size={16} aria-hidden="true" />
+                </button>
+                <span className="ds-num t4-nav-index">{index + 1}</span>
+              </span>
               <Field label="Page name" error={nameErrors[page.id]}>
                 <TextInput value={page.name} invalid={Boolean(nameErrors[page.id])} onChange={(event) => setPages(updatePage(pages, page.id, { name: event.target.value }))} />
               </Field>
