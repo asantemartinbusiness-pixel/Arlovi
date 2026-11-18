@@ -1,4 +1,5 @@
 import type { AttentionItem, Priority } from "./attention";
+import { clockNow } from "./clock";
 
 /** Platform-wide presentation and routing contract, never an authority grant. */
 export type NotificationCategory = "messages" | "work" | "projects" | "agents" | "routine" | "security";
@@ -85,7 +86,7 @@ export function groupNotificationUpdates<T extends AttentionItem>(items: T[]): {
   }));
 }
 
-export function isSnoozed(until: string | undefined, now = new Date()): boolean {
+export function isSnoozed(until: string | undefined, now = clockNow()): boolean {
   if (!until) return false;
   const end = Date.parse(until);
   return Number.isFinite(end) && end > now.getTime();
