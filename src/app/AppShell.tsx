@@ -22,6 +22,7 @@ import { ExecutionTray } from "@/app/ExecutionTray";
 import { HeaderContextBar } from "@/app/HeaderContextBar";
 import { getApp, useApplicationRegistryRevision } from "@/platform/registry";
 import { canOpen, ROLE_LABELS } from "@/platform/policy";
+import { canOpenLegacyScreen } from "@/platform/accessInventory";
 import { ORGS } from "@/platform/org";
 import { useCollections, useWorkspace, useMutations } from "@/platform/workspace";
 import { buildAttention, filterForRole, headerAttentionCounts } from "@/platform/attention";
@@ -90,7 +91,7 @@ export function AppShell() {
     const recent = readNavigation(org.id, org.slug).recent;
     const candidate = recent
       .map(item => findScreen(item.path)?.screen)
-      .find(screen => screen && screen.applicationCode !== "HQ" && canOpen(role, screen.applicationCode));
+      .find(screen => screen && screen.applicationCode !== "HQ" && canOpenLegacyScreen(role, screen));
     if (candidate) prefetchController.schedule(candidate.applicationCode, 5000);
     return () => prefetchController.cancel();
   }, [location.pathname, org.id, org.slug, role, prefetchController]);
@@ -100,7 +101,7 @@ export function AppShell() {
     const link = target.closest("a[href]");
     if (!(link instanceof HTMLAnchorElement) || !link.pathname.startsWith(`/o/${org.slug}/`)) return null;
     const screen = findScreen(link.pathname)?.screen;
-    if (!screen || screen.applicationCode === activeScreen?.applicationCode || !canOpen(role, screen.applicationCode)) return null;
+    if (!screen || screen.applicationCode === activeScreen?.applicationCode || !canOpenLegacyScreen(role, screen)) return null;
     return screen.applicationCode;
   }
   function prefetchLinkedApplication(target: EventTarget | null, delay = 180) {
@@ -146,7 +147,7 @@ export function AppShell() {
     ui.setRole(nextRole);
     // A role view is not authentication. Avoid stranding the user on a
     // native application hidden by the new local navigation perspective.
-    if (activeScreen && !canOpen(nextRole, activeScreen.applicationCode)) {
+    if (activeScreen && !canOpenLegacyScreen(nextRole, activeScreen)) {
       navigate(nextRole === "client" ? appEntry("PORTAL", org.slug) : workAreaPath(org.slug, "home"));
     }
   }
@@ -381,7 +382,7 @@ export function AppShell() {
                   {section.label && <div className="hq-navsection">{section.label}</div>}
                   {section.items.map((item) => {
                     const target = screens.find((screen) => screen.id === item.screenId);
-                    if (!target) return null;
+                    if (!target || !canOpenLegacyScreen(role, target)) return null;
                     const to = nativeNavPath(target, org.slug, activeMatch);
                     const ItemIcon = item.icon;
                     const content = <>
