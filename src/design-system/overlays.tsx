@@ -117,13 +117,14 @@ export function Drawer({
             <Dialog.Content
               className="ds-drawer"
               style={{ ["--drawer-w" as string]: `${width}px` }}
-              aria-describedby={undefined}
               onInteractOutside={(event) => { if (fromToast(event)) event.preventDefault(); }}
             >
               <header className="ds-overlay-head">
                 <div className="ds-grow">
                   <Dialog.Title asChild><h2>{title}</h2></Dialog.Title>
-                  {subtitle && <Dialog.Description className="ds-card-sub">{subtitle}</Dialog.Description>}
+                  {subtitle
+                    ? <Dialog.Description className="ds-card-sub">{subtitle}</Dialog.Description>
+                    : <Dialog.Description className="ds-overlay-visually-hidden">Review details and available actions in this panel.</Dialog.Description>}
                 </div>
                 {head}
                 <Dialog.Close asChild>
