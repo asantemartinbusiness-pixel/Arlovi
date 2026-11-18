@@ -262,3 +262,41 @@
 @media(max-width:800px){.cmx-shell{grid-template-columns:minmax(0,1fr)}.cmx-rail{border-right:0;border-bottom:1px solid var(--border-subtle);padding:12px}.cmx-rail-heading,.cmx-rail-separator,.cmx-rail-foot{display:none}.cmx-rail nav{flex-direction:row;overflow-x:auto;gap:4px}.cmx-rail-link{width:auto;min-width:max-content}.cmx-rail-link>small{display:none}.cmx-header{padding:18px}.cmx-toolbar{padding:10px}.cmx-workspace{grid-template-columns:minmax(200px,40%) minmax(0,1fr)}}
 @media(max-width:620px){.cmx-header{align-items:flex-start}.cmx-header h2{font-size:24px}.cmx-workspace{display:block;position:relative}.cmx-list{min-height:330px;border-right:0}.cmx-reader{display:none}.cmx-reader[data-open="true"]{display:flex;position:relative;background:var(--bg-surface);min-height:350px}.cmx-workspace:has(.cmx-reader[data-open="true"]) .cmx-list{display:none}.cmx-back{display:inline-flex}.cmx-reader-inner{padding:14px}.cmx-empty-steps{grid-template-columns:minmax(0,1fr)}.cmx-toolbar{gap:8px}.cmx-search{max-width:none;flex-basis:100%}.cmx-count{margin-left:0}.cmx-setting-layout{padding:14px}.cmx-settings .cm-mail-identities{margin:14px}.cmx-head-actions .cmx-connection{display:none}}
 @media(prefers-reduced-motion:no-preference){.cmx-rail-link,.cmx-message,.cmx-filter{transition:background-color .15s ease,color .15s ease}}
+
+
+/* Compact Arlovi email composer */
+.cm-compose{display:flex;flex-direction:column;gap:0;min-width:0}
+.cm-compose-heading{display:flex;gap:10px;align-items:center;padding:0 0 18px;border-bottom:1px solid var(--border-subtle)}
+.cm-compose-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:var(--bg-selected);flex:none}
+.cm-compose-heading>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.cm-compose-heading strong{font-size:14px;font-weight:650}
+.cm-compose-heading small,.cm-compose-help{font-size:11px;color:var(--fg-subtle)}
+.cm-compose-state{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;color:var(--fg-subtle);font-size:11px}
+.cm-compose-fields{display:flex;flex-direction:column;gap:0}
+.cm-compose-row{display:grid;grid-template-columns:72px minmax(0,1fr);gap:12px;align-items:center;border-bottom:1px solid var(--border-subtle);min-height:56px}
+.cm-compose-row>label{font-size:12px;font-weight:600;color:var(--fg-subtle)}
+.cm-compose-row .cm-mail-identity-select{border:0;min-height:39px;padding-inline:0;outline-offset:-2px}
+.cm-compose-control{display:flex;flex-direction:column;min-width:0;padding:4px 0 6px}
+.cm-compose-recipient{display:flex;align-items:center;gap:6px;min-width:0}
+.cm-compose-recipient>input{flex:1;min-width:0}
+.cm-compose-row input{border:0!important;box-shadow:none!important;background:transparent!important;padding-inline:0!important;width:100%}
+.cm-compose-inline,.cm-compose-editor-tools button{display:inline-flex;align-items:center;gap:4px;border:0;background:transparent;color:var(--fg-subtle);cursor:pointer;font:inherit;font-size:11px;white-space:nowrap;padding:7px;border-radius:6px}
+.cm-compose-inline:hover,.cm-compose-editor-tools button:hover{background:var(--bg-hover);color:var(--fg-default)}
+.cm-compose-inline:focus-visible,.cm-compose-editor-tools button:focus-visible{outline:2px solid var(--accent)}
+.cm-compose-editor{display:flex;flex-direction:column;gap:9px;padding-top:16px}
+.cm-compose-editor>label{font-size:12px;font-weight:650}
+.cm-compose-editor textarea{min-height:180px;resize:vertical;line-height:1.6;border-radius:8px}
+.cm-compose-editor-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--fg-subtle);font-size:11px}
+.cm-compose-editor-tools button:disabled{opacity:.45;cursor:not-allowed}
+.cm-compose-signature{white-space:pre-wrap;border-left:2px solid var(--accent);padding:10px 13px;background:var(--bg-inset);border-radius:5px}
+.cm-compose-signature strong{font-size:11px}.cm-compose-signature p{margin:7px 0 0;font-size:12px}
+.cm-compose-connect{display:flex;align-items:flex-start;gap:11px;padding:12px;margin-top:16px;border:1px solid var(--border-default);background:var(--bg-inset);border-radius:8px}
+.cm-compose-connect>svg{color:var(--fg-subtle);flex:none;margin-top:2px}
+.cm-compose-connect>div{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.cm-compose-connect strong{font-size:12px;font-weight:650}.cm-compose-connect small{font-size:11px;color:var(--fg-subtle);line-height:1.5}
+.cm-compose-connect>button{flex:none}
+.cm-compose #cm-compose-message{width:100%}
+.cm-compose>p.ds-subtle{font-size:11px;margin:10px 0 0}
+.cm-compose>.ds-notice{margin-top:12px}
+.cm-compose>.ds-row:last-child{margin-top:12px}
+@media(max-width:600px){.cm-compose-row{grid-template-columns:50px minmax(0,1fr);gap:8px}.cm-compose-heading{flex-wrap:wrap}.cm-compose-state{margin-left:44px}.cm-compose-connect{flex-wrap:wrap}.cm-compose-connect>button{margin-left:27px}}
