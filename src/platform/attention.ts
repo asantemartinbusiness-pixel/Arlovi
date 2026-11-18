@@ -30,6 +30,7 @@ export interface AttentionItem {
   read: boolean;
   acknowledged: boolean;
   resolved: boolean;
+  snoozedUntil?: string;
   /** Live task owner or named decision recipient, if the source records one. */
   assignee?: string;
   /** Source record if the item is backed by one. */
