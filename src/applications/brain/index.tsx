@@ -10,6 +10,9 @@ import { freshness, wallMs } from "@/platform/clock";
 import { CapabilityLine, DiagramToggle } from "@/applications/t2_shared/pieces";
 import { usePanelFlags } from "@/applications/t2_shared/store";
 import type { Rec } from "@/domain/types";
+import { internalPeople } from "./people";
+import { KnowledgeWorkspace } from "./knowledge/Workspace";
+import { KNOWLEDGE } from "./knowledge/model";
 
 /* ====================================================================== *
  * BRAIN — Company Brain & Knowledge
@@ -25,7 +28,7 @@ const CONFIDENCE_TONE: Record<string, "success" | "info" | "warning" | "danger">
 };
 
 function useKnowledge() {
-  return useCollections(["facts", "sources", "conflicts", "decisions", "policies", "brands", "graphLinks", "agents", "members"]);
+  return useCollections(["facts", "sources", "conflicts", "decisions", "policies", "brands", "graphLinks", "agents", "members", KNOWLEDGE]);
 }
 
 function sourceOf(data: Record<string, Rec[]>, id: unknown): Rec | undefined {
@@ -37,16 +40,13 @@ function sourceOf(data: Record<string, Rec[]>, id: unknown): Rec | undefined {
 function KnowledgeHome({ context, view }: { context: ScreenContext; view: "Overview" | "Recent" | "Quality" | "Opportunities" }) {
   const data = useKnowledge();
   const { now } = useWorkspace();
-  const verified = data.facts.filter((fact) => fact.status === "verified");
   const proposed = data.facts.filter((fact) => fact.status === "proposed");
-  const expired = data.facts.filter((fact) => fact.status === "expired");
-  const openConflicts = data.conflicts.filter((conflict) => conflict.status === "open");
   const stale = data.sources.filter((source) => freshness(String(source.fields.freshness ?? source.updatedAt), now, 45).stale);
   const held = data.sources.filter((source) => ["quarantined", "failed"].includes(source.status));
   const unsourced = data.facts.filter((fact) => !sourceOf(data, fact.fields.sourceId));
 
   if (view === "Recent") {
-    const rows = [...data.sources, ...data.facts].sort((a, b) => (b.at ?? b.updatedAt).localeCompare(a.at ?? a.updatedAt)).slice(0, 20);
+    const rows = [...data.sources, ...data.facts, ...data[KNOWLEDGE]].sort((a, b) => (b.at ?? b.updatedAt).localeCompare(a.at ?? a.updatedAt)).slice(0, 20);
     return (
       <DataGrid
         rows={rows}
@@ -54,11 +54,13 @@ function KnowledgeHome({ context, view }: { context: ScreenContext; view: "Overv
         label="Recent knowledge"
         columns={[
           { key: "title", header: "Record", primary: true, cell: (row) => row.title, filterValue: (row) => row.title },
-          { key: "kind", header: "Kind", cell: (row) => <Pill tone={row.collection === "facts" ? "accent" : "neutral"}>{row.collection === "facts" ? "Assertion" : "Source"}</Pill> },
+          { key: "kind", header: "Kind", cell: (row) => <Pill tone={row.collection === "facts" ? "accent" : row.collection === KNOWLEDGE ? "info" : "neutral"}>{row.collection === "facts" ? "Assertion" : row.collection === KNOWLEDGE ? "Knowledge record" : "Source"}</Pill> },
           { key: "state", header: "State", cell: (row) => <Pill tone={CONFIDENCE_TONE[row.status] ?? "neutral"}>{row.status}</Pill> },
           { key: "when", header: "Recorded", align: "end", cell: (row) => context.relative(row.at ?? row.updatedAt), sortValue: (row) => row.at ?? row.updatedAt },
         ]}
-        onOpen={(id) => context.openOverlay("Knowledge inspector", { id })}
+        onOpen={(id) => (rows.find((row) => row.id === id)?.collection === KNOWLEDGE
+          ? context.navigate(`/o/${context.org.slug}/brain/home?tab=Overview&record=${encodeURIComponent(id)}`)
+          : context.openOverlay("Knowledge inspector", { id }))}
       />
     );
   }
@@ -66,6 +68,8 @@ function KnowledgeHome({ context, view }: { context: ScreenContext; view: "Overv
   if (view === "Quality") {
     const domains = [...new Set(data.facts.map((fact) => String(fact.fields.domain ?? "unfiled")))];
     return (
+      <Stack gap={5}>
+      <RegistryOverview context={context} />
       <Grid>
         <Card span={12} eyebrow="REGISTRY" prov="posted" title="Assertions by domain" subtitle="Verified against everything else recorded">
           <BarChart
@@ -107,6 +111,7 @@ function KnowledgeHome({ context, view }: { context: ScreenContext; view: "Overv
           )}
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
@@ -148,6 +153,19 @@ function KnowledgeHome({ context, view }: { context: ScreenContext; view: "Overv
       </Stack>
     );
   }
+
+  return <KnowledgeWorkspace context={context} />;
+}
+
+function RegistryOverview({ context }: { context: ScreenContext }) {
+  const data = useKnowledge();
+  const { now } = useWorkspace();
+  const verified = data.facts.filter((fact) => fact.status === "verified");
+  const proposed = data.facts.filter((fact) => fact.status === "proposed");
+  const expired = data.facts.filter((fact) => fact.status === "expired");
+  const openConflicts = data.conflicts.filter((conflict) => conflict.status === "open");
+  const held = data.sources.filter((source) => ["quarantined", "failed"].includes(source.status));
+  const unsourced = data.facts.filter((fact) => !sourceOf(data, fact.fields.sourceId));
 
   return (
     <Stack gap={5}>
@@ -587,19 +605,7 @@ function BusinessGraph({ context, view }: { context: ScreenContext; view: "Entit
 
 /* ---------------------------- BRAIN-005 ---------------------------- */
 
-/** People inside the organisation who can own knowledge: humans, not clients, external contacts or agents. */
-export function internalPeople(members: Rec[]): Rec[] {
-  const seen = new Set<string>();
-  return members.filter((member) => {
-    const internal = String(member.fields.kind ?? "human") === "human"
-      && member.fields.external !== true
-      && !["client", "agent", "guest"].includes(String(member.fields.role ?? "member"))
-      && member.status !== "suspended";
-    if (!internal || seen.has(member.title)) return false;
-    seen.add(member.title);
-    return true;
-  });
-}
+export { internalPeople };
 
 /** Unresolved conflict records that name an assertion. The list and the evidence drawer both count these. */
 export function conflictsOfFact(fact: Rec, conflicts: Rec[]): Rec[] {
@@ -2376,7 +2382,11 @@ export const brainApp = registerApp({
         render: (context: ScreenContext) => <KnowledgeHome context={context} view={view} />,
       })),
       actions: [
-        { id: "Search knowledge", placement: "primary", run: (context) => context.openOverlay("Knowledge inspector") },
+        { id: "Search knowledge", placement: "primary", run: (context) => {
+          if (context.tab !== "Overview") context.setTab("Overview");
+          window.setTimeout(() => document.querySelector<HTMLInputElement>('input[aria-label="Search knowledge"]')?.focus(), 60);
+        } },
+        { id: "inspect", label: "Inspect assertions and sources", placement: "overflow", run: (context) => context.openOverlay("Knowledge inspector") },
         { id: "import", label: "Import a source", placement: "secondary", run: (context) => context.openOverlay("upload") },
         { id: "review proposal", placement: "secondary", capability: "edit_knowledge", run: (context) => context.openOverlay("suggestion approval") },
         { id: "opportunities", label: "All opportunities", placement: "overflow", run: (context) => context.setTab("Opportunities") },
