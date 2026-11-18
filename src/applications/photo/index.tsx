@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Camera, Brush, Eraser, Crop, Move, SquareDashed, Lasso, Pipette, Hand, Stamp,
-  Layers as LayersIcon, SlidersHorizontal, Images, Download, Circle,
+  Layers as LayersIcon, SlidersHorizontal, Images, Download, Circle, Undo2, Redo2,
 } from "lucide-react";
 import {
   Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill, Properties,
@@ -27,6 +27,8 @@ import {
   bumpPixels, newPixelLayer, parsePhoto, photoUi, setPhotoTool, starterPhoto, unsupportedReason, type PhotoTool,
 } from "./model";
 import { clockIso, wallMs } from "@/platform/clock";
+import { ImageTools } from "./imageTools";
+import "./photo.css";
 
 /* ====================================================================== *
  * PHOTO — Photo & Image Editing
@@ -201,19 +203,19 @@ function RasterEditor({ context, actions }: { context: ScreenContext; actions: A
       subtitle={<Row gap={2} wrap><SaveState handle={handle} />{doc && <span>{doc.width} × {doc.height} · {doc.layers.length} layers</span>}</Row>}
       backTo={{ label: "Photo", to: `/o/${context.org.slug}/photo/photos` }}
       tools={
-        <>
+        <div className="ph-tools">
           <Toolbar label="Tools">
             {PHOTO_TOOLS.map((item) => (
               <Tool key={item.tool} label={`${item.label} (${item.key})`} icon={item.icon} active={ui.tool === item.tool} onClick={() => setPhotoTool(item.tool)} />
             ))}
           </Toolbar>
-          <ToolbarSeparator />
           <Toolbar label="History">
-            <Button size="sm" variant="ghost" disabled={!handle.canUndo} onClick={handle.undo}>Undo</Button>
-            <Button size="sm" variant="ghost" disabled={!handle.canRedo} onClick={handle.redo}>Redo</Button>
-            <Button size="sm" variant={ui.compare ? "primary" : "ghost"} onClick={() => photoUi.set((c) => ({ ...c, compare: !c.compare }))}>Compare</Button>
+            <Tool label="Undo (⌘Z)" icon={<Undo2 size={15} />} disabled={!handle.canUndo} onClick={() => { handle.undo(); bumpPixels(); }} />
+            <Tool label="Redo (⇧⌘Z)" icon={<Redo2 size={15} />} disabled={!handle.canRedo} onClick={() => { handle.redo(); bumpPixels(); }} />
+            <Tool label="Before and after: bypass every adjustment" active={ui.compare} onClick={() => photoUi.set((c) => ({ ...c, compare: !c.compare }))}>Before</Tool>
           </Toolbar>
-        </>
+          <ImageTools context={context} handle={handle} bank={bank} title={record.title} />
+        </div>
       }
       left={
         <Stack gap={3}>

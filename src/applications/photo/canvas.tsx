@@ -409,7 +409,9 @@ export function PhotoCanvas({ handle, bank, paintTarget = "layer", showSelection
     if (event.key === "0") { event.preventDefault(); return photoUi.set((c) => ({ ...c, zoom: 1, pan: { x: 0, y: 0 } })); }
   };
 
-  if (!doc) return <div className="ds-empty" style={{ height: "100%" }}><p>Opening the image…</p></div>;
+  /* The measured frame is rendered even while the document opens: the size
+     observer attaches once, so it must find this element on first render. */
+  if (!doc) return <div ref={frameRef} className="ds-empty" style={{ position: "absolute", inset: 0 }}><p>Opening the image…</p></div>;
 
   const activeLayer = doc.layers.find((item) => item.id === doc.activeLayerId);
   const cursor = ui.tool === "hand" ? "grab" : ui.tool === "eyedropper" ? "crosshair" : ui.tool === "move" ? "move" : "crosshair";
