@@ -493,10 +493,12 @@ function TakeDepositForm({ context, close, booking, loaded }: { context: ScreenC
   });
   const invalidAmount = !Number.isSafeInteger(amount) || serviceValue <= 0 || amount <= 0 || amount > serviceValue;
   const canRecord = !recorded && !busy && !invalidAmount && !totals.hasUnknownRate;
+  const requestAlreadyRecorded = state === "awaiting_payment" && amount === startingAmount;
+  const canRecordRequest = canRecord && !requestAlreadyRecorded;
   const hasUnsavedWork = !recorded && (amount !== startingAmount || confirmReceived);
 
   async function recordDeposit(received: boolean) {
-    if (!canRecord || (received && !confirmReceived)) return;
+    if (!canRecord || (!received && !canRecordRequest) || (received && !confirmReceived)) return;
     setBusy(true);
     try {
       const result = await context.mutate.patch(booking.id, {
@@ -598,8 +600,8 @@ function TakeDepositForm({ context, close, booking, loaded }: { context: ScreenC
           </>
         ) : (
           <>
-            <Button variant="primary" size="sm" busy={busy} disabled={!canRecord} onClick={() => { void recordDeposit(false); }}>
-              Record deposit request
+            <Button variant="primary" size="sm" busy={busy} disabled={!canRecordRequest} onClick={() => { void recordDeposit(false); }}>
+              {requestAlreadyRecorded ? "Request already recorded" : state === "awaiting_payment" ? "Update deposit request" : "Record deposit request"}
             </Button>
             <Button variant="secondary" size="sm" disabled={!canRecord} onClick={() => setConfirmReceived(true)}>
               Money received elsewhere
