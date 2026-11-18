@@ -194,7 +194,7 @@ export const adminApp = registerApp({
       ],
       overlays: [
         { id: "Provider setup", kind: "modal", title: "Single sign-on", width: 560, render: ({ close, ...context }) => <ProviderSetup context={context} close={close} /> },
-        { id: "emergency revoke", kind: "modal", title: "Revoke sessions", tone: "danger", width: 560, blocking: true, render: ({ close, ...context }) => <EmergencyRevoke context={context} close={close} /> },
+        { id: "emergency revoke", kind: "modal", title: "Revoke sessions", tone: "danger", width: 560, blocking: true, capability: "manage_policy", presentation: { guidance: "Verify the affected identities and active sessions before recording an emergency revocation." }, render: ({ close, ...context }) => <EmergencyRevoke context={context} close={close} /> },
         { id: "security review", kind: "modal", title: "Confirm a security change", width: 560, render: ({ close, ...context }) => <SecurityReview context={context} close={close} /> },
         { id: "export sessions", kind: "modal", title: "Export sessions", width: 500, render: ({ close, ...context }) => <SessionsExport context={context} close={close} /> },
       ],
