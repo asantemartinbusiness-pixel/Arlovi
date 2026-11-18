@@ -9,6 +9,7 @@ import { appEntry, findScreen, nativeNavPath, screens } from "@/app/catalog";
 import { destinationForOrganization } from "@/app/organizationNavigation";
 import { ScreenHost } from "@/app/ScreenHost";
 import { FirstRunGuide } from "@/app/FirstRunGuide";
+import { RoleFirstRun } from "@/app/RoleFirstRun";
 import { GuidedTour } from "@/app/GuidedTour";
 import { WORK_AREAS, WorkspaceNavigation, WorkspaceSideNav, currentWorkArea, isWorkAreaPath, workAreaPath } from "@/app/WorkspaceNavigation";
 import { ScreenErrorBoundary } from "@/app/ErrorBoundary";
@@ -461,6 +462,7 @@ export function AppShell() {
             </div>
           )}
           {org.ownerName && (location.pathname === `/o/${org.slug}/hq/home` || location.pathname === workAreaPath(org.slug,"home")) && <FirstRunGuide />}
+          {org.ownerName && (location.pathname === `/o/${org.slug}/hq/home` || location.pathname === workAreaPath(org.slug,"home")) && <RoleFirstRun />}
           <ScreenErrorBoundary resetKey={location.pathname} label={isWorkspaceArea ? "Workspace" : activeScreen?.title ?? "This screen"}>
             {isWorkspaceArea ? <WorkspaceNavigation /> : <ScreenHost />}
           </ScreenErrorBoundary>
