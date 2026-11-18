@@ -64,6 +64,9 @@ export function AccessPermissionMatrix({ roleId, context }: { roleId:string; con
     `${page.title} ${page.id}`.toLowerCase().includes(filter.toLowerCase()) &&
     (!changedOnly || Boolean(Object.keys(draft.pageRules[page.id]??{}).length))),
     [appCode,filter,changedOnly,draft.pageRules]);
+  const tableRows = view==="apps"
+    ? apps.map(app=>({ key:app.code, app:app.code, pageId:undefined as string|undefined, title:app.name }))
+    : currentPages.map(page=>({ key:page.id, app:page.applicationCode, pageId:page.id as string|undefined, title:page.title }));
   const edits=countDraftChanges(draft);
   const applyRule=(level:"application"|"page",key:string,action:MatrixAction,choice:PermissionChoice)=>{
     setDraft(previous=>updateRolePermission(previous,level,key,action,choice));
@@ -143,19 +146,16 @@ export function AccessPermissionMatrix({ roleId, context }: { roleId:string; con
           {GRID_ACTIONS.map(a=><th key={a} scope="col">{a[0].toUpperCase()+a.slice(1)}</th>)}
           {view==="apps"&&<th scope="col">Data scope</th>}
         </tr></thead>
-        <tbody>{(view==="apps"?apps:currentPages).map(item=>{
-          const app=view==="apps"?item.code:("applicationCode" in item?item.applicationCode:"");
-          const pageId=view==="pages"&&"id" in item?item.id:undefined;
-          const key=view==="apps"?app:pageId??"";
+        <tbody>{tableRows.map(item=>{
+          const { app, pageId, key } = item;
           const level=view==="apps"?"application":"page";
           const viewDecision=plannedPermission(roleId,app,pageId,"view",draft);
           const editDecision=plannedPermission(roleId,app,pageId,"edit",draft);
           const row=draft[level==="application"?"appRules":"pageRules"][key]??{};
-          const sensitive=view==="pages"&&"title" in item&&item.title
-            ? viewDecision.restricted :false;
+          const sensitive=view==="pages" && viewDecision.restricted;
           return <tr key={key}>
             <th scope="row"><div className="aw-perm-identity">
-              <strong>{view==="apps"?"name" in item?item.name:app:"title" in item?item.title:pageId}</strong>
+              <strong>{item.title}</strong>
               <small>{view==="apps"?app:pageId}</small>
               {sensitive&&<span className="aw-perm-sensitive"><LockKeyhole size={11}/> Sensitive</span>}
               {view==="apps"&&<button className="aw-perm-drill" type="button" onClick={()=>{setAppCode(app);setView("pages");setFilter("");}}>Inspect pages</button>}
@@ -175,7 +175,7 @@ export function AccessPermissionMatrix({ roleId, context }: { roleId:string; con
           </tr>;
         })}</tbody>
       </table>
-      {(view==="apps"?apps:currentPages).length===0&&<p className="aw-empty">No matching permission rows.</p>}
+      {tableRows.length===0&&<p className="aw-empty">No matching permission rows.</p>}
     </div>}
     {view==="review"&&<div className="aw-perm-review">
       <p>Review each exception before saving. Explicit draft denies override page-level allows; edit requires view.</p>
