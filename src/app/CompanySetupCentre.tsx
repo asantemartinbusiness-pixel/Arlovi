@@ -80,7 +80,7 @@ export function CompanySetupCentre() {
       <Link className="setup-centre-back" to={"/o/" + org.slug + "/workspace/home"}>Back to My Workspace <ArrowRight size={16}/></Link>
     </header>
     <div className="setup-centre-overview">
-      <div className="setup-centre-overview-icon" style={{background:org.accent}}>{org.shortName.slice(0,1)}</div>
+      <div className="setup-centre-overview-icon" style={{borderColor:org.accent}}>{org.shortName.slice(0,1)}</div>
       <div className="setup-centre-overview-copy"><strong>{org.name}</strong><span>Browser-local headquarters · {org.currency} · {org.timezone}</span></div>
       <div className="setup-centre-overview-stat"><strong>{readyCount} of {sections.length}</strong><span>areas with local foundations</span></div>
     </div>
@@ -89,16 +89,17 @@ export function CompanySetupCentre() {
       <div><strong>Set up what matters next.</strong><p>You don't need to finish every area to work. Select a section to open its native workspace. Setup isn't a claim that external services are connected or that invitations have been delivered.</p></div>
     </div>
     {!canEdit && <div className="setup-centre-boundary"><LockKeyhole size={18}/><p>You're viewing the {role} interface preview. This frontend's role selector is not verified account authorization; actual editing is controlled within local application views until a real identity service is connected.</p></div>}
-    <div className="setup-centre-grid">
-      {sections.map(({title,description,href,detail,state,Icon})=>
+    <div className="setup-centre-grid" aria-label="Company setup sections">
+      {sections.map(({title,description,href,detail,state,Icon},index)=>
         <Link to={href} key={title} className="setup-centre-card">
-          <div className="setup-centre-card-top">
-            <span className="setup-centre-card-icon"><Icon size={20}/></span>
+          <span className="setup-centre-card-number">{String(index+1).padStart(2,"0")}</span>
+          <span className="setup-centre-card-icon"><Icon size={19}/></span>
+          <div className="setup-centre-card-main"><h2>{title}</h2><p>{description}</p></div>
+          <div className="setup-centre-card-meta">
             <span className="setup-centre-state" data-state={state}>{state==="ready"?<CheckCircle2 size={13}/>:<CircleDot size={13}/>} {state==="ready"?"Local foundation":state==="connection"?"Provider review":state==="draft"?"Draft / review":"Needs review"}</span>
+            <span className="setup-centre-card-detail">{detail}</span>
           </div>
-          <h2>{title}</h2>
-          <p>{description}</p>
-          <div className="setup-centre-card-bottom"><span>{detail}</span><ArrowRight size={17} aria-hidden="true"/></div>
+          <ArrowRight size={18} className="setup-centre-card-arrow" aria-hidden="true"/>
         </Link>
       )}
     </div>
