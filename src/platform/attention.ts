@@ -269,6 +269,9 @@ export const RECORD_ROUTES: Record<string, { list: string; detail?: string; quer
   designs: { list: "design/files", detail: "design/files" }, contracts: { list: "legal/contracts", detail: "legal/contracts" }, suppliers: { list: "proc/suppliers", detail: "proc/suppliers" },
   // Knowledge records open inside the Company Brain workspace by query.
   knowledge: { list: "brain/home", query: "record" },
+  // Agent teams are managed in the AI workforce directory (no per-team page).
+  agentTeams: { list: "team/agents" },
+  workflows: { list: "auto/workflows", detail: "auto/workflows" },
 };
 
 export function routeForRecord(record: Rec, orgSlug: string): string | undefined {

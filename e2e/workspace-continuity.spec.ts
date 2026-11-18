@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 
 test("recent places survive a reload and can be saved", async ({ page }) => {
   await page.goto("/o/northline/workspace/work");
-  await expect(page.getByRole("heading", { level:1,name: "Projects" })).toBeVisible();
+  // The Work area is titled "Work" in the space-led navigation model.
+  await expect(page.getByRole("heading", { level:1,name: "Work" })).toBeVisible();
   await page.goto("/o/northline/workspace/home");
   await expect(page.getByRole("heading", { name: "Pick up where you left off" })).toBeVisible();
   const recent = page.getByRole("region", { name: "Recently visited" });
@@ -17,8 +18,9 @@ test("recent places survive a reload and can be saved", async ({ page }) => {
 
 test("global search finds organisation workspaces and saved destinations", async ({ page }) => {
   await page.goto("/o/northline/workspace/spaces");
-  await page.getByRole("button", { name: /Search Northline/ }).click();
-  const search = page.getByRole("combobox", { name: /Search screens and records/ });
+  // The unified header (af2a2d8) names the search control "Search anything in <company>".
+  await page.getByRole("button", { name: /Search anything in Northline/ }).click();
+  const search = page.getByRole("combobox", { name: /Search screens, records and actions/ });
   await search.fill("Work");
   await expect(page.getByRole("option", { name: /Work/ }).first()).toBeVisible();
 });

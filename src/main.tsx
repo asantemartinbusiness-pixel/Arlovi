@@ -41,8 +41,10 @@ function Boot() {
         // Fixtures (data only, no screens) load once the browser is idle, so
         // cross-application references resolve without opening every app.
         const idle = (window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
-        if (idle) idle(() => void loadAllSeeds(), { timeout: 2500 });
-        else window.setTimeout(() => void loadAllSeeds(), 1200);
+        // A failure is logged by the loader; screens that need every record say so.
+        const background = () => { loadAllSeeds().catch(() => undefined); };
+        if (idle) idle(background, { timeout: 2500 });
+        else window.setTimeout(background, 1200);
         // Only the requested application loads after the core workspace opens.
         // AppShell routes initiate loading; navigation hints may prefetch it.
       })

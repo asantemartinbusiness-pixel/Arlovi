@@ -156,11 +156,19 @@ export async function loadApplications(): Promise<LoadFailure[]> {
 let allSeeds: Promise<void> | null = null;
 export function loadAllSeeds(): Promise<void> {
   if (allSeeds) return allSeeds;
-  allSeeds = Promise.allSettled(Object.keys(NATIVE).map(code => SEED_MODULES[code]?.()))
-    .then(() => seedLateContributors())
+  const codes = Object.keys(NATIVE);
+  allSeeds = Promise.allSettled(codes.map(code => SEED_MODULES[code]?.()))
+    .then(async (outcomes) => {
+      // Seed whatever did load, then report a partial load as a failure so a
+      // screen that counts across applications never treats it as complete.
+      await seedLateContributors();
+      const missing = codes.filter((_, index) => outcomes[index].status === "rejected");
+      if (missing.length) throw new Error(`Fixtures did not load for: ${missing.join(", ")}`);
+    })
     .catch(error => {
-      allSeeds = null; // A later navigation may retry.
+      allSeeds = null; // A later call may retry.
       console.error("Arlovi: background fixtures failed to load.", error);
+      throw error;
     });
   return allSeeds;
 }

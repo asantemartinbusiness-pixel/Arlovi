@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Skeleton, Stack } from "@/design-system";
+import { Notice, Skeleton, Stack } from "@/design-system";
 import type { ScreenContext, ScreenDef } from "@/platform/registry";
 
 /* ====================================================================== *
@@ -12,14 +12,16 @@ import type { ScreenContext, ScreenDef } from "@/platform/registry";
  * ====================================================================== */
 
 let seedsReady = false;
+let seedsPartial = false;
 let waiting: Promise<void> | null = null;
 
 function whenSeeded(): Promise<void> {
   if (!waiting) {
     waiting = import("@/applications")
       .then((module) => module.loadAllSeeds())
-      .then(() => { seedsReady = true; })
-      .catch(() => { seedsReady = true; /* a failed fixture load is reported by the shell; do not block forever */ });
+      .then(() => { seedsReady = true; seedsPartial = false; })
+      // Do not block forever, but never present a partial read as complete.
+      .catch(() => { seedsReady = true; seedsPartial = true; waiting = null; });
   }
   return waiting;
 }
@@ -42,6 +44,16 @@ export function AnalyticsReady({ children }: { children: ReactNode }) {
           <Skeleton height={180} />
         </Stack>
       </div>
+    );
+  }
+  if (seedsPartial) {
+    return (
+      <Stack gap={3}>
+        <Notice tone="warning" title="Some applications' records could not be read">
+          Figures below may be incomplete. Reload the page to try reading every application again.
+        </Notice>
+        {children}
+      </Stack>
     );
   }
   return <>{children}</>;
