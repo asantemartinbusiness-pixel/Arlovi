@@ -2694,7 +2694,7 @@ registerApp({
         { id: "Insert tools", kind: "modal", title: "Insert", width: 480, render: ({ close }) => <InsertTools close={close} /> },
         { id: "fill picker", kind: "drawer", title: "Fill", width: 380, render: ({ ...context }) => <FillPicker context={context} /> },
         { id: "style inspector", kind: "drawer", title: "Properties", width: 400, render: ({ ...context }) => <InspectorOverlay context={context} /> },
-        { id: "export", kind: "modal", title: "Export", width: 520, render: ({ ...context }) => <ExportOverlay context={context} /> },
+        { id: "export", kind: "modal", title: "Export", width: 520, presentation: { guidance: "Confirm the document, output bounds and format before creating the export." }, render: ({ ...context }) => <ExportOverlay context={context} /> },
         { id: "move selection", kind: "modal", title: "Drag the selection", width: 440, render: ({ close, ...context }) => <MoveSelection context={context} close={close} />, footer: submitFooter("design-move-selection", "Move") },
       ],
     },
