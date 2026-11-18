@@ -62,7 +62,7 @@ export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string 
   }, [history, historyKey]);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const recordCount = useMemo(() => records.filter((record) => record.orgId === org.id).length, [records, org.id]);
+  const recordCount = useMemo(() => records.filter((record) => record.organizationId === org.id).length, [records, org.id]);
   const replyContext = context === "Workspace" ? org.name : context;
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
