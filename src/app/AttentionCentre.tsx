@@ -140,6 +140,7 @@ export function AttentionCentre({ items, onClose, initialView = "for-you" }: {
                             {actionable ? "Review" : "Open"}
                           </Button>}
                         {!item.read && <button onClick={() => markRead(item)} type="button">Mark read</button>}
+                        {item.read && <button onClick={() => receipt(item, { read: false })} type="button">Mark unread</button>}
                         {!item.acknowledged && <button onClick={() => acknowledge(item)} type="button">Acknowledge</button>}
                         {!isUrgent(item.priority) && notificationCategory(item) !== "security" && !item.snoozed && !item.resolved &&
                           <button onClick={() => snooze(item)} type="button"><Clock3 size={12}/> Snooze 1h</button>}
