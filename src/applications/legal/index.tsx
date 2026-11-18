@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Archive, CalendarClock, FileSignature, FileText, Gavel, Scale, ShieldAlert } from "lucide-react";
+import { Archive, CalendarClock, FileText, Gavel, Scale, ShieldAlert } from "lucide-react";
 import {
   Button, Checkbox, Empty, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayCancel, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
