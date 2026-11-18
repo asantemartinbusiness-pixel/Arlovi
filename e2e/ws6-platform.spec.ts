@@ -85,6 +85,8 @@ test("IT: an incident moves through triage and mitigation with timeline entries 
   const composer = page.getByLabel("Add a timeline entry");
   await composer.getByLabel("What happened").fill("Checked storage quota on the shared laptop");
   await composer.getByRole("button", { name: "Add to timeline" }).click();
+  // Wait for the write to land before reloading, so the reload proves persistence rather than racing it.
+  await expect(page.getByLabel("Incident timeline")).toContainText("Checked storage quota on the shared laptop");
   await page.reload();
   const timeline = page.getByLabel("Incident timeline");
   await expect(timeline).toContainText("Checked storage quota on the shared laptop");
@@ -99,6 +101,7 @@ test("IT: change approval is separated from the requester, and access reviews re
   await changes.getByRole("button", { name: /Move the showroom diary/ }).click();
   await changes.getByLabel("Approver").selectOption("Ada Fernsby");
   await changes.getByRole("button", { name: "Record approval" }).click();
+  await expect(changes).toContainText("Approved by");
   await page.reload();
   await expect(page.getByLabel("Change requests")).toContainText("Approved by");
   await expect(page.getByLabel("Change requests").getByRole("button", { name: "Record as implemented" })).toBeVisible();
@@ -108,6 +111,7 @@ test("IT: change approval is separated from the requester, and access reviews re
   await reviews.getByRole("button", { name: "Start an access review" }).click();
   await reviews.getByLabel("Decision for Maya Chen").selectOption("keep");
   await reviews.locator(".it-review-row").first().getByRole("button", { name: "Record decision" }).click();
+  await expect(reviews).toContainText("Decided by");
   await page.reload();
   await expect(page.getByLabel("Access reviews")).toContainText("Decided by");
   await expect(page.getByLabel("Access reviews").getByRole("button", { name: "Complete the review" })).toBeDisabled();
@@ -121,6 +125,7 @@ test("IT: assets distinguish local evidence from unconnected remote infrastructu
   await assets.getByRole("button", { name: /Showroom laptop/ }).click();
   await assets.getByLabel("What you checked").fill("Disk encryption is on");
   await assets.getByRole("button", { name: "Record a hand check" }).click();
+  await expect(assets).toContainText("Disk encryption is on");
   await page.reload();
   await page.getByLabel("Assets and configuration").getByRole("button", { name: /Showroom laptop/ }).click();
   await expect(page.getByLabel("Assets and configuration")).toContainText("Disk encryption is on");
@@ -137,6 +142,7 @@ test("CONNECT: a mapping moves a connection from pending to configured to simula
   await main.getByRole("button", { name: "Save mapping" }).click();
   await expect(main.getByRole("button", { name: "Simulate with the sample row" })).toBeEnabled();
   await main.getByRole("button", { name: "Simulate with the sample row" }).click();
+  await expect(page.getByText("Simulation recorded")).toBeVisible();
   await page.reload();
   await expect(main.getByLabel("Arlovi field for summary")).toHaveValue("title");
   await page.goto("/o/northline/connect/sync?tab=Data+mapping");
@@ -155,6 +161,7 @@ test("WEB: SEO fields refuse an invalid address and save a valid title", async (
   await address.fill("/");
   await main.getByLabel(/Page title/).fill("Northline Atelier — lighting workshop");
   await main.getByRole("button", { name: "Save SEO fields" }).click();
+  await expect(page.getByText("SEO fields saved")).toBeVisible();
   await page.reload();
   await expect(main.getByLabel(/Page title/)).toHaveValue("Northline Atelier — lighting workshop");
 });
