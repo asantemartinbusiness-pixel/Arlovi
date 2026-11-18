@@ -217,13 +217,6 @@ RULES: list[tuple[str, str]] = [
 ]
 
 
-# Approved Communications workspace tabs added after the original screen inventory.
-# Keep the generated contract aligned with the actual navigable application.
-APPROVED_TAB_EXTENSIONS = {
-    "ARL-COMMS-005": ["Shared inboxes", "Accounts & domains", "Sender identities"],
-}
-
-
 def collection_for(app: str, route: str) -> str:
     for frag, col in RULES:
         if frag in route:
@@ -257,7 +250,7 @@ def main() -> None:
                     "applicationName": app["name"],
                     "purpose": app["purpose"],
                     "regions": pg["regions"],
-                    "tabs": list(dict.fromkeys([*pg["tabs"], *APPROVED_TAB_EXTENSIONS.get(pg["id"], [])])),
+                    "tabs": pg["tabs"],
                     "actions": pg["actions"],
                     "overlays": pg["overlays"],
                     "ai": pg["ai"],
