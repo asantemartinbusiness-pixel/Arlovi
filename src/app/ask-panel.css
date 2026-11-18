@@ -41,3 +41,13 @@
 .ask-composer-caption { text-align: center; font-size: 10px; opacity: .55; margin: 7px 0 0; line-height: 1.4; }
 @media (max-width: 420px) { .ask-suggestions { grid-template-columns: 1fr; } .ask-suggestion { min-height: 88px; } .ask-context-count { display: none; } }
 @media (prefers-reduced-motion: reduce) { .ask-suggestion { transition: none; } .ask-suggestion:hover { transform: none; } }
+
+.ask-toolbar-actions { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.ask-history { padding: 12px; border: 1px solid var(--border, #dedede); border-radius: 12px; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.ask-history .ask-suggestion-heading { margin: 0 0 6px; }
+.ask-history-empty { margin: 0; font-size: 12px; opacity: .65; }
+.ask-history-item { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; padding: 9px 11px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.ask-history-item:hover, .ask-history-item[aria-current="true"] { border-color: var(--border, #ddd); background: var(--surface-subtle, rgba(127,127,127,.05)); }
+.ask-history-item:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.ask-history-item span { font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.ask-history-item small { font-size: 10px; opacity: .55; }
