@@ -70,9 +70,17 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
   for (const record of input.notifications) {
     const priority = (typeof record.fields.priority === "string" && /^P[0-5]$/.test(record.fields.priority)
       ? record.fields.priority : "P3") as Priority;
-    const audience = typeof record.fields.audience === "string"
+    const declaredAudience = typeof record.fields.audience === "string"
       ? record.fields.audience.split(",").map((value) => value.trim()).filter(Boolean) as Role[]
       : [];
+    // Sensitive local notifications need a scoped role preview even when their
+    // source has not declared recipients. This is a display guard, NOT Auth/RLS.
+    const appCode = String(record.fields.appCode ?? "").toUpperCase();
+    const restrictedAudience: Role[] = appCode === "HR" ? ["owner", "people"]
+      : appCode === "FIN" ? ["owner", "finance"]
+      : ["ADMIN", "IT", "LEGAL"].includes(appCode) ? ["owner"]
+      : [];
+    const audience = declaredAudience.length > 0 ? declaredAudience : restrictedAudience;
     items.push({
       id: record.id,
       kind: (record.fields.kind as AttentionKind) ?? "update",
