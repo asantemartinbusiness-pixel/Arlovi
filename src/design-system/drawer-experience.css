@@ -1,0 +1,125 @@
+/* Arlovi overlay architecture — shared by every native application.
+   Preserve the existing colour system and scale; improve panel hierarchy,
+   available work area, action persistence, and accessible motion. */
+
+.ds-drawer {
+  width: min(var(--drawer-w, 440px), calc(100vw - 28px));
+  max-width: 100vw;
+  min-width: 0;
+  min-height: 0;
+  isolation: isolate;
+}
+.ds-drawer .ds-overlay-head {
+  flex: none;
+  align-items: center;
+  min-height: calc(64px * var(--interface-scale, 1));
+  padding: var(--space-4) var(--space-6);
+  background: var(--bg-surface);
+}
+.ds-drawer .ds-overlay-head h2 {
+  font-size: var(--text-xl);
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+.ds-drawer .ds-overlay-head .ds-card-sub {
+  line-height: 1.45;
+  max-width: 70ch;
+  margin-block-start: var(--space-1);
+}
+.ds-drawer .ds-overlay-head .ds-btn[data-icon-only="true"] {
+  flex: none;
+  color: var(--fg-muted);
+}
+.ds-drawer .ds-overlay-body {
+  min-height: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: var(--space-6);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.ds-drawer-foot {
+  flex: none;
+  min-height: calc(58px * var(--interface-scale, 1));
+  padding: var(--space-3) var(--space-6);
+  background: var(--bg-surface);
+  box-shadow: 0 -8px 24px rgb(0 0 0 / 2%);
+  padding-block-end: max(var(--space-3), env(safe-area-inset-bottom));
+}
+.ds-drawer-foot:empty { display: none; }
+.ds-drawer-action-row {
+  display: flex;
+  flex: 1 1 100%;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: var(--space-2);
+}
+.ds-drawer .ds-overlay-body :is(input, textarea, select, button, a):focus-visible,
+.ds-drawer .ds-overlay-head button:focus-visible,
+.ds-drawer-foot :is(button, a):focus-visible {
+  outline: 2px solid var(--fg-default);
+  outline-offset: 3px;
+}
+@media (min-width: 900px) {
+  .ds-drawer { width: min(var(--drawer-w, 440px), calc(100vw - 72px)); }
+}
+@media (max-width: 599px) {
+  .ds-drawer {
+    inset-inline: 0;
+    width: 100vw;
+    max-width: 100vw;
+    height: min(94dvh, 100dvh);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
+  .ds-drawer .ds-overlay-head {
+    padding: var(--space-4);
+    min-height: 60px;
+  }
+  .ds-drawer .ds-overlay-body { padding: var(--space-4); scrollbar-gutter: auto; }
+  .ds-drawer-foot {
+    padding-inline: var(--space-4);
+    padding-block-end: max(var(--space-4), env(safe-area-inset-bottom));
+  }
+  .ds-drawer-action-row > .ds-btn { flex: 1 1 auto; }
+}
+@media (max-height: 560px) and (min-width: 600px) {
+  .ds-drawer .ds-overlay-head { min-height: 52px; padding-block: var(--space-2); }
+  .ds-drawer .ds-overlay-body { padding-block: var(--space-3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ds-drawer, .ds-drawer-scrim { animation: none !important; }
+}
+
+/* Persistent, on-page inspectors use the same architectural rhythm as drawers. */
+.ds-inspector { min-width: 0; overflow: hidden; }
+.ds-inspector .ds-inspector-head {
+  flex: none;
+  min-height: calc(52px * var(--interface-scale, 1));
+  padding: var(--space-4);
+  background: var(--bg-surface);
+}
+.ds-inspector .ds-inspector-head h3 {
+  font-size: var(--text-md);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+.ds-inspector .ds-inspector-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.ds-overlay-visually-hidden {
+  position: absolute; width: 1px; height: 1px; padding: 0;
+  margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0);
+  white-space: nowrap; border: 0;
+}

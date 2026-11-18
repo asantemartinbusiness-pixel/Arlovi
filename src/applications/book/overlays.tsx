@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, MoneyInput, Notice, Pill, Properties, Row,
+  Button, Card, Checkbox, DataGrid, Empty, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, MoneyInput, Notice, Pill, Properties, Row,
   Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
@@ -16,6 +16,7 @@ import { ConflictNotice, SlotPicker } from "./calendar";
 import { overlappingOn, reasonError, reasonLabel, RESCHEDULE_REASONS, resourceCapacity, seatsOf, slotProblems } from "./availability";
 import { recordTestSend } from "./actions";
 import type { Rec } from "@/domain/types";
+import "./deposit-modal.css";
 
 /* ====================================================================== *
  * BOOK overlays. Every slot a form offers has been checked for a conflict
@@ -476,54 +477,139 @@ function TakeDepositForm({ context, close, booking, loaded }: { context: ScreenC
   const live = useBookData();
   const data = live.services.length ? live : loaded;
   const { org, now } = useWorkspace();
-  const service = data.services.find((item) => item.id === String(booking?.fields.serviceId ?? ""));
-  const [amount, setAmount] = useState(Number(booking?.fields.depositMinor ?? service?.fields.depositMinor ?? 0));
-  if (!booking) return <Empty title="No booking" />;
+  const service = data.services.find((item) => item.id === String(booking.fields.serviceId ?? ""));
+  const startingAmount = Number(booking.fields.depositMinor ?? service?.fields.depositMinor ?? 0);
+  const [amount, setAmount] = useState(startingAmount);
+  const [confirmReceived, setConfirmReceived] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const state = String(booking.fields.depositState ?? "none");
+  const recorded = state === "paid_local";
+  const serviceValue = service?.amountMinor ?? 0;
   const totals = computeInvoice({
     lines: [{ id: "deposit", description: `Deposit · ${service?.title ?? "service"}`, quantity: 1, unitPriceMinor: amount, taxCategory: "standard" }],
     jurisdiction: org.jurisdiction,
     customerStatus: "domestic",
     date: now.toISOString(),
   });
+  const invalidAmount = !Number.isSafeInteger(amount) || serviceValue <= 0 || amount <= 0 || amount > serviceValue;
+  const canRecord = !recorded && !busy && !invalidAmount && !totals.hasUnknownRate;
+  const requestAlreadyRecorded = state === "awaiting_payment" && amount === startingAmount;
+  const canRecordRequest = canRecord && !requestAlreadyRecorded;
+  const hasUnsavedWork = !recorded && (amount !== startingAmount || confirmReceived);
+
+  async function recordDeposit(received: boolean) {
+    if (!canRecord || (!received && !canRecordRequest) || (received && !confirmReceived)) return;
+    setBusy(true);
+    try {
+      const result = await context.mutate.patch(booking.id, {
+        fields: {
+          ...booking.fields,
+          depositMinor: amount,
+          depositState: received ? "paid_local" : "awaiting_payment",
+          ...(received ? { payment: "paid_local" } : {}),
+        },
+      }, {
+        expectRevision: booking.revision,
+        event: received
+          ? `Deposit of ${amount} marked as received outside Arlovi on ${booking.title}`
+          : `Deposit of ${amount} requested on ${booking.title}`,
+      });
+      if (!result) {
+        context.toast("Deposit not updated", CHANGED_ELSEWHERE, "failed");
+        return;
+      }
+      context.toast(
+        received ? "External receipt recorded" : "Deposit requested",
+        received
+          ? `${context.money(amount)} was marked as received outside Arlovi. No charge was made here.`
+          : `${context.money(amount)} is awaiting payment. No charge was made.`,
+      );
+      close();
+    } catch (error) {
+      context.toast("Deposit not updated", error instanceof Error ? error.message : "Reload and try again.", "failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <Stack gap={4}>
-      <Properties rows={[
-        { label: "Booking", value: booking.title },
-        { label: "Service value", value: <span className="ds-num">{context.money(service?.amountMinor ?? 0)}</span> },
-        { label: "Current deposit state", value: DEPOSIT_LABEL[String(booking.fields.depositState ?? "none")] ?? "" },
-      ]} />
-      <Field label="Deposit amount"><MoneyInput valueMinor={amount} onChangeMinor={setAmount} currency={org.currency} label="Deposit amount" /></Field>
-      <TotalsBlock totals={totals} money={context.money} label="Deposit" />
-      <ProviderBoundary id="payment.capture" title="The deposit stops here">
-        No card field is shown and no charge is attempted. Recording the request puts the amount and its tax on the booking so it can be collected another way and reconciled afterwards.
-      </ProviderBoundary>
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          onClick={async () => {
-            await context.mutate.patch(booking.id, {
-              fields: { ...booking.fields, depositMinor: amount, depositState: "awaiting_payment" },
-            }, { expectRevision: booking.revision, event: `Deposit of ${amount} requested on ${booking.title}` });
-            context.toast("Deposit requested", `${context.money(amount)} is recorded as awaiting payment. Nothing was charged.`);
-            close();
-          }}
-        >
-          Record the request
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={async () => {
-            await context.mutate.patch(booking.id, {
-              fields: { ...booking.fields, depositMinor: amount, depositState: "paid_local", payment: "paid_local" },
-            }, { expectRevision: booking.revision, event: `Deposit of ${amount} recorded as received on ${booking.title}` });
-            context.toast("Marked as received", "This records that money arrived some other way. It is a ledger entry, not a capture.");
-            close();
-          }}
-        >
-          Money arrived another way
-        </Button>
-      </Row>
-    </Stack>
+    <div className="book-deposit-flow">
+      <ModalUnsavedChanges when={hasUnsavedWork} />
+      <ModalInFlight when={busy} />
+
+      <section className="book-deposit-booking" aria-label="Booking context">
+        <span className="book-deposit-eyebrow">Booking</span>
+        <h3 className="book-deposit-booking-title">{booking.title}</h3>
+        <div className="book-deposit-metadata">
+          <span>Service value <strong className="ds-num">{context.money(serviceValue)}</strong></span>
+          <Pill tone={state === "paid_local" ? "success" : state === "awaiting_payment" ? "warning" : "neutral"}>
+            {DEPOSIT_LABEL[state] ?? "Deposit status unavailable"}
+          </Pill>
+        </div>
+      </section>
+
+      <section className="book-deposit-calculation" aria-label="Deposit calculation">
+        <div className="book-deposit-section-head">
+          <div>
+            <span className="book-deposit-eyebrow">Amount & tax</span>
+            <h3>Set the deposit request</h3>
+          </div>
+          <span className="book-deposit-hint">{org.currency}</span>
+        </div>
+        <Field label="Deposit amount" hint="Amount before applicable tax. No card is charged.">
+          <MoneyInput valueMinor={amount} onChangeMinor={(value) => { setAmount(value); setConfirmReceived(false); }}
+            currency={org.currency} label="Deposit amount" disabled={busy || recorded} />
+        </Field>
+        {invalidAmount && <Notice tone="danger" title="Enter a valid deposit">
+          {serviceValue <= 0 ? "This service has no payable value, so a deposit cannot be recorded." : "The amount must be greater than zero and cannot exceed the service value."}
+        </Notice>}
+        <div className="book-deposit-totals">
+          <TotalsBlock totals={totals} money={context.money} label="Deposit" />
+        </div>
+      </section>
+
+      <div className="book-deposit-provider">
+        <ProviderBoundary id="payment.capture" title="Payment collection is not connected">
+          No card details are entered and no charge is attempted. A request is recorded as awaiting payment;
+          an external receipt is recorded only after you confirm the money arrived.
+        </ProviderBoundary>
+      </div>
+
+      {recorded && (
+        <Notice tone="info" title="This deposit is already marked as received">
+          This dialog cannot collect a second payment or reverse an existing receipt. Review the booking's payment history before making any adjustment.
+        </Notice>
+      )}
+
+      {confirmReceived && !recorded && (
+        <Notice tone="warning" title="Confirm money arrived outside Arlovi">
+          Only confirm receipt if the payment is visible in your external bank or payment records.
+          This changes the booking's local payment status; it does not charge a card or create an external bank transaction.
+        </Notice>
+      )}
+
+      <ModalActions>
+        {recorded ? (
+          <Button variant="secondary" size="sm" onClick={close}>Done</Button>
+        ) : confirmReceived ? (
+          <>
+            <Button variant="secondary" size="sm" disabled={busy} onClick={() => setConfirmReceived(false)}>Back</Button>
+            <Button variant="primary" size="sm" busy={busy} disabled={!canRecord} onClick={() => { void recordDeposit(true); }}>
+              Confirm external receipt
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="primary" size="sm" busy={busy} disabled={!canRecordRequest} onClick={() => { void recordDeposit(false); }}>
+              {requestAlreadyRecorded ? "Request already recorded" : state === "awaiting_payment" ? "Update deposit request" : "Record deposit request"}
+            </Button>
+            <Button variant="secondary" size="sm" disabled={!canRecord} onClick={() => setConfirmReceived(true)}>
+              Money received elsewhere
+            </Button>
+          </>
+        )}
+      </ModalActions>
+    </div>
   );
 }
 
