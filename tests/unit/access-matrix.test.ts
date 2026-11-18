@@ -40,6 +40,9 @@ describe("editable access matrix — proposal only",()=>{
     draft=updateRolePermission(draft,"page",page.id,"edit","allow");
     expect(plannedPermission("client","HR",page.id,"edit",draft).allowed).toBe(false);
     draft=updateRolePermission(draft,"application","HR","view","allow");
+    // A page inherits View from its parent application unless explicitly denied.
+    expect(plannedPermission("client","HR",page.id,"edit",draft).allowed).toBe(true);
+    draft=updateRolePermission(draft,"page",page.id,"view","deny");
     expect(plannedPermission("client","HR",page.id,"edit",draft).allowed).toBe(false);
     draft=updateRolePermission(draft,"page",page.id,"view","allow");
     expect(plannedPermission("client","HR",page.id,"edit",draft).allowed).toBe(true);
