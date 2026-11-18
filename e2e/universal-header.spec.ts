@@ -55,7 +55,7 @@ test("profile menu keeps local role views and appearance settings separate from 
 
 test("nested project context row persists across page refresh",async({page})=>{
   await page.goto("/o/northline/workspace/work");
-  const project=page.locator('.ws-entry-list a[href*="/workspace/work/project/"]').first();
+  const project=page.locator('.ww-projects a[href*="/workspace/work/project/"]').first();
   await expect(project).toBeVisible();
   await project.click();
   await page.getByRole("button",{name:"Files",exact:true}).click();
