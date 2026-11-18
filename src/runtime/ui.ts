@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { PaletteId } from "@/brand";
 import type { Role } from "@/domain/types";
 import type { AttentionReceipt } from "@/platform/attentionReceipts";
+import type { PersonalNotificationPreferences } from "@/platform/notificationPolicy";
 import { normaliseInterfaceScale, readInterfaceScale, SCALE_VERSION } from "./interfaceScale";
 
 export interface Toast {
@@ -27,6 +28,8 @@ interface UiState {
   offline: boolean;
   toasts: Toast[];
   attentionReceipts: Record<string, AttentionReceipt>;
+  notificationSettings: Record<string, PersonalNotificationPreferences>;
+  setNotificationSettings: (key: string, value: PersonalNotificationPreferences) => void;
   setAttentionReceipt: (key: string, update: AttentionReceipt) => void;
   setRole: (role: Role) => void;
   setTheme: (theme: "light" | "dark") => void;
@@ -71,6 +74,8 @@ export const useUi = create<UiState>((set) => ({
   offline: typeof navigator !== "undefined" ? !navigator.onLine : false,
   toasts: [],
   attentionReceipts: initial.attentionReceipts ?? {},
+  notificationSettings: initial.notificationSettings ?? {},
+  setNotificationSettings: (key, value) => set(state => ({ notificationSettings: { ...state.notificationSettings, [key]: value } })),
   setAttentionReceipt: (key, update) => set((state) => ({
     attentionReceipts: {
       ...state.attentionReceipts,
@@ -108,6 +113,7 @@ useUi.subscribe((state) => {
       palette: state.palette,
       collapsed: state.collapsed,
       attentionReceipts: state.attentionReceipts,
+      notificationSettings: state.notificationSettings,
     }),
     );
   } catch {

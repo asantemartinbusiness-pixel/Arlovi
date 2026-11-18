@@ -2,7 +2,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import {
   Building2, Check, ChevronRight, Database, HelpCircle, History, House,
-  Monitor, Moon, Palette, Pin, PinOff, SlidersHorizontal, Sun, UserRound, Users,
+  Bell, Monitor, Moon, Palette, Pin, PinOff, SlidersHorizontal, Sun, UserRound, Users,
 } from "lucide-react";
 import { Button } from "@/design-system";
 import { palettes } from "@/app/brand";
@@ -22,6 +22,7 @@ const DENSITIES = [
 
 interface ProfileMenuProps {
   onOpenDisplay: () => void;
+  onOpenNotificationPreferences?: () => void;
   onRoleViewChange: (next: Role) => void;
   onStartTour: () => void;
   activeApplication?: {
@@ -37,7 +38,7 @@ interface ProfileMenuProps {
  * nor the local owner name conveys verified identity or access.
  */
 export function ProfileMenu({
-  onOpenDisplay, onRoleViewChange, onStartTour, activeApplication,
+  onOpenDisplay, onOpenNotificationPreferences, onRoleViewChange, onStartTour, activeApplication,
 }: ProfileMenuProps) {
   const { org, role } = useWorkspace();
   const ui = useUi();
@@ -126,6 +127,13 @@ export function ProfileMenu({
 
           <DropdownMenu.Separator className="profile-menu__separator" />
           <DropdownMenu.Label className="profile-menu__label">Personal preferences</DropdownMenu.Label>
+          {onOpenNotificationPreferences && (
+            <DropdownMenu.Item className="profile-menu__item" onSelect={onOpenNotificationPreferences}>
+              <Bell size={17} aria-hidden="true" />
+              <span className="profile-menu__item-title">Notification preferences</span>
+              <ChevronRight size={15} aria-hidden="true" className="profile-menu__chevron" />
+            </DropdownMenu.Item>
+          )}
           <DropdownMenu.Item className="profile-menu__item" onSelect={onOpenDisplay}>
             <Monitor size={17} aria-hidden="true" />
             <span className="profile-menu__item-title">Display & scaling</span>

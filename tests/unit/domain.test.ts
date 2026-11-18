@@ -214,7 +214,14 @@ describe("registry routes", () => {
 
   it("matches every registered route and keeps static segments first", () => {
     expect(catalog.screens).toHaveLength(316);
-    expect(catalog.screens.reduce((sum, screen) => sum + screen.tabs.length, 0)).toBe(catalog.counts.tabs);
+    // The historical contract has 1,324 tabs. These three previously approved
+    // Communications workspace tabs extend that baseline, without permitting
+    // arbitrary unregistered additions (verify_inventory enforces exact names).
+    const approvedEmailTabs = ["Shared inboxes", "Accounts & domains", "Sender identities"];
+    const emailScreen = catalog.screens.find(screen => screen.id === "ARL-COMMS-005");
+    expect(emailScreen?.tabs.slice(-approvedEmailTabs.length)).toEqual(approvedEmailTabs);
+    expect(catalog.screens.reduce((sum, screen) => sum + screen.tabs.length, 0))
+      .toBe(catalog.counts.tabs + approvedEmailTabs.length);
     expect(catalog.screens.reduce((sum, screen) => sum + screen.actions.length, 0)).toBe(catalog.counts.primary_actions);
     expect(catalog.screens.reduce((sum, screen) => sum + screen.overlays.length, 0)).toBe(catalog.counts.overlays);
     for (const screen of catalog.screens) {
