@@ -6,6 +6,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from build_catalog import APPROVED_TAB_EXTENSIONS
 
 ROOT = Path(__file__).resolve().parents[1]
 REG = json.loads((ROOT / "docs/arlovi/07_ORIGINAL_SPECIFICATIONS/Arlovi_Complete_UX_Screen_Registry.json").read_text())
@@ -32,8 +33,16 @@ overlays = sum(len(screen["overlays"]) for screen in CAT["screens"])
 declared = REG["counts"]
 declared_counts = (declared["tabs"], declared["primary_actions"], declared["overlays"])
 actual_counts = (tabs, actions, overlays)
-registry_counts = (reg_tabs, reg_actions, reg_overlays)
-if actual_counts != registry_counts or actual_counts != declared_counts:
+# Approved post-spec navigation tabs extend historical counts without allowing drift.
+extension_count = sum(len(values) for values in APPROVED_TAB_EXTENSIONS.values())
+registry_counts = (reg_tabs + extension_count, reg_actions, reg_overlays)
+expected_counts = (declared_counts[0] + extension_count, declared_counts[1], declared_counts[2])
+for screen in CAT["screens"]:
+    allowed = APPROVED_TAB_EXTENSIONS.get(screen["id"], [])
+    original = next((page for app in REG["applications"] for page in app["pages"] if page["id"] == screen["id"]), None)
+    if original and screen["tabs"] != list(dict.fromkeys([*original["tabs"], *allowed])):
+        errors.append(f"unapproved tabs in {screen['id']}")
+if actual_counts != registry_counts or actual_counts != expected_counts:
     errors.append(
         f"interaction counts catalog={actual_counts}, registry={registry_counts}, declared={declared_counts}"
     )
