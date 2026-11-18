@@ -20,6 +20,7 @@ import {
   FinanceTimeInputs, FinanceTimeReview,
   PaymentForm, ReminderApproval, VoidReason,
 } from "./invoices";
+import { PromiseToPayForm } from "./collectionsView";
 import {
   ApprovalChain, BillCapture, BillsTable, ExpenseDetail, ExpensesTable, MatchInspector, PayablesStrip,
   PaymentAuthorization, ReceiptCapture,
@@ -30,7 +31,7 @@ import {
   ReconciliationHistory, ReconciliationStrip, ToReconcile,
 } from "./banking";
 import {
-  BudgetApprovalOverlay, BudgetApprovalTab, BudgetRevisionHistory, BudgetsTab, ForecastsTab, ModelAssumptions,
+  BudgetApprovalOverlay, BudgetApprovalTab, BudgetRevisionHistory, BudgetsTab, VarianceDrilldown, ForecastsTab, ModelAssumptions,
   PlanningStrip, ScenariosTab,
 } from "./planning";
 import {
@@ -203,6 +204,7 @@ export const finApp = registerApp({
         { id: "New invoice", kind: "modal", title: "New invoice", width: 720, render: ({ close, ...context }) => <NewInvoice context={context} close={close} /> },
         { id: "bulk action preview", kind: "modal", title: "Reminders to be drafted", width: 680, render: ({ close, ...context }) => <BulkActionPreview context={context} close={close} /> },
         { id: "reminder approval", kind: "modal", title: "Approve reminders", width: 620, render: ({ close, ...context }) => <ReminderApproval context={context} close={close} /> },
+        { id: "promise to pay", kind: "modal", title: "Record a promise to pay", width: 620, render: ({ close, ...context }) => <PromiseToPayForm context={context} close={close} /> },
         { id: "export invoices", kind: "modal", title: "Export invoices", width: 520, render: ({ close, ...context }) => <InvoiceExport context={context} close={close} run={(rows, data) => exportInvoices(context, data, rows)} /> },
       ],
     },
@@ -227,6 +229,7 @@ export const finApp = registerApp({
         { id: "record payment", label: "Record a payment", placement: "overflow", capability: "post_journal", run: (context) => context.openOverlay("payment form") },
         { id: "send", label: "Send (queued locally)", placement: "overflow", run: (context) => context.openOverlay("send invoice") },
         { id: "draft email", label: "Draft an email", placement: "overflow", run: (context) => context.openOverlay("email preview") },
+        { id: "promise", label: "Record a promise to pay", placement: "overflow", run: (context) => context.openOverlay("promise to pay") },
         { id: "void", label: "Void or credit", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("void reason") },
       ],
       overlays: [
@@ -236,6 +239,7 @@ export const finApp = registerApp({
         { id: "void reason", kind: "modal", title: "Void or credit this invoice", width: 580, tone: "danger", render: ({ close, ...context }) => <VoidReason context={context} close={close} /> },
         { id: "approve invoice", kind: "modal", title: "Approve and post this invoice", width: 680, render: ({ close, ...context }) => <ApproveInvoice context={context} close={close} /> },
         { id: "send invoice", kind: "modal", title: "Send this invoice", width: 620, render: ({ close, ...context }) => <SendInvoice context={context} close={close} /> },
+        { id: "promise to pay", kind: "modal", title: "Record a promise to pay", width: 620, render: ({ close, ...context }) => <PromiseToPayForm context={{ ...context, overlayPayload: { invoiceId: context.params.id } }} close={close} /> },
       ],
     },
 
@@ -359,6 +363,7 @@ export const finApp = registerApp({
       overlays: [
         { id: "Model assumptions", kind: "drawer", title: "Forecast assumptions", width: 760, render: ({ close, ...context }) => <ModelAssumptions context={context} close={close} /> },
         { id: "revision history", kind: "drawer", title: "Budget revisions", width: 640, render: ({ ...context }) => <BudgetRevisionHistory context={context} /> },
+        { id: "variance drilldown", kind: "drawer", title: "Explain a variance", width: 720, render: ({ ...context }) => <VarianceDrilldown context={context} /> },
         { id: "budget approval", kind: "modal", title: "Submit a budget", width: 620, render: ({ close, ...context }) => <BudgetApprovalOverlay context={context} close={close} /> },
       ],
     },

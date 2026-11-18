@@ -17,6 +17,7 @@ import type { JLine } from "@/domain/fin-ledger";
 import { contactOf, openInvoices, outstandingMinor, useFinData } from "./data";
 import type { FinData } from "./data";
 import { Amount, CapabilityNotice, CapabilityPill, OverdueBadge, SourceNote, StatementRow, StatusPill, TaxCodePill, taxRateText } from "./parts";
+import { CollectionsByCustomer } from "./collectionsView";
 import { clockIso } from "@/platform/clock";
 import { prepareInvoiceIssue, prepareInvoiceReceipt } from "./settlement";
 import { assessTimeBilling } from "./timeBilling";
@@ -92,6 +93,8 @@ export function InvoiceList({ context, tab }: { context: ScreenContext; tab: str
           {unresolved.map((invoice) => invoice.title).join(", ")} — no approved rate matches the jurisdiction, line category, customer status and date. They cannot be issued until the combination is approved.
         </Notice>
       )}
+
+      {tab === "Overdue" && <CollectionsByCustomer context={context} />}
 
       <DataGrid
         rows={rows}

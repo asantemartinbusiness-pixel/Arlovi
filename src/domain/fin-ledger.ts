@@ -397,7 +397,8 @@ export function ageBuckets(records: Rec[], now: Date): AgeBucket[] {
     const due = record.dueAt ?? record.at;
     const days = due ? Math.floor((now.getTime() - new Date(due).getTime()) / 86_400_000) : 0;
     const index = days <= 0 ? 0 : days <= 30 ? 1 : days <= 60 ? 2 : days <= 90 ? 3 : 4;
-    buckets[index].amountMinor += Number(record.amountMinor ?? 0);
+    // Age what is still owed: a part-paid document is aged at its balance, not its gross.
+    buckets[index].amountMinor += Math.max(0, Number(record.amountMinor ?? 0) - Number(record.fields.paidMinor ?? 0));
     buckets[index].count += 1;
     buckets[index].ids.push(record.id);
   }
@@ -619,6 +620,64 @@ export function budgetVariance(budgets: Rec[], rows: TrialRow[], accounts: Rec[]
       hasActual: Boolean(row && (row.debitMinor !== 0 || row.creditMinor !== 0)),
     };
   });
+}
+
+export interface AccountMovement {
+  journal: Rec;
+  date: string;
+  memo: string;
+  debitMinor: number;
+  creditMinor: number;
+  /** Movement in the account's normal direction: a cost for an expense, income for revenue. */
+  netMinor: number;
+}
+
+/**
+ * The posted journal lines on one account inside a month: the transactions
+ * that make up a budget line's actual. Sum of netMinor equals the trial
+ * balance figure for the same account and period.
+ */
+export function accountMovements(accounts: Rec[], journals: Rec[], code: string, period: string): AccountMovement[] {
+  const account = accounts.find((item) => accountCode(item) === code);
+  if (!account) return [];
+  const type = accountType(account);
+  const debitNormal = type === "asset" || type === "expense";
+  const out: AccountMovement[] = [];
+  for (const journal of journals) {
+    if (journal.status !== "posted") continue;
+    const date = journalDate(journal);
+    if (periodOf(date) !== period) continue;
+    let debit = 0;
+    let credit = 0;
+    const memos: string[] = [];
+    for (const line of journalLines(journal)) {
+      if (line.accountId !== account.id) continue;
+      debit += line.debitMinor;
+      credit += line.creditMinor;
+      if (line.memo) memos.push(line.memo);
+    }
+    if (debit === 0 && credit === 0) continue;
+    out.push({
+      journal, date, memo: memos.join("; ") || journalMemo(journal),
+      debitMinor: debit, creditMinor: credit, netMinor: debitNormal ? debit - credit : credit - debit,
+    });
+  }
+  return out.sort((a, b) => b.netMinor - a.netMinor || a.date.localeCompare(b.date));
+}
+
+/** Revenue and expense accounts that moved in the period but have no approved budget line. */
+export function unbudgetedActuals(budgets: Rec[], rows: TrialRow[]): TrialRow[] {
+  const budgeted = new Set(budgets.map((budget) => String(budget.fields.accountCode ?? "")));
+  return rows
+    .filter((row) => (row.type === "revenue" || row.type === "expense") && !budgeted.has(row.code))
+    .filter((row) => row.debitMinor !== 0 || row.creditMinor !== 0)
+    .sort((a, b) => Math.abs(b.balanceMinor) - Math.abs(a.balanceMinor));
+}
+
+/** Variance as a whole percentage of budget, or undefined when nothing was budgeted. */
+export function variancePercent(row: VarianceRow): number | undefined {
+  if (row.budgetMinor === 0) return undefined;
+  return Math.round((row.varianceMinor / Math.abs(row.budgetMinor)) * 100);
 }
 
 /* ------------------------- Multi-entity ------------------------- */
