@@ -111,6 +111,7 @@ function StateOfPlay({
         ))}
       </h2>
       <RoutingLine nodes={[{ icon: <Users size={18} />, label: "People" }, { icon: <Sparkles size={18} />, label: "Agents" }, { icon: <BookOpen size={18} />, label: "Books" }]} />
+      <div className="hq-state-orbit" aria-hidden="true"><span/><span/><span/><span/></div>
       {ledgerStale && (
         <p className="ds-subtle" style={{ maxWidth: "52ch" }}>
           Figures below come from posted journals in this browser. Nothing is read from a bank feed.

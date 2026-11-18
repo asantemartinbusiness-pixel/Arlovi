@@ -92,3 +92,16 @@
 .onb-brand-custom{display:inline-flex;align-items:center;gap:12px;margin-top:14px;color:var(--fg-muted);font-size:var(--text-xs,12px);font-weight:550}
 .onb-brand-custom input{width:40px;height:34px;padding:2px;border:1px solid var(--border-default);border-radius:var(--radius-md,8px);background:var(--bg-surface);cursor:pointer}
 .onb-brand-hint{max-width:55ch;font-size:var(--text-xs,12px);line-height:1.55;color:var(--fg-muted);margin-top:10px}
+
+/* Onboarding art carries an optimistic four-colour composition; forms remain white. */
+.onb-art { background:linear-gradient(125deg,#ecfbf5 0%,#f2eaff 53%,#fff8e8 100%); border-color:#dcdfe4; isolation:isolate; }
+.onb-art::before { content:""; position:absolute; width:190px; height:72px; top:54px; left:54px; border-radius:18px; background:var(--studio-iris); transform:rotate(-15deg); box-shadow:44px 35px 0 -12px var(--studio-citrus); }
+.onb-art::after { content:""; position:absolute; width:60px; height:60px; bottom:14px; right:54px; border-radius:50%; background:var(--studio-coral); box-shadow:inset -12px -12px 0 var(--studio-coral-soft); }
+.onb-orbit { border-color:rgb(108 72 215 / 26%); z-index:1; }
+.onb-node { z-index:2; box-shadow:0 4px 12px rgb(31 29 52 / 12%); }
+.onb-node-one { background:var(--studio-citrus); }
+.onb-node-two { background:var(--studio-seafoam); }
+.onb-node-three { background:var(--studio-iris); }
+.onb-eyebrow { color:var(--studio-violet-ink); }
+.onb-step.current { border-bottom-color:var(--studio-iris); }
+:root[data-theme="dark"] .onb-art { background:var(--bg-surface); }
