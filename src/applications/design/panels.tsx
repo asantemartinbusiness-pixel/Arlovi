@@ -9,7 +9,7 @@ import {
 import { ColorBox, NumberBox, PanelGroup, SliderBox, useStore, type DocHandle } from "@/applications/visual/kit";
 import type { ScreenContext } from "@/platform/registry";
 import {
-  absoluteRect, activePage, applyAutoLayout, childrenOf, contrastRatio, flatten, groupNodes,
+  absoluteRect, activePage, alignTarget, applyAutoLayout, childrenOf, contrastRatio, flatten, groupNodes,
   patchNode, patchNodes, removeNodes, reorder, selectionBounds, ungroup, updatePage, wcagGrade,
   type DesignDoc, type NodeKind, type SceneNode,
 } from "./scene";
@@ -404,7 +404,8 @@ export function AlignControls({ handle }: { handle: DocHandle<DesignDoc> }) {
   const doc = handle.doc;
   if (!doc) return null;
   const page = activePage(doc);
-  const bounds = selectionBounds(page, ui.selected);
+  const bounds = alignTarget(page, ui.selected);
+  const toParent = ui.selected.length === 1 && bounds !== null;
   const modes: { mode: AlignMode; label: string }[] = [
     { mode: "left", label: "Left" }, { mode: "center-x", label: "Centre" }, { mode: "right", label: "Right" },
     { mode: "top", label: "Top" }, { mode: "center-y", label: "Middle" }, { mode: "bottom", label: "Bottom" },
@@ -420,7 +421,7 @@ export function AlignControls({ handle }: { handle: DocHandle<DesignDoc> }) {
     <PanelGroup title="Align and distribute">
       <Row gap={1} wrap>
         {modes.map((item) => (
-          <Button key={item.mode} size="sm" variant="ghost" disabled={ui.selected.length < 2} onClick={() => align(item.mode)}>{item.label}</Button>
+          <Button key={item.mode} size="sm" variant="ghost" disabled={!bounds} aria-label={`Align ${item.label.toLowerCase()}${toParent ? " in the parent" : ""}`} onClick={() => align(item.mode)}>{item.label}</Button>
         ))}
       </Row>
       <Row gap={1} wrap>
@@ -439,7 +440,8 @@ export function AlignControls({ handle }: { handle: DocHandle<DesignDoc> }) {
           </Button>
         ))}
       </Row>
-      {ui.selected.length < 2 && <p className="vx-mini">Select two layers to align, three to distribute.</p>}
+      {toParent && <p className="vx-mini">One layer aligns inside its parent frame or group.</p>}
+      {!bounds && <p className="vx-mini">Select two layers to align (or one inside a frame), three to distribute.</p>}
     </PanelGroup>
   );
 }

@@ -8,10 +8,10 @@ import {
 import { dragPointer, useMeasure, useStore, type DocHandle } from "@/applications/visual/kit";
 import type { ScreenContext } from "@/platform/registry";
 import {
-  absoluteOffset, absoluteRect, activePage, addNode, applyAutoLayout, childrenOf, flatten,
-  groupNodes, isEditable, makeNode, marqueeHits, pageBounds, parentOf, patchNode,
-  patchNodes, removeNodes, reorder, updatePage,
-  type DesignDoc, type NodeKind, type SceneNode, type ScenePage,
+  absoluteOffset, absoluteRect, activePage, addNode, applyAutoLayout, childrenOf, copyNodes, duplicateNodes, flatten,
+  groupNodes, isEditable, makeNode, marqueeHits, pageBounds, parentOf, pasteNodes, patchNode,
+  patchNodes, removeNodes, reorder, reorderTo, ungroup, updatePage,
+  type DesignDoc, type NodeKind, type SceneClip, type SceneNode, type ScenePage,
 } from "./scene";
 import { NodeView } from "./render";
 import { designUi, setSelection, setTool, toggleSelection, type DesignTool } from "./model";
@@ -28,6 +28,9 @@ const TOOL_KIND: Partial<Record<DesignTool, NodeKind>> = {
 };
 
 export type CanvasMode = "design" | "prototype" | "inspect" | "comments";
+
+/* The design clipboard lives for the browser tab, so layers copy between pages and files. */
+let designClipboard: { clip: SceneClip; pastes: number } | null = null;
 
 export interface CanvasProps {
   handle: DocHandle<DesignDoc>;
@@ -316,31 +319,95 @@ export function DesignCanvas({ handle, context, mode, onPlaceComment, onLinkNode
       if (event.altKey) {
         handle.edit((current) => updatePage(current, (p) => patchNodes(p, ids, (node) => ({ w: Math.max(2, node.w + dx * step), h: Math.max(2, node.h + dy * step) }))), "Resize by keyboard");
       } else {
-        handle.edit((current) => updatePage(current, (p) => patchNodes(p, ids, (node) => ({ x: node.x + dx * step, y: node.y + dy * step }))), "Nudge");
+        const movable = ids.filter((id) => isEditable(page, id));
+        if (movable.length) handle.edit((current) => updatePage(current, (p) => patchNodes(p, movable, (node) => ({ x: node.x + dx * step, y: node.y + dy * step }))), "Nudge");
       }
     };
     if (event.key === "ArrowLeft") return nudge(-1, 0);
     if (event.key === "ArrowRight") return nudge(1, 0);
     if (event.key === "ArrowUp") return nudge(0, -1);
     if (event.key === "ArrowDown") return nudge(0, 1);
-    if (event.key === "[" && meta) { event.preventDefault(); return ids.forEach((id) => handle.edit((current) => updatePage(current, (p) => reorder(p, id, -1)), "Move backwards")); }
-    if (event.key === "]" && meta) { event.preventDefault(); return ids.forEach((id) => handle.edit((current) => updatePage(current, (p) => reorder(p, id, 1)), "Move forwards")); }
-    if (event.key.toLowerCase() === "g" && meta && ids.length > 1) {
+    if (event.key === "[" && meta && !event.shiftKey) { event.preventDefault(); return ids.forEach((id) => handle.edit((current) => updatePage(current, (p) => reorder(p, id, -1)), "Move backwards")); }
+    if (event.key === "]" && meta && !event.shiftKey) { event.preventDefault(); return ids.forEach((id) => handle.edit((current) => updatePage(current, (p) => reorder(p, id, 1)), "Move forwards")); }
+    if (event.key.toLowerCase() === "g" && meta && !event.shiftKey && ids.length > 1) {
       event.preventDefault();
-      return handle.edit((current) => updatePage(current, (p) => groupNodes(p, ids).page), "Group selection");
+      let groupId = "";
+      handle.edit((current) => updatePage(current, (p) => {
+        const result = groupNodes(p, ids);
+        groupId = result.groupId;
+        return result.page;
+      }), "Group selection");
+      if (groupId) setSelection([groupId]);
+      return;
     }
     if (event.key.toLowerCase() === "z" && meta) { event.preventDefault(); return event.shiftKey ? handle.redo() : handle.undo(); }
-    if (event.key.toLowerCase() === "d" && meta && ids.length) {
+    const key = event.key.toLowerCase();
+    const editable = ids.filter((id) => isEditable(page, id));
+    if (key === "d" && meta && ids.length) {
       event.preventDefault();
-      return handle.edit((current) => updatePage(current, (p) => {
-        let next = p;
-        for (const id of ids) {
-          const node = p.nodes[id];
-          if (!node) continue;
-          next = addNode(next, { ...node, id: `${node.id}-copy-${wallMs().toString(36)}`, x: node.x + 16, y: node.y + 16, name: `${node.name} copy` }, parentOf(p, id) ?? p.id);
-        }
-        return next;
+      let made: string[] = [];
+      handle.edit((current) => updatePage(current, (p) => {
+        const result = duplicateNodes(p, ids.filter((id) => p.nodes[id]));
+        made = result.ids;
+        return result.page;
       }), "Duplicate");
+      if (made.length) setSelection(made);
+      return;
+    }
+    if (key === "a" && meta) {
+      event.preventDefault();
+      return setSelection(childrenOf(page, page.id).filter((node) => isEditable(page, node.id)).map((node) => node.id));
+    }
+    if ((key === "c" || key === "x") && meta && ids.length) {
+      event.preventDefault();
+      const clip = copyNodes(page, ids);
+      if (!clip) return;
+      designClipboard = { clip, pastes: 0 };
+      if (key === "x" && editable.length) {
+        handle.edit((current) => updatePage(current, (p) => removeNodes(p, editable)), "Cut");
+        setSelection([]);
+      }
+      return;
+    }
+    if (key === "v" && meta && designClipboard) {
+      event.preventDefault();
+      designClipboard.pastes += 1;
+      const { clip, pastes } = designClipboard;
+      let made: string[] = [];
+      handle.edit((current) => updatePage(current, (p) => {
+        const result = pasteNodes(p, clip, 16 * pastes);
+        made = result.ids;
+        return result.page;
+      }), "Paste");
+      if (made.length) setSelection(made);
+      return;
+    }
+    if (key === "g" && meta && event.shiftKey) {
+      event.preventDefault();
+      const groups = editable.filter((id) => ["group", "frame"].includes(page.nodes[id]?.kind ?? ""));
+      if (groups.length === 0) return;
+      const freed = groups.flatMap((id) => page.children[id] ?? []);
+      handle.edit((current) => updatePage(current, (p) => groups.reduce((acc, id) => ungroup(acc, id), p)), "Ungroup");
+      setSelection(freed);
+      return;
+    }
+    if (key === "h" && meta && event.shiftKey && ids.length) {
+      event.preventDefault();
+      const show = ids.some((id) => page.nodes[id] && !page.nodes[id].visible);
+      return handle.edit((current) => updatePage(current, (p) => patchNodes(p, ids, () => ({ visible: show }))), show ? "Show" : "Hide");
+    }
+    if (key === "l" && meta && event.shiftKey && ids.length) {
+      event.preventDefault();
+      const lock = ids.some((id) => page.nodes[id] && !page.nodes[id].locked);
+      return handle.edit((current) => updatePage(current, (p) => patchNodes(p, ids, () => ({ locked: lock }))), lock ? "Lock" : "Unlock");
+    }
+    if (meta && (event.key === "}" || (event.key === "]" && event.shiftKey)) && editable.length) {
+      event.preventDefault();
+      return handle.edit((current) => updatePage(current, (p) => editable.reduce((acc, id) => reorderTo(acc, id, Number.MAX_SAFE_INTEGER), p)), "Bring to front");
+    }
+    if (meta && (event.key === "{" || (event.key === "[" && event.shiftKey)) && editable.length) {
+      event.preventDefault();
+      return handle.edit((current) => updatePage(current, (p) => [...editable].reverse().reduce((acc, id) => reorderTo(acc, id, 0), p)), "Send to back");
     }
     if ((event.key === "Delete" || event.key === "Backspace") && ids.length) {
       event.preventDefault();
