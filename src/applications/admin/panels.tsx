@@ -9,7 +9,8 @@ import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES } from "@/platform/capability";
 import { can as roleCan, ROLE_LABELS, type Capability } from "@/platform/policy";
 import type { Rec, Role } from "@/domain/types";
-import { AccessRequests, EffectiveAccess } from "./access";
+import { AccessRequests } from "./access";
+import { AccessStudio } from "./accessStudio";
 import {
   appsForRole, CAPABILITIES, capabilityLabel, csvCell, csvList, ofKind, ROLES, RoleReach, StepUp,
   useAdmin, useOrganisationRecord, useSeeded, useSeededList,
@@ -750,7 +751,7 @@ export function RolesScreen({ context, tab }: { context: ScreenContext; tab: "Ro
     );
   }
 
-  if (tab === "Effective access") return <EffectiveAccess context={context} />;
+  if (tab === "Effective access") return <AccessStudio context={context} />;
 
   const exceptions = custom.filter((role) => csvList(role.fields.deny).length > 0 || role.status === "draft");
   return (
