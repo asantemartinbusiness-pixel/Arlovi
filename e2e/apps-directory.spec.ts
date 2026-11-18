@@ -94,3 +94,36 @@ test("Platform shortcuts fit at compact mobile widths", async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
+
+
+test("directory switches between cards and compact app list without losing category or search", async ({ page }) => {
+  await page.goto("/o/northline/workspace/apps?category=Growth&q=calendar");
+  await expect(page.locator(".apps-directory")).toHaveAttribute("data-view", "cards");
+  await page.getByRole("button", { name: "Compact list view" }).click();
+  await expect(page.locator(".apps-directory")).toHaveAttribute("data-view", "compact");
+  await expect(page).toHaveURL(/category=Growth/);
+  await expect(page).toHaveURL(/q=calendar/);
+  await page.reload();
+  await expect(page.locator(".apps-directory")).toHaveAttribute("data-view", "compact");
+  await page.getByRole("button", { name: "Card view" }).click();
+  await expect(page.locator(".apps-directory")).toHaveAttribute("data-view", "cards");
+});
+
+test("favourites filter only displays pinned apps and can reset safely", async ({ page }) => {
+  await page.goto("/o/northline/workspace/apps");
+  await page.getByRole("button", { name: "Pin Finance" }).click();
+  await page.getByRole("navigation", { name: "Application categories" }).getByRole("button", { name: /Favourites/ }).click();
+  await expect(page).toHaveURL(/saved=1/);
+  await expect(page.locator(".apps-directory-open")).toHaveCount(1);
+  await expect(page.getByRole("link", { name: "Finance", exact: true })).toBeVisible();
+  await page.getByRole("navigation", { name: "Application categories" }).getByRole("button", { name: /Favourites/ }).click();
+  await expect(page.locator(".apps-directory-open")).toHaveCount(35);
+});
+
+test("redesigned app directory remains responsive in compact mode", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/o/northline/workspace/apps?view=compact");
+  await expect(page.locator(".apps-directory-open")).toHaveCount(35);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
