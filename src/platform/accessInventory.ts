@@ -1,6 +1,6 @@
 import { applications, screens, type ScreenInfo } from "@/app/catalog";
 import { NAV_GROUPS } from "@/app/nav";
-import { canOpen, type Capability } from "./policy";
+import { canOpen, can as roleCan, type Capability } from "./policy";
 import type { Role } from "@/domain/types";
 import type { Classification } from "./accessModel";
 
@@ -85,18 +85,7 @@ export function canOpenLegacyScreen(role: Role, screen: ScreenInfo): boolean {
   const capability = descriptor.legacyCapability;
   if (!capability) return true;
   // Avoid a circular dependency: permission lookup from the existing policy.
-  return roleHasCapability(role, capability);
-}
-
-function roleHasCapability(role: Role, capability: Capability): boolean {
-  switch (role) {
-    case "owner": return true;
-    case "finance": return ["post_journal","approve_payment","export_data","view_legal","run_automation"].includes(capability);
-    case "sales": return ["edit_pipeline","publish_campaign","export_data"].includes(capability);
-    case "people": return ["edit_people","view_payroll","export_data","view_legal"].includes(capability);
-    case "member":
-    case "client": return false;
-  }
+  return roleCan(role, capability);
 }
 
 export function accessInventoryCoverage() {
