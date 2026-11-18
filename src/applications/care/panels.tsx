@@ -364,6 +364,19 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
               <strong style={{ fontSize: "var(--text-lg)" }}>{active.title}</strong>
               <Pill tone={PRIORITY_TONE[String(active.fields.priority ?? "normal")] ?? "neutral"} dot>{String(active.fields.priority ?? "")}</Pill>
               <span className="ds-grow" />
+              {String(active.fields.assignee ?? "") !== actor && !["resolved", "closed"].includes(active.status) && (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={async () => {
+                    await context.mutate.patch(active.id, { status: active.status === "new" ? "open" : active.status, fields: { ...active.fields, assignee: actor } }, { expectRevision: active.revision, event: `${String(active.fields.ref ?? active.title)} taken by ${actor}` });
+                    setActiveId(active.id);
+                    context.toast("Assigned to you", `${String(active.fields.ref ?? active.title)} is in your queue.`);
+                  }}
+                >
+                  Assign to me
+                </Button>
+              )}
               <Button size="sm" variant="secondary" onClick={() => { context.select(active.id); context.openOverlay("Customer inspector", { id: active.id }); }}>Customer</Button>
               <Button size="sm" variant="secondary" onClick={() => { context.select(active.id); context.openOverlay("canned reply", { id: active.id }); }}>Macros</Button>
               <Button size="sm" variant="outline-danger" onClick={() => { context.select(active.id); context.openOverlay("escalation", { id: active.id }); }}>Escalate</Button>
@@ -605,7 +618,7 @@ export function TicketDetail({ context, lens }: { context: ScreenContext; lens: 
         </Stack>
       </Card>
       <TriageCard context={context} ticket={ticket} state={state} />
-      <Card span={7} eyebrow="SLA" prov="human" title="Against the clock" subtitle={policyFor(ticket, data.slas)?.title ?? "No policy matched"}>
+      <Card span={6} eyebrow="SLA" prov="human" title="Against the clock" subtitle={policyFor(ticket, data.slas)?.title ?? "No policy matched"}>
         <Stack gap={3}>
           <SlaBadge state={state} />
           <Properties rows={[

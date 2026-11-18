@@ -62,7 +62,8 @@ const PRIORITIES = ["low", "normal", "high", "urgent"];
 /** Status, owner and priority, changed in place with the move recorded on the case. */
 export function TriageCard({ context, ticket, state }: { context: ScreenContext; ticket: Rec; state: SlaState }) {
   const { employees } = useCollections(["employees"]);
-  const staff = employees.filter((employee) => employee.status !== "alumni").map((employee) => employee.title).sort((a, b) => a.localeCompare(b));
+  const current = String(ticket.fields.assignee ?? "");
+  const staff = [...new Set([...employees.filter((employee) => employee.status !== "alumni").map((employee) => employee.title), context.actor, ...(current ? [current] : [])])].sort((a, b) => a.localeCompare(b));
   const moves = allowedMoves(ticket.status);
   const ref = String(ticket.fields.ref ?? ticket.title);
 

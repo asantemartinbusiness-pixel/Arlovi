@@ -326,6 +326,19 @@ export function ContractLibrary({ context, lens }: { context: ScreenContext; len
           }, sortValue: (row) => renewalInfo(row, now).noticeInDays ?? 99_999 },
           { key: "status", header: "Status", align: "end", cell: (row) => <Pill tone={STATUS_TONE[row.status] ?? "neutral"} dot>{lifecycleLabel(row.status)}</Pill>, sortValue: (row) => row.status, hideBelow: 760 },
         ]}
+        card={(row) => {
+          const info = renewalInfo(row, now);
+          return (
+            <>
+              <strong>{row.title}</strong>
+              <span className="ds-subtle">{String(row.fields.counterparty ?? "")} · ends <span className="ds-num">{context.date(row.endAt)}</span></span>
+              <span className="ds-row ds-gap-2 ds-wrap">
+                <Pill tone={info.tone} dot><span className="ds-num">{info.label}</span></Pill>
+                <Pill tone={STATUS_TONE[row.status] ?? "neutral"}>{lifecycleLabel(row.status)}</Pill>
+              </span>
+            </>
+          );
+        }}
         onSelect={(id) => context.select(id)}
         onOpen={(id) => context.navigate(`/o/${org.slug}/legal/contracts/${id}`)}
         bulkActions={[
