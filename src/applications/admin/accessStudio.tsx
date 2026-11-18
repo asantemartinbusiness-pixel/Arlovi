@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ArrowUpRight, BriefcaseBusiness, ChevronRight, Eye, LockKeyhole, Search, ShieldCheck, ShieldX, Users } from "lucide-react";
-import { Button, Notice, Pill, Row, TextInput } from "@/design-system";
+import { Button, Notice, Pill, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { ROLE_TEMPLATES, templateOffersApp } from "@/platform/accessModel";
 import { ACCESS_APPLICATION_INVENTORY, accessInventoryCoverage } from "@/platform/accessInventory";
