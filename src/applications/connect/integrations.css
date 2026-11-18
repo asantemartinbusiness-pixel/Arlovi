@@ -120,3 +120,4 @@
 .connect-issues{margin:4px 0 0;padding-inline-start:18px}
 @media(max-width:560px){.connect-state-legend li{grid-template-columns:minmax(0,1fr)}}
 .connect-mapping-table tbody th{text-transform:none;letter-spacing:normal;font-weight:500}
+.connect-state-legend li>:first-child{justify-self:start}
