@@ -28,6 +28,7 @@ import { buildAttention, filterForRole, headerAttentionCounts } from "@/platform
 import { applyAttentionReceipts } from "@/platform/attentionReceipts";
 import { useUi } from "@/runtime/ui";
 import { DisplayPreferences } from "@/app/DisplayPreferences";
+import { NotificationToastStack } from "@/app/NotificationToastStack";
 import type { Role } from "@/domain/types";
 import "@/app/shell.css";
 
@@ -488,17 +489,7 @@ export function AppShell() {
       {ui.notes && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening attention centre…</div>}><AttentionCentre key={attentionView} initialView={attentionView} items={attention} onClose={() => ui.setNotes(false)} /></Suspense>}
       {ui.ask && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening assistant…</div>}><AskPanel onClose={() => ui.setAsk(false)} seed={ui.askSeed} /></Suspense>}
 
-      <div className="ds-toasts" aria-live="polite" aria-atomic="false">
-        {ui.toasts.map((toast) => (
-          <div key={toast.id} className="ds-toast" data-tone={toast.tone}>
-            <div className="ds-grow">
-              <strong>{toast.title}</strong>
-              <p>{toast.body}</p>
-            </div>
-            <Button variant="ghost" size="sm" iconOnly aria-label="Dismiss" onClick={() => ui.dismissToast(toast.id)}><X size={14} /></Button>
-          </div>
-        ))}
-      </div>
+      <NotificationToastStack />
     </div>
   );
 }
