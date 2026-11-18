@@ -612,6 +612,11 @@
    },
    {
     "kind": "action",
+    "name": "coach",
+    "ok": true
+   },
+   {
+    "kind": "action",
     "name": "Compare agents",
     "ok": true
    },
@@ -621,9 +626,7 @@
     "ok": true
    }
   ],
-  "guarded": [
-   "coach"
-  ]
+  "guarded": []
  },
  {
   "id": "ARL-TEAM-010",

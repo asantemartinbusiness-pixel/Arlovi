@@ -46,22 +46,7 @@
    },
    {
     "kind": "action",
-    "name": "Open",
-    "ok": true
-   },
-   {
-    "kind": "action",
     "name": "New site",
-    "ok": true
-   },
-   {
-    "kind": "action",
-    "name": "Duplicate",
-    "ok": true
-   },
-   {
-    "kind": "action",
-    "name": "Archive",
     "ok": true
    },
    {
@@ -70,7 +55,11 @@
     "ok": true
    }
   ],
-  "guarded": []
+  "guarded": [
+   "Open",
+   "Duplicate",
+   "Archive"
+  ]
  },
  {
   "id": "ARL-WEB-002",
@@ -193,6 +182,11 @@
    {
     "kind": "action",
     "name": "Place a component (drag or insert)",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Manage pages",
     "ok": true
    },
    {

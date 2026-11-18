@@ -214,6 +214,11 @@
     "kind": "action",
     "name": "Publish a draft",
     "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Request access",
+    "ok": true
    }
   ],
   "guarded": []

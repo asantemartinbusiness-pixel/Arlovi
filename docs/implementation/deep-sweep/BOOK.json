@@ -230,6 +230,11 @@
     "kind": "action",
     "name": "Cancellation policy",
     "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Cancel booking",
+    "ok": true
    }
   ],
   "guarded": []

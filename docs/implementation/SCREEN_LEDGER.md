@@ -16,9 +16,9 @@ Nothing in this file is written by hand.
 | Contract element | Declared | Required |
 | --- | ---: | ---: |
 | Screens owned by their application | 316 | 316 |
-| Tab instances | 1323 | 1323 |
+| Tab instances | 1324 | 1324 |
 | Primary actions | 1328 | 1328 |
-| Overlays | 956 | 956 |
+| Overlays | 957 | 957 |
 
 ## By application
 
@@ -96,10 +96,10 @@ Defects found by the journeys: 38; fixed and retested: 38; open: 0.
 
 ## What this evidence does not cover
 
-- **223 actions were not pressed by the sweep.** Each needs a specific selection
+- **231 actions were not pressed by the sweep.** Each needs a specific selection
   the sweep could not make generically, so it stayed disabled. They were judged in the
   semantic review and most were driven by hand in the remediation reviews, but this
-  automated run did not exercise them. The sweep pressed 1415 actions.
+  automated run did not exercise them. The sweep pressed 1432 actions.
 - **Pressing an action is not the same as completing its save path.** The sweep opens what
   an action opens and checks for errors; it does not fill and submit every form. Save paths
   were checked selectively during remediation, and the open items below record where they

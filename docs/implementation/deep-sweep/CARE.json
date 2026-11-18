@@ -304,6 +304,16 @@
     "kind": "action",
     "name": "Request a refund",
     "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Escalate",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Link a customer or order",
+    "ok": true
    }
   ],
   "guarded": []

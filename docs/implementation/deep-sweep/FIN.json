@@ -250,6 +250,11 @@
     "ok": true
    },
    {
+    "kind": "tab",
+    "name": "Time inputs",
+    "ok": true
+   },
+   {
     "kind": "overlay",
     "name": "New invoice",
     "ok": true
@@ -262,6 +267,11 @@
    {
     "kind": "overlay",
     "name": "reminder approval",
+    "ok": true
+   },
+   {
+    "kind": "overlay",
+    "name": "finance time review",
     "ok": true
    },
    {
@@ -375,6 +385,11 @@
    {
     "kind": "action",
     "name": "Draft an email",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Record a promise to pay",
     "ok": true
    },
    {

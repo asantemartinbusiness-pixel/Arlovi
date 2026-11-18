@@ -56,6 +56,11 @@
    },
    {
     "kind": "action",
+    "name": "New folder",
+    "ok": true
+   },
+   {
+    "kind": "action",
     "name": "Search the library",
     "ok": true
    },
@@ -67,6 +72,8 @@
   ],
   "guarded": [
    "Inspect",
+   "Edit details",
+   "Link to a record",
    "Replace",
    "Check rights"
   ]
@@ -123,12 +130,22 @@
    },
    {
     "kind": "action",
+    "name": "Edit details",
+    "ok": true
+   },
+   {
+    "kind": "action",
     "name": "Create a variant",
     "ok": true
    },
    {
     "kind": "action",
     "name": "Download",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Link to a record",
     "ok": true
    },
    {
