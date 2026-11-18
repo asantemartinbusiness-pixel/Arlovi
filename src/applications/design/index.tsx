@@ -4,7 +4,7 @@ import {
   MousePointer2, Hand, Grid3x3, Magnet, Link2, Play, FileCode2, Download, Plus, Component,
 } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row,
+  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, ModalActions, ModalInFlight, Notice, OverlayCancel, Pill, Properties, Row,
   Select, Stack, Stat, StatRow, TextArea, TextInput, Tool, Toolbar, ToolbarSeparator,
 } from "@/design-system";
 import { registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
@@ -3135,55 +3135,86 @@ function InspectorOverlay({ context }: { context: ScreenContext }) {
 
 function ExportOverlay({ context }: { context: ScreenContext }) {
   const { record, handle } = useDesignDoc(context);
+  const [format, setFormat] = useState<"png" | "svg">("png");
   const [scale, setScale] = useState(2);
   const [busy, setBusy] = useState(false);
-  if (!record || !handle.doc) return <Empty title="Open a file first" />;
+  const [error, setError] = useState("");
+  if (!record || record.organizationId !== context.org.id || record.collection !== "designs" || !handle.doc) {
+    return <Empty title="Open a design file first">Export follows the current file and page; no other design is substituted.</Empty>;
+  }
   const page = activePage(handle.doc);
   const bounds = pageBounds(page);
+  const width = Math.round(bounds.w * (format === "png" ? scale : 1));
+  const height = Math.round(bounds.h * (format === "png" ? scale : 1));
+  const rasterTooLarge = format === "png" && (width > 16384 || height > 16384 || width * height > 100_000_000);
+  const invalidBounds = !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0;
+  const filename = `${slug(record.title)}-${slug(page.name)}${format === "png" ? `@${scale}x` : ""}.${format}`;
   return (
-    <Stack gap={3}>
+    <Stack gap={4}>
+      <ModalInFlight when={busy} />
       <Properties rows={[
+        { label: "Design file", value: record.title },
         { label: "Page", value: page.name },
-        { label: "Bounds", value: `${Math.round(bounds.w)} × ${Math.round(bounds.h)}` },
-        { label: "PNG at this scale", value: `${Math.round(bounds.w * scale)} × ${Math.round(bounds.h * scale)} pixels` },
+        { label: "Page bounds", value: `${Math.round(bounds.w)} × ${Math.round(bounds.h)}` },
+        { label: "Output", value: filename },
+        { label: "Export dimensions", value: format === "png" ? `${width} × ${height} pixels` : "Scalable vector geometry" },
       ]} />
-      <Field label="Scale">
-        <Select value={scale} onChange={(event) => setScale(Number(event.target.value))}>
-          {[1, 2, 3, 4].map((option) => <option key={option} value={option}>{option}×</option>)}
+      <Field label="File format">
+        <Select aria-label="File format" value={format} disabled={busy}
+          onChange={event => { setFormat(event.target.value as "svg" | "png"); setError(""); }}>
+          <option value="png">PNG image · raster</option>
+          <option value="svg">SVG · scalable vector</option>
         </Select>
       </Field>
-      <Row gap={2} wrap>
-        <Button
-          variant="primary"
-          onClick={() => {
-            downloadText(`${slug(record.title)}.svg`, pageToSvg(page, bounds), "image/svg+xml");
-            context.toast("SVG written", "Scale and fill rules are preserved; the text keeps its requested font family.");
-          }}
-        >
-          Download SVG
-        </Button>
-        <Button
-          variant="secondary"
-          busy={busy}
+      {format === "png" && (
+        <Field label="Image resolution" hint="Higher scales produce larger files and use more browser memory.">
+          <Select aria-label="Image resolution" value={scale} disabled={busy}
+            onChange={event => { setScale(Number(event.target.value)); setError(""); }}>
+            {[1, 2, 3, 4].map(option => <option key={option} value={option}>{option}×</option>)}
+          </Select>
+        </Field>
+      )}
+      {(rasterTooLarge || invalidBounds) && (
+        <Notice tone="danger" title="This output is too large for safe browser export">
+          {invalidBounds ? "The current page has no valid exportable bounds." :
+            `The selected size is ${width} × ${height} pixels. Lower the scale to avoid exhausting device memory.`}
+        </Notice>
+      )}
+      <Notice tone="info" title={format === "svg" ? "Scalable output" : "Rasterised in this browser"}>
+        {format === "svg"
+          ? "SVG preserves vector geometry and named font families. It does not embed fonts that are missing from the recipient's device."
+          : "PNG is rendered from the same SVG geometry as the canvas. It is created and downloaded locally, not sent to a provider."}
+      </Notice>
+      {error && <Notice tone="danger" title="Export failed">{error}</Notice>}
+      <ModalActions>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
+        <span className="ds-grow" />
+        <Button variant="primary" busy={busy} disabled={busy || invalidBounds || rasterTooLarge}
           onClick={async () => {
+            if (busy || invalidBounds || rasterTooLarge) return;
             setBusy(true);
+            setError("");
             try {
-              const blob = await svgToPng(pageToSvg(page, bounds), bounds.w, bounds.h, scale);
-              downloadBlob(`${slug(record.title)}@${scale}x.png`, blob);
-              context.toast("PNG written", `${(blob.size / 1024).toFixed(0)} kB rasterised by this browser.`);
-            } catch (error) {
-              context.toast("Export failed", error instanceof Error ? error.message : "The browser could not rasterise the document.", "failed");
+              const svg = pageToSvg(page, bounds);
+              if (format === "svg") {
+                downloadText(filename, svg, "image/svg+xml");
+                context.toast("SVG downloaded", `${page.name} exported as scalable vector geometry.`);
+              } else {
+                const blob = await svgToPng(svg, bounds.w, bounds.h, scale);
+                downloadBlob(filename, blob);
+                context.toast("PNG downloaded", `${page.name} exported at ${width} × ${height} pixels (${(blob.size / 1024).toFixed(0)} kB).`);
+              }
+            } catch (cause) {
+              const message = cause instanceof Error ? cause.message : "The browser could not export this page.";
+              setError(message);
+              context.toast("Export failed", message, "failed");
             } finally {
               setBusy(false);
             }
-          }}
-        >
-          Download PNG
+          }}>
+          Download {format.toUpperCase()}
         </Button>
-      </Row>
-      <Notice tone="info" title="What the export contains">
-        The SVG is generated from the same renderer the canvas uses, so geometry, gradients, shadows and fill rules match what is on screen. A font this browser does not have is named in the file rather than outlined.
-      </Notice>
+      </ModalActions>
     </Stack>
   );
 }
