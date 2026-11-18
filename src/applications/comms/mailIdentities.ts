@@ -33,6 +33,6 @@ export function signaturePreview(message: string, signature: string): string {
 
 export function validateIdentity(name: string, address: string): string | null {
   if (!name.trim()) return "Enter a display name.";
-  if (!/^[^\\s@<>(),;]+@[^\\s@<>(),;]+\\.[^\\s@<>(),;]+$/.test(address.trim())) return "Enter a valid email address.";
+  if (!/^[^\s@<>(),;]+@[^\s@<>(),;]+\.[^\s@<>(),;]+$/.test(address.trim())) return "Enter a valid email address.";
   return null;
 }
