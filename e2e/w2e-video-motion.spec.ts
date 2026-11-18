@@ -2,7 +2,9 @@ import { expect, test, type Page } from "@playwright/test";
 
 /* W2E — VIDEO: split and trim at the playhead from the keyboard, lock a
    track so its clips refuse edits, and edit caption cues on the timeline's
-   caption lane; all of it survives a reload. */
+   caption lane. MOTION: keyframes are retimed, revalued, eased with a live
+   preview, added and deleted, looped, and a frame is written as PNG. All of
+   it survives a reload. */
 
 async function copyVideo(page: Page): Promise<string> {
   await page.goto("/o/northline/video/projects/nl-videos-020");
@@ -92,4 +94,104 @@ test("the caption lane and cut tools fit a phone-sized screen", async ({ page })
   await expect(main.getByRole("group", { name: "Caption cues, en" })).toBeAttached();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
+});
+
+/* ------------------------------ MOTION ------------------------------ */
+
+async function createComposition(page: Page): Promise<string> {
+  await page.goto("/o/northline/motion/projects");
+  return page.evaluate(async () => {
+    const repoPath = "/src/platform/repo.ts";
+    const modelPath = "/src/applications/motion/model.ts";
+    const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
+    const model = await import(/* @vite-ignore */ modelPath) as typeof import("../src/applications/motion/model");
+    const ctx = { actor: "Maya Chen", now: new Date().toISOString() };
+    const record = repo.newRecord({
+      organizationId: "org-northline", collection: "motions", currency: "GBP",
+      title: "W2E keyframe check", status: "draft", body: { ...model.starterMotion("W2E keyframe check"), loop: false },
+      fields: { kind: "composition" },
+    }, ctx);
+    await repo.putRecord(record, ctx);
+    return record.id;
+  });
+}
+
+test("edit keyframes, preview the easing, loop, export a frame, and reopen", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const id = await createComposition(page);
+  await page.goto(`/o/northline/motion/projects/${id}`);
+  const main = page.locator("#main");
+  const panel = main.getByRole("complementary", { name: "Properties and keyframes" });
+  const titleKeys = main.getByRole("button", { name: /^Title opacity keyframe at / });
+
+  /* Pick the title's second opacity keyframe on the timeline; retime and revalue it. */
+  await main.getByRole("button", { name: /^Title opacity keyframe at 0\.80 seconds/ }).click();
+  await panel.getByLabel("Time (s)").fill("1.2");
+  await expect(main.getByRole("button", { name: /^Title opacity keyframe at 1\.20 seconds/ })).toBeVisible();
+  await panel.getByLabel("Value", { exact: true }).fill("0.6");
+  await expect(main.getByRole("button", { name: "Title opacity keyframe at 1.20 seconds, value 0.6" })).toBeVisible();
+
+  /* Ease out of the first keyframe and watch the preview. */
+  await main.getByRole("button", { name: /^Title opacity keyframe at 0\.00 seconds/ }).click();
+  await panel.getByLabel("Easing out of this keyframe").selectOption("ease-in");
+  const preview = panel.getByTestId("easing-preview");
+  await expect(preview).toBeVisible();
+  const toggle = preview.getByRole("button", { name: /the preview/ });
+  const pressed = await toggle.getAttribute("aria-pressed");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", pressed === "true" ? "false" : "true");
+
+  /* Double-click the title's opacity row to add a keyframe; Delete removes it; undo brings it back. */
+  const before = await titleKeys.count();
+  const row = main.getByRole("button", { name: /^Title opacity keyframe at 1\.20 seconds/ }).locator("xpath=..");
+  const rb = (await row.boundingBox())!;
+  await page.mouse.dblclick(rb.x + rb.width * 0.85, rb.y + rb.height / 2);
+  await expect(titleKeys).toHaveCount(before + 1);
+  await main.getByRole("application", { name: /Composition editor/ }).focus();
+  await page.keyboard.press("Delete");
+  await expect(titleKeys).toHaveCount(before);
+  await page.keyboard.press("Control+z");
+  await expect(titleKeys).toHaveCount(before + 1);
+
+  /* Loop is a property of the composition, on the undo stack. */
+  const loop = main.getByRole("button", { name: "Loop", exact: true });
+  await expect(loop).toHaveAttribute("aria-pressed", "false");
+  await loop.click();
+  await expect(loop).toHaveAttribute("aria-pressed", "true");
+
+  const download = page.waitForEvent("download");
+  await main.getByRole("button", { name: "PNG", exact: true }).click();
+  expect((await download).suggestedFilename()).toMatch(/w2e-keyframe-check-frame-\d{4}\.png$/);
+
+  await expect(main.getByText("Saved", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await page.reload();
+  await expect(main.getByRole("button", { name: "Title opacity keyframe at 1.20 seconds, value 0.6" })).toBeVisible();
+  await expect(titleKeys).toHaveCount(before + 1);
+  await expect(main.getByRole("button", { name: "Loop", exact: true })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("the composition editor fits a phone-sized screen", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const id = await createComposition(page);
+  await page.goto(`/o/northline/motion/projects/${id}`);
+  const main = page.locator("#main");
+  await expect(main.getByTestId("motion-play")).toBeVisible();
+  await expect(main.getByRole("button", { name: "PNG", exact: true })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test("record the composition as WebM in this browser, from the editor", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const id = await createComposition(page);
+  await page.goto(`/o/northline/motion/projects/${id}`);
+  const main = page.locator("#main");
+  const webm = main.getByRole("button", { name: "WebM", exact: true });
+  test.skip(await webm.isDisabled(), "This browser build has no MediaRecorder for a canvas stream; the button says so and stays disabled.");
+  const download = page.waitForEvent("download", { timeout: 30_000 });
+  await webm.click();
+  await expect(main.getByText(/^recording \d+\/\d+$/)).toBeVisible();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(/w2e-keyframe-check\.webm$/);
+  await expect(page.getByText(/was written by this browser/).first()).toBeVisible();
 });
