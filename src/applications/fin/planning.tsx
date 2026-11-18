@@ -442,9 +442,9 @@ export function VarianceDrilldown({ context }: { context: ScreenContext }) {
   const actual = movements.reduce((sum, item) => sum + item.netMinor, 0);
   const originalNote = String(budget?.fields.varianceNote ?? "");
   const [saved, setSaved] = useState<{ budgetId: string; value: string } | null>(null);
-  const savedNote = saved?.budgetId === budget?.id ? saved.value : originalNote;
+  const savedNote = saved && saved.budgetId === budget?.id ? saved.value : originalNote;
   const [draft, setDraft] = useState<{ budgetId: string; value: string } | null>(null);
-  const note = draft?.budgetId === budget?.id ? draft.value : savedNote;
+  const note = draft && draft.budgetId === budget?.id ? draft.value : savedNote;
   const [busy, setBusy] = useState(false);
   const dirty = note.trim() !== savedNote.trim();
 
