@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("workspace remains navigable while optional resource and people panels load", async ({ page }) => {
   await page.goto("/o/northline/workspace/home");
-  await expect(page.getByRole("heading", { name: "Your day, in one place." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Make room for what matters/i })).toBeVisible();
   await page.goto("/o/northline/workspace/resources");
   await expect(page.getByRole("heading", { level:1, name: "Files & resources" })).toBeVisible();
   await expect(page.getByRole("region",{name:"Company resources"})).toBeVisible();
