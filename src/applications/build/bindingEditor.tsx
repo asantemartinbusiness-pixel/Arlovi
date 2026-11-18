@@ -6,6 +6,7 @@ import {
   type FilterOperator, type InteractionKind, type QueryFilter,
 } from "./binding";
 import type { AppModel, Entity, ScreenComponent } from "./model";
+import type { ComponentPatch } from "./state";
 
 /* ====================================================================== *
  * Inspector sections for a component's data binding (which records, in
@@ -28,7 +29,7 @@ function FilterValueInput({ label, value, type, onCommit }: { label: string; val
 
 export function BindingEditor({ component, entity, model, screenId, onEdit }: {
   component: ScreenComponent; entity: Entity; model: AppModel; screenId: string;
-  onEdit: (patch: Partial<ScreenComponent>) => void;
+  onEdit: (patch: ComponentPatch) => void;
 }) {
   const queryable = (QUERY_KINDS as readonly string[]).includes(component.kind);
   const interactive = (INTERACTIVE_KINDS as readonly string[]).includes(component.kind);
@@ -36,7 +37,7 @@ export function BindingEditor({ component, entity, model, screenId, onEdit }: {
   const problems = bindingProblems(component, entity.fields.map((field) => field.id), model.screens, screenId);
 
   function setFilter(id: string, patch: Partial<QueryFilter>) {
-    onEdit({ filters: component.filters.map((filter) => (filter.id === id ? { ...filter, ...patch } : filter)) });
+    onEdit((current) => ({ filters: current.filters.map((filter) => (filter.id === id ? { ...filter, ...patch } : filter)) }));
   }
 
   return (
@@ -67,22 +68,22 @@ export function BindingEditor({ component, entity, model, screenId, onEdit }: {
                   </Select>
                   : <FilterValueInput key={`${filter.id}-${filter.value}`} label={`Filter ${index + 1} value`} value={filter.value} type={field?.kind === "date" ? "date" : "text"} onCommit={(value) => setFilter(filter.id, { value })} />;
               })()}
-              <Button size="sm" variant="ghost" aria-label={`Remove filter ${index + 1}`} onClick={() => onEdit({ filters: component.filters.filter((item) => item.id !== filter.id) })}>Remove</Button>
+              <Button size="sm" variant="ghost" aria-label={`Remove filter ${index + 1}`} onClick={() => onEdit((current) => ({ filters: current.filters.filter((item) => item.id !== filter.id) }))}>Remove</Button>
             </div>
           ))}
           <Row gap={2} wrap>
             <Button size="sm" variant="secondary" disabled={entity.fields.length === 0}
-              onClick={() => onEdit({ filters: [...component.filters, { id: `f${wallMs().toString(36)}`, fieldId: entity.fields[0]?.id ?? "", operator: "equals", value: "" }] })}>Add a filter</Button>
+              onClick={() => { const id = `f${wallMs().toString(36)}`; onEdit((current) => ({ filters: [...current.filters, { id, fieldId: entity.fields[0]?.id ?? "", operator: "equals", value: "" }] })); }}>Add a filter</Button>
           </Row>
           {component.kind !== "stat" && component.kind !== "chart" && (
             <div className="t6-build-filter" role="group" aria-label="Order and limit">
               <span className="ds-subtle">Sort by</span>
-              <Select aria-label="Sort field" value={component.sort?.fieldId ?? ""} onChange={(event) => onEdit({ sort: event.target.value ? { fieldId: event.target.value, direction: component.sort?.direction ?? "asc" } : null })}>
+              <Select aria-label="Sort field" value={component.sort?.fieldId ?? ""} onChange={(event) => { const fieldId = event.target.value; onEdit((current) => ({ sort: fieldId ? { fieldId, direction: current.sort?.direction ?? "asc" } : null })); }}>
                 <option value="">Stored order</option>
                 {entity.fields.map((field) => <option key={field.id} value={field.id}>{field.name}</option>)}
               </Select>
               {component.sort && (
-                <Select aria-label="Sort direction" value={component.sort.direction} onChange={(event) => onEdit({ sort: { fieldId: component.sort!.fieldId, direction: event.target.value === "desc" ? "desc" : "asc" } })}>
+                <Select aria-label="Sort direction" value={component.sort.direction} onChange={(event) => { const direction = event.target.value === "desc" ? "desc" : "asc"; onEdit((current) => ({ sort: current.sort ? { ...current.sort, direction } : null })); }}>
                   <option value="asc">Ascending</option>
                   <option value="desc">Descending</option>
                 </Select>
@@ -112,7 +113,7 @@ export function BindingEditor({ component, entity, model, screenId, onEdit }: {
           </Field>
           {component.interaction.kind !== "none" && (
             <Field label="Screen" htmlFor={`interaction-screen-${component.id}`}>
-              <Select id={`interaction-screen-${component.id}`} value={component.interaction.screenId} onChange={(event) => onEdit({ interaction: { ...component.interaction, screenId: event.target.value } })}>
+              <Select id={`interaction-screen-${component.id}`} value={component.interaction.screenId} onChange={(event) => { const screenId = event.target.value; onEdit((current) => ({ interaction: { ...current.interaction, screenId } })); }}>
                 <option value="">Choose a screen</option>
                 {model.screens.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.route}</option>)}
               </Select>

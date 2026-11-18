@@ -37,7 +37,10 @@ export async function saveApp(context: ScreenContext, record: Rec, next: AppMode
  */
 let componentQueue: Promise<void> = Promise.resolve();
 
-export function editComponent(context: ScreenContext, recordId: string, componentId: string, patch: Partial<ScreenComponent>, label: string): Promise<void> {
+/** A change to one component: fields to set, or a function of the latest stored component. */
+export type ComponentPatch = Partial<ScreenComponent> | ((current: ScreenComponent) => Partial<ScreenComponent>);
+
+export function editComponent(context: ScreenContext, recordId: string, componentId: string, patch: ComponentPatch, label: string): Promise<void> {
   const run = async () => {
     const repo = await import("@/platform/repo");
     const latest = await repo.getRecordInOrg(context.org.id, recordId);
@@ -48,7 +51,7 @@ export function editComponent(context: ScreenContext, recordId: string, componen
       ...model,
       screens: model.screens.map((screen) => ({
         ...screen,
-        components: screen.components.map((component) => (component.id === componentId ? { ...component, ...patch } : component)),
+        components: screen.components.map((component) => (component.id === componentId ? { ...component, ...(typeof patch === "function" ? patch(component) : patch) } : component)),
       })),
     };
     await saveApp(context, latest, next, label);

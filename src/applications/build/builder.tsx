@@ -20,7 +20,7 @@ import { ScreenPreview } from "./preview";
 import { BindingEditor } from "./bindingEditor";
 import { describeQuery } from "./binding";
 import { DeviceLayoutPreview } from "./devicePreview";
-import { editComponent, saveApp, useBuildUi } from "./state";
+import { editComponent, saveApp, useBuildUi, type ComponentPatch } from "./state";
 import { wallMs } from "@/platform/clock";
 
 const COMPONENT_ICONS: Record<ComponentKind, React.ReactNode> = {
@@ -364,7 +364,7 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
 
 export function ComponentInspector({
   component, model, onEdit, onRemove,
-}: { component: ScreenComponent; model: AppModel; onEdit: (patch: Partial<ScreenComponent>) => void; onRemove?: () => void }) {
+}: { component: ScreenComponent; model: AppModel; onEdit: (patch: ComponentPatch) => void; onRemove?: () => void }) {
   const entity = model.entities.find((item) => item.id === component.entityId);
   const [removeId, setRemoveId] = useState<string | null>(null);
   return (
