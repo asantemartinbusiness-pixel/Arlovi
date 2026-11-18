@@ -97,7 +97,8 @@ test("native sidebar follows the active mission record between detail screens", 
 test("switching a local role view never strands the user on a hidden native application", async ({page}) => {
   await page.goto("/o/northline/mission/missions");
   await page.getByRole("button", {name: /Profile and preferences/}).click();
-  await page.getByRole("menuitem", {name: "Client", exact: true}).click();
+  await page.getByRole("menuitem", {name: /Preview as Owner/}).click();
+  await page.getByRole("menuitemradio", {name: "Client", exact: true}).click();
   await expect(page).toHaveURL(/\/o\/northline\/portal\//);
   await expect(page.getByText(/Outside the Client view/)).toHaveCount(0);
 });
