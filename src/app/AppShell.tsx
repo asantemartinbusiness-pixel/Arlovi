@@ -25,7 +25,7 @@ import { canOpen, ROLE_LABELS } from "@/platform/policy";
 import { ORGS } from "@/platform/org";
 import { useCollections, useWorkspace, useMutations } from "@/platform/workspace";
 import { buildAttention, filterForRole, headerAttentionCounts } from "@/platform/attention";
-import { applyAttentionReceipts, attentionSnoozed } from "@/platform/attentionReceipts";
+import { applyAttentionReceipts, applyInboxAttentionState, attentionSnoozed } from "@/platform/attentionReceipts";
 import { normalizeNotificationPreferences, notificationPreferenceKey } from "@/platform/notificationExperience";
 import { useUi } from "@/runtime/ui";
 import { DisplayPreferences } from "@/app/DisplayPreferences";
@@ -117,8 +117,8 @@ export function AppShell() {
     prefetchController.cancel();
   }
 
-  const data = useCollections(["notifications", "invoices", "bills", "tasks", "shifts", "missions", "deals", "leaveRequests", "expenses", "workflowApprovals", "organizations", "preferences"]);
-  const attention = useMemo(() => applyAttentionReceipts(filterForRole(buildAttention({
+  const data = useCollections(["notifications", "invoices", "bills", "tasks", "shifts", "missions", "deals", "leaveRequests", "expenses", "workflowApprovals", "attentionState", "organizations", "preferences"]);
+  const attention = useMemo(() => applyAttentionReceipts(applyInboxAttentionState(filterForRole(buildAttention({
     notifications: data.notifications,
     invoices: data.invoices,
     bills: data.bills,
@@ -129,7 +129,7 @@ export function AppShell() {
     workflowApprovals: data.workflowApprovals,
     orgSlug: org.slug,
     now,
-  }), role), ui.attentionReceipts, org.id, actor), [data, org.slug, org.id, now, role, actor, ui.attentionReceipts]);
+  }), role), data.attentionState), ui.attentionReceipts, org.id, actor), [data, org.slug, org.id, now, role, actor, ui.attentionReceipts]);
   const contextVisible = isWorkspaceArea && ["project","department"].includes(location.pathname.split("/")[5]);
   const personalPrefs = normalizeNotificationPreferences(ui.notificationPreferences[notificationPreferenceKey(org.id, actor)]);
   const visibleAttention = attention.filter((item) => !attentionSnoozed(item, ui.attentionReceipts, org.id, actor, now));
