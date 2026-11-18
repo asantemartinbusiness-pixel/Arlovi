@@ -36,7 +36,7 @@ export function AppShell() {
   const ui = useUi();
   const location = useLocation();
   const navigate = useNavigate();
-  const { org, role, now } = useWorkspace();
+  const { org, role, actor, now } = useWorkspace();
   const mutate = useMutations();
   const [navOpen, setNavOpenState] = useState(false);
   /* The path the drawer was opened on. Route changes close the drawer, but the
@@ -50,7 +50,7 @@ export function AppShell() {
   }, []);
   const [displayOpen, setDisplayOpen] = useState(false);
   const closeDisplay = useCallback(() => setDisplayOpen(false), []);
-  const [attentionView, setAttentionView] = useState<"for-you" | "approvals" | "updates">("for-you");
+  const [attentionView, setAttentionView] = useState<"for-you" | "approvals" | "updates" | "settings">("for-you");
   const searchTrigger = useRef<HTMLButtonElement>(null);
   const keyboardHint = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.userAgent) ? "⌘K" : "Ctrl+K";
 
@@ -125,12 +125,12 @@ export function AppShell() {
     workflowApprovals: data.workflowApprovals,
     orgSlug: org.slug,
     now,
-  }), role), ui.attentionReceipts, org.id, role), [data, org.slug, org.id, now, role, ui.attentionReceipts]);
+  }), role), ui.attentionReceipts, org.id, role, actor, now), [data, org.slug, org.id, now, role, actor, ui.attentionReceipts]);
   const contextVisible = isWorkspaceArea && ["project","department"].includes(location.pathname.split("/")[5]);
   const {decisions, unreadUpdates: updates} = headerAttentionCounts(attention);
   function openCommand() { ui.setAsk(false); ui.setNotes(false); ui.setCommand(true); }
   function openAsk() { ui.setCommand(false); ui.setNotes(false); ui.setAsk(true); }
-  function openAttention(view: "for-you" | "approvals" | "updates") {
+  function openAttention(view: "for-you" | "approvals" | "updates" | "settings") {
     if (ui.notes && attentionView === view) {ui.setNotes(false);return;}
     setAttentionView(view);ui.setCommand(false);ui.setAsk(false);ui.setNotes(true);
   }
@@ -307,6 +307,7 @@ export function AppShell() {
           items={[
             {label: `${org.ownerName ?? "Local workspace profile"} · ${org.name}`, group:"Account (browser-local)", disabled:true},
             {label:"Account & data readiness",group:"Account",onSelect:()=>navigate(`/o/${org.slug}/workspace/account`)},
+            {label:"Notification preferences",group:"Account",onSelect:()=>openAttention("settings")},
             ...(["owner", "finance", "sales", "people", "member", "client"] as Role[]).map((item) => ({
               label: item === role ? `${ROLE_LABELS[item]} · current view` : ROLE_LABELS[item],
               group: "Role view (not a security boundary)",
