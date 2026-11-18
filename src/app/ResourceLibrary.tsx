@@ -39,6 +39,7 @@ export function ResourceLibrary({ scope = null }: { scope?: Scope }) {
   const { documents = [], resourceFolders: folders = [], resourceLinks: links = [], projects = [], departments = [] } = useCollections(["documents", RESOURCE_FOLDERS, RESOURCE_LINKS, "projects", "departments"]);
   const [folderId,setFolderId] = useState<string | null>(null);
   const [query,setQuery] = useState("");
+  const [resourceView,setResourceView] = useState<"all" | "folders" | "documents">("all");
   const [newFolder,setNewFolder] = useState("");
   const [creating,setCreating] = useState(false);
   const [busy,setBusy] = useState(false);
@@ -131,7 +132,8 @@ export function ResourceLibrary({ scope = null }: { scope?: Scope }) {
     await perform(()=>patchDocument(doc,{resourceFolderId:nextFolder},`Organised document in ${nextFolder?"folder":"root"}`),"Document moved");
   }
   return <section className="rs-library" aria-label={scope?`${scope.title} resources`:"Company resources"}>
-    <header className="rs-head"><div><h2>Resources</h2><ScopeDescription scope={scope}/></div><div className="rs-counts"><span>{counts.folders} folders</span><span>{counts.docs} documents</span></div></header>
+    <header className="rs-head"><div><span className="rs-eyebrow">{scope?"WORKSPACE / SHARED RESOURCES":"COMPANY / RESOURCES"}</span><h2>Files & resources</h2><ScopeDescription scope={scope}/></div><div className="rs-counts"><span>{counts.folders} folders</span><span>{counts.docs} documents</span></div></header>
+    <div className="rs-overview" aria-label="Resource overview"><div><Folder size={19}/><span>Folders</span><strong>{counts.folders}</strong></div><div><FileText size={19}/><span>Documents</span><strong>{counts.docs}</strong></div><div><Link2 size={19}/><span>Linked to this space</span><strong>{scope?linkedIds.size:0}</strong></div></div>
     <div className="rs-actions">
       <label className="rs-search"><Search size={16}/><span className="ds-sr-only">Search resources</span><input aria-label="Search resources" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Find files and folders"/></label>
       <button type="button" onClick={()=>setCreating(v=>!v)}><FolderPlus size={16}/> New folder</button>
@@ -142,11 +144,12 @@ export function ResourceLibrary({ scope = null }: { scope?: Scope }) {
     {showAttach&&scope&&<div className="rs-inline-form"><label>Existing company document<select aria-label="Existing document to link" value={attachId} onChange={e=>setAttachId(e.target.value)}><option value="">Select a document</option>{selectable.map(d=><option key={d.id} value={d.id}>{d.title}</option>)}</select></label><button type="button" onClick={()=>void attach()} disabled={!attachId||busy}>Link to {scope.title}</button><button type="button" onClick={()=>setShowAttach(false)} aria-label="Close link document"><X size={16}/></button></div>}
     {error&&<p className="rs-error" role="alert">{error}</p>}
     <nav className="rs-crumbs" aria-label="Folder location"><button type="button" onClick={()=>{setFolderId(null);setQuery("");}}><Folder size={15}/> All resources</button>{folderAncestors().map(folder=><span key={folder.id}><ChevronRight size={14}/><button type="button" onClick={()=>{setFolderId(folder.id);setQuery("");}}>{folder.title}</button></span>)}</nav>
+    <div className="rs-resource-toolbar"><div className="rs-view-options" role="group" aria-label="Resource type">{(["all","folders","documents"] as const).map(value=><button type="button" key={value} aria-pressed={resourceView===value} onClick={()=>{setResourceView(value);setSelectedId(null);}}>{value==="all"?"All resources":value==="folders"?"Folders":"Documents"}</button>)}</div><span className="rs-view-count">{(resourceView==="documents"?0:visibleFolders.length)+(resourceView==="folders"?0:visibleDocs.length)} items shown</span></div>
     <div className="rs-body">
       <div className="rs-list">
-        {visibleFolders.map(folder=><button key={folder.id} type="button" className="rs-file-row" onClick={()=>{setFolderId(folder.id);setQuery("");setSelectedId(null);}}><Folder size={19}/><span className="rs-file-name"><strong>{folder.title}</strong><small>Folder · {folder.ownerName}</small></span><ChevronRight size={16}/></button>)}
-        {visibleDocs.map(doc=><button key={doc.id} type="button" className="rs-file-row" data-selected={selectedId===doc.id?"true":undefined} onClick={()=>setSelectedId(doc.id)}><File size={19}/><span className="rs-file-name"><strong>{doc.title}</strong><small>{doc.status} · revision {doc.revision} · {new Date(doc.updatedAt).toLocaleDateString()}</small></span><ChevronRight size={16}/></button>)}
-        {!visibleDocs.length&&!visibleFolders.length&&<div className="rs-empty"><Archive size={20}/><p>{query?"No resources match your search.":"There are no resources in this folder yet."}</p></div>}
+        {resourceView!=="documents"&&visibleFolders.map(folder=><button key={folder.id} type="button" className="rs-file-row" onClick={()=>{setFolderId(folder.id);setQuery("");setSelectedId(null);}}><Folder size={19}/><span className="rs-file-name"><strong>{folder.title}</strong><small>Folder · {folder.ownerName}</small></span><ChevronRight size={16}/></button>)}
+        {resourceView!=="folders"&&visibleDocs.map(doc=><button key={doc.id} type="button" className="rs-file-row" data-selected={selectedId===doc.id?"true":undefined} onClick={()=>setSelectedId(doc.id)}><File size={19}/><span className="rs-file-name"><strong>{doc.title}</strong><small>{doc.status} · revision {doc.revision} · {new Date(doc.updatedAt).toLocaleDateString()}</small></span><ChevronRight size={16}/></button>)}
+        {!(resourceView==="documents"?visibleDocs.length:resourceView==="folders"?visibleFolders.length:visibleDocs.length+visibleFolders.length)&&<div className="rs-empty"><Archive size={20}/><p>{query?"No resources match your search.":"There are no resources in this folder yet."}</p></div>}
       </div>
       {selected&&<aside className="rs-preview" aria-label="Document preview"><div className="rs-preview-head"><h3>{selected.title}</h3><button type="button" onClick={()=>setSelectedId(null)} aria-label="Close document preview"><X size={17}/></button></div><p className="rs-summary">{selected.summary||"Document"}</p><dl><div><dt>Owner</dt><dd>{selected.ownerName}</dd></div><div><dt>Modified</dt><dd>{new Date(selected.updatedAt).toLocaleString()}</dd></div><div><dt>Version</dt><dd>Revision {selected.revision}</dd></div><div><dt>Space</dt><dd>{String(names.get(String(selected.fields.projectId||selected.fields.departmentId))||"Company")}</dd></div></dl>
         <div className="rs-preview-text"><h4>Content preview</h4><p>{textPreview(selected)||"This document is empty."}</p></div>
