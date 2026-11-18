@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { DragEndEvent } from "@dnd-kit/core";
 import {
-  Database, FileText, Globe, Inbox, Layers, Link2, Plus, Shapes,
+  ArrowDown, ArrowUp, Database, FileText, Globe, Inbox, Layers, Link2, Plus, Shapes,
 } from "lucide-react";
 import {
   Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties,
@@ -18,6 +18,8 @@ import {
 import { PageView } from "./render";
 import { ThemeEditor } from "./builder";
 import { saveSite, useWebUi } from "./state";
+import { findLink, moveChild, placeLink, removeLink, targetProblem } from "./nav";
+import { redirectId } from "./pages";
 import { SiteLibrary } from "./siteLibrary";
 
 /* ---------------------------------------------------------------- *
@@ -185,6 +187,7 @@ export function SiteDashboard({ context, lens }: { context: ScreenContext; lens:
       <Stack gap={4}>
         <Row gap={2} wrap>
           <Button variant="primary" icon={<Plus size={15} />} onClick={() => context.openOverlay("site settings", { tab: "page" })}>Add page</Button>
+          <Button variant="secondary" onClick={() => context.openOverlay("Manage pages")}>Manage pages</Button>
           <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/builder`)}>Open the builder</Button>
         </Row>
         <DataGrid
@@ -656,16 +659,38 @@ export function SiteNavigation({ context, lens }: { context: ScreenContext; lens
                 onMove={(from, to) => setLinks(move(links, from, to), `${lens} menu reordered`)}
               >
                 {({ handle }) => (
-                  <Row gap={2} style={{ padding: "var(--space-2) var(--space-3)", alignItems: "center" }}>
-                    {handle}
-                    <div className="ds-grow">
-                      <strong>{link.label}</strong>
-                      <div className="ds-subtle"><code>{link.target}</code> · {link.kind}</div>
-                    </div>
-                    {link.kind === "page" && !site.pages.some((page) => page.path === link.target) && <Pill tone="danger">No page</Pill>}
-                    <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Link picker", { which, id: link.id })}>Edit</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setLinks(links.filter((item) => item.id !== link.id), `Removed ${link.label} from the ${lens.toLowerCase()} menu`)}>Remove</Button>
-                  </Row>
+                  <div className="web-nav-item">
+                    <Row gap={2} style={{ padding: "var(--space-2) var(--space-3)", alignItems: "center" }}>
+                      {handle}
+                      <div className="ds-grow">
+                        <strong>{link.label}</strong>
+                        <div className="ds-subtle"><code>{link.target}</code> · {link.kind}{link.children.length ? ` · submenu of ${link.children.length}` : ""}</div>
+                      </div>
+                      {targetProblem(site, link.kind, link.target) && <Pill tone="danger">{link.kind === "page" ? "No page" : "Invalid target"}</Pill>}
+                      {which === "header" && <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Link picker", { which, parentId: link.id })}>Add sub-link</Button>}
+                      <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Link picker", { which, id: link.id })}>Edit</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setLinks(removeLink(links, link.id), `Removed ${link.label}${link.children.length ? ` and its ${link.children.length} sub-links` : ""} from the ${lens.toLowerCase()} menu`)}>Remove</Button>
+                    </Row>
+                    {link.children.length > 0 && (
+                      <ul className="web-nav-children" aria-label={`Submenu of ${link.label}`}>
+                        {link.children.map((child, childIndex) => (
+                          <li key={child.id}>
+                            <div className="ds-grow">
+                              <span>{child.label}</span>
+                              <div className="ds-subtle"><code>{child.target}</code> · {child.kind}</div>
+                            </div>
+                            {targetProblem(site, child.kind, child.target) && <Pill tone="danger">{child.kind === "page" ? "No page" : "Invalid target"}</Pill>}
+                            <Button size="sm" variant="ghost" iconOnly aria-label={`Move ${child.label} up`} disabled={childIndex === 0} icon={<ArrowUp size={14} />}
+                              onClick={() => setLinks(moveChild(links, link.id, child.id, -1), `${child.label} moved up in the ${link.label} submenu`)} />
+                            <Button size="sm" variant="ghost" iconOnly aria-label={`Move ${child.label} down`} disabled={childIndex === link.children.length - 1} icon={<ArrowDown size={14} />}
+                              onClick={() => setLinks(moveChild(links, link.id, child.id, 1), `${child.label} moved down in the ${link.label} submenu`)} />
+                            <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Link picker", { which, id: child.id })}>Edit</Button>
+                            <Button size="sm" variant="ghost" onClick={() => setLinks(removeLink(links, child.id), `Removed ${child.label} from the ${link.label} submenu`)}>Remove</Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 )}
               </SortableRow>
             ))}
@@ -1005,30 +1030,37 @@ function suggestStructure(brief: string): { why: string; pages: { name: string; 
 
 export function LinkPickerForm({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, site } = useSiteRecord(context);
-  const payload = context.overlayPayload as { which?: "header" | "footer"; id?: string } | undefined;
+  const payload = context.overlayPayload as { which?: "header" | "footer"; id?: string; parentId?: string } | undefined;
   const which = payload?.which ?? "header";
-  const existing = (which === "footer" ? site.nav.footer : site.nav.header).find((link) => link.id === payload?.id);
+  const links = which === "footer" ? site.nav.footer : site.nav.header;
+  const found = payload?.id ? findLink(links, payload.id) : undefined;
+  const existing = found?.link;
   const [label, setLabel] = useState(existing?.label ?? "");
   const [kind, setKind] = useState<NavLink["kind"]>(existing?.kind ?? "page");
   const [target, setTarget] = useState(existing?.target ?? site.pages[0]?.path ?? "/");
+  const [parentId, setParentId] = useState(found?.parentId ?? payload?.parentId ?? "");
+  const [tried, setTried] = useState(false);
   if (!record) return <NoSite />;
-  const invalid = kind === "page" && !site.pages.some((page) => page.path === target);
+  const problem = targetProblem(site, kind, target);
+  const parents = which === "header" && !(existing && existing.children.length > 0)
+    ? links.filter((link) => link.id !== existing?.id) : [];
   return (
     <form
       id="link-picker"
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!label.trim()) return;
-        const links = which === "footer" ? site.nav.footer : site.nav.header;
-        const next: NavLink = { id: existing?.id ?? `n-${wallMs().toString(36)}`, label: label.trim(), kind, target, children: existing?.children ?? [] };
-        const updated = existing ? links.map((link) => (link.id === existing.id ? next : link)) : [...links, next];
-        await saveSite(context, record, { ...site, nav: { ...site.nav, [which]: updated } }, existing ? `Menu link ${next.label} updated` : `Menu link ${next.label} added`);
-        context.toast("Menu saved", `${next.label} points at ${next.target}.`);
+        setTried(true);
+        if (!label.trim() || problem) return;
+        const next: NavLink = { id: existing?.id ?? `n-${wallMs().toString(36)}`, label: label.trim(), kind, target: target.trim(), children: existing?.children ?? [] };
+        const updated = placeLink(links, next, parentId);
+        const under = parentId ? links.find((link) => link.id === parentId)?.label : "";
+        await saveSite(context, record, { ...site, nav: { ...site.nav, [which]: updated } }, existing ? `Menu link ${next.label} updated` : `Menu link ${next.label} added${under ? ` under ${under}` : ""}`);
+        context.toast("Menu saved", `${next.label} points at ${next.target}${under ? `, in the ${under} submenu` : ""}.`);
         close();
       }}
     >
-      <Field label="Link text" required><TextInput value={label} onChange={(event) => setLabel(event.target.value)} required /></Field>
+      <Field label="Link text" required error={tried && !label.trim() ? "Give the link some text." : undefined}><TextInput value={label} onChange={(event) => setLabel(event.target.value)} required /></Field>
       <Field label="Kind">
         <Select value={kind} onChange={(event) => setKind(event.target.value as NavLink["kind"])}>
           <option value="page">A page on this site</option>
@@ -1037,14 +1069,22 @@ export function LinkPickerForm({ context, close }: { context: ScreenContext; clo
         </Select>
       </Field>
       {kind === "page" ? (
-        <Field label="Page" error={invalid ? "That address is not a page on this site." : undefined}>
+        <Field label="Page" error={problem}>
           <Select value={target} onChange={(event) => setTarget(event.target.value)}>
             {site.pages.map((page) => <option key={page.id} value={page.path}>{page.name} · {page.path}</option>)}
           </Select>
         </Field>
       ) : (
-        <Field label="Target" hint={kind === "anchor" ? "For example #pricing" : "Include the scheme, for example https://example.com"}>
+        <Field label="Target" error={tried || target.trim() ? problem : undefined} hint={kind === "anchor" ? "For example #pricing" : "Include the scheme, for example https://example.com"}>
           <TextInput value={target} onChange={(event) => setTarget(event.target.value)} />
+        </Field>
+      )}
+      {parents.length > 0 && (
+        <Field label="Place in" hint="One level of submenu. A link that has its own submenu stays at the top.">
+          <Select value={parentId} onChange={(event) => setParentId(event.target.value)} aria-label="Place in menu">
+            <option value="">Top level of the header menu</option>
+            {parents.map((link) => <option key={link.id} value={link.id}>Submenu of {link.label}</option>)}
+          </Select>
         </Field>
       )}
     </form>
@@ -1067,7 +1107,7 @@ export function RedirectForm({ context, close }: { context: ScreenContext; close
         if (!from.trim() || loop) return;
         await saveSite(context, record, {
           ...site,
-          nav: { ...site.nav, redirects: [...site.nav.redirects, { id: `r-${wallMs().toString(36)}`, from: from.trim(), to: to.trim(), code: code === "302" ? 302 : 301 }] },
+          nav: { ...site.nav, redirects: [...site.nav.redirects, { id: redirectId(), from: from.trim(), to: to.trim(), code: code === "302" ? 302 : 301 }] },
         }, `Redirect ${from.trim()} added`);
         context.toast("Redirect added", `${from.trim()} will answer with a ${code}.`);
         close();

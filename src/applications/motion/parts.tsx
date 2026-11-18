@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Pill } from "@/design-system";
+import { Button, Pill } from "@/design-system";
 import { clamp } from "@/applications/visual/geometry";
 import { dragPointer, useMeasure, useStore, type DocHandle } from "@/applications/visual/kit";
 import {
-  NUMERIC_PROPERTIES, easeAt, keyframeCount, moveKeyframe, removeKeyframe, sampleAll, sampleLayer,
+  NUMERIC_PROPERTIES, easeAt, keyframeCount, moveKeyframe, propertyDefault, removeKeyframe, sampleAll, sampleLayer, sampleTrack, setKeyframe,
   type AnimatableProperty, type Easing, type MotionDoc, type MotionLayer, type SampledLayer,
 } from "./anim";
 import { motionUi, setMotionTime } from "./model";
@@ -203,7 +203,23 @@ export function KeyframeTimeline({ handle, height = 230, onOpenKeyframe }: { han
           </div>
 
           {rows.map((row, index) => (
-            <div key={`${row.layer.id}-${row.property ?? "head"}-${index}`} className="vx-tl-row" style={{ height: 28 }}>
+            <div
+              key={`${row.layer.id}-${row.property ?? "head"}-${index}`}
+              className="vx-tl-row"
+              style={{ height: 28 }}
+              title={row.property ? "Double-click to add a keyframe here" : undefined}
+              onDoubleClick={row.property && !row.layer.locked ? (event) => {
+                if ((event.target as HTMLElement).closest(".vx-key")) return;
+                const rect = event.currentTarget.getBoundingClientRect();
+                const property = row.property!;
+                const t = Math.round(clamp((event.clientX - rect.left) / pxPerSecond, 0, doc.duration) * doc.fps) / doc.fps;
+                const value = sampleTrack(row.layer.tracks[property], t, property === "colour" ? row.layer.fill : propertyDefault(property, row.layer));
+                handle.edit((current) => setKeyframe(current, row.layer.id, property, t, value), "Add a keyframe");
+                const made = `kf-${row.layer.id}-${property}-${Math.round(t * 1000)}`;
+                const existing = (row.layer.tracks[property] ?? []).find((keyframe) => Math.abs(keyframe.t - t) < 0.5 / doc.fps);
+                motionUi.set((current) => ({ ...current, time: t, selectedLayerId: row.layer.id, selectedProperty: property, selectedKeyframeId: existing?.id ?? made }));
+              } : undefined}
+            >
               {row.property && (row.layer.tracks[row.property] ?? []).map((keyframe) => (
                 <button
                   key={keyframe.id}
@@ -267,8 +283,16 @@ export function KeyframeTimeline({ handle, height = 230, onOpenKeyframe }: { han
  * ====================================================================== */
 
 export function EasingGraph({
-  easing, onChange, size = 230, progress, label = "Easing curve",
-}: { easing: Easing; onChange: (next: Easing) => void; size?: number; progress?: number; label?: string }) {
+  easing, onChange, onCommit, size = 230, progress, label = "Easing curve",
+}: {
+  easing: Easing;
+  onChange: (next: Easing) => void;
+  /** Called once a drag ends or a key moves a handle, so the change becomes one undo step. */
+  onCommit?: () => void;
+  size?: number;
+  progress?: number;
+  label?: string;
+}) {
   const points = easing.points ?? [0.25, 0.1, 0.25, 1];
   const curve = useMemo(() => {
     const parts: string[] = [];
@@ -300,6 +324,7 @@ export function EasingGraph({
         const local = new DOMPoint(point.x, point.y).matrixTransform(matrix.inverse());
         write(index, local.x / size, 1 - local.y / size);
       },
+      end: (moved) => { if (moved) onCommit?.(); },
     });
   };
 
@@ -313,6 +338,7 @@ export function EasingGraph({
     else if (event.key === "ArrowDown") write(index, x, y - step);
     else return;
     event.preventDefault();
+    onCommit?.();
   };
 
   const editable = easing.kind === "bezier";
@@ -369,6 +395,48 @@ export function EasingGraph({
 }
 
 /* ====================================================================== *
+ * Easing preview: a ball travelling under the curve against a linear one.
+ * ====================================================================== */
+
+export function EasingPreview({ easing, seconds, fps, autoPlay }: { easing: Easing; seconds: number; fps: number; autoPlay: boolean }) {
+  const [playing, setPlaying] = useState(autoPlay);
+  const [progress, setProgress] = useState(0);
+  const raf = useRef(0);
+  const span = Math.max(0.1, seconds);
+  useEffect(() => {
+    if (!playing) return;
+    const origin = performance.now();
+    let last = -1;
+    const tick = (now: number) => {
+      /* The move, then a short hold at the end, then again. */
+      const elapsed = ((now - origin) / 1000) % (span + 0.4);
+      const frame = Math.floor(elapsed * fps);
+      if (frame !== last) { last = frame; setProgress(Math.min(1, elapsed / span)); }
+      raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf.current);
+  }, [playing, span, fps]);
+  const eased = easeAt(easing, progress);
+  const lane = (value: number, tone: string, label: string) => (
+    <div className="mo-ease-lane" aria-hidden="true">
+      <span className="vx-mini mo-ease-label">{label}</span>
+      <span className="mo-ease-ball" style={{ insetInlineStart: `calc(${clamp(value, -0.2, 1.2) * 100}% - 7px)`, background: tone }} />
+    </div>
+  );
+  return (
+    <div className="mo-ease" data-testid="easing-preview">
+      {lane(eased, "var(--aqua-400)", "eased")}
+      {lane(progress, "var(--paper-300)", "linear")}
+      <div className="ds-row ds-gap-2" style={{ alignItems: "center" }}>
+        <Button size="sm" variant="ghost" aria-pressed={playing} onClick={() => setPlaying((value) => !value)}>{playing ? "Pause the preview" : "Play the preview"}</Button>
+        <span className="vx-mini ds-num">{span.toFixed(2)}s · value {eased.toFixed(2)} at {(progress * 100).toFixed(0)}% of the time</span>
+      </div>
+    </div>
+  );
+}
+
+/* ====================================================================== *
  * Playback at the real frame rate.
  * ====================================================================== */
 
@@ -419,7 +487,7 @@ export function useMotionPlayback(doc: MotionDoc | null): { fps: number } {
   return { fps: ui.playing ? measured : 0 };
 }
 
-export function TransportRow({ doc, fps }: { doc: MotionDoc; fps: number }) {
+export function TransportRow({ doc, fps, handle }: { doc: MotionDoc; fps: number; handle?: DocHandle<MotionDoc> }) {
   const ui = useStore(motionUi);
   return (
     <div className="ds-row ds-gap-2 ds-wrap" style={{ alignItems: "center" }}>
@@ -437,6 +505,19 @@ export function TransportRow({ doc, fps }: { doc: MotionDoc; fps: number }) {
       </button>
       <button type="button" className="ds-btn" data-variant="ghost" data-size="sm" aria-label="Forward one frame" onClick={() => setMotionTime(ui.time + 1 / doc.fps, doc.fps)}>|▶</button>
       <button type="button" className="ds-btn" data-variant="ghost" data-size="sm" aria-label="Go to the end" onClick={() => setMotionTime(doc.duration, doc.fps)}>⏭</button>
+      {handle && (
+        <button
+          type="button"
+          className="ds-btn"
+          data-variant={doc.loop ? "primary" : "ghost"}
+          data-size="sm"
+          aria-pressed={doc.loop}
+          title="Loop playback, and loop in the exported CSS, SVG and GIF"
+          onClick={() => handle.edit((current) => ({ ...current, loop: !current.loop }), doc.loop ? "Stop looping" : "Loop the composition")}
+        >
+          Loop
+        </button>
+      )}
       <Pill tone="info"><span className="ds-num">{ui.time.toFixed(2)}s</span></Pill>
       <Pill><span className="ds-num">frame {Math.round(ui.time * doc.fps)} / {Math.round(doc.duration * doc.fps)}</span></Pill>
       {ui.playing && fps > 0 && <Pill tone={fps >= doc.fps - 4 ? "success" : "warning"}><span className="ds-num">{fps} fps measured</span></Pill>}

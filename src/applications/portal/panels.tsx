@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import {
   BarChart, Button, Card, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row,
-  Segmented, Select, Stack, Stat, StatRow, TextArea,
+  Select, Stack, Stat, StatRow, TextArea,
 } from "@/design-system";
 import { FileText, LifeBuoy, MessageSquare, ShieldCheck, Users } from "lucide-react";
 import type { ScreenContext } from "@/platform/registry";
@@ -15,6 +15,7 @@ import {
   bodyOf, expiryState, GATE_LABELS, MODULE_LABELS, portalDocuments, portalForRole,
   listedPortals, portalMessages, portalUsers, portalVisibleInvoices, resolvePortal, sharedRecords, sharedWithPortal, statusTone, usePortalData, type PortalBody,
 } from "./data";
+import { BrandEditor, BrandMark, brandOf, ExposureEditor, NavigationEditor, RequestTypesEditor, RolePreview, RolesEditor, SharingStateCard } from "./configure";
 
 /* ====================================================================== *
  * PORTAL panels — branded external spaces. A portal grants nothing by
@@ -121,39 +122,18 @@ export function PortalDirectory({ context, audience }: { context: ScreenContext;
 /* ---------------------------- PORTAL-002 ---------------------------- */
 
 export function PortalBuilder({ context, lens }: { context: ScreenContext; lens: string }) {
-  const data = usePortalData();
-  const { role, org } = useWorkspace();
+  const { role } = useWorkspace();
   const { portal } = usePortal(context);
-  const [device, setDevice] = useState<"phone" | "desktop">("desktop");
   if (role === "client") return <ClientOnlyNotice context={context} />;
   if (!portal) return <Empty title="No portal" />;
   const body = bodyOf<PortalBody>(portal, {});
   const pages = body.pages ?? [];
-  const shared = sharedRecords(portal, data);
 
   if (lens === "Design") {
     return (
-      <Grid>
-        <Card span={6} eyebrow="BRAND" prov="human" title="Brand" subtitle="What the client sees at the top of every page">
-          <Stack gap={3}>
-            <Row gap={3}>
-              <span className="t4-portal-mark" style={{ background: String(portal.fields.accent ?? "var(--accent)") }}>{portal.title.slice(0, 2).toUpperCase()}</span>
-              <div>
-                <strong>{portal.title}</strong>
-                <p className="ds-subtle">{String(portal.fields.customDomain) || `${org.slug}.example/portal`}</p>
-              </div>
-            </Row>
-            <Properties rows={[
-              { label: "Accent", value: <span className="ds-num">{String(portal.fields.accent ?? "")}</span> },
-              { label: "Custom domain", value: String(portal.fields.customDomain) || "None" },
-              { label: "Domain verified", value: portal.fields.domainVerified === true ? <Pill tone="success">Verified</Pill> : <Pill tone="warning">Not verified</Pill> },
-              { label: "Terms version", value: <span className="ds-num">{String(portal.fields.termsVersion ?? "—")}</span> },
-            ]} />
-            <Notice tone="warning" title="A custom domain needs DNS and a certificate">
-              Neither can be arranged from a browser. The domain is recorded so it is ready, and the portal is reached through the workspace until it is set up.
-            </Notice>
-          </Stack>
-        </Card>
+      <Stack gap={4}>
+        <BrandEditor context={context} portal={portal} />
+        <Grid>
         <Card span={6} eyebrow="ACCESSIBILITY" prov="human" title="What the layout commits to">
           <Properties rows={[
             { label: "Navigation", value: "Real links, reachable in order by keyboard" },
@@ -162,7 +142,11 @@ export function PortalBuilder({ context, lens }: { context: ScreenContext; lens:
             { label: "Labels", value: "Every control has a visible label" },
           ]} />
         </Card>
-      </Grid>
+        <Card span={6} eyebrow="CUSTOM DOMAIN" prov="human" title="A custom domain needs DNS and a certificate">
+          <p className="ds-subtle">Neither can be arranged from a browser. The domain is recorded so it is ready, and the portal is reached through the workspace until it is set up.</p>
+        </Card>
+        </Grid>
+      </Stack>
     );
   }
 
@@ -172,14 +156,8 @@ export function PortalBuilder({ context, lens }: { context: ScreenContext; lens:
         <Notice tone="success" title="A portal starts with nothing shared">
           Records appear only when their id is added to this portal. There is no rule that shares a whole collection, so a new portal cannot inherit another client's records.
         </Notice>
-        <DataGrid rows={shared} rowId={(row) => row.record.id} label="Shared records" filterable={false}
-          columns={[
-            { key: "collection", header: "Kind", primary: true, cell: (row) => <Pill>{row.collection}</Pill> },
-            { key: "title", header: "Record", cell: (row) => row.record.title },
-            { key: "status", header: "State", cell: (row) => <Pill tone={statusTone(row.record.status)}>{row.record.status.replace("_", " ")}</Pill> },
-            { key: "value", header: "Value", align: "end", cell: (row) => (row.record.amountMinor === undefined ? <span className="ds-subtle">—</span> : <span className="ds-num">{context.money(row.record.amountMinor)}</span>) },
-          ]}
-          empty={<Empty title="Nothing is shared yet" >Grant a record from the module picker. Until then the portal shows its pages with no data.</Empty>} />
+        <ExposureEditor context={context} portal={portal} />
+        <RequestTypesEditor context={context} portal={portal} />
         <Card eyebrow="IDENTIFIERS" prov="human" title="What the client never sees">
           <Notice tone="info">
             A portal page refers to a shared record by its title and its own reference, never by the internal record id. Nothing in the portal exposes an id that could be changed to reach another client's record.
@@ -190,7 +168,6 @@ export function PortalBuilder({ context, lens }: { context: ScreenContext; lens:
   }
 
   if (lens === "Access") {
-    const users = body.users ?? [];
     return (
       <Stack gap={4}>
         <DataGrid rows={pages} rowId={(row) => row.id} label="Page access" filterable={false}
@@ -199,34 +176,13 @@ export function PortalBuilder({ context, lens }: { context: ScreenContext; lens:
             { key: "modules", header: "Modules", cell: (row) => row.modules.map((module) => MODULE_LABELS[module] ?? module).join(", ") },
             { key: "gate", header: "Who can open it", cell: (row) => <Pill tone={row.gate === "any_member" ? "neutral" : "warning"}>{GATE_LABELS[row.gate] ?? row.gate}</Pill> },
           ]} />
-        <Card eyebrow="EXTERNAL USERS" prov="human" title={`${users.length} people can sign in`} subtitle="Each one is scoped to this portal only">
-          <Stack gap={2}>
-            {users.map((user) => (
-              <Row key={user.id} gap={2}>
-                <span className="ds-grow">{user.name}</span>
-                <span className="ds-subtle">{user.email}</span>
-                <Pill tone={user.role === "portal_admin" ? "accent" : "neutral"}>{user.role.replace("_", " ")}</Pill>
-              </Row>
-            ))}
-            {users.length === 0 && <span className="ds-subtle">Nobody has been invited.</span>}
-          </Stack>
-        </Card>
+        <RolesEditor context={context} portal={portal} />
       </Stack>
     );
   }
 
   if (lens === "Preview") {
-    return (
-      <Stack gap={4}>
-        <Row gap={2}>
-          <Segmented label="Preview width" value={device} onChange={setDevice} options={[{ value: "phone", label: "390" }, { value: "desktop", label: "Full" }]} />
-          <span className="ds-subtle">This is what a signed-in client sees. Nothing internal is rendered.</span>
-        </Row>
-        <div style={{ maxWidth: device === "phone" ? 390 : undefined, marginInline: device === "phone" ? "auto" : undefined }}>
-          <PortalShell portal={portal} active="Overview" />
-        </div>
-      </Stack>
-    );
+    return <RolePreview key={portal.id} portal={portal} />;
   }
 
   return (
@@ -240,6 +196,10 @@ export function PortalBuilder({ context, lens }: { context: ScreenContext; lens:
           { key: "gate", header: "Gate", cell: (row) => GATE_LABELS[row.gate] ?? row.gate },
         ]}
         empty={<Empty title="No pages" >Add a page from the module picker.</Empty>} />
+      <Grid>
+        <div className="ds-col-7"><NavigationEditor context={context} portal={portal} /></div>
+        <div className="ds-col-5"><SharingStateCard context={context} portal={portal} /></div>
+      </Grid>
       <ProviderBoundary id="site.publish" title="The portal is not hosted" />
     </Stack>
   );
@@ -253,12 +213,13 @@ export function PortalShell({ portal, active, children }: { portal: Rec; active:
   const body = bodyOf<PortalBody>(portal, {});
   const pages = body.pages ?? [];
   const shared = sharedRecords(portal, data);
+  const brand = brandOf(portal);
   return (
     <div className="t4-portal">
       <div className="t4-portal-top">
-        <span className="t4-portal-mark" style={{ background: String(portal.fields.accent ?? "var(--accent)") }}>{portal.title.slice(0, 2).toUpperCase()}</span>
+        <BrandMark portal={portal} />
         <div className="ds-grow">
-          <strong>{portal.title}</strong>
+          <strong>{brand.displayName}</strong>
           <p className="ds-subtle">{org.name} client portal</p>
         </div>
         <Pill tone="warning">Preview</Pill>
@@ -271,7 +232,7 @@ export function PortalShell({ portal, active, children }: { portal: Rec; active:
       <div className="t4-portal-body">
         {children ?? (
           <>
-            <Card eyebrow="WELCOME" prov="human" title={`Hello, ${portal.title}`} subtitle="Everything your project shares with you, in one place.">
+            <Card eyebrow="WELCOME" prov="human" title={`Hello, ${brand.displayName}`} subtitle={brand.welcome || "Everything your project shares with you, in one place."}>
               <Properties rows={[
                 { label: "Records shared with you", value: <span className="ds-num">{String(sharedWithPortal(portal, data).length)}</span> },
                 { label: "Open requests", value: <span className="ds-num">{String(portalMessages(portal, data.messages).filter((message) => message.status === "open").length)}</span> },

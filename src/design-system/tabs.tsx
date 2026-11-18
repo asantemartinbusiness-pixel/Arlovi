@@ -1,5 +1,17 @@
 import { useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 
+/**
+ * Tab ids are often human labels ("For You"). An HTML id may not contain
+ * whitespace, and an IDREF with a space points at two nonexistent ids, so the
+ * DOM ids are derived from a sanitised form of the tab id.
+ */
+function domSafe(id: string): string {
+  return id.replace(/[^A-Za-z0-9_-]+/g, "-");
+}
+export function tabDomId(id: string): string { return `tab-${domSafe(id)}`; }
+export function panelDomId(id: string): string { return `panel-${domSafe(id)}`; }
+
+
 export interface TabItem {
   id: string;
   label: string;
@@ -40,13 +52,13 @@ export function Tabs({
             type="button"
             role="tab"
             data-tab={item.id}
-            id={`tab-${item.id}`}
+            id={tabDomId(item.id)}
             className="ds-tab"
             aria-selected={item.id === value}
             // Only the active panel is mounted by consumers. An aria-controls
             // IDREF on an inactive tab would point to a nonexistent element
             // and fail accessibility validation. Keep the active relationship.
-            aria-controls={item.id === value ? `panel-${item.id}` : undefined}
+            aria-controls={item.id === value ? panelDomId(item.id) : undefined}
             tabIndex={item.id === value ? 0 : -1}
             disabled={item.disabled}
             onClick={() => onChange(item.id)}
@@ -63,7 +75,7 @@ export function Tabs({
 
 export function TabPanel({ id, children, style }: { id: string; children: ReactNode; style?: CSSProperties }) {
   return (
-    <div role="tabpanel" id={`panel-${id}`} aria-labelledby={`tab-${id}`} tabIndex={0} style={{ outline: "none", ...style }}>
+    <div role="tabpanel" id={panelDomId(id)} aria-labelledby={tabDomId(id)} tabIndex={0} style={{ outline: "none", ...style }}>
       {children}
     </div>
   );

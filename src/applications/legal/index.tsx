@@ -12,6 +12,7 @@ import {
   versionsOf,
 } from "./panels";
 import { Redline } from "./redline";
+import { reviewsOf, startRound } from "./register";
 import "./legal.css";
 import { kitOverlays, needsSelection } from "@/applications/hr/opsKit";
 import {
@@ -182,7 +183,7 @@ function ContractUpload({ context, close }: { context: ScreenContext; close: () 
 
 function ReviewerPicker({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useLegalData();
-  const contract = useRecord(context.selectedId) ?? data.contracts.find((row) => row.status === "draft") ?? data.contracts[0];
+  const contract = useRecord(context.params.id ?? context.selectedId) ?? data.contracts.find((row) => row.status === "draft") ?? data.contracts[0];
   if (!contract) return <Empty title="Select a contract" icon={<FileText size={20} />} />;
   return (
     <form
@@ -195,6 +196,7 @@ function ReviewerPicker({ context, close }: { context: ScreenContext; close: () 
         await context.mutate.patch(contract.id, {
           status: "in_review",
           fields: { ...contract.fields, reviewer, reviewRequestedBy: context.actor, reviewRequestedAt: clockIso() },
+          body: { ...(contract.body as object ?? {}), reviews: startRound(reviewsOf(contract), reviewer, context.actor, clockIso(), crypto.randomUUID()) },
         }, { expectRevision: contract.revision, event: `${contract.title} sent for review to ${reviewer} by ${context.actor}` });
         context.toast("Review requested", `${contract.title} is in review with ${reviewer}.`);
         close();

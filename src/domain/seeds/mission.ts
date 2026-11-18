@@ -26,6 +26,7 @@ registerSeed("mission", (ctx) => {
     departmentId?: string;
     planVersion?: number;
     objectiveId?: string;
+    extra?: Record<string, unknown>;
   }) => ctx.rec({
     org: "nl", collection: "missions", n, title, status: input.status, owner: input.owner,
     summary: input.summary, at: at(-6), dueAt: input.dueDays === undefined ? undefined : at(input.dueDays),
@@ -41,7 +42,7 @@ registerSeed("mission", (ctx) => {
       objectiveId: input.objectiveId ?? "",
       executionPaused: false,
     },
-    body: { criteria: input.criteria },
+    body: { criteria: input.criteria, ...(input.extra ?? {}) },
   });
 
   const task = (n: number, title: string, input: {
@@ -114,6 +115,24 @@ registerSeed("mission", (ctx) => {
         { id: "c1", label: "Two suppliers recorded with comparable terms", verified: false },
         { id: "c2", label: "Risk register updated with the result", verified: false },
       ],
+      extra: {
+        brief: {
+          objective: "Qualify one more collar supplier before the winter run, from recorded terms only.",
+          inScope: "Brass collars for the Arc Lamp and the pendant trio. Terms already recorded in this workspace.",
+          outOfScope: "Contacting suppliers or placing orders. Glaze and shade suppliers.",
+          constraints: "No spend beyond the mission ceiling. No supplier is contacted from this workspace.",
+          successMeasure: "Maya Chen can compare two suppliers' recorded terms side by side and records a decision.",
+        },
+        milestones: [
+          { id: "ms-60-1", title: "Current terms understood", dueAt: at(3), taskIds: ["nl-missionTasks-060", "nl-missionTasks-061"] },
+          { id: "ms-60-2", title: "Second supplier on record", dueAt: at(10), taskIds: ["nl-missionTasks-062"] },
+          { id: "ms-60-3", title: "Recommendation approved", dueAt: at(20), taskIds: ["nl-missionTasks-063", "nl-missionTasks-064"] },
+        ],
+        participants: [
+          { id: "pt-60-1", recordId: "nl-members-001", name: "Maya Chen", kind: "human", role: "owner", addedBy: "Maya Chen", addedAt: at(-6) },
+          { id: "pt-60-2", recordId: "nl-members-002", name: "Jonah Adeyemi", kind: "human", role: "reviewer", addedBy: "Maya Chen", addedAt: at(-6) },
+        ],
+      },
     }),
     mission(61, "Shade warranty replies", {
       status: "waiting", owner: "Priya Shah", agentId: "nl-agents-004",

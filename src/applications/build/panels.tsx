@@ -18,6 +18,11 @@ import { NoProject, useAppRecord } from "./builder";
 import { ScreenPreview } from "./preview";
 import { SeedRows } from "./actions";
 import { saveApp, useBuildUi } from "./state";
+import { NO_INTERACTION } from "./binding";
+import type { ScreenComponent } from "./model";
+
+/** Template components start with every record shown and no interaction. */
+const unfiltered = (): Pick<ScreenComponent, "filters" | "sort" | "limit" | "interaction"> => ({ filters: [], sort: null, limit: 0, interaction: NO_INTERACTION });
 
 /* ================================================================ *
  * ARL-BUILD-001 — App Project Library
@@ -139,10 +144,11 @@ const PROJECT_TEMPLATES: { id: string; title: string; summary: string; build: ()
       ],
       screens: [
         { id: "s-board", name: "Quote board", route: "/quotes", components: [
-          { id: "c-stat", kind: "stat", title: "Open quotes", entityId: "e-quote", fieldIds: [], aggregate: "count", text: "", span: 4 },
-          { id: "c-value", kind: "stat", title: "Quoted value", entityId: "e-quote", fieldIds: ["q-amount"], aggregate: "sum", text: "", span: 4 },
-          { id: "c-chart", kind: "chart", title: "By status", entityId: "e-quote", fieldIds: ["q-status"], aggregate: "count", text: "", span: 4 },
-          { id: "c-table", kind: "table", title: "Quotes", entityId: "e-quote", fieldIds: ["q-title", "q-amount", "q-status"], aggregate: "count", text: "", span: 12 },
+          { id: "c-stat", kind: "stat", title: "Open quotes", entityId: "e-quote", fieldIds: [], aggregate: "count", text: "", span: 4, ...unfiltered(),
+            filters: [{ id: "f-open-1", fieldId: "q-status", operator: "not_equals", value: "accepted" }, { id: "f-open-2", fieldId: "q-status", operator: "not_equals", value: "declined" }] },
+          { id: "c-value", kind: "stat", title: "Quoted value", entityId: "e-quote", fieldIds: ["q-amount"], aggregate: "sum", text: "", span: 4 , ...unfiltered() },
+          { id: "c-chart", kind: "chart", title: "By status", entityId: "e-quote", fieldIds: ["q-status"], aggregate: "count", text: "", span: 4 , ...unfiltered() },
+          { id: "c-table", kind: "table", title: "Quotes", entityId: "e-quote", fieldIds: ["q-title", "q-amount", "q-status"], aggregate: "count", text: "", span: 12 , ...unfiltered() },
         ] },
       ],
       automations: [],
@@ -171,9 +177,9 @@ const PROJECT_TEMPLATES: { id: string; title: string; summary: string; build: ()
       ],
       screens: [
         { id: "s-queue", name: "Queue", route: "/queue", components: [
-          { id: "c-open", kind: "stat", title: "Tickets", entityId: "e-ticket", fieldIds: [], aggregate: "count", text: "", span: 4 },
-          { id: "c-by", kind: "chart", title: "By state", entityId: "e-ticket", fieldIds: ["t-status"], aggregate: "count", text: "", span: 8 },
-          { id: "c-list", kind: "table", title: "All tickets", entityId: "e-ticket", fieldIds: ["t-title", "t-status", "t-owner"], aggregate: "count", text: "", span: 12 },
+          { id: "c-open", kind: "stat", title: "Tickets", entityId: "e-ticket", fieldIds: [], aggregate: "count", text: "", span: 4 , ...unfiltered() },
+          { id: "c-by", kind: "chart", title: "By state", entityId: "e-ticket", fieldIds: ["t-status"], aggregate: "count", text: "", span: 8 , ...unfiltered() },
+          { id: "c-list", kind: "table", title: "All tickets", entityId: "e-ticket", fieldIds: ["t-title", "t-status", "t-owner"], aggregate: "count", text: "", span: 12, ...unfiltered(), sort: { fieldId: "t-status", direction: "asc" } },
         ] },
       ],
       automations: [],

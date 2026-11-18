@@ -10,6 +10,7 @@ import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import { freshness, wallMs } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
+import { ReportLibrary } from "./reports";
 import {
   DIMENSIONS, dimensionById, measureById, runQuery, type QueryFilter,
 } from "./metrics";
@@ -171,6 +172,7 @@ export function DashboardDirectory({ context, tab }: { context: ScreenContext; t
   }
 
   return (
+    <Stack gap={5}>
     <Grid>
       {filtered.map((row) => {
         const sensitive = row.record.fields.sensitive === true;
@@ -202,8 +204,11 @@ export function DashboardDirectory({ context, tab }: { context: ScreenContext; t
               ]} />
               <Row gap={2} wrap>
                 <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/analytics/dashboards/${row.record.id}`)}>Open</Button>
+                {/* Selecting a dashboard enables the page actions (Open, Share, Pin, Archive). */}
+                <Button size="sm" variant={context.selectedId === row.record.id ? "primary" : "secondary"} aria-pressed={context.selectedId === row.record.id} onClick={() => context.select(context.selectedId === row.record.id ? undefined : row.record.id)}>{context.selectedId === row.record.id ? "Selected" : "Select"}</Button>
                 <Button size="sm" variant="ghost" icon={<Pin size={14} />} onClick={async () => {
-                  await context.mutate.patch(row.record.id, { fields: { ...row.record.fields, pinned: row.record.fields.pinned !== true } }, { event: row.record.fields.pinned === true ? "Dashboard unpinned" : "Dashboard pinned" });
+                  const saved = await context.mutate.patch(row.record.id, { fields: { ...row.record.fields, pinned: row.record.fields.pinned !== true } }, { event: row.record.fields.pinned === true ? "Dashboard unpinned" : "Dashboard pinned" });
+                  if (!saved) return;
                   context.toast(row.record.fields.pinned === true ? "Unpinned" : "Pinned", `${row.record.title} was updated on the record.`);
                 }}>{row.record.fields.pinned === true ? "Unpin" : "Pin"}</Button>
                 <Button size="sm" variant="ghost" icon={<Share2 size={14} />} onClick={() => { context.select(row.record.id); context.openOverlay("sharing"); }}>Share</Button>
@@ -213,6 +218,8 @@ export function DashboardDirectory({ context, tab }: { context: ScreenContext; t
         );
       })}
     </Grid>
+    {tab === "All" && <ReportLibrary context={context} />}
+    </Stack>
   );
 }
 

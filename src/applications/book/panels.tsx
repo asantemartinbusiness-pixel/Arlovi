@@ -1,3 +1,4 @@
+import { resourceCapacity } from "./availability";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -59,7 +60,8 @@ export function BookingsOverview({ context, lens }: { context: ScreenContext; le
         <Grid>
           {bookable.map((resource) => {
             const window = workingHours(resource);
-            const capacity = (window.endHour - window.startHour) * 60 * window.days.length;
+            // Seat-minutes: a resource that holds several at once has that much more capacity.
+            const capacity = (window.endHour - window.startHour) * 60 * window.days.length * resourceCapacity(resource);
             const booked = bookedMinutes(data.bookings, resource.id, week.start, week.end);
             return (
               <Card key={resource.id} span={4} eyebrow={String(resource.fields.kind ?? "resource").toUpperCase()} prov="human" title={resource.title} subtitle={String(resource.fields.workingHours ?? "")}
@@ -298,8 +300,8 @@ export function BookingCalendar({ context, lens }: { context: ScreenContext; len
           onCreate={(_columnId, startAt) => context.openOverlay("Booking form", { resourceId: active.id, startAt })}
         />
       )}
-      <Notice tone="info" title="Two people cannot take the same slot">
-        Every move and every new booking is checked against the existing bookings for that resource, and for any resource linked to it, before it is written. A clash is refused with the booking that already holds the slot.
+      <Notice tone="info" title="No resource is booked past its capacity">
+        Every move and every new booking is checked against the existing bookings for that resource, and for any resource linked to it, before it is written. A single-seat resource takes one booking at a time; a multi-seat resource such as the showroom floor takes bookings side by side until its seats are full. A clash is refused with the booking that already holds the slot.
       </Notice>
     </Stack>
   );
@@ -570,6 +572,7 @@ export function StaffAndResources({ context, lens }: { context: ScreenContext; l
             { key: "title", header: "Resource", primary: true, cell: (row) => row.title },
             { key: "kind", header: "Kind", cell: (row) => <Pill>{String(row.fields.kind ?? "")}</Pill> },
             { key: "hours", header: "Working hours", cell: (row) => <span className="ds-num">{String(row.fields.workingHours ?? "Not recorded")}</span> },
+            { key: "capacity", header: "Holds at once", align: "end", cell: (row) => <span className="ds-num">{resourceCapacity(row)}</span>, sortValue: (row) => resourceCapacity(row) },
             { key: "tz", header: "Time zone", cell: (row) => String(row.fields.timezone ?? org.timezone) },
             { key: "blackouts", header: "Blackouts", align: "end", cell: (row) => {
               const list = bodyOf<import("./data").ResourceBody>(row, {}).blackouts ?? [];
@@ -591,7 +594,8 @@ export function StaffAndResources({ context, lens }: { context: ScreenContext; l
     <Grid>
       {rows.map((resource) => {
         const window = workingHours(resource);
-        const capacity = (window.endHour - window.startHour) * 60 * window.days.length;
+        // Seat-minutes: a resource that holds several at once has that much more capacity.
+        const capacity = (window.endHour - window.startHour) * 60 * window.days.length * resourceCapacity(resource);
         const booked = bookedMinutes(data.bookings, resource.id, week.start, week.end);
         const blackouts = bodyOf<import("./data").ResourceBody>(resource, {}).blackouts ?? [];
         return (
@@ -605,6 +609,7 @@ export function StaffAndResources({ context, lens }: { context: ScreenContext; l
             <Stack gap={3}>
               <Properties rows={[
                 { label: "Hours", value: <span className="ds-num">{String(resource.fields.workingHours ?? "Not recorded")}</span> },
+                { label: "Holds at once", value: <span className="ds-num">{resourceCapacity(resource)}</span> },
                 { label: "Booked this week", value: <span className="ds-num">{Math.round(booked / 60)}h of {Math.round(capacity / 60)}h</span> },
                 { label: "Blackouts", value: blackouts.length ? `${blackouts.length} (${blackouts[0].reason})` : "None" },
               ]} />
@@ -989,7 +994,7 @@ function BookingReportsBody({ context, lens }: { context: ScreenContext; lens: s
           { key: "booked", header: "Booked", align: "end", cell: (row) => <span className="ds-num">{Math.round(bookedMinutes(bookings, row.id, week.start, week.end) / 60)}h</span> },
           { key: "util", header: "Utilisation", cell: (row) => {
             const window = workingHours(row);
-            const capacity = (window.endHour - window.startHour) * 60 * window.days.length;
+            const capacity = (window.endHour - window.startHour) * 60 * window.days.length * resourceCapacity(row);
             const booked = bookedMinutes(bookings, row.id, week.start, week.end);
             return <Meter value={booked} max={capacity || 1} label={`${row.title} utilisation`} tone={booked / capacity > 0.8 ? "warning" : undefined} />;
           } },

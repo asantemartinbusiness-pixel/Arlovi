@@ -7,6 +7,7 @@ import {
   type PhotoLayer, type RasterDoc,
 } from "./raster";
 import { bumpPixels, photoUi } from "./model";
+import { drawMaskAligned, frameOf } from "./maskSpace";
 
 /* ====================================================================== *
  * The raster canvas. Layer images are decoded once and kept in a map; the
@@ -206,7 +207,9 @@ export function PhotoCanvas({ handle, bank, paintTarget = "layer", showSelection
     if (existing) {
       try {
         const image = await loadImage(existing);
-        ctx.drawImage(image, 0, 0, width, height);
+        /* A mask is painted where it shows now, after following the layer. */
+        if (paintTarget === "mask") drawMaskAligned(ctx, image, layer, { width, height });
+        else ctx.drawImage(image, 0, 0, width, height);
       } catch { /* start from an empty canvas */ }
     } else if (paintTarget === "mask") {
       ctx.fillStyle = "#ffffff";
@@ -255,7 +258,7 @@ export function PhotoCanvas({ handle, bank, paintTarget = "layer", showSelection
           ...current,
           layers: current.layers.map((item) => (item.id === live.layerId
             ? (paintTarget === "mask"
-              ? { ...item, mask: data, maskEnabled: true }
+              ? { ...item, mask: data, maskEnabled: true, maskFrame: frameOf(item) }
               : { ...item, src: data, naturalWidth: width, naturalHeight: height, w: item.w || width, h: item.h || height })
             : item)),
         }), paintTarget === "mask" ? "Paint on the mask" : cloning ? "Clone stamp" : photoUi.get().brush.mode === "erase" ? "Erase" : "Brush stroke");
@@ -409,7 +412,7 @@ export function PhotoCanvas({ handle, bank, paintTarget = "layer", showSelection
     if (event.key === "0") { event.preventDefault(); return photoUi.set((c) => ({ ...c, zoom: 1, pan: { x: 0, y: 0 } })); }
   };
 
-  if (!doc) return <div className="ds-empty" style={{ height: "100%" }}><p>Opening the image…</p></div>;
+  if (!doc) return <div className="ds-empty" style={{ position: "absolute", inset: 0 }}><p>Opening the image…</p></div>;
 
   const activeLayer = doc.layers.find((item) => item.id === doc.activeLayerId);
   const cursor = ui.tool === "hand" ? "grab" : ui.tool === "eyedropper" ? "crosshair" : ui.tool === "move" ? "move" : "crosshair";

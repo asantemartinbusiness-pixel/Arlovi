@@ -111,3 +111,13 @@
 .connect-receipts-head h2{font:500 var(--text-xl) var(--font-display);line-height:1.25;letter-spacing:-.025em}
 .connect-receipts-head p{margin-top:var(--space-2);font-size:var(--text-sm);line-height:1.5;color:var(--fg-muted)}
 @media(max-width:640px){.connect-receipts-head{flex-direction:column}}
+
+/* Connection states and data mapping */
+.connect-state-legend{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--space-2)}
+.connect-state-legend li{display:grid;grid-template-columns:150px minmax(0,1fr);gap:var(--space-3);align-items:center;padding:var(--space-2);border-radius:var(--radius-md);font-size:var(--text-sm);color:var(--fg-muted)}
+.connect-state-legend li[aria-current="true"]{background:var(--bg-surface);color:var(--fg-default);outline:1px solid var(--border-default)}
+.connect-mapping-table select{min-width:150px}
+.connect-issues{margin:4px 0 0;padding-inline-start:18px}
+@media(max-width:560px){.connect-state-legend li{grid-template-columns:minmax(0,1fr)}}
+.connect-mapping-table tbody th{text-transform:none;letter-spacing:normal;font-weight:500}
+.connect-state-legend li>:first-child{justify-self:start}

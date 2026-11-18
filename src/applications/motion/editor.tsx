@@ -1,19 +1,22 @@
 import { useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { ArrowDown, ArrowUp, Circle, Diamond, Eye, EyeOff, Lock, Square, Trash2, Type, Unlock } from "lucide-react";
+import { ArrowDown, ArrowUp, Circle, Copy, Diamond, Eye, EyeOff, Film, ImageDown, Keyboard, Lock, Square, Trash2, Type, Unlock } from "lucide-react";
 import {
-  Button, Notice, Pill, Row, Select, Stack, TextInput, Tool, Toolbar, ToolbarSeparator,
+  Button, Notice, Pill, Row, Select, Stack, TextInput, Tool, Toolbar,
 } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import {
-  ColorBox, EditorFrame, NumberBox, PanelGroup, RecoveryNotice, SaveState, ShortcutTable, useStore, type DocHandle,
+  ColorBox, EditorFrame, NumberBox, PanelGroup, RecoveryNotice, SaveState, ShortcutTable, downloadBlob, slug, useStore, type DocHandle,
 } from "@/applications/visual/kit";
 import { clamp, uid } from "@/applications/visual/geometry";
 import {
-  EASING_PRESETS, MOTION_PRESETS, applyPreset, editProperty, propertyDefault, removeKeyframe, sampleLayer, sampleTrack,
-  setEasing, setKeyframe, type AnimatableProperty, type Easing, type Keyframe, type MotionDoc, type MotionLayer,
+  EASING_PRESETS, MOTION_PRESETS, applyPreset, duplicateLayer, editProperty, moveKeyframe, neighbourKeyframes, propertyDefault,
+  removeKeyframe, sampleLayer, sampleTrack, setEasing, setKeyframe, setKeyframeValue,
+  type AnimatableProperty, type Easing, type Keyframe, type MotionDoc, type MotionLayer,
 } from "./anim";
 import { motionUi, setMotionTime } from "./model";
-import { EasingGraph, KeyframeTimeline, Stage, TransportRow } from "./parts";
+import { EasingGraph, EasingPreview, KeyframeTimeline, Stage, TransportRow } from "./parts";
+import { makeCanvas, recorderSupport, renderFrame } from "./render";
+import { renderProgress, runRender } from "./export";
 import { MissingComposition, SHORTCUTS, useAssetLookup, useMotionDoc, usePrefersReducedMotion, useSession, FormField } from "./shared";
 
 /* ====================================================================== *
@@ -79,7 +82,28 @@ export function editorKeys(event: ReactKeyboardEvent, handle: DocHandle<MotionDo
   if (event.key.toLowerCase() === "k" && !mod) { event.preventDefault(); const blocked = setKeyframeHere(handle); if (blocked) context.toast("No keyframe set", blocked, "blocked"); return; }
   if (event.key === "Home") { event.preventDefault(); setMotionTime(0, doc.fps); return; }
   if (event.key === "End") { event.preventDefault(); setMotionTime(doc.duration, doc.fps); return; }
-  if (event.key === "," || event.key === ".") { event.preventDefault(); setMotionTime(ui.time + (event.key === "," ? -1 : 1) / doc.fps, doc.fps); }
+  if (event.key === "," || event.key === ".") { event.preventDefault(); setMotionTime(ui.time + (event.key === "," ? -1 : 1) / doc.fps, doc.fps); return; }
+  if ((event.key === "Delete" || event.key === "Backspace") && !mod) {
+    const picked = selectedKeyframe(doc);
+    if (!picked) return;
+    event.preventDefault();
+    if (picked.layer.locked) { context.toast("Keyframe kept", `${picked.layer.name} is locked.`, "blocked"); return; }
+    handle.edit((current) => removeKeyframe(current, picked.layer.id, picked.property, picked.keyframe.id), "Delete the keyframe");
+    motionUi.set((current) => ({ ...current, selectedKeyframeId: undefined }));
+  }
+}
+
+/** Write the frame at the playhead as a PNG at the composition's full size, in this browser. */
+async function exportFramePng(doc: MotionDoc, time: number, title: string, context: ScreenContext): Promise<void> {
+  const canvas = makeCanvas(doc.width, doc.height);
+  renderFrame(canvas, doc, time);
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) { context.toast("No PNG written", "This browser produced no image data for the frame.", "failed"); return; }
+  const frame = Math.round(time * doc.fps);
+  const name = `${slug(title)}-frame-${String(frame).padStart(4, "0")}.png`;
+  downloadBlob(name, blob);
+  if (context.params.id) await context.mutate.log(`Exported frame ${frame} as ${name} (${blob.size} bytes)`, { entityId: context.params.id, type: "export" });
+  context.toast("PNG written", `${name}: frame ${frame} at ${doc.width} × ${doc.height}, ${(blob.size / 1024).toFixed(0)} kB, drawn by this browser.`);
 }
 
 export function EditorScreen({ context, actions }: { context: ScreenContext; actions: ActionDef[] }) {
@@ -88,6 +112,8 @@ export function EditorScreen({ context, actions }: { context: ScreenContext; act
   const osReduced = usePrefersReducedMotion();
   const [showFull, setShowFull] = useState(false);
   const assets = useAssetLookup();
+  const recording = useStore(renderProgress);
+  const webm = useMemo(() => recorderSupport(), []);
   if (!record) return <div className="pg-body"><MissingComposition context={context} /></div>;
   const tab = context.tab || "Animate";
   const layer = selectedLayer(doc);
@@ -152,22 +178,34 @@ export function EditorScreen({ context, actions }: { context: ScreenContext; act
       subtitle={<Row gap={2} wrap><SaveState handle={handle} />{doc && <span><span className="ds-num">{doc.duration}s</span> · <span className="ds-num">{doc.width}×{doc.height}</span> · <span className="ds-num">{doc.fps}</span> fps</span>}{ui.animate && <Pill tone="danger" dot>Animate mode: edits write keyframes</Pill>}</Row>}
       backTo={{ label: "Motion", to: `/o/${context.org.slug}/motion/projects` }}
       tools={
-        <>
+        <div className="mo-tools">
           <Toolbar label="Add a layer">
             <Tool label="Add a rectangle" icon={<Square size={15} />} onClick={() => addLayer(handle, "rect")} />
             <Tool label="Add an ellipse" icon={<Circle size={15} />} onClick={() => addLayer(handle, "ellipse")} />
             <Tool label="Add text" icon={<Type size={15} />} onClick={() => addLayer(handle, "text")} />
           </Toolbar>
-          <ToolbarSeparator />
           <Toolbar label="View">
             <Button size="sm" variant={ui.onion ? "primary" : "ghost"} aria-pressed={ui.onion} onClick={() => motionUi.set((c) => ({ ...c, onion: !c.onion }))}>Onion skin</Button>
             <Button size="sm" variant="ghost" aria-label="Zoom the timeline out" onClick={() => motionUi.set((c) => ({ ...c, zoom: clamp(c.zoom / 1.5, 0.5, 6) }))}>−</Button>
             <span className="ds-num vx-mini">{Math.round(ui.zoom * 100)}%</span>
             <Button size="sm" variant="ghost" aria-label="Zoom the timeline in" onClick={() => motionUi.set((c) => ({ ...c, zoom: clamp(c.zoom * 1.5, 0.5, 6) }))}>+</Button>
           </Toolbar>
-          <ToolbarSeparator />
-          <Button size="sm" variant="ghost" onClick={() => context.openOverlay("keyboard")}>Keyboard</Button>
-        </>
+          <Toolbar label="Output">
+            <Tool label="Save the frame at the playhead as PNG" icon={<ImageDown size={15} />} disabled={!doc} onClick={() => { if (doc) void exportFramePng(doc, ui.time, record.title, context); }}>PNG</Tool>
+            <Tool
+              label={webm.webm ? "Record the composition as WebM in this browser (real time)" : `WebM is not available: ${webm.reason}`}
+              icon={<Film size={15} />}
+              disabled={!doc || !webm.webm || recording.frames > 0}
+              onClick={() => { if (doc) void runRender(context, { format: "webm", width: Math.min(doc.width, 1280), fps: doc.fps, loop: doc.loop, reduced: false }); }}
+            >
+              WebM
+            </Tool>
+            {recording.frames > 0 && <Pill tone="info"><span className="ds-num">recording {recording.frame}/{recording.frames}</span></Pill>}
+          </Toolbar>
+          <Toolbar label="Help">
+            <Tool label="Keyboard shortcuts" icon={<Keyboard size={15} />} onClick={() => context.openOverlay("keyboard")} />
+          </Toolbar>
+        </div>
       }
       left={doc ? <LayerList handle={handle} doc={doc} missingIds={missingIds} context={context} /> : null}
       leftLabel="Vector layers"
@@ -219,7 +257,7 @@ export function EditorScreen({ context, actions }: { context: ScreenContext; act
           )}
         </div>
         <div className="mo-transport">
-          {doc && <TransportRow doc={doc} fps={playback.fps} />}
+          {doc && <TransportRow doc={doc} fps={playback.fps} handle={handle} />}
           {reducedPreview && <div className="vx-mini" role="status">Showing the reduced-motion alternative: {doc?.reducedMotion.strategy === "none" ? "none is declared, so the full motion plays" : doc?.reducedMotion.strategy}.</div>}
         </div>
         {tab !== "Preview" && (
@@ -285,6 +323,11 @@ function LayerList({ handle, doc, missingIds, context }: { handle: DocHandle<Mot
       {selected && (
         <Row gap={1} wrap>
           <Button size="sm" variant="secondary" onClick={() => context.openOverlay("layer inspector")}>Layer inspector</Button>
+          <Button size="sm" variant="ghost" icon={<Copy size={14} />} onClick={() => {
+            const id = uid("lay");
+            handle.edit((current) => duplicateLayer(current, selected.id, id), `Duplicate ${selected.name}`);
+            motionUi.set((current) => ({ ...current, selectedLayerId: id, selectedKeyframeId: undefined }));
+          }}>Duplicate</Button>
           <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} disabled={doc.layers.length <= 1} onClick={() => {
             handle.edit((current) => ({ ...current, layers: current.layers.filter((layer) => layer.id !== selected.id), triggers: current.triggers.filter((trigger) => trigger.layerId !== selected.id) }), `Delete ${selected.name}`);
             motionUi.set((current) => ({ ...current, selectedLayerId: undefined, selectedKeyframeId: undefined }));
@@ -341,6 +384,10 @@ function PropertyRow({ handle, doc, layer, property }: { handle: DocHandle<Motio
   );
 }
 
+function usesReducedMotion(): boolean {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 function AnimatePanel({ handle, doc, context }: { handle: DocHandle<MotionDoc>; doc: MotionDoc; context: ScreenContext }) {
   useStore(motionUi);
   const layer = selectedLayer(doc);
@@ -357,6 +404,54 @@ function AnimatePanel({ handle, doc, context }: { handle: DocHandle<MotionDoc>; 
         {picked ? (
           <Stack gap={2}>
             <span className="vx-mini">{picked.layer.name} · {PROPERTY_LABEL[picked.property]} · <span className="ds-num">{picked.keyframe.t.toFixed(2)}s</span> → {picked.next ? <span className="ds-num">{picked.next.t.toFixed(2)}s</span> : "end"}</span>
+            <div className="vx-fieldrow">
+              <NumberBox
+                label="Time"
+                suffix="s"
+                step={1 / doc.fps}
+                min={0}
+                max={doc.duration}
+                value={Math.round(picked.keyframe.t * 1000) / 1000}
+                disabled={picked.layer.locked}
+                onChange={(next) => handle.edit((current) => moveKeyframe(current, picked.layer.id, picked.property, picked.keyframe.id, next), "Move the keyframe")}
+              />
+              {picked.property === "colour"
+                ? <ColorBox label="Value" value={String(picked.keyframe.value)} onChange={(next) => handle.edit((current) => setKeyframeValue(current, picked.layer.id, picked.property, picked.keyframe.id, next), "Change the keyframe value")} />
+                : (
+                  <NumberBox
+                    label="Value"
+                    step={picked.property === "opacity" || picked.property === "scale" ? 0.05 : 1}
+                    value={Number(picked.keyframe.value)}
+                    disabled={picked.layer.locked}
+                    onChange={(next) => handle.edit((current) => setKeyframeValue(current, picked.layer.id, picked.property, picked.keyframe.id, next), "Change the keyframe value")}
+                  />
+                )}
+            </div>
+            <Row gap={1} wrap>
+              {(() => {
+                const around = neighbourKeyframes(picked.layer, picked.property, picked.keyframe.id);
+                const go = (keyframe?: Keyframe) => keyframe && motionUi.set((current) => ({ ...current, selectedKeyframeId: keyframe.id, time: keyframe.t }));
+                return (
+                  <>
+                    <Button size="sm" variant="ghost" disabled={!around.previous} onClick={() => go(around.previous)}>← Previous</Button>
+                    <Button size="sm" variant="ghost" disabled={!around.next} onClick={() => go(around.next)}>Next →</Button>
+                  </>
+                );
+              })()}
+              <Button size="sm" variant="ghost" onClick={() => setMotionTime(picked.keyframe.t, doc.fps)}>Go to it</Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<Trash2 size={14} />}
+                disabled={picked.layer.locked}
+                onClick={() => {
+                  handle.edit((current) => removeKeyframe(current, picked.layer.id, picked.property, picked.keyframe.id), "Delete the keyframe");
+                  motionUi.set((current) => ({ ...current, selectedKeyframeId: undefined }));
+                }}
+              >
+                Delete keyframe
+              </Button>
+            </Row>
             <FormField label="Easing out of this keyframe">
               <Select
                 value={EASING_PRESETS.find((preset) => JSON.stringify(preset.easing) === JSON.stringify(picked.keyframe.easing))?.id ?? "custom"}
@@ -370,9 +465,11 @@ function AnimatePanel({ handle, doc, context }: { handle: DocHandle<MotionDoc>; 
               </Select>
             </FormField>
             {picked.keyframe.easing.kind === "bezier"
-              ? <EasingGraph easing={picked.keyframe.easing} size={200} label="Easing of the selected keyframe" onChange={(next) => handle.live((current) => setEasing(current, picked.layer.id, picked.property, picked.keyframe.id, next))} />
+              ? <EasingGraph easing={picked.keyframe.easing} size={200} label="Easing of the selected keyframe" onChange={(next) => handle.live((current) => setEasing(current, picked.layer.id, picked.property, picked.keyframe.id, next))} onCommit={handle.beginGesture} />
               : <p className="vx-mini">A {picked.keyframe.easing.kind} easing has no handles. Choose a bezier preset to drag the curve.</p>}
-            {picked.keyframe.easing.kind === "bezier" && <Button size="sm" variant="ghost" onClick={() => handle.beginGesture()}>Mark the curve change as one undo step</Button>}
+            {picked.next
+              ? <EasingPreview easing={picked.keyframe.easing} seconds={picked.next.t - picked.keyframe.t} fps={doc.fps} autoPlay={!usesReducedMotion()} />
+              : <p className="vx-mini">This is the last keyframe of the property, so nothing eases out of it.</p>}
           </Stack>
         ) : <p className="vx-mini">Select a keyframe on the timeline (click, or Tab to it) to edit its easing here.</p>}
       </PanelGroup>

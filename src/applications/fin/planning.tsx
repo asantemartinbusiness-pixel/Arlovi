@@ -6,12 +6,12 @@ import {
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
-import { accountCode, budgetVariance, cashBalance, periodLabel, recentPeriods, trialForRange } from "@/domain/fin-ledger";
+import { accountCode, accountMovements, budgetVariance, cashBalance, periodLabel, recentPeriods, trialForRange, unbudgetedActuals, variancePercent } from "@/domain/fin-ledger";
 import type { VarianceRow } from "@/domain/fin-ledger";
 import { useFinData } from "./data";
 import type { FinData } from "./data";
-import { Amount, SourceNote, StatementRow } from "./parts";
-import { wallMs } from "@/platform/clock";
+import { Amount, BooksLoading, SourceNote, StatementRow } from "./parts";
+import { clockIso, wallMs } from "@/platform/clock";
 
 /* ---------------------------- FIN-010 ---------------------------- */
 
@@ -52,6 +52,7 @@ export function BudgetsTab({ context }: { context: ScreenContext }) {
   const budgetTotal = rows.reduce((sum, row) => sum + row.budgetMinor, 0);
   const actualTotal = rows.reduce((sum, row) => sum + row.actualMinor, 0);
   const adverse = rows.filter((row) => !row.favourable && row.varianceMinor !== 0);
+  const unbudgeted = unbudgetedActuals(approved.filter((budget) => String(budget.fields.period ?? "") === period), scoped.rows);
 
   return (
     <Stack gap={4}>
@@ -84,17 +85,53 @@ export function BudgetsTab({ context }: { context: ScreenContext }) {
             cell: (row) => row.hasActual ? <Amount minor={row.actualMinor} context={context} /> : <span className="ds-subtle">Nothing posted</span>,
             sortValue: (row) => row.actualMinor },
           { key: "variance", header: "Variance", align: "end", cell: (row) => <Amount minor={row.varianceMinor} context={context} bold tone={row.favourable ? "success" : "danger"} />, sortValue: (row) => row.varianceMinor },
+          { key: "pct", header: "%", align: "end", hideBelow: 900, cell: (row) => {
+            const pct = variancePercent(row);
+            return <span className="ds-num">{pct === undefined ? "—" : `${pct > 0 ? "+" : ""}${pct}%`}</span>;
+          }, sortValue: (row) => variancePercent(row) ?? 0 },
           { key: "verdict", header: "Verdict", cell: (row) => row.varianceMinor === 0
             ? <Pill tone="neutral">On budget</Pill>
             : <Pill tone={row.favourable ? "success" : "danger"} dot>{row.favourable ? "Favourable" : "Adverse"}</Pill> },
+          { key: "drill", header: "", cell: (row) => (
+            <Button size="sm" variant="ghost" aria-label={`Explain ${row.label}`}
+              onClick={(event) => { event.stopPropagation(); context.openOverlay("variance drilldown", { code: row.accountCode, period, budgetId: row.id }); }}>
+              Explain
+            </Button>
+          ) },
         ]}
-        onOpen={() => context.openOverlay("revision history")}
+        onOpen={(id) => {
+          const row = rows.find((item) => item.id === id);
+          if (row) context.openOverlay("variance drilldown", { code: row.accountCode, period, budgetId: row.id });
+        }}
         summary={<>
           <Amount minor={budgetTotal} context={context} bold />
           <span className="ds-subtle">vs</span>
           <Amount minor={actualTotal} context={context} bold />
         </>}
       />
+
+      {unbudgeted.length > 0 && (
+        <Card prov="posted" eyebrow="NOT IN THE BUDGET" title="Posted with no budget line"
+          subtitle={`${unbudgeted.length} revenue or expense account${unbudgeted.length === 1 ? "" : "s"} moved in ${periodLabel(period, org.locale)} without an approved budget line, so no variance can be judged`}
+          actions={<Button size="sm" variant="ghost" onClick={() => context.openOverlay("revision history")}>Budget revisions</Button>}>
+          <DataGrid
+            rows={unbudgeted}
+            rowId={(row) => row.accountId}
+            label="Actuals with no budget line"
+            filterable={false}
+            columns={[
+              { key: "code", header: "Code", width: "80px", cell: (row) => <code className="ds-num">{row.code}</code> },
+              { key: "name", header: "Account", primary: true, cell: (row) => row.name },
+              { key: "type", header: "Type", cell: (row) => <Pill tone={row.type === "revenue" ? "success" : "neutral"}>{row.type}</Pill> },
+              { key: "actual", header: "Actual", align: "end", cell: (row) => <Amount minor={row.balanceMinor} context={context} /> },
+              { key: "drill", header: "", cell: (row) => (
+                <Button size="sm" variant="ghost" aria-label={`Explain ${row.code} ${row.name}`}
+                  onClick={(event) => { event.stopPropagation(); context.openOverlay("variance drilldown", { code: row.code, period }); }}>Explain</Button>
+              ) },
+            ]}
+          />
+        </Card>
+      )}
 
       <Card prov="human" title="Variance by line" subtitle="Budget against posted actual">
         <BarChart
@@ -385,6 +422,102 @@ export function ModelAssumptions({ context, close }: { context: ScreenContext; c
         </Button>
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
+    </Stack>
+  );
+}
+
+/** Why one budget line came out where it did: the posted lines behind its actual, and a recorded explanation. */
+export function VarianceDrilldown({ context }: { context: ScreenContext }) {
+  const data = useFinData();
+  const { org } = useWorkspace();
+  const payload = (context.overlayPayload ?? {}) as { code?: string; period?: string; budgetId?: string };
+  const code = payload.code ?? "";
+  const period = payload.period ?? data.currentPeriod;
+  const account = data.accounts.find((item) => accountCode(item) === code);
+  const budget = payload.budgetId ? data.budgets.find((item) => item.id === payload.budgetId) : undefined;
+  const scoped = trialForRange(data.accounts, data.journals, org.id, { period });
+  const row = budget ? budgetVariance([budget], scoped.rows, data.accounts)[0] : undefined;
+  const movements = accountMovements(data.accounts, data.journals, code, period);
+  const actual = movements.reduce((sum, item) => sum + item.netMinor, 0);
+  const savedNote = String(budget?.fields.varianceNote ?? "");
+  const [draft, setNote] = useState<string>();
+  const note = draft ?? savedNote;
+  const [busy, setBusy] = useState(false);
+
+  if (!data.ready) return <BooksLoading />;
+  if (!account) return <Empty title="That account is not in the chart">Choose a line from the budget table.</Empty>;
+  const pct = row ? variancePercent(row) : undefined;
+
+  return (
+    <Stack gap={4}>
+      <Properties rows={[
+        { label: "Account", value: `${code} ${account.title}` },
+        { label: "Period", value: periodLabel(period, org.locale) },
+        { label: "Budget", value: row ? <Amount minor={row.budgetMinor} context={context} /> : "No approved budget line" },
+        { label: "Actual", value: <Amount minor={actual} context={context} bold /> },
+        ...(row ? [
+          { label: "Variance", value: <Row gap={2}><Amount minor={row.varianceMinor} context={context} bold tone={row.favourable ? "success" : "danger"} />{pct !== undefined && <span className="ds-num ds-subtle">{pct > 0 ? "+" : ""}{pct}%</span>}</Row> },
+          { label: "Verdict", value: row.varianceMinor === 0 ? <Pill>On budget</Pill> : <Pill tone={row.favourable ? "success" : "danger"} dot>{row.favourable ? "Favourable" : "Adverse"}</Pill> },
+        ] : []),
+      ]} />
+
+      <Card prov="posted" eyebrow="WHAT MAKES UP THE ACTUAL" title={`${movements.length} posted journal${movements.length === 1 ? "" : "s"}`}
+        subtitle="Largest first. Their total is the actual above, to the penny." flush>
+        {movements.length === 0 ? (
+          <div className="ds-card-body"><span className="ds-subtle">Nothing was posted to {code} in {periodLabel(period, org.locale)}, so the actual is zero rather than unknown.</span></div>
+        ) : (
+          <DataGrid
+            rows={movements}
+            rowId={(item) => item.journal.id}
+            label="Posted lines behind the actual"
+            filterable={false}
+            columns={[
+              { key: "date", header: "Date", cell: (item) => <span className="ds-num">{context.date(item.date)}</span>, sortValue: (item) => item.date },
+              { key: "journal", header: "Journal", primary: true, cell: (item) => (
+                <div style={{ minWidth: 0 }}>
+                  <span>{item.journal.title}</span>
+                  {item.memo && <span className="ds-subtle ds-truncate" style={{ display: "block", fontSize: "var(--text-xs)" }}>{item.memo}</span>}
+                </div>
+              ) },
+              { key: "net", header: "Amount", align: "end", cell: (item) => <Amount minor={item.netMinor} context={context} />, sortValue: (item) => item.netMinor },
+              { key: "share", header: "Share", align: "end", hideBelow: 700, cell: (item) => <span className="ds-num">{actual ? `${Math.round((item.netMinor / actual) * 100)}%` : "—"}</span> },
+            ]}
+            summary={<Amount minor={actual} context={context} bold />}
+          />
+        )}
+      </Card>
+
+      {budget ? (
+        <Stack gap={2}>
+          <Field label="Variance explanation" hint="Kept on the approved budget line with your name, for the month-end pack.">
+            <TextArea aria-label="Variance explanation" rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Timing: the January rent was invoiced early" />
+          </Field>
+          {budget.fields.varianceNoteBy && (
+            <SourceNote>Last explained by {String(budget.fields.varianceNoteBy)} {budget.fields.varianceNoteAt ? `on ${context.date(String(budget.fields.varianceNoteAt))}` : ""}.</SourceNote>
+          )}
+          <Row gap={2}>
+            <Button variant="primary" size="sm" busy={busy} disabled={note.trim() === savedNote.trim()}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await context.mutate.patch(budget.id, {
+                    fields: { ...budget.fields, varianceNote: note.trim(), varianceNoteBy: context.actor, varianceNoteAt: clockIso() },
+                  }, { expectRevision: budget.revision, event: `Variance on ${budget.title} explained by ${context.actor}` });
+                  context.toast("Explanation saved", `${budget.title} now carries the explanation. No figure changed.`);
+                } catch (error) {
+                  context.toast("Explanation not saved", error instanceof Error ? error.message : "Reload and retry.", "failed");
+                } finally {
+                  setBusy(false);
+                }
+              }}>Save the explanation</Button>
+            <Button variant="ghost" size="sm" onClick={() => context.navigate(`/o/${org.slug}/fin/ledger?tab=Entries`)}>Open the General Ledger</Button>
+          </Row>
+        </Stack>
+      ) : (
+        <Notice tone="info" title="No budget line to explain against">
+          Add {code} to next period's budget from the Approval tab if this spending is expected to recur.
+        </Notice>
+      )}
     </Stack>
   );
 }

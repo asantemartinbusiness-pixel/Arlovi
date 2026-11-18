@@ -1,9 +1,12 @@
-import { useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
+import * as repo from "@/platform/repo";
 import { Button, Field, Notice, Pill, Properties, Row, Stack, TextInput } from "@/design-system";
 import { applications } from "@/app/catalog";
 import { canOpen, can as roleCan, ROLE_LABELS, type Capability } from "@/platform/policy";
 import { useCollections, useWorkspace } from "@/platform/workspace";
 import type { Rec, Role } from "@/domain/types";
+import { settleSeeds, type SeedStatus } from "./settle";
 
 /* ====================================================================== *
  * ADMIN shared pieces — the few primitives the administration console needs
@@ -17,6 +20,18 @@ export const ADMIN_COLLECTIONS = [
 ];
 
 export const ROLES: Role[] = ["owner", "finance", "sales", "people", "member", "client"];
+
+/**
+ * One quoted CSV cell. Text a spreadsheet would read as a formula (it starts
+ * with = + - @, a tab or a carriage return) is prefixed with an apostrophe;
+ * plain numbers pass through untouched.
+ */
+export function csvCell(value: unknown): string {
+  const text = String(value ?? "");
+  const numeric = typeof value === "number" || /^-?\d+(\.\d+)?$/.test(text);
+  const guarded = !numeric && /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  return `"${guarded.replace(/"/g, '""')}"`;
+}
 
 export const CAPABILITIES: Capability[] = [
   "post_journal", "approve_payment", "approve_mission", "edit_people", "view_payroll",
@@ -142,4 +157,76 @@ export function useSeededList(seedCsv: string): [string[], Dispatch<SetStateActi
     setValue(csvList(seedCsv));
   }
   return [value, setValue];
+}
+
+/* ------------------------------------------------------------------ *
+ * Settled workspace records.
+ *
+ * Every application's fixtures load in the background after start-up. A
+ * privacy register that counts the records a subject request covers must not
+ * report a figure (or let an export or an erasure run) while part of the
+ * workspace is still arriving: a partial count reads as a complete one, and a
+ * deletion would silently miss records. `useSettledOrgRecords` returns null
+ * until every application's records are in the store, then the live set.
+ * ------------------------------------------------------------------ */
+
+let seedStatus: SeedStatus = "loading";
+const seedListeners = new Set<(status: SeedStatus) => void>();
+let seedRun: Promise<SeedStatus> | null = null;
+
+function startSeedLoad(): Promise<SeedStatus> {
+  if (seedRun) return seedRun;
+  seedStatus = "loading";
+  seedListeners.forEach((listener) => listener(seedStatus));
+  seedRun = settleSeeds(() => import("@/applications").then((module) => module.loadAllSeeds())).then((status) => {
+    seedStatus = status;
+    // A failed load may be retried; a settled one is final.
+    if (status === "failed") seedRun = null;
+    seedListeners.forEach((listener) => listener(status));
+    return status;
+  });
+  return seedRun;
+}
+
+/** Whether every application's fixtures are in the store, and a retry for a failed load. */
+export function useSeedStatus(): { status: SeedStatus; retry: () => void } {
+  const [status, setStatus] = useState<SeedStatus>(seedStatus);
+  useEffect(() => {
+    seedListeners.add(setStatus);
+    setStatus(seedStatus);
+    if (seedStatus === "loading") void startSeedLoad();
+    return () => { seedListeners.delete(setStatus); };
+  }, []);
+  return { status, retry: () => { void startSeedLoad(); } };
+}
+
+export function useSeedsSettled(): boolean {
+  return useSeedStatus().status === "settled";
+}
+
+export function useSettledOrgRecords(): Rec[] | null {
+  const { org } = useWorkspace();
+  const settled = useSeedsSettled();
+  // The result is tagged with the settled flag it was read under, so a
+  // snapshot taken before the fixtures landed is never shown as complete.
+  const result = useLiveQuery(
+    () => (settled ? repo.listByOrg(org.id).then((rows) => ({ settled: true, rows })) : { settled: false, rows: [] as Rec[] }),
+    [org.id, settled],
+  );
+  return result?.settled ? result.rows : null;
+}
+
+/** Shown in place of counts, exports and erasure when not every application's records could be loaded. */
+export function SeedsFailedNotice({ retry }: { retry: () => void }) {
+  return (
+    <Notice tone="danger" title="Could not load every application">
+      <Stack gap={2}>
+        <span>
+          Counts may be incomplete because some applications' records did not load in this browser. Export and erasure are
+          unavailable until every record is known.
+        </span>
+        <Row gap={2}><Button size="sm" variant="secondary" onClick={retry}>Try again</Button></Row>
+      </Stack>
+    </Notice>
+  );
 }

@@ -1,3 +1,4 @@
+import { VariantsWorkspace } from "./VariantsWorkspace";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -15,6 +16,8 @@ import {
   stockRows, taxCategoryOfProduct, useCommerceData, PAYMENT_LABEL, paymentTone,
   type OrderBody, type ProductBody,
 } from "./data";
+import { lineProgress, refundableMinor, refundedMinor, shipmentsOf } from "./fulfilment";
+import { RefundHistory, ShipmentsPanel } from "./operations";
 import { StorefrontPreview } from "./storefront";
 import { applyOrderFilter, LocationScopeNote, orderFilter, useLocationScope, useOrderFilter } from "./actions";
 
@@ -327,18 +330,7 @@ export function ProductDetail({ context, lens }: { context: ScreenContext; lens:
   const margin = marginOf(product);
 
   if (lens === "Variants") {
-    return variants.length === 0
-      ? <Empty title="No variants" icon={<Package size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Variant editor")}>Add a variant</Button>} />
-      : (
-        <DataGrid rows={variants} rowId={(row) => row.id} label="Variants" filterable={false}
-          columns={[
-            { key: "name", header: "Variant", primary: true, cell: (row) => row.name },
-            { key: "sku", header: "SKU", cell: (row) => <code>{row.sku}</code> },
-            { key: "delta", header: "Price difference", align: "end", cell: (row) => (row.priceDeltaMinor === 0 ? "—" : `+${context.money(row.priceDeltaMinor)}`) },
-            { key: "price", header: "Price", align: "end", cell: (row) => context.money((product.amountMinor ?? 0) + row.priceDeltaMinor) },
-            { key: "tax", header: "Tax", cell: () => <Pill>{taxCode.code}</Pill> },
-          ]} />
-      );
+    return <VariantsWorkspace context={context} product={product} taxCode={taxCode.code} />;
   }
 
   if (lens === "Media") {
@@ -491,6 +483,7 @@ export function Inventory({ context, lens }: { context: ScreenContext; lens: str
           { key: "warehouse", header: "Location", cell: (row) => warehouseName(data.warehouses, String(row.fields.warehouseId)) },
           { key: "kind", header: "Kind", cell: (row) => <Pill>{String(row.fields.kind ?? "move").replace("_", " ")}</Pill> },
           { key: "qty", header: "Quantity", align: "end", cell: (row) => <strong className={Number(row.fields.quantity) < 0 ? "ds-field-error" : "ds-num"}>{Number(row.fields.quantity) > 0 ? "+" : ""}{String(row.fields.quantity)}</strong>, sortValue: (row) => Number(row.fields.quantity ?? 0) },
+          { key: "why", header: "Reason", cell: (row) => String(row.fields.note || row.summary || "—"), hideBelow: 900 },
           { key: "ref", header: "Reference", cell: (row) => String(row.fields.reference ?? "—"), hideBelow: 1100 },
           { key: "at", header: "When", align: "end", cell: (row) => context.date(row.at), sortValue: (row) => row.at ?? "" },
         ]}
@@ -553,6 +546,7 @@ export function Inventory({ context, lens }: { context: ScreenContext; lens: str
         rowId={(row) => `${row.product.id}-${row.warehouseId}`}
         label="Stock levels"
         onSelect={(id) => context.select(id)}
+        onOpen={(id) => { context.select(id); context.openOverlay("stock history"); }}
         rowTone={(row) => (row.available < 0 ? "danger" : row.available === 0 ? "warning" : undefined)}
         columns={[
           { key: "sku", header: "SKU", primary: true, cell: (row) => <code>{String(row.product.fields.sku)}</code>, filterValue: (row) => `${String(row.product.fields.sku)} ${row.product.title}` },
@@ -659,18 +653,7 @@ export function OrderDetail({ context, lens }: { context: ScreenContext; lens: s
             )}
           </Stack>
         </Card>
-        <Card title="Stock effect" subtitle="Fulfilling writes a negative movement for each line" flush>
-          <DataGrid rows={body.lines ?? []} rowId={(row) => row.id} label="Lines to pick" filterable={false}
-            columns={[
-              { key: "description", header: "Line", primary: true, cell: (row) => row.description },
-              { key: "qty", header: "Quantity", align: "end", cell: (row) => String(row.quantity) },
-              { key: "available", header: "Available now", align: "end", cell: (row) => {
-                const product = data.products.find((item) => item.id === row.productId);
-                if (!product) return <span className="ds-subtle">Not a catalogue line</span>;
-                return String(onHandFor(data.stockMoves, product.id) - reservedFor(data.orders, product.id) + row.quantity);
-              } },
-            ]} />
-        </Card>
+        <ShipmentsPanel context={context} order={order} />
       </Stack>
     );
   }
@@ -696,9 +679,16 @@ export function OrderDetail({ context, lens }: { context: ScreenContext; lens: s
 
   if (lens === "Returns") {
     return returns.length === 0
-      ? <Empty title="No returns on this order" icon={<RotateCcw size={20} />} />
+      ? <Empty title="No returns on this order" icon={<RotateCcw size={20} />}
+        action={<Button variant="secondary" onClick={() => context.openOverlay("raise return", { id: order.id })}>Raise a return</Button>}>
+        Only units that have shipped can be returned.
+      </Empty>
       : (
         <Stack gap={3}>
+          <Row gap={2} wrap>
+            <span className="ds-subtle ds-grow">{returns.length} return{returns.length === 1 ? "" : "s"} · {context.money(returns.reduce((sum, item) => sum + refundedMinor(item), 0))} refunded and recorded</span>
+            <Button size="sm" variant="secondary" onClick={() => context.openOverlay("raise return", { id: order.id })}>Raise a return</Button>
+          </Row>
           {returns.map((item) => (
             <Card key={item.id} title={item.title} subtitle={item.summary}
               actions={<Pill tone={statusTone(item.status)}>{item.status.replace("_", " ")}</Pill>}>
@@ -708,7 +698,9 @@ export function OrderDetail({ context, lens }: { context: ScreenContext; lens: s
                 { label: "Restock", value: item.fields.restock === true ? "Back into stock" : "Not resaleable" },
                 { label: "Refund state", value: <Pill tone="warning">{String(item.fields.refundState ?? "").replace(/_/g, " ")}</Pill> },
                 { label: "Value", value: context.money(item.amountMinor) },
+                { label: "Refunded", value: <span className="ds-num">{context.money(refundedMinor(item))}</span> },
               ]} />
+              <RefundHistory context={context} item={item} />
             </Card>
           ))}
         </Stack>
@@ -1034,7 +1026,7 @@ export function Fulfilment({ context, lens }: { context: ScreenContext; lens: st
   const data = useCommerceData();
   const { org } = useWorkspace();
   const stages: Record<string, string[]> = {
-    Pick: ["unfulfilled", "picking"],
+    Pick: ["unfulfilled", "picking", "partially_shipped"],
     Pack: ["packed"],
     Ship: ["shipped"],
     Track: ["in_transit", "delivered"],
@@ -1080,6 +1072,7 @@ export function Fulfilment({ context, lens }: { context: ScreenContext; lens: st
                 <button key={order.id} type="button" className="ds-record-card" onClick={() => context.navigate(`/o/${org.slug}/commerce/orders/${order.id}`)}>
                   <Row gap={2}><strong className="ds-grow" style={{ textAlign: "start" }}>{order.title}</strong><span className="ds-num">{context.money(order.amountMinor)}</span></Row>
                   <span className="ds-subtle">{(bodyOf<OrderBody>(order, {}).lines ?? []).reduce((sum, line) => sum + line.quantity, 0)} units · {String(order.fields.carrier) || "no carrier"}</span>
+                  {String(order.fields.fulfilment) === "partially_shipped" && <Pill tone="info">Part shipped · {lineProgress(order).reduce((sum, row) => sum + row.ordered - row.shipped, 0)} to go</Pill>}
                 </button>
               ))}
             </div>
@@ -1092,11 +1085,17 @@ export function Fulfilment({ context, lens }: { context: ScreenContext; lens: st
           columns={[
             { key: "title", header: "Order", primary: true, cell: (row) => row.title, filterValue: (row) => row.title },
             { key: "units", header: "Units", align: "end", cell: (row) => String((bodyOf<OrderBody>(row, {}).lines ?? []).reduce((sum, line) => sum + line.quantity, 0)) },
+            { key: "shipments", header: "Shipments", cell: (row) => {
+              const shipments = shipmentsOf(row);
+              const left = lineProgress(row).reduce((sum, item) => sum + item.remaining, 0);
+              return shipments.length ? <span className="ds-num">{shipments.length} · {left} left</span> : <span className="ds-subtle">None</span>;
+            } },
             { key: "warehouse", header: "From", cell: (row) => warehouseName(data.warehouses, String(row.fields.warehouseId)) },
             { key: "carrier", header: "Carrier", cell: (row) => String(row.fields.carrier) || <span className="ds-subtle">Not chosen</span> },
             { key: "tracking", header: "Tracking", cell: (row) => String(row.fields.tracking) || <span className="ds-subtle">None</span>, hideBelow: 1100 },
           ]}
           bulkActions={[
+            { label: "Fulfil lines", disabled: (selected) => selected.length !== 1, onRun: (selected) => context.openOverlay("fulfil lines", { id: selected[0].id }) },
             { label: "Choose a carrier", disabled: (selected) => selected.length === 0, onRun: (selected) => context.openOverlay("Carrier selector", { ids: selected.map((order) => order.id) }) },
           ]}
           empty={<Empty title={`Nothing in ${lens.toLowerCase()}`} icon={<Truck size={20} />} />} />
@@ -1113,7 +1112,10 @@ export function Returns({ context, state }: { context: ScreenContext; state: str
   const rows = data.returns.filter((item) => (map[state] ?? []).includes(item.status));
 
   if (rows.length === 0) {
-    return <Empty title={`No ${state.toLowerCase()} returns`} icon={<RotateCcw size={20} />}>A return is raised against an order line with a reason and a photograph count.</Empty>;
+    return <Empty title={`No ${state.toLowerCase()} returns`} icon={<RotateCcw size={20} />}
+      action={state === "Requested" ? <Button variant="secondary" onClick={() => context.openOverlay("raise return")}>Raise a return</Button> : undefined}>
+      A return is raised against a shipped order line with a reason. Refunds are recorded against it once made outside Arlovi.
+    </Empty>;
   }
 
   return (
@@ -1142,12 +1144,13 @@ export function Returns({ context, state }: { context: ScreenContext; state: str
             if (days === undefined) return <Pill tone="warning">No order date</Pill>;
             return days <= 14 ? <Pill tone="success">Within 14 days</Pill> : <Pill tone="warning">{days} days after the order</Pill>;
           } },
-          { key: "refund", header: "Refund", cell: (row) => <Pill tone={String(row.fields.refundState) === "credit_note_local" ? "success" : "warning"}>{String(row.fields.refundState ?? "").replace(/_/g, " ")}</Pill> },
+          { key: "refund", header: "Refund", cell: (row) => <Pill tone={["credit_note_local", "refund_recorded"].includes(String(row.fields.refundState)) ? "success" : "warning"}>{String(row.fields.refundState ?? "").replace(/_/g, " ")}</Pill> },
+          { key: "refunded", header: "Refunded", align: "end", hideBelow: 1000, cell: (row) => <span className="ds-num">{context.money(refundedMinor(row))}</span>, sortValue: (row) => refundedMinor(row) },
           { key: "value", header: "Value", align: "end", cell: (row) => context.money(row.amountMinor), sortValue: (row) => row.amountMinor ?? 0 },
         ]}
         bulkActions={[
           { label: "Assess restocking", disabled: (selected) => selected.length === 0, onRun: (selected) => context.openOverlay("restock assessment", { ids: selected.map((item) => item.id) }) },
-          { label: "Authorise a refund", disabled: (selected) => selected.some((item) => item.tags.includes("disputed")), onRun: (selected) => context.openOverlay("refund authorization", { id: selected[0]?.id }) },
+          { label: "Record a refund", disabled: (selected) => selected.length !== 1 || selected.some((item) => item.tags.includes("disputed") || refundableMinor(item) === 0), onRun: (selected) => context.openOverlay("refund authorization", { id: selected[0]?.id }) },
         ]}
       />
     </Stack>

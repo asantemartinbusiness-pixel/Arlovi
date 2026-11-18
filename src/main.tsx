@@ -10,7 +10,7 @@ import { ensureSeed } from "@/runtime/db";
 import { useUi } from "@/runtime/ui";
 import "@/design-system";
 import "@/design-system/interface-scale.css";
-import { loadCoreApplications } from "@/applications";
+import { loadCoreApplications, loadAllSeeds } from "@/applications";
 
 function WorkspaceEntry({ recoveredSlug }: { recoveredSlug: string | null }) {
   let slug: string | null = null;
@@ -38,6 +38,13 @@ function Boot() {
       .then((slug) => {
         setRecoveredSlug(slug);
         setReady(true);
+        // Fixtures (data only, no screens) load once the browser is idle, so
+        // cross-application references resolve without opening every app.
+        const idle = (window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+        // A failure is logged by the loader; screens that need every record say so.
+        const background = () => { loadAllSeeds().catch(() => undefined); };
+        if (idle) idle(background, { timeout: 2500 });
+        else window.setTimeout(background, 1200);
         // Only the requested application loads after the core workspace opens.
         // AppShell routes initiate loading; navigation hints may prefetch it.
       })

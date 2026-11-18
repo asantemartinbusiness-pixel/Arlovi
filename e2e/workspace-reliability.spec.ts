@@ -4,8 +4,8 @@ test("workspace health is read-only and shows company-scoped diagnostics",async(
   await page.goto("/o/northline/workspace/health");
   await expect(page.getByRole("heading",{level:1,name:"Workspace health"})).toBeVisible();
   await expect(page.getByRole("heading",{name:"Workspace diagnostics"})).toBeVisible();
-  await expect(page.getByText("Company records")).toBeVisible();
-  await expect(page.getByText("Application loading")).toBeVisible();
+  await expect(page.getByText("Company records", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Application loading/ })).toBeVisible();
   await expect(page.getByRole("link",{name:/Go to account & company archive/})).toBeVisible();
   await page.getByRole("button",{name:"Run checks"}).click();
   await expect(page.getByRole("heading",{name:/Data integrity/})).toBeVisible();

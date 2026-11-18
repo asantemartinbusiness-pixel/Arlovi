@@ -11,12 +11,14 @@ import {
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
+import { wallMs } from "@/platform/clock";
 import { MiniField, PaletteChip, ReorderArea, SortableRow, move } from "@/applications/t6kit/kit";
 import {
-  FIELD_HINTS, FIELD_LABELS, FIELD_TYPES, STRUCTURAL, logicIssues, makeField, readForm,
-  type FieldType, type FormField, type FormModel,
+  FIELD_HINTS, FIELD_LABELS, FIELD_TYPES, OPERATOR_LABELS, STRUCTURAL, logicIssues, makeField, readForm,
+  type FieldType, type FormField, type FormModel, type LogicRule, type Operator,
 } from "./model";
 import { FormRuntime } from "./runtime";
+import { PreviewRunsPanel, keepPreviewRun } from "./previewRunsPanel";
 import { saveForm, useFormsUi } from "./state";
 
 const ICONS: Record<FieldType, React.ReactNode> = {
@@ -159,7 +161,7 @@ export function FormBuilder({ context }: { context: ScreenContext }) {
   const inspector = (
     <div className="t6-pane" data-kind="inspector" key="inspector">
       {selected
-        ? <FieldInspector field={selected} model={model} onEdit={(patch) => setFields(model.fields.map((item) => (item.id === selected.id ? { ...item, ...patch } : item)), `Edited ${selected.label}`)} onRemove={() => { setFields(model.fields.filter((item) => item.id !== selected.id), `Removed ${selected.label}`); ui.select(""); }} />
+        ? <FieldInspector field={selected} model={model} onEdit={(patch) => setFields(model.fields.map((item) => (item.id === selected.id ? { ...item, ...patch } : item)), `Edited ${selected.label}`)} onRemove={() => { setFields(model.fields.filter((item) => item.id !== selected.id), `Removed ${selected.label}`); ui.select(""); }} onLogic={(logic, label) => void write({ ...model, logic }, label)} />
         : <Empty title="No field selected" icon={<Type size={18} />}>Select a field to change its label, help text and validation.</Empty>}
     </div>
   );
@@ -202,11 +204,13 @@ export function FormBuilder({ context }: { context: ScreenContext }) {
             onChange={ui.setDevice}
             options={[{ value: "mobile" as const, label: "Mobile 390" }, { value: "desktop" as const, label: "Desktop" }]}
           />
-          <span className="ds-subtle">The preview validates exactly as the public form does and stops before writing.</span>
+          <span className="ds-subtle">The preview validates exactly as the public form does. A finished run is kept below as a preview run, never as a response.</span>
         </Row>
         <div style={{ width: ui.device === "mobile" ? 390 : "100%", maxWidth: "100%" }}>
-          <FormRuntime model={model} record={record} context={context} mode="preview" />
+          <FormRuntime model={model} record={record} context={context} mode="preview"
+            onPreviewComplete={(run) => keepPreviewRun(context, record, model, ui.device, run)} />
         </div>
+        <PreviewRunsPanel context={context} record={record} model={model} />
       </Stack>
     </div>
   );
@@ -283,9 +287,82 @@ export function FormBuilder({ context }: { context: ScreenContext }) {
 
 /* ------------------------------ Inspector ------------------------------ */
 
+let ruleCounter = 0;
+
+/**
+ * "Show this question only when…" — edits the show rules that govern one
+ * field, reading only questions that come before it so the condition is
+ * always answerable by the time the person reaches it.
+ */
+export function VisibilityEditor({ field, model, onLogic }: { field: FormField; model: FormModel; onLogic: (logic: LogicRule[], label: string) => void }) {
+  const index = model.fields.findIndex((item) => item.id === field.id);
+  const sources = model.fields.slice(0, Math.max(0, index)).filter((item) => !STRUCTURAL.includes(item.type));
+  const rules = model.logic.filter((rule) => rule.targetId === field.id && rule.action === "show");
+  const [sourceId, setSourceId] = useState("");
+  const [operator, setOperator] = useState<Operator>("equals");
+  const [value, setValue] = useState("");
+  const source = sources.find((item) => item.id === sourceId) ?? sources[sources.length - 1];
+  const needsValue = operator !== "answered" && operator !== "empty";
+  const optionsForSource = source && (source.type === "select" || source.type === "multiselect") ? source.options
+    : source?.type === "checkbox" ? ["yes", "no"] : [];
+  const effectiveValue = needsValue ? (optionsForSource.length && !optionsForSource.includes(value) ? optionsForSource[0] : value) : "";
+  const label = (id: string) => model.fields.find((item) => item.id === id)?.label ?? "a missing question";
+
+  return (
+    <section className="forms-condition" aria-label="Visibility condition">
+      <strong>Show this question only when…</strong>
+      {rules.length === 0
+        ? <span className="ds-subtle">Always shown. Add a condition to show it only after a particular answer.</span>
+        : (
+          <Stack gap={2}>
+            {rules.map((rule) => (
+              <Row key={rule.id} gap={2} wrap>
+                <span className="ds-grow">{label(rule.whenFieldId)} {OPERATOR_LABELS[rule.operator]}{rule.value ? ` "${rule.value}"` : ""}</span>
+                <Button size="sm" variant="ghost" onClick={() => onLogic(model.logic.filter((item) => item.id !== rule.id), `Removed a visibility condition from ${field.label}`)}>Remove condition</Button>
+              </Row>
+            ))}
+            {rules.length > 1 && <span className="ds-subtle">Shown when any one of these conditions matches.</span>}
+          </Stack>
+        )}
+      {sources.length === 0 ? (
+        <span className="ds-subtle">A condition reads an earlier question. Move this question below another one to add a condition.</span>
+      ) : (
+        <Stack gap={2}>
+          <Field label="Question to read">
+            <Select value={source?.id ?? ""} onChange={(event) => { setSourceId(event.target.value); setValue(""); }}>
+              {sources.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </Select>
+          </Field>
+          <Row gap={2} wrap>
+            <Field label="Comparison">
+              <Select value={operator} onChange={(event) => setOperator(event.target.value as Operator)}>
+                {(Object.keys(OPERATOR_LABELS) as Operator[]).map((key) => <option key={key} value={key}>{OPERATOR_LABELS[key]}</option>)}
+              </Select>
+            </Field>
+            {needsValue && (
+              <Field label="Answer">
+                {optionsForSource.length
+                  ? <Select value={effectiveValue} onChange={(event) => setValue(event.target.value)}>{optionsForSource.map((option) => <option key={option} value={option}>{option}</option>)}</Select>
+                  : <TextInput value={value} onChange={(event) => setValue(event.target.value)} />}
+              </Field>
+            )}
+          </Row>
+          <Button size="sm" variant="secondary" disabled={!source || (needsValue && !effectiveValue.trim())} onClick={() => {
+            if (!source) return;
+            ruleCounter += 1;
+            const rule: LogicRule = { id: `l${wallMs().toString(36)}${ruleCounter}`, targetId: field.id, action: "show", whenFieldId: source.id, operator, value: effectiveValue.trim() };
+            onLogic([...model.logic, rule], `Added a condition: show ${field.label} when ${source.label} ${OPERATOR_LABELS[operator]} ${rule.value}`.trim());
+            setValue("");
+          }}>Add condition</Button>
+        </Stack>
+      )}
+    </section>
+  );
+}
+
 export function FieldInspector({
-  field, model, onEdit, onRemove,
-}: { field: FormField; model: FormModel; onEdit: (patch: Partial<FormField>) => void; onRemove?: () => void }) {
+  field, model, onEdit, onRemove, onLogic,
+}: { field: FormField; model: FormModel; onEdit: (patch: Partial<FormField>) => void; onRemove?: () => void; onLogic?: (logic: LogicRule[], label: string) => void }) {
   const governed = model.logic.filter((rule) => rule.targetId === field.id);
   const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
   const confirmingRemoval = pendingRemovalId === field.id;
@@ -350,6 +427,7 @@ export function FieldInspector({
       {!STRUCTURAL.includes(field.type) && (
         <Field label="Placeholder"><TextInput value={field.placeholder} onChange={(event) => onEdit({ placeholder: event.target.value })} /></Field>
       )}
+      {onLogic && !STRUCTURAL.includes(field.type) && <VisibilityEditor key={field.id} field={field} model={model} onLogic={onLogic} />}
       {governed.length > 0 && (
         <Notice tone="info" title={`${governed.length} rule${governed.length === 1 ? "" : "s"} governs this field`}>
           {governed.map((rule) => `${rule.action} when ${model.fields.find((item) => item.id === rule.whenFieldId)?.label ?? "a missing field"} ${rule.operator.replace("_", " ")} ${rule.value}`).join("; ")}

@@ -12,7 +12,8 @@ test("display scaling saves and restores global preference", async ({ page }) =>
   for (let step = 0; step < 10; step++) await slider.press("ArrowRight");
   await expect(dialog.locator("output")).toHaveText("125%");
   await expect.poll(() => page.locator("html").evaluate(el => getComputedStyle(el).getPropertyValue("--interface-scale").trim())).toBe("1.25");
-  await dialog.getByText("Compact", { exact: true }).click();
+  // Choose density by its radio control (the input overlays its label text).
+  await dialog.getByRole("radio", { name: "Compact" }).check();
   await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
   await dialog.getByRole("button", { name: "Done" }).click();
   await page.reload();

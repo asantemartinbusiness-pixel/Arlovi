@@ -255,6 +255,8 @@ export function CampaignTemplatePicker({ context, close }: { context: ScreenCont
   );
 }
 
+interface ApprovalDecision { at: string; by: string; decision: "approve" | "changes"; note: string }
+
 export function PlanApproval({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useMarketData();
   const { now, actor } = useWorkspace();
@@ -272,6 +274,10 @@ export function PlanApproval({ context, close }: { context: ScreenContext; close
   ] : [];
   const alreadyApproved = String(campaign?.fields.approval) === "approved";
   const blocked = alreadyApproved || checks.some((check) => !check.ok);
+  const [decision, setDecision] = useState<"approve" | "changes">("approve");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const history = ((campaign?.body as { approvalHistory?: ApprovalDecision[] } | undefined)?.approvalHistory ?? []);
 
   if (!campaign) return <Empty title="No campaign is waiting for approval" />;
 
@@ -281,10 +287,25 @@ export function PlanApproval({ context, close }: { context: ScreenContext; close
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
+        const entry = { at: now.toISOString(), by: actor, decision, note: reason.trim() };
+        const nextBody = { ...(campaign.body ?? {}), approvalHistory: [entry, ...history] };
+        if (decision === "changes") {
+          if (alreadyApproved) { setError("An approved plan is not sent back here; duplicate it as a draft to change it."); return; }
+          if (reason.trim().length < 5) { setError("Say what needs to change so the owner can act on it."); return; }
+          await context.mutate.patch(campaign.id, {
+            status: campaign.status === "active" ? "active" : "draft",
+            fields: { ...campaign.fields, approval: "changes_requested", changesRequestedBy: actor, changesRequestedAt: now.toISOString() },
+            body: nextBody,
+          }, { expectRevision: campaign.revision, event: `Changes requested on ${campaign.title} by ${actor}: ${reason.trim()}` });
+          context.toast("Changes requested", `${campaign.title} is back with ${campaign.ownerName || "its owner"} as a draft, with your note.`);
+          close();
+          return;
+        }
         if (blocked) return;
         await context.mutate.patch(campaign.id, {
           status: campaign.status === "active" ? "active" : "approved",
           fields: { ...campaign.fields, approval: "approved", approvedBy: actor, approvedAt: now.toISOString() },
+          body: nextBody,
         }, { expectRevision: campaign.revision, event: `Plan approved for ${campaign.title} by ${actor}` });
         context.toast("Plan approved", `${campaign.title} is recorded as approved by ${actor}. It is not live until a launch is recorded. No provider was told.`);
         close();
@@ -305,6 +326,34 @@ export function PlanApproval({ context, close }: { context: ScreenContext; close
         : blocked
         ? <Notice tone="danger" title="This plan cannot be approved yet">Every check above has to pass. Approving a plan with unapproved creative or an empty audience would commit budget against nothing.</Notice>
         : <Notice tone="info" title="What approval does here">The record is marked approved by {actor} with today's date. Scheduling stays local; no advertising or mail provider is connected.</Notice>}
+      {!alreadyApproved && (
+        <Field label="Decision">
+          <Select value={decision} onChange={(event) => { setDecision(event.target.value as "approve" | "changes"); setError(""); }}>
+            <option value="approve" disabled={blocked}>Approve the plan</option>
+            <option value="changes">Request changes</option>
+          </Select>
+        </Field>
+      )}
+      {decision === "changes" && !alreadyApproved && (
+        <Field label="What needs to change" required error={error || undefined}>
+          <TextArea rows={3} value={reason} onChange={(event) => { setReason(event.target.value); setError(""); }} />
+        </Field>
+      )}
+      {decision === "changes" && !alreadyApproved && <p className="ds-subtle">The plan goes back to draft with this note. Nothing already scheduled is changed.</p>}
+      {history.length > 0 && (
+        <Stack gap={2}>
+          <strong>Decisions on this plan</strong>
+          <ol className="t4-approval-history">
+            {history.map((item, index) => (
+              <li key={`${item.at}-${index}`}>
+                <Pill tone={item.decision === "approve" ? "success" : "warning"}>{item.decision === "approve" ? "Approved" : "Changes requested"}</Pill>
+                <span className="ds-subtle">{item.by} · {context.date(item.at)}</span>
+                {item.note && <span>{item.note}</span>}
+              </li>
+            ))}
+          </ol>
+        </Stack>
+      )}
     </form>
   );
 }

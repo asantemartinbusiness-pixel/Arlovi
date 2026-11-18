@@ -55,6 +55,10 @@ export const HOME_CARDS = [
   { key: "stats", label: "Figures: receivable, overdue, ledger, bank feed" },
   { key: "waiting", label: "Waiting on you" },
   { key: "missions", label: "Active missions" },
+  { key: "exceptions", label: "Needs attention: overdue, stopped and lapsing" },
+  { key: "objectives", label: "Objectives and key results" },
+  { key: "departments", label: "Department health" },
+  { key: "decisions", label: "Decision log" },
   { key: "due", label: "Work due in the period" },
   { key: "recommended", label: "Recommended" },
 ] as const;

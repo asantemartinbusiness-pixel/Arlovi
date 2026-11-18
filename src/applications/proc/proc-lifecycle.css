@@ -1,0 +1,15 @@
+/* PROC quote comparison and purchase trail. Tokens only. */
+.t4-quote-lines { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-3); }
+.t4-trail { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.t4-trail-step { display: flex; gap: var(--space-3); padding: var(--space-3) 0; position: relative; }
+.t4-trail-step:not(:last-child)::after {
+  content: ""; position: absolute; left: 11px; top: calc(var(--space-3) + 26px); bottom: calc(-1 * var(--space-1)); width: 2px; background: var(--border-default);
+}
+.t4-trail-step p { margin: var(--space-1) 0 0; }
+.t4-trail-icon {
+  flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid var(--border-default); background: var(--bg-surface); color: var(--fg-muted);
+}
+.t4-trail-step[data-state="done"] .t4-trail-icon { background: var(--accent); border-color: var(--accent); color: var(--fg-on-accent); }
+.t4-trail-step[data-state="blocked"] .t4-trail-icon { border-color: var(--danger-border); background: var(--danger-soft); color: var(--danger); }
+.t4-trail-step[data-state="partial"] .t4-trail-icon { color: var(--fg-strong); border-color: var(--fg-strong); }

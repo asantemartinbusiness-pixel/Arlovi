@@ -18,6 +18,9 @@ import {
   type CheckResult,
 } from "./diagnostics";
 import { useItUi, watchErrors } from "./state";
+import { IncidentLifecycle, TimelineComposer, timelineKindLabel, useVerified } from "./lifecycle";
+import { STAGE_LABELS, readTimeline, stageOf } from "./register";
+import { AccessReviews, AssetRegister, ChangeRequests } from "./registers";
 
 /* ---------------------------------------------------------------- *
  * Shared
@@ -92,6 +95,8 @@ export function OperationsHome({ context, lens }: { context: ScreenContext; lens
     const changes = events.filter((event) => ["update", "create", "delete"].includes(event.type)).slice(0, 60);
     return (
       <Stack gap={4}>
+        <ChangeRequests context={context} />
+        <h2 style={{ fontSize: "var(--text-lg)", margin: 0 }}>Record changes in this workspace</h2>
         <Notice tone="info" title="A change here is a write to this workspace">
           There is no deployment pipeline. Every row below is an audit entry for a record that changed, which is the only change log that exists.
         </Notice>
@@ -324,6 +329,7 @@ export function IncidentQueue({ context, lens }: { context: ScreenContext; lens:
         { key: "title", header: "Incident", primary: true, cell: (row) => (row.fields.latestReport
           ? <span className="ds-stack"><span>{row.title}</span><span className="ds-subtle">Latest report: {String(row.fields.latestReport)}</span></span>
           : row.title), sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary} ${String(row.fields.latestReport ?? "")}` },
+        { key: "stage", header: "Stage", cell: (row) => STAGE_LABELS[stageOf(row)], sortValue: (row) => ["open", "triage", "mitigate", "resolve", "postmortem"].indexOf(stageOf(row)) },
         { key: "severity", header: "Severity", cell: (row) => <Pill tone={SEVERITY_TONE[String(row.fields.severity ?? "medium")] ?? "warning"}>{String(row.fields.severity ?? "medium")}</Pill> },
         { key: "service", header: "Service", cell: (row) => incidentService(row, connectors) },
         { key: "origin", header: "Origin", cell: (row) => <Pill tone={String(row.fields.origin) === "provider" ? "neutral" : "info"}>{String(row.fields.origin ?? "ours")}</Pill> },
@@ -356,26 +362,32 @@ export function IncidentDetail({ context, lens }: { context: ScreenContext; lens
   const connectors = useCollection("connectors");
   const missions = useCollection("missions");
   const { ui } = useDiagnostics(context);
+  const verifiedSinceOpening = useVerified(record);
   if (!record) return <Empty title="No incident" icon={<Siren size={20} />} />;
 
   if (lens === "Timeline") {
+    const recorded = readTimeline(record);
     const entries = [
-      { at: record.at ?? record.createdAt, who: record.createdBy, what: `Incident opened: ${record.title}` },
-      ...record.history.map((snapshot) => ({ at: snapshot.at, who: record.updatedBy, what: `Status was ${snapshot.status}` })),
-      ...events.map((event) => ({ at: event.at, who: event.actor, what: event.message })),
+      { at: record.at ?? record.createdAt, who: record.createdBy, what: `Incident opened: ${record.title}`, kind: "Opened" },
+      ...recorded.map((entry) => ({ at: entry.at, who: entry.by, what: entry.text, kind: timelineKindLabel(entry.kind) })),
+      ...(recorded.length ? [] : record.history.map((snapshot) => ({ at: snapshot.at, who: record.updatedBy, what: `Status was ${snapshot.status}`, kind: "History" }))),
+      ...events.filter((event) => event.type === "note").map((event) => ({ at: event.at, who: event.actor, what: event.message, kind: "Note" })),
     ].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
     return (
-      <ol className="t6-timeline">
+      <Stack gap={4}>
+      <TimelineComposer context={context} record={record} />
+      <ol className="t6-timeline" aria-label="Incident timeline">
         {entries.map((entry, index) => (
           <li key={`${entry.at}-${index}`}>
             <div>
               <strong className="ds-num">{context.dateTime(entry.at)}</strong>
               <div className="ds-subtle">{entry.who}</div>
             </div>
-            <div>{entry.what}</div>
+            <div><Pill tone="neutral">{entry.kind}</Pill> {entry.what}</div>
           </li>
         ))}
       </ol>
+      </Stack>
     );
   }
 
@@ -446,6 +458,8 @@ export function IncidentDetail({ context, lens }: { context: ScreenContext; lens
   }
 
   return (
+    <Stack gap={4}>
+    <IncidentLifecycle context={context} record={record} />
     <Grid>
       <Card span={7} eyebrow="INCIDENT" prov="human" title={record.title} subtitle={record.summary}
         actions={<Pill tone={SEVERITY_TONE[String(record.fields.severity ?? "medium")] ?? "warning"} dot>{String(record.fields.severity ?? "medium")}</Pill>}>
@@ -462,15 +476,18 @@ export function IncidentDetail({ context, lens }: { context: ScreenContext; lens
       <Card span={5} eyebrow="IMPACT" prov="posted" title="What it affects">
         <Stack gap={3}>
           <p className="ds-prose">{String(record.fields.impact ?? "No impact statement recorded.")}</p>
-          <Notice tone={record.status === "resolved" ? "success" : "warning"} title={record.status === "resolved" ? "Verified before closing" : "Not yet verified"}>
-            {record.status === "resolved"
+          <Notice tone={record.status === "resolved" || record.status === "closed" || verifiedSinceOpening ? "success" : "warning"} title={record.status === "resolved" || record.status === "closed" ? "Verified before closing" : verifiedSinceOpening ? "Checked since it opened" : "Not yet verified"}>
+            {record.status === "resolved" || record.status === "closed"
               ? `Closed by ${String(record.fields.verifiedBy ?? record.updatedBy)} after a check.`
-              : "Run the diagnostics on the health screen before resolving this; the resolve action is guarded on it."}
+              : verifiedSinceOpening
+                ? "Diagnostics have run since this incident was opened, so it can be resolved once the fix is recorded."
+                : "Run the diagnostics on the health screen before resolving this; the resolve action is guarded on it."}
           </Notice>
           <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/it/health`)}>Run the diagnostics</Button>
         </Stack>
       </Card>
     </Grid>
+    </Stack>
   );
 }
 
@@ -508,7 +525,7 @@ export function RemediationPanel({ context, record }: { context: ScreenContext; 
           <Button
             variant="primary"
             disabled={!verified || record.status === "resolved"}
-            title={!verified ? "Run the diagnostics after the incident was opened first" : undefined}
+            title={!verified ? "Run the workspace diagnostics after the incident was opened first" : undefined}
             onClick={async () => {
               await context.mutate.patch(record.id, {
                 status: "resolved",
@@ -568,6 +585,8 @@ export function SystemHealth({ context, lens }: { context: ScreenContext; lens: 
   if (lens === "Provider status") {
     return (
       <Stack gap={4}>
+        <AssetRegister context={context} />
+        <h2 style={{ fontSize: "var(--text-lg)", margin: 0 }}>Provider capabilities</h2>
         <Notice tone="warning" title="Provider status cannot be read from here">
           A status page is a network call, and this workspace makes none. What is shown is the capability register's own state, which is about our connection rather than their service.
         </Notice>
@@ -1199,6 +1218,8 @@ export function SecurityCentre({ context, lens }: { context: ScreenContext; lens
 
   if (lens === "Access") {
     return (
+      <Stack gap={5}>
+      <AccessReviews context={context} />
       <Grid>
         <Card span={7} eyebrow="SESSIONS" prov="posted" title="What a browser can honestly say" subtitle="No account system exists, so there is no session list">
           <Properties rows={[
@@ -1226,6 +1247,7 @@ export function SecurityCentre({ context, lens }: { context: ScreenContext; lens
           </Stack>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 

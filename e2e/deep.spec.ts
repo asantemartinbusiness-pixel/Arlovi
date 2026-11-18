@@ -63,6 +63,9 @@ async function settle(page: Page, ms = 160) {
 }
 
 async function closeDialogs(page: Page) {
+  // An on-demand overlay (the assistant) may still be loading its code; let it
+  // mount first, or it would open after this check and cover the next action.
+  await page.locator(".hq-overlay-pending").first().waitFor({ state: "detached", timeout: 5000 }).catch(() => undefined);
   for (let i = 0; i < 3; i += 1) {
     if ((await page.getByRole("dialog").count()) === 0) return;
     await page.keyboard.press("Escape");
@@ -92,15 +95,22 @@ async function load(page: Page, url: string) {
   await settle(page, 120);
 }
 
-/** Selects a record the way a person would: a grid row, or a card's Select control. */
+/**
+ * Selects a record the way a person would: the first selectable control on the
+ * page, whether a grid row or a card's Select control, in reading order.
+ */
 async function selectSomething(page: Page): Promise<boolean> {
   const row = page.locator("main tbody tr[data-row]").first();
-  if (await row.count()) {
+  const card = page.locator("main button[aria-pressed]", { hasText: /^Select$/ }).first();
+  const hasRow = (await row.count()) > 0;
+  const hasCard = (await card.count()) > 0;
+  const cardFirst = hasRow && hasCard && await card.evaluate((cardEl, rowEl) =>
+    Boolean(cardEl.compareDocumentPosition(rowEl as Node) & Node.DOCUMENT_POSITION_FOLLOWING), await row.elementHandle());
+  if (hasRow && !cardFirst) {
     await row.click({ position: { x: 8, y: 8 } }).catch(() => undefined);
     return true;
   }
-  const card = page.locator("main button[aria-pressed]", { hasText: /^Select$/ }).first();
-  if (await card.count()) { await card.click().catch(() => undefined); return true; }
+  if (hasCard) { await card.click().catch(() => undefined); return true; }
   const recordCard = page.locator("main .ds-record-card").first();
   if (await recordCard.count()) { await recordCard.click().catch(() => undefined); return true; }
   return false;
@@ -225,11 +235,14 @@ for (const code of apps) {
     const page = await context.newPage();
     const errors = watch(page);
     const results: ScreenResult[] = [];
-    mkdirSync(OUT, { recursive: true });
+    // Evidence is written only when requested (`npm run evidence`), so a
+    // routine run never leaves partial sweep files in the working tree.
+    const writeEvidence = process.env.ARLOVI_WRITE_EVIDENCE === "1";
+    if (writeEvidence) mkdirSync(OUT, { recursive: true });
     for (const screen of screens) {
       results.push(await sweepScreen(page, screen, errors));
       // Written after every screen, so a timeout never discards finished work.
-      writeFileSync(new URL(`${code}.json`, OUT), `${JSON.stringify(results, null, 1)}\n`);
+      if (writeEvidence) writeFileSync(new URL(`${code}.json`, OUT), `${JSON.stringify(results, null, 1)}\n`);
     }
     await context.close();
 

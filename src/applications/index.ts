@@ -49,6 +49,42 @@ const NATIVE: Record<string, NativeLoader> = {
   CONNECT: { group: "Platform / connect", load: () => Promise.all([import("@/domain/seeds/connect"),import("./connect/index")]) },
   IT: { group: "Platform / it", load: () => Promise.all([import("@/domain/seeds/it"),import("./it/index")]) },
 };
+const SEED_MODULES: Record<string, () => Promise<unknown>> = {
+  INBOX: () => import("@/domain/seeds/inbox"),
+  ADMIN: () => import("@/domain/seeds/admin"),
+  ASSET: () => import("@/domain/seeds/asset"),
+  AI: () => import("@/domain/seeds/ai"),
+  BRAIN: () => import("@/domain/seeds/brain"),
+  TEAM: () => import("@/domain/seeds/team"),
+  MISSION: () => import("@/domain/seeds/mission"),
+  AUTO: () => import("@/domain/seeds/auto"),
+  ANALYTICS: () => import("@/domain/seeds/analytics"),
+  FIN: () => import("@/domain/seeds/fin"),
+  CRM: () => import("@/domain/seeds/crm"),
+  HR: () => import("@/domain/seeds/hr"),
+  PROJECT: () => import("@/domain/seeds/project"),
+  COMMS: () => import("@/domain/seeds/comms"),
+  CARE: () => import("@/domain/seeds/care"),
+  LEGAL: () => import("@/domain/seeds/legal"),
+  MARKET: () => import("@/domain/seeds/market"),
+  COMMERCE: () => import("@/domain/seeds/commerce"),
+  BOOK: () => import("@/domain/seeds/book"),
+  PROC: () => import("@/domain/seeds/proc"),
+  PORTAL: () => import("@/domain/seeds/portal"),
+  DOCS: () => import("@/domain/seeds/docs"),
+  SHEETS: () => import("@/domain/seeds/sheets"),
+  PRESENT: () => import("@/domain/seeds/present"),
+  DESIGN: () => import("@/domain/seeds/design"),
+  PHOTO: () => import("@/domain/seeds/photo"),
+  LAYOUT: () => import("@/domain/seeds/layout"),
+  VIDEO: () => import("@/domain/seeds/video"),
+  MOTION: () => import("@/domain/seeds/motion"),
+  WEB: () => import("@/domain/seeds/web"),
+  FORMS: () => import("@/domain/seeds/forms"),
+  BUILD: () => import("@/domain/seeds/build"),
+  CONNECT: () => import("@/domain/seeds/connect"),
+  IT: () => import("@/domain/seeds/it"),
+};
 const states = new Map<string, ApplicationLoadStatus>();
 const pending = new Map<string, Promise<void>>();
 const failures = new Map<string, LoadFailure>();
@@ -109,5 +145,31 @@ export function prefetchNativeApplication(code: string): Promise<void> {
 export async function loadApplications(): Promise<LoadFailure[]> {
   await Promise.allSettled([loadCoreApplications(),...Object.keys(NATIVE).map(code=>loadNativeApplication(code))]);
   return applicationLoadFailures();
+}
+/**
+ * Every application's fixtures, without its screens. Records in one
+ * application routinely reference another's (a care case names a CRM account,
+ * a mission names an AI employee), so those references must resolve before the
+ * owning application has been opened. Seed modules are data-only and load in
+ * the background after the workspace is ready; screen code stays on demand.
+ */
+let allSeeds: Promise<void> | null = null;
+export function loadAllSeeds(): Promise<void> {
+  if (allSeeds) return allSeeds;
+  const codes = Object.keys(NATIVE);
+  allSeeds = Promise.allSettled(codes.map(code => SEED_MODULES[code]?.()))
+    .then(async (outcomes) => {
+      // Seed whatever did load, then report a partial load as a failure so a
+      // screen that counts across applications never treats it as complete.
+      await seedLateContributors();
+      const missing = codes.filter((_, index) => outcomes[index].status === "rejected");
+      if (missing.length) throw new Error(`Fixtures did not load for: ${missing.join(", ")}`);
+    })
+    .catch(error => {
+      allSeeds = null; // A later call may retry.
+      console.error("Arlovi: background fixtures failed to load.", error);
+      throw error;
+    });
+  return allSeeds;
 }
 export const NATIVE_APPLICATION_CODES: readonly string[] = Object.keys(NATIVE);

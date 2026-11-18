@@ -275,6 +275,7 @@
   "guarded": [
    "Approve selected",
    "Reject selected",
+   "Compare quotes",
    "Convert to a purchase order"
   ]
  },
@@ -336,6 +337,11 @@
    {
     "kind": "action",
     "name": "Revise selected",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Purchase trail",
     "ok": true
    },
    {
@@ -487,6 +493,11 @@
    {
     "kind": "action",
     "name": "Flag a discrepancy",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Return to supplier",
     "ok": true
    },
    {

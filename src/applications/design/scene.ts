@@ -409,15 +409,15 @@ export function ungroup(page: ScenePage, groupId: string): ScenePage {
 }
 
 export function duplicateNodes(page: ScenePage, ids: string[], offset = 16): { page: ScenePage; ids: string[] } {
+  /* A layer inside another selected layer is copied with its parent, not twice. */
+  const roots = ids.filter((id) => page.nodes[id] && !ids.some((other) => other !== id && descendants(page, other).includes(id)));
   let next = page;
   const made: string[] = [];
-  for (const id of ids) {
-    const node = page.nodes[id];
-    if (!node) continue;
+  const map = new Map<string, string>();
+  for (const id of roots) {
     const parent = parentOf(page, id) ?? page.id;
-    const map = new Map<string, string>();
     const clone = (sourceId: string, targetParent: string): void => {
-      const source = next.nodes[sourceId] ?? page.nodes[sourceId];
+      const source = page.nodes[sourceId];
       if (!source) return;
       const copy: SceneNode = {
         ...structuredCloneSafe(source),
@@ -434,11 +434,93 @@ export function duplicateNodes(page: ScenePage, ids: string[], offset = 16): { p
     const root = map.get(id);
     if (root) made.push(root);
   }
-  return { page: next, ids: made };
+  return { page: remapLinks(next, map), ids: made };
+}
+
+/**
+ * Point the prototype links of freshly copied layers at the copies of their
+ * targets. A link to a layer outside the copied set keeps its target when that
+ * layer is on the page, and is dropped when it is not (pasted to another page or file).
+ */
+function remapLinks(page: ScenePage, map: Map<string, string>): ScenePage {
+  const nodes = { ...page.nodes };
+  for (const copyId of map.values()) {
+    const node = nodes[copyId];
+    if (!node?.link) continue;
+    const mapped = map.get(node.link.to);
+    if (mapped) {
+      nodes[copyId] = { ...node, link: { ...node.link, to: mapped } };
+    } else if (!page.nodes[node.link.to]) {
+      const { link: _dropped, ...rest } = node;
+      nodes[copyId] = rest;
+    }
+  }
+  return { ...page, nodes };
 }
 
 function structuredCloneSafe<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/* ------------------------------ clipboard ------------------------------ */
+
+/** Copied layers with their descendants; roots carry page-absolute positions. */
+export interface SceneClip {
+  roots: string[];
+  nodes: Record<string, SceneNode>;
+  children: Record<string, string[]>;
+}
+
+/** Copy layers (and everything inside them) so they can be pasted on any page. */
+export function copyNodes(page: ScenePage, ids: string[]): SceneClip | null {
+  /* A layer inside another selected layer comes along with its parent. */
+  const roots = ids.filter((id) => page.nodes[id] && !ids.some((other) => other !== id && descendants(page, other).includes(id)));
+  if (roots.length === 0) return null;
+  const nodes: Record<string, SceneNode> = {};
+  const children: Record<string, string[]> = {};
+  for (const root of roots) {
+    const abs = absoluteRect(page, page.nodes[root]);
+    nodes[root] = { ...structuredCloneSafe(page.nodes[root]), x: abs.x, y: abs.y };
+    for (const id of descendants(page, root)) {
+      nodes[id] = structuredCloneSafe(page.nodes[id]);
+    }
+    for (const id of [root, ...descendants(page, root)]) {
+      if (page.children[id]?.length) children[id] = [...page.children[id]];
+    }
+  }
+  return { roots, nodes, children };
+}
+
+/** Paste a clip at the top level of a page with fresh ids, offset from where it was copied. */
+export function pasteNodes(page: ScenePage, clip: SceneClip, offset = 16): { page: ScenePage; ids: string[] } {
+  let next = page;
+  const made: string[] = [];
+  const map = new Map<string, string>();
+  const place = (sourceId: string, parent: string, isRoot: boolean) => {
+    const source = clip.nodes[sourceId];
+    if (!source) return;
+    const copy: SceneNode = {
+      ...structuredCloneSafe(source),
+      id: uid(source.kind),
+      x: source.x + (isRoot ? offset : 0),
+      y: source.y + (isRoot ? offset : 0),
+    };
+    map.set(sourceId, copy.id);
+    next = addNode(next, copy, parent);
+    if (isRoot) made.push(copy.id);
+    for (const child of clip.children[sourceId] ?? []) place(child, copy.id, false);
+  };
+  for (const root of clip.roots) place(root, page.id, true);
+  return { page: remapLinks(next, map), ids: made };
+}
+
+/** Where a selection aligns: its own bounds for two or more layers, the parent frame for one. */
+export function alignTarget(page: ScenePage, ids: string[]): Rect | null {
+  if (ids.length >= 2) return selectionBounds(page, ids);
+  if (ids.length !== 1) return null;
+  const parent = parentOf(page, ids[0]);
+  const parentNode = parent && parent !== page.id ? page.nodes[parent] : undefined;
+  return parentNode ? absoluteRect(page, parentNode) : null;
 }
 
 /* ------------------------------ auto layout ------------------------------ */

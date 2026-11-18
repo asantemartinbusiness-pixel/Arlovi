@@ -126,7 +126,7 @@ function CurvesTab({ handle, doc, context }: { handle: DocHandle<MotionDoc>; doc
     <Row gap={4} wrap style={{ alignItems: "flex-start" }}>
       <div style={{ flex: "1 1 280px", maxWidth: 420 }}>
         {easing.kind === "bezier"
-          ? <EasingGraph easing={easing} size={260} progress={progress} label={`${picked.layer.name} ${PROPERTY_LABEL[picked.property]} easing`} onChange={(next) => handle.live((current) => setEasing(current, picked.layer.id, picked.property, picked.keyframe.id, next))} />
+          ? <EasingGraph easing={easing} size={260} progress={progress} label={`${picked.layer.name} ${PROPERTY_LABEL[picked.property]} easing`} onChange={(next) => handle.live((current) => setEasing(current, picked.layer.id, picked.property, picked.keyframe.id, next))} onCommit={handle.beginGesture} />
           : <EasingGraph easing={easing} size={260} progress={progress} onChange={() => {}} label={`${easing.kind} easing (no handles)`} />}
       </div>
       <Stack gap={2} style={{ flex: "1 1 220px" }}>

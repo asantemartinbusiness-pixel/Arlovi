@@ -23,7 +23,9 @@ export default defineConfig({
     navigationTimeout: 30_000,
     launchOptions,
   },
-  webServer: {
+  /* With BASE_URL the suite targets a server that is already running (a
+     preview, or a dev server on another port), so none is started here. */
+  webServer: process.env.BASE_URL ? undefined : {
     command: "npm run dev -- --host 127.0.0.1 --port 5173",
     url: "http://127.0.0.1:5173",
     reuseExistingServer: true,

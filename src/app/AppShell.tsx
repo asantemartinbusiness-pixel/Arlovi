@@ -38,7 +38,16 @@ export function AppShell() {
   const navigate = useNavigate();
   const { org, role, now } = useWorkspace();
   const mutate = useMutations();
-  const [navOpen, setNavOpen] = useState(false);
+  const [navOpen, setNavOpenState] = useState(false);
+  /* The path the drawer was opened on. Route changes close the drawer, but the
+     close runs after React renders the new route; a person who reopens the
+     drawer in that gap (a slow device, an application still loading) must not
+     have it shut underneath them. */
+  const navOpenedAt = useRef<string | null>(null);
+  const setNavOpen = useCallback((open: boolean) => {
+    navOpenedAt.current = open ? window.location.pathname : null;
+    setNavOpenState(open);
+  }, []);
   const [displayOpen, setDisplayOpen] = useState(false);
   const closeDisplay = useCallback(() => setDisplayOpen(false), []);
   const [attentionView, setAttentionView] = useState<"for-you" | "approvals" | "updates">("for-you");
@@ -183,7 +192,7 @@ export function AppShell() {
   }, [ui]);
 
   useEffect(() => {
-    setNavOpen(false);
+    if (navOpenedAt.current !== location.pathname) setNavOpen(false);
     const container = document.querySelector<HTMLElement>(".hq-scroll");
     if (container) container.scrollTop = 0;
     // A keyboard/screen-reader user needs a reliable focus destination after

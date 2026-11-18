@@ -1,0 +1,25 @@
+/* Publication editor: compact tool strip, a scrollable stage that keeps the
+   whole spread reachable, and the frames list. Tokens only. */
+
+.lx-tools { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; width: 100%; }
+.lx-tools .ds-toolbar { border-bottom: 0; padding: 0; min-height: 0; background: transparent; gap: var(--space-2); }
+.lx-tools .ds-tool { min-width: 30px; padding-inline: var(--space-2); font-size: var(--text-xs); }
+.lx-zoom { min-width: 3.4em; text-align: center; font-size: var(--text-2xs); color: var(--fg-muted); }
+
+/* Centring with margin:auto rather than place-content keeps the left edge of
+   a spread wider than the window scrollable into view. */
+.lx-stage { position: absolute; inset: 0; overflow: auto; display: flex; padding: var(--space-6); background: var(--bg-sunken); outline: none; }
+.lx-stage[data-tool="text"], .lx-stage[data-tool="image"], .lx-stage[data-tool="shape"] { cursor: crosshair; }
+.lx-spread { display: flex; gap: 10px; margin: auto; flex: none; box-shadow: var(--shadow-2); }
+
+.lx-layers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.lx-layer { display: flex; align-items: center; gap: var(--space-1); border-radius: var(--radius-sm); }
+.lx-layer:hover { background: var(--bg-hover); }
+.lx-layer[data-selected="true"] { background: var(--bg-selected); }
+.lx-layer-name {
+  flex: 1; min-width: 0; text-align: start; background: none; border: 0; cursor: pointer;
+  padding: var(--space-1) var(--space-2); font: inherit; font-size: var(--text-xs); color: var(--fg-default);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lx-layer[data-selected="true"] .lx-layer-name { color: var(--accent-soft-fg); font-weight: 600; }
+.lx-layer-name:focus-visible { box-shadow: var(--focus-ring); outline: none; }

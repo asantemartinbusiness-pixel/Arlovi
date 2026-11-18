@@ -19,10 +19,12 @@ import {
   InsightDetail, InsightsOverview, MetricInspector, QuestionComposer, SaveView, ScenarioEditor,
 } from "./overview";
 import { allMeasures, formatMeasure, measureById, runQuery } from "./metrics";
+import { exploreCsvCell } from "./explore";
 import {
   AdjustInputs, CiteFigures, CompareMeasures, CompareScenarios, DeployModel, GrantDataset, RefreshDataset, RefreshModel,
   ResizeTile, SetFilter, TestMeasure, ValidateModel,
 } from "./actions";
+import { gateScreens } from "./ready";
 import "./analytics.css";
 
 /* ====================================================================== *
@@ -43,7 +45,7 @@ const submitFooter = (formId: string, label: string) => ({ close }: { close: () 
 );
 
 function downloadCsv(name: string, header: string[], rows: (string | number)[][], context: ScreenContext) {
-  const escape = (cell: string | number) => `"${String(cell).replace(/"/g, '""')}"`;
+  const escape = exploreCsvCell;
   const text = [header.map(escape).join(","), ...rows.map((row) => row.map(escape).join(","))].join("\n");
   const blob = new Blob([text], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
@@ -86,7 +88,7 @@ export const analyticsApp = registerApp({
     },
   ],
 
-  screens: {
+  screens: gateScreens({
     /* ------------------------------ 001 ------------------------------ */
     "ARL-ANALYTICS-001": {
       id: "ARL-ANALYTICS-001",
@@ -132,7 +134,8 @@ export const analyticsApp = registerApp({
           run: async (context) => {
             const record = context.selectedId ? await db.records.get(context.selectedId) : undefined;
             if (!record) return;
-            await context.mutate.patch(record.id, { fields: { ...record.fields, pinned: record.fields.pinned !== true } }, { event: record.fields.pinned === true ? "Dashboard unpinned" : "Dashboard pinned" });
+            const saved = await context.mutate.patch(record.id, { fields: { ...record.fields, pinned: record.fields.pinned !== true } }, { event: record.fields.pinned === true ? "Dashboard unpinned" : "Dashboard pinned" });
+            if (!saved) return;
             context.toast(record.fields.pinned === true ? "Unpinned" : "Pinned", "The change is on the record.");
           },
         },
@@ -142,7 +145,8 @@ export const analyticsApp = registerApp({
           guard: (context) => (context.selectedId ? undefined : "Select a dashboard first"),
           run: async (context) => {
             if (!context.selectedId) return;
-            await context.mutate.patch(context.selectedId, { status: "archived" }, { event: "Dashboard archived" });
+            const saved = await context.mutate.patch(context.selectedId, { status: "archived" }, { event: "Dashboard archived" });
+            if (!saved) return;
             context.toast("Archived", "It no longer appears in the working directory. Its tiles are kept on the record.");
           },
         },
@@ -152,6 +156,7 @@ export const analyticsApp = registerApp({
         { id: "Dashboard setup", kind: "modal", title: "New dashboard", width: 560, render: ({ close, ...context }) => <DashboardSetup context={context} close={close} />, footer: submitFooter("dashboard-setup", "Create dashboard") },
         { id: "sharing", kind: "modal", title: "Sharing", width: 520, render: ({ close, ...context }) => <SharingPanel context={context} close={close} /> },
         { id: "source dependency", kind: "drawer", title: "What this dashboard depends on", width: 520, render: ({ ...context }) => <SourceDependencyOverlay context={context} /> },
+        { id: "create report", kind: "modal", title: "New report", width: 520, render: ({ close, ...context }) => <CreateReport context={context} close={close} />, footer: submitFooter("create-report", "Create report") },
       ],
     },
 
@@ -459,9 +464,10 @@ export const analyticsApp = registerApp({
         { id: "delivery method", kind: "modal", title: "How a report would be delivered", width: 520, render: ({ ...context }) => <DeliveryMethod context={context} /> },
         { id: "failure detail", kind: "drawer", title: "Why it did not go out", width: 520, render: ({ ...context }) => <FailureDetail context={context} /> },
         { id: "schedule", kind: "modal", title: "Schedule", width: 520, render: ({ close, ...context }) => <ScheduleOverlay context={context} close={close} /> },
+        { id: "create report", kind: "modal", title: "New report", width: 520, render: ({ close, ...context }) => <CreateReport context={context} close={close} />, footer: submitFooter("create-report", "Create report") },
       ],
     },
-  },
+  }),
 
   fallback: (context) => (
     <Notice tone="warning" title={`${context.screen.title} is not built yet`}>

@@ -154,7 +154,7 @@ export function TagCase({ context, close }: { context: ScreenContext; close: () 
 }
 
 export function LinkRecord({ context, close }: { context: ScreenContext; close: () => void }) {
-  const ticket = useRecord(context.selectedId);
+  const ticket = useRecord((context.overlayPayload as { id?: string } | undefined)?.id ?? context.params.id ?? context.selectedId);
   const data = useCollections(["contacts", "orders"]);
   const [contactIdRaw, setContactId] = useState<string | null>(null);
   const contactId = contactIdRaw ?? (String(ticket?.fields.contactId ?? ""));

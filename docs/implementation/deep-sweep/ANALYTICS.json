@@ -119,7 +119,27 @@
    },
    {
     "kind": "action",
+    "name": "Open",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Share",
+    "ok": true
+   },
+   {
+    "kind": "action",
     "name": "Create a dashboard",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Pin",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Archive",
     "ok": true
    },
    {
@@ -128,12 +148,7 @@
     "ok": true
    }
   ],
-  "guarded": [
-   "Open",
-   "Share",
-   "Pin",
-   "Archive"
-  ]
+  "guarded": []
  },
  {
   "id": "ARL-ANALYTICS-003",
@@ -647,23 +662,12 @@
     "kind": "action",
     "name": "Test a delivery",
     "ok": true
-   },
-   {
-    "kind": "action",
-    "name": "Schedule",
-    "ok": true
-   },
-   {
-    "kind": "action",
-    "name": "Pause",
-    "ok": true
-   },
-   {
-    "kind": "action",
-    "name": "Resend safely",
-    "ok": true
    }
   ],
-  "guarded": []
+  "guarded": [
+   "Schedule",
+   "Pause",
+   "Resend safely"
+  ]
  }
 ]

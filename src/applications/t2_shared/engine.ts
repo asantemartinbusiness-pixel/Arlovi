@@ -1,4 +1,5 @@
 import type { Rec } from "@/domain/types";
+import { rankKnowledge } from "@/applications/brain/knowledge/model";
 
 /* ====================================================================== *
  * Local answer engine for the intelligence applications.
@@ -180,6 +181,28 @@ const TOPICS: Topic[] = [
         citations: cite([...verified, ...proposed, ...conflicts, ...sources]),
         read: ["facts", "sources", "conflicts"],
         limits: ["A proposed fact is not authoritative until a person verifies it."],
+      };
+    },
+  },
+  {
+    id: "knowledgeRecords",
+    label: "Written knowledge",
+    test: /how (do|should|to)|procedure|process|checklist|warranty|lead time|return|policy|guide|what is our|who approves|knowledge/,
+    answer: ({ records, prompt }) => {
+      const hits = rankKnowledge(records, prompt);
+      if (hits.length === 0) return null;
+      const label = (record: Rec) => (record.status === "verified" ? "verified" : record.status === "needs_review" ? "in review, not verified" : "draft, not verified");
+      return {
+        text: [
+          `${hits.length} knowledge record${hits.length === 1 ? " matches" : "s match"} the words you used (${[...new Set(hits.flatMap((hit) => hit.matched))].join(", ")}).`,
+          ...hits.map(({ record }) => `“${record.title}” (${label(record)}${record.fields.provenance === "model_generated" ? ", model-generated text" : ""}): ${record.summary || "no summary written."}`),
+        ].join(" "),
+        citations: cite(hits.map((hit) => hit.record)),
+        read: ["knowledge"],
+        limits: [
+          "Matched by the words in your question and quoted from each record's summary. Nothing was paraphrased or generated.",
+          ...(hits.some(({ record }) => record.status !== "verified") ? ["A record that is not verified is not an authoritative answer."] : []),
+        ],
       };
     },
   },

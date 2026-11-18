@@ -16,6 +16,7 @@
     "qa": "npm run verify:inventory && npm run typecheck && npm run lint && npm run test && npm run build",
     "catalog": "python3 scripts/build_catalog.py",
     "ledger": "python3 scripts/build_screen_ledger.py",
+    "evidence": "ARLOVI_WRITE_EVIDENCE=1 vitest run tests/unit/registry-contract.test.ts && ARLOVI_WRITE_EVIDENCE=1 playwright test e2e/contract.spec.ts e2e/deep.spec.ts && npm run ledger",
     "test:journeys": "playwright test e2e/workflows.spec.ts",
     "test:sweep": "playwright test e2e/deep.spec.ts --workers=4",
     "test:visual": "playwright test e2e/full-visual-audit.spec.ts --workers=4"

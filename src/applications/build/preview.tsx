@@ -1,8 +1,9 @@
-import { useMemo } from "react";
-import { BarChart, Card, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextInput } from "@/design-system";
+import { useMemo, useState } from "react";
+import { BarChart, Button, Card, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextInput } from "@/design-system";
 import { useCollections, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
-import type { AppModel, AppScreen, Entity } from "./model";
+import type { AppModel, AppScreen, Entity, ScreenComponent } from "./model";
+import { applyQuery, describeQuery } from "./binding";
 
 /* ====================================================================== *
  * The preview runs a designed screen against records that are really in
@@ -24,9 +25,19 @@ function valueOf(record: Rec, fieldName: string): string {
   return direct === undefined ? "" : String(direct);
 }
 
+interface PreviewStep { screenId: string; recordId: string; via: string }
+
 export function ScreenPreview({
-  model, screen, role,
+  model, screen: designed, role,
 }: { model: AppModel; screen: AppScreen | undefined; role: string }) {
+  /* Interactions move the preview between screens without touching the
+     designer's selection. The trail resets when another screen is designed. */
+  const [trail, setTrail] = useState<PreviewStep[]>([]);
+  const [baseId, setBaseId] = useState(designed?.id);
+  if (designed?.id !== baseId) { setBaseId(designed?.id); setTrail([]); }
+  const step = trail[trail.length - 1];
+  const screen = (step && model.screens.find((item) => item.id === step.screenId)) || designed;
+  const focusId = step?.recordId ?? "";
   const collections = useMemo(
     () => [...new Set(model.entities.map((entity) => entity.collection).filter(Boolean))],
     [model.entities],
@@ -37,10 +48,24 @@ export function ScreenPreview({
 
   if (!screen) return <Empty title="No screen designed yet" >Add a screen in the designer and the preview runs it here.</Empty>;
 
-  function rowsFor(entity: Entity | undefined): Rec[] {
+  function allRows(entity: Entity | undefined): Rec[] {
     if (!entity || !entity.collection) return [];
     return data[entity.collection] ?? [];
   }
+
+  function queried(entity: Entity | undefined, component: ScreenComponent) {
+    const rows = allRows(entity);
+    const read = (row: Rec, fieldId: string) => valueOf(row, entity?.fields.find((field) => field.id === fieldId)?.name ?? "");
+    return applyQuery(rows, component, read, entity?.fields.map((field) => field.id) ?? []);
+  }
+
+  function choose(component: ScreenComponent, row?: Rec) {
+    const { kind, screenId } = component.interaction;
+    if (kind === "none" || !model.screens.some((item) => item.id === screenId)) return;
+    setTrail((current) => [...current, { screenId, recordId: kind === "open_record" && row ? row.id : "", via: `${component.title}${row ? `: ${row.title}` : ""}` }]);
+  }
+
+  const target = (component: ScreenComponent) => model.screens.find((item) => item.id === component.interaction.screenId);
 
   function denied(entity: Entity | undefined): boolean {
     if (!activeRole || !entity) return false;
@@ -54,13 +79,26 @@ export function ScreenPreview({
         <code className="ds-subtle">{screen.route}</code>
         {activeRole && <Pill tone="accent">as {activeRole.name}</Pill>}
       </Row>
+      {step && (
+        <div className="t6-build-preview-trail" aria-label="Preview path">
+          <span className="ds-subtle">Opened from {step.via}</span>
+          <Button size="sm" variant="secondary" onClick={() => setTrail((current) => current.slice(0, -1))}>
+            Back to {(trail.length > 1 ? model.screens.find((item) => item.id === trail[trail.length - 2].screenId) : designed)?.name ?? "the previous screen"}
+          </Button>
+          {trail.length > 1 && <Button size="sm" variant="ghost" onClick={() => setTrail([])}>Back to {designed?.name}</Button>}
+        </div>
+      )}
       <Grid>
         {screen.components.length === 0 && (
           <Card span={12}><Empty title="This screen has no components" >Add one from the palette and it appears here immediately.</Empty></Card>
         )}
         {screen.components.map((component) => {
           const entity = model.entities.find((item) => item.id === component.entityId);
-          const rows = rowsFor(entity);
+          const result = queried(entity, component);
+          const rows = result.rows;
+          const fieldName = (id: string) => entity?.fields.find((field) => field.id === id)?.name;
+          const scope = `${describeQuery(component, fieldName)} · ${result.matched === result.total ? result.total : `${result.matched} of ${result.total}`} ${entity?.collection ?? ""} records`;
+          const focused = focusId ? allRows(entity).find((row) => row.id === focusId) : undefined;
           const fields = component.fieldIds.length
             ? component.fieldIds.map((id) => entity?.fields.find((field) => field.id === id)).filter((field): field is NonNullable<typeof field> => Boolean(field))
             : entity?.fields.slice(0, 4) ?? [];
@@ -106,7 +144,7 @@ export function ScreenPreview({
                   <Stat
                     label={component.title}
                     value={isMoney ? money(total) : String(total)}
-                    meta={`${component.aggregate === "sum" ? "Sum" : "Count"} over ${rows.length} ${entity.collection} records`}
+                    meta={`${component.aggregate === "sum" ? "Sum" : "Count"} over ${rows.length} ${entity.collection} records · ${describeQuery(component, fieldName)}`}
                   />
                 </StatRow>
               </Card>
@@ -121,7 +159,7 @@ export function ScreenPreview({
               return map;
             }, {});
             return (
-              <Card key={component.id} span={component.span} title={component.title} subtitle={`Grouped by ${field.name}`}>
+              <Card key={component.id} span={component.span} title={component.title} subtitle={`Grouped by ${field.name} · ${scope}`}>
                 {rows.length === 0
                   ? <Empty title={`No ${entity.collection} records`} />
                   : <BarChart
@@ -137,10 +175,14 @@ export function ScreenPreview({
           if (component.kind === "list") {
             const field = fields[0] ?? entity.fields[0];
             return (
-              <Card key={component.id} span={component.span} title={component.title} subtitle={`${rows.length} ${entity.collection}`}>
-                {rows.length === 0 ? <Empty title="No records" /> : (
+              <Card key={component.id} span={component.span} title={component.title} subtitle={scope}>
+                {rows.length === 0 ? <Empty title={result.total ? "No records match the filters" : "No records"} /> : (
                   <Stack gap={1}>
-                    {rows.slice(0, 8).map((row) => <Row key={row.id} gap={2}><span className="ds-grow ds-truncate">{valueOf(row, field.name) || row.title}</span><Pill tone="neutral">{row.status}</Pill></Row>)}
+                    {rows.slice(0, component.limit || 8).map((row) => component.interaction.kind !== "none" && target(component)
+                      ? <button key={row.id} type="button" className="ds-record-card t6-build-row-action" aria-label={`${valueOf(row, field.name) || row.title}: open ${target(component)?.name}`} onClick={() => choose(component, row)}>
+                        <Row gap={2}><span className="ds-grow ds-truncate" style={{ textAlign: "start" }}>{valueOf(row, field.name) || row.title}</span><Pill tone="neutral">{row.status}</Pill></Row>
+                      </button>
+                      : <Row key={row.id} gap={2}><span className="ds-grow ds-truncate">{valueOf(row, field.name) || row.title}</span><Pill tone="neutral">{row.status}</Pill></Row>)}
                   </Stack>
                 )}
               </Card>
@@ -148,9 +190,9 @@ export function ScreenPreview({
           }
 
           if (component.kind === "detail") {
-            const first = rows[0];
+            const first = focused ?? rows[0];
             return (
-              <Card key={component.id} span={component.span} title={component.title} subtitle={first ? first.title : undefined}>
+              <Card key={component.id} span={component.span} title={component.title} subtitle={first ? `${first.title}${focused ? " · the chosen record" : ""}` : undefined}>
                 {first
                   ? <Properties rows={fields.map((field) => ({ label: field.name, value: valueOf(first, field.name) || <span className="ds-subtle">Empty</span> }))} />
                   : <Empty title={`No ${entity.collection} record to show`} />}
@@ -163,13 +205,19 @@ export function ScreenPreview({
             return (
               <Card key={component.id} span={component.span} title={component.title} subtitle={`${fields.length} fields from ${entity.name}`}>
                 <Stack gap={3}>
+                  {focused && <Pill tone="info">Editing {focused.title}</Pill>}
                   {fields.map((field) => (
-                    <Field key={field.id} label={field.name} required={field.required}>
+                    <Field key={`${field.id}-${focused?.id ?? "new"}`} label={field.name} required={field.required}>
                       {field.kind === "choice"
-                        ? <Select disabled={!writable} defaultValue="">{["", ...field.options].map((option) => <option key={option || "none"} value={option}>{option || "Choose"}</option>)}</Select>
-                        : <TextInput disabled={!writable} type={field.kind === "number" || field.kind === "money" ? "number" : field.kind === "date" ? "date" : "text"} />}
+                        ? <Select disabled={!writable} defaultValue={focused ? valueOf(focused, field.name) : ""}>{[...new Set(["", ...field.options, ...(focused ? [valueOf(focused, field.name)] : [])])].map((option) => <option key={option || "none"} value={option}>{option || "Choose"}</option>)}</Select>
+                        : <TextInput disabled={!writable} defaultValue={focused ? valueOf(focused, field.name) : undefined} type={field.kind === "number" || field.kind === "money" ? "number" : field.kind === "date" ? "date" : "text"} />}
                     </Field>
                   ))}
+                  {component.interaction.kind !== "none" && target(component) && (
+                    <Row gap={2} wrap>
+                      <Button size="sm" variant="secondary" onClick={() => choose(component)}>Continue to {target(component)?.name} (nothing is saved)</Button>
+                    </Row>
+                  )}
                   {!writable && <Notice tone="warning" title={`${activeRole?.name} has read access only`}>The fields are disabled in this role view.</Notice>}
                   <Notice tone="info" title="The preview does not write">A form in the preview shows the generated validation. Creating records is a decision for the built app, not for a design preview.</Notice>
                 </Stack>
@@ -178,8 +226,8 @@ export function ScreenPreview({
           }
 
           return (
-            <Card key={component.id} span={component.span} title={component.title} subtitle={`${rows.length} records from ${entity.collection}`} flush>
-              {rows.length === 0 ? <Empty title={`No ${entity.collection} records in this organisation`} /> : (
+            <Card key={component.id} span={component.span} title={component.title} subtitle={scope} flush>
+              {rows.length === 0 ? <Empty title={result.total ? "No records match the filters" : `No ${entity.collection} records in this organisation`} /> : (
                 <DataGrid
                   rows={rows}
                   rowId={(row) => row.id}
@@ -193,6 +241,7 @@ export function ScreenPreview({
                     sortValue: (row: Rec) => valueOf(row, field.name),
                     filterValue: (row: Rec) => valueOf(row, field.name),
                   }))}
+                  onOpen={component.interaction.kind !== "none" && target(component) ? (id) => choose(component, rows.find((row) => row.id === id)) : undefined}
                 />
               )}
             </Card>

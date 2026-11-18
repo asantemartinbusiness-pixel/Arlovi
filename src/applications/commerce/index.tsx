@@ -11,6 +11,7 @@ import {
   ProductInspect, publishStorefront, reorderStock, rollbackStorefront, ScanParcel, ScheduleOffer, StorefrontVersions, StorePicker, ThemeInspector,
 } from "./actions";
 import "@/applications/market/growth.css";
+import { AdvanceShipment, FulfilLines, RaiseReturn, RecordRefund, StockAdjustmentForm, StockHistory } from "./operations";
 import { bodyOf, statusTone, taxCategoryOfProduct, type OrderBody, type ProductBody } from "./data";
 import {
   CheckoutAdmin, CommerceAnalytics, CommerceOverview, Fulfilment, Inventory, OrderDetail,
@@ -21,8 +22,8 @@ import {
   CountReconciliation, DeliveryException, ExceptionList, ImportMapping, KpiExplanation, KpiInspector,
   LabelPreview, MarginCheck, MarginImpact, MediaPicker, OfferBuilder, OfferLaunchApproval,
   OrderQuickView, ProductEditor, ProviderSetup, PublishProduct,
-  RefundApproval, RefundAuthorization, RefundConfirmation, ReportSchedule, RestockAssessment,
-  ReturnInspector, ShippingLabel, StockAdjustment, TemplatePicker,
+  RefundApproval, RefundConfirmation, ReportSchedule, RestockAssessment,
+  ReturnInspector, ShippingLabel, TemplatePicker,
   TransferApproval, VariantEditor,
 } from "./overlays";
 
@@ -154,6 +155,7 @@ export const commerceApp = registerApp({
       })),
       actions: [
         { id: "Adjust", label: "Adjust stock", placement: "primary", run: (context) => context.openOverlay("Stock adjustment") },
+        { id: "history", label: "Stock history", placement: "secondary", run: (context) => context.openOverlay("stock history") },
         { id: "transfer", label: "Transfer", placement: "secondary", run: (context) => context.openOverlay("transfer approval") },
         { id: "count", label: "Stock count", placement: "secondary", run: (context) => context.openOverlay("count reconciliation") },
         { id: "receive", label: "Receive against a PO", placement: "overflow", run: (context) => context.openOverlay("receive goods") },
@@ -161,7 +163,8 @@ export const commerceApp = registerApp({
         { id: "receiving", label: "Open Receiving", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/proc/receiving`) },
       ],
       overlays: [
-        { id: "Stock adjustment", kind: "modal", title: "Adjust stock", width: 580, render: ({ close, ...context }) => <StockAdjustment context={context} close={close} />, footer: submitFooter("stock-adjustment", "Record movement") },
+        { id: "Stock adjustment", kind: "modal", title: "Adjust stock", width: 580, render: ({ close, ...context }) => <StockAdjustmentForm context={context} close={close} />, footer: submitFooter("stock-adjustment", "Record movement") },
+        { id: "stock history", kind: "drawer", title: "Stock history", width: 780, render: ({ ...context }) => <StockHistory context={context} /> },
         { id: "transfer approval", kind: "modal", title: "Transfer between locations", width: 620, render: ({ close, ...context }) => <TransferApproval context={context} close={close} />, footer: submitFooter("transfer-approval", "Record transfer") },
         { id: "count reconciliation", kind: "drawer", title: "Stock count", width: 700, render: ({ close, ...context }) => <CountReconciliation context={context} close={close} />, footer: submitFooter("count-reconciliation", "Record variances") },
         { id: "Requisition form", kind: "drawer", title: "Reorder: raise a requisition", width: 720, render: ({ close, ...context }) => <RequisitionForm context={context} close={close} />, footer: submitFooter("requisition-form", "Submit for approval") },
@@ -210,7 +213,9 @@ export const commerceApp = registerApp({
         </Row>
       ),
       actions: [
-        { id: "Fulfil", label: "Fulfil (record handover)", placement: "primary", run: (context) => context.openOverlay("Shipping label") },
+        { id: "Fulfil", label: "Fulfil lines", placement: "primary", run: (context) => context.openOverlay("fulfil lines", { id: context.params.id }) },
+        { id: "raise return", label: "Raise a return", placement: "secondary", run: (context) => context.openOverlay("raise return", { id: context.params.id }) },
+        { id: "handover", label: "Whole-order handover", placement: "overflow", run: (context) => context.openOverlay("Shipping label") },
         { id: "refund proposal", label: "Propose a refund", placement: "secondary", run: (context) => context.openOverlay("refund approval", { id: context.params.id }) },
         { id: "contact buyer", label: "Contact the buyer", placement: "overflow", run: (context) => context.openOverlay("buyer message", { id: context.params.id }) },
         { id: "refund state", label: "Refund state", placement: "overflow", run: (context) => context.openOverlay("refund confirmation") },
@@ -218,6 +223,10 @@ export const commerceApp = registerApp({
       ],
       overlays: [
         { id: "Shipping label", kind: "modal", title: "Carrier handover", width: 580, render: ({ close, ...context }) => <ShippingLabel context={context} close={close} /> },
+        { id: "fulfil lines", kind: "drawer", title: "Fulfil lines", width: 680, render: ({ close, ...context }) => <FulfilLines context={context} close={close} />, footer: submitFooter("fulfil-lines", "Start shipment") },
+        { id: "advance shipment", kind: "modal", title: "Update shipment", width: 560, render: ({ close, ...context }) => <AdvanceShipment context={context} close={close} />, footer: submitFooter("advance-shipment", "Record") },
+        { id: "raise return", kind: "modal", title: "Raise a return", width: 600, render: ({ close, ...context }) => <RaiseReturn context={context} close={close} />, footer: submitFooter("raise-return", "Raise return") },
+        { id: "refund authorization", kind: "modal", title: "Record a refund", width: 600, render: ({ close, ...context }) => <RecordRefund context={context} close={close} />, footer: submitFooter("record-refund", "Record refund") },
         { id: "cancellation impact", kind: "modal", title: "What cancelling does", tone: "danger", width: 580, render: ({ close, ...context }) => <CancellationImpact context={context} close={close} /> },
         { id: "refund confirmation", kind: "drawer", title: "Refund", width: 560, render: ({ ...context }) => <RefundConfirmation context={context} /> },
         { id: "refund approval", kind: "modal", title: "Propose a refund", width: 580, render: ({ close, ...context }) => <RefundApproval context={context} close={close} />, footer: submitFooter("refund-approval", "Record proposal") },
@@ -286,7 +295,8 @@ export const commerceApp = registerApp({
         render: (context: ScreenContext) => <Fulfilment context={context} lens={lens} />,
       })),
       actions: [
-        { id: "Create label", label: "Create label", placement: "primary", guard: needsSelection, run: (context) => createLabel(context) },
+        { id: "fulfil lines", label: "Fulfil lines", placement: "primary", guard: needsSelection, run: (context) => context.openOverlay("fulfil lines", { id: context.selectedId }) },
+        { id: "Create label", label: "Create label", placement: "secondary", guard: needsSelection, run: (context) => createLabel(context) },
         { id: "scan", label: "Scan", placement: "secondary", run: (context) => context.openOverlay("scan parcel") },
         { id: "handoff", label: "Hand off to carrier", placement: "secondary", guard: needsSelection, run: (context) => context.openOverlay("handoff", { id: context.selectedId }) },
         { id: "carrier", label: "Choose a carrier", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("Carrier selector", { ids: context.selectedId ? [context.selectedId] : [] }) },
@@ -299,6 +309,8 @@ export const commerceApp = registerApp({
         { id: "delivery exception", kind: "modal", title: "Delivery exception", width: 600, render: ({ close, ...context }) => <DeliveryException context={context} close={close} />, footer: submitFooter("delivery-exception", "Record decision") },
         { id: "scan parcel", kind: "drawer", title: "Scan", width: 600, render: ({ ...context }) => <ScanParcel context={context} /> },
         { id: "handoff", kind: "modal", title: "Hand off to the carrier", width: 580, render: ({ close, ...context }) => <ShippingLabel context={context} close={close} /> },
+        { id: "fulfil lines", kind: "drawer", title: "Fulfil lines", width: 680, render: ({ close, ...context }) => <FulfilLines context={context} close={close} />, footer: submitFooter("fulfil-lines", "Start shipment") },
+        { id: "advance shipment", kind: "modal", title: "Update shipment", width: 560, render: ({ close, ...context }) => <AdvanceShipment context={context} close={close} />, footer: submitFooter("advance-shipment", "Record") },
         confirmOverlay,
       ],
     },
@@ -314,13 +326,15 @@ export const commerceApp = registerApp({
       actions: [
         { id: "Approve", label: "Review and approve", placement: "primary", guard: needsSelection, run: (context) => context.openOverlay("Return inspector", { id: context.selectedId }) },
         { id: "restock", label: "Assess restocking", placement: "secondary", guard: needsSelection, run: (context) => context.openOverlay("restock assessment", { ids: context.selectedId ? [context.selectedId] : [] }) },
-        { id: "refund", label: "Refund (credit note)", placement: "secondary", guard: needsSelection, run: (context) => context.openOverlay("refund authorization", { id: context.selectedId }) },
+        { id: "refund", label: "Record a refund", placement: "secondary", guard: needsSelection, run: (context) => context.openOverlay("refund authorization", { id: context.selectedId }) },
+        { id: "raise return", label: "Raise a return", placement: "secondary", run: (context) => context.openOverlay("raise return") },
         { id: "communicate", label: "Message the customer", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("buyer message", { id: context.selectedId }) },
       ],
       overlays: [
         { id: "Return inspector", kind: "drawer", title: "Return", width: 600, render: ({ close, ...context }) => <ReturnInspector context={context} close={close} /> },
         { id: "restock assessment", kind: "modal", title: "Restocking", width: 600, render: ({ close, ...context }) => <RestockAssessment context={context} close={close} />, footer: submitFooter("restock-assessment", "Save assessment") },
-        { id: "refund authorization", kind: "modal", title: "Authorise a credit note", width: 580, render: ({ close, ...context }) => <RefundAuthorization context={context} close={close} />, footer: submitFooter("refund-authorization", "Record credit note") },
+        { id: "refund authorization", kind: "modal", title: "Record a refund", width: 600, render: ({ close, ...context }) => <RecordRefund context={context} close={close} />, footer: submitFooter("record-refund", "Record refund") },
+        { id: "raise return", kind: "modal", title: "Raise a return", width: 600, render: ({ close, ...context }) => <RaiseReturn context={context} close={close} />, footer: submitFooter("raise-return", "Raise return") },
         { id: "buyer message", kind: "modal", title: "Message the customer", width: 600, render: ({ close, ...context }) => <BuyerMessage context={context} close={close} />, footer: submitFooter("buyer-message", "Keep as a draft") },
       ],
     },

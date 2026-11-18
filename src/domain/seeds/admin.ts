@@ -131,6 +131,16 @@ registerSeed("admin", (ctx) => {
     term: "annual", processor: "not_connected", balanceMinor: 0, pricePerSeatMinor: 2_400,
   }, "published", 24_000);
 
+  /* ---------------- Access requests: reviewed under Roles & Permissions → Exceptions ---------------- */
+  const accessRequest = (n: number, member: { id: string; name: string; from: string }, to: string, reason: string, hoursAgo: number) =>
+    records.push(ctx.rec({
+      org: "nl", collection: "policies", n, title: `${member.name}: ${member.from} → ${to}`, status: "open", summary: reason, at: at(hoursAgo),
+      fields: { kind: "accessRequest", memberId: member.id, memberName: member.name, fromRole: member.from, requestedRole: to, requestedBy: member.name },
+      tags: ["accessRequest"],
+    }));
+  accessRequest(39, { id: "nl-members-003", name: "Priya Shah", from: "sales" }, "finance", "Covering month-end while Jonah is away; I need to post the accrual journals.", 20);
+  accessRequest(40, { id: "nl-members-020", name: "Theo Marsh", from: "member" }, "people", "Running workshop rotas and onboarding the two new finishers.", 52);
+
   /* ---------------- Sessions and devices ---------------- */
   const session = (n: number, title: string, fields: Record<string, string | number | boolean>, status: string, hoursAgo: number) =>
     records.push(ctx.rec({ org: "nl", collection: "sessions", n, title, status, summary: String(fields.agent ?? ""), at: at(hoursAgo), fields, owner: String(fields.member) }));

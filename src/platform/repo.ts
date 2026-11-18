@@ -168,6 +168,28 @@ export interface PatchOptions {
   event?: Omit<Audit, "id" | "at" | "actor" | "organizationId">;
 }
 
+/**
+ * The record a patch produces, without writing it. `patchRecord` uses this,
+ * and so can a caller that must commit several revisions atomically through
+ * `putMany` (an approval that changes a member and closes a request together).
+ * Identity, organisation and collection can never be changed by a patch.
+ */
+export function revisedRecord(current: Rec, patch: Partial<Rec>, context: Pick<WriteContext, "now" | "actor">, options: Pick<PatchOptions, "replaceFields" | "skipHistory"> = {}): Rec {
+  return {
+    ...current,
+    ...patch,
+    // A patch names the fields it changes; it never silently wipes the others.
+    fields: patch.fields ? (options.replaceFields ? { ...patch.fields } : { ...current.fields, ...patch.fields }) : current.fields,
+    id: current.id,
+    organizationId: current.organizationId,
+    collection: current.collection,
+    history: options.skipHistory ? current.history : [snapshot(current, context.now), ...current.history].slice(0, 25),
+    revision: current.revision + 1,
+    updatedAt: context.now,
+    updatedBy: context.actor,
+  };
+}
+
 export async function patchRecord(id: string, patch: Partial<Rec>, context: WriteContext, options: PatchOptions = {}): Promise<Rec> {
   return db.transaction("rw", [db.records, db.events], async () => {
     const current = await db.records.get(id);
@@ -178,19 +200,7 @@ export async function patchRecord(id: string, patch: Partial<Rec>, context: Writ
     if (options.expectRevision !== undefined && current.revision !== options.expectRevision) {
       throw new ConflictError(id, options.expectRevision, current.revision);
     }
-    const next: Rec = {
-      ...current,
-      ...patch,
-      // A patch names the fields it changes; it never silently wipes the others.
-      fields: patch.fields ? (options.replaceFields ? { ...patch.fields } : { ...current.fields, ...patch.fields }) : current.fields,
-      id: current.id,
-      organizationId: current.organizationId,
-      collection: current.collection,
-      history: options.skipHistory ? current.history : [snapshot(current, context.now), ...current.history].slice(0, 25),
-      revision: current.revision + 1,
-      updatedAt: context.now,
-      updatedBy: context.actor,
-    };
+    const next = revisedRecord(current, patch, context, options);
     await assertOpenJournalPeriod(next, current);
     if (rosterChanged(next, current)) await validateRosterWrites(current.organizationId, [next]);
     await db.records.put(next);

@@ -544,3 +544,62 @@ export function planImport(rows: string[][], headerRow: boolean): ColumnPlan[] {
   }
   return plans;
 }
+
+/* ---------------------------- Editing helpers ---------------------------- */
+
+/** True when the formula being typed is at a point where a cell reference may be inserted by pointing. */
+export function formulaWantsReference(value: string): boolean {
+  if (!value.startsWith("=")) return false;
+  const trimmed = value.trimEnd();
+  return trimmed === "=" || /[(,+\-*/^&<>=:]$/.test(trimmed);
+}
+
+/** The function name being typed at the end of a formula, if any. */
+export function typedFunctionPrefix(value: string): string | null {
+  if (!value.startsWith("=")) return null;
+  const match = /(^=|[(,+\-*/^&<>=\s])([A-Za-z][A-Za-z0-9]*)$/.exec(value);
+  if (!match) return null;
+  /* A cell reference such as A1 or AB12 is not a function prefix. */
+  if (/^[A-Za-z]{1,3}\d+$/.test(match[2])) return null;
+  return match[2].toUpperCase();
+}
+
+/** Functions whose name starts with what is being typed, shortest first. */
+export function functionSuggestions(value: string, names: string[], limit = 6): string[] {
+  const prefix = typedFunctionPrefix(value);
+  if (!prefix) return [];
+  return names
+    .filter((name) => name.startsWith(prefix) && name !== prefix)
+    .sort((a, b) => a.length - b.length || a.localeCompare(b))
+    .slice(0, limit);
+}
+
+/** Replace the typed prefix with the chosen function and an opening parenthesis. */
+export function applySuggestion(value: string, name: string): string {
+  const prefix = typedFunctionPrefix(value);
+  if (!prefix) return value;
+  return `${value.slice(0, value.length - prefix.length)}${name}(`;
+}
+
+function filled(sheet: Sheet, col: number, row: number): boolean {
+  const raw = sheet.cells[cellAddress(col, row)];
+  return raw !== undefined && raw !== "";
+}
+
+/**
+ * Ctrl + arrow: move to the edge of the current block of data, the start of
+ * the next block, or the sheet edge — the spreadsheet convention.
+ */
+export function edgeJump(sheet: Sheet, col: number, row: number, dCol: number, dRow: number): { col: number; row: number } {
+  const inside = (c: number, r: number) => c >= 0 && r >= 0 && c < sheet.cols && r < sheet.rows;
+  let c = col;
+  let r = row;
+  if (!inside(c + dCol, r + dRow)) return { col: c, row: r };
+  if (filled(sheet, c, r) && filled(sheet, c + dCol, r + dRow)) {
+    while (inside(c + dCol, r + dRow) && filled(sheet, c + dCol, r + dRow)) { c += dCol; r += dRow; }
+    return { col: c, row: r };
+  }
+  c += dCol; r += dRow;
+  while (!filled(sheet, c, r) && inside(c + dCol, r + dRow)) { c += dCol; r += dRow; }
+  return { col: c, row: r };
+}

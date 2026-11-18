@@ -5,7 +5,7 @@ import {
   ActionReceipts, CapabilityInspector, CapabilityRegistry, ConnectionDetail,
   ConnectionWizard, Connections, ConnectorDetail, ConnectorHealth, ConnectorPreview, ConsentStatus,
   CustomConnectors, ExternalOAuth, MappingEditor, Marketplace, ProviderEvidence, ReceiptDetail,
-  RetryReview, RevokeGrant, RiskSummary, ScopeReview, SyncCentre,
+  RetryReview, RevokeGrant, RiskSummary, ScopeReview, SyncCentre, openConnector, useConnector,
 } from "./panels";
 import { CONNECTOR_ENTRIES } from "./catalog";
 import { Button, Notice, Properties, Stack } from "@/design-system";
@@ -42,12 +42,13 @@ function ScopeChangePanel({ context }: { context: ScreenContext }) {
 }
 
 function ReconnectDialog({ context }: { context: ScreenContext }) {
+  const { records, entry } = useConnector(context);
   return (
     <Stack gap={3}>
       <Notice tone="warning" title="Reconnecting is the same flow that cannot complete">
         There is no previous connection to restore. Reconnect and connect are the same action, and both stop at the provider redirect.
       </Notice>
-      <Button variant="secondary" onClick={() => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/connect/connect/${CONNECTOR_ENTRIES[0].capability.id}`); }}>
+      <Button variant="secondary" onClick={() => { context.closeOverlay(); openConnector(context, records, entry ?? CONNECTOR_ENTRIES[0], "connect"); }}>
         Open the authorisation flow
       </Button>
     </Stack>

@@ -11,7 +11,7 @@ import {
   ageBuckets, cashFlow, monthlyMovement, periodLabel, recentPeriods, reconcile, trialForRange,
 } from "@/domain/fin-ledger";
 import { contactOf, openInvoices, outstandingMinor, receivablePosition, useFinData } from "./data";
-import { Amount, CapabilityNotice, CapabilityPill, LedgerHealth, OverdueBadge, SourceNote, StatementRow, StatusPill } from "./parts";
+import { Amount, BooksLoading, CapabilityNotice, CapabilityPill, LedgerHealth, OverdueBadge, SourceNote, StatementRow, StatusPill } from "./parts";
 
 /* ---------------------------- FIN-001 ---------------------------- */
 
@@ -27,6 +27,7 @@ export function FinanceOverview({ context }: { context: ScreenContext }) {
   const month = trialForRange(data.accounts, data.journals, org.id, { period: data.currentPeriod });
   const pl = { revenue: month.rows.filter((row) => row.type === "revenue").reduce((sum, row) => sum + row.balanceMinor, 0), expense: month.rows.filter((row) => row.type === "expense").reduce((sum, row) => sum + row.balanceMinor, 0) };
 
+  if (!data.ready) return <BooksLoading />;
   return (
     <Stack gap={5}>
       <StatRow>

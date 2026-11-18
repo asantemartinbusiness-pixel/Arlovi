@@ -15,13 +15,13 @@ export function GrowthOverviewNav({ context, code }: { context: ScreenContext; c
     .filter(link => link.to !== context.screen.route.replace(":org", context.org.slug));
   const peer = growthPeerDestination(code, context.org.slug);
 
-  return <section className="growth-workflow" aria-label={context.screen.applicationName + " workflow shortcuts"}>
+  return <section className="growth-workflow" aria-label={workflow.appName + " workflow shortcuts"}>
     <div className="growth-workflow-copy">
       <span className="growth-workflow-eyebrow">GROWTH / {workflow.stage.toUpperCase()}</span>
       <strong>{workflow.title}</strong>
       <p>{workflow.description}</p>
     </div>
-    {destinations.length > 0 && <nav className="growth-workflow-links" aria-label={context.screen.applicationName + " work areas"}>
+    {destinations.length > 0 && <nav className="growth-workflow-links" aria-label={workflow.appName + " work areas"}>
       {destinations.map(link =>
         <Link key={link.to} to={link.to}>{link.label}<ArrowUpRight size={14} aria-hidden="true" /></Link>)}
     </nav>}

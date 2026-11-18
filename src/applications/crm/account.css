@@ -1,0 +1,95 @@
+/* CRM account profile (inside ARL-CRM-004). Tokens only. */
+
+.crm-chain-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  min-width: 0;
+}
+
+.crm-chain {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs);
+}
+
+.crm-chain li {
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--fg-subtle);
+  white-space: nowrap;
+}
+
+.crm-chain li[data-state="done"] {
+  border-color: var(--success-border);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.crm-chain li[data-state="current"] {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-soft-fg);
+  font-weight: 600;
+}
+
+.crm-chain li[data-state="skipped"] {
+  border-style: dashed;
+}
+
+.crm-risk-list {
+  margin: 0;
+  padding-inline-start: var(--space-5);
+}
+
+.crm-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crm-task-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block-end: var(--space-2);
+  border-block-end: 1px solid var(--border-subtle);
+}
+
+.crm-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crm-timeline li {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--space-3);
+  padding-inline-start: var(--space-3);
+  border-inline-start: 2px solid var(--border-default);
+}
+
+.crm-timeline li[data-group="finance"] { border-inline-start-color: var(--success-border); }
+.crm-timeline li[data-group="pipeline"] { border-inline-start-color: var(--accent-border); }
+
+@media (max-width: 640px) {
+  .crm-timeline li { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+}
+
+.crm-timeline-filter {
+  max-width: 100%;
+  overflow-x: auto;
+}

@@ -9,7 +9,7 @@ import type { ScreenContext } from "@/platform/registry";
 import { useRecord } from "@/platform/workspace";
 import { ACTION_KINDS, findCycles, type WfNode, type WfNodeConfig } from "./engine";
 import { setDraftGraph, updateDraft, useBuilderDraft } from "./store";
-import { AUTOMATION_COLLECTIONS } from "./runner";
+import { AUTOMATION_COLLECTIONS, useGraphRecords } from "./runner";
 import { bindingsOf } from "./builder";
 import { nodeSummary } from "./canvas";
 
@@ -395,9 +395,10 @@ export function PolicySimulation({ context }: { context: ScreenContext }) {
 export function VariableSelector({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, draft } = useActionContext(context);
   const [target, setTarget] = useState<"titleExpr" | "summaryExpr">("titleExpr");
+  const pool = useGraphRecords(draft?.graph ?? { nodes: [], edges: [] });
   if (!record || !draft) return <Empty title="Open an automation first" />;
   const node = draft.graph.nodes.find((item) => item.id === draft.selectedNodeId && item.type === "action");
-  const bindings = bindingsOf(draft.graph);
+  const bindings = bindingsOf(draft.graph, pool);
 
   return (
     <Stack gap={4}>

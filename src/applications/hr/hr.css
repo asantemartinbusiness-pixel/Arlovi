@@ -425,3 +425,8 @@
 @media (max-width: 760px) {
   .hr-employee-history { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* People / leaver checklist and its preview in the departure dialog. */
+.hr-leaver-detail { flex: 1 0 100%; margin: 0; font-size: var(--text-xs); }
+.hr-leaver-preview { padding: var(--space-3); border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-inset); font-size: var(--text-sm); }
+.hr-leaver-preview ul { margin: var(--space-2) 0 0; padding-inline-start: var(--space-5); display: flex; flex-direction: column; gap: var(--space-1); }

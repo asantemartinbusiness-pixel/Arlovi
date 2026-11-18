@@ -2,6 +2,7 @@ import { useCollections } from "@/platform/workspace";
 import { computeInvoice, type CustomerTaxStatus, type InvoiceLine, type InvoiceTotals, type TaxCategory } from "@/platform/money";
 import type { Rec } from "@/domain/types";
 import { clockIso } from "@/platform/clock";
+import { lineProgress } from "./fulfilment";
 
 /* ---------------- Record body shapes used by COMMERCE ---------------- */
 
@@ -61,7 +62,8 @@ export function onHandFor(moves: Rec[], productId: string, warehouseId?: string)
 export function reservedFor(orders: Rec[], productId: string, warehouseId?: string): number {
   return orders
     .filter((order) => ["awaiting_payment", "unfulfilled", "exception"].includes(order.status) && (!warehouseId || String(order.fields.warehouseId) === warehouseId))
-    .flatMap((order) => bodyOf<OrderBody>(order, {}).lines ?? [])
+    // Units already shipped on a partial shipment have left stock, so they no longer reserve it.
+    .flatMap((order) => lineProgress(order).map((row) => ({ productId: row.line.productId, quantity: row.ordered - row.shipped })))
     .filter((line) => line.productId === productId)
     .reduce((sum, line) => sum + line.quantity, 0);
 }

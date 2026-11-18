@@ -632,6 +632,11 @@
    },
    {
     "kind": "action",
+    "name": "Edit details",
+    "ok": true
+   },
+   {
+    "kind": "action",
     "name": "Mute or unmute",
     "ok": true
    },

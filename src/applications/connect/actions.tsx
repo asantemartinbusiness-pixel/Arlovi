@@ -27,6 +27,10 @@ export function routeEntry(context: ScreenContext, records: Rec[]): ConnectorEnt
   return record ? entryForRecord(record.fields) : undefined;
 }
 
+/** Overlays without a target collection watch the connector records, so a routed record id resolves to its capability. */
+const useConnectorRecords = () => useCollection("connectors");
+const watchedEntry = (context: ScreenContext, watched: unknown) => routeEntry(context, (watched as Rec[] | undefined) ?? []);
+
 function recordsFor(entry: ConnectorEntry | undefined, records: Rec[]): Rec[] {
   if (!entry) return records;
   return records.filter((record) => entryForRecord(record.fields)?.capability.id === entry.capability.id);
@@ -126,9 +130,10 @@ export const installConnector = actOverlay({
   consequenceTitle: "An install stops at the provider",
   consequence: () => "A connector is an authorisation held against a provider account. Installing records your request on the connector record and in the receipts; the state stays not connected until a provider grant exists and one read succeeds.",
   boundary: { id: "email.send", action: "Installing" },
-  fields: ({ context }) => {
+  useWatch: useConnectorRecords,
+  fields: ({ context, watched }) => {
     const payload = context.overlayPayload as { id?: string } | undefined;
-    return [{ name: "capability", label: "Connector", kind: "select", initial: payload?.id ?? context.params.id, options: CONNECTOR_ENTRIES.map((entry) => ({ value: entry.capability.id, label: `${entry.capability.label} · ${entry.capability.provider}` })) }];
+    return [{ name: "capability", label: "Connector", kind: "select", initial: payload?.id ?? watchedEntry(context, watched)?.capability.id, options: CONNECTOR_ENTRIES.map((entry) => ({ value: entry.capability.id, label: `${entry.capability.label} · ${entry.capability.provider}` })) }];
   },
   submit: "Record the install request",
   apply: async ({ values, context }) => {
@@ -203,8 +208,9 @@ export const requestCapability = actOverlay({
   id: "request capability",
   title: "Request a capability",
   consequence: () => "A request for an operation the contract does not offer becomes a task for the person who owns connectors, with your reason. Nothing is added to the registry until a person declares and approves it.",
-  fields: ({ people, context }) => {
-    const entry = entryById(context.params.id ?? "");
+  useWatch: useConnectorRecords,
+  fields: ({ people, context, watched }) => {
+    const entry = watchedEntry(context, watched);
     return [
       { name: "capability", label: "On", kind: "select", initial: entry?.capability.id, options: CONNECTOR_ENTRIES.map((item) => ({ value: item.capability.id, label: item.capability.label })) },
       { name: "operation", label: "Operation wanted", required: true, placeholder: "list_refunds" },
@@ -237,8 +243,9 @@ export const attemptAuthorisation = actOverlay({
   title: "Leaving for the provider",
   tone: "danger",
   consequenceTitle: "The flow stops here, deliberately",
-  consequence: ({ context }) => {
-    const entry = entryById(context.params.id ?? "") ?? CONNECTOR_ENTRIES[0];
+  useWatch: useConnectorRecords,
+  consequence: ({ context, watched }) => {
+    const entry = watchedEntry(context, watched) ?? CONNECTOR_ENTRIES[0];
     return `An authorisation for ${entry.capability.label} sends you to a page ${entry.capability.provider.toLowerCase()} controls, and expects a callback to an address this workspace does not have. The attempt is recorded as blocked and nothing is marked connected.`;
   },
   Details: () => (
@@ -249,8 +256,8 @@ export const attemptAuthorisation = actOverlay({
     ]} />
   ),
   submit: "Attempt the authorisation",
-  apply: async ({ context }) => {
-    const entry = entryById(context.params.id ?? "") ?? CONNECTOR_ENTRIES[0];
+  apply: async ({ context, watched }) => {
+    const entry = watchedEntry(context, watched) ?? CONNECTOR_ENTRIES[0];
     await findOrCreateConnector(context, entry, { lastAuthAttemptAt: nowIso(context), lastAuthAttemptBy: context.actor, lastAuthOutcome: "stopped before the provider redirect" }, `Authorisation attempted for ${entry.capability.label}: stopped before the redirect`);
     await context.mutate.log(`Authorisation attempted for ${entry.capability.label}: stopped before the provider redirect. No grant, no token, no connection.`, { type: "capability", capability: "not_connected" });
     context.setTab("Confirm");

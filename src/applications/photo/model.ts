@@ -4,6 +4,7 @@
 
 import { createStore, type Store } from "@/applications/visual/kit";
 import { uid, type Rect } from "@/applications/visual/geometry";
+import { withMaskFrames } from "./maskSpace";
 import {
   NEUTRAL_ADJUST, generateBasePixels, newAdjustmentLayer,
   type BrushSettings, type PhotoLayer, type RasterDoc,
@@ -58,6 +59,20 @@ function isRasterDoc(body: unknown): body is RasterDoc {
   return Boolean(body && typeof body === "object" && (body as RasterDoc).version === 2 && Array.isArray((body as RasterDoc).layers));
 }
 
+/* A stored document without pixels (a seeded one) gets the same generated
+   base raster the legacy path uses, cached per size so library thumbnails
+   do not regenerate it on every render. */
+const generatedBases = new Map<string, string>();
+function generatedBase(width: number, height: number): string {
+  const key = `${width}x${height}`;
+  let src = generatedBases.get(key);
+  if (!src) {
+    src = generateBasePixels(width, height, 212, "generated in-canvas");
+    generatedBases.set(key, src);
+  }
+  return src;
+}
+
 /**
  * Open a photo record. The old studio body is a list of coloured rectangles
  * with brightness and contrast; it is lifted into real layers, and a base
@@ -68,6 +83,9 @@ export function parsePhoto(body: unknown): RasterDoc {
   if (isRasterDoc(body)) {
     return {
       ...body,
+      layers: withMaskFrames(body.layers).map((layer, index) => (index === 0 && layer.kind === "pixel" && !layer.src && typeof document !== "undefined"
+        ? { ...layer, src: generatedBase(layer.w || body.width, layer.h || body.height), naturalWidth: layer.w || body.width, naturalHeight: layer.h || body.height }
+        : layer)),
       presets: body.presets ?? defaultPresets(),
       profile: body.profile ?? "sRGB IEC61966-2.1",
       rights: body.rights ?? { license: "Company-owned", credit: "not recorded" },

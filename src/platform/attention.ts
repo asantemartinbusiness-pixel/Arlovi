@@ -257,9 +257,9 @@ function approverRoles(collection: string): Role[] {
 }
 
 /** List and detail screens for each collection; checked against the catalogue in tests. */
-export const RECORD_ROUTES: Record<string, { list: string; detail?: string }> = {
+export const RECORD_ROUTES: Record<string, { list: string; detail?: string; query?: string }> = {
   invoices: { list: "fin/invoices", detail: "fin/invoices" }, bills: { list: "fin/bills" }, expenses: { list: "fin/expenses" }, journals: { list: "fin/ledger" },
-  deals: { list: "crm/deals", detail: "crm/deals" }, contacts: { list: "crm/contacts", detail: "crm/contacts" }, companies: { list: "crm/companies" }, quotes: { list: "crm/quotes" },
+  deals: { list: "crm/deals", detail: "crm/deals" }, contacts: { list: "crm/contacts", detail: "crm/contacts" }, companies: { list: "crm/companies", query: "account" }, quotes: { list: "crm/quotes" },
   employees: { list: "hr/employees", detail: "hr/employees" }, leaveRequests: { list: "hr/leave" }, candidates: { list: "hr/recruitment", detail: "hr/candidates" },
   projects: { list: "project/projects", detail: "project/projects" }, tasks: { list: "project/projects", detail: "project/tasks" },
   missions: { list: "mission/missions", detail: "mission/missions" }, agents: { list: "team/agents", detail: "team/agents" },
@@ -267,12 +267,19 @@ export const RECORD_ROUTES: Record<string, { list: string; detail?: string }> = 
   orders: { list: "commerce/orders", detail: "commerce/orders" }, bookings: { list: "book/calendar", detail: "book/bookings" }, tickets: { list: "care/tickets", detail: "care/tickets" },
   documents: { list: "docs/files", detail: "docs/documents" }, workbooks: { list: "sheets/workbooks", detail: "sheets/workbooks" }, decks: { list: "present/decks", detail: "present/decks" },
   designs: { list: "design/files", detail: "design/files" }, contracts: { list: "legal/contracts", detail: "legal/contracts" }, suppliers: { list: "proc/suppliers", detail: "proc/suppliers" },
+  // Knowledge records open inside the Company Brain workspace by query.
+  knowledge: { list: "brain/home", query: "record" },
+  // Agent teams are managed in the AI workforce directory (no per-team page).
+  agentTeams: { list: "team/agents" },
+  workflows: { list: "auto/workflows", detail: "auto/workflows" },
 };
 
 export function routeForRecord(record: Rec, orgSlug: string): string | undefined {
   const route = RECORD_ROUTES[record.collection];
   if (!route) return undefined;
-  return route.detail ? `/o/${orgSlug}/${route.detail}/${record.id}` : `/o/${orgSlug}/${route.list}`;
+  if (route.detail) return `/o/${orgSlug}/${route.detail}/${record.id}`;
+  if (route.query) return `/o/${orgSlug}/${route.list}?${route.query}=${encodeURIComponent(record.id)}`;
+  return `/o/${orgSlug}/${route.list}`;
 }
 
 /** A person's Inbox "Mine" lens must not contain somebody else's tasks. */

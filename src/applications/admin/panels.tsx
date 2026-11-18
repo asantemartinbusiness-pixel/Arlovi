@@ -9,10 +9,13 @@ import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES } from "@/platform/capability";
 import { can as roleCan, ROLE_LABELS, type Capability } from "@/platform/policy";
 import type { Rec, Role } from "@/domain/types";
+import { AccessRequests, EffectiveAccess } from "./access";
 import {
-  appsForRole, CAPABILITIES, capabilityLabel, csvList, ofKind, ROLES, RoleReach, StepUp,
+  appsForRole, CAPABILITIES, capabilityLabel, csvCell, csvList, ofKind, ROLES, RoleReach, StepUp,
   useAdmin, useOrganisationRecord, useSeeded, useSeededList,
 } from "./pieces";
+import { LeaverHandoffs, completeHandoffs, useLeaverHandoffs } from "./leavers";
+import { TeamsManager } from "./teams";
 import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
@@ -380,33 +383,14 @@ export function MembersScreen({ context, tab }: { context: ScreenContext; tab: "
   }
 
   if (tab === "Teams") {
-    return (
-      <Grid>
-        {data.departments.map((department) => {
-          const people = internal.filter((member) => member.fields.departmentId === department.id);
-          return (
-            <Card key={department.id} eyebrow="TEAM" prov="posted" span={6} title={department.title} subtitle={`${people.length} ${people.length === 1 ? "member" : "members"}`}>
-              <Stack gap={2}>
-                {people.map((member) => (
-                  <Row key={member.id} gap={2}>
-                    <span className="ds-grow ds-truncate">{member.title}</span>
-                    <Pill tone={member.fields.kind === "ai" ? "accent" : "neutral"}>{member.fields.kind === "ai" ? "Agent" : ROLE_LABELS[String(member.fields.role) as Role] ?? "Member"}</Pill>
-                  </Row>
-                ))}
-                {people.length === 0 && <span className="ds-subtle">Nobody is assigned to this department.</span>}
-              </Stack>
-            </Card>
-          );
-        })}
-        {data.departments.length === 0 && <Empty title="No departments" icon={<Users size={20} />}>Departments are created in Headquarters.</Empty>}
-      </Grid>
-    );
+    return <TeamsManager context={context} members={internal} departments={data.departments} />;
   }
 
   const rows = tab === "External" ? external : internal;
 
   return (
     <Stack gap={4}>
+      {tab === "Members" && <LeaverHandoffs context={context} members={internal} sessions={data.sessions} />}
       {tab === "External" && (
         <Notice tone="info" title="External people see only what is shared with them">
           A client or supplier contact holds the client view: their own records in the portal and nothing else. The scope column says
@@ -453,7 +437,7 @@ export function MembersScreen({ context, tab }: { context: ScreenContext; tab: "
               label: "Export CSV",
               onRun: (selected) => {
                 const header = "name,role,status,department,last seen\n";
-                const body = selected.map((row) => [row.title, String(row.fields.role ?? ""), row.status, String(row.fields.departmentId ?? ""), String(row.fields.lastAccessAt ?? "")].map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")).join("\n");
+                const body = selected.map((row) => [row.title, String(row.fields.role ?? ""), row.status, String(row.fields.departmentId ?? ""), String(row.fields.lastAccessAt ?? "")].map((cell) => csvCell(cell)).join(",")).join("\n");
                 const blob = new Blob([header + body], { type: "text/csv" });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement("a");
@@ -606,7 +590,8 @@ export function RoleImpact({ context, close }: { context: ScreenContext; close: 
           onClick={async () => {
             setBusy(true);
             try {
-              await context.mutate.patch(member.id, { fields: { ...member.fields, role } }, { event: `Role view changed from ${current} to ${role} for ${member.title}`, expectRevision: member.revision });
+              const saved = await context.mutate.patch(member.id, { fields: { ...member.fields, role } }, { event: `Role view changed from ${current} to ${role} for ${member.title}`, expectRevision: member.revision });
+              if (!saved) return;
               context.toast("Role changed", `${member.title} now holds the ${ROLE_LABELS[role]} view, and the change is in the audit trail.`);
               close();
             } finally {
@@ -628,6 +613,7 @@ export function RevokeConfirmation({ context, close }: { context: ScreenContext;
   const members = data.members.filter((row) => ids.includes(row.id));
   const sessions = data.sessions.filter((session) => members.some((member) => member.title === String(session.fields.member)) && session.status === "active");
   const keys = data.apiKeys.filter((key) => members.some((member) => member.title === String(key.fields.createdBy)) && key.status === "active");
+  const handoffs = useLeaverHandoffs().filter((task) => members.some((member) => member.title === String(task.fields.employeeName ?? "")));
   const [busy, setBusy] = useState(false);
 
   if (members.length === 0) return <Empty title="Select a member" icon={<Users size={20} />}>Choose who is leaving.</Empty>;
@@ -640,25 +626,43 @@ export function RevokeConfirmation({ context, close }: { context: ScreenContext;
       onConfirm={async () => {
         setBusy(true);
         try {
+          // A patch returns null when the record changed elsewhere (the helper
+          // has already said so). Only a member whose suspension saved has
+          // their sessions and keys revoked and their leaver step closed.
+          const suspended: Rec[] = [];
           for (const member of members) {
-            await context.mutate.patch(member.id, {
+            const saved = await context.mutate.patch(member.id, {
               status: "suspended",
               fields: { ...member.fields, suspendedBy: context.actor, suspendedAt: clockIso() },
             }, { event: `Access suspended for ${member.title}`, expectRevision: member.revision });
+            if (saved) suspended.push(member);
           }
-          for (const session of sessions) {
-            await context.mutate.patch(session.id, {
+          if (suspended.length === 0) return;
+          const names = suspended.map((member) => member.title);
+          let revokedSessions = 0;
+          for (const session of sessions.filter((row) => names.includes(String(row.fields.member)))) {
+            const saved = await context.mutate.patch(session.id, {
               status: "revoked",
               fields: { ...session.fields, revokedBy: context.actor, revokedAt: clockIso() },
-            }, { event: `Session revoked during offboarding: ${session.title}` });
+            }, { event: `Session revoked during offboarding: ${session.title}`, expectRevision: session.revision });
+            if (saved) revokedSessions += 1;
           }
-          for (const key of keys) {
-            await context.mutate.patch(key.id, {
+          let revokedKeys = 0;
+          for (const key of keys.filter((row) => names.includes(String(row.fields.createdBy)))) {
+            const saved = await context.mutate.patch(key.id, {
               status: "revoked",
               fields: { ...key.fields, revokedBy: context.actor, revokedAt: clockIso() },
-            }, { event: `API key revoked during offboarding: ${key.title}` });
+            }, { event: `API key revoked during offboarding: ${key.title}`, expectRevision: key.revision });
+            if (saved) revokedKeys += 1;
           }
-          context.toast("Offboarded", `${members.length} suspended, ${sessions.length} ${sessions.length === 1 ? "session" : "sessions"} revoked, ${keys.length} ${keys.length === 1 ? "key" : "keys"} revoked.`);
+          const failed = members.length - suspended.length;
+          const closed = await completeHandoffs(context, handoffs, names, `member suspended, ${revokedSessions} sessions and ${revokedKeys} keys revoked`);
+          context.toast(
+            failed ? "Partly offboarded" : "Offboarded",
+            `${suspended.length} suspended, ${revokedSessions} ${revokedSessions === 1 ? "session" : "sessions"} revoked, ${revokedKeys} ${revokedKeys === 1 ? "key" : "keys"} revoked.${closed ? ` ${closed} leaver ${closed === 1 ? "step" : "steps"} closed in People.` : ""}${failed ? ` ${failed} ${failed === 1 ? "member was" : "members were"} not suspended because the record changed elsewhere; reload and try again.` : ""}`,
+            failed ? "blocked" : "ok",
+          );
+          if (failed) return;
           close();
         } finally {
           setBusy(false);
@@ -670,6 +674,7 @@ export function RevokeConfirmation({ context, close }: { context: ScreenContext;
         { label: "Sessions revoked", value: `${sessions.length}${sessions.length ? `: ${sessions.map((session) => session.title).join("; ")}` : ""}` },
         { label: "API keys revoked", value: `${keys.length}${keys.length ? `: ${keys.map((key) => key.title).join("; ")}` : ""}` },
         { label: "Records kept", value: "Everything they created stays, with their name on it, for the audit trail." },
+        ...(handoffs.length ? [{ label: "People leaver step", value: `Closed on ${handoffs.map((task) => String(task.fields.employeeName)).join(", ")}'s record when this is confirmed` }] : []),
       ]} />
       <Notice tone="warning" title="Suspending is not deleting">
         Their work, approvals and messages remain. A request to erase personal data is handled in Privacy, where a legal hold can
@@ -745,49 +750,13 @@ export function RolesScreen({ context, tab }: { context: ScreenContext; tab: "Ro
     );
   }
 
-  if (tab === "Effective access") {
-    return (
-      <Stack gap={4}>
-        <Notice tone="warning" title="Deny wins, and a server would decide">
-          This grid is what the interface offers each role view today. In a product with a server, deny takes precedence over allow and
-          the tenant boundary is enforced there, not here. Nothing in this browser is a security boundary.
-        </Notice>
-        <Card eyebrow="EFFECTIVE ACCESS" prov="posted" title="Role against capability" flush>
-          <div className="ds-grid-wrap">
-            <div className="ds-grid-scroll">
-              <table className="ds-table">
-                <caption className="ds-sr-only">Capabilities held by each role view</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Capability</th>
-                    {ROLES.map((role) => <th key={role} scope="col">{ROLE_LABELS[role]}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {CAPABILITIES.map((capability) => (
-                    <tr key={capability}>
-                      <th scope="row" className="ds-table-primary">{capabilityLabel(capability)}</th>
-                      {ROLES.map((role) => (
-                        <td key={role}>
-                          {roleCan(role, capability)
-                            ? <Pill tone="success">Allowed</Pill>
-                            : <span className="ds-subtle">Denied</span>}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </Card>
-      </Stack>
-    );
-  }
+  if (tab === "Effective access") return <EffectiveAccess context={context} />;
 
   const exceptions = custom.filter((role) => csvList(role.fields.deny).length > 0 || role.status === "draft");
   return (
     <Stack gap={4}>
+      <AccessRequests context={context} />
+      <h3 style={{ fontSize: "var(--text-md)" }}>Custom roles that differ from their base view</h3>
       {exceptions.length === 0 ? (
         <Empty title="No exceptions" icon={<ShieldCheck size={20} />}>Every role in use matches its built-in view with nothing added.</Empty>
       ) : (

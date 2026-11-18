@@ -697,11 +697,6 @@
    },
    {
     "kind": "action",
-    "name": "Correct an entry",
-    "ok": true
-   },
-   {
-    "kind": "action",
     "name": "Export timesheets",
     "ok": true
    },
@@ -711,6 +706,8 @@
     "ok": true
    }
   ],
-  "guarded": []
+  "guarded": [
+   "Correct an entry"
+  ]
  }
 ]

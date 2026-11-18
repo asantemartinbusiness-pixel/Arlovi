@@ -61,6 +61,11 @@
    },
    {
     "kind": "action",
+    "name": "Inspect assertions and sources",
+    "ok": true
+   },
+   {
+    "kind": "action",
     "name": "All opportunities",
     "ok": true
    },
@@ -663,16 +668,6 @@
    },
    {
     "kind": "action",
-    "name": "approve extraction",
-    "ok": true
-   },
-   {
-    "kind": "action",
-    "name": "route document",
-    "ok": true
-   },
-   {
-    "kind": "action",
     "name": "Upload",
     "ok": true
    },
@@ -682,6 +677,9 @@
     "ok": true
    }
   ],
-  "guarded": []
+  "guarded": [
+   "approve extraction",
+   "route document"
+  ]
  }
 ]

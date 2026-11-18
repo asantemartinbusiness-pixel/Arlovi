@@ -55,7 +55,7 @@ describe("arithmetic and precedence", () => {
   });
 
   it("names an unknown function instead of guessing", () => {
-    expect(value({ A1: "=XLOOKUP(1,2,3)" }, "A1").error).toBe("#NAME?");
+    expect(value({ A1: "=GROWTH(1,2,3)" }, "A1").error).toBe("#NAME?");
   });
 
   it("reports an unparseable formula", () => {

@@ -80,3 +80,15 @@
 .mo-prop .vx-label {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* Easing preview: the eased ball against a linear one, on two lanes. */
+.mo-ease { display: grid; gap: var(--space-1); }
+.mo-ease-lane { position: relative; height: 22px; border-radius: var(--radius-sm); background: var(--graphite-900); margin-inline-start: 52px; }
+.mo-ease-label { position: absolute; inset-inline-end: calc(100% + 6px); top: 3px; }
+.mo-ease-ball { position: absolute; top: 4px; width: 14px; height: 14px; border-radius: 50%; }
+
+/* One compact tool row above the stage (the same treatment the video and layout editors use). */
+.mo-tools { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; width: 100%; }
+.mo-tools .ds-toolbar { border-bottom: 0; padding: 0; min-height: 0; background: transparent; }
+.mo-tools .ds-toolbar + .ds-toolbar { border-inline-start: 1px solid var(--border-default); padding-inline-start: var(--space-2); }
+.mo-tools .ds-tool { min-width: 30px; padding-inline: var(--space-2); font-size: var(--text-xs); }

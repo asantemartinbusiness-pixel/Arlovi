@@ -20,6 +20,10 @@
   background: var(--bg-surface); color: var(--fg-subtle); font-size: var(--text-sm); font-weight: 300;
 }
 .hq-search:hover { background: var(--bg-hover); }
+/* At larger interface scales the label must truncate, not wrap the pill onto
+   several lines; the full name stays available to assistive technology. */
+.hq-search-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hq-search .ds-kbd { flex-shrink: 0; }
 .hq-bell { position: relative; }
 .hq-bell-count {
   position: absolute; inset-block-start: 2px; inset-inline-end: 2px; min-width: 16px; height: 16px;

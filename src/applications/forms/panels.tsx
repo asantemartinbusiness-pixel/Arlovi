@@ -9,7 +9,7 @@ import type { ScreenContext } from "@/platform/registry";
 import { useChildren, useCollection, useEvents, useWorkspace } from "@/platform/workspace";
 import { daysBetween, wallMs } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
-import { BoundaryNotice, downloadCsv, downloadFile } from "@/applications/t6kit/kit";
+import { BoundaryNotice, downloadFile } from "@/applications/t6kit/kit";
 import {
   FIELD_LABELS, OPERATOR_LABELS, STRUCTURAL, answerText, embedSnippet, evaluate, logicIssues,
   makeField, pages, readForm, validate, type Answers, type FormModel, type LogicRule, type Operator,
@@ -17,6 +17,7 @@ import {
 import { FormRuntime } from "./runtime";
 import { NoForm, useFormRecord } from "./builder";
 import { saveForm } from "./state";
+import { QuestionSummaryView, ResultsTableView, exportResultsCsv } from "./results";
 
 /* ================================================================ *
  * ARL-FORMS-001 — Forms Directory
@@ -566,6 +567,7 @@ export function SubmissionsScreen({ context, lens }: { context: ScreenContext; l
   const { now } = useWorkspace();
   const [revealed, setRevealed] = useState<string[]>([]);
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<"inbox" | "table" | "summary">("inbox");
   if (!record) return <NoForm />;
   const sensitive = model.fields.filter((field) => field.sensitive).map((field) => field.label);
   const rows = children.filter((row) => {
@@ -609,7 +611,19 @@ export function SubmissionsScreen({ context, lens }: { context: ScreenContext; l
         </Notice>
       )}
 
-      {rows.length === 0 ? (
+      <Row gap={3} wrap>
+        <Segmented
+          label="Response view"
+          value={view}
+          onChange={setView}
+          options={[{ value: "inbox" as const, label: "Inbox" }, { value: "table" as const, label: "Results table" }, { value: "summary" as const, label: "Question summary" }]}
+        />
+        <span className="ds-subtle ds-grow">{view === "inbox" ? "Review, assign and route each response." : view === "table" ? "One row per response, one column per question." : "Counts and distributions for each question."}</span>
+      </Row>
+
+      {view === "table" ? <ResultsTableView context={context} record={record} model={model} submissions={rows} />
+        : view === "summary" ? <QuestionSummaryView model={model} submissions={rows} />
+        : rows.length === 0 ? (
         <Empty title={query.trim() ? "No responses match this search" : `No ${lens === "All" ? "" : lens.toLowerCase() + " "}submissions`} icon={<Inbox size={20} />} action={query.trim() ? <Button variant="secondary" onClick={() => setQuery("")}>Clear search</Button> : undefined}>
           {query.trim() ? "Try a different respondent, status or assignee." : "Answer the form on its publish screen and the record appears here."}
         </Empty>
@@ -653,19 +667,7 @@ export function SubmissionsScreen({ context, lens }: { context: ScreenContext; l
             { label: "Assign to me", onRun: (selected) => selected.forEach((row) => void context.mutate.patch(row.id, { status: "routed", fields: { ...row.fields, assignee: context.actor } }, { event: `Submission ${row.title} assigned to ${context.actor}` })) },
           ]}
           toolbar={
-            <Button size="sm" variant="secondary" onClick={() => {
-              const labels = model.fields.filter((field) => !STRUCTURAL.includes(field.type)).map((field) => field.label);
-              downloadCsv(
-                `${context.org.slug}-${record.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-submissions.csv`,
-                ["received", "from", "version", "state", ...labels],
-                rows.map((row) => [
-                  row.at ?? row.createdAt, row.title, row.fields.formVersion ?? "", row.status,
-                  ...labels.map((label) => (sensitive.includes(label) ? "[redacted]" : String(row.fields[label] ?? ""))),
-                ]),
-              );
-              void context.mutate.log(`${rows.length} submissions exported to CSV${sensitive.length ? " with sensitive answers redacted" : ""}`, { entityId: record.id, type: "export" });
-              context.toast("Exported", `${rows.length} rows written to CSV${sensitive.length ? ", sensitive answers redacted" : ""}.`);
-            }}>Export CSV</Button>
+            <Button size="sm" variant="secondary" onClick={() => exportResultsCsv(context, record, model, rows)}>Export CSV</Button>
           }
           summary={<span>Sensitive answers always export as <code>[redacted]</code>; revealing on screen does not include them in the CSV. Every reveal is logged.</span>}
         />
@@ -1089,7 +1091,7 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
                 title="Answers per question"
                 height={Math.max(180, perField.length * 28)}
                 format={(value) => String(Math.round(value))}
-                series={[{ name: "Answered", points: perField.map((row) => ({ label: row.field.label.slice(0, 18), value: row.answered })) }]}
+                series={[{ name: "Answered", points: perField.map((row, index) => ({ label: `Q${index + 1}`, value: row.answered })) }]}
                 footer={enough ? undefined : `${children.length} submissions is a small sample; the counts are exact but a share drawn from them is not meaningful yet.`}
               />
             </Card>
@@ -1098,7 +1100,7 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
               rowId={(row) => row.field.id}
               label="Question performance"
               columns={[
-                { key: "label", header: "Question", primary: true, cell: (row) => row.field.label, filterValue: (row) => row.field.label },
+                { key: "label", header: "Question", primary: true, cell: (row) => `Q${perField.indexOf(row) + 1} · ${row.field.label}`, filterValue: (row) => row.field.label },
                 { key: "type", header: "Type", cell: (row) => FIELD_LABELS[row.field.type] },
                 { key: "required", header: "Required", cell: (row) => row.field.required ? <Pill tone="warning">yes</Pill> : <span className="ds-subtle">no</span> },
                 { key: "answered", header: "Answered", align: "end", cell: (row) => String(row.answered), sortValue: (row) => row.answered },
@@ -1106,6 +1108,10 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
               ]}
               onOpen={() => context.openOverlay("field insight")}
             />
+            <section aria-label="Answer distribution per question" className="ds-stack ds-gap-3">
+              <h3 style={{ fontSize: "var(--text-md)", margin: 0 }}>How each question was answered</h3>
+              <QuestionSummaryView model={model} submissions={children} />
+            </section>
           </>
         )}
       </Stack>

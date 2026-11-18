@@ -311,3 +311,21 @@ export function adapterChecks(operations: AdapterOperation[]): { label: string; 
     { label: "Every operation names a local equivalent", state: noLocal.length ? "fail" : "pass", detail: noLocal.length ? noLocal.map((operation) => operation.name).join(", ") : "Each says what happens while not connected" },
   ];
 }
+
+/**
+ * The workspace's connector record for a catalogue entry. Detail and
+ * authorisation routes carry a record id, never a catalogue id, so the
+ * address always names a record this organisation holds. A record that
+ * declares the capability exactly wins over one inferred from its provider.
+ */
+export function connectorRecordFor<T extends { id: string; fields: Record<string, string | number | boolean> }>(records: T[], entry: ConnectorEntry): T | undefined {
+  const exact = records.find((record) => String(record.fields.capabilityId ?? "") === entry.capability.id);
+  if (exact) return exact;
+  return records.find((record) => String(record.fields.kind ?? "") !== "custom" && entryForRecord(record.fields)?.capability.id === entry.capability.id);
+}
+
+/** Route for a connector's detail ("marketplace") or authorisation ("connect") screen, if the workspace holds its record. */
+export function connectorPath<T extends { id: string; fields: Record<string, string | number | boolean> }>(orgSlug: string, records: T[], entry: ConnectorEntry, screen: "marketplace" | "connect"): string | undefined {
+  const record = connectorRecordFor(records, entry);
+  return record ? `/o/${orgSlug}/connect/${screen}/${record.id}` : undefined;
+}

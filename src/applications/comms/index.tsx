@@ -7,9 +7,11 @@ import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import {
   Announcements, Calendar, CallsScreen, ChannelConversation, ChannelCreation, ChannelsDirectory, CommsHome,
-  ComposeMail, DirectMessages, EmailInbox, EmailThread, EventEditor, MailBoundary, MeetingRoom,
+  DirectMessages, EmailThread, MailBoundary,
   MemberManagement, Preferences, PhishingReport, QuickSwitcher, useCommsData,
 } from "./panels";
+import { DraftComposer, MailWorkspace } from "./mail";
+import { EventForm, MeetingWorkspace } from "./meetings";
 import "./comms.css";
 import { kitOverlays, needsSelection } from "@/applications/hr/opsKit";
 import {
@@ -453,7 +455,7 @@ export const commsApp = registerApp({
         ...kitOverlays,
         { id: "message composer", kind: "modal", title: "Write a message", width: 560, render: ({ close, ...context }) => <MessageComposer context={context} close={close} />, footer: submitFooter("cm-message", "Post") },
         { id: "summary", kind: "drawer", title: "What needs you", width: 520, render: ({ ...context }) => <AskSummary context={context} /> },
-        { id: "Compose", kind: "modal", title: "Compose", width: 620, render: ({ close, ...context }) => <ComposeMail context={context} close={close} />, footer: submitFooter("cm-compose", "Save as a draft") },
+        { id: "Compose", kind: "modal", title: "Draft an email", width: 660, render: ({ close, ...context }) => <DraftComposer context={context} close={close} />, footer: submitFooter("cm-compose", "Save as a draft") },
         { id: "quick switcher", kind: "modal", title: "Jump to", width: 520, render: ({ close, ...context }) => <QuickSwitcher context={context} close={close} /> },
         { id: "notification preferences", kind: "modal", title: "Notifications", width: 520, render: ({ close, ...context }) => <NotificationPreferences context={context} close={close} />, footer: submitFooter("cm-notifications", "Save notifications") },
       ],
@@ -538,7 +540,7 @@ export const commsApp = registerApp({
       id: "ARL-COMMS-005",
       subtitle: () => "Threads kept in this browser. Composing works; delivery needs a provider.",
       tabs: (["Inbox", "Sent", "Drafts", "Archive", "Spam"] as const).map((lens) => ({
-        id: lens, render: (context: ScreenContext) => <EmailInbox context={context} lens={lens} />,
+        id: lens, render: (context: ScreenContext) => <MailWorkspace context={context} lens={lens} />,
       })),
       actions: [
         { id: "Compose", label: "Compose", placement: "primary", run: (context) => context.openOverlay("Compose window") },
@@ -553,7 +555,7 @@ export const commsApp = registerApp({
         { id: "reply", kind: "modal", title: "Reply", width: 640, render: ({ close, ...context }) => <ReplyEditor context={context} close={close} />, footer: submitFooter("cm-reply", "Save the draft reply") },
         { id: "forward", kind: "modal", title: "Forward", width: 600, render: ({ ...context }) => <ForwardMail context={context} />, footer: submitFooter("cm-forward", "Check recipients") },
         { id: "label", kind: "modal", title: "Label this thread", width: 480, render: ({ close, ...context }) => <LabelThread context={context} close={close} />, footer: submitFooter("cm-label", "Save labels") },
-        { id: "Compose window", kind: "modal", title: "Compose", width: 640, render: ({ close, ...context }) => <ComposeMail context={context} close={close} />, footer: submitFooter("cm-compose", "Save as a draft") },
+        { id: "Compose window", kind: "modal", title: "Draft an email", width: 660, render: ({ close, ...context }) => <DraftComposer context={context} close={close} />, footer: submitFooter("cm-compose", "Save as a draft") },
         { id: "send confirmation", kind: "modal", title: "Confirm the recipients", width: 560, render: ({ close, ...context }) => <SendConfirmation context={context} close={close} /> },
         { id: "rule editor", kind: "modal", title: "Mail rule", width: 560, render: ({ close, ...context }) => <RuleEditor context={context} close={close} />, footer: submitFooter("cm-rule", "Save rule") },
       ],
@@ -617,7 +619,8 @@ export const commsApp = registerApp({
         { id: "find time", kind: "drawer", title: "Find a time", width: 540, render: ({ close, ...context }) => <FindTime context={context} close={close} /> },
         { id: "invite", kind: "modal", title: "Invite someone", width: 520, render: ({ close, ...context }) => <InviteToMeeting context={context} close={close} />, footer: submitFooter("cm-invite", "Invite") },
         { id: "reschedule meeting", kind: "modal", title: "Move or reschedule a meeting", width: 540, render: ({ close, ...context }) => <RescheduleMeeting context={context} close={close} />, footer: submitFooter("cm-reschedule", "Save the new time") },
-        { id: "Event editor", kind: "modal", title: "New event", width: 620, render: ({ close, ...context }) => <EventEditor context={context} close={close} />, footer: submitFooter("cm-event", "Create event") },
+        { id: "Event editor", kind: "modal", title: "New event", width: 640, render: ({ close, ...context }) => <EventForm context={context} close={close} />, footer: submitFooter("cm-event", "Create event") },
+        { id: "edit event", kind: "modal", title: "Edit event", width: 640, render: ({ close, ...context }) => <EventForm context={context} close={close} formId="cm-event-edit" />, footer: submitFooter("cm-event-edit", "Save changes") },
         { id: "conflict inspector", kind: "drawer", title: "Clashes", width: 520, render: ({ ...context }) => <ClashInspector context={context} /> },
         { id: "attendee status", kind: "drawer", title: "Attendee status", width: 480, render: ({ ...context }) => <AttendeeStatus context={context} /> },
       ],
@@ -628,10 +631,11 @@ export const commsApp = registerApp({
       title: () => "Meeting",
       subtitle: () => "The record of a meeting: time, people, agenda, notes and actions.",
       tabs: (["Call", "Chat", "Notes", "Participants"] as const).map((lens) => ({
-        id: lens, render: (context: ScreenContext) => <MeetingRoom context={context} lens={lens} />,
+        id: lens, render: (context: ScreenContext) => <MeetingWorkspace context={context} lens={lens} />,
       })),
       actions: [
         { id: "record consent", label: "Recording and consent", placement: "primary", run: (context) => context.openOverlay("recording consent") },
+        { id: "edit details", label: "Edit details", placement: "overflow", run: (context) => context.openOverlay("edit event", { id: context.params.id }) },
         { id: "end", label: "End the meeting", placement: "secondary", run: (context) => endMeeting(context) },
         { id: "Mute", label: "Mute or unmute", placement: "overflow", run: (context) => toggleMute(context) },
         { id: "share", label: "Share — invite someone", placement: "overflow", run: (context) => context.openOverlay("invite") },
@@ -643,6 +647,7 @@ export const commsApp = registerApp({
         { id: "Device permissions", kind: "modal", title: "Device permissions", width: 520, render: () => <DevicePermissions /> },
         { id: "invite", kind: "modal", title: "Invite someone to this meeting", width: 520, render: ({ close, ...context }) => <InviteToMeeting context={context} close={close} />, footer: submitFooter("cm-invite", "Invite") },
         { id: "recording consent", kind: "modal", title: "Recording and consent", width: 580, render: ({ close, ...context }) => <RecordingConsent context={context} close={close} /> },
+        { id: "edit event", kind: "modal", title: "Edit event", width: 640, render: ({ close, ...context }) => <EventForm context={context} close={close} formId="cm-event-edit" />, footer: submitFooter("cm-event-edit", "Save changes") },
       ],
     },
 

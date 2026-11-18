@@ -1,3 +1,4 @@
+import { exportResultsCsv } from "./results";
 import { useState } from "react";
 import { BarChart3 } from "lucide-react";
 import { Empty, Field, Notice, Pill, Properties, Select, Stack } from "@/design-system";
@@ -218,12 +219,7 @@ export async function exportSubmissions(context: ScreenContext): Promise<void> {
   }
   const model = readForm(record);
   const rows = (await repo.listByCollection(context.org.id, "submissions")).filter((row) => row.parentId === record.id);
-  const labels = answerable(model).map((field) => field.label);
-  const sensitive = model.fields.filter((field) => field.sensitive).map((field) => field.label);
-  downloadCsv(`${context.org.slug}-${record.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-submissions.csv`, ["received", "from", "version", "state", ...labels],
-    rows.map((row) => [row.at ?? row.createdAt, row.title, row.fields.formVersion ?? "", row.status, ...labels.map((label) => (sensitive.includes(label) ? "[redacted]" : String(row.fields[label] ?? "")))]));
-  await context.mutate.log(`${rows.length} submissions exported to CSV${sensitive.length ? " with sensitive answers redacted" : ""}`, { entityId: record.id, type: "export" });
-  context.toast("Exported", `${rows.length} submissions written to CSV${sensitive.length ? `; ${sensitive.join(", ")} redacted` : ""}.`);
+  exportResultsCsv(context, record, model, rows);
 }
 
 /* ------------------------------ Analytics ------------------------------ */

@@ -63,6 +63,11 @@
     "kind": "action",
     "name": "Save this view",
     "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Log a decision",
+    "ok": true
    }
   ],
   "guarded": []
@@ -495,7 +500,9 @@
     "ok": true
    }
   ],
-  "guarded": []
+  "guarded": [
+   "Check in on key results"
+  ]
  },
  {
   "id": "ARL-HQ-008",
@@ -628,6 +635,11 @@
    {
     "kind": "action",
     "name": "Filter",
+    "ok": true
+   },
+   {
+    "kind": "action",
+    "name": "Log a decision",
     "ok": true
    },
    {

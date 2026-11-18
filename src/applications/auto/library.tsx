@@ -5,10 +5,12 @@ import {
   Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
-import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
+import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { freshness } from "@/platform/clock";
-import { readGraph, validateGraph, type WorkflowGraph } from "./engine";
+import { readGraph, type WorkflowGraph } from "./engine";
+import { validateWorkflow } from "./validate";
+import { AUTOMATION_COLLECTIONS } from "./runner";
 import { nodeSummary } from "./canvas";
 import { readRun } from "./panels";
 
@@ -24,13 +26,29 @@ export interface WorkflowRow {
   runCount: number;
 }
 
+/** The records of every collection a workflow's trigger watches, so validation sees the real fields. */
+function useTriggerPool(workflows: Rec[]): Rec[] {
+  const names = useMemo(() => {
+    const set = new Set<string>(["invoices"]);
+    for (const workflow of workflows) {
+      for (const node of readGraph(workflow).nodes) {
+        const name = node.config?.collection;
+        if (name && AUTOMATION_COLLECTIONS.includes(name)) set.add(name);
+      }
+    }
+    return [...set].sort();
+  }, [workflows]);
+  const data = useCollections(names);
+  return useMemo(() => names.flatMap((name) => data[name] ?? []), [names, data]);
+}
+
 export function useWorkflowRows(): WorkflowRow[] {
   const workflows = useCollection("workflows");
   const runs = useCollection("workflowRuns");
-  const invoices = useCollection("invoices");
+  const pool = useTriggerPool(workflows);
   return useMemo(() => workflows.map((record) => {
     const graph = readGraph(record);
-    const issues = validateGraph(graph, invoices);
+    const issues = validateWorkflow(graph, pool);
     const mine = runs
       .filter((run) => run.parentId === record.id || run.fields.workflowId === record.id)
       .sort((left, right) => String(right.at ?? right.createdAt).localeCompare(String(left.at ?? left.createdAt)));
@@ -44,7 +62,7 @@ export function useWorkflowRows(): WorkflowRow[] {
       lastRun: mine[0],
       runCount: mine.length,
     };
-  }), [workflows, runs, invoices]);
+  }), [workflows, runs, pool]);
 }
 
 function statusTone(status: string) {
@@ -211,11 +229,12 @@ export function WorkflowQuickView({ context }: { context: ScreenContext }) {
 
 export function ActivationReview({ context, close }: { context: ScreenContext; close: () => void }) {
   const rows = useWorkflowRows();
-  const invoices = useCollection("invoices");
+  const workflows = useCollection("workflows");
+  const pool = useTriggerPool(workflows);
   const row = rows.find((item) => item.record.id === context.selectedId) ?? rows[0];
   const [acknowledged, setAcknowledged] = useState(false);
   if (!row) return <Empty title="No automation selected" />;
-  const issues = validateGraph(row.graph, invoices);
+  const issues = validateWorkflow(row.graph, pool);
   const errors = issues.filter((issue) => issue.severity === "error");
   const warnings = issues.filter((issue) => issue.severity === "warning");
   const providerNodes = row.graph.nodes.filter((node) => node.config?.kind === "provider.call");
@@ -261,7 +280,7 @@ export function ActivationReview({ context, close }: { context: ScreenContext; c
           icon={<PlayCircle size={15} />}
           disabled={errors.length > 0 || !acknowledged}
           onClick={async () => {
-            await context.mutate.patch(row.record.id, { status: "active" }, { expectRevision: row.record.revision, event: "Automation activated after review" });
+            if (!await context.mutate.patch(row.record.id, { status: "active" }, { expectRevision: row.record.revision, event: "Automation activated after review" })) return;
             context.toast("Activated", `${row.record.title} is active. The record now reads active; nothing has been scheduled outside this browser.`);
             close();
           }}
@@ -273,7 +292,7 @@ export function ActivationReview({ context, close }: { context: ScreenContext; c
             variant="secondary"
             icon={<PauseCircle size={15} />}
             onClick={async () => {
-              await context.mutate.patch(row.record.id, { status: "paused" }, { expectRevision: row.record.revision, event: "Automation paused from the activation review" });
+              if (!await context.mutate.patch(row.record.id, { status: "paused" }, { expectRevision: row.record.revision, event: "Automation paused from the activation review" })) return;
               context.toast("Paused", `${row.record.title} will not start a new run.`);
               close();
             }}
@@ -304,7 +323,7 @@ export function ArchiveWorkflow({ context, close }: { context: ScreenContext; cl
         variant="outline-danger"
         disabled={confirm.trim() !== row.record.title}
         onClick={async () => {
-          await context.mutate.patch(row.record.id, { status: "archived" }, { expectRevision: row.record.revision, event: "Automation archived" });
+          if (!await context.mutate.patch(row.record.id, { status: "archived" }, { expectRevision: row.record.revision, event: "Automation archived" })) return;
           context.toast("Archived", `${row.record.title} is archived. Its runs are still in the run history.`);
           close();
         }}

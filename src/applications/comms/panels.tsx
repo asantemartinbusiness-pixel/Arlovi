@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  AtSign, CalendarDays, Hash, Mail, Megaphone, MessageSquare, Phone, ShieldAlert, Users, Video,
+  AtSign, CalendarDays, Hash, Mail, Megaphone, MessageSquare, Phone, ShieldAlert, Users,
 } from "lucide-react";
 import {
   Avatar, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Select,
@@ -9,10 +9,11 @@ import {
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { capabilityById } from "@/platform/capability";
-import { clockIso, sameDay } from "@/platform/clock";
+import { sameDay } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { ChannelList, Conversation } from "./chat";
 import { CalendarSurface, type CalendarView } from "./calendar";
+import { localDate } from "./schedule";
 
 export function useCommsData() {
   return useCollections(["channels", "messages", "emailThreads", "meetings", "calls", "announcements", "preferences", "members", "employees", "contacts", "documents"]);
@@ -363,73 +364,6 @@ export function messagesOf(thread: Rec): MailMessage[] {
   return (thread.body as { messages?: MailMessage[] } | undefined)?.messages ?? [];
 }
 
-const FOLDERS = ["Inbox", "Sent", "Drafts", "Archive", "Spam"] as const;
-
-export function EmailInbox({ context, lens }: { context: ScreenContext; lens: (typeof FOLDERS)[number] }) {
-  const data = useCommsData();
-  const { org } = useWorkspace();
-  const folder = lens.toLowerCase();
-  const rows = data.emailThreads.filter((thread) => String(thread.fields.folder ?? "inbox") === folder);
-
-  return (
-    <div className="cm-mail">
-      <aside className="cm-mail-folders">
-        {FOLDERS.map((name) => {
-          const count = data.emailThreads.filter((thread) => String(thread.fields.folder ?? "inbox") === name.toLowerCase()).length;
-          return (
-            <button
-              key={name}
-              type="button"
-              className="cm-channel"
-              aria-current={name === lens ? "true" : undefined}
-              onClick={() => context.setTab(name)}
-            >
-              <Mail size={14} aria-hidden="true" />
-              <span className="ds-grow">{name}</span>
-              <span className="ds-subtle ds-num">{count}</span>
-            </button>
-          );
-        })}
-        <MailBoundary />
-      </aside>
-      <div>
-        {rows.length === 0 ? <Empty title={`${lens} is empty`} icon={<Mail size={20} />} /> : (
-          <DataGrid
-            rows={rows}
-            rowId={(row) => row.id}
-            label={`${lens} mail`}
-            selectedId={context.selectedId}
-            rowTone={(row) => (row.fields.risk === "phishing" ? "danger" : undefined)}
-            columns={[
-              { key: "from", header: folder === "sent" || folder === "drafts" ? "To" : "From", cell: (row) => (
-                <Row gap={2}>
-                  <Avatar name={String(folder === "sent" || folder === "drafts" ? row.fields.to : row.fields.from)} size="sm" />
-                  <span className="ds-truncate">{String(folder === "sent" || folder === "drafts" ? row.fields.to : row.fields.from)}</span>
-                </Row>
-              ), sortValue: (row) => String(row.fields.from ?? ""), filterValue: (row) => `${String(row.fields.from ?? "")} ${String(row.fields.to ?? "")}` },
-              { key: "subject", header: "Subject", primary: true, cell: (row) => (
-                <Row gap={2}>
-                  {row.fields.unread === true && <Pill tone="accent">New</Pill>}
-                  <span className="ds-truncate">{row.title}</span>
-                  {row.fields.risk === "phishing" && <Pill tone="danger" dot>Suspected phishing</Pill>}
-                </Row>
-              ), sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
-              { key: "labels", header: "Labels", cell: (row) => <Row gap={1} wrap>{String(row.fields.labels ?? "").split(",").filter(Boolean).map((label) => <Pill key={label}>{label}</Pill>)}</Row>, hideBelow: 1100 },
-              { key: "when", header: "When", align: "end", cell: (row) => context.date(row.at), sortValue: (row) => row.at ?? "" },
-            ]}
-            onSelect={(id) => context.select(id)}
-            onOpen={(id) => context.navigate(`/o/${org.slug}/comms/email/${id}`)}
-            bulkActions={[
-              { label: "Archive", onRun: (selected) => selected.forEach((thread) => { void context.mutate.patch(thread.id, { status: "archive", fields: { ...thread.fields, folder: "archive" } }, { event: `${thread.title} archived` }); }) },
-              { label: "Mark read", onRun: (selected) => selected.forEach((thread) => { void context.mutate.patch(thread.id, { fields: { ...thread.fields, unread: false } }, { event: `${thread.title} marked read` }); }) },
-            ]}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
-
 export function EmailThread({ context, lens }: { context: ScreenContext; lens: "Messages" | "Related records" | "Activity" }) {
   const data = useCommsData();
   const record = useRecord(context.params.id);
@@ -551,7 +485,8 @@ export function Calendar({ context, lens }: { context: ScreenContext; lens: "Day
       meetings={meetings}
       view={lens as CalendarView}
       onPick={(meeting) => context.navigate(`/o/${org.slug}/comms/meetings/${meeting.id}`)}
-      onCreateAt={(day) => context.openOverlay("Event editor", { date: day.toISOString().slice(0, 10) })}
+      onCreateAt={(day, time) => context.openOverlay("Event editor", { date: localDate(day), time })}
+      onEdit={(meeting) => context.openOverlay("edit event", { id: meeting.id })}
     />
   );
 }
@@ -559,133 +494,6 @@ export function Calendar({ context, lens }: { context: ScreenContext; lens: "Day
 /* ------------------------------------------------------------------ *
  * ARL-COMMS-008 · Meeting Room
  * ------------------------------------------------------------------ */
-
-interface MeetingAction { label: string; owner: string; done: boolean }
-
-export function MeetingRoom({ context, lens }: { context: ScreenContext; lens: "Call" | "Chat" | "Notes" | "Participants" }) {
-  const data = useCommsData();
-  const record = useRecord(context.params.id);
-  const meeting = record ?? data.meetings[0];
-  const [notes, setNotes] = useState("");
-  if (!meeting) return <Empty title="No meeting" icon={<CalendarDays size={20} />} />;
-  const attendees = String(meeting.fields.attendees ?? "").split(",").map((name) => name.trim()).filter(Boolean);
-  const body = meeting.body as { notes?: string; actions?: MeetingAction[] } | undefined;
-
-  if (lens === "Chat") {
-    return (
-      <Stack gap={4}>
-        <Empty title="No meeting chat was recorded" icon={<MessageSquare size={20} />}>
-          Chat during a call would be kept with the meeting record. Nothing was captured for this one.
-        </Empty>
-        <Notice tone="info">Discussion that matters belongs in a channel, where it can be found again.</Notice>
-      </Stack>
-    );
-  }
-
-  if (lens === "Notes") {
-    return (
-      <Stack gap={4}>
-        <Card title="Notes" subtitle={body?.notes ? "Recorded in this workspace" : "Nothing recorded yet"}>
-          <form
-            className="ds-stack ds-gap-3"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              await context.mutate.patch(meeting.id, {
-                body: { ...(meeting.body as object ?? {}), notes: notes || body?.notes },
-              }, { expectRevision: meeting.revision, event: `Notes saved on ${meeting.title}` });
-              context.toast("Notes saved", "They are on the meeting record.");
-              setNotes("");
-            }}
-          >
-            <Field label="What was decided"><TextArea rows={5} value={notes || body?.notes || ""} onChange={(event) => setNotes(event.target.value)} /></Field>
-            <Row gap={2}><Button type="submit" variant="primary">Save notes</Button></Row>
-          </form>
-        </Card>
-        <Card title="Actions" subtitle={`${(body?.actions ?? []).length} recorded`}>
-          <Stack gap={2}>
-            {(body?.actions ?? []).map((action, index) => (
-              <Checkbox
-                key={action.label}
-                label={`${action.label} — ${action.owner}`}
-                checked={action.done}
-                onChange={async (event) => {
-                  const next = (body?.actions ?? []).map((item, position) => (position === index ? { ...item, done: event.target.checked } : item));
-                  await context.mutate.patch(meeting.id, { body: { ...(meeting.body as object ?? {}), actions: next } }, { event: `Meeting action updated on ${meeting.title}` });
-                }}
-              />
-            ))}
-            {(body?.actions ?? []).length === 0 && <span className="ds-subtle">No actions were recorded.</span>}
-          </Stack>
-          <Button size="sm" variant="secondary" style={{ marginBlockStart: "var(--space-3)" }} onClick={() => context.openOverlay("recording consent")}>Record an action</Button>
-        </Card>
-      </Stack>
-    );
-  }
-
-  if (lens === "Participants") {
-    return (
-      <Stack gap={4}>
-        <DataGrid
-          rows={attendees.map((name) => ({ id: name, name }))}
-          rowId={(row) => row.id}
-          label="Participants"
-          filterable={false}
-          columns={[
-            { key: "name", header: "Person", primary: true, cell: (row) => <Row gap={2}><Avatar name={row.name} size="sm" />{row.name}</Row> },
-            { key: "here", header: "In the meeting", cell: (row) => (
-              <Row gap={1} wrap>
-                {String(meeting.fields.joined ?? "").split(",").includes(row.name) && <Pill tone="info">Joined</Pill>}
-                {String(meeting.fields.handsRaised ?? "").split(",").includes(row.name) && <Pill tone="warning">Hand raised</Pill>}
-                {String(meeting.fields.muted ?? "").split(",").includes(row.name) && <Pill tone="neutral">Muted</Pill>}
-                {String(meeting.fields.recordingConsent ?? "").split(",").includes(row.name) && <Pill tone="success">Consents to recording</Pill>}
-              </Row>
-            ) },
-            { key: "status", header: "Invite status", align: "end", cell: () => <Pill tone="neutral" dot>Invited</Pill> },
-          ]}
-        />
-        <Notice tone="warning" title="Nobody is shown as accepted">
-          No calendar provider is connected, so an acceptance made elsewhere is not known here. Everyone stays invited until
-          somebody records an answer in this workspace.
-        </Notice>
-      </Stack>
-    );
-  }
-
-  return (
-    <Grid>
-      <Card span={8} eyebrow="MEETING" prov="human" title={meeting.title} subtitle={<span><span className="ds-num">{context.dateTime(meeting.startAt)}</span> · {String(meeting.fields.minutes ?? 0)} minutes · {String(meeting.fields.where ?? "")}</span>}>
-        <Stack gap={4}>
-          <div className="ds-panel" style={{ padding: "var(--space-6)", textAlign: "center" }}>
-            <Video size={28} aria-hidden="true" />
-            <h3 style={{ marginBlock: "var(--space-2)" }}>No conferencing service is connected</h3>
-            <p className="ds-prose" style={{ margin: "0 auto" }}>
-              This workspace cannot open a microphone, a camera or a call. The meeting record holds its time, place, attendees,
-              agenda, notes and actions, which is what the rest of the workspace reads.
-            </p>
-          </div>
-          <Row gap={2} wrap>
-            <Button variant="secondary" disabled title="No conferencing service is connected">Mute</Button>
-            <Button variant="secondary" disabled title="No conferencing service is connected">Share a screen</Button>
-            <Button variant="secondary" disabled title="No conferencing service is connected">Raise a hand</Button>
-            <Button variant="secondary" onClick={() => context.openOverlay("recording consent")}>Record consent</Button>
-            <Button variant="outline-danger" onClick={async () => {
-              await context.mutate.patch(meeting.id, { status: "finished" }, { expectRevision: meeting.revision, event: `${meeting.title} marked finished by ${context.actor}` });
-              context.toast("Meeting closed", "The record is marked finished.");
-            }}>End the meeting</Button>
-          </Row>
-        </Stack>
-      </Card>
-      <Card span={4} eyebrow="AGENDA" prov="human" title="Agenda">
-        <p>{String(meeting.fields.agenda ?? "No agenda recorded.")}</p>
-        <Properties rows={[
-          { label: "Organiser", value: String(meeting.fields.organizer ?? "") },
-          { label: "Attendees", value: <span className="ds-num">{String(attendees.length)}</span> },
-          { label: "Recording", value: <Pill tone="warning">Not possible here</Pill> },
-        ]} />
-      </Card>
-    </Grid>
-  );
-}
 
 /* ------------------------------------------------------------------ *
  * ARL-COMMS-009 · Calls & Voicemail
@@ -915,56 +723,6 @@ export function Preferences({ context, lens }: { context: ScreenContext; lens: "
  * Overlay bodies
  * ------------------------------------------------------------------ */
 
-export function ComposeMail({ context, close }: { context: ScreenContext; close: () => void }) {
-  const [to, setTo] = useState("");
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
-  const recipients = to.split(",").map((value) => value.trim()).filter(Boolean);
-  const bulk = recipients.length > 4;
-  const [confirmed, setConfirmed] = useState(false);
-  const invalid = recipients.some((value) => !value.includes("@"));
-
-  return (
-    <form
-      id="cm-compose"
-      className="ds-stack ds-gap-4"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        if (invalid || (bulk && !confirmed)) return;
-        await context.mutate.create({
-          collection: "emailThreads",
-          title: subject || "(no subject)",
-          status: "draft",
-          summary: body.slice(0, 160),
-          at: clockIso(),
-          tags: ["draft"],
-          fields: {
-            folder: "drafts", from: `${context.actor.split(" ")[0].toLowerCase()}@${context.org.slug}.example`,
-            to: recipients.join(", "), unread: false, risk: "none", labels: "draft",
-            delivery: "not_connected", messageCount: 1,
-          },
-          body: { messages: [{ from: `${context.actor.split(" ")[0].toLowerCase()}@${context.org.slug}.example`, at: clockIso(), body, external: false }] },
-        }, `Email draft saved by ${context.actor}`);
-        context.toast("Draft saved", "The draft is in this workspace with its recipients and body. No mail provider is connected, so nothing was sent.");
-        close();
-      }}
-    >
-      <Field label="To" required hint="Separate addresses with a comma.">
-        <TextInput value={to} onChange={(event) => setTo(event.target.value)} invalid={invalid} required />
-      </Field>
-      {invalid && <Notice tone="danger" title="One of those is not an address">Every recipient needs an @ in it.</Notice>}
-      <Field label="Subject"><TextInput value={subject} onChange={(event) => setSubject(event.target.value)} /></Field>
-      <Field label="Message"><TextArea value={body} onChange={(event) => setBody(event.target.value)} rows={6} /></Field>
-      {bulk && (
-        <Notice tone="warning" title={`${recipients.length} recipients is a bulk send`}>
-          <Checkbox label="I have checked this list and it is right" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
-        </Notice>
-      )}
-      <MailBoundary />
-    </form>
-  );
-}
-
 export function QuickSwitcher({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCommsData();
   const { org, actor } = useWorkspace();
@@ -1081,80 +839,6 @@ export function MemberManagement({ context }: { context: ScreenContext }) {
       )}
       <Notice tone="info">Adding somebody to a channel lets them read what was said there from now on; it grants nothing else.</Notice>
     </Stack>
-  );
-}
-
-export function EventEditor({ context, close }: { context: ScreenContext; close: () => void }) {
-  const payload = context.overlayPayload as { date?: string; id?: string } | undefined;
-  const existing = useRecord(payload?.id);
-  const data = useCommsData();
-  const [date, setDate] = useState(payload?.date ?? clockIso().slice(0, 10));
-  const [start, setStart] = useState("10:00");
-  const [minutes, setMinutes] = useState(30);
-  const [attendees, setAttendees] = useState<string[]>([]);
-
-  const startAt = new Date(`${date}T${start}:00.000Z`);
-  const endAt = new Date(startAt.getTime() + minutes * 60_000);
-  const clashes = data.meetings.filter((meeting) =>
-    meeting.id !== existing?.id
-    && meeting.startAt && meeting.endAt
-    && new Date(meeting.startAt) < endAt && new Date(meeting.endAt) > startAt
-    && attendees.some((name) => String(meeting.fields.attendees ?? "").includes(name)));
-
-  return (
-    <form
-      id="cm-event"
-      className="ds-stack ds-gap-4"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        const form = new FormData(event.currentTarget);
-        await context.mutate.create({
-          collection: "meetings",
-          title: String(form.get("title") ?? "Meeting"),
-          status: clashes.length > 0 ? "tentative" : "scheduled",
-          summary: String(form.get("agenda") ?? ""),
-          startAt: startAt.toISOString(),
-          endAt: endAt.toISOString(),
-          at: startAt.toISOString(),
-          fields: {
-            where: String(form.get("where") ?? ""), organizer: context.actor,
-            attendees: [context.actor, ...attendees].join(","), agenda: String(form.get("agenda") ?? ""),
-            minutes, recurring: false, conferencing: "not_connected", accepted: 0,
-          },
-        }, `Meeting created by ${context.actor}`);
-        context.toast("Meeting created", clashes.length > 0 ? "Saved as tentative because of a clash." : "It is in the calendar in this workspace.");
-        close();
-      }}
-    >
-      <Field label="Title" required><TextInput name="title" required defaultValue={existing?.title ?? ""} /></Field>
-      <Row gap={3}>
-        <Field label="Date"><TextInput type="date" value={date} onChange={(event) => setDate(event.target.value)} /></Field>
-        <Field label="Start"><TextInput type="time" value={start} onChange={(event) => setStart(event.target.value)} /></Field>
-        <Field label="Minutes"><TextInput inputMode="numeric" align="end" value={String(minutes)} onChange={(event) => setMinutes(Number(event.target.value) || 30)} /></Field>
-      </Row>
-      <Field label="Where"><TextInput name="where" defaultValue="Studio table" /></Field>
-      <Field label="Attendees">
-        <Select
-          multiple
-          value={attendees}
-          onChange={(event) => setAttendees(Array.from(event.target.selectedOptions).map((option) => option.value))}
-          style={{ minHeight: 120 }}
-        >
-          {data.employees.filter((employee) => employee.status !== "alumni").map((employee) => <option key={employee.id} value={employee.title}>{employee.title}</option>)}
-        </Select>
-      </Field>
-      <Field label="Agenda"><TextArea name="agenda" rows={3} /></Field>
-      {clashes.length > 0 && (
-        <Notice tone="warning" title={`${clashes.length} clash${clashes.length === 1 ? "" : "es"} with this time`}>
-          {clashes.map((meeting) => `${meeting.title} at ${context.dateTime(meeting.startAt)}`).join("; ")}.
-          The meeting can still be created; it is saved as tentative.
-        </Notice>
-      )}
-      <Notice tone="info" title="Invites are not sent">
-        No calendar provider is connected. Attendees appear on the record as invited, and their answer is only known here if
-        somebody records it.
-      </Notice>
-    </form>
   );
 }
 

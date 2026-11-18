@@ -13,7 +13,12 @@ export type LayoutTool = "select" | "text" | "image" | "shape" | "thread";
 
 export interface LayoutUi {
   tool: LayoutTool;
+  /** The primary selection: the frame the inspector shows. */
   selectedFrameId?: string;
+  /** Every selected frame, the primary included. More than one means a multi-selection. */
+  selectedIds: string[];
+  /** What a multi-selection aligns to. */
+  alignTo?: "selection" | "margins" | "page";
   zoom: number;
   spread: boolean;
   showGuides: boolean;
@@ -22,10 +27,13 @@ export interface LayoutUi {
   /** Frame waiting to be linked to the next one. */
   threadFrom?: string;
   previewMode: boolean;
+  /** Guide lines shown while a drag snaps, in page points. */
+  snapGuide?: { pageId: string; x?: number; y?: number };
 }
 
 export const layoutUi: Store<LayoutUi> = createStore<LayoutUi>({
   tool: "select",
+  selectedIds: [],
   zoom: 0.78,
   spread: true,
   showGuides: true,
@@ -39,7 +47,34 @@ export function setLayoutTool(tool: LayoutTool): void {
 }
 
 export function selectFrame(id?: string): void {
-  layoutUi.set((current) => ({ ...current, selectedFrameId: id }));
+  layoutUi.set((current) => ({ ...current, selectedFrameId: id, selectedIds: id ? [id] : [] }));
+}
+
+/** Select several frames; the last becomes the primary. */
+export function selectFrames(ids: string[]): void {
+  const unique = [...new Set(ids)];
+  layoutUi.set((current) => ({ ...current, selectedIds: unique, selectedFrameId: unique[unique.length - 1] }));
+}
+
+/** The ids currently selected — the primary on its own when nothing else is. */
+export function selectedFrameIds(ui: Pick<LayoutUi, "selectedFrameId" | "selectedIds"> = layoutUi.get()): string[] {
+  if (!ui.selectedFrameId) return [];
+  return ui.selectedIds.includes(ui.selectedFrameId) ? ui.selectedIds : [ui.selectedFrameId];
+}
+
+/**
+ * Shift-click: add a frame to the selection or take it out. Frames on a
+ * different page start a new selection, since alignment is per page.
+ */
+export function toggleFrameSelection(id: string, samePage: (a: string, b: string) => boolean): void {
+  const ids = selectedFrameIds();
+  if (ids.includes(id)) {
+    const rest = ids.filter((item) => item !== id);
+    layoutUi.set((current) => ({ ...current, selectedIds: rest, selectedFrameId: rest[rest.length - 1] }));
+    return;
+  }
+  const keep = ids.filter((item) => samePage(item, id));
+  selectFrames([...keep, id]);
 }
 
 /* ------------------------------ styles ------------------------------ */

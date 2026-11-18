@@ -314,6 +314,41 @@ export function setEasing(doc: MotionDoc, layerId: string, property: AnimatableP
   };
 }
 
+/** Change the value a keyframe holds, leaving its time and easing alone. */
+export function setKeyframeValue(doc: MotionDoc, layerId: string, property: AnimatableProperty, keyframeId: string, value: number | string): MotionDoc {
+  return {
+    ...doc,
+    layers: doc.layers.map((layer) => (layer.id === layerId
+      ? { ...layer, tracks: { ...layer.tracks, [property]: (layer.tracks[property] ?? []).map((keyframe) => (keyframe.id === keyframeId ? { ...keyframe, value } : keyframe)) } }
+      : layer)),
+  };
+}
+
+/** The keyframes of a property either side of one, in time order. */
+export function neighbourKeyframes(layer: MotionLayer, property: AnimatableProperty, keyframeId: string): { previous?: Keyframe; next?: Keyframe } {
+  const sorted = [...(layer.tracks[property] ?? [])].sort((a, b) => a.t - b.t);
+  const index = sorted.findIndex((keyframe) => keyframe.id === keyframeId);
+  return index < 0 ? {} : { previous: sorted[index - 1], next: sorted[index + 1] };
+}
+
+/**
+ * Copy a layer, with its own keyframe ids, directly above the original.
+ * Triggers stay on the original; the copy is a new, independent layer.
+ */
+export function duplicateLayer(doc: MotionDoc, layerId: string, newId: string): MotionDoc {
+  const index = doc.layers.findIndex((layer) => layer.id === layerId);
+  if (index < 0) return doc;
+  const source = doc.layers[index];
+  const tracks: MotionLayer["tracks"] = {};
+  for (const [property, keyframes] of Object.entries(source.tracks) as [AnimatableProperty, Keyframe[] | undefined][]) {
+    tracks[property] = (keyframes ?? []).map((keyframe) => ({ ...keyframe, id: `${keyframe.id}-${newId}` }));
+  }
+  const copy: MotionLayer = { ...source, id: newId, name: `${source.name} copy`, locked: false, tracks, box: { ...source.box, x: source.box.x + 16, y: source.box.y + 16 } };
+  const layers = [...doc.layers];
+  layers.splice(index + 1, 0, copy);
+  return { ...doc, layers, activeLayerId: newId };
+}
+
 /** Offset each layer's keyframes by a step, which is what a stagger is. */
 export function stagger(doc: MotionDoc, layerIds: string[], step: number): MotionDoc {
   return {

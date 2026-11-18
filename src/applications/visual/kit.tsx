@@ -469,8 +469,15 @@ export function dragPointer(
 export function useMeasure<T extends HTMLElement>(): [React.RefObject<T | null>, { width: number; height: number }] {
   const ref = useRef<T | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  /* The measured element can mount after the first render (a canvas shown
+     once its data has loaded). Re-check the ref after every render and
+     re-attach the observer when the element changes, instead of observing
+     only whatever existed on mount. */
+  const [element, setElement] = useState<T | null>(null);
   useEffect(() => {
-    const element = ref.current;
+    if (ref.current !== element) setElement(ref.current);
+  });
+  useEffect(() => {
     if (!element) return;
     const observer = new ResizeObserver((entries) => {
       const box = entries[0]?.contentRect;
@@ -479,7 +486,7 @@ export function useMeasure<T extends HTMLElement>(): [React.RefObject<T | null>,
     observer.observe(element);
     setSize({ width: element.clientWidth, height: element.clientHeight });
     return () => observer.disconnect();
-  }, []);
+  }, [element]);
   return [ref, size];
 }
 

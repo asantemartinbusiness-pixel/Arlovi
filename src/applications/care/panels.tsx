@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { BookOpen, Headphones, Inbox, MessageSquare, Smile, Timer, Wand2 } from "lucide-react";
 import {
   Avatar, BarChart, Button, Card, Checkbox, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice,
@@ -9,6 +10,8 @@ import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { SLA_TONE, formatMinutes, slaState, type SlaState } from "./sla";
 import { CoachingAssignments, matchesCase, useCaseFilter } from "./caseFilter";
+import { isBreachingOrAtRisk, queueCounts, triageCompare } from "./triage";
+import { DeliveryPill, LinkedContextCard, QueueBar, ResolutionCard, TriageCard, type InboxSort, type InboxView } from "./triagePanels";
 
 export function useCareData() {
   return useCollections(["tickets", "messages", "articles", "macros", "slas", "contacts", "employees", "members", "tasks"]);
@@ -259,8 +262,21 @@ export function ServiceOverview({ context, lens }: { context: ScreenContext; len
 export function OmnichannelInbox({ context, lens }: { context: ScreenContext; lens: "Unassigned" | "Mine" | "Team" | "Waiting" | "Closed" }) {
   const data = useCareData();
   const { now, actor, org } = useWorkspace();
-  const [activeId, setActiveId] = useState("");
-  const [draft, setDraft] = useState("");
+  /* The open case lives in the URL, so a reload, Back or a shared link reopens
+     the same conversation (and its saved draft) instead of whichever case
+     currently sorts first. */
+  const [params, setParams] = useSearchParams();
+  const activeId = params.get("case") ?? "";
+  const setActiveId = useCallback((id: string) => {
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      if (id) next.set("case", id); else next.delete("case");
+      return next;
+    }, { replace: true });
+  }, [setParams]);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [view, setView] = useState<InboxView>("all");
+  const [sort, setSort] = useState<InboxSort>("sla");
 
   const rows = useMemo(() => {
     const open = data.tickets.filter((ticket) => !["resolved", "closed"].includes(ticket.status));
@@ -270,10 +286,21 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
     if (lens === "Closed") return data.tickets.filter((ticket) => ["resolved", "closed"].includes(ticket.status));
     return open;
   }, [data.tickets, lens, actor]);
+  const stateOf = (ticket: Rec) => slaState(ticket, policyFor(ticket, data.slas), now);
+  const scored = rows.map((ticket) => ({ ticket, state: stateOf(ticket) }));
+  const inViewBreaching = scored.filter((row) => isBreachingOrAtRisk(row.state)).length;
+  const ordered = scored
+    .filter((row) => view === "all" || isBreachingOrAtRisk(row.state))
+    .sort(sort === "sla" ? triageCompare : (a, b) => (b.ticket.at ?? "").localeCompare(a.ticket.at ?? ""))
+    .map((row) => row.ticket);
+  const counts = queueCounts(data.tickets, actor, stateOf);
 
   /* An explicit choice survives the case leaving this filter, so answering an
      unassigned case does not throw the reader onto a different conversation. */
-  const active = data.tickets.find((ticket) => ticket.id === activeId) ?? rows[0];
+  const active = data.tickets.find((ticket) => ticket.id === activeId) ?? ordered[0] ?? rows[0];
+  const draft = active ? (drafts[active.id] ?? String(active.fields.replyDraft ?? "")) : "";
+  const setDraft = (value: string) => { if (active) setDrafts((current) => ({ ...current, [active.id]: value })); };
+  const savedDraft = active ? String(active.fields.replyDraft ?? "") : "";
   const outOfView = Boolean(active && activeId === active.id && !rows.some((ticket) => ticket.id === active.id));
   const conversation = active ? conversationOf(data.messages, active.id) : [];
   const contact = active ? data.contacts.find((row) => row.id === active.fields.contactId) : undefined;
@@ -287,17 +314,23 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
     await context.mutate.create({
       collection: "messages",
       title: `${String(active.fields.ref ?? "")} — ${internal ? "internal note" : "reply"}`,
-      status: internal ? "note" : "sent",
+      status: internal ? "note" : "recorded",
       summary: draft.trim(),
       parentId: active.id,
       at: context.now.toISOString(),
-      fields: { kind: "ticket", author: actor, side: "agent", channel: internal ? "internal" : String(active.fields.channel ?? "email"), internal },
-    }, `${internal ? "Internal note added" : "Reply sent"} on ${String(active.fields.ref ?? active.title)} by ${actor}`);
-    if (!internal && !active.fields.firstResponseAt) {
-      await context.mutate.patch(active.id, {
+      fields: { kind: "ticket", author: actor, side: "agent", channel: internal ? "internal" : String(active.fields.channel ?? "email"), internal, delivery: internal ? "internal" : "not_sent" },
+    }, `${internal ? "Internal note added" : "Reply recorded (not sent, no provider)"} on ${String(active.fields.ref ?? active.title)} by ${actor}`);
+    // No provider is connected, so the reply never reached the customer: it is
+    // recorded as a first response but does not stop the first-response clock.
+    if (!internal && !active.fields.firstResponseAt && !active.fields.firstResponseRecordedAt) {
+      const saved = await context.mutate.patch(active.id, {
         status: active.status === "new" ? "open" : active.status,
-        fields: { ...active.fields, firstResponseAt: context.now.toISOString(), assignee: String(active.fields.assignee || actor) },
-      }, { event: `First response recorded on ${String(active.fields.ref ?? "")}` });
+        fields: { firstResponseRecordedAt: context.now.toISOString(), assignee: String(active.fields.assignee || actor), replyDraft: "" },
+      }, { event: `First reply recorded (not delivered) on ${String(active.fields.ref ?? "")}` });
+      if (!saved) return;
+    } else if (active.fields.replyDraft) {
+      const saved = await context.mutate.patch(active.id, { fields: { replyDraft: "" } }, { event: `Saved reply draft cleared on ${String(active.fields.ref ?? "")}` });
+      if (!saved) return;
     }
     setDraft("");
     setActiveId(active.id);
@@ -306,10 +339,16 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
 
   return (
     <div className="cr-inbox">
-      <aside>
+      <aside className="ds-stack ds-gap-3">
+        <QueueBar counts={counts} view={view} sort={sort} onView={setView} onSort={setSort} inView={{ total: rows.length, breaching: inViewBreaching }} />
+        {ordered.length === 0 && (
+          <Empty title="Nothing at risk here" icon={<Inbox size={20} />}>
+            No case in {lens.toLowerCase()} is breached or close to its target.
+          </Empty>
+        )}
         <div className="cr-list" role="listbox" aria-label={`${lens} cases`}>
-          {rows.map((ticket) => {
-            const state = slaState(ticket, policyFor(ticket, data.slas), now);
+          {ordered.map((ticket) => {
+            const state = stateOf(ticket);
             return (
               <button
                 key={ticket.id}
@@ -341,6 +380,19 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
               <strong style={{ fontSize: "var(--text-lg)" }}>{active.title}</strong>
               <Pill tone={PRIORITY_TONE[String(active.fields.priority ?? "normal")] ?? "neutral"} dot>{String(active.fields.priority ?? "")}</Pill>
               <span className="ds-grow" />
+              {String(active.fields.assignee ?? "") !== actor && !["resolved", "closed"].includes(active.status) && (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={async () => {
+                    await context.mutate.patch(active.id, { status: active.status === "new" ? "open" : active.status, fields: { ...active.fields, assignee: actor } }, { expectRevision: active.revision, event: `${String(active.fields.ref ?? active.title)} taken by ${actor}` });
+                    setActiveId(active.id);
+                    context.toast("Assigned to you", `${String(active.fields.ref ?? active.title)} is in your queue.`);
+                  }}
+                >
+                  Assign to me
+                </Button>
+              )}
               <Button size="sm" variant="secondary" onClick={() => { context.select(active.id); context.openOverlay("Customer inspector", { id: active.id }); }}>Customer</Button>
               <Button size="sm" variant="secondary" onClick={() => { context.select(active.id); context.openOverlay("canned reply", { id: active.id }); }}>Macros</Button>
               <Button size="sm" variant="outline-danger" onClick={() => { context.select(active.id); context.openOverlay("escalation", { id: active.id }); }}>Escalate</Button>
@@ -365,6 +417,7 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
                     <Avatar name={String(message.fields.author ?? "")} kind={data.members.some((member) => member.title === message.fields.author && member.fields.kind === "ai") ? "ai" : "human"} size="sm" />
                     <strong>{String(message.fields.author ?? "")}</strong>
                     {message.fields.internal === true && <Pill tone="warning">Internal note</Pill>}
+                    <DeliveryPill message={message} />
                     <span className="ds-subtle">{context.dateTime(message.at)}</span>
                   </div>
                   <p>{message.summary}</p>
@@ -382,7 +435,20 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
                 placeholder="Write a reply. A macro can fill this in from an approved article."
               />
               <Row gap={2} wrap>
-                <span className="ds-subtle ds-grow">Replies are recorded on the case. No mail or chat provider is connected.</span>
+                <span className="ds-subtle ds-grow">
+                  {savedDraft && savedDraft === draft ? "Draft saved on the case. " : ""}A recorded reply stays on the case: no mail or chat provider is connected, so it is not sent.
+                </span>
+                <Button
+                  variant="ghost"
+                  disabled={!draft.trim() || draft === savedDraft}
+                  onClick={async () => {
+                    await context.mutate.patch(active.id, { fields: { ...active.fields, replyDraft: draft } }, { event: `Reply draft saved on ${String(active.fields.ref ?? "")} by ${actor}` });
+                    setActiveId(active.id);
+                    context.toast("Draft saved", "It is kept on the case for whoever picks it up. Nothing was sent.");
+                  }}
+                >
+                  Save draft
+                </Button>
                 <Button variant="secondary" disabled={!draft.trim()} onClick={() => void send(true)}>Add as an internal note</Button>
                 <Button type="submit" variant="primary" disabled={!draft.trim()}>Record the reply</Button>
               </Row>
@@ -480,6 +546,7 @@ export function TicketDetail({ context, lens }: { context: ScreenContext; lens: 
                 <Avatar name={String(message.fields.author ?? "")} size="sm" />
                 <strong>{String(message.fields.author ?? "")}</strong>
                 {message.fields.internal === true && <Pill tone="warning">Internal note</Pill>}
+                <DeliveryPill message={message} />
                 <span className="ds-subtle">{context.dateTime(message.at)}</span>
               </div>
               <p>{message.summary}</p>
@@ -539,7 +606,7 @@ export function TicketDetail({ context, lens }: { context: ScreenContext; lens: 
       <Stack gap={4}>
         <Properties rows={[
           { label: "Opened", value: `${context.dateTime(ticket.at)} by ${ticket.createdBy}` },
-          { label: "First response", value: ticket.fields.firstResponseAt ? context.dateTime(String(ticket.fields.firstResponseAt)) : "Not yet" },
+          { label: "First response", value: ticket.fields.firstResponseAt ? context.dateTime(String(ticket.fields.firstResponseAt)) : ticket.fields.firstResponseRecordedAt ? `Reply recorded ${context.dateTime(String(ticket.fields.firstResponseRecordedAt))}, not delivered` : "Not yet" },
           { label: "Resolved", value: ticket.fields.resolvedAt ? context.dateTime(String(ticket.fields.resolvedAt)) : "Not yet" },
           { label: "Reopened", value: ticket.fields.reopened === true ? "Yes, at least once" : "No" },
           { label: "Revisions", value: String(ticket.revision) },
@@ -566,7 +633,8 @@ export function TicketDetail({ context, lens }: { context: ScreenContext; lens: 
           ]} />
         </Stack>
       </Card>
-      <Card span={5} eyebrow="SLA" prov="human" title="Against the clock" subtitle={policyFor(ticket, data.slas)?.title ?? "No policy matched"}>
+      <TriageCard context={context} ticket={ticket} state={state} />
+      <Card span={6} eyebrow="SLA" prov="human" title="Against the clock" subtitle={policyFor(ticket, data.slas)?.title ?? "No policy matched"}>
         <Stack gap={3}>
           <SlaBadge state={state} />
           <Properties rows={[
@@ -585,33 +653,8 @@ export function TicketDetail({ context, lens }: { context: ScreenContext; lens: 
           </Stack>
         ) : <span className="ds-subtle">No contact record is linked to this case.</span>}
       </Card>
-      <Card span={6} eyebrow="RESOLUTION" prov="human" title="Resolution">
-        {ticket.fields.resolvedAt ? (
-          <Stack gap={3}>
-            <Properties rows={[
-              { label: "Resolved", value: context.dateTime(String(ticket.fields.resolvedAt)) },
-              { label: "By", value: String(ticket.fields.resolvedBy || "Not recorded") },
-            ]} />
-            <Button variant="secondary" onClick={() => context.openOverlay("internal note")}>Reopen this case</Button>
-          </Stack>
-        ) : (
-          <Stack gap={3}>
-            <span className="ds-subtle">This case is still open.</span>
-            <Button
-              variant="primary"
-              onClick={async () => {
-                await context.mutate.patch(ticket.id, {
-                  status: "resolved",
-                  fields: { ...ticket.fields, resolvedAt: context.now.toISOString(), resolvedBy: context.actor, assignee: String(ticket.fields.assignee || context.actor) },
-                }, { expectRevision: ticket.revision, event: `${String(ticket.fields.ref ?? ticket.title)} resolved by ${context.actor}` });
-                context.toast("Case resolved", "The record changed and the clock stopped.");
-              }}
-            >
-              Mark resolved
-            </Button>
-          </Stack>
-        )}
-      </Card>
+      <ResolutionCard context={context} ticket={ticket} />
+      <LinkedContextCard context={context} ticket={ticket} contact={contact} />
     </Grid>
   );
 }
@@ -1107,17 +1150,19 @@ export function ResponseComposer({ context, close }: { context: ScreenContext; c
         await context.mutate.create({
           collection: "messages",
           title: `${String(ticket.fields.ref ?? "")} — reply`,
-          status: "sent",
+          status: "recorded",
           summary: text.trim(),
           parentId: ticket.id,
           at: context.now.toISOString(),
-          fields: { kind: "ticket", author: context.actor, side: "agent", channel: String(ticket.fields.channel ?? "email"), internal: false },
+          fields: { kind: "ticket", author: context.actor, side: "agent", channel: String(ticket.fields.channel ?? "email"), internal: false, delivery: "not_sent" },
         }, `Reply recorded on ${String(ticket.fields.ref ?? ticket.title)} by ${context.actor}`);
-        if (!ticket.fields.firstResponseAt) {
-          await context.mutate.patch(ticket.id, {
+        if (!ticket.fields.firstResponseAt && !ticket.fields.firstResponseRecordedAt) {
+          // Recorded, not delivered: the first-response clock keeps running.
+          const saved = await context.mutate.patch(ticket.id, {
             status: ticket.status === "new" ? "open" : ticket.status,
-            fields: { ...ticket.fields, firstResponseAt: context.now.toISOString(), assignee: String(ticket.fields.assignee || context.actor) },
-          }, { event: `First response recorded on ${String(ticket.fields.ref ?? "")}` });
+            fields: { firstResponseRecordedAt: context.now.toISOString(), assignee: String(ticket.fields.assignee || context.actor) },
+          }, { event: `First reply recorded (not delivered) on ${String(ticket.fields.ref ?? "")}` });
+          if (!saved) return;
         }
         if (macro) {
           await context.mutate.patch(macro.id, { fields: { ...macro.fields, uses: Number(macro.fields.uses ?? 0) + 1 } }, { event: `${macro.title} used` });
