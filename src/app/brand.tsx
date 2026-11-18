@@ -15,10 +15,10 @@ export function ArloviMark({ size = 28, title }: { size?: number; title?: string
     <svg width={size} height={size} viewBox="0 0 64 64" role={title ? "img" : undefined} aria-hidden={title ? undefined : true} aria-label={title}>
       {title && <title>{title}</title>}
       <rect width="64" height="64" rx="32" fill="#1F2723" />
-      <path d="M18 43 C26 43 26 21 34 21 H46" fill="none" stroke="#D7F0E8" strokeWidth="2.5" strokeLinecap="round" />
-      <circle cx="18" cy="43" r="6" fill="#ffffff" />
-      <circle cx="34" cy="21" r="5" fill="#E9DFFA" />
-      <circle cx="47" cy="21" r="5" fill="#FFF0C8" />
+      <path d="M18 43 C26 43 26 21 34 21 H46" fill="none" stroke="#69D5BA" strokeWidth="2.5" strokeLinecap="round" />
+      <circle cx="18" cy="43" r="6" fill="#F58E6A" />
+      <circle cx="34" cy="21" r="5" fill="#9B7BFA" />
+      <circle cx="47" cy="21" r="5" fill="#D9F768" />
     </svg>
   );
 }

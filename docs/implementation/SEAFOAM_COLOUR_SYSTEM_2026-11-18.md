@@ -1,30 +1,29 @@
-# Arlovi Seafoam — colour orchestration contract
-Approved direction: 18 November 2026. Applies to all first-party applications and shared UI.
+# Arlovi Chromatic Studio — Approved colour direction
+Updated 18 November 2026. Supersedes the overly restrictive Seafoam-only 90/7/3 rule.
 
-## Decision
-The default theme is **light**, with white and neutral surfaces dominant. Brand pastel Seafoam is `#D7F0E8`; the primary interactive colour is `#2D6B65`; the stronger ink is `#174A44`. Secondary pastels are Lilac `#E9DFFA`, Butter `#FFF0C8`, Peach `#FCE7D6`, and Sage `#DDEDDC`. Blue and blush pink are retired as Arlovi defaults.
+## Vision
+Arlovi is a joyful, capable AI business operating system. Its presentation should share Wix Studio's creative confidence, not its logos or brand assets. Pure white and warm-neutrals anchor work. A four-colour expressive family returns personality to the experience.
 
-## Colour-area hierarchy
-Aim for roughly **90% neutral surfaces, 7% pale tints, 3% strong brand colour** on operational screens. This is an editorial guide, not pixel-computed compliance. Ordinary typography and dense analytical content are excluded from those ratios. The primary colour must not become a full sidebar, full KPI card, or ubiquitous hero background.
+## Brand quartet
+- Seafoam #69D5BA; readable ink #176D60, soft #D7F0E8.
+- Electric Iris #6C48D7; soft #EEE7FF.
+- Citrus #D9F768; dark ink #526519.
+- Coral #F58E6A; dark ink #AE4D37.
+- White #FFFFFF and dark graphite #1F2723 are the stable foundation.
+Pairing: Seafoam + Iris = distinctive duet; Citrus = small high-energy punctuation; Coral = occasional warmth. Do not treat decorative Coral as a danger status.
 
-## Placement rules
-- **Shell and documents**: white header, white sidebars, neutral canvas and white record panels. Borders and typography establish structure.
-- **Navigation and selection**: small Seafoam tint and one independent marker/underline/border; never tint every tab or group.
-- **Primary actions**: deep Seafoam, generally one dominant action per decision area. Secondary controls neutral.
-- **KPIs and data grids**: white cards; small trend/status accents; row selection uses the lightest tint. Never rainbow-fill metrics.
-- **Popovers, drawers, modals**: white; contextual colour only when content requires it.
-- **App families**: People may use small Lilac motifs; Growth Peach; Planning Butter; Intelligence Seafoam; Finance reserved status/contrast green. App accents do not recolour chrome.
-- **Onboarding**: more expressive than accounting, but do not use oversized colourful gradients or large pastel slabs.
-- **AI employees**: source/provenance marker, task status and accountability—not neon glows, random sparkles or large dark AI cards.
-- **Charts**: use `--series-1` to `--series-8` for categorical series, distinct from brand and operational status; add labels, legends and line styles. Sequential/diverging charts require domain-specific palettes, never generic pastel rotation.
-- **Semantic states**: success `#166B50`, warning `#895800`, danger `#B42332`, info `#5D4B84`, with soft backgrounds. Meaning never changes with selected palette or tenant colour.
+## Placement
+- Executive Home: prominent but compact multicolour symbol or graphic and balanced coloured statistical markers.
+- My Workspace: one subtle spectrum strip, coloured icon chips, one atmospheric focus card, vivid typographic underline.
+- Apps Directory: consistent coloured app-family icons, coloured active filters, slim strips on cards and app-family headings. All cards retain white backgrounds.
+- Onboarding: an optimistic deliberately composed artwork with visible colour, not a generic blue gradient.
+- Studio and AI: colourful product identity; actual operations, permissions, evidence and status remain precise.
+- Legal, finance, HR and business tables: white and neutral with tiny accents.
+- Do not force a full-colour panel every screen. No random neon glows, enormous gradients or rainbow KPI slabs.
+- Charts may use Iris, Seafoam, coral and warm ochre in independently legible darker series, coupled with legends and patterns. Status green/amber/red/purple remain separate.
 
-## Theme and tenant policy
-- Personal theme/palette in Appearance & display is browser-local; Seafoam light is the default.
-- Legacy cobalt defaults migrate to Seafoam; old other presets map to their closest muted alternatives.
-- Tenant accent is independent of personal appearance and operational states. The onboarding picker offers muted brand colours and custom hex. The company switcher computes high-contrast lettering for its accent swatch.
-- Existing custom organisation colours remain unchanged. New organisations use deep Seafoam by default.
-- Dark is opt-in, and preserves readable semantic tokens. Do not recolour dark surfaces with large saturated panels.
+## Controls
+Existing theme presets still work. Personal accent preference is distinct from tenant brand identity. Default remains Seafoam for navigational and main actions; expressive quartet is consistent platform-wide. Semantic states never recolour to match a chosen brand.
 
-## Review checklist
-Across all apps, check 320–1920px, zoom, dark/light appearance, company switching, keyboard focus, selected states, empty/loading/error, charts, exports and colour-vision distinguishability. Text should meet WCAG AA 4.5:1 and relevant non-text indicators 3:1. Colour alone cannot convey a business state. Do not hide errors in transient toasts.
+## QA
+Check desktop/tablet/mobile, dark mode, small zoom, reduced motion, keyboard focus, app categories, workflows, tabs, modals, charts and exports. Relevant text must meet 4.5:1 contrast, state indicators need additional distinguishing cues. Confirm real visual uplift without increasing cognitive load.

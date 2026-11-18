@@ -1,10 +1,10 @@
 /* ==========================================================================
    Arlovi design tokens — "Connected work" system
 
-   Light-first, Seafoam-led and restrained. Neutral surfaces own workspaces;
-   pastel Seafoam marks selection and deep Seafoam marks primary interactions.
-   Lilac, Butter, Peach and Sage have small, intentional supporting roles.
-   Aim for 90/7/3 neutral/pastel/strong colour on operational surfaces.
+   Light-first, bright and cohesive. Seafoam joins electric Iris, Citrus and
+   Coral as a recognisable expressive family. Colour lives in app identity,
+   purposeful graphics, data visualisation, small markers and AI surfaces.
+   Never fill every work card, sidebar or business form with pastel.
 
    Signature (kept from the original system): an element that asserts a fact
    carries a provenance edge — posted, human, agent or unknown.
@@ -38,6 +38,23 @@
   --app-planning: var(--butter-ink);
   --app-intelligence: var(--seafoam-700);
   --app-finance: #166b50;
+
+  /* Chromatic Studio: vivid roles have a light companion and readable ink.
+     This is our identity, not a copy of any reference brand. */
+  --studio-iris: #6c48d7;
+  --studio-iris-soft: #eee7ff;
+  --studio-citrus: #d9f768;
+  --studio-citrus-ink: #526519;
+  --studio-coral: #f58e6a;
+  --studio-coral-ink: #ae4d37;
+  --studio-seafoam: #69d5ba;
+  --studio-seafoam-ink: #176d60;
+  --studio-violet-ink: #5f3cbd;
+  --studio-pastel-purple: #e5d9fc;
+  --studio-citrus-soft: #f3fad5;
+  --studio-coral-soft: #fff0e8;
+  --studio-spectrum: linear-gradient(100deg, var(--studio-seafoam) 0 28%, var(--studio-iris) 28% 55%, var(--studio-coral) 55% 78%, var(--studio-citrus) 78% 100%);
+  --studio-ambient: linear-gradient(115deg, #f5fcf8 0%, #f7f3ff 55%, #fff9f0 100%);
 
   /* ---- Brand ramps ---- */
   /* Deprecated cobalt variable names map to Seafoam, avoiding blue in older apps. */
@@ -147,18 +164,18 @@
 
   /* ---- Provenance materials: the signature device ---- */
   --mat-posted: var(--graphite-900);
-  --mat-human: var(--lilac-ink);
-  --mat-agent: var(--seafoam-700);
+  --mat-human: var(--studio-iris);
+  --mat-agent: var(--studio-seafoam-ink);
   --mat-unknown: var(--warning);
   --mat-width: 2px;
 
   /* Chart series: distinct from statuses, support line styles + labels. */
-  --series-1: #2d6b65;
-  --series-2: #705a95;
-  --series-3: #a45136;
-  --series-4: #895800;
+  --series-1: #176d60;
+  --series-2: #6c48d7;
+  --series-3: #ae4d37;
+  --series-4: #916017;
   --series-5: #166b50;
-  --series-6: #76566b;
+  --series-6: #934b88;
   --series-7: #4f5f3c;
   --series-8: #635869;
 
@@ -238,7 +255,7 @@
 
   /* ---- Machine surfaces: the dark connected stage ---- */
   --grad-intelligence: #0d0d0d;
-  --grad-horizon: linear-gradient(118deg, #174a44 0%, #2d6b65 60%, #d7f0e8 100%);
+  --grad-horizon: linear-gradient(112deg, #176d60 0%, #6c48d7 48%, #f58e6a 100%);
   --grad-ember: linear-gradient(118deg, #805137 0%, #a45136 52%, #fce7d6 100%);
   --dot-field: radial-gradient(rgb(255 255 255 / 16%) 1px, transparent 1.2px);
   --hatch-agent: repeating-linear-gradient(135deg, var(--seafoam-700) 0 1.5px, transparent 1.5px 4px);
@@ -296,7 +313,7 @@
   --mat-agent: #a6d9ca;
   --mat-unknown: #e8c27a;
   --series-1: #a6d9ca;
-  --series-2: #c9b6e9;
+  --series-2: #bda7f9;
   --series-3: #f4bba1;
   --series-4: #e8c27a;
   --series-5: #98d9b6;

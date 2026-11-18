@@ -375,3 +375,12 @@ body:has([role="dialog"]) .ds-toasts { inset-block-start: var(--space-4); inset-
 }
 .ds-routing-node::after { content: ""; position: absolute; inset-inline-end: -3px; inset-block-start: 50%; width: 6px; height: 6px; margin-top: -3px; border-radius: 50%; background: var(--fg-strong); }
 @media (max-width: 599px) { .ds-routing { height: 72px; } .ds-routing-node { width: 40px; height: 40px; } }
+
+/* Brand signature: 3px editorial colour markers on otherwise neutral figures. */
+.ds-statrow > * { position: relative; overflow: hidden; }
+.ds-statrow > *::before { content:""; position:absolute; left:var(--space-5); top:0; width:44px; height:3px; border-radius:0 0 5px 5px; background:var(--studio-seafoam); }
+.ds-statrow > :nth-child(4n+2)::before { background:var(--studio-iris); }
+.ds-statrow > :nth-child(4n+3)::before { background:var(--studio-coral); }
+.ds-statrow > :nth-child(4n+4)::before { background:var(--studio-citrus); }
+.ds-card[data-prov="agent"] .ds-card-head .ds-eyebrow { color:var(--studio-violet-ink); }
+:root[data-theme="dark"] .ds-card[data-prov="agent"] .ds-card-head .ds-eyebrow { color:#cdb9ff; }
