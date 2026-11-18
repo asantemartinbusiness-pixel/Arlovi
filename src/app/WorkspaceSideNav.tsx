@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
-  Activity, Building2, CalendarDays, CheckSquare2, Clock3, FileText,
+  Activity, Bot, Building2, CalendarDays, CheckSquare2, Clock3, FileText,
   FolderKanban, Grid2X2, Home, Inbox, Layers, LockKeyhole, MessageSquare,
   Rocket, Settings2, Users, Workflow,
 } from "lucide-react";
@@ -80,11 +80,13 @@ export function WorkspaceSideNav() {
   const detailRoot=kind && record ? workspaceDetailPath(org.slug,kind,record.id):null;
   const scopedNavigation:NavItem[] = detailRoot?[
     {label:"Overview",to:detailRoot,icon:Home},
-    {label:"Work",to:`${detailRoot}?tab=work`,icon:CheckSquare2},
+    {label:"Tasks & work",to:`${detailRoot}?tab=work`,icon:CheckSquare2},
+    {label:"AI workforce",to:`${detailRoot}?tab=ai%20workforce`,icon:Bot},
     {label:"People",to:`${detailRoot}?tab=people`,icon:Users},
     {label:"Files",to:`${detailRoot}?tab=files`,icon:FolderKanban},
     {label:"Conversations",to:`${detailRoot}?tab=conversations`,icon:MessageSquare},
     {label:"Approvals",to:`${detailRoot}?tab=approvals`,icon:CheckSquare2},
+    {label:"Activity",to:`${detailRoot}?tab=activity`,icon:Activity},
   ]:[];
   const sectionLabel = area==="home"?"MY DAY":area==="company"?"ORGANISATION":area==="spaces"?"WORKSPACES":area==="work"?"DELIVERY":"APPLICATIONS";
   const currentDetailTab = new URLSearchParams(location.search).get("tab") ?? "overview";
