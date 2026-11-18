@@ -25,6 +25,7 @@ import { canOpen, ROLE_LABELS } from "@/platform/policy";
 import { ORGS } from "@/platform/org";
 import { useCollections, useWorkspace, useMutations } from "@/platform/workspace";
 import { buildAttention, filterForRole, headerAttentionCounts } from "@/platform/attention";
+import { DEFAULT_NOTIFICATION_PREFERENCES, isUrgent, mayInterrupt } from "@/platform/notificationPolicy";
 import { applyAttentionReceipts } from "@/platform/attentionReceipts";
 import { useUi } from "@/runtime/ui";
 import { DisplayPreferences } from "@/app/DisplayPreferences";
@@ -130,6 +131,34 @@ export function AppShell() {
   }), role), ui.attentionReceipts, org.id, role, actor, now), [data, org.slug, org.id, now, role, actor, ui.attentionReceipts]);
   const contextVisible = isWorkspaceArea && ["project","department"].includes(location.pathname.split("/")[5]);
   const {decisions, unreadUpdates: updates} = headerAttentionCounts(attention);
+  // Start from the current feed. Only events arriving after this view mounts may
+  // produce transient feedback; loading historical notifications never spams toasts.
+  const arrivalTracker = useRef<{ scope: string; seen: Set<string> } | null>(null);
+  useEffect(() => {
+    const scope = `${org.id}:${encodeURIComponent(actor)}:${role}`;
+    if (!arrivalTracker.current || arrivalTracker.current.scope !== scope) {
+      arrivalTracker.current = { scope, seen: new Set(attention.map(item => item.id)) };
+      return;
+    }
+    const fresh = attention.filter(item => !arrivalTracker.current!.seen.has(item.id));
+    fresh.forEach(item => arrivalTracker.current!.seen.add(item.id));
+    const personal = ui.notificationSettings[`${org.id}:${encodeURIComponent(actor)}`] ?? DEFAULT_NOTIFICATION_PREFERENCES;
+    const eligible = fresh.filter(item => mayInterrupt(item, personal,
+      Boolean(item.route) && item.route!.split("?")[0] === location.pathname));
+    if (!eligible.length) return;
+    const mostImportant = [...eligible].sort((a,b)=>a.priority.localeCompare(b.priority))[0];
+    const privateSummary = personal.preview === "private";
+    ui.pushToast({
+      title: privateSummary ? (isUrgent(mostImportant.priority) ? "Urgent notification" : "New notification") : mostImportant.title,
+      body: privateSummary ? `${eligible.length} new item(s) need your attention. Open notifications to review.`
+        : eligible.length > 1 ? `${eligible.length} new updates · ${mostImportant.body}` : mostImportant.body,
+      tone: isUrgent(mostImportant.priority) ? "blocked" : "info",
+      durationMs: isUrgent(mostImportant.priority) ? 0 : 6000,
+      actionLabel: "Review",
+      onAction: () => { setAttentionView(mostImportant.kind === "approval" || mostImportant.kind === "assignment" ? "approvals" : "updates");
+        ui.setCommand(false); ui.setAsk(false); ui.setNotes(true); },
+    });
+  }, [attention, org.id, actor, role, location.pathname, ui.notificationSettings, ui.pushToast, ui.setNotes, ui.setAsk, ui.setCommand]);
   function openCommand() { ui.setAsk(false); ui.setNotes(false); ui.setCommand(true); }
   function openAsk() { ui.setCommand(false); ui.setNotes(false); ui.setAsk(true); }
   function openAttention(view: "for-you" | "approvals" | "updates" | "settings") {
