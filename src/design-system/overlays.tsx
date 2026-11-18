@@ -168,6 +168,7 @@ export function Modal({
  */
 const DrawerFooterTarget = createContext<HTMLElement | null>(null);
 const DrawerDirtyRegistrar = createContext<((dirty: boolean) => void) | null>(null);
+const DrawerBusyRegistrar = createContext<((busy: boolean) => void) | null>(null);
 
 /** Place this inside drawer content to dock its actions below the scroll region. */
 export function DrawerActions({ children }: { children: ReactNode }) {
@@ -179,6 +180,16 @@ export function DrawerActions({ children }: { children: ReactNode }) {
 /** Protect an edited form from Escape, outside clicks, and the close button. */
 export function DrawerUnsavedChanges({ when }: { when: boolean }) {
   const register = useContext(DrawerDirtyRegistrar);
+  useEffect(() => {
+    register?.(when);
+    return () => register?.(false);
+  }, [register, when]);
+  return null;
+}
+
+/** Prevent a pending native drawer mutation being dismissed through Escape or the scrim. */
+export function DrawerInFlight({ when }: { when: boolean }) {
+  const register = useContext(DrawerBusyRegistrar);
   useEffect(() => {
     register?.(when);
     return () => register?.(false);
@@ -207,8 +218,10 @@ export function Drawer({
 }) {
   const [footerTarget, setFooterTarget] = useState<HTMLElement | null>(null);
   const [isDirty, setDirty] = useState(false);
+  const [inFlight, setInFlight] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const requestOpenChange = (next: boolean) => {
+    if (!next && inFlight) return;
     if (!next && isDirty) {
       setConfirmDiscard(true);
       return;
@@ -218,6 +231,7 @@ export function Drawer({
 
   return (
     <DrawerDirtyRegistrar.Provider value={setDirty}>
+      <DrawerBusyRegistrar.Provider value={setInFlight}>
       <DrawerFooterTarget.Provider value={footerTarget}>
         <Dialog.Root open={open} onOpenChange={requestOpenChange}>
           <Dialog.Portal>
@@ -226,7 +240,8 @@ export function Drawer({
               className="ds-drawer"
               data-native-app={application}
               style={{ ["--drawer-w" as string]: `${width}px` }}
-              onInteractOutside={(event) => { if (fromToast(event)) event.preventDefault(); }}
+              onEscapeKeyDown={(event) => { if (inFlight) event.preventDefault(); }}
+              onInteractOutside={(event) => { if (inFlight || fromToast(event)) event.preventDefault(); }}
             >
               <header className="ds-overlay-head">
                 <div className="ds-grow">
@@ -238,7 +253,7 @@ export function Drawer({
                 </div>
                 {head}
                 <Dialog.Close asChild>
-                  <Button variant="ghost" size="sm" iconOnly aria-label="Close panel">
+                  <Button variant="ghost" size="sm" iconOnly aria-label="Close panel" disabled={inFlight}>
                     <X size={16} aria-hidden="true" />
                   </Button>
                 </Dialog.Close>
@@ -265,6 +280,7 @@ export function Drawer({
           <p className="ds-prose">You can return to this record, but the changes you just made will be lost.</p>
         </Modal>
       </DrawerFooterTarget.Provider>
+      </DrawerBusyRegistrar.Provider>
     </DrawerDirtyRegistrar.Provider>
   );
 }
