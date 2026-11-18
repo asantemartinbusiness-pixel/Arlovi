@@ -83,6 +83,8 @@ export interface OverlayDef {
     guidance?: string;
     /** Opt in to including the page's selected record in overlay context. */
     selectedRecord?: boolean;
+    /** Restrict record-backed flows to their real collection. */
+    collection?: string;
     /** Omit record context on creation or sensitive confirmation surfaces. */
     noRecordContext?: boolean;
   };
