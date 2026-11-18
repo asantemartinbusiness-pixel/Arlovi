@@ -1,0 +1,53 @@
+/* Personal work desk: original Arlovi tokens, no parallel design system. */
+.ww-page{display:flex;flex-direction:column;gap:var(--space-5);min-width:0}
+.ww-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--space-5);padding:var(--space-6);background:var(--bg-surface);border:1px solid var(--border-default);border-left:4px solid var(--accent);border-radius:var(--radius-lg)}
+.ww-hero>div:first-child{display:flex;flex-direction:column;gap:var(--space-3)}
+.ww-hero h1{font:500 clamp(32px,3.6vw,52px)/1.1 var(--font-display);letter-spacing:-.04em}
+.ww-hero p{color:var(--fg-muted);font-size:var(--text-md);line-height:1.55;max-width:58ch}
+.ww-hero-action{flex:none}.ww-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-3)}
+.ww-summary>div{background:var(--bg-surface);border:1px solid var(--border-default);border-radius:var(--radius-lg);padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-2)}
+.ww-summary span{font-size:var(--text-sm);color:var(--fg-muted)}
+.ww-summary strong{font:500 clamp(27px,2.6vw,40px)/1.1 var(--font-display);font-variant-numeric:tabular-nums}
+.ww-summary small{font-size:var(--text-xs);color:var(--fg-muted)}
+.ww-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(270px,.85fr);gap:var(--space-4);align-items:start}
+.ww-main,.ww-aside-panel{background:var(--bg-surface);border:1px solid var(--border-default);border-radius:var(--radius-lg);padding:var(--space-4);min-width:0}
+.ww-aside{display:flex;flex-direction:column;gap:var(--space-4);min-width:0}
+.ww-panel-header{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);margin-bottom:var(--space-4)}
+.ww-panel-header>div{display:flex;flex-direction:column;gap:6px}
+.ww-eyebrow{font:500 var(--text-xs) var(--font-mono);letter-spacing:.06em;color:var(--fg-muted)}
+.ww-panel-header h2{font:500 var(--text-xl) var(--font-display);letter-spacing:-.025em}
+.ww-panel-header>a{color:var(--fg-default);padding:8px}
+.ww-count{font-size:var(--text-xs);color:var(--fg-muted);white-space:nowrap}
+.ww-toolbar{display:flex;gap:var(--space-2);justify-content:space-between;flex-wrap:wrap}
+.ww-tabs{display:flex;gap:3px;padding:3px;background:var(--bg-sunken);border:1px solid var(--border-subtle);border-radius:var(--radius-pill)}
+.ww-tabs button{border:0;border-radius:var(--radius-pill);padding:8px 12px;min-height:36px;background:transparent;color:var(--fg-muted);font:500 var(--text-xs) var(--font-sans);cursor:pointer}
+.ww-tabs button[aria-pressed=true]{background:var(--bg-surface);color:var(--fg-default);box-shadow:0 0 0 1px var(--border-default)}
+.ww-search{display:flex;gap:8px;align-items:center;border:1px solid var(--border-default);border-radius:var(--radius-pill);padding:0 12px;min-height:42px;flex:1;max-width:260px;color:var(--fg-muted)}
+.ww-search input{width:100%;min-width:0;background:transparent;border:0;outline:0;color:var(--fg-default);font:var(--text-sm) var(--font-sans)}
+.ww-filterbar{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-3);padding:var(--space-3) 0;color:var(--fg-muted);font-size:var(--text-xs)}
+.ww-filterbar label{display:flex;align-items:center;gap:8px}
+.ww-filterbar select{max-width:180px;min-height:36px;border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:0 8px;background:var(--bg-surface);color:var(--fg-default);font:var(--text-xs) var(--font-sans)}
+.ww-row{display:flex;align-items:center;gap:var(--space-3);border-top:1px solid var(--border-subtle);padding:var(--space-3) 0;min-height:64px;color:var(--fg-default);text-decoration:none}
+.ww-row:hover .ww-row-copy strong{text-decoration:underline}
+.ww-row-icon,.ww-project-icon{display:grid;place-items:center;width:35px;height:35px;border-radius:var(--radius-md);background:var(--bg-sunken);color:var(--fg-muted);flex:none}
+.ww-row-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.ww-row-copy strong,.ww-projects strong{font-size:var(--text-sm);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ww-row-copy small,.ww-projects small{font-size:var(--text-xs);color:var(--fg-muted);text-transform:capitalize}
+.ww-row>svg:last-child,.ww-projects>a>svg:last-child{color:var(--fg-subtle);flex:none}
+.ww-state-done{color:var(--fg-muted)}
+.ww-projects{display:flex;flex-direction:column}
+.ww-projects>a{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-3) 0;border-top:1px solid var(--border-subtle);text-decoration:none;color:var(--fg-default);min-width:0}
+.ww-projects>a>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:5px;min-width:0}
+.ww-projects>a:hover strong{text-decoration:underline}
+.ww-projects .ww-row{padding:var(--space-3) 0}
+.ww-small-empty{padding:var(--space-4) 0;color:var(--fg-muted);font-size:var(--text-sm)}
+.ww-native-links{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)}
+.ww-native-links a{display:flex;align-items:center;gap:var(--space-2);color:var(--fg-default);text-decoration:none;font-size:var(--text-xs);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:var(--space-3);background:var(--bg-surface)}
+.ww-native-links a svg:last-child{margin-left:auto}.ww-native-links a:hover{background:var(--bg-hover)}
+.ww-empty{display:flex;flex-direction:column;align-items:flex-start;gap:var(--space-2);padding:var(--space-6) 0;color:var(--fg-muted);font-size:var(--text-sm)}
+.ww-empty strong{color:var(--fg-default);font-size:var(--text-md)}
+.ww-empty button{background:transparent;border:0;text-decoration:underline;font:500 var(--text-sm) var(--font-sans);padding:8px 0;cursor:pointer;color:var(--fg-default)}
+.ww-visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.ww-page a:focus-visible,.ww-page button:focus-visible,.ww-page select:focus-visible,.ww-search:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:1100px){.ww-layout{grid-template-columns:1fr}.ww-aside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.ww-native-links{grid-column:1/-1}}
+@media(max-width:720px){.ww-hero{flex-direction:column;align-items:stretch;padding:var(--space-4)}.ww-summary{grid-template-columns:1fr}.ww-aside{grid-template-columns:1fr}.ww-toolbar{flex-direction:column}.ww-search{max-width:none}.ww-tabs{width:100%;justify-content:space-between}.ww-tabs button{flex:1;padding:8px 4px}.ww-native-links{grid-template-columns:1fr 1fr}}
