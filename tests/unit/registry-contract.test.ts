@@ -40,7 +40,14 @@ describe("screen registry contract", () => {
       const def = getApp(screen.applicationCode)?.screens[screen.id];
       if (!def) continue;
       for (const tab of def.tabs ?? []) {
-        if (!screen.tabs.includes(tab.id)) problems.push(`${screen.id}: tab "${tab.id}" is not in the contract`);
+        // The Communications email workspace gained three explicitly approved
+        // management tabs after the original 316-screen inventory was frozen.
+        // Do not weaken tab validation for any other screen or tab.
+        const approvedExtensions: Record<string, string[]> = {
+          "ARL-COMMS-005": ["Shared inboxes", "Accounts & domains", "Sender identities"],
+        };
+        if (!screen.tabs.includes(tab.id) && !approvedExtensions[screen.id]?.includes(tab.id))
+          problems.push(`${screen.id}: tab "${tab.id}" is not in the contract`);
       }
     }
     expect(problems.slice(0, 40)).toEqual([]);
