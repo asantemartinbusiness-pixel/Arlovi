@@ -694,6 +694,10 @@ export function RolesScreen({ context, tab }: { context: ScreenContext; tab: "Ro
   if (tab === "Roles") {
     return (
       <Stack gap={4}>
+        <Notice tone="info" title="Explore the expanded role architecture"
+          actions={<Button variant="secondary" size="sm" onClick={() => context.setTab("Effective access")}>Explore role templates</Button>}>
+          Thirteen proposed job-title templates, all 35 native applications and 316 screen contracts are available in Effective access. These are preview rules, not live employee grants.
+        </Notice>
         <Grid>
           {ROLES.map((role) => {
             const holders = data.members.filter((member) => member.fields.role === role);
