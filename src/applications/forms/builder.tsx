@@ -18,6 +18,7 @@ import {
   type FieldType, type FormField, type FormModel, type LogicRule, type Operator,
 } from "./model";
 import { FormRuntime } from "./runtime";
+import { PreviewRunsPanel, keepPreviewRun } from "./previewRunsPanel";
 import { saveForm, useFormsUi } from "./state";
 
 const ICONS: Record<FieldType, React.ReactNode> = {
@@ -203,11 +204,13 @@ export function FormBuilder({ context }: { context: ScreenContext }) {
             onChange={ui.setDevice}
             options={[{ value: "mobile" as const, label: "Mobile 390" }, { value: "desktop" as const, label: "Desktop" }]}
           />
-          <span className="ds-subtle">The preview validates exactly as the public form does and stops before writing.</span>
+          <span className="ds-subtle">The preview validates exactly as the public form does. A finished run is kept below as a preview run, never as a response.</span>
         </Row>
         <div style={{ width: ui.device === "mobile" ? 390 : "100%", maxWidth: "100%" }}>
-          <FormRuntime model={model} record={record} context={context} mode="preview" />
+          <FormRuntime model={model} record={record} context={context} mode="preview"
+            onPreviewComplete={(run) => keepPreviewRun(context, record, model, ui.device, run)} />
         </div>
+        <PreviewRunsPanel context={context} record={record} model={model} />
       </Stack>
     </div>
   );

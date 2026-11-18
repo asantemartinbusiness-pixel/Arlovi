@@ -100,7 +100,7 @@ export function FieldControl({
 }
 
 export function FormRuntime({
-  model, record, context, mode, onSubmitted,
+  model, record, context, mode, onSubmitted, onPreviewComplete,
 }: {
   model: FormModel;
   record: Rec;
@@ -108,6 +108,8 @@ export function FormRuntime({
   /** "live" writes a submission record; "preview" validates without writing. */
   mode: "live" | "preview";
   onSubmitted?: (id: string) => void;
+  /** Preview only: called with the visible answers when a run passes validation. Nothing is written as a submission. */
+  onPreviewComplete?: (run: { answers: [string, string][]; hidden: number }) => Promise<void> | void;
 }) {
   const [answers, setAnswers] = useState<Answers>({});
   const [errors, setErrors] = useState<FieldError[]>([]);
@@ -129,11 +131,13 @@ export function FormRuntime({
       <div className="t6-formskin" style={skin(model)}>
         <Stack gap={3}>
           <h2>{record.title}</h2>
-          <Notice tone="success" title="Recorded">{model.settings.confirmation}</Notice>
+          <Notice tone="success" title={mode === "live" ? "Recorded" : "Preview complete"}>{model.settings.confirmation}</Notice>
           <p className="ds-subtle">
             {mode === "live"
               ? `A submission record was created against ${record.title}, answering version ${model.settings.version}.`
-              : "Nothing was written: this is the preview, and it stops before the record."}
+              : onPreviewComplete
+                ? "Kept as a preview run on this form. It is not a response: the inbox, analytics and exports never count it."
+                : "Nothing was written: this is the preview, and it stops before the record."}
           </p>
           {model.settings.notifyEnabled && mode === "live" && (
             <Notice tone="warning" title="The notification was not sent">
@@ -169,7 +173,21 @@ export function FormRuntime({
           }
           return;
         }
-        if (mode === "preview") { setDone("preview"); return; }
+        if (mode === "preview") {
+          const answerable = model.fields.filter((field) => !STRUCTURAL.includes(field.type));
+          const shown = answerable.filter((field) => visible.has(field.id));
+          setBusy(true);
+          try {
+            await onPreviewComplete?.({
+              answers: shown.map((field) => [field.label, answerText(answers[field.id])]),
+              hidden: answerable.length - shown.length,
+            });
+          } finally {
+            setBusy(false);
+          }
+          setDone("preview");
+          return;
+        }
         setBusy(true);
         try {
           const answered = model.fields
@@ -242,7 +260,7 @@ export function FormRuntime({
             {last ? (mode === "live" ? "Submit" : "Check the answers") : "Next"}
           </Button>
         </div>
-        {mode === "preview" && <p className="ds-subtle">The preview runs the same validation and the same rules as the public form, and stops before writing a record.</p>}
+        {mode === "preview" && <p className="ds-subtle">The preview runs the same validation and the same rules as the public form. A finished run is kept as a preview run, never as a response.</p>}
       </Stack>
     </form>
   );

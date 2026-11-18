@@ -17,6 +17,7 @@ import {
   type AppModel, type ComponentKind, type Entity, type EntityField, type ScreenComponent,
 } from "./model";
 import { ScreenPreview } from "./preview";
+import { BindingEditor } from "./bindingEditor";
 import { DeviceLayoutPreview } from "./devicePreview";
 import { saveApp, useBuildUi } from "./state";
 import { wallMs } from "@/platform/clock";
@@ -406,6 +407,10 @@ export function ComponentInspector({
                 <option value="sum">Add up the chosen field</option>
               </Select>
             </Field>
+          )}
+          {entity && (
+            <BindingEditor component={component} entity={entity} model={model} onEdit={onEdit}
+              screenId={model.screens.find((item) => item.components.some((entry) => entry.id === component.id))?.id ?? ""} />
           )}
         </>
       )}
