@@ -22,7 +22,7 @@ describe("platform notifications contracts", () => {
       status: "active", at: "2026-11-18T12:00:00Z", updatedAt: "2026-11-18T12:00:00Z",
     } as unknown as Rec));
     const items = buildAttention({
-      notifications: records, bills: [], tasks: [], missions: [], approvals: [],
+      notifications: records, invoices: [], bills: [], tasks: [], missions: [], approvals: [],
       orgSlug: "northline", now: new Date("2026-11-18T13:00:00Z"),
     });
     const roles = (id: string) => items.find(item => item.id === id)?.audience;
