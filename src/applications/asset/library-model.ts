@@ -236,3 +236,27 @@ export function hexDigest(buffer: ArrayBuffer): string {
 export function duplicatesOf(rows: Rec[], checksum: string): Rec[] {
   return rows.filter((row) => row.status !== "archived" && String(row.fields.checksum ?? "") === checksum);
 }
+
+/**
+ * Assets as they would be written when their folder is deleted: unfiled,
+ * revision bumped, prior state kept in history. Used for one atomic batch so
+ * a conflict on any asset leaves the folder and every asset untouched.
+ */
+export function unfiledRevisions(assets: Rec[], actor: string, now: string): Rec[] {
+  return assets.map((asset) => ({
+    ...asset,
+    fields: { ...asset.fields, folderId: "" },
+    history: [{
+      title: asset.title, status: asset.status, summary: asset.summary,
+      fields: { ...asset.fields }, body: asset.body, amountMinor: asset.amountMinor, at: now,
+    }, ...asset.history].slice(0, 25),
+    revision: asset.revision + 1,
+    updatedAt: now,
+    updatedBy: actor,
+  }));
+}
+
+/** How many of a batch of guarded patches actually saved (null = refused). */
+export function savedCount(results: readonly unknown[]): number {
+  return results.filter((result) => result !== null && result !== undefined).length;
+}

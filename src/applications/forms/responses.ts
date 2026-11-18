@@ -27,6 +27,33 @@ export function answerFor(submission: Rec, field: FormField): string {
   return String(value).trim();
 }
 
+/**
+ * The picks in a stored multi-select answer. Answers are stored joined by
+ * ", ", and an option label may itself contain a comma, so known labels are
+ * matched first (longest first) and only unmatched text is split on commas.
+ * An answer stored as an array is read as-is.
+ */
+export function multiselectPicks(value: unknown, options: string[]): string[] {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  const text = value === undefined || value === null ? "" : String(value).trim();
+  const known = [...new Set(options.map((option) => option.trim()).filter(Boolean))].sort((a, b) => b.length - a.length);
+  const picks: string[] = [];
+  let at = 0;
+  while (at < text.length) {
+    while (at < text.length && (text[at] === "," || text[at] === " ")) at += 1;
+    if (at >= text.length) break;
+    const rest = text.slice(at);
+    const match = known.find((option) => rest.startsWith(option) && /^\s*(,|$)/.test(rest.slice(option.length)));
+    if (match) { picks.push(match); at += match.length; continue; }
+    const comma = text.indexOf(",", at);
+    const end = comma === -1 ? text.length : comma;
+    const unknown = text.slice(at, end).trim();
+    if (unknown) picks.push(unknown);
+    at = end;
+  }
+  return picks;
+}
+
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
@@ -47,8 +74,10 @@ export function summariseQuestion(field: FormField, submissions: Rec[]): Questio
   if (field.type === "select" || field.type === "multiselect") {
     const counts = new Map(field.options.map((option) => [option, 0]));
     let other = 0;
-    for (const text of given) {
-      const picks = field.type === "multiselect" ? text.split(",").map((item) => item.trim()).filter(Boolean) : [text];
+    const rows = submissions.filter((row) => answerFor(row, field).length > 0);
+    for (const row of rows) {
+      const text = answerFor(row, field);
+      const picks = field.type === "multiselect" ? multiselectPicks(row.fields[field.label], field.options) : [text];
       for (const pick of picks) {
         if (counts.has(pick)) counts.set(pick, (counts.get(pick) ?? 0) + 1);
         else other += 1;

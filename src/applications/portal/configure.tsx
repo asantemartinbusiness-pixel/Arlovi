@@ -9,7 +9,7 @@ import { clockIso } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { CHANGED_ELSEWHERE } from "@/applications/market/kit";
 import {
-  bodyOf, GATE_LABELS, MODULE_LABELS, portalMessages, portalVisibleInvoices, sharedRecords, statusTone, usePortalData,
+  bodyOf, GATE_LABELS, MODULE_LABELS, portalDocuments, portalMessages, portalVisibleInvoices, sharedRecords, statusTone, usePortalData,
   type PortalBody, type PortalPage,
 } from "./data";
 import {
@@ -261,7 +261,7 @@ export function ExposureEditor({ context, portal }: { context: ScreenContext; po
   const data = usePortalData();
   const [kind, setKind] = useState("documents");
   const [busy, setBusy] = useState("");
-  const alias = typeof portal.fields.canonicalFor === "string" ? [portal.fields.canonicalFor] : [];
+  const alias = typeof portal.fields.canonicalFor === "string" && portal.fields.canonicalFor ? [portal.fields.canonicalFor] : [];
   const pools = useMemo(() => ({
     documents: data.documents, invoices: data.invoices, orders: data.orders, bookings: data.bookings, returns: data.returns, purchaseOrders: data.purchaseOrders,
   }), [data.documents, data.invoices, data.orders, data.bookings, data.returns, data.purchaseOrders]);
@@ -417,7 +417,7 @@ export function RolePreview({ portal }: { portal: Rec }) {
     const list = (collection: string) => shared.filter((item) => item.collection === collection).map((item) => item.record);
     const records = module === "orders" ? list("orders").concat(list("purchaseOrders"))
       : module === "bookings" ? list("bookings")
-        : module === "documents" ? list("documents").concat(data.documents.filter((doc) => doc.organizationId === portal.organizationId && [portal.id, String(portal.fields.canonicalFor ?? "")].includes(String(doc.fields.portalId ?? "")) && !list("documents").some((item) => item.id === doc.id)))
+        : module === "documents" ? list("documents").concat(portalDocuments(portal, data.documents).filter((doc) => !list("documents").some((item) => item.id === doc.id)))
           : module === "invoices" ? invoices
             : [];
     if (module === "welcome") return <p>{brand.welcome || `Hello${user ? `, ${user.name}` : ""}. Everything shared with you is here.`}</p>;

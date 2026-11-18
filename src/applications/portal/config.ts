@@ -154,7 +154,8 @@ export interface ExposureRow {
 export function exposureRows(portal: Rec, pools: Record<string, Rec[]>, aliasIds: string[] = []): ExposureRow[] {
   const shared = ((portal.body as { shared?: SharedScope[] } | undefined)?.shared) ?? [];
   const contactId = String(portal.fields.contactId ?? "");
-  const ids = new Set([portal.id, ...aliasIds]);
+  // An empty alias would match every record with no portalId at all.
+  const ids = new Set([portal.id, ...aliasIds].filter(Boolean));
   const rows: ExposureRow[] = [];
   for (const [collection, records] of Object.entries(pools)) {
     const granted = new Set(shared.find((scope) => scope.collection === collection)?.ids ?? []);
