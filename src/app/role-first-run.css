@@ -1,16 +1,19 @@
-.role-welcome{display:flex;gap:18px;align-items:flex-start;border:1px solid var(--border,#dbe2ee);border-radius:15px;padding:clamp(18px,2vw,30px);background:var(--surface-1,#fff);margin:0 0 20px}
-.role-welcome-icon{display:flex;align-items:center;justify-content:center;background:var(--surface-2,#eff3fb);height:43px;width:43px;border-radius:12px;color:#234fe8;flex-shrink:0}
-.role-welcome-content{flex:1;min-width:0}
-.role-welcome-eyebrow{font-size:10px;letter-spacing:.12em;color:var(--text-secondary,#62718d);font-weight:700}
-.role-welcome h2{font-size:22px;letter-spacing:-.03em;margin:8px 0}
-.role-welcome p{font-size:13px;line-height:1.6;color:var(--text-secondary,#66738a);margin:0 0 17px}
-.role-welcome-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.role-welcome-actions a{display:flex;justify-content:space-between;align-items:center;gap:12px;text-decoration:none;color:inherit;border:1px solid var(--border,#e2e6ee);border-radius:10px;padding:14px}
-.role-welcome-actions a:hover{border-color:#234fe8}
-.role-welcome-actions span{display:flex;flex-direction:column;gap:5px}
-.role-welcome-actions strong{font-size:12px}
-.role-welcome-actions small,.role-welcome-note{font-size:11px;color:var(--text-secondary,#677289);line-height:1.5}
-.role-welcome-actions svg{color:var(--accent,#234fe8);flex-shrink:0}
-.role-welcome-note{display:block;margin-top:17px}
-.role-welcome-close{border:0;background:transparent;padding:7px;cursor:pointer;color:var(--text-secondary,#66738a)}
-@media(max-width:840px){.role-welcome-actions{grid-template-columns:1fr}.role-welcome{padding:18px;gap:12px}}
+/* Contextual role guidance — a quiet workspace section, not a new dashboard. */
+.role-welcome{display:grid;grid-template-columns:33px minmax(0,1fr) auto;gap:16px;align-items:start;margin:0 var(--page-pad) var(--space-4);padding:22px 0;border-top:1px solid var(--border-strong);border-bottom:1px solid var(--border-default);background:var(--bg-surface);color:var(--fg-default)}
+.role-welcome-icon{display:grid;place-items:center;width:31px;height:31px;border:1px solid var(--border-default);background:var(--bg-surface);border-radius:var(--radius-md);color:var(--fg-muted)}
+.role-welcome-content{min-width:0}
+.role-welcome-eyebrow{font:500 var(--text-2xs,11px) var(--font-mono,monospace);color:var(--fg-subtle);letter-spacing:.08em}
+.role-welcome h2{font:500 clamp(20px,2.3vw,28px)/1.2 var(--font-display,Inter,sans-serif);letter-spacing:-.035em;margin:9px 0}
+.role-welcome p{color:var(--fg-muted);font-size:var(--text-sm,14px);line-height:1.55;max-width:62ch;margin:0 0 18px}
+.role-welcome-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.role-welcome-actions a{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--border-default);padding:12px 0;color:var(--fg-default);text-decoration:none}
+.role-welcome-actions a:hover strong{text-decoration:underline}
+.role-welcome-actions span{display:flex;flex-direction:column;gap:5px;min-width:0}
+.role-welcome-actions strong{font-size:var(--text-sm,14px);font-weight:600}
+.role-welcome-actions small,.role-welcome-note{color:var(--fg-muted);font-size:var(--text-xs,12px);line-height:1.45}
+.role-welcome-actions svg{flex:none;color:var(--fg-subtle)}
+.role-welcome-note{display:block;margin-top:12px}
+.role-welcome-close{border:0;background:transparent;color:var(--fg-muted);padding:5px;cursor:pointer}
+.role-welcome-close:focus-visible,.role-welcome-actions a:focus-visible{outline:2px solid var(--focus-ring,var(--fg-default));outline-offset:3px}
+@media(max-width:840px){.role-welcome-actions{grid-template-columns:1fr;gap:0}}
+@media(max-width:600px){.role-welcome{grid-template-columns:26px minmax(0,1fr) 25px;gap:10px}.role-welcome h2{font-size:22px}}
