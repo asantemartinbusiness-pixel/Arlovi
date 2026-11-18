@@ -537,11 +537,10 @@ export function ToReconcile({ context }: { context: ScreenContext }) {
         <Stat prov="posted" label="Statement closing" value={context.money(recon.statementClosingMinor ?? 0)} meta={`${recon.statement.filename}`} />
         <Stat prov="posted" label="Ledger balance" value={context.money(recon.bookBalanceMinor)} meta="Every posted journal on 1000, to date" />
         <Stat prov="posted" label="Ledger at statement end" value={context.money(recon.ledgerMinor)} meta={recon.statement.to ? `Posted on 1000 up to ${context.date(recon.statement.to)}` : "Posted journals on 1000"} />
-        <Stat prov="posted" label="Difference" value={context.money(recon.differenceMinor ?? 0)} meta={`${open.length} open lines`} />
         <Stat prov="posted"
           label="Unexplained"
           value={context.money(recon.unexplainedMinor ?? 0)}
-          meta={recon.unexplainedMinor === 0 ? "Every penny accounted for" : "Investigate before confirming"}
+          meta={`Difference ${context.money(recon.differenceMinor ?? 0)} · ${open.length} open line${open.length === 1 ? "" : "s"} · ${recon.unexplainedMinor === 0 ? "every penny accounted for" : "investigate before confirming"}`}
         />
       </StatRow>
 

@@ -16,6 +16,7 @@ import {
 import type { CrmData } from "./data";
 import { ActivityPill, CapabilityNotice, ConsentPill, Money, ProbabilityPill, QuoteStatusPill, StagePill } from "./parts";
 import { quoteTotals } from "./quotes";
+import { accountHref } from "./account";
 
 /* ---------------------------- CRM-007 ---------------------------- *
  * Deal detail: a real 360 built from linked records — activities, quotes,
@@ -49,7 +50,7 @@ export function DealHeader({ context }: { context: ScreenContext }) {
             </Row>
             <p className="ds-subtle">{deal.summary}</p>
             <Row gap={3} wrap style={{ marginBlockStart: "var(--space-2)" }}>
-              {company && <Link to={`/o/${context.org.slug}/crm/companies?tab=All`} style={{ color: "inherit" }}>{company.title}</Link>}
+              {company && <Link to={accountHref(context.org.slug, company.id)} style={{ color: "inherit" }}>{company.title}</Link>}
               {contact && <Link to={`/o/${context.org.slug}/crm/contacts/${contact.id}`} style={{ color: "inherit" }}>{contact.title}</Link>}
               <span className="ds-subtle">Owner {String(deal.fields.owner ?? deal.ownerName)}</span>
             </Row>

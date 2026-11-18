@@ -18,6 +18,7 @@ import type { CrmData } from "./data";
 import { ActivityPill, CapabilityNotice, ConsentPill, Money, StagePill } from "./parts";
 import { MergeGroups } from "./actions";
 import { clockIso } from "@/platform/clock";
+import { accountHref } from "./account";
 
 /* ---------------------------- CRM-002 ---------------------------- */
 
@@ -460,7 +461,7 @@ export function ContactHeader({ context }: { context: ScreenContext }) {
               <h2 style={{ fontSize: "var(--text-xl)" }}>{contact.title}</h2>
               <ConsentPill contact={contact} />
             </Row>
-            <p className="ds-subtle">{String(contact.fields.role ?? "")}{company ? ` at ${company.title}` : ""}</p>
+            <p className="ds-subtle">{String(contact.fields.role ?? "")}{company && <>{" at "}<Link to={accountHref(context.org.slug, company.id)} style={{ color: "inherit" }}>{company.title}</Link></>}</p>
             <Row gap={3} wrap style={{ marginBlockStart: "var(--space-2)" }}>
               <span className="ds-subtle"><Mail size={13} aria-hidden="true" /> {String(contact.fields.email ?? "no email")}</span>
               <span className="ds-subtle">{String(contact.fields.phone ?? "no phone")}</span>

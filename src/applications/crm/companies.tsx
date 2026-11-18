@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Building2, Inbox, Target } from "lucide-react";
 import {
   Avatar, Button, Card, DataGrid, Empty, Field, Grid, Meter, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
@@ -16,6 +16,7 @@ import {
 import type { CrmData } from "./data";
 import { ActivityPill, ConsentPill, Money, StagePill } from "./parts";
 import { clockIso } from "@/platform/clock";
+import { AccountProfileView } from "./account";
 
 /* ---------------------------- CRM-004 ---------------------------- */
 
@@ -38,11 +39,28 @@ function companyValue(data: CrmData, company: Rec): { openMinor: number; wonMino
 export function CompaniesTable({ context, tab }: { context: ScreenContext; tab: string }) {
   const data = useCrmData();
   const { org } = useWorkspace();
+  const [params, setParams] = useSearchParams();
+  const accountId = params.get("account");
   const rows = useMemo(
     () => data.companies.filter((company) => (COMPANY_TABS[tab] ?? (() => true))(company)),
     [data.companies, tab],
   );
   const totals = rows.reduce((sum, company) => sum + companyValue(data, company).openMinor, 0);
+  const openAccount = (id: string) => {
+    context.select(id);
+    const next = new URLSearchParams(params);
+    next.set("account", id);
+    setParams(next);
+  };
+  const closeAccount = useCallback(() => {
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("account");
+      return next;
+    }, { replace: true });
+  }, [setParams]);
+
+  if (accountId) return <AccountProfileView context={context} companyId={accountId} onBack={closeAccount} />;
 
   if (rows.length === 0) {
     return (
@@ -85,7 +103,7 @@ export function CompaniesTable({ context, tab }: { context: ScreenContext; tab: 
           { key: "won", header: "Won", align: "end", hideBelow: 1400, cell: (row) => <Money minor={companyValue(data, row).wonMinor} context={context} /> },
           { key: "open", header: "Open value", align: "end", cell: (row) => <Money minor={companyValue(data, row).openMinor} context={context} bold />, sortValue: (row) => companyValue(data, row).openMinor },
         ]}
-        onOpen={(id) => { context.select(id); context.openOverlay("relationship inspector", { id }); }}
+        onOpen={(id) => openAccount(id)}
         bulkActions={[
           { label: "Export", onRun: (selected) => exportCompanies(context, data, selected) },
         ]}
@@ -106,7 +124,8 @@ export function CompaniesTable({ context, tab }: { context: ScreenContext; tab: 
               subtitle={company.summary}
               actions={<Pill tone={company.status === "active" ? "success" : "info"}>{company.status}</Pill>}
               footer={<>
-                <Button size="sm" variant="secondary" onClick={() => { context.select(company.id); context.openOverlay("relationship inspector", { id: company.id }); }}>Relationships</Button>
+                <Button size="sm" variant="secondary" onClick={() => openAccount(company.id)}>Open the account</Button>
+                <Button size="sm" variant="ghost" onClick={() => { context.select(company.id); context.openOverlay("relationship inspector", { id: company.id }); }}>Relationships</Button>
                 <Button size="sm" variant="ghost" onClick={() => { context.select(company.id); context.openOverlay("Account editor", { id: company.id }); }}>Edit</Button>
               </>}
             >
