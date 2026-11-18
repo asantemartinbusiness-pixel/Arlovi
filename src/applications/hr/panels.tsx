@@ -2086,6 +2086,14 @@ export function Scheduling({ context, lens }: { context: ScreenContext; lens: "R
               const row = filtered.find((item) => item.id === id);
               if (row) openSource(row);
             }}
+            // The mobile card is itself a button that opens the source, so it
+            // must not contain the "Next action" button (no nested buttons).
+            card={(row) => (
+              <>
+                <strong><Pill tone={row.tone}>{row.kind}</Pill></strong>
+                <span className="ds-subtle">{row.detail}</span>
+              </>
+            )}
             columns={[
               { key: "kind", header: "Issue", primary: true, cell: (row) => <Pill tone={row.tone}>{row.kind}</Pill>, filterValue: (row) => row.kind },
               { key: "detail", header: "Source and context", cell: (row) => row.detail, filterValue: (row) => row.detail },
