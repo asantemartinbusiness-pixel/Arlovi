@@ -491,7 +491,7 @@ function TakeDepositForm({ context, close, booking, loaded }: { context: ScreenC
     customerStatus: "domestic",
     date: now.toISOString(),
   });
-  const invalidAmount = !Number.isSafeInteger(amount) || amount <= 0 || (serviceValue > 0 && amount > serviceValue);
+  const invalidAmount = !Number.isSafeInteger(amount) || serviceValue <= 0 || amount <= 0 || amount > serviceValue;
   const canRecord = !recorded && !busy && !invalidAmount && !totals.hasUnknownRate;
   const hasUnsavedWork = !recorded && (amount !== startingAmount || confirmReceived);
 
@@ -559,7 +559,7 @@ function TakeDepositForm({ context, close, booking, loaded }: { context: ScreenC
             currency={org.currency} label="Deposit amount" disabled={busy || recorded} />
         </Field>
         {invalidAmount && <Notice tone="danger" title="Enter a valid deposit">
-          The amount must be greater than zero{serviceValue > 0 ? " and cannot exceed the service value" : ""}.
+          {serviceValue <= 0 ? "This service has no payable value, so a deposit cannot be recorded." : "The amount must be greater than zero and cannot exceed the service value."}
         </Notice>}
         <div className="book-deposit-totals">
           <TotalsBlock totals={totals} money={context.money} label="Deposit" />
