@@ -24,6 +24,19 @@ export interface ReceiptReturn {
 
 export interface ReceiptBodyWithReturns extends ReceiptBody { returns?: ReceiptReturn[] }
 
+/**
+ * A fresh id for a return entry on a receipt. Never taken from the workspace
+ * clock, which ticks once a minute, and never one the receipt already holds.
+ */
+export function freshReturnId(taken: Iterable<string> = [], random: () => string = () => crypto.randomUUID()): string {
+  const used = new Set(taken);
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    const candidate = `rt-${random().replace(/-/g, "").slice(0, 12)}`;
+    if (!used.has(candidate)) return candidate;
+  }
+  throw new Error("Could not find a free return id.");
+}
+
 export const RETURN_REASONS: { value: string; label: string }[] = [
   { value: "damaged", label: "Damaged in transit" },
   { value: "defective", label: "Defective or out of specification" },

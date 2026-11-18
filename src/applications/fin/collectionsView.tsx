@@ -47,7 +47,10 @@ export function CollectionsByCustomer({ context }: { context: ScreenContext }) {
           { key: "promise", header: "Promise", cell: (row) => {
             const first = row.promises[0];
             if (!first) return <span className="ds-subtle">None</span>;
-            return <Pill tone={row.promises.some((item) => item.broken) ? "danger" : "info"} dot>{row.promises.some((item) => item.broken) ? "Broken" : `By ${context.date(first.date)}`}</Pill>;
+            const broken = row.promises.some((item) => item.broken);
+            const pending = row.promises.find((item) => !item.kept);
+            if (!broken && !pending) return <Pill tone="success" dot>Kept</Pill>;
+            return <Pill tone={broken ? "danger" : "info"} dot>{broken ? "Broken" : `By ${context.date((pending ?? first).date)}`}</Pill>;
           } },
           { key: "act", header: "", cell: (row) => (
             <Row gap={1}>
@@ -118,12 +121,16 @@ export function PromiseToPayForm({ context, close }: { context: ScreenContext; c
           onClick={async () => {
             setBusy(true);
             try {
-              await context.mutate.patch(invoice.id, {
+              // The balance at promise time lets a later part payment of the
+              // promised amount count as kept, not broken.
+              const saved = await context.mutate.patch(invoice.id, {
                 fields: {
-                  ...invoice.fields, promiseDate: date, promiseMinor: amount, promiseBy: context.actor,
+                  ...invoice.fields, promiseDate: date, promiseMinor: amount, promiseBalanceMinor: balance, promiseBy: context.actor,
                   promiseNote: note.trim(), promiseRecordedAt: clockIso(),
                 },
               }, { expectRevision: invoice.revision, event: `Promise to pay ${context.money(amount)} by ${date} recorded on ${invoice.title}` });
+              // A conflict is already reported; the form stays open to retry.
+              if (!saved) return;
               context.toast("Promise recorded", `${invoice.title}: ${context.money(amount)} by ${context.date(date)}. Still owed until a receipt is posted.`);
               close();
             } catch (error) {

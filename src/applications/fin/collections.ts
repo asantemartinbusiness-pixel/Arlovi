@@ -16,7 +16,9 @@ export interface PromiseToPay {
   amountMinor: number;
   by: string;
   note: string;
-  /** The promised date has passed and the invoice still has a balance. */
+  /** The promised amount has been paid since the promise was made. */
+  kept: boolean;
+  /** The promised date has passed and less than the promised amount has been paid since the promise. */
   broken: boolean;
 }
 
@@ -58,15 +60,32 @@ export function promiseOf(invoice: Rec, now: Date): PromiseToPay | undefined {
   const date = String(invoice.fields.promiseDate ?? "");
   if (!date) return undefined;
   const balance = invoiceBalance(invoice);
+  const amountMinor = Number(invoice.fields.promiseMinor ?? balance);
+  const past = `${date}T23:59:59.999Z` < now.toISOString();
+  const kept = promiseKept(invoice, balance, amountMinor);
   return {
     invoiceId: invoice.id,
     invoiceTitle: invoice.title,
     date,
-    amountMinor: Number(invoice.fields.promiseMinor ?? balance),
+    amountMinor,
     by: String(invoice.fields.promiseBy ?? ""),
     note: String(invoice.fields.promiseNote ?? ""),
-    broken: balance > 0 && `${date}T23:59:59.999Z` < now.toISOString(),
+    kept,
+    broken: past && !kept,
   };
+}
+
+/**
+ * A promise is kept once the customer has paid what they promised since it
+ * was made. With the balance recorded at promise time that is measured
+ * directly, so a promise for part of the balance is kept when that part
+ * arrives. An older promise without the stored balance is kept only when
+ * nothing is left owed.
+ */
+function promiseKept(invoice: Rec, balance: number, amountMinor: number): boolean {
+  const stored = invoice.fields.promiseBalanceMinor;
+  if (stored === undefined || stored === "" || !Number.isFinite(Number(stored))) return balance <= 0;
+  return Number(stored) - balance >= amountMinor;
 }
 
 export function collectionsWorklist(invoices: Rec[], contacts: Rec[], now: Date): CustomerCollection[] {
@@ -94,7 +113,7 @@ export function collectionsWorklist(invoices: Rec[], contacts: Rec[], now: Date)
     const overdueMinor = overdue.reduce((sum, invoice) => sum + invoiceBalance(invoice), 0);
     const lastReminderAt = reminders.at(-1);
     const daysSinceReminder = lastReminderAt ? Math.floor((now.getTime() - new Date(lastReminderAt).getTime()) / DAY) : undefined;
-    const live = promises.filter((item) => !item.broken);
+    const live = promises.filter((item) => !item.broken && !item.kept);
     let nextAction: string;
     if (promises.some((item) => item.broken)) nextAction = "Promise broken. Call the customer and agree a new date.";
     else if (live.length > 0) nextAction = `Promised for ${live[0].date}. Check the bank on the day.`;

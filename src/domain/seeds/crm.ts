@@ -359,13 +359,15 @@ registerSeed("crm", (context) => {
     owner: "Priya Shah",
     fields: { trigger: "lead.created", scope: "source = website", runs: 14, lastRunAt: "2026-11-13T16:30:00.000Z" },
     body: {
+      // Explicit configuration: without it the interpreter's defaults watch
+      // tasks and test record.amountMinor, which tasks do not carry.
       nodes: [
-        { id: "n1", type: "trigger", label: "Lead created", x: 40, y: 80 },
-        { id: "n2", type: "condition", label: "Source is website", x: 220, y: 80 },
-        { id: "n3", type: "action", label: "Assign to Priya Shah", x: 420, y: 40 },
-        { id: "n4", type: "action", label: "Create qualification task", x: 420, y: 140 },
+        { id: "n1", type: "trigger", label: "Lead created", x: 40, y: 80, config: { collection: "leads", event: "record.matches", timezone: "Europe/London" } },
+        { id: "n2", type: "condition", label: "Source is website", x: 220, y: 80, config: { left: "record.source", op: "eq", right: "website" } },
+        { id: "n3", type: "action", label: "Assign to Priya Shah", x: 420, y: 40, config: { kind: "log.note", summaryExpr: "{record.title} assigned to Priya Shah.", retries: 0, onError: "halt", impact: "low" } },
+        { id: "n4", type: "action", label: "Create qualification task", x: 420, y: 140, config: { kind: "record.create", target: "tasks", titleExpr: "Qualify {record.title}", summaryExpr: "Website lead {record.title} needs a qualification call.", retries: 0, onError: "halt", impact: "low" } },
       ],
-      edges: [{ from: "n1", to: "n2" }, { from: "n2", to: "n3" }, { from: "n3", to: "n4" }],
+      edges: [{ from: "n1", to: "n2", port: "out" }, { from: "n2", to: "n3", port: "then" }, { from: "n3", to: "n4", port: "out" }],
     },
   });
   push({
@@ -375,11 +377,11 @@ registerSeed("crm", (context) => {
     fields: { trigger: "deal.idle", scope: "open stages only", runs: 6, lastRunAt: "2026-11-12T07:00:00.000Z" },
     body: {
       nodes: [
-        { id: "n1", type: "trigger", label: "Deal idle 10 days", x: 40, y: 80 },
-        { id: "n2", type: "condition", label: "Stage is open", x: 220, y: 80 },
-        { id: "n3", type: "action", label: "Create follow-up task", x: 420, y: 80 },
+        { id: "n1", type: "trigger", label: "Deal idle 10 days", x: 40, y: 80, config: { collection: "deals", event: "record.matches", timezone: "Europe/London", filters: [{ field: "record.updatedAt", op: "olderThanDays", value: "10" }, { field: "record.status", op: "neq", value: "lost" }] } },
+        { id: "n2", type: "condition", label: "Stage is open", x: 220, y: 80, config: { left: "record.status", op: "neq", right: "won" } },
+        { id: "n3", type: "action", label: "Create follow-up task", x: 420, y: 80, config: { kind: "record.create", target: "tasks", titleExpr: "Follow up {record.title}", summaryExpr: "{record.title} has had no activity for ten days. It never contacts the customer.", retries: 0, onError: "halt", impact: "low" } },
       ],
-      edges: [{ from: "n1", to: "n2" }, { from: "n2", to: "n3" }],
+      edges: [{ from: "n1", to: "n2", port: "out" }, { from: "n2", to: "n3", port: "then" }],
     },
   });
   push({

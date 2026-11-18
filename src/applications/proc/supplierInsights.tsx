@@ -5,10 +5,12 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
+import { clockIso } from "@/platform/clock";
+import { newRecord, revisedRecord } from "@/platform/repo";
 import type { Rec } from "@/domain/types";
 import { bodyOf, useProcData, type PoBody } from "./data";
 import {
-  RETURN_REASONS, returnReasonLabel, returnableUnits, supplierPerformance, suppliedItems,
+  freshReturnId, RETURN_REASONS, returnReasonLabel, returnableUnits, supplierPerformance, suppliedItems,
   type ReceiptBodyWithReturns, type ReceiptReturn,
 } from "./performance";
 
@@ -168,7 +170,7 @@ export function QualityReturn({ context, close }: { context: ScreenContext; clos
 
 function QualityReturnForm({ context, close, receipt }: { context: ScreenContext; close: () => void; receipt: Rec }) {
   const data = useProcData();
-  const { now, actor } = useWorkspace();
+  const { now, actor, org } = useWorkspace();
   const lines = bodyOf<ReceiptBodyWithReturns>(receipt, {}).lines ?? [];
   const order = data.purchaseOrders.find((item) => item.id === String(receipt.fields.purchaseOrderId));
   const earlier = data.receipts.filter((other) => other.id !== receipt.id && other.status !== "expected"
@@ -193,17 +195,33 @@ function QualityReturnForm({ context, close, receipt }: { context: ScreenContext
       event.preventDefault();
       if (problems.length || !line) { setError(problems[0] ?? ""); return; }
       const body = bodyOf<ReceiptBodyWithReturns>(receipt, {});
-      const entry: ReceiptReturn = { id: `rt-${now.getTime().toString(36)}`, lineId: line.lineId, description: line.description, productId, quantity: count, reason, note: note.trim(), at: now.toISOString(), by: actor };
-      await context.mutate.patch(receipt.id, {
+      const entry: ReceiptReturn = { id: freshReturnId((body.returns ?? []).map((item) => item.id)), lineId: line.lineId, description: line.description, productId, quantity: count, reason, note: note.trim(), at: now.toISOString(), by: actor };
+      const stamp = clockIso();
+      const revised = revisedRecord(receipt, {
         fields: { ...receipt.fields, discrepancy: String(receipt.fields.discrepancy) === "none" ? "returned" : receipt.fields.discrepancy },
         body: { ...body, returns: [...(body.returns ?? []), entry] },
-      }, { expectRevision: receipt.revision, event: `${count} × ${line.description} returned to supplier from ${receipt.title}: ${returnReasonLabel(reason)}` });
-      if (productId) {
-        await context.mutate.create({
-          collection: "stockMoves", title: `return to supplier · ${line.description}`, status: "posted", at: now.toISOString(),
-          summary: `Returned from ${receipt.title}: ${returnReasonLabel(reason)}.`,
-          fields: { productId, warehouseId: String(receipt.fields.warehouseId ?? ""), quantity: -count, kind: "return_to_supplier", reference: order?.title ?? receipt.title, receiptId: receipt.id },
-        }, `Stock reduced by ${count} for a return from ${receipt.title}`);
+      }, { actor, now: stamp });
+      const move = productId ? newRecord({
+        organizationId: org.id, currency: org.currency,
+        collection: "stockMoves", title: `return to supplier · ${line.description}`, status: "posted", at: now.toISOString(),
+        summary: `Returned from ${receipt.title}: ${returnReasonLabel(reason)}.`,
+        fields: { productId, warehouseId: String(receipt.fields.warehouseId ?? ""), quantity: -count, kind: "return_to_supplier", reference: order?.title ?? receipt.title, receiptId: receipt.id, returnId: entry.id },
+      }, { actor, now: stamp }) : undefined;
+      // The receipt's return entry and its stock movement commit together,
+      // guarded by the receipt's revision. A conflict writes neither, so a
+      // retry can never take the same units out of stock twice.
+      try {
+        await context.mutate.putMany(
+          move ? [revised, move] : [revised],
+          [`${count} × ${line.description} returned to supplier from ${receipt.title}: ${returnReasonLabel(reason)}`, ...(move ? [`Stock reduced by ${count} for a return from ${receipt.title}`] : [])],
+          { [receipt.id]: receipt.revision },
+          move ? ["update", "create"] : ["update"],
+        );
+      } catch (failure) {
+        setError(failure instanceof Error && failure.name !== "ConflictError"
+          ? failure.message
+          : "The receipt changed elsewhere, so nothing was recorded. Reopen it and record the return again.");
+        return;
       }
       context.toast("Return recorded", `${count} × ${line.description} recorded as returned${productId ? " and taken out of stock" : ""}. Nothing has been sent to the supplier from here.`);
       close();
