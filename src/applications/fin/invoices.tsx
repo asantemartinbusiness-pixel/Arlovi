@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { FileText, Plus, Printer, Send, Trash2 } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, OverlayCancel, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
@@ -1357,7 +1357,7 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
         >
           Post the receipt
         </Button>
-        <Button variant="ghost" onClick={close} disabled={busy}>Cancel</Button>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
       </ModalActions>
     </Stack>
   );
