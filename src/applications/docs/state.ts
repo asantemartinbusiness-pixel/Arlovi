@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Rec } from "@/domain/types";
 import type { ScreenContext } from "@/platform/registry";
 import {
-  activeMarks, blockIndex, blockText, collapsed, deleteRange, indent as indentBlock, insertText,
+  activeMarks, autoformat, blockIndex, blockText, collapsed, deleteRange, indent as indentBlock, insertText,
   isTextBlock, mergeBackwards, orderedRange, outdent as outdentBlock, readDoc, setBlockType,
   splitBlock, toggleMark,
   type DocModel, type DocRange, type EditActor, type History, type HistoryEntry,
@@ -186,10 +186,21 @@ function useOwnDocEditor(context: ScreenContext, record: Rec | undefined): DocEd
           const split = splitBlock(result.model, result.selection, actor);
           result = insertText(split.model, split.selection, line, actor);
         }
+        /* "# ", "- ", "1. ", "> " at the start of a paragraph become a heading, list or quote. One undo step returns the typed characters. */
+        const formatted = intent.text === " " ? autoformat(result.model, result.selection.head) : null;
+        if (formatted) { commit(formatted.model, "Autoformat", formatted.selection); return; }
         commit(result.model, "Typing", result.selection, lines.length === 1 && intent.text.length === 1);
         return;
       }
       case "splitBlock": {
+        /* Enter on an empty list item or quote leaves the list, as word processors do. */
+        const at = model.blocks[blockIndex(model, intent.range.head.blockId)];
+        if (at && intent.range.anchor.blockId === intent.range.head.blockId && intent.range.anchor.offset === intent.range.head.offset
+          && ["bulletItem", "numberItem", "quote"].includes(at.type) && blockText(at) === "" && !model.suggestMode) {
+          const result = setBlockType(model, intent.range, "paragraph");
+          commit({ ...result.model, blocks: result.model.blocks.map((block) => (block.id === at.id ? { ...block, indent: 0 } : block)) }, "End list", intent.range);
+          return;
+        }
         const result = splitBlock(model, intent.range, actor);
         commit(result.model, "New block", result.selection);
         return;

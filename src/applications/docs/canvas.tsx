@@ -1,10 +1,12 @@
 import {
-  useCallback, useEffect, useLayoutEffect, useMemo, useRef, type CSSProperties, type ReactNode,
+  useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode,
 } from "react";
 import {
   blockText, collapsed, isTextBlock, outline, runPrefixLength,
   type Block, type DocComment, type DocModel, type DocPosition, type DocRange, type Hit, type InlineRun, type MarkType,
+  type TableEdit,
 } from "./model";
+import { Button } from "@/design-system";
 
 /* ====================================================================== *
  * The editing surface.
@@ -188,6 +190,8 @@ export interface CanvasProps {
   onSelection: (range: DocRange | null) => void;
   onCommentClick?: (commentId: string) => void;
   onTableCell?: (blockId: string, row: number, col: number, value: string) => void;
+  /** Add or remove rows and columns of a table block. */
+  onTableEdit?: (blockId: string, edit: TableEdit) => void;
   onBlockClick?: (blockId: string) => void;
   /** Incremented by the owner to force the caret back to `selection`. */
   restoreToken: number;
@@ -199,9 +203,16 @@ export interface CanvasProps {
 
 export function DocumentCanvas({
   model, readOnly, showSuggestions, hits, activeCommentId, focusBlockId,
-  onEdit, onSelection, onCommentClick, onTableCell, onBlockClick, restoreToken, selection, style, pageWidth, children,
+  onEdit, onSelection, onCommentClick, onTableCell, onTableEdit, onBlockClick, restoreToken, selection, style, pageWidth, children,
 }: CanvasProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  /* The table cell that last had focus: row and column commands act on it. */
+  const [tableCell, setTableCell] = useState<{ blockId: string; row: number; col: number } | null>(null);
+  const focusCell = (blockId: string, row: number, col: number) => {
+    requestAnimationFrame(() => {
+      rootRef.current?.querySelector<HTMLInputElement>(`[data-bid="${blockId}"] input[data-cell="${row}:${col}"]`)?.focus();
+    });
+  };
   const modelRef = useRef(model);
   const selectionRef = useRef(selection);
   modelRef.current = model;
@@ -334,6 +345,10 @@ export function DocumentCanvas({
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root || readOnly || !selection || restoreToken === 0) return;
+    /* A table cell being typed in keeps its focus; restoring the document
+       caret here would pull every keystroke after the first out of the cell. */
+    const active = root.ownerDocument.activeElement;
+    if (active instanceof HTMLElement && root.contains(active) && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
     writeSelection(root, model, selection);
   }, [restoreToken, readOnly, selection, model]);
 
@@ -403,19 +418,34 @@ export function DocumentCanvas({
     }
     if (block.type === "table") {
       const rows = block.table?.rows ?? [];
+      const width = rows.reduce((max, row) => Math.max(max, row.length), 0);
+      const focused = tableCell?.blockId === block.id ? tableCell : null;
+      const tableId = block.id;
+      const cellInput = (cell: string, row: number, col: number, label: string) => (
+        <input
+          aria-label={label}
+          data-cell={`${row}:${col}`}
+          value={cell}
+          readOnly={readOnly}
+          onFocus={() => setTableCell({ blockId: tableId, row, col })}
+          onChange={(event) => onTableCell?.(tableId, row, col, event.target.value)}
+          onKeyDown={(event) => {
+            /* Tab from the last cell adds a row, as word processors do. */
+            if (readOnly || !onTableEdit || event.key !== "Tab" || event.shiftKey) return;
+            if (row === rows.length - 1 && col === width - 1) {
+              event.preventDefault();
+              onTableEdit(tableId, { kind: "addRow", after: row });
+              focusCell(tableId, row + 1, 0);
+            }
+          }}
+        />
+      );
       nodes.push(
         <div key={block.id} data-bid={block.id} className="dx-block dx-tablewrap" contentEditable={false}>
           <table className="dx-table">
             {block.table?.header && rows[0] && (
               <thead><tr>{rows[0].map((cell, col) => (
-                <th key={col} scope="col">
-                  <input
-                    aria-label={`Column ${col + 1} heading`}
-                    value={cell}
-                    readOnly={readOnly}
-                    onChange={(event) => onTableCell?.(block.id, 0, col, event.target.value)}
-                  />
-                </th>
+                <th key={col} scope="col">{cellInput(cell, 0, col, `Column ${col + 1} heading`)}</th>
               ))}</tr></thead>
             )}
             <tbody>
@@ -424,20 +454,22 @@ export function DocumentCanvas({
                 return (
                   <tr key={actual}>
                     {row.map((cell, col) => (
-                      <td key={col}>
-                        <input
-                          aria-label={`Row ${actual + 1} column ${col + 1}`}
-                          value={cell}
-                          readOnly={readOnly}
-                          onChange={(event) => onTableCell?.(block.id, actual, col, event.target.value)}
-                        />
-                      </td>
+                      <td key={col}>{cellInput(cell, actual, col, `Row ${actual + 1} column ${col + 1}`)}</td>
                     ))}
                   </tr>
                 );
               })}
             </tbody>
           </table>
+          {!readOnly && onTableEdit && (
+            <div className="dx-table-tools" role="toolbar" aria-label={`Table ${rows.length} by ${width}`}>
+              <span className="dx-table-where">{focused ? `Row ${focused.row + 1}, column ${focused.col + 1}` : `${rows.length} × ${width}`}</span>
+              <Button size="sm" variant="ghost" onClick={() => { const after = focused?.row ?? rows.length - 1; onTableEdit(tableId, { kind: "addRow", after }); focusCell(tableId, after + 1, focused?.col ?? 0); }}>Add row</Button>
+              <Button size="sm" variant="ghost" onClick={() => { const after = focused?.col ?? width - 1; onTableEdit(tableId, { kind: "addColumn", after }); focusCell(tableId, focused?.row ?? 0, after + 1); }}>Add column</Button>
+              <Button size="sm" variant="ghost" disabled={rows.length <= (block.table?.header ? 2 : 1)} onClick={() => { onTableEdit(tableId, { kind: "removeRow", at: focused?.row ?? rows.length - 1 }); setTableCell(null); }}>Remove row</Button>
+              <Button size="sm" variant="ghost" disabled={width <= 1} onClick={() => { onTableEdit(tableId, { kind: "removeColumn", at: focused?.col ?? width - 1 }); setTableCell(null); }}>Remove column</Button>
+            </div>
+          )}
         </div>,
       );
       continue;

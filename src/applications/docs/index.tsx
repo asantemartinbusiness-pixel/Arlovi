@@ -16,7 +16,7 @@ import { freshness } from "@/platform/clock";
 import { downloadFile } from "@/runtime/db";
 import type { Rec } from "@/domain/types";
 import {
-  addComment, blockIndex, blockText, commentDrifted, documentStats, emptyBlock, findAll,
+  addComment, blockIndex, blockText, commentDrifted, documentStats, editTable, emptyBlock, findAll,
   headingLevel, insertBlockAfter, isTextBlock, moveSection, nextId, openSuggestions, outline,
   paginate, readDoc, removeBlock, replaceAll, resolveSuggestion, sectionSpan, setBlockType,
   setLink, setStyle, structureWarnings, toHtml, toMarkdown, toPlainText, visibleText,
@@ -617,7 +617,8 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
     if (!block.table) return;
     const rows = block.table.rows.map((line, lineIndex) => (lineIndex === row ? line.map((cell, cellIndex) => (cellIndex === col ? value : cell)) : line));
     const blocks = editor.model.blocks.map((item) => (item.id === blockId ? { ...item, table: { ...block.table!, rows } } : item));
-    editor.commit({ ...editor.model, blocks }, "Table cell", editor.selection, true);
+    /* No caret restore: restoring the document selection would pull focus out of the cell after one keystroke. */
+    editor.commit({ ...editor.model, blocks }, "Table cell", undefined, true);
   }
 
   return (
@@ -773,6 +774,7 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
                 onSelection={editor.setSelection}
                 onCommentClick={setActiveCommentId}
                 onTableCell={setTableCell}
+                onTableEdit={(blockId, edit) => editor.commit(editTable(editor.model, blockId, edit), edit.kind === "addRow" ? "Add table row" : edit.kind === "addColumn" ? "Add table column" : edit.kind === "removeRow" ? "Remove table row" : "Remove table column")}
                 onBlockClick={(blockId) => context.openOverlay("insert table", { mode: "image", blockId })}
                 pageWidth={editor.model.page.size === "A4" ? 820 : 860}
               />
