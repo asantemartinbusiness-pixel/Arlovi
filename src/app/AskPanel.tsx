@@ -6,6 +6,7 @@ import { ArrowUp, CalendarDays, FileText, Landmark, Boxes, MessageSquarePlus, Sp
 import { Button, Drawer, TextArea } from "@/design-system";
 import { brand } from "@/app/brand";
 import { localAssistantReply } from "@/domain/assistant";
+import { clockIso } from "@/platform/clock";
 import { routeForRecord } from "@/platform/attention";
 import { useOrgRecords, useWorkspace } from "@/platform/workspace";
 import "./ask-panel.css";
@@ -76,7 +77,7 @@ export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string 
       .filter((record) => record.organizationId === org.id && reply.citations.some((source) => source.id === record.id))
       .slice(0, 4)
       .map((record) => ({ id: record.id, title: record.title, route: routeForRecord(record, org.slug) }));
-    const updatedAt = new Date().toISOString();
+    const updatedAt = clockIso();
     const nextTurns: Turn[] = [
       ...turns,
       { id: crypto.randomUUID(), role: "person", text: question, at: updatedAt },
