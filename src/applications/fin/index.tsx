@@ -174,7 +174,7 @@ export const finApp = registerApp({
       overlays: [
         { id: "Journal form", kind: "drawer", title: (context) => (context.selectedId ? "Journal" : "New journal"), width: 920, render: ({ close, ...context }) => <JournalForm context={context} close={close} /> },
         { id: "balancing validator", kind: "drawer", title: "Draft journals checked", width: 620, render: ({ ...context }) => <BalancingValidator context={context} /> },
-        { id: "reverse confirmation", kind: "modal", title: "Reverse a posted journal", width: 640, tone: "danger", render: ({ close, ...context }) => <ReverseConfirmation context={context} close={close} /> },
+        { id: "reverse confirmation", kind: "modal", title: "Reverse a posted journal", width: 680, tone: "danger", capability: "post_journal", presentation: { selectedRecord: true, collection: "journals", guidance: "Review the posted entries, choose an open reversal date and record a specific reason before creating the offsetting journal." }, render: ({ close, ...context }) => <ReverseConfirmation context={context} close={close} /> },
         { id: "journal search", kind: "drawer", title: "Search the ledger", width: 760, render: ({ close, ...context }) => <JournalSearch context={context} close={close} /> },
       ],
     },
