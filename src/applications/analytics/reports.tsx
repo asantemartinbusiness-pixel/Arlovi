@@ -16,6 +16,8 @@ import { dimensionById, formatMeasure, measureById, runQuery, type QueryFilter }
 import {
   DimensionPicker, FilterRows, MeasurePicker, MeasureView, useAnalytics, VIZ_LABELS, type Viz,
 } from "./panels";
+import { EXPLORE_SOURCE_LABEL, ExploreReport, isQueryReport, newQueryBody } from "./explorer";
+import { ANALYTICS_COLLECTIONS } from "./metrics";
 
 /**
  * A report's recurrence. A report that records only its period ("monthly",
@@ -89,12 +91,14 @@ export function checkBlocks(body: ReportBody, context: ScreenContext, queryConte
  * ARL-ANALYTICS-004 — Report builder (and the report library)
  * ====================================================================== */
 
-function ReportLibrary({ context, note }: { context: ScreenContext; note?: string }) {
+export function ReportLibrary({ context, note }: { context: ScreenContext; note?: string }) {
   const reports = useCollection("reports");
   return (
     <Stack gap={4}>
       {note && <Notice tone="warning" title="That address is not a report">{note}</Notice>}
-      <Card eyebrow="LIBRARY" title="Reports in this company" subtitle={`${reports.length} recorded`} prov="human" flush>
+      <Card eyebrow="LIBRARY" title="Reports in this company" subtitle={`${reports.length} recorded · figures recomputed from ${EXPLORE_SOURCE_LABEL.toLowerCase()}`} prov="human" flush
+        actions={<Button variant="secondary" icon={<Plus size={15} />} onClick={() => context.openOverlay("create report")}>New report</Button>}
+      >
         {reports.length === 0 ? (
           <Empty title="No report yet" icon={<FileText size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("create report")}>New report</Button>}>
             A report is a set of blocks: headings and commentary written by a person, and figures recomputed from the records in this company.
@@ -108,7 +112,7 @@ function ReportLibrary({ context, note }: { context: ScreenContext; note?: strin
             columns={[
               { key: "title", header: "Report", primary: true, cell: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}`, sortValue: (row) => row.title },
               { key: "owner", header: "Owner", cell: (row) => row.ownerName },
-              { key: "blocks", header: "Blocks", align: "end", cell: (row) => String(readReport(row).blocks.length) },
+              { key: "kind", header: "Kind", cell: (row) => (isQueryReport(row) ? <Pill tone="info">query · {String(row.fields.queryCollection ?? "")}</Pill> : <Pill>{readReport(row).blocks.length} blocks</Pill>), sortValue: (row) => (isQueryReport(row) ? "query" : "written") },
               { key: "status", header: "Status", cell: (row) => <Pill tone={row.status === "published" ? "success" : "neutral"} dot>{row.status}</Pill> },
               { key: "updated", header: "Updated", align: "end", cell: (row) => context.dateTime(row.updatedAt), sortValue: (row) => row.updatedAt },
             ]}
@@ -124,6 +128,8 @@ export function ReportBuilder({ context }: { context: ScreenContext }) {
   const { context: queryContext } = useAnalytics();
   const [editing, setEditing] = useState<string | null>(null);
   const [buffer, setBuffer] = useState("");
+
+  if (record && isQueryReport(record)) return <ExploreReport context={context} record={record} />;
 
   if (!record || record.collection !== "reports") {
     return (
@@ -359,6 +365,19 @@ export function ReportBlockOverlay({ context, close }: { context: ScreenContext;
   const [dimensionId, setDimensionId] = useState("");
   const [viz, setViz] = useState<Viz>("bar");
   if (!record || record.collection !== "reports") return <Empty title="Open a report first" />;
+  if (isQueryReport(record)) {
+    return (
+      <Stack gap={3}>
+        <Notice tone="info" title="A query report has one figure">
+          {record.title} is built from a collection, a measure, a grouping and filters on its Content tab. Headings, commentary and catalogue charts belong to a written report.
+        </Notice>
+        <Row gap={2}>
+          <Button variant="primary" onClick={() => { close(); context.openOverlay("create report"); }}>Create a written report</Button>
+          <Button variant="ghost" onClick={close}>Close</Button>
+        </Row>
+      </Stack>
+    );
+  }
   const body = readReport(record);
 
   return (
@@ -417,6 +436,19 @@ export function SourceInspection({ context }: { context: ScreenContext }) {
   const record = useRecord(context.params.id);
   const { context: queryContext } = useAnalytics();
   if (!record || record.collection !== "reports") return <Empty title="Open a report first" />;
+  if (isQueryReport(record)) {
+    return (
+      <Stack gap={3}>
+        <Notice tone="info" title="A query report has one figure">
+          {record.title} is built from a collection, a measure, a grouping and filters on its Content tab. Headings, commentary and catalogue charts belong to a written report.
+        </Notice>
+        <Row gap={2}>
+          <Button variant="primary" onClick={() => { close(); context.openOverlay("create report"); }}>Create a written report</Button>
+          <Button variant="ghost" onClick={close}>Close</Button>
+        </Row>
+      </Stack>
+    );
+  }
   const body = readReport(record);
   const checks = checkBlocks(body, context, queryContext);
 
@@ -498,33 +530,61 @@ export function CreateReport({ context, close }: { context: ScreenContext; close
   const [title, setTitle] = useState("");
   const [period, setPeriod] = useState("monthly");
   const [audience, setAudience] = useState("Owners");
+  const [kind, setKind] = useState<"query" | "written">("query");
+  const [collection, setCollection] = useState("invoices");
+  const pool = useCollection(collection);
   return (
     <form
       id="create-report"
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        const created = await context.mutate.create({
-          collection: "reports",
-          title: title.trim() || "Untitled report",
-          status: "draft",
-          summary: `A ${period} report for ${audience}.`,
-          fields: { period, audience, scheduleFrequency: period === "weekly" ? "weekly" : "monthly", scheduleHour: 8, scheduleTimezone: context.org.timezone },
-          body: {
-            blocks: [
-              { id: "b1", kind: "heading", text: "Summary" },
-              { id: "b2", kind: "metric", measureId: "revenue.paid", text: "Revenue recognised" },
-              { id: "b3", kind: "commentary", text: "" },
-            ],
-            filters: [],
-          },
-        }, "Report created");
-        context.toast("Report created", `${created.title} starts with one figure and an empty commentary block.`);
+        const base = { period, audience, scheduleFrequency: period === "weekly" ? "weekly" : "monthly", scheduleHour: 8, scheduleTimezone: context.org.timezone };
+        const created = kind === "query"
+          ? await context.mutate.create({
+            collection: "reports",
+            title: title.trim() || `${collection.charAt(0).toUpperCase()}${collection.slice(1)} report`,
+            status: "draft",
+            summary: `A query over ${collection}. ${EXPLORE_SOURCE_LABEL}.`,
+            fields: { ...base, kind: "query", queryCollection: collection },
+            body: newQueryBody(collection, pool),
+          }, "Query report created")
+          : await context.mutate.create({
+            collection: "reports",
+            title: title.trim() || "Untitled report",
+            status: "draft",
+            summary: `A ${period} report for ${audience}.`,
+            fields: base,
+            body: {
+              blocks: [
+                { id: "b1", kind: "heading", text: "Summary" },
+                { id: "b2", kind: "metric", measureId: "revenue.paid", text: "Revenue recognised" },
+                { id: "b3", kind: "commentary", text: "" },
+              ],
+              filters: [],
+            },
+          }, "Report created");
+        context.toast("Report created", kind === "query"
+          ? `${created.title} reads ${collection} from this workspace. Choose the measure, grouping and filters.`
+          : `${created.title} starts with one figure and an empty commentary block.`);
         context.navigate(`/o/${context.org.slug}/analytics/reports/${created.id}`);
         close();
       }}
     >
       <Field label="Report name" required><TextInput aria-label="Report name" value={title} onChange={(event) => setTitle(event.target.value)} required placeholder="Monthly trading review" /></Field>
+      <Field label="Kind of report">
+        <Select aria-label="Kind of report" value={kind} onChange={(event) => setKind(event.target.value as "query" | "written")}>
+          <option value="query">Query report: one collection, a measure, a grouping and filters</option>
+          <option value="written">Written report: headings, commentary and catalogue figures</option>
+        </Select>
+      </Field>
+      {kind === "query" && (
+        <Field label="Records to report on" hint={`${pool.length} ${collection} record${pool.length === 1 ? "" : "s"} in this workspace`}>
+          <Select aria-label="Records to report on" value={collection} onChange={(event) => setCollection(event.target.value)}>
+            {ANALYTICS_COLLECTIONS.filter((name) => name !== "accounts").map((name) => <option key={name} value={name}>{name}</option>)}
+          </Select>
+        </Field>
+      )}
       <Field label="Period">
         <Select aria-label="Period" value={period} onChange={(event) => setPeriod(event.target.value)}>
           {["weekly", "monthly", "quarterly"].map((item) => <option key={item} value={item}>{item}</option>)}
@@ -719,7 +779,7 @@ export function Distribution({ context, tab }: { context: ScreenContext; tab: st
 
       <Card eyebrow="SCHEDULES" title="Scheduled reports" prov="human" flush>
         {reports.length === 0 ? (
-          <Empty title="No report to schedule" icon={<CalendarClock size={20} />} action={<Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/analytics/reports/new`)}>Open the report library</Button>}>
+          <Empty title="No report to schedule" icon={<CalendarClock size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("create report")}>Create a report</Button>}>
             Create a report first; its schedule then appears here.
           </Empty>
         ) : (

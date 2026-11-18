@@ -152,6 +152,7 @@ export const analyticsApp = registerApp({
         { id: "Dashboard setup", kind: "modal", title: "New dashboard", width: 560, render: ({ close, ...context }) => <DashboardSetup context={context} close={close} />, footer: submitFooter("dashboard-setup", "Create dashboard") },
         { id: "sharing", kind: "modal", title: "Sharing", width: 520, render: ({ close, ...context }) => <SharingPanel context={context} close={close} /> },
         { id: "source dependency", kind: "drawer", title: "What this dashboard depends on", width: 520, render: ({ ...context }) => <SourceDependencyOverlay context={context} /> },
+        { id: "create report", kind: "modal", title: "New report", width: 520, render: ({ close, ...context }) => <CreateReport context={context} close={close} />, footer: submitFooter("create-report", "Create report") },
       ],
     },
 
@@ -459,6 +460,7 @@ export const analyticsApp = registerApp({
         { id: "delivery method", kind: "modal", title: "How a report would be delivered", width: 520, render: ({ ...context }) => <DeliveryMethod context={context} /> },
         { id: "failure detail", kind: "drawer", title: "Why it did not go out", width: 520, render: ({ ...context }) => <FailureDetail context={context} /> },
         { id: "schedule", kind: "modal", title: "Schedule", width: 520, render: ({ close, ...context }) => <ScheduleOverlay context={context} close={close} /> },
+        { id: "create report", kind: "modal", title: "New report", width: 520, render: ({ close, ...context }) => <CreateReport context={context} close={close} />, footer: submitFooter("create-report", "Create report") },
       ],
     },
   },
