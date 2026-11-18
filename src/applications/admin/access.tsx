@@ -7,7 +7,7 @@ import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
 import { ROLE_LABELS, can as roleCan, type Capability } from "@/platform/policy";
 import { clockIso } from "@/platform/clock";
-import type { Role } from "@/domain/types";
+import type { Rec, Role } from "@/domain/types";
 import { CAPABILITIES, ROLES, appsForRole, capabilityLabel, ofKind, useAdmin } from "./pieces";
 
 /* ====================================================================== *
@@ -156,6 +156,22 @@ export function AccessRequests({ context }: { context: ScreenContext }) {
   );
 }
 
+/** A record as `patchRecord` would write it, for atomic multi-record batches. */
+function reviseRecord(current: Rec, patch: Partial<Rec>, actor: string, now: string): Rec {
+  return {
+    ...current,
+    ...patch,
+    fields: patch.fields ? { ...current.fields, ...patch.fields } : current.fields,
+    history: [{
+      title: current.title, status: current.status, summary: current.summary,
+      fields: { ...current.fields }, body: current.body, amountMinor: current.amountMinor, at: now,
+    }, ...current.history].slice(0, 25),
+    revision: current.revision + 1,
+    updatedAt: now,
+    updatedBy: actor,
+  };
+}
+
 export function AccessReview({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
   const { role: viewerRole } = useWorkspace();
@@ -179,14 +195,33 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
     if (outcome === "declined" && !note.trim()) { setError("Say why, so the person knows what would change the answer."); return; }
     setBusy(true);
     try {
+      const requestFields = { ...request.fields, decidedBy: context.actor, decidedAt: clockIso(), decisionNote: note.trim() };
+      const requestEvent = `Access request ${outcome} by ${context.actor}: ${String(request.fields.memberName)} → ${to}${note.trim() ? ` (${note.trim()})` : ""}`;
       if (outcome === "approved") {
         if (!member) { setError("The member is no longer in this workspace."); return; }
-        await context.mutate.patch(member.id, { fields: { ...member.fields, role: to } }, { event: `Role view changed from ${from} to ${to} for ${member.title} (access request approved)`, expectRevision: member.revision });
+        // The role change and the decision commit together, guarded by both
+        // revisions: a conflict on either leaves neither half written.
+        const now = clockIso();
+        try {
+          await context.mutate.putMany(
+            [
+              reviseRecord(member, { fields: { ...member.fields, role: to } }, context.actor, now),
+              reviseRecord(request, { status: outcome, fields: requestFields }, context.actor, now),
+            ],
+            [`Role view changed from ${from} to ${to} for ${member.title} (access request approved)`, requestEvent],
+            { [member.id]: member.revision, [request.id]: request.revision },
+            ["update", "update"],
+          );
+        } catch (reason) {
+          context.toast("Access not granted", reason instanceof Error && reason.name !== "ConflictError"
+            ? reason.message
+            : "The member or the request changed elsewhere. Reload and review it again.", "blocked");
+          return;
+        }
+      } else {
+        const saved = await context.mutate.patch(request.id, { status: outcome, fields: requestFields }, { event: requestEvent, expectRevision: request.revision });
+        if (!saved) return;
       }
-      await context.mutate.patch(request.id, {
-        status: outcome,
-        fields: { ...request.fields, decidedBy: context.actor, decidedAt: clockIso(), decisionNote: note.trim() },
-      }, { event: `Access request ${outcome} by ${context.actor}: ${String(request.fields.memberName)} → ${to}${note.trim() ? ` (${note.trim()})` : ""}`, expectRevision: request.revision });
       context.toast(outcome === "approved" ? "Access granted" : "Request declined", outcome === "approved" ? `${String(request.fields.memberName)} now holds the ${ROLE_LABELS[to]} view.` : "The reason is stored on the request.");
       close();
     } finally { setBusy(false); }

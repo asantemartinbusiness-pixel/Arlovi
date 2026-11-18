@@ -15,7 +15,7 @@ import {
   ALL_FOLDERS, EMPTY_FILTER, LINKABLE_COLLECTIONS, LINKABLE_LABEL, SORT_LABEL, UNFILED,
   addTags, bytesOf, duplicatesOf, extensionOf, filterAssets, folderCounts, folderOf, hexDigest, kindForFile,
   licence, linkedIds, parseTags, removeTag, sortAssets, tagCounts, titleFromFileName, validateUpload,
-  withLink, withoutLink,
+  savedCount, unfiledRevisions, withLink, withoutLink,
   type AssetSort, type LibraryFilter, type LicenceFilter,
 } from "./library-model";
 import "./asset.css";
@@ -176,9 +176,16 @@ export function AssetLibrary({ context, tab }: { context: ScreenContext; tab: Li
 
   async function archive(list: Rec[]) {
     const live = list.filter((row) => row.status !== "archived");
-    await Promise.all(live.map((row) => context.mutate.patch(row.id, { status: "archived", fields: { ...row.fields, archivedBy: context.actor, archivedAt: clockIso(), statusBeforeArchive: row.status } }, { event: `Asset archived: ${row.title}`, expectRevision: row.revision })));
-    context.toast("Archived", `${live.length} ${live.length === 1 ? "asset is" : "assets are"} archived. Archived assets stay resolvable so older documents still find them.`);
-    setChecked(new Set());
+    const results = await Promise.all(live.map((row) => context.mutate.patch(row.id, { status: "archived", fields: { ...row.fields, archivedBy: context.actor, archivedAt: clockIso(), statusBeforeArchive: row.status } }, { event: `Asset archived: ${row.title}`, expectRevision: row.revision })));
+    const saved = savedCount(results);
+    if (saved === 0 && live.length > 0) return;
+    const missed = live.length - saved;
+    context.toast(
+      "Archived",
+      `${saved} ${saved === 1 ? "asset is" : "assets are"} archived.${missed ? ` ${missed} changed elsewhere and ${missed === 1 ? "was" : "were"} not archived.` : ""} Archived assets stay resolvable so older documents still find them.`,
+      missed ? "blocked" : "ok",
+    );
+    setChecked(new Set(live.filter((_, index) => results[index] === null).map((row) => row.id)));
   }
 
   const rail = (
@@ -458,7 +465,8 @@ export function FolderEditor({ context, close }: { context: ScreenContext; close
     setBusy(true);
     try {
       if (record) {
-        await context.mutate.patch(record.id, { title: name, summary: summary.trim() }, { event: `Asset folder renamed to ${name}`, expectRevision: record.revision });
+        const saved = await context.mutate.patch(record.id, { title: name, summary: summary.trim() }, { event: `Asset folder renamed to ${name}`, expectRevision: record.revision });
+        if (!saved) return;
         context.toast("Folder saved", `${name} is updated.`);
       } else {
         const created = await context.mutate.create({ collection: FOLDER_COLLECTION, title: name, summary: summary.trim(), status: "active", tags: [], fields: {} }, `Asset folder created: ${name}`);
@@ -475,7 +483,23 @@ export function FolderEditor({ context, close }: { context: ScreenContext; close
     if (!record) return;
     setBusy(true);
     try {
-      await Promise.all(inside.map((row) => context.mutate.patch(row.id, { fields: { ...row.fields, folderId: "" } }, { event: `Asset moved out of ${record.title} when the folder was deleted`, expectRevision: row.revision })));
+      if (inside.length) {
+        // All assets move out together, guarded by their revisions; if any
+        // changed elsewhere nothing moves and the folder is kept.
+        try {
+          await context.mutate.putMany(
+            unfiledRevisions(inside, context.actor, clockIso()),
+            inside.map(() => `Asset moved out of ${record.title} when the folder was deleted`),
+            Object.fromEntries(inside.map((row) => [row.id, row.revision])),
+            inside.map(() => "update" as const),
+          );
+        } catch (reason) {
+          context.toast("Folder not deleted", reason instanceof Error && reason.name !== "ConflictError"
+            ? reason.message
+            : "An asset in this folder changed elsewhere. Nothing was moved; reload and try again.", "blocked");
+          return;
+        }
+      }
       await context.mutate.remove(record.id, `Asset folder deleted: ${record.title} (${inside.length} assets moved out, none deleted)`);
       const next = new URLSearchParams(params);
       next.delete("folder");
@@ -564,13 +588,19 @@ export function BulkEdit({ context, close }: { context: ScreenContext; close: ()
             setBusy(true);
             try {
               const folderTitle = folder === UNFILED ? "no folder" : folders.find((row) => row.id === folder)?.title;
-              await Promise.all(records.map((row) => {
+              const results = await Promise.all(records.map((row) => {
                 const tags = addTags(row.tags, addList).filter((tag) => !removed.includes(tag));
                 const fields = folder === "keep" ? row.fields : { ...row.fields, folderId: folder === UNFILED ? "" : folder };
                 const parts = [folder !== "keep" ? `moved to ${folderTitle}` : "", addList.length ? `tagged ${addList.join(", ")}` : "", removed.length ? `untagged ${removed.join(", ")}` : ""].filter(Boolean);
                 return context.mutate.patch(row.id, { tags, fields }, { event: `Asset ${parts.join("; ")}: ${row.title}`, expectRevision: row.revision });
               }));
-              context.toast("Assets updated", `${records.length} ${records.length === 1 ? "asset" : "assets"} changed. Each change is in the asset's history.`);
+              const saved = savedCount(results);
+              if (saved === 0) return;
+              if (saved < records.length) {
+                context.toast("Some assets not updated", `${saved} of ${records.length} assets changed. ${records.length - saved} changed elsewhere; reload and apply again.`, "blocked");
+                return;
+              }
+              context.toast("Assets updated", `${saved} ${saved === 1 ? "asset" : "assets"} changed. Each change is in the asset's history.`);
               close();
             } finally { setBusy(false); }
           }}

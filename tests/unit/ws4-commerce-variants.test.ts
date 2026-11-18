@@ -20,6 +20,17 @@ describe("variant combinations and SKUs", () => {
     const added = generateVariants([{ name: "Finish", values: ["Natural brass", "Blackened brass"] }], existing, "BCN-01");
     expect(added).toEqual([{ id: "BCN-01-BB-2-v", name: "Blackened brass", sku: "BCN-01-BB-2", priceDeltaMinor: 0 }]);
   });
+
+  it("never reuses an existing variant id after a SKU rename and regenerate", () => {
+    // "BCN-01-NB-v" was generated, then its SKU and name were renamed by hand.
+    const existing = [{ id: "BCN-01-NB-v", name: "Brass custom", sku: "CUSTOM-1", priceDeltaMinor: 0 }];
+    const added = generateVariants([{ name: "Finish", values: ["Natural brass"] }], existing, "BCN-01");
+    expect(added).toHaveLength(1);
+    expect(added[0].sku).toBe("BCN-01-NB");
+    expect(added[0].id).not.toBe("BCN-01-NB-v");
+    const ids = [...existing, ...added].map((variant) => variant.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
 });
 
 describe("variant validation", () => {

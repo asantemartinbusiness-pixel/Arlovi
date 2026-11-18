@@ -29,10 +29,13 @@ export function skuFor(baseSku: string, values: string[]): string {
  * Variants to add for the combinations not already on the product. A
  * combination counts as present when a variant has its name or its SKU; a
  * generated SKU that collides is suffixed rather than overwriting anything.
+ * Ids are unique against every existing id, not just SKUs: a variant whose
+ * SKU was renamed keeps its old SKU-shaped id, so the id is checked on its own.
  */
 export function generateVariants(options: ProductOption[], existing: Variant[], baseSku: string): Variant[] {
   const names = new Set(existing.map((variant) => variant.name.trim().toLowerCase()));
   const skus = new Set(existing.map((variant) => variant.sku.trim().toUpperCase()));
+  const ids = new Set(existing.map((variant) => variant.id));
   const out: Variant[] = [];
   for (const combo of combinations(options)) {
     const name = combo.join(" / ");
@@ -41,7 +44,10 @@ export function generateVariants(options: ProductOption[], existing: Variant[], 
     for (let n = 2; skus.has(sku); n += 1) sku = `${skuFor(baseSku, combo)}-${n}`;
     skus.add(sku);
     names.add(name.toLowerCase());
-    out.push({ id: `${sku}-v`, name, sku, priceDeltaMinor: 0 });
+    let id = `${sku}-v`;
+    for (let n = 2; ids.has(id); n += 1) id = `${sku}-v${n}`;
+    ids.add(id);
+    out.push({ id, name, sku, priceDeltaMinor: 0 });
   }
   return out;
 }

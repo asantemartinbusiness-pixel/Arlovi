@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Rec } from "@/domain/types";
 import { evaluate, makeField, readForm, validate } from "@/applications/forms/model";
-import { csvCell, resultsCsv, resultsTable, summariseQuestion } from "@/applications/forms/responses";
+import { csvCell, multiselectPicks, resultsCsv, resultsTable, summariseQuestion } from "@/applications/forms/responses";
 import {
   accessSignals, approvalBlocker, configDiff, decisionBlocker, entriesFromMembers, parseConfig, readTimeline,
   reviewProgress, riskOf, stageBlockers, stageOf, submitBlockers, withEntry,
@@ -57,6 +57,22 @@ describe("FORMS responses", () => {
     expect(csvCell("=SUM(A1)")).toBe("'=SUM(A1)");
     expect(csvCell("-12.5")).toBe("-12.5");
     expect(resultsCsv({ header: ["a"], rows: [["1"]] })).toBe("a\r\n1");
+  });
+
+  it("counts multi-select options whose labels contain commas", () => {
+    const pick = { ...makeField("multiselect"), label: "Needs", options: ["Lighting, rigging", "Power", "Sound, small venue"] };
+    const rows = [
+      rec({ id: "m1", fields: { Needs: "Lighting, rigging, Power" } }),
+      rec({ id: "m2", fields: { Needs: "Sound, small venue" } }),
+      rec({ id: "m3", fields: { Needs: "Power, Catering" } }),
+    ];
+    const summary = summariseQuestion(pick, rows);
+    expect(summary.kind === "choice" && summary.options).toEqual([
+      { label: "Lighting, rigging", count: 1 }, { label: "Power", count: 2 }, { label: "Sound, small venue", count: 1 },
+    ]);
+    expect(summary.kind === "choice" && summary.other).toBe(1);
+    expect(multiselectPicks("Power, Lighting, rigging", pick.options)).toEqual(["Power", "Lighting, rigging"]);
+    expect(multiselectPicks("Lighting, other", pick.options)).toEqual(["Lighting", "other"]);
   });
 });
 

@@ -4,7 +4,7 @@ import {
   acceptedRequestTypes, accentWarning, addPage, brandingProblems, canOpenPage, contrastWithWhite, exposureRows, initialsOf,
   markTextColour, movePage, pagesForRole, removePage, setExposure, sharingState, updatePage, validatePageName,
 } from "@/applications/portal/config";
-import type { PortalPage } from "@/applications/portal/data";
+import { portalDocuments, type PortalPage } from "@/applications/portal/data";
 
 function rec(id: string, collection: string, fields: Rec["fields"] = {}, extra: Partial<Rec> = {}): Rec {
   return {
@@ -124,5 +124,23 @@ describe("portal requests and sharing state", () => {
     expect(live).toMatchObject({ state: "marked_live", linkLive: false, plannedAddress: "https://harrow.example" });
     expect(sharingState(rec("p", "portals", {}, { status: "draft" }), "northline").plannedAddress).toBe("https://northline.example/portal/p");
     expect(sharingState(rec("p", "portals", {}, { status: "suspended" }), "northline").tone).toBe("danger");
+  });
+});
+
+describe("portal attachment never matches unattached records", () => {
+  const orgDocs = [
+    rec("doc-mine", "documents", { portalId: "p-1" }),
+    rec("doc-loose", "documents", {}),
+    rec("doc-blank", "documents", { portalId: "" }),
+  ];
+
+  it("portalDocuments ignores documents with no portalId when no alias is set", () => {
+    expect(portalDocuments(rec("p-1", "portals"), orgDocs).map((doc) => doc.id)).toEqual(["doc-mine"]);
+    expect(portalDocuments(rec("p-1", "portals", { canonicalFor: "" }), orgDocs).map((doc) => doc.id)).toEqual(["doc-mine"]);
+  });
+
+  it("exposureRows does not report unattached documents as attached for an empty alias", () => {
+    const rows = exposureRows(rec("p-1", "portals"), { documents: orgDocs }, [""]);
+    expect(rows.filter((row) => row.source === "attached").map((row) => row.record.id)).toEqual(["doc-mine"]);
   });
 });

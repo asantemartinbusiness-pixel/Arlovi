@@ -339,7 +339,9 @@ export function KeyResultsEditor({ context, close }: { context: ScreenContext; c
                 body: { ...(objective.body as object), keyResults: next, checkIns: history },
                 fields,
               }, { event: `Objective check-in: ${objective.title} at ${Math.round(preview.ratio * 100)}%${note.trim() ? ` — ${note.trim()}` : ""}`, expectRevision: objective.revision });
-              if (saved) context.toast("Check-in saved", `${objective.title} is at ${Math.round(preview.ratio * 100)}%.`);
+              // A refused write keeps the overlay open so the check-in is not lost.
+              if (!saved) return;
+              context.toast("Check-in saved", `${objective.title} is at ${Math.round(preview.ratio * 100)}%.`);
               close();
             } finally { setBusy(false); }
           }}
@@ -462,7 +464,8 @@ export function DecisionRow({ context, event, withHeading = true }: { context: S
             size="sm"
             variant="ghost"
             onClick={async () => {
-              await context.mutate.patch(event.id, { fields: { ...event.fields, reviewedAt: clockIso(), reviewedBy: context.actor } }, { event: `Decision reviewed: ${event.title}`, expectRevision: event.revision });
+              const saved = await context.mutate.patch(event.id, { fields: { ...event.fields, reviewedAt: clockIso(), reviewedBy: context.actor } }, { event: `Decision reviewed: ${event.title}`, expectRevision: event.revision });
+              if (!saved) return;
               context.toast("Review recorded", `${event.title} was looked at again by ${context.actor}.`);
             }}
           >

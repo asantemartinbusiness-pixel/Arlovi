@@ -3,7 +3,7 @@ import type { Rec } from "@/domain/types";
 import {
   ALL_FOLDERS, EMPTY_FILTER, UNFILED, addTags, duplicatesOf, filterAssets, folderCounts, hexDigest, kindForFile,
   licence, linkedIds, parseTags, sortAssets, tagCounts, titleFromFileName, validateUpload, withLink, withoutLink,
-  UPLOAD_LIMIT_BYTES,
+  UPLOAD_LIMIT_BYTES, savedCount, unfiledRevisions,
 } from "@/applications/asset/library-model";
 
 const NOW = new Date("2026-11-14T09:30:00Z");
@@ -106,5 +106,20 @@ describe("asset uploads", () => {
     const live = asset("live", { checksum: "sha256-1" });
     const archived = asset("old", { checksum: "sha256-1" }, { status: "archived" });
     expect(duplicatesOf([live, archived, asset("other", { checksum: "sha256-2" })], "sha256-1")).toEqual([live]);
+  });
+});
+
+describe("asset folder deletion batch", () => {
+  it("unfiles every asset as a guarded revision and keeps history", () => {
+    const rows = [asset("One", { folderId: "f-1" }), asset("Two", { folderId: "f-1", kind: "image" }, { revision: 4 })];
+    const next = unfiledRevisions(rows, "Maya Chen", "2026-11-14T10:00:00Z");
+    expect(next.map((row) => [row.fields.folderId, row.revision])).toEqual([["", 2], ["", 5]]);
+    expect(next[1].fields.kind).toBe("image");
+    expect(next[0].history[0].fields.folderId).toBe("f-1");
+    expect(rows[0].fields.folderId).toBe("f-1");
+  });
+  it("counts only saved patches", () => {
+    expect(savedCount([asset("A"), null, asset("B"), null])).toBe(2);
+    expect(savedCount([])).toBe(0);
   });
 });
