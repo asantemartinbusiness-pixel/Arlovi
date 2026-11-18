@@ -7,6 +7,7 @@ import { runNativeScreenAction } from "@/app/screenActions";
 import { APP_ENTRIES } from "@/app/nav";
 import { getApp, useApplicationRegistryRevision, type ActionDef, type ScreenContext, type ScreenDef } from "@/platform/registry";
 import { can as roleCan, canOpen, ROLE_LABELS } from "@/platform/policy";
+import { canOpenLegacyScreen, accessDescriptor } from "@/platform/accessInventory";
 import { useMutations, useToast, useWorkspace } from "@/platform/workspace";
 import { getRecord, getRecordInOrg, knownRecord } from "@/platform/repo";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -21,10 +22,11 @@ export function ScreenHost() {
   const match = findScreen(location.pathname);
   const screen = match?.screen;
   const mutate = useMutations(screen?.id);
+  const screenVisible = screen ? canOpenLegacyScreen(workspace.role, screen) : false;
   /* The record in the address must belong to the organisation in the address.
      Ids are global, so a record from another organisation is refused here
      before any screen renders or offers an action on it. */
-  const routeId = match?.params.id;
+  const routeId = screenVisible ? match?.params.id : undefined;
   const recordAccess = useLiveQuery(async () => {
     if (!routeId) return "not_applicable" as const;
     // Resolve the record before mounting any page-specific editor or inspector.
@@ -110,6 +112,30 @@ export function ScreenHost() {
     );
   }
 
+  // Presentation guard only; the authenticated API must re-evaluate every
+  // resource and action before returning data. Check before detail lookup so
+  // restricted routes cannot reveal existence through this frontend flow.
+  if (!screenVisible) {
+    const isAppBlocked = !canOpen(workspace.role, screen.applicationCode);
+    const descriptor = accessDescriptor(screen);
+    return <div className="pg">
+      <div className="pg-head">
+        <Breadcrumbs items={[{ label: workspace.org.name, to: `/o/${workspace.org.slug}/hq/home` }, { label: screen.applicationName }]}/>
+        <h1>{isAppBlocked ? "Application not available" : "Page access restricted"}</h1>
+      </div>
+      <div className="pg-body">
+        <Notice tone="warning" title={isAppBlocked ? `Outside the ${ROLE_LABELS[workspace.role]} view` : "Additional permission required"}>
+          {isAppBlocked ? "This application is not included in the selected role view." :
+            `This page requires the ${descriptor.legacyCapability?.replaceAll("_"," ") ?? "relevant"} permission.`}
+          {" "}Contact the organisation administrator to request access. This browser role view is not a server-side security boundary.
+        </Notice>
+        <Button variant="secondary" onClick={() => navigate(`/o/${workspace.org.slug}/workspace/apps`)}>
+          Back to Applications
+        </Button>
+      </div>
+    </div>;
+  }
+
   if (routeId && recordAccess === undefined) {
     return (
       <div className="pg" role="status" aria-busy="true">
@@ -148,22 +174,6 @@ export function ScreenHost() {
     );
   }
 
-  if (!canOpen(workspace.role, screen.applicationCode)) {
-    return (
-      <div className="pg">
-        <div className="pg-head">
-          <Breadcrumbs items={[{ label: workspace.org.name, to: `/o/${workspace.org.slug}/hq/home` }, { label: screen.applicationName }]} />
-          <h1>{screen.title}</h1>
-        </div>
-        <div className="pg-body">
-          <Notice tone="warning" title={`Outside the ${ROLE_LABELS[workspace.role]} view`}>
-            This view does not open {screen.applicationName}. Change the role view from the account menu if you are reviewing another desk.
-            The role view shapes the interface; it is not an account security boundary.
-          </Notice>
-        </div>
-      </div>
-    );
-  }
 
   if (!app) {
     const status = applicationStatus(screen.applicationCode);

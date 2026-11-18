@@ -11,6 +11,7 @@ import { can as roleCan, ROLE_LABELS, type Capability } from "@/platform/policy"
 import type { Rec, Role } from "@/domain/types";
 import { AccessRequests, EffectiveAccess } from "./access";
 import { AccessWorkspace } from "./AccessWorkspace";
+import { AccessStudio } from "./accessStudio";
 import {
   appsForRole, CAPABILITIES, capabilityLabel, csvCell, csvList, ofKind, ROLES, RoleReach, StepUp,
   useAdmin, useOrganisationRecord, useSeeded, useSeededList,
@@ -689,6 +690,7 @@ export function RevokeConfirmation({ context, close }: { context: ScreenContext;
 
 export function RolesScreen({ context, tab }: { context: ScreenContext; tab: "Roles" | "Policies" | "Effective access" | "Exceptions" }) {
   const data = useAdmin();
+  const [accessView, setAccessView] = useState<"templates" | "effective">("templates");
   const custom = ofKind(data.policies, "role");
 
   if (tab === "Roles") {
@@ -742,7 +744,19 @@ export function RolesScreen({ context, tab }: { context: ScreenContext; tab: "Ro
     );
   }
 
-  if (tab === "Effective access") return <Stack gap={4}><AccessWorkspace detailed context={context} /><EffectiveAccess context={context} /></Stack>;
+  if (tab === "Effective access") return (
+    <Stack gap={4}>
+      <Row gap={2} wrap>
+        <Button variant={accessView === "templates" ? "primary" : "secondary"} size="sm"
+          aria-pressed={accessView === "templates"} onClick={() => setAccessView("templates")}>Role templates & apps</Button>
+        <Button variant={accessView === "effective" ? "primary" : "secondary"} size="sm"
+          aria-pressed={accessView === "effective"} onClick={() => setAccessView("effective")}>Current access preview</Button>
+      </Row>
+      {accessView === "templates"
+        ? <AccessStudio context={context} />
+        : <><AccessWorkspace detailed context={context} /><EffectiveAccess context={context} /></>}
+    </Stack>
+  );
 
   const exceptions = custom.filter((role) => csvList(role.fields.deny).length > 0 || role.status === "draft");
   return (
