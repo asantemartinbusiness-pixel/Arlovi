@@ -12,7 +12,7 @@ const STEPS: TourStep[] = [
   { title: "Find your way", description: "Search and jump between tools with the command interface. You can also use Ctrl+K or ⌘K.", target: ".hq-search" },
   { title: "Ask Arlovi", description: "Open the AI companion here. Any capabilities that require an external provider will be marked as not connected.", target: '[aria-label="Ask Arlovi"]' },
   { title: "Your attention centre", description: "Review updates, outstanding work and items needing a decision in this space.", target: ".hq-bell" },
-  { title: "Make it yours", description: "Your account menu contains personal preferences and a way to return to the getting-started guide.", target: '[aria-label^="Account and view settings"]' },
+  { title: "Make it yours", description: "Your account menu contains personal preferences and a way to return to the getting-started guide.", target: '[aria-label^="Profile and preferences"]' },
 ];
 type Pos = { top: number; left: number; width: number; target?: DOMRect };
 const empty: Pos = { top: 110, left: 16, width: 340 };
