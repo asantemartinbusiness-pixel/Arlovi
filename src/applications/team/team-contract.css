@@ -36,3 +36,18 @@
   .team-scope > .ds-select { grid-column: 1 / 2; grid-row: 2; }
   .team-scope-new { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Agent teams */
+.team-agentteams-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-3); }
+.team-agentteam { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-surface); min-width: 0; }
+.team-agentteam[data-status="archived"] { opacity: 0.7; }
+.team-agentteam p { margin: 0; overflow-wrap: anywhere; }
+.team-agentteam-lead { display: flex; flex-direction: column; gap: 2px; font-size: var(--text-sm); }
+.team-agentteam-members { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.team-agentteam-policy { font-size: var(--text-sm); }
+.team-agentteams-note { margin: var(--space-3) 0 0; font-size: var(--text-xs); }
+.team-agentteam-pick { border: 0; margin: 0; padding: 0; min-width: 0; }
+.team-agentteam-picklist { display: grid; gap: var(--space-1); max-height: 220px; overflow: auto; padding: var(--space-2); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.team-agentteams-org { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.team-agentteams-org > li { display: flex; flex-direction: column; gap: var(--space-1); padding-block-end: var(--space-3); border-bottom: 1px solid var(--border-subtle); }
+.team-agentteams-org > li:last-child { border-bottom: 0; padding-block-end: 0; }

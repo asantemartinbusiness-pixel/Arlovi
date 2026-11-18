@@ -194,6 +194,8 @@ export function executeDry(options: {
   fixture?: Record<string, string | number | boolean>;
   decisions?: Record<string, "approved" | "rejected">;
   resume?: { steps: RunResult["steps"]; variables: RunResult["variables"] };
+  /** A record of the trigger's collection to test with, instead of the first match. */
+  sampleId?: string;
 }): RunResult {
   return runWorkflow({
     graph: options.graph,
@@ -204,5 +206,6 @@ export function executeDry(options: {
     fixture: options.fixture,
     decisions: options.decisions,
     resume: options.resume,
+    sampleId: options.sampleId,
   });
 }

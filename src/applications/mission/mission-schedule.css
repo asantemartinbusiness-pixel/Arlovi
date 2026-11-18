@@ -1,0 +1,17 @@
+/* MISSION — task schedule on Plan → Timeline. */
+.mission-sched { position: relative; display: grid; gap: var(--space-1); padding-block: 22px var(--space-3); margin-block-end: var(--space-3); }
+.mission-sched-ticks { position: absolute; top: 0; inset-inline: calc(30% + var(--space-3)) 0; height: 18px; }
+.mission-sched-ticks > span { position: absolute; transform: translateX(-50%); font-size: var(--text-2xs); color: var(--fg-subtle); white-space: nowrap; }
+.mission-sched-row { display: grid; grid-template-columns: 30% minmax(0, 1fr); gap: var(--space-3); align-items: center; min-height: 24px; }
+.mission-sched-name { font-size: var(--text-sm); min-width: 0; }
+.mission-sched-track { position: relative; height: 14px; background: var(--bg-sunken); border-radius: var(--radius-xs); }
+.mission-sched-bar { position: absolute; top: 0; bottom: 0; border-radius: var(--radius-xs); background: var(--info); min-width: 4px; }
+.mission-sched-bar[data-stage="verified"], .mission-sched-bar[data-stage="done"] { background: var(--success); }
+.mission-sched-bar[data-point="true"] { opacity: 0.75; }
+.mission-sched-bar[data-clash="true"] { background: var(--warning); }
+.mission-sched-today, .mission-sched-due { position: absolute; top: 18px; bottom: 0; width: 0; border-inline-start: 2px dashed var(--accent); pointer-events: none; }
+.mission-sched-due { border-inline-start-color: var(--fg-muted); }
+.mission-sched-list { list-style: none; margin: 0; padding: var(--space-3) 0 0; border-top: 1px solid var(--border-subtle); display: grid; gap: var(--space-2); }
+.mission-sched-list > li { display: grid; gap: var(--space-2); min-width: 0; }
+.mission-sched-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-2); align-items: start; padding: var(--space-2); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.mission-sched-actions { grid-column: 1 / -1; }

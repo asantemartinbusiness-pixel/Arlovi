@@ -10,6 +10,7 @@ import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
 import { freshness, wallMs } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
+import { ReportLibrary } from "./reports";
 import {
   DIMENSIONS, dimensionById, measureById, runQuery, type QueryFilter,
 } from "./metrics";
@@ -171,6 +172,7 @@ export function DashboardDirectory({ context, tab }: { context: ScreenContext; t
   }
 
   return (
+    <Stack gap={5}>
     <Grid>
       {filtered.map((row) => {
         const sensitive = row.record.fields.sensitive === true;
@@ -213,6 +215,8 @@ export function DashboardDirectory({ context, tab }: { context: ScreenContext; t
         );
       })}
     </Grid>
+    {tab === "All" && <ReportLibrary context={context} />}
+    </Stack>
   );
 }
 

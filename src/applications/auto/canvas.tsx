@@ -10,6 +10,8 @@ import {
   CONDITION_OPS, ACTION_KINDS, defaultConfigFor, portsFor,
   type GraphIssue, type NodeKind, type PortId, type StepResult, type WfNode, type WorkflowGraph,
 } from "./engine";
+import { bindingsAt, checkNodeReferences } from "./schema";
+import type { Rec } from "@/domain/types";
 
 export const NODE_WIDTH = 184;
 const PORT_TOP = 18;
@@ -551,19 +553,30 @@ export function GraphList({ graph, onChange, selectedId, onSelect, readOnly }: O
  * ====================================================================== */
 
 export function NodeInspector({
-  graph, nodeId, onChange, collections, readOnly,
+  graph, nodeId, onChange, collections, readOnly, records, lastStep,
 }: {
   graph: WorkflowGraph;
   nodeId?: string;
   onChange: (next: WorkflowGraph, note: string) => void;
   collections: string[];
   readOnly?: boolean;
+  /** The trigger collection's records; with them every reference is checked. */
+  records?: Rec[];
+  /** This node's step in the last local test, if it was reached. */
+  lastStep?: StepResult;
 }) {
   const node = graph.nodes.find((item) => item.id === nodeId);
   if (!node) {
     return <Empty title="No node selected" icon={<MousePointer2 size={20} />}>Choose a node on the canvas or in the list view to edit what it does.</Empty>;
   }
   const config = node.config ?? {};
+  const checks = records ? checkNodeReferences(graph, records, node) : [];
+  const available = records ? bindingsAt(graph, records, node.id) : [];
+  const listId = `auto-bindings-${node.id}`;
+  const problemIn = (where: string) => {
+    const bad = checks.filter((check) => check.where === where && check.state !== "ok");
+    return bad.length ? bad.map((check) => check.message).join(" ") : undefined;
+  };
   function patch(next: Partial<WfNode>, note: string) {
     onChange({ ...graph, nodes: graph.nodes.map((item) => (item.id === node!.id ? { ...item, ...next } : item)) }, note);
   }
@@ -609,8 +622,8 @@ export function NodeInspector({
 
       {node.type === "condition" && (
         <>
-          <Field label="Field" hint="A binding path, for example record.amountMinor or overdueDays.">
-            <TextInput aria-label="Field" value={config.left ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ left: event.target.value }, "Condition field changed")} />
+          <Field label="Field" hint="A binding path, for example record.amountMinor or overdueDays. Suggestions are the fields this trigger's records carry." error={problemIn("field")}>
+            <TextInput aria-label="Field" list={listId} invalid={Boolean(problemIn("field"))} value={config.left ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ left: event.target.value }, "Condition field changed")} />
           </Field>
           <Field label="Test">
             <Select aria-label="Test" value={config.op ?? "gt"} disabled={readOnly} onChange={(event) => patchConfig({ op: event.target.value as typeof config.op }, "Condition operator changed")}>
@@ -633,8 +646,8 @@ export function NodeInspector({
           <Field label="Variable name">
             <TextInput aria-label="Variable name" value={config.name ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ name: event.target.value }, "Variable renamed")} />
           </Field>
-          <Field label="Expression" hint="A number, a binding path, sum/count/avg/max of a path, or a path combined with a number.">
-            <TextInput aria-label="Expression" value={config.expr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ expr: event.target.value }, "Expression changed")} />
+          <Field label="Expression" hint="A number, a binding path, sum/count/avg/max of a path, or a path combined with a number." error={problemIn("expression")}>
+            <TextInput aria-label="Expression" invalid={Boolean(problemIn("expression"))} value={config.expr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ expr: event.target.value }, "Expression changed")} />
           </Field>
         </>
       )}
@@ -663,11 +676,11 @@ export function NodeInspector({
                   {collections.map((name) => <option key={name} value={name}>{name}</option>)}
                 </Select>
               </Field>
-              <Field label="Title template" hint="Use {record.title} or {overdueDays} to insert a binding.">
-                <TextInput aria-label="Title template" value={config.titleExpr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ titleExpr: event.target.value }, "Title template changed")} />
+              <Field label="Title template" hint="Use {record.title} or {overdueDays} to insert a binding." error={problemIn("title template")}>
+                <TextInput aria-label="Title template" invalid={Boolean(problemIn("title template"))} value={config.titleExpr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ titleExpr: event.target.value }, "Title template changed")} />
               </Field>
-              <Field label="Summary template">
-                <TextInput aria-label="Summary template" value={config.summaryExpr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ summaryExpr: event.target.value }, "Summary template changed")} />
+              <Field label="Summary template" error={problemIn("summary template")}>
+                <TextInput aria-label="Summary template" invalid={Boolean(problemIn("summary template"))} value={config.summaryExpr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ summaryExpr: event.target.value }, "Summary template changed")} />
               </Field>
             </>
           )}
@@ -677,8 +690,8 @@ export function NodeInspector({
             </Field>
           )}
           {config.kind === "log.note" && (
-            <Field label="Log line" hint="Bindings in braces are substituted when the step runs.">
-              <TextInput aria-label="Log line" value={config.summaryExpr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ summaryExpr: event.target.value }, "Log line changed")} />
+            <Field label="Log line" hint="Bindings in braces are substituted when the step runs." error={problemIn("log line")}>
+              <TextInput aria-label="Log line" invalid={Boolean(problemIn("log line"))} value={config.summaryExpr ?? ""} disabled={readOnly} onChange={(event) => patchConfig({ summaryExpr: event.target.value }, "Log line changed")} />
             </Field>
           )}
           <Field label="Retries" hint="Attempts after the first, with exponential backoff recorded on each attempt.">
@@ -713,8 +726,33 @@ export function NodeInspector({
         </Field>
       )}
 
+      {checks.some((check) => check.where.startsWith("filter") && check.state !== "ok") ? (
+        <Notice tone="danger" title="A trigger filter names an unknown field">
+          {checks.filter((check) => check.where.startsWith("filter") && check.state !== "ok").map((check) => `${check.where}: ${check.message}`).join(" ")}
+        </Notice>
+      ) : null}
+
+      {records && available.length > 0 && (
+        <details className="auto-bindings">
+          <summary>{available.length} bindings available at this step</summary>
+          <datalist id={listId}>{available.map((binding) => <option key={binding.path} value={binding.path} />)}</datalist>
+          <ul>
+            {available.map((binding) => (
+              <li key={binding.path}><code>{binding.path}</code> <span className="ds-subtle">{binding.type} · {binding.note}</span></li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {lastStep && (
+        <div className="auto-laststep" data-status={lastStep.status}>
+          <strong>Last local test: {lastStep.status}{lastStep.branch ? ` → ${lastStep.branch === "then" ? "when true" : lastStep.branch === "else" ? "when false" : lastStep.branch}` : ""}</strong>
+          <p>{lastStep.message}</p>
+        </div>
+      )}
+
       {!readOnly && (
-        <Row gap={2}>
+        <Row gap={2} wrap>
           <Button variant="ghost" icon={<CircleSlash size={14} />} onClick={() => onChange(disconnect(graph, node.id, portsFor(node.type)[0].id), "Connection removed")}>
             Clear first connection
           </Button>

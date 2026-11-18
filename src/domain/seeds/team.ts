@@ -157,6 +157,13 @@ registerSeed("team", (ctx) => {
     ctx.rec({ org: "nl", collection: "members", n: 62, title: "Bela Novak", summary: "Scheduling agent. Local contract.", fields: { kind: "ai", role: "agent", departmentId: "nl-departments-001", title: "Scheduling agent", agentId: "nl-agents-063" }, tags: ["ai"] }),
     ctx.rec({ org: "nl", collection: "members", n: 63, title: "Pilar Sainz", summary: "Analytics agent. Local contract.", fields: { kind: "ai", role: "agent", departmentId: "nl-departments-002", title: "Analytics agent", agentId: "nl-agents-064" }, tags: ["ai"] }),
     ctx.rec({ org: "nl", collection: "members", n: 64, title: "Soren Fisk", summary: "Quality agent. Local contract.", fields: { kind: "ai", role: "agent", departmentId: "nl-departments-060", title: "Quality agent", agentId: "nl-agents-065" }, tags: ["ai"] }),
+    // An agent team: one lead, one purpose, one approval policy. It grants nothing by itself.
+    ctx.rec({
+      org: "nl", collection: "agentTeams", n: 60, title: "Supplier review desk", status: "active", owner: "Maya Chen",
+      summary: "Compares supplier terms and lead times before a purchase order is raised. Every draft goes to a person.",
+      fields: { leadId: "nl-agents-061", approvalPolicy: "lead_then_person", approver: "Jonah Adeyemi" },
+      body: { memberIds: ["nl-agents-061", "nl-agents-060", "nl-agents-064"] },
+    }),
 
     skill(60, "Evidence assembly", {
       origin: "native", version: "2.1", owner: "Maya Chen",

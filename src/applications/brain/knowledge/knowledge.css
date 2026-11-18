@@ -32,6 +32,8 @@
 .brain-kw-colnote { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: var(--space-1); }
 .brain-kw-colnote p { margin: 0; }
 .brain-kw-newcol { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2); margin-bottom: var(--space-2); border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-inset); }
+.brain-kw-confirm { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2); border: 1px solid var(--danger); border-radius: var(--radius-md); font-size: var(--text-sm); }
+.brain-kw-confirm p { margin: 0; }
 
 .brain-kw-filters { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-3); }
 .brain-kw-search { position: relative; display: flex; align-items: center; }

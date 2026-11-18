@@ -19,6 +19,7 @@ import type { Rec } from "@/domain/types";
 import { clockIso } from "@/platform/clock";
 
 import { ExecutionStatusCard, MilestoneTimeline, MilestonesCard, MissionBriefCard, ParticipantsPanel } from "./BriefPanels";
+import { TaskSchedule } from "./TaskSchedule";
 /* ====================================================================== *
  * MISSION — Missions & Autonomous Execution
  *
@@ -596,6 +597,7 @@ function PlanDependencies({ context, view }: { context: ScreenContext; view: str
     return (
       <Stack gap={4}>
         <MilestoneTimeline context={context} mission={mission} tasks={tasks} />
+        <TaskSchedule context={context} mission={mission} tasks={ordered} />
         <Card eyebrow="TIMELINE" prov="human" title="Sequence by dependency" subtitle={`${ordered.length} tasks, ${withDates.length} with a date`}>
           <Stack gap={2}>
             {ordered.map((task, index) => {
