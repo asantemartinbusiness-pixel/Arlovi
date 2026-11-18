@@ -53,7 +53,7 @@ test("lazy native destinations work after direct navigation and reload", async (
 test("navigation and document workspaces retain working deep links", async ({ page }) => {
   await page.goto("/o/northline/workspace/work");
   await expect(page.locator(".hq-main h1").first()).toBeVisible();
-  const project = page.locator('.ws-entry-list a[href*="/workspace/work/project/"]').first();
+  const project = page.locator('.ww-projects a[href*="/workspace/work/project/"]').first();
   await expect(project).toBeVisible();
   await project.click();
   await page.getByRole("button",{name:"Files",exact:true}).click();
