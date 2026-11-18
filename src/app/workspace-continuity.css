@@ -17,3 +17,13 @@
 .ws-continuity-action:focus-visible,.ws-continuity-clear:focus-visible,.ws-continuity-destination:focus-visible,.ws-continuity-all:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .ws-continuity-all{align-self:flex-start;color:var(--fg-default);font-size:var(--text-sm);font-weight:500;text-decoration:underline}
 @media(max-width:599px){.ws-continuity-meta{display:none}.ws-continuity-destination{min-height:48px}}
+
+/* Discovery controls on the full Recent & Saved surface. */
+.ws-continuity-controls{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap}
+.ws-continuity-filters{display:flex;gap:var(--space-1);padding:4px;border:1px solid var(--border-subtle);border-radius:var(--radius-pill);background:var(--bg-sunken)}
+.ws-continuity-filters button{border:0;background:transparent;border-radius:var(--radius-pill);color:var(--fg-muted);font:500 var(--text-xs) var(--font-sans);min-height:36px;padding:0 var(--space-3);cursor:pointer}
+.ws-continuity-filters button[aria-pressed=true]{background:var(--bg-surface);color:var(--fg-default);box-shadow:0 0 0 1px var(--border-default)}
+.ws-continuity-filters button:focus-visible,.ws-continuity-search:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.ws-continuity-search{display:flex;align-items:center;gap:var(--space-2);min-height:44px;border:1px solid var(--border-default);border-radius:var(--radius-pill);background:var(--bg-surface);padding:0 var(--space-3);color:var(--fg-muted);flex:1;max-width:300px}
+.ws-continuity-search input{min-width:0;flex:1;background:transparent;border:0;outline:0;font:var(--text-sm) var(--font-sans);color:var(--fg-default)}
+@media(max-width:599px){.ws-continuity-controls{align-items:stretch}.ws-continuity-filters{width:100%;justify-content:space-between}.ws-continuity-filters button{flex:1;padding-inline:var(--space-2)}.ws-continuity-search{max-width:none;flex-basis:100%}}

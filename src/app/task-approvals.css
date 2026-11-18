@@ -12,3 +12,17 @@
 .ws-approval-actions button:disabled{opacity:.5;cursor:not-allowed}.ws-approval-actions button:focus-visible,.ws-approval-actions a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .ws-approval-error{color:var(--danger);font-size:var(--text-sm)}
 @media(max-width:599px){.ws-approval-row{align-items:stretch}.ws-approval-actions{width:100%}.ws-approval-actions button,.ws-approval-actions a{flex:1;justify-content:center;min-height:44px}}
+
+.ws-approvals{border-top:0;padding-top:0;gap:var(--space-4)}
+.ws-approval-intro{padding:var(--space-5);border:1px solid var(--border-default);border-left:4px solid var(--accent);border-radius:var(--radius-lg);background:var(--bg-surface)}
+.ws-approval-intro h2{font:500 clamp(24px,2.7vw,34px)/1.15 var(--font-display);letter-spacing:-.035em;margin-top:var(--space-2)}
+.ws-approval-eyebrow{font:500 var(--text-xs) var(--font-mono);letter-spacing:.075em;color:var(--fg-muted)}
+.ws-approval-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-3)}
+.ws-approval-overview>div{display:flex;flex-direction:column;gap:var(--space-2);padding:var(--space-4);background:var(--bg-surface);border:1px solid var(--border-default);border-radius:var(--radius-lg)}
+.ws-approval-overview span,.ws-approval-overview small{font-size:var(--text-xs);color:var(--fg-muted)}
+.ws-approval-overview strong{font:500 clamp(24px,2.7vw,34px) var(--font-display);font-variant-numeric:tabular-nums}
+.ws-approval-empty{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-4);border:1px solid var(--border-subtle);background:var(--bg-surface);border-radius:var(--radius-lg)}
+.ws-approval-empty>svg{color:var(--fg-muted);flex:none}.ws-approval-empty strong{font-size:var(--text-sm)}.ws-approval-empty p{margin-top:5px;font-size:var(--text-xs);color:var(--fg-muted)}
+.ws-approval-history-toggle{display:flex;align-items:center;gap:8px;width:100%;min-height:48px;padding:var(--space-3) var(--space-4);border:0;background:transparent;color:var(--fg-default);cursor:pointer;text-align:left;font:500 var(--text-sm) var(--font-sans)}
+.ws-approval-history-toggle span{margin-left:auto;font-size:var(--text-xs);color:var(--fg-muted)}.ws-approval-history-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+@media(max-width:680px){.ws-approval-overview{grid-template-columns:1fr}.ws-approval-intro{padding:var(--space-4)}}

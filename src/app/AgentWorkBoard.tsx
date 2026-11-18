@@ -27,6 +27,7 @@ export function AgentWorkBoard({ scope = null }: { scope?: Scope }) {
   const [agentId, setAgentId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [showPrevious, setShowPrevious] = useState(false);
 
   const relevantTasks = tasks.filter(t => inScope(t, scope));
   const selectableTasks = relevantTasks.filter(t => !["completed", "cancelled", "archived"].includes(t.status));
@@ -46,7 +47,8 @@ export function AgentWorkBoard({ scope = null }: { scope?: Scope }) {
   }
   const readyToAssign = Boolean(taskId && agentId) && !pending.some(a => a.fields.taskId === taskId);
   return <section className="ws-section ws-agent-work" aria-label="AI work assignments">
-    <div className="ws-agent-heading"><div><h2>AI work assignments</h2><p>Assign work to an AI employee contract and prepare a reviewable source brief. Provider execution is not configured.</p></div><Bot size={23} aria-hidden="true"/></div>
+    <div className="ws-agent-heading"><div><span className="ws-agent-eyebrow">AI WORKFORCE / DELEGATION</span><h2>AI workforce</h2><p>Prepare assignments, link work to AI employee contracts and review evidence in one place. Provider execution is not configured.</p></div><Bot size={25} aria-hidden="true"/></div>
+    <div className="ws-agent-overview" aria-label="AI assignment overview"><div><span>Awaiting provider</span><strong>{pending.length}</strong><small>Not executing</small></div><div><span>Available agents</span><strong>{activeAgents.length}</strong><small>Active contracts</small></div><div><span>Assignable tasks</span><strong>{selectableTasks.length}</strong><small>In this workspace</small></div></div>
     <div className="ws-agent-capability" role="status"><PauseCircle size={18}/><div><strong>Execution unavailable</strong><span>{model?.note ?? "No language model is connected."} Assignments remain pending, not running.</span></div></div>
     {error && <p role="alert" className="ws-agent-error">{error}</p>}
     <div className="ws-agent-form">
@@ -62,6 +64,7 @@ export function AgentWorkBoard({ scope = null }: { scope?: Scope }) {
     </div>
     {activeAgents.length === 0 && <p className="ws-agent-note"><ShieldAlert size={16}/> No active AI employee contracts in this company. Configure an employee in the <Link to={`/o/${org.slug}/team/agents`}>AI Workforce</Link> application.</p>}
     {selectableTasks.length === 0 && <p className="ws-empty">No open tasks in this working space. Create a task first.</p>}
+    {pending.length === 0 && <div className="ws-agent-empty"><Bot size={19}/><div><strong>No assignments awaiting a provider</strong><p>Choose a task and an AI employee to prepare a new assignment.</p></div></div>}
     {pending.length > 0 && <div className="ws-agent-list"><h3>Awaiting provider ({pending.length})</h3>{pending.map(assignment => {
       const task=tasks.find(t=>t.id===assignment.fields.taskId);
       const related=receipts.filter(r=>r.fields.assignmentId===assignment.id)
@@ -79,7 +82,7 @@ export function AgentWorkBoard({ scope = null }: { scope?: Scope }) {
         </div>
       </div>;
     })}</div>}
-    {recent.length>0 && <div className="ws-agent-list"><h3>Previous assignments</h3>{recent.map(assignment=><div key={assignment.id} className="ws-agent-row"><div className="ws-agent-details"><strong>{assignment.title}</strong><small>{assignment.status} · {new Date(assignment.updatedAt).toLocaleDateString()}</small></div></div>)}</div>}
+    {recent.length>0 && <div className="ws-agent-list"><button type="button" className="ws-agent-previous-toggle" aria-expanded={showPrevious} onClick={()=>setShowPrevious(v=>!v)}>Previous assignments ({recent.length}) <span>{showPrevious?"Hide":"Show"}</span></button>{showPrevious&&recent.map(assignment=><div key={assignment.id} className="ws-agent-row"><div className="ws-agent-details"><strong>{assignment.title}</strong><small>{assignment.status} · {new Date(assignment.updatedAt).toLocaleDateString()}</small></div></div>)}</div>}
     <p className="ws-agent-note"><ShieldAlert size={16}/> This is a browser-local assignment and evidence workflow. It does not perform AI inference, schedule background work, incur model charges, or enforce server-side workforce permissions.</p>
   </section>;
 }

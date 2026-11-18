@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Bookmark, BookmarkCheck, Clock3, Trash2 } from "lucide-react";
+import { Bookmark, BookmarkCheck, Clock3, Search, Trash2 } from "lucide-react";
 import { findScreen } from "@/app/catalog";
 import { useCollections, useWorkspace } from "@/platform/workspace";
 import {
@@ -31,29 +32,38 @@ function LocationRow({ item, saved, label, onToggle, onRemove }: { item: Navigat
 }
 export function WorkspaceContinuity({ compact = false }: { compact?: boolean }) {
   const { org } = useWorkspace();
+  const [view, setView] = useState<"all" | "recent" | "saved">("all");
+  const [query, setQuery] = useState("");
   const { recent, pinned } = useNavigationContinuity(org.id, org.slug);
   const related = useCollections(["projects","departments"]);
   const projects = related.projects ?? [];
   const departments = related.departments ?? [];
   const available = recent.filter(item => item.path !== `/o/${org.slug}/workspace/home`);
   const pinnedItems = pinned.map(path => recent.find(item => item.path === path) ?? {path,visitedAt:new Date(0).toISOString()});
-  const sorted = compact ? available.slice(0,5) : available.slice(0,12);
+  const sorted = compact ? available.slice(0,5) : available.slice(0,20);
+  const matches = (item: NavigationItem) => destinationLabel(item.path,org.slug,projects,departments).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
+  const visiblePinned = compact ? pinnedItems.slice(0,4) : pinnedItems.filter(matches);
+  const visibleRecent = compact ? sorted : sorted.filter(matches);
+  const showSaved = compact || view !== "recent";
+  const showRecent = compact || view !== "saved";
   const toggle = (path: string) => toggleSavedNavigation(org.id,org.slug,path);
   return <section className="ws-section ws-continuity" aria-label="Recent and saved work">
     <div className="ws-continuity-heading"><h2><Clock3 size={18}/> {compact ? "Pick up where you left off" : "Recent and saved work"}</h2>
       {!compact && available.length > 0 && <button className="ws-continuity-clear" type="button" onClick={() => clearRecentNavigation(org.id,org.slug)}>Clear recent</button>}
     </div>
-    {pinnedItems.length > 0 && <section className="ws-continuity-list" aria-label="Saved places">
+    {!compact && <div className="ws-continuity-controls"><div className="ws-continuity-filters" aria-label="Filter recent work">{(["all","recent","saved"] as const).map(value => <button type="button" key={value} aria-pressed={view === value} onClick={() => setView(value)}>{value === "all" ? "All places" : value === "recent" ? "Recently visited" : "Saved"}</button>)}</div><label className="ws-continuity-search"><Search size={16} aria-hidden="true"/><span className="sr-only">Search recent and saved places</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Find a place…"/></label></div>}
+    {showSaved && visiblePinned.length > 0 && <section className="ws-continuity-list" aria-label="Saved places">
       <div className="ws-continuity-group">SAVED PLACES</div>
-      {pinnedItems.slice(0,compact?4:24).map(item=><LocationRow key={item.path} item={item} saved label={destinationLabel(item.path,org.slug,projects,departments)} onToggle={() => toggle(item.path)}/>)}
+      {visiblePinned.map(item=><LocationRow key={item.path} item={item} saved label={destinationLabel(item.path,org.slug,projects,departments)} onToggle={() => toggle(item.path)}/>)}
     </section>}
-    {sorted.length > 0 ? <section className="ws-continuity-list" aria-label="Recently visited">
+    {showRecent && visibleRecent.length > 0 ? <section className="ws-continuity-list" aria-label="Recently visited">
       <div className="ws-continuity-group">RECENTLY VISITED</div>
-      {sorted.map(item=><LocationRow key={item.path} item={item} saved={pinned.includes(item.path)}
+      {visibleRecent.map(item=><LocationRow key={item.path} item={item} saved={pinned.includes(item.path)}
         label={destinationLabel(item.path,org.slug,projects,departments)}
         onToggle={() => toggle(item.path)}
         onRemove={compact ? undefined : () => removeRecentNavigation(org.id,org.slug,item.path)}/>)}
-    </section> : pinnedItems.length === 0 && <p className="ws-empty">Pages and workspaces you visit will appear here, so you can return to them quickly.</p>}
+    </section> : showRecent && available.length === 0 && pinnedItems.length === 0 && <p className="ws-empty">Pages and workspaces you visit will appear here, so you can return to them quickly.</p>}
+    {!compact && (query.trim() || view !== "all") && (showSaved ? visiblePinned.length === 0 : true) && (showRecent ? visibleRecent.length === 0 : true) && <p className="ws-empty">No matching places in this view. Try a different search or filter.</p>}
     {compact && <Link className="ws-continuity-all" to={`/o/${org.slug}/workspace/recent`}>View all recent work</Link>}
   </section>;
 }

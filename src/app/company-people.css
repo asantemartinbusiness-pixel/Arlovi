@@ -33,3 +33,19 @@
 .cp-empty{padding:var(--space-5);font-size:var(--text-sm);line-height:1.5;color:var(--fg-muted);background:var(--bg-surface);border:1px solid var(--border-default);border-radius:var(--radius-lg)}
 .cp-disclaimer{border-top:1px solid var(--border-subtle);padding-top:var(--space-3)}
 @media(max-width:599px){.cp-form{align-items:stretch;flex-direction:column}.cp-form label{min-width:0;width:100%;flex:auto}.cp-actions button,.cp-actions a{flex:1}.cp-access{flex:1}}
+
+/* Project collaboration cockpit: scoped hierarchy without changing permissions. */
+.cp-eyebrow{display:block;font:500 var(--text-xs) var(--font-mono);letter-spacing:.075em;color:var(--fg-muted);margin-bottom:var(--space-2)}
+.cp-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-3)}
+.cp-overview>div{display:flex;flex-direction:column;gap:var(--space-2);padding:var(--space-4);border:1px solid var(--border-default);border-radius:var(--radius-lg);background:var(--bg-surface)}
+.cp-overview span,.cp-overview small{color:var(--fg-muted);font-size:var(--text-xs)}
+.cp-overview strong{font:500 clamp(24px,2.8vw,34px)/1.1 var(--font-display);font-variant-numeric:tabular-nums}
+.cp-directory-toggle{min-height:40px;border:1px solid var(--border-default);border-radius:var(--radius-pill);background:var(--bg-surface);padding:8px 13px;font:500 var(--text-xs) var(--font-sans);color:var(--fg-default);cursor:pointer}
+.cp-directory-toggle:hover{background:var(--bg-hover)}
+.cp-directory-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ws-detail-content .cp-people{min-width:0}
+.ws-detail-content .cp-heading{padding:var(--space-5);border:1px solid var(--border-default);border-left:4px solid var(--accent);border-radius:var(--radius-lg);background:var(--bg-surface)}
+.ws-detail-content .cp-heading h2{font-size:clamp(23px,2.5vw,33px);letter-spacing:-.035em}
+.ws-detail-content .cp-notice{padding:var(--space-3) var(--space-4)}
+.ws-detail-content .cp-section{border:1px solid var(--border-default);border-radius:var(--radius-lg);padding:var(--space-4);background:var(--bg-surface)}
+@media(max-width:680px){.cp-overview{grid-template-columns:1fr}.ws-detail-content .cp-heading{padding:var(--space-4)}.ws-detail-content .cp-section{padding:var(--space-3)}}

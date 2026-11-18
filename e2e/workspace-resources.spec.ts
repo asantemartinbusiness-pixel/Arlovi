@@ -17,12 +17,12 @@ test("company resource folders are saved, searchable and survive reload", async 
 
 test("a project files tab offers a scoped resource library", async ({ page }) => {
   await page.goto("/o/northline/workspace/work");
-  const project=page.locator('.ws-entry-list a[href*="/project/"]').first();
+  const project=page.locator('.ww-projects a[href*="/workspace/work/project/"]').first();
   await expect(project).toBeVisible();
   await project.click();
   await page.getByRole("button",{name:"Files",exact:true}).click();
   await expect(page.getByRole("button",{name:"Link document"})).toBeVisible();
-  await expect(page.getByRole("heading",{name:"Resources"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Files & resources"})).toBeVisible();
 });
 
 test("resource inspector previews the existing document and its revision",async({page})=>{
@@ -39,7 +39,7 @@ test("resource inspector previews the existing document and its revision",async(
 
 test("linking a document to a project does not replace its original owner or project",async({page})=>{
   await page.goto("/o/northline/workspace/work");
-  const project=page.locator('.ws-entry-list a[href*="/project/"]').first();
+  const project=page.locator('.ww-projects a[href*="/workspace/work/project/"]').first();
   await expect(project).toBeVisible();
   await project.click();
   await page.getByRole("button",{name:"Files",exact:true}).click();

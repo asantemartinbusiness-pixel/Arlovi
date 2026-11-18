@@ -19,7 +19,7 @@ test("header decision and notification controls remain distinct and accessible o
 test("header stays within available screen width and remains usable on a project detail",async({page})=>{
   await page.goto("/o/northline/workspace/work");
   await expect(page.locator(".hq-header")).toBeVisible();
-  const project=page.locator('.ws-entry-list a[href*="/workspace/work/project/"]').first();
+  const project=page.locator('.ww-projects a[href*="/workspace/work/project/"]').first();
   await expect(project).toBeVisible();
   await project.click();
   await expect(page.getByRole("navigation",{name:"Current workspace context"})).toBeVisible();

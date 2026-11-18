@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 
 test("recent places survive a reload and can be saved", async ({ page }) => {
   await page.goto("/o/northline/workspace/work");
-  // The Work area is titled "Work" in the space-led navigation model.
-  await expect(page.getByRole("heading", { level:1,name: "Work" })).toBeVisible();
+  // The work area now has a dedicated execution desk heading.
+  await expect(page.getByRole("heading", { level:1,name: "Work, moving forward." })).toBeVisible();
   await page.goto("/o/northline/workspace/home");
   await expect(page.getByRole("heading", { name: "Pick up where you left off" })).toBeVisible();
   const recent = page.getByRole("region", { name: "Recently visited" });
