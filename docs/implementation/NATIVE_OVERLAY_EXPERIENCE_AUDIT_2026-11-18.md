@@ -77,3 +77,18 @@ Prioritise security-sensitive or financial operations (ADMIN, FIN, HR, LEGAL, PR
 ## Release checks
 
 `npm run audit:overlays` · `npm run qa` · `npx playwright test e2e/native-overlay-experience.spec.ts e2e/modal-experience.spec.ts e2e/drawer-experience.spec.ts`. Review the Vercel preview, verify no loss of native app functionality, and merge only after green checks or documented exceptions.
+
+## Follow-on workflow refinements (18 November, second pass)
+
+The first pass established app ownership and data scope. This follow-on change makes six further *task-specific* flows safer and clearer, without replacing each native application's renderer:
+
+| Application and overlay | New evidence and decision UX | Business integrity |
+|---|---|---|
+| Finance · Reverse posted journal | Shows original journal/date/amount, offsetting journal lines, selected period and a required specific explanation; actions dock to the modal | New reversal and original journal status now commit together through revision-checked `putMany`. A failed write leaves neither an orphan reversal nor a falsely reversed source. |
+| People · Leave decision | User chooses the pending request explicitly; sees employee, dates, balance and reviewer; approval/decline docked to the drawer, roster review before acknowledgement | No first pending leave is silently substituted; existing leave planner retains atomic request/balance updates. |
+| Administration · Role impact | Current and proposed role, gained/lost capabilities, role reach, visible local-only boundary and accountable save | Requires policy-management permission in UI and checks record revision; draft changes and in-flight requests protected. |
+| CRM · Merge companies | Two independent company selectors, linked contacts/deals, all differing nonempty fields, audit preview and explicit human confirmation | Both companies and their linked contacts/deals update in one compare-and-swap transaction. No arbitrary first-company selection or partial merge. |
+| Documents · Sharing | Document title/classification, existing share entries, purpose and realistic local permission options | Confidential documents cannot select broad links; no false claim that a public URL or delivered invitation exists; guarded save/close. |
+| Design · Export | Selected page, filename, file format, resolution, previewed dimensions and raster safety checks | SVG is vector, PNG is scaled raster; limits overly large image exports and only claims local downloads. |
+
+The shared Drawer now has `DrawerInFlight` to prevent close/Escape/scrim dismissal during a pending write. The new browser cases check missing targets and application-specific controls. The PR remains a scoped implementation pass, not an assertion that every overlay in the 957-entry registry has been manually QA-certified.
