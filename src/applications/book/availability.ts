@@ -114,3 +114,53 @@ export function cancellationFee(input: { startAt?: string; now: Date; noticeHour
   const insideNotice = hoursAway < input.noticeHours;
   return { insideNotice, hoursAway, feeMinor: insideNotice ? Math.round((input.priceMinor * input.feeBp) / 10_000) : 0 };
 }
+
+/* ---------------- Calendar lanes ---------------- */
+
+export interface BookingLane { lane: number; lanes: number }
+
+/**
+ * Side-by-side layout for bookings drawn in one calendar column. Bookings that
+ * overlap in time share a cluster; each gets the first free lane, and every
+ * booking in the cluster is drawn at the cluster's lane count so widths line up.
+ * Bookings with no end are treated as `fallbackMinutes` long.
+ */
+export function bookingLanes(
+  items: { id: string; startAt?: string; endAt?: string }[], fallbackMinutes = 60,
+): Map<string, BookingLane> {
+  const spans = items
+    .filter((item) => item.startAt)
+    .map((item) => {
+      const start = new Date(item.startAt!).getTime();
+      const end = item.endAt ? new Date(item.endAt).getTime() : start + fallbackMinutes * 60_000;
+      return { id: item.id, start, end: Math.max(end, start + 1) };
+    })
+    .sort((a, b) => a.start - b.start || b.end - a.end || a.id.localeCompare(b.id));
+  const result = new Map<string, BookingLane>();
+  let cluster: { id: string; lane: number }[] = [];
+  let laneEnds: number[] = [];
+  let clusterEnd = -Infinity;
+  const flush = () => {
+    const lanes = Math.max(1, laneEnds.length);
+    for (const entry of cluster) result.set(entry.id, { lane: entry.lane, lanes });
+    cluster = [];
+    laneEnds = [];
+  };
+  for (const span of spans) {
+    if (span.start >= clusterEnd) { flush(); clusterEnd = -Infinity; }
+    let lane = laneEnds.findIndex((end) => end <= span.start);
+    if (lane === -1) { lane = laneEnds.length; laneEnds.push(span.end); } else laneEnds[lane] = span.end;
+    cluster.push({ id: span.id, lane });
+    clusterEnd = Math.max(clusterEnd, span.end);
+  }
+  flush();
+  return result;
+}
+
+/** Seats taken on a resource at an instant (cancelled bookings release their seats). */
+export function seatsInUse(bookings: Rec[], resourceId: string, instant: string): number {
+  return bookings
+    .filter((booking) => booking.status !== "cancelled" && String(booking.fields.resourceId) === resourceId
+      && booking.startAt && booking.endAt && booking.startAt <= instant && booking.endAt > instant)
+    .reduce((sum, booking) => sum + seatsOf(booking), 0);
+}

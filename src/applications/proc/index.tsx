@@ -11,6 +11,7 @@ import {
 } from "./actions";
 import "@/applications/market/growth.css";
 import { PurchaseTrail, QuoteComparison } from "./quotes";
+import { QualityReturn } from "./supplierInsights";
 import { approverFor, statusTone } from "./data";
 import {
   ProcurementAnalytics, ProcurementOverview, PurchaseOrders, Receiving, Replenishment,
@@ -239,6 +240,7 @@ export const procApp = registerApp({
         { id: "count", label: "Count selected", placement: "secondary", guard: needsSelection, run: (context) => countReceipt(context) },
         { id: "flag damage", label: "Flag a discrepancy", placement: "secondary", guard: needsSelection, run: (context) => context.openOverlay("discrepancy", { id: context.selectedId }) },
         { id: "put away", label: "Put away selected", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("put away") },
+        { id: "quality return", label: "Return to supplier", placement: "secondary", guard: needsSelection, run: (context) => context.openOverlay("quality return", { id: context.selectedId }) },
         { id: "open receipt", label: "Open selected", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("receipt confirmation", { id: context.selectedId }) },
         { id: "movements", label: "Stock movements", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/proc/movements`) },
       ],
@@ -247,6 +249,7 @@ export const procApp = registerApp({
         { id: "discrepancy", kind: "modal", title: "Discrepancy", width: 620, render: ({ close, ...context }) => <Discrepancy context={context} close={close} />, footer: submitFooter("discrepancy", "Record discrepancy") },
         { id: "receipt confirmation", kind: "drawer", title: "Receipt", width: 700, render: ({ ...context }) => <ReceiptConfirmation context={context} /> },
         { id: "put away", kind: "modal", title: "Put away", width: 600, render: ({ close, ...context }) => <PutAway context={context} close={close} />, footer: submitFooter("put-away", "Put away") },
+        { id: "quality return", kind: "modal", title: "Return to supplier", width: 620, render: ({ close, ...context }) => <QualityReturn context={context} close={close} />, footer: submitFooter("quality-return", "Record return") },
       ],
     },
 

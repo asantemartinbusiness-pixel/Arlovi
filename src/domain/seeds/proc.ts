@@ -222,7 +222,8 @@ registerSeed("proc", (ctx) => {
       body: { lines: [
         { lineId: "l1", description: "Brass collar, 60mm", expected: 200, received: 120, condition: "good", bin: "B-02" },
         { lineId: "l2", description: "Weighted base, 180mm", expected: 60, received: 60, condition: "good", bin: "B-03" },
-      ], scans: ["TB-COL-60", "TB-BASE-180"] } }),
+      ], scans: ["TB-COL-60", "TB-BASE-180"],
+      returns: [{ id: "rt-seed-1", lineId: "l2", description: "Weighted base, 180mm", quantity: 3, reason: "defective", note: "Casting porosity on the underside; three bases set aside for collection.", at: shift(now, -4, 15), by: "Theo Marsh" }] } }),
     rec({ org: "nl", collection: "receipts", n: 22, title: "GRN-83", status: "expected",
       at: shift(now, 7, 10), dueAt: shift(now, 7, 10), summary: "Remaining 80 collars expected against PO-206.",
       fields: { purchaseOrderId: PO(31), supplierId: SUP(20), warehouseId: "nl-warehouses-001", receivedBy: "", scanned: false, discrepancy: "none", lineCount: 1, quantityExpected: 80, quantityReceived: 0 },

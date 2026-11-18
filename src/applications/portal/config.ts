@@ -216,3 +216,12 @@ export function sharingState(portal: Rec, orgSlug: string): SharingState {
   return { state: "never_hosted", label: "Not hosted", tone: "info", linkLive: false, plannedAddress,
     detail: "No hosting service is connected, so no link reaches this portal from outside." };
 }
+
+/** Move the page at `from` to position `to`, shifting the pages between (drag and drop order). */
+export function reorderPage(pages: PortalPage[], from: number, to: number): PortalPage[] {
+  if (from < 0 || from >= pages.length || to < 0 || to >= pages.length || from === to) return pages;
+  const next = [...pages];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}

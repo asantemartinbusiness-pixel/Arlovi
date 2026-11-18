@@ -131,6 +131,9 @@ test.describe("BOOK cancellation and moves", () => {
     await card.getByRole("button", { name: "Edit" }).click();
     await dialog(page).getByRole("textbox", { name: /Capacity/ }).fill("4");
     await dialog(page).getByRole("button", { name: /Save/ }).click();
+    // Assert the saved state before reloading so the reload cannot race the IndexedDB write.
+    await expect(dialog(page)).toHaveCount(0);
+    await expect(main(page).locator(".ds-card").filter({ hasText: "Sample room" }).locator("dd").filter({ hasText: /^4$/ })).toHaveCount(1);
     await page.reload();
     await expect(main(page).locator(".ds-card").filter({ hasText: "Sample room" }).getByText("Holds at once")).toBeVisible();
     await expect(main(page).locator(".ds-card").filter({ hasText: "Sample room" }).locator("dd").filter({ hasText: /^4$/ })).toHaveCount(1);

@@ -1,0 +1,16 @@
+/* COMMERCE operations: shipment cards, step tracks and history filters. */
+.t4-shipments { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.t4-shipment {
+  display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding: var(--space-3);
+  border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--bg-surface);
+}
+.t4-shipment > button { align-self: flex-start; }
+.t4-shipment-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; list-style: none; padding: 0; margin: 0; }
+.t4-shipment-steps li {
+  font-size: var(--text-2xs); color: var(--fg-subtle); padding-top: 6px; border-top: 3px solid var(--border-subtle);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.t4-shipment-steps li[data-done] { color: var(--fg-default); border-top-color: var(--accent); font-weight: 600; }
+.t4-shipment-lines { list-style: none; padding: 0; margin: 0; display: grid; gap: 2px; font-size: var(--text-xs); }
+.t4-shipment-lines li { overflow-wrap: anywhere; }
+.t4-history-filters { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); align-items: end; }

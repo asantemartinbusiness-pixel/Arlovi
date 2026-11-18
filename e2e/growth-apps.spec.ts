@@ -82,7 +82,8 @@ test("Marketing Campaign Library has searchable portfolio and card/list views", 
   const search = page.getByRole("searchbox", { name: "Search campaigns" });
   await search.fill("Clerkenwell");
   await expect(page.getByRole("status").filter({ hasText: "1 of" })).toBeVisible();
-  await expect(page.getByText("Clerkenwell open studio", { exact: true })).toBeVisible();
+  // The portfolio grid keeps a hidden mobile card beside each table row; assert the visible one.
+  await expect(page.getByText("Clerkenwell open studio", { exact: true }).filter({ visible: true })).toBeVisible();
   await page.getByRole("group", { name: "Campaign layout" }).getByRole("button", { name: "Cards" }).click();
   await expect(page.getByRole("list", { name: "All campaign cards" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Clerkenwell open studio" })).toBeVisible();
@@ -179,8 +180,9 @@ test("Audience Segments allows searchable compact rules and filter recovery", as
   await expect(page.getByRole("region", { name: "Audience Segments workspace summary" })).toBeVisible();
   const search = page.getByRole("searchbox", { name: "Search audience segments" });
   await search.fill("Trade accounts");
+  // Review notices on segment cards are also role=status; assert the result-count status itself.
   await expect(page.getByRole("region", { name: "Audience segments directory" })
-    .getByRole("status")).toContainText("of");
+    .getByRole("status").filter({ hasText: /segments$/ })).toContainText("of");
   await expect(page.getByText("Trade accounts with consent", { exact: true })).toBeVisible();
   await page.locator(".t4-audience-rules summary").first().click();
   await expect(page.locator(".t4-audience-rules[open]")).toHaveCount(1);

@@ -1,11 +1,21 @@
 /* PORTAL builder configuration surfaces. Tokens only; no new colours. */
 .t4-nav-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .t4-nav-item {
-  display: grid; grid-template-columns: 28px minmax(0, 1fr) minmax(190px, 1fr) auto; gap: var(--space-2) var(--space-3);
+  display: grid; grid-template-columns: 48px minmax(0, 1fr) minmax(190px, 1fr) auto; gap: var(--space-2) var(--space-3);
   align-items: end; padding: var(--space-2) var(--space-3); border: 1px solid var(--border-default);
   border-radius: var(--radius-md); background: var(--bg-surface);
 }
 .t4-nav-index { align-self: center; color: var(--fg-muted); }
+.t4-nav-grip { display: flex; align-items: center; gap: 2px; align-self: center; }
+.t4-nav-handle {
+  display: inline-grid; place-items: center; width: 24px; height: 32px; padding: 0; border: 1px solid transparent;
+  border-radius: var(--radius-sm); background: transparent; color: var(--fg-subtle); cursor: grab;
+}
+.t4-nav-handle:hover { background: var(--bg-hover); color: var(--fg-default); }
+.t4-nav-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.t4-nav-handle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--bg-selected); cursor: grabbing; }
+.t4-nav-item[data-dragging="true"] { border-style: dashed; border-color: var(--accent); background: var(--bg-selected); }
+.t4-nav-item[data-over="true"] { box-shadow: inset 0 3px 0 var(--accent); }
 .t4-nav-tools { align-self: center; }
 .t4-nav-modules { grid-column: 2 / -1; font-size: var(--text-xs); }
 .t4-nav-add { display: flex; gap: var(--space-2); align-items: end; flex-wrap: wrap; }
@@ -33,7 +43,7 @@
 .t4-preview-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .t4-preview-list li { display: flex; gap: var(--space-2); align-items: center; }
 @media (max-width: 640px) {
-  .t4-nav-item { grid-template-columns: 24px minmax(0, 1fr); }
+  .t4-nav-item { grid-template-columns: 48px minmax(0, 1fr); }
   .t4-nav-item > .ds-field, .t4-nav-tools, .t4-nav-modules { grid-column: 2 / -1; }
 }
 .t4-wrap-segment .ds-segment { flex-wrap: wrap; height: auto; }
