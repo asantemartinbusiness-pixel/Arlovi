@@ -16,7 +16,7 @@ import { accountCode, accountType, ageBuckets, checkPosting, daysOverdue } from 
 import type { JLine } from "@/domain/fin-ledger";
 import { contactOf, openInvoices, outstandingMinor, useFinData } from "./data";
 import type { FinData } from "./data";
-import { Amount, CapabilityNotice, CapabilityPill, OverdueBadge, SourceNote, StatementRow, StatusPill, TaxCodePill, taxRateText } from "./parts";
+import { Amount, BooksLoading, CapabilityNotice, CapabilityPill, OverdueBadge, SourceNote, StatementRow, StatusPill, TaxCodePill, taxRateText } from "./parts";
 import { CollectionsByCustomer } from "./collectionsView";
 import { clockIso } from "@/platform/clock";
 import { prepareInvoiceIssue, prepareInvoiceReceipt } from "./settlement";
@@ -170,6 +170,8 @@ export function InvoiceList({ context, tab }: { context: ScreenContext; tab: str
 export function FinanceTimeInputs({ context }: { context: ScreenContext }) {
   const data = useCollections(["shifts", "employees", "projects", "invoices"]);
   const [view, setView] = useState<"all" | "attention" | "ready" | "reviewed">("all");
+  // A time entry is "ready" only if no invoice already carries it, so wait for the invoices.
+  const booksReady = useFinData().ready;
   const sourceRows = data.shifts
     .filter((row) => row.fields.kind === "time" && row.fields.billable === true)
     .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
@@ -179,6 +181,7 @@ export function FinanceTimeInputs({ context }: { context: ScreenContext }) {
   const needsWork = sourceRows.filter((entry) => !["ready", "reviewed", "invoiced"].includes(assess(entry).state));
   const rows = view === "attention" ? needsWork : view === "ready" ? ready : view === "reviewed" ? reviewed : sourceRows;
   const approvedEstimate = reviewed.reduce((sum, entry) => sum + Number(assess(entry).netEstimateMinor ?? 0), 0);
+  if (!booksReady) return <BooksLoading what="invoices and time inputs" />;
   return (
     <Stack gap={4}>
       <OpsHeader
