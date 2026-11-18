@@ -239,7 +239,7 @@ export function AppsDirectory() {
     </nav>
 
     {group !== "All" && !query && !pinnedOnly && visible.length > 0 && CATEGORY_OVERVIEWS[group] && (
-      <section className="apps-platform-intro" aria-label={`${group} application overview`}>
+      <section className="apps-platform-intro" data-group={group.toLowerCase()} aria-label={`${group} application overview`}>
         <div>
           <span className="apps-platform-kicker">{CATEGORY_OVERVIEWS[group].kicker}</span>
           <h2>{CATEGORY_OVERVIEWS[group].title}</h2>
@@ -281,7 +281,7 @@ export function AppsDirectory() {
       : NAV_GROUPS.map(category => {
           const items = visible.filter(app => app.group === category.label);
           if (!items.length) return null;
-          return <section className="ws-section apps-directory-group" key={category.label}
+          return <section className="ws-section apps-directory-group" key={category.label} data-group={category.label.toLowerCase()}
             aria-label={category.label + " applications"}>
             <div className="apps-directory-group-heading">
               <div><span className="apps-directory-group-overline">APPLICATION COLLECTION</span><h2>{category.label}</h2></div>

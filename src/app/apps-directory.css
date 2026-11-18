@@ -147,3 +147,37 @@
 @media(max-width:950px){.apps-directory-summary-stats>span{min-width:69px;padding:3px 10px}}
 @media(max-width:700px){.apps-directory-summary{align-items:flex-start;flex-direction:column;padding:17px;gap:15px}.apps-directory-summary-stats{width:100%}.apps-directory-summary-stats>span{flex:1;padding:3px 10px}.apps-directory-summary-stats>span:first-child{border-left:0;padding-left:0}.apps-directory-view-controls{width:100%;justify-content:space-between}.apps-directory-toolbar .ws-app-search{max-width:none}.apps-directory-categories .apps-directory-favourites-filter{margin-left:0}.apps-directory-group-heading h2{font-size:19px}.apps-directory-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr))}.apps-directory-continuity{grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){.apps-directory-card,.apps-directory-icon{transition:none}.apps-directory-card:hover{transform:none}}
+
+/* Chromatic Studio / category colours establish distinction without colour-slab cards. */
+.apps-directory-card { --directory-ink:var(--studio-seafoam-ink); --directory-soft:var(--seafoam-50); }
+.apps-directory-card[data-category="headquarters"] { --directory-ink:var(--studio-seafoam-ink); --directory-soft:#d9f4eb; }
+.apps-directory-card[data-category="intelligence"] { --directory-ink:var(--studio-iris); --directory-soft:var(--studio-iris-soft); }
+.apps-directory-card[data-category="operations"] { --directory-ink:#386b4b; --directory-soft:#e6f2e4; }
+.apps-directory-card[data-category="growth"] { --directory-ink:var(--studio-coral-ink); --directory-soft:var(--studio-coral-soft); }
+.apps-directory-card[data-category="studio"] { --directory-ink:var(--studio-violet-ink); --directory-soft:#e8dcff; }
+.apps-directory-card[data-category="platform"] { --directory-ink:var(--studio-citrus-ink); --directory-soft:var(--studio-citrus-soft); }
+.apps-directory-icon { background:var(--directory-soft); color:var(--directory-ink); border-radius:12px; }
+.apps-directory-card:hover .apps-directory-icon { background:var(--directory-soft); color:var(--directory-ink); transform:rotate(-4deg) scale(1.04); }
+.apps-directory-card::after { content:""; position:absolute; top:0; left:var(--space-4); height:3px; width:54px; background:var(--directory-ink); border-radius:0 0 6px 6px; pointer-events:none; opacity:.65; }
+.apps-directory-card[data-category="intelligence"]::after,.apps-directory-card[data-category="studio"]::after { background:var(--studio-iris); }
+.apps-directory-card[data-category="growth"]::after { background:var(--studio-coral); }
+.apps-directory-card[data-category="platform"]::after { background:var(--studio-citrus); }
+.apps-directory-card:hover .apps-directory-card-action { color:var(--directory-ink); }
+.apps-directory-summary { position:relative; overflow:hidden; }
+.apps-directory-summary::after { content:""; position:absolute; width:min(225px,40%); height:4px; background:var(--studio-spectrum); right:0; top:0; border-radius:0 0 0 6px; pointer-events:none; }
+.apps-directory-summary-kicker::before { content:""; width:8px; height:8px; border-radius:3px; background:var(--studio-iris); box-shadow:11px 0 var(--studio-seafoam),22px 0 var(--studio-citrus); margin-right:22px; flex:none; }
+.apps-directory-group { --directory-group-ink:var(--studio-seafoam-ink); }
+.apps-directory-group[data-group="intelligence"],.apps-directory-group[data-group="studio"] { --directory-group-ink:var(--studio-iris); }
+.apps-directory-group[data-group="growth"] { --directory-group-ink:var(--studio-coral-ink); }
+.apps-directory-group[data-group="platform"] { --directory-group-ink:var(--studio-citrus-ink); }
+.apps-directory-group-heading h2 { display:flex; align-items:center; gap:10px; }
+.apps-directory-group-heading h2::before { content:""; width:7px; height:20px; border-radius:20px; background:var(--directory-group-ink); flex:none; }
+.apps-directory-group-overline { color:var(--directory-group-ink); }
+.apps-platform-intro { position:relative; overflow:hidden; border-left:4px solid var(--studio-seafoam); }
+.apps-platform-intro[data-group="intelligence"],.apps-platform-intro[data-group="studio"] { border-left-color:var(--studio-iris); }
+.apps-platform-intro[data-group="growth"] { border-left-color:var(--studio-coral); }
+.apps-platform-intro[data-group="platform"] { border-left-color:var(--studio-citrus); }
+.apps-platform-intro::after { content:""; position:absolute; width:90px; height:90px; top:-55px; right:45px; border:16px solid var(--studio-iris-soft); border-radius:50%; opacity:.75; pointer-events:none; }
+:root[data-theme="dark"] .apps-directory-icon { background:color-mix(in srgb,var(--directory-ink) 15%,var(--bg-surface)); color:var(--fg-strong); }
+:root[data-theme="dark"] .apps-platform-intro::after { opacity:.16; }
+@media(prefers-reduced-motion:reduce){.apps-directory-card:hover .apps-directory-icon{transform:none}}
