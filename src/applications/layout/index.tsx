@@ -568,7 +568,8 @@ function FramePanel({ handle, context, compositions }: { handle: DocHandle<Publi
           </Field>
         </PanelGroup>
       )}
-      <Button size="sm" variant="ghost" onClick={() => { handle.edit((current) => removeFrame(current, frame.id), "Delete the frame"); selectFrame(undefined); }}>Delete the frame</Button>
+      <Button size="sm" variant="ghost" disabled={frame.locked} title={frame.locked ? "Locked frames cannot be deleted. Unlock it first." : undefined} onClick={() => { handle.edit((current) => removeFrame(current, frame.id), "Delete the frame"); selectFrame(undefined); }}>Delete the frame</Button>
+      {frame.locked && <p className="vx-mini">This frame is locked, so it cannot be deleted. Unlock it to delete it.</p>}
     </Stack>
   );
 }

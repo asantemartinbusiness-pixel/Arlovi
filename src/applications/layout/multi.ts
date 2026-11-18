@@ -113,6 +113,7 @@ export function distributeFrames(doc: PublicationDoc, ids: string[], axis: "x" |
 }
 
 /** Remove every frame in the selection, relinking threads as single deletes do. */
+/** Remove every unlocked frame in the selection; locked frames stay. */
 export function removeFrames(doc: PublicationDoc, ids: string[]): PublicationDoc {
   return ids.reduce((current, id) => removeFrame(current, id), doc);
 }

@@ -76,6 +76,11 @@ describe("WS5 layout arranging", () => {
     expect(result.pages[1].frames.map((frame) => frame.id)).toEqual(["fr-3"]);
   });
 
+  it("does not remove a locked frame", () => {
+    const locked = { ...doc, pages: doc.pages.map((page, index) => (index === 0 ? { ...page, frames: page.frames.map((frame) => ({ ...frame, locked: true })) } : page)) };
+    expect(removeFrame(locked, "fr-1")).toBe(locked);
+  });
+
   it("duplicates a text frame with its own copy of the story", () => {
     const { doc: next, id } = duplicateFrame(doc, "fr-1", "fr-copy");
     expect(id).toBe("fr-copy");

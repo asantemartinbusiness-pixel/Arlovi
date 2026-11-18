@@ -63,6 +63,13 @@ describe("W2E layout: several frames at once", () => {
     expect(removed.pages[0].frames.map((frame) => frame.id)).toEqual(["c"]);
   });
 
+  it("never removes a locked frame", () => {
+    const locked = lockFrames(doc, ["b"], true);
+    const removed = removeFrames(locked, ["a", "b"]);
+    expect(removed.pages[0].frames.map((frame) => frame.id)).toEqual(["b", "c"]);
+    expect(removeFrames(locked, ["b"])).toBe(locked);
+  });
+
   it("bounds a selection", () => {
     expect(boundsOf([{ x: 0, y: 0, w: 10, h: 10 }, { x: 20, y: 5, w: 5, h: 20 }])).toEqual({ x: 0, y: 0, w: 25, h: 25 });
   });

@@ -171,10 +171,11 @@ export function ArrangePanel({ handle, frame, target, onTarget }: {
         <Tool
           label="Delete (⌫)"
           icon={<Trash2 size={15} />}
+          disabled={locked}
           onClick={() => { handle.edit((current) => removeFrame(current, frame.id), "Delete the frame"); selectFrame(undefined); }}
         />
       </Toolbar>
-      {locked && <p className="vx-mini">Locked frames cannot be moved, resized or aligned. Unlock to change them.</p>}
+      {locked && <p className="vx-mini">Locked frames cannot be moved, resized, aligned or deleted. Unlock to change them.</p>}
     </PanelGroup>
   );
 }
@@ -213,7 +214,7 @@ export function MultiArrangePanel({ handle, target, onTarget }: {
       <PanelGroup title={`${count} frames selected`}>
         <p className="vx-mini">
           Drag any of them to move them together. Arrows nudge all of them; Delete removes all.
-          {locked > 0 ? ` ${locked} locked frame${locked === 1 ? " stays" : "s stay"} put.` : ""}
+          {locked > 0 ? ` ${locked} locked frame${locked === 1 ? " stays" : "s stay"} put and ${locked === 1 ? "is" : "are"} not deleted.` : ""}
         </p>
         <ul className="lx-layers" aria-label="Selected frames">
           {found.map(({ frame }) => (
@@ -270,9 +271,10 @@ export function MultiArrangePanel({ handle, target, onTarget }: {
             onClick={() => handle.edit((current) => lockFrames(current, ids, !allLocked), allLocked ? `Unlock ${count} frames` : `Lock ${count} frames`)}
           />
           <Tool
-            label={`Delete ${count} frames (⌫)`}
+            label={allLocked ? `Delete ${count} frames (⌫): locked frames cannot be deleted` : `Delete ${count - locked} frames (⌫)`}
             icon={<Trash2 size={15} />}
-            onClick={() => { handle.edit((current) => removeFrames(current, ids), `Delete ${count} frames`); selectFrame(undefined); }}
+            disabled={allLocked}
+            onClick={() => { handle.edit((current) => removeFrames(current, ids), `Delete ${count - locked} frames`); selectFrame(undefined); }}
           />
         </Toolbar>
       </PanelGroup>
@@ -440,7 +442,10 @@ export function useLayoutKeys(handle: DocHandle<PublicationDoc>): void {
         }
         if (event.key === "Delete" || event.key === "Backspace") {
           event.preventDefault();
-          handle.edit((current) => removeFrames(current, ids), `Delete ${ids.length} frames`);
+          /* Locked frames are kept; if every selected frame is locked nothing changes. */
+          const unlocked = ids.filter((id) => !locateFrame(doc, id)?.frame.locked);
+          if (unlocked.length === 0) return;
+          handle.edit((current) => removeFrames(current, unlocked), `Delete ${unlocked.length} frames`);
           selectFrame(undefined);
           return;
         }
@@ -463,6 +468,8 @@ export function useLayoutKeys(handle: DocHandle<PublicationDoc>): void {
       }
       if ((event.key === "Delete" || event.key === "Backspace") && found) {
         event.preventDefault();
+        /* A locked frame is not deleted; the inspector says why. */
+        if (found.frame.locked) return;
         handle.edit((current) => removeFrame(current, found.frame.id), "Delete the frame");
         selectFrame(undefined);
         return;

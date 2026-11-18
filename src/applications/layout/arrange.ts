@@ -175,11 +175,12 @@ export function nudgeFrame(doc: PublicationDoc, id: string, dx: number, dy: numb
 
 /**
  * Remove a frame. Any frame that flowed into it is relinked to whatever it
- * flowed into, so a thread is shortened rather than cut.
+ * flowed into, so a thread is shortened rather than cut. A locked frame is
+ * kept: locking protects it from being deleted as well as moved.
  */
 export function removeFrame(doc: PublicationDoc, id: string): PublicationDoc {
   const found = locateFrame(doc, id);
-  if (!found) return doc;
+  if (!found || found.frame.locked) return doc;
   const after = found.frame.next;
   return {
     ...doc,
