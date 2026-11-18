@@ -4050,7 +4050,10 @@
         "Sent",
         "Drafts",
         "Archive",
-        "Spam"
+        "Spam",
+        "Shared inboxes",
+        "Accounts & domains",
+        "Sender identities"
       ],
       "actions": [
         "Compose",
@@ -12156,7 +12159,7 @@
   "counts": {
     "applications": 35,
     "screens": 316,
-    "tabs": 1324,
+    "tabs": 1327,
     "overlays": 957,
     "primary_actions": 1328,
     "workflows": 20,
