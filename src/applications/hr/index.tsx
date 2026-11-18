@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Briefcase, CalendarDays, ClipboardCheck, GraduationCap, Receipt, UserPlus, Users, Clock } from "lucide-react";
 import {
-  Button, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Checkbox, DataGrid, Empty, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
@@ -72,6 +72,8 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
   const canSubmit = reason.trim().length >= 10 && assetsReviewed && accessFollowUp && confirmed && !saving;
   return (
     <Stack gap={4}>
+      <ModalUnsavedChanges when={Boolean(reason.trim()) || assetsReviewed || accessFollowUp || confirmed} />
+      <ModalInFlight when={saving} />
       <PeopleDialogLead
         eyebrow="PEOPLE / EMPLOYEE LIFECYCLE"
         title="Record a departure"
@@ -108,7 +110,7 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
         <Checkbox checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} label={`I, ${context.actor}, authorise recording this departure for ${employee.title}.`} />
       </PeopleDialogSection>
       {error && <Notice tone="danger" title="Departure could not be completed">{error}</Notice>}
-      <Row gap={2}>
+      <ModalActions>
         <Button variant="ghost" onClick={close} disabled={saving}>Cancel</Button>
         <span className="ds-grow" />
         <Button
@@ -158,7 +160,7 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
         >
           {saving ? "Recording…" : "Record departure"}
         </Button>
-      </Row>
+      </ModalActions>
     </Stack>
   );
 }
