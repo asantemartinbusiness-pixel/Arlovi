@@ -108,9 +108,9 @@ export function ProfileMenu({
           )}
           {org.ownerName && (
             <DropdownMenu.Item className="profile-menu__item"
-              onSelect={() => navigate(`/o/${org.slug}/hq/home?gettingStarted=1`)}>
+              onSelect={() => navigate(`/o/${org.slug}/workspace/setup`)}>
               <Check size={17} aria-hidden="true"/>
-              <span className="profile-menu__item-title">Review company setup</span>
+              <span className="profile-menu__item-title">Company Setup Centre</span>
               <ChevronRight size={15} aria-hidden="true" className="profile-menu__chevron"/>
             </DropdownMenu.Item>
           )}
