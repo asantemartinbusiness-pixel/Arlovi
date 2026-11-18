@@ -1,6 +1,7 @@
 import type { Role } from "@/domain/types";
 import type { AttentionItem } from "@/platform/attention";
 import { isSnoozed } from "@/platform/notificationPolicy";
+import { clockNow } from "@/platform/clock";
 
 /** Browser-local personal receipts; never a business approval or source resolution. */
 export interface AttentionReceipt {
@@ -27,7 +28,7 @@ export function applyAttentionReceipts<T extends AttentionItem>(
   orgId: string,
   role: Role,
   actor?: string,
-  now = new Date(),
+  now = clockNow(),
 ): (T & PresentedAttentionItem)[] {
   return items.map((item) => {
     const receipt = receipts[attentionReceiptKey(orgId, role, item.id, actor)];
