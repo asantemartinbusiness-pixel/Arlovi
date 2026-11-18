@@ -7,7 +7,7 @@ test("Apps directory exposes all tools with capability search and category navig
   await expect(page.locator(".apps-directory-open")).toHaveCount(35);
   const search = page.getByRole("textbox", { name: "Find an application" });
   await search.fill("invoices");
-  await expect(page.locator(".apps-directory-open").getByRole("link", { name: "Finance", exact: true })).toBeVisible();
+  await expect(page.locator(".apps-directory-open[aria-label=\"Finance\"]")).toBeVisible();
   await expect(page.getByRole("link", { name: "Design", exact: true })).toHaveCount(0);
   await expect(page).toHaveURL(/q=invoices/);
   await page.getByRole("button", { name: "Clear application search" }).click();
