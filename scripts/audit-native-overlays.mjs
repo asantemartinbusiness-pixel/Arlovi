@@ -11,9 +11,10 @@
  */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { mkdirSync } from "node:fs";
 
-const root = resolve(import.meta.dirname, "..");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const appRoot = join(root, "src", "applications");
 const catalog = JSON.parse(readFileSync(join(root, "src/generated/catalog.json"), "utf8"));
 const expected = new Set(catalog.applications.map(item => item.code));
