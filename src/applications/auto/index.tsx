@@ -4,7 +4,8 @@ import {
 } from "lucide-react";
 import { Button, Notice, Pill, Row } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
-import { readGraph, validateGraph } from "./engine";
+import { readGraph } from "./engine";
+import { validateWorkflow } from "./validate";
 import {
   ActivationReview, ArchiveWorkflow, AutomationLibrary, CreateWorkflow, DuplicateWorkflow,
   WorkflowInspector, WorkflowQuickView, type LibraryTab,
@@ -144,7 +145,7 @@ export const autoApp = registerApp({
           run: (context) => {
             const draft = getDraft(context.params.id ?? "");
             if (!draft) { context.toast("Nothing to validate", "Open an automation first.", "blocked"); return; }
-            const issues = validateGraph(draft.graph, []);
+            const issues = validateWorkflow(draft.graph, []);
             const errors = issues.filter((issue) => issue.severity === "error").length;
             context.toast(
               errors ? `${errors} error${errors === 1 ? "" : "s"}` : "The graph passes",
@@ -202,7 +203,7 @@ export const autoApp = registerApp({
             if (!id) return;
             const draft = getDraft(id);
             if (draft) {
-              const errors = validateGraph(draft.graph, []).filter((issue) => issue.severity === "error");
+              const errors = validateWorkflow(draft.graph, []).filter((issue) => issue.severity === "error");
               if (errors.length) {
                 context.toast("Activation blocked", `${errors[0].title}. Fix it in the builder's validation panel.`, "blocked");
                 return;

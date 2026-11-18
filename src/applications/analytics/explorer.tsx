@@ -8,6 +8,7 @@ import type { Rec } from "@/domain/types";
 import { routeForRecord } from "@/platform/attention";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection } from "@/platform/workspace";
+import { wallMs } from "@/platform/clock";
 import {
   AGG_LABELS, NO_VALUE_OPS, displayKey, OPS_BY_TYPE, RANGE_LABELS, exploreCsv, fieldValue, groupKey, inferSchema,
   numericFields, readExplore, runExplore,
@@ -332,7 +333,7 @@ function FilterEditor({ filters, schema, onChange }: { filters: ExploreFilter[];
           disabled={schema.length === 0}
           onClick={() => {
             const first = schema.find((item) => item.key === "status") ?? schema[0];
-            onChange([...filters, { id: `f${Date.now().toString(36)}${filters.length}`, field: first.key, op: OPS_BY_TYPE[first.type][0], value: "" }]);
+            onChange([...filters, { id: `f${wallMs().toString(36)}${filters.length}`, field: first.key, op: OPS_BY_TYPE[first.type][0], value: "" }]);
           }}
         >
           Add a filter

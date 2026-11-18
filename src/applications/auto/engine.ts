@@ -493,6 +493,8 @@ export interface RunRequest {
   decisions?: Record<string, "approved" | "rejected">;
   /** Dry-run fixture values merged over the trigger payload. */
   fixture?: Record<string, string | number | boolean>;
+  /** Dry run only: bind this record of the trigger's collection instead of the first match. */
+  sampleId?: string;
   resume?: { steps: StepResult[]; variables: Bindings };
 }
 
@@ -523,7 +525,7 @@ export function receiptFor(parts: unknown[]): string {
   return `rcpt_${hash.toString(16).padStart(8, "0")}`;
 }
 
-function projectRecord(record: Rec): Record<string, unknown> {
+export function projectRecord(record: Rec): Record<string, unknown> {
   return {
     id: record.id,
     title: record.title,
@@ -735,9 +737,17 @@ function executeNode(input: ExecuteInput): StepResult {
   if (node.type === "trigger") {
     const matched = matchTrigger(config, records, now);
     const fixture = { ...(request.graph.fixture ?? {}), ...(request.fixture ?? {}) };
-    const first = matched[0] ? projectRecord(matched[0]) : undefined;
+    const chosen = mode === "dry" && request.sampleId
+      ? records.find((record) => record.id === request.sampleId && record.collection === config.collection)
+      : undefined;
+    const sampleMatches = chosen ? matched.some((record) => record.id === chosen.id) : undefined;
+    const first = chosen ? projectRecord(chosen) : matched[0] ? projectRecord(matched[0]) : undefined;
     const record = mode === "dry" && Object.keys(fixture).length > 0 ? { ...(first ?? {}), ...fixture } : first;
-    const stepInput = { collection: config.collection ?? "(none)", event: config.event ?? "record.matches", timezone: config.timezone ?? "UTC", fixtureApplied: mode === "dry" && Object.keys(fixture).length > 0 };
+    const stepInput = {
+      collection: config.collection ?? "(none)", event: config.event ?? "record.matches", timezone: config.timezone ?? "UTC",
+      fixtureApplied: mode === "dry" && Object.keys(fixture).length > 0,
+      ...(chosen ? { sample: chosen.id, sampleMatchesTrigger: sampleMatches } : {}),
+    };
     if (!record) {
       return finish({
         status: "failed",
@@ -768,7 +778,9 @@ function executeNode(input: ExecuteInput): StepResult {
           },
         },
       },
-      message: `${matched.length} ${config.collection} record${matched.length === 1 ? "" : "s"} matched. ${record.title} is bound to this run.`,
+      message: chosen
+        ? `${record.title} was chosen as the test sample. ${sampleMatches ? "It matches the trigger" : "It does not match the trigger's event or filters, so a real run would not pick it"}; ${matched.length} ${config.collection} record${matched.length === 1 ? "" : "s"} match in all.`
+        : `${matched.length} ${config.collection} record${matched.length === 1 ? "" : "s"} matched. ${record.title} is bound to this run.`,
     });
   }
 

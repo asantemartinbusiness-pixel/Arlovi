@@ -8,12 +8,16 @@ import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES, capabilityBy
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord } from "@/platform/workspace";
 import {
-  portsFor, validateGraph, type PortId, type WfNode, type WorkflowGraph,
+  portsFor, type PortId, type WfNode, type WorkflowGraph,
 } from "./engine";
 import { GraphCanvas, GraphList, NODE_KINDS, NodeInspector, NodePalette, addNode, connect, nodeSummary } from "./canvas";
 import { RunHeadline, RunTimeline, ValidationPanel, readRun } from "./panels";
 import { AUTOMATION_COLLECTIONS, executeDry, executeRun, useGraphRecords } from "./runner";
 import { markSaved, setDraftGraph, updateDraft, useBuilderDraft } from "./store";
+import { bindingsAt } from "./schema";
+import { validateWorkflow } from "./validate";
+import { LocalTestPanel } from "./localtest";
+import type { Rec } from "@/domain/types";
 
 export function useBuilderWorkflow(context: ScreenContext) {
   const record = useRecord(context.params.id);
@@ -21,7 +25,10 @@ export function useBuilderWorkflow(context: ScreenContext) {
   return { record, draft };
 }
 
-export function bindingsOf(graph: WorkflowGraph): { path: string; note: string }[] {
+export function bindingsOf(graph: WorkflowGraph, records: Rec[] = []): { path: string; note: string }[] {
+  /* With the trigger's records in hand, the bindings are the fields those records really carry. */
+  const live = bindingsAt(graph, records);
+  if (live.some((binding) => binding.source === "record")) return live.map((binding) => ({ path: binding.path, note: binding.note }));
   const out: { path: string; note: string }[] = [
     { path: "record.id", note: "Id of the record the trigger bound" },
     { path: "record.title", note: "Title of that record" },
@@ -51,7 +58,7 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
   const [busy, setBusy] = useState<"dry" | "live" | null>(null);
 
   const issues = useMemo(
-    () => (draft ? validateGraph(draft.graph, pool) : []),
+    () => (draft ? validateWorkflow(draft.graph, pool) : []),
     [draft, pool],
   );
 
@@ -99,7 +106,7 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
 
         <Card span={6} eyebrow="BINDINGS" prov="agent" title="Bindings available to a step" subtitle="Computed from the graph, not a fixed list">
           <Stack gap={2}>
-            {bindingsOf(graph).map((binding) => (
+            {bindingsOf(graph, pool).map((binding) => (
               <Row key={binding.path} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
                 <code className="ds-num">{binding.path}</code>
                 <span className="ds-grow ds-subtle" style={{ fontSize: "var(--text-xs)" }}>{binding.note}</span>
@@ -163,7 +170,7 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
                 onClick={async () => {
                   setBusy("dry");
                   try {
-                    const result = executeDry({ graph, pool, context, fixture: draft.fixture });
+                    const result = executeDry({ graph, pool, context, fixture: draft.fixture, sampleId: draft.sampleId });
                     updateDraft(record.id, { dryRun: result, dryRunAt: new Date(context.now).toISOString() });
                     context.toast("Dry run finished", `${result.steps.length} steps, ${result.status.replace(/_/g, " ")}. Nothing was written.`, result.status === "failed" ? "failed" : "ok");
                   } finally {
@@ -301,12 +308,16 @@ export function WorkflowBuilder({ context }: { context: ScreenContext }) {
           nodeId={draft.selectedNodeId}
           onChange={change}
           collections={AUTOMATION_COLLECTIONS}
+          records={pool}
+          lastStep={draft.dryRun?.steps.filter((step) => step.nodeId === draft.selectedNodeId).at(-1)}
         />
       </Card>
 
       <Card eyebrow="VALIDATION" prov="agent" title="Validation" subtitle={`${errors.length} error${errors.length === 1 ? "" : "s"}, ${issues.length - errors.length} warning${issues.length - errors.length === 1 ? "" : "s"}`}>
         <ValidationPanel issues={issues} onSelect={(nodeId) => updateDraft(record.id, { selectedNodeId: nodeId, view: draft.view })} />
       </Card>
+
+      <LocalTestPanel context={context} record={record} draft={draft} pool={pool} />
     </div>
   );
 }
@@ -458,6 +469,7 @@ export function ConnectorGrants({ context }: { context: ScreenContext }) {
 
 export function NodeConfiguration({ context }: { context: ScreenContext }) {
   const { record, draft } = useBuilderWorkflow(context);
+  const pool = useGraphRecords(draft?.graph ?? { nodes: [], edges: [] });
   if (!record || !draft) return <Empty title="Open an automation first" />;
   return (
     <Stack gap={4}>
@@ -474,6 +486,7 @@ export function NodeConfiguration({ context }: { context: ScreenContext }) {
         nodeId={draft.selectedNodeId}
         onChange={(next, note) => setDraftGraph(record.id, next, note)}
         collections={AUTOMATION_COLLECTIONS}
+        records={pool}
       />
     </Stack>
   );
@@ -483,7 +496,7 @@ export function ValidationReport({ context }: { context: ScreenContext }) {
   const { record, draft } = useBuilderWorkflow(context);
   const pool = useGraphRecords(draft?.graph ?? { nodes: [], edges: [] });
   if (!record || !draft) return <Empty title="Open an automation first" />;
-  const issues = validateGraph(draft.graph, pool);
+  const issues = validateWorkflow(draft.graph, pool);
   return (
     <Stack gap={4}>
       <ValidationPanel issues={issues} onSelect={(nodeId) => updateDraft(record.id, { selectedNodeId: nodeId })} />
@@ -493,10 +506,11 @@ export function ValidationReport({ context }: { context: ScreenContext }) {
 
 export function FixtureEditor({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, draft } = useBuilderWorkflow(context);
+  const pool = useGraphRecords(draft?.graph ?? { nodes: [], edges: [] });
   const [key, setKey] = useState("record.status");
   const [value, setValue] = useState("");
   if (!record || !draft) return <Empty title="Open an automation first" />;
-  const bindings = bindingsOf(draft.graph);
+  const bindings = bindingsOf(draft.graph, pool);
   return (
     <Stack gap={4}>
       <Notice tone="info" title="A fixture only changes a dry run">

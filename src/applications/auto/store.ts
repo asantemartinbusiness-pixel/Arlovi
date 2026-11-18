@@ -23,6 +23,10 @@ export interface BuilderDraft {
   dryRun?: RunResult;
   dryRunAt?: string;
   fixture: Record<string, string | number | boolean>;
+  /** The record a local test binds to the trigger; unset means the first match. */
+  sampleId?: string;
+  /** Decisions a local test assumes at approval gates. */
+  testDecisions?: Record<string, "approved" | "rejected">;
 }
 
 const drafts = new Map<string, BuilderDraft>();
