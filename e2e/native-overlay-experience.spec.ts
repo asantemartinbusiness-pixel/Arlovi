@@ -48,3 +48,41 @@ test("an invoice receipt refuses a booking ID instead of showing a different inv
   await expect(dialog).toContainText("The selected record is unavailable");
   await expect(dialog.getByRole("button", { name: "Post the receipt" })).toHaveCount(0);
 });
+
+test("a finance reversal cannot target an arbitrary ledger entry", async ({ page }) => {
+  await page.goto("/o/northline/fin/ledger?overlay=reverse%20confirmation");
+  const dialog = page.getByRole("dialog", { name: "Reverse a posted journal" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("Choose a record first");
+  await expect(dialog.getByRole("button", { name: "Post the reversal" })).toHaveCount(0);
+});
+
+test("a CRM merge requires two explicitly chosen companies", async ({ page }) => {
+  await page.goto("/o/northline/crm/companies?overlay=merge%20preview");
+  const drawer = page.getByRole("dialog", { name: "Merge two accounts" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByRole("combobox", { name: "Keep this account" })).toBeVisible();
+  await expect(drawer.getByRole("combobox", { name: "Merge this account into it" })).toBeVisible();
+  await expect(drawer).toContainText("Two different active company records are required");
+  await expect(drawer.getByRole("button", { name: "Review and merge" })).toBeDisabled();
+});
+
+test("a document sharing drawer never silently chooses a document", async ({ page }) => {
+  await page.goto("/o/northline/docs/files?overlay=sharing");
+  const drawer = page.getByRole("dialog", { name: "Sharing" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toContainText("Choose a record first");
+  await expect(drawer.getByRole("button", { name: "Record sharing instruction" })).toHaveCount(0);
+});
+
+test("a design export is tied to a real page and reports its output format", async ({ page }) => {
+  await page.goto("/o/northline/design/files/nl-designs-001?overlay=export");
+  const dialog = page.getByRole("dialog", { name: "Export this page" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("combobox", { name: "File format" })).toBeVisible();
+  await expect(dialog.getByRole("combobox", { name: "Image resolution" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Download PNG" })).toBeEnabled();
+  await dialog.getByRole("combobox", { name: "File format" }).selectOption("svg");
+  await expect(dialog.getByRole("button", { name: "Download SVG" })).toBeEnabled();
+  await expect(dialog.getByRole("combobox", { name: "Image resolution" })).toHaveCount(0);
+});
