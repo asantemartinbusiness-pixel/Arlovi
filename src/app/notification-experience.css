@@ -76,3 +76,16 @@
 .ds-toasts{pointer-events:none}.ds-toasts .ds-toast{pointer-events:auto;max-width:min(420px,calc(100vw - 24px));box-shadow:var(--shadow-2)}
 @media(max-width:600px){.an-footer>span{display:none}.an-footer>button{width:100%;justify-content:center}.an-view-tabs{gap:2px}.an-view-tabs button{padding:8px 9px}.an-settings-card{padding:10px}.an-category{gap:8px}.an-category select{width:105px}.an-event{padding:12px 10px}.an-event-actions{gap:3px}}
 @media(prefers-reduced-motion:reduce){.an-event,.an-icon-btn,.an-view-tabs button{transition:none}}
+
+/* Contextual platform banners: persistent only while the source condition exists. */
+.an-platform-banner{display:flex;align-items:flex-start;gap:12px;padding:12px 15px;border-radius:9px;border:1px solid var(--border-default);background:var(--bg-surface);box-shadow:0 1px 3px rgba(0,0,0,.025)}
+.an-platform-banner-icon{width:30px;height:30px;flex:none;display:grid;place-items:center;background:var(--bg-inset);color:var(--fg-muted);border-radius:8px}
+.an-platform-banner[data-priority="P0"],.an-platform-banner[data-priority="P1"]{border-inline-start:3px solid var(--danger)}
+.an-platform-banner[data-priority="P0"] .an-platform-banner-icon,.an-platform-banner[data-priority="P1"] .an-platform-banner-icon{color:var(--danger)}
+.an-platform-banner-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.an-platform-banner-copy strong{font-size:12px;font-weight:700}
+.an-platform-banner-copy>div{font-size:11.5px;line-height:1.55;color:var(--fg-muted)}
+.an-platform-banner-close{flex:none;cursor:pointer;display:grid;place-items:center;width:30px;height:30px;background:transparent;border:0;color:var(--fg-muted);border-radius:7px}
+.an-platform-banner-close:hover{background:var(--bg-hover)}
+.an-platform-banner>button{flex:none}
+@media(max-width:600px){.an-platform-banner{flex-wrap:wrap}.an-platform-banner>button{margin-left:42px}}
