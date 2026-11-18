@@ -23,6 +23,7 @@ import {
   AdjustInputs, CiteFigures, CompareMeasures, CompareScenarios, DeployModel, GrantDataset, RefreshDataset, RefreshModel,
   ResizeTile, SetFilter, TestMeasure, ValidateModel,
 } from "./actions";
+import { gateScreens } from "./ready";
 import "./analytics.css";
 
 /* ====================================================================== *
@@ -86,7 +87,7 @@ export const analyticsApp = registerApp({
     },
   ],
 
-  screens: {
+  screens: gateScreens({
     /* ------------------------------ 001 ------------------------------ */
     "ARL-ANALYTICS-001": {
       id: "ARL-ANALYTICS-001",
@@ -463,7 +464,7 @@ export const analyticsApp = registerApp({
         { id: "create report", kind: "modal", title: "New report", width: 520, render: ({ close, ...context }) => <CreateReport context={context} close={close} />, footer: submitFooter("create-report", "Create report") },
       ],
     },
-  },
+  }),
 
   fallback: (context) => (
     <Notice tone="warning" title={`${context.screen.title} is not built yet`}>
