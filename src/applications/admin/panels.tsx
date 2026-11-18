@@ -9,6 +9,7 @@ import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES } from "@/platform/capability";
 import { can as roleCan, ROLE_LABELS, type Capability } from "@/platform/policy";
 import type { Rec, Role } from "@/domain/types";
+import { AccessRequests, EffectiveAccess } from "./access";
 import {
   appsForRole, CAPABILITIES, capabilityLabel, csvList, ofKind, ROLES, RoleReach, StepUp,
   useAdmin, useOrganisationRecord, useSeeded, useSeededList,
@@ -745,49 +746,13 @@ export function RolesScreen({ context, tab }: { context: ScreenContext; tab: "Ro
     );
   }
 
-  if (tab === "Effective access") {
-    return (
-      <Stack gap={4}>
-        <Notice tone="warning" title="Deny wins, and a server would decide">
-          This grid is what the interface offers each role view today. In a product with a server, deny takes precedence over allow and
-          the tenant boundary is enforced there, not here. Nothing in this browser is a security boundary.
-        </Notice>
-        <Card eyebrow="EFFECTIVE ACCESS" prov="posted" title="Role against capability" flush>
-          <div className="ds-grid-wrap">
-            <div className="ds-grid-scroll">
-              <table className="ds-table">
-                <caption className="ds-sr-only">Capabilities held by each role view</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Capability</th>
-                    {ROLES.map((role) => <th key={role} scope="col">{ROLE_LABELS[role]}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {CAPABILITIES.map((capability) => (
-                    <tr key={capability}>
-                      <th scope="row" className="ds-table-primary">{capabilityLabel(capability)}</th>
-                      {ROLES.map((role) => (
-                        <td key={role}>
-                          {roleCan(role, capability)
-                            ? <Pill tone="success">Allowed</Pill>
-                            : <span className="ds-subtle">Denied</span>}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </Card>
-      </Stack>
-    );
-  }
+  if (tab === "Effective access") return <EffectiveAccess context={context} />;
 
   const exceptions = custom.filter((role) => csvList(role.fields.deny).length > 0 || role.status === "draft");
   return (
     <Stack gap={4}>
+      <AccessRequests context={context} />
+      <h3 style={{ fontSize: "var(--text-md)" }}>Custom roles that differ from their base view</h3>
       {exceptions.length === 0 ? (
         <Empty title="No exceptions" icon={<ShieldCheck size={20} />}>Every role in use matches its built-in view with nothing added.</Empty>
       ) : (

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   AlarmClock, AlertTriangle, Bell, CalendarClock, CheckCheck, Inbox, Mail, Megaphone,
   ShieldAlert, Users,
@@ -16,13 +17,14 @@ import { clockIso, clockNow, freshness } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { mineAttentionItems } from "@/platform/attention";
 import {
-  activeQueue, approvalRows, attentionBus, busItem, csv, groupBy, PRIORITIES, PRIORITY_LABEL, PRIORITY_TONE,
+  activeQueue, approvalRows, attentionBus, busItem, csv, DECIDED, groupBy, PRIORITIES, PRIORITY_LABEL, PRIORITY_TONE,
   routeReason, targetDrift, useInboxData, usePublishedItems, useSeeded, useSeededList, writeTriage,
   type ApprovalTab, type InboxItem,
 } from "./engine";
 import {
   AcknowledgeIncident, DelegateApproval, EscalateIncident, FollowSource, RevokeRule, SetDigest, ToggleChannel,
 } from "./actions";
+import "./inbox.css";
 
 /* ====================================================================== *
  * INBOX — Inbox, Notifications & Attention Engine
@@ -87,7 +89,14 @@ function DeepLink({ item, context }: { item: InboxItem; context: ScreenContext }
   }
   return (
     <Row gap={2} wrap>
-      <Button variant="primary" busy={probe === "checking"} onClick={() => context.navigate(route)}>
+      <Button
+        variant="primary"
+        busy={probe === "checking"}
+        onClick={async () => {
+          if (!item.read) await writeTriage(context.mutate, item, { read: true }, `Opened from the inbox: ${item.title}`);
+          context.navigate(route);
+        }}
+      >
         Open record
       </Button>
       <span className="ds-subtle">{known.screen.title}{item.entityId ? ` · ${item.entityId}` : ""}</span>
@@ -95,9 +104,20 @@ function DeepLink({ item, context }: { item: InboxItem; context: ScreenContext }
   );
 }
 
+/** Where an approval item is decided: the Approvals screen with that request's review open. */
+export function approvalReviewPath(slug: string, item: Pick<InboxItem, "sourceId" | "entityId" | "sourceKind">): string {
+  // A derived approval item is the request itself; a notification about one points at the request's target.
+  const id = item.sourceKind === "derived" ? item.sourceId ?? item.entityId : item.entityId;
+  return `/o/${slug}/inbox/approvals?tab=Pending${id ? `&review=${encodeURIComponent(id)}` : ""}`;
+}
+
 function openItem(context: ScreenContext, item: InboxItem | undefined) {
   if (!item) {
     context.toast("Nothing selected", "Choose an item in the queue first.", "info");
+    return;
+  }
+  if (item.kind === "approval") {
+    context.navigate(approvalReviewPath(context.org.slug, item));
     return;
   }
   const route = item.route?.replace(":org", context.org.slug);
@@ -105,6 +125,8 @@ function openItem(context: ScreenContext, item: InboxItem | undefined) {
     context.openOverlay("Notification detail", { itemId: item.id });
     return;
   }
+  // Opening the record is reading it; acknowledging and resolving stay separate decisions.
+  if (!item.read) void writeTriage(context.mutate, item, { read: true }, `Opened from the inbox: ${item.title}`);
   context.navigate(route);
 }
 
@@ -145,6 +167,14 @@ function bulkTriageActions(context: ScreenContext) {
       disabled: (rows: InboxItem[]) => rows.every((row) => row.read),
     },
     {
+      label: "Mark unread",
+      onRun: (rows: InboxItem[]) => {
+        void Promise.all(rows.map((row) => writeTriage(context.mutate, row, { read: false, acknowledged: false }, `Marked unread in the inbox: ${row.title}`)))
+          .then(() => context.toast("Marked unread", `${rows.length} ${rows.length === 1 ? "item is" : "items are"} back to unread.`));
+      },
+      disabled: (rows: InboxItem[]) => rows.every((row) => !row.read),
+    },
+    {
       label: "Acknowledge",
       onRun: (rows: InboxItem[]) => {
         void Promise.all(rows.map((row) => writeTriage(context.mutate, row, { read: true, acknowledged: true }, `Acknowledged in the inbox: ${row.title}`)))
@@ -160,26 +190,73 @@ function bulkTriageActions(context: ScreenContext) {
       onRun: (rows: InboxItem[]) => context.openOverlay("action preview", { itemIds: rows.map((row) => row.id), intent: "resolve" }),
       disabled: (rows: InboxItem[]) => rows.some((row) => row.kind === "approval"),
     },
+    {
+      label: "Reopen",
+      onRun: (rows: InboxItem[]) => {
+        void Promise.all(rows.map((row) => writeTriage(context.mutate, row, { resolved: false, snoozedUntil: null }, `Reopened in the inbox: ${row.title}`)))
+          .then(() => context.toast("Reopened", `${rows.length} ${rows.length === 1 ? "item is" : "items are"} back in the queue.`));
+      },
+      disabled: (rows: InboxItem[]) => rows.every((row) => !row.resolved && !row.snoozed),
+    },
   ];
+}
+
+/* Queue filters live in the address, so leaving for a record and coming back keeps the same view. */
+const LENSES = ["queue", "unread", "mine", "urgent", "snoozed", "resolved"] as const;
+function useQueueParams() {
+  const [params, setParams] = useSearchParams();
+  const raw = params.get("lens");
+  const lens = (LENSES as readonly string[]).includes(raw ?? "") ? (raw as ForYouLens) : "queue";
+  const source = params.get("source") ?? "all";
+  const priority = params.get("priority") ?? "all";
+  function set(key: string, value: string, fallback: string) {
+    const next = new URLSearchParams(params);
+    if (value === fallback) next.delete(key); else next.set(key, value);
+    setParams(next, { replace: true });
+  }
+  return {
+    lens, source, priority,
+    setLens: (value: ForYouLens) => set("lens", value, "queue"),
+    setSource: (value: string) => set("source", value, "all"),
+    setPriority: (value: string) => set("priority", value, "all"),
+    clear: () => {
+      const next = new URLSearchParams(params);
+      for (const key of ["lens", "source", "priority"]) next.delete(key);
+      setParams(next, { replace: true });
+    },
+  };
+}
+
+function matchesPriority(item: InboxItem, filter: string): boolean {
+  if (filter === "all") return true;
+  if (filter.endsWith("+")) return item.priority <= filter.slice(0, -1);
+  return item.priority === filter;
 }
 
 /* ---------------------------- INBOX-001 ---------------------------- */
 
-type ForYouLens = "queue" | "unread" | "mine" | "urgent" | "snoozed";
+type ForYouLens = "queue" | "unread" | "mine" | "urgent" | "snoozed" | "resolved";
 
 function ForYou({ context }: { context: ScreenContext }) {
   const { items, rules, hiddenByRole } = useInboxData();
   const { role, actor } = useWorkspace();
-  const [lens, setLens] = useState<ForYouLens>("queue");
+  const { lens, source, priority, setLens, setSource, setPriority, clear } = useQueueParams();
+  const sources = useMemo(() => [...new Set(items.map((item) => item.sourceLabel))].sort(), [items]);
 
-  const rows = useMemo(() => {
-    if (lens === "snoozed") return items.filter((item) => item.snoozed);
+  const lensRows = useMemo(() => {
+    if (lens === "snoozed") return items.filter((item) => item.snoozed && !item.resolved);
+    if (lens === "resolved") return items.filter((item) => item.resolved);
     const live = activeQueue(items);
     if (lens === "unread") return live.filter((item) => !item.read);
     if (lens === "mine") return mineAttentionItems(live, actor);
     if (lens === "urgent") return live.filter((item) => item.priority === "P0" || item.priority === "P1");
     return live;
   }, [items, lens, actor]);
+  const rows = useMemo(
+    () => lensRows.filter((item) => (source === "all" || item.sourceLabel === source) && matchesPriority(item, priority)),
+    [lensRows, source, priority],
+  );
+  const filtered = source !== "all" || priority !== "all";
 
   usePublishedItems(rows);
 
@@ -209,24 +286,42 @@ function ForYou({ context }: { context: ScreenContext }) {
           columns={queueColumns(context)}
           bulkActions={bulkTriageActions(context)}
           toolbar={
-            <Segmented
-              label="Queue filter"
-              value={lens}
-              onChange={setLens}
-              options={[
-                { value: "queue", label: "Everything" },
-                { value: "unread", label: "Unread" },
-                { value: "mine", label: "Needs me" },
-                { value: "urgent", label: "P0–P1" },
-                { value: "snoozed", label: "Snoozed" },
-              ]}
-            />
+            <div className="inbox-filters">
+              <Segmented
+                label="Queue filter"
+                value={lens}
+                onChange={setLens}
+                options={[
+                  { value: "queue", label: "Everything" },
+                  { value: "unread", label: "Unread" },
+                  { value: "mine", label: "Needs me" },
+                  { value: "urgent", label: "P0–P1" },
+                  { value: "snoozed", label: "Snoozed" },
+                  { value: "resolved", label: "Resolved" },
+                ]}
+              />
+              <Select aria-label="Source application" value={source} onChange={(event) => setSource(event.target.value)} style={{ width: "auto", minWidth: 150 }}>
+                <option value="all">Every source</option>
+                {sources.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
+              </Select>
+              <Select aria-label="Priority" value={priority} onChange={(event) => setPriority(event.target.value)} style={{ width: "auto", minWidth: 150 }}>
+                <option value="all">Any priority</option>
+                <option value="P1+">P1 and above</option>
+                <option value="P2+">P2 and above</option>
+                {PRIORITIES.map((entry) => <option key={entry} value={entry}>{entry} only · {PRIORITY_LABEL[entry]}</option>)}
+              </Select>
+              {(filtered || lens !== "queue") && <Button size="sm" variant="ghost" onClick={clear}>Clear filters</Button>}
+            </div>
           }
           empty={
-            <Empty title={lens === "snoozed" ? "Nothing is snoozed" : "The queue is clear"} icon={<CheckCheck size={20} />}>
-              {lens === "snoozed"
-                ? "Snoozed items come back to the queue when their time passes."
-                : "Items arrive here when a record needs a decision, falls past its date, or names you."}
+            <Empty title={filtered ? "Nothing matches these filters" : lens === "snoozed" ? "Nothing is snoozed" : lens === "resolved" ? "Nothing resolved yet" : "The queue is clear"} icon={<CheckCheck size={20} />}>
+              {filtered
+                ? "Try another source or priority."
+                : lens === "snoozed"
+                  ? "Snoozed items come back to the queue when their time passes."
+                  : lens === "resolved"
+                    ? "Resolved items are kept here and can be reopened."
+                    : "Items arrive here when a record needs a decision, falls past its date, or names you."}
             </Empty>
           }
         />
@@ -310,7 +405,7 @@ function ApprovalsPreview({ context }: { context: ScreenContext }) {
                 <Row gap={2} wrap><PriorityTag priority={item.priority} /><StateTags item={item} /></Row>
                 <p>{item.body}</p>
                 <Row gap={2} wrap>
-                  <Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/inbox/approvals`)}>Review on the record</Button>
+                  <Button variant="primary" onClick={() => context.navigate(approvalReviewPath(context.org.slug, item))}>Review on the record</Button>
                   <Button variant="ghost" onClick={() => context.openOverlay("Notification detail", { itemId: item.id })}>Why me?</Button>
                 </Row>
               </Stack>
@@ -489,14 +584,26 @@ function NotificationDetail({ context }: { context: ScreenContext }) {
       ]} />
       <Notice tone="info" title="Why this reached you">{routeReason(item, rules, role)}</Notice>
       <DeepLink item={item} context={context} />
+      <Notice tone="neutral" title="What each action means">
+        Read: you have seen it. Acknowledge: you accept it is yours to deal with. Snooze: out of the queue until a time.
+        Resolve: nothing more is needed. {item.kind === "approval" ? "Approving or declining happens on the request itself." : ""}
+      </Notice>
       <Row gap={2} wrap>
-        <Button
-          variant="secondary"
-          disabled={item.read}
-          onClick={() => void writeTriage(context.mutate, item, { read: true }, `Marked read: ${item.title}`).then(() => context.toast("Marked read", "The item is still open. Reading does not approve or resolve it."))}
-        >
-          Mark read
-        </Button>
+        {item.read ? (
+          <Button
+            variant="ghost"
+            onClick={() => void writeTriage(context.mutate, item, { read: false, acknowledged: false }, `Marked unread: ${item.title}`).then(() => context.toast("Marked unread", "It is back in Unread."))}
+          >
+            Mark unread
+          </Button>
+        ) : (
+          <Button
+            variant="secondary"
+            onClick={() => void writeTriage(context.mutate, item, { read: true }, `Marked read: ${item.title}`).then(() => context.toast("Marked read", "The item is still open. Reading does not approve or resolve it."))}
+          >
+            Mark read
+          </Button>
+        )}
         <Button
           variant="secondary"
           disabled={item.acknowledged}
@@ -504,9 +611,15 @@ function NotificationDetail({ context }: { context: ScreenContext }) {
         >
           Acknowledge
         </Button>
-        <Button variant="secondary" onClick={() => context.openOverlay("snooze picker", { itemIds: [item.id] })}>Snooze</Button>
+        {item.snoozed ? (
+          <Button variant="secondary" onClick={() => void writeTriage(context.mutate, item, { snoozedUntil: null }, `Woken early: ${item.title}`).then(() => context.toast("Back in the queue", "The snooze was cleared."))}>Wake now</Button>
+        ) : (
+          <Button variant="secondary" disabled={item.resolved} onClick={() => context.openOverlay("snooze picker", { itemIds: [item.id] })}>Snooze</Button>
+        )}
         {item.kind === "approval" ? (
-          <Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/inbox/approvals`)}>Decide on the record</Button>
+          <Button variant="primary" onClick={() => context.navigate(approvalReviewPath(context.org.slug, item))}>Decide on the record</Button>
+        ) : item.resolved ? (
+          <Button variant="secondary" onClick={() => void writeTriage(context.mutate, item, { resolved: false, snoozedUntil: null }, `Reopened: ${item.title}`).then(() => context.toast("Reopened", "The item is back in the queue."))}>Reopen</Button>
         ) : (
           <Button
             variant="primary"
@@ -661,6 +774,23 @@ function ApprovalsScreen({ context, tab }: { context: ScreenContext; tab: Approv
   const approvals = useCollection("approvals");
   const { actor, now } = useWorkspace();
   const rows = approvalRows(approvals, tab, actor);
+  const [params, setParams] = useSearchParams();
+  const requested = params.get("review");
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    if (!requested || opened.current === requested) return;
+    const match = approvals.find((row) => row.id === requested) ?? approvals.find((row) => !DECIDED.has(row.status) && String(row.fields.targetId ?? "") === requested);
+    if (!match) return;
+    opened.current = requested;
+    const next = new URLSearchParams(params);
+    next.delete("review");
+    setParams(next, { replace: true });
+    // After the screen host has settled its own overlay state for this address.
+    window.setTimeout(() => {
+      context.select(match.id);
+      context.openOverlay("Approval review", { id: match.id });
+    }, 0);
+  }, [requested, approvals, context, params, setParams]);
 
   return (
     <Stack gap={4}>

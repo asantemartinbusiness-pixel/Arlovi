@@ -21,6 +21,7 @@ import {
   ApproveIncrease, ArchiveOrg, AuditRetention, ConfigureEntity, DownloadInvoices, ExportEverything, MembersExport,
   PaySubscription, RevokeKey, RotateKey, SessionsExport, SuspendMember, UpdatePaymentMethod,
 } from "./actions";
+import { AccessRequestForm, AccessReview } from "./access";
 
 /* ====================================================================== *
  * ADMIN — Administration, Identity, Policy & Billing
@@ -125,11 +126,14 @@ export const adminApp = registerApp({
         { id: "compare", label: "Compare two views", placement: "secondary", run: (context) => context.openOverlay("effective rights") },
         { id: "simulate", label: "Simulate a role", placement: "secondary", run: (context) => context.openOverlay("impact review") },
         { id: "publish", label: "Publish a draft", placement: "overflow", capability: "manage_policy", guard: (context) => (context.selectedId ? undefined : "Select a draft role"), run: (context) => context.openOverlay("impact review", { id: context.selectedId }) },
+        { id: "request access", label: "Request access", placement: "overflow", run: (context) => context.openOverlay("access request form") },
       ],
       overlays: [
         { id: "Policy editor", kind: "modal", title: "Custom role", width: 620, render: ({ close, ...context }) => <PolicyEditor context={context} close={close} />, footer: submitFooter("policy-editor", "Save draft") },
         { id: "effective rights", kind: "drawer", title: "Compare role views", width: 620, render: ({ close: _close, ...context }) => <EffectiveRights context={context} /> },
         { id: "impact review", kind: "modal", title: "Simulate and publish", width: 640, render: ({ close, ...context }) => <ImpactReview context={context} close={close} /> },
+        { id: "access review", kind: "drawer", title: "Review access request", width: 600, render: ({ close, ...context }) => <AccessReview context={context} close={close} /> },
+        { id: "access request form", kind: "modal", title: "Request access", width: 540, render: ({ close, ...context }) => <AccessRequestForm context={context} close={close} /> },
       ],
     },
 

@@ -22,6 +22,10 @@ import {
   openLatestDraft, pinTask, prioritizeTask, sortDepartments, timelineFilter, usePref, writePref, type Insight,
 } from "@/applications/hq/actions";
 import type { Rec } from "@/domain/types";
+import {
+  DecisionEditor, DecisionRow, DecisionsCard, DepartmentHealthCard, ExceptionsCard, KeyResultsEditor, ObjectiveKeyResults, ObjectivesCard,
+} from "@/applications/hq/command";
+import { confidence, objectiveProgress } from "@/applications/hq/model";
 
 /* ====================================================================== *
  * HQ — Headquarters & Organization
@@ -128,10 +132,11 @@ export function useHomeInsights(): Insight[] {
     if (overdue.length) list.push({ id: "overdue", title: `${overdue.length} invoice${overdue.length === 1 ? "" : "s"} past due`, body: `Oldest is ${overdue[0].title}. Chasing is local; no mail provider is connected.`, to: `/o/${org.slug}/fin/invoices` });
     if (ledgerAge.stale) list.push({ id: "ledger", title: "The ledger has not been posted recently", body: ledgerAge.known ? `Last posting was ${ledgerAge.days} days ago.` : "No posting date is recorded.", to: `/o/${org.slug}/fin/ledger` });
     for (const objective of data.objectives) {
-      const target = Number(objective.fields.target ?? 0);
-      const current = Number(objective.fields.current ?? 0);
-      if (objective.status === "active" && target > 0 && current / target < 0.6) {
-        list.push({ id: objective.id, title: `${objective.title} is behind`, body: `${current} of ${target} ${String(objective.fields.measure ?? "")}.`, to: `/o/${org.slug}/hq/goals` });
+      if (objective.status !== "active") continue;
+      const verdict = confidence(objective, now);
+      if (verdict.value === "off_track") {
+        const progress = objectiveProgress(objective);
+        list.push({ id: objective.id, title: `${objective.title} is behind`, body: `${Math.round(progress.ratio * 100)}% of the way there (${verdict.reason}).`, to: `/o/${org.slug}/hq/goals` });
       }
     }
     return list;
@@ -270,6 +275,10 @@ function ExecutiveHome({ context, range }: { context: ScreenContext; range: "tod
           )}
       </Card>
     ),
+    exceptions: <ExceptionsCard key="exceptions" context={context} span={7} />,
+    objectives: <ObjectivesCard key="objectives" context={context} span={5} />,
+    departments: <DepartmentHealthCard key="departments" context={context} span={7} />,
+    decisions: <DecisionsCard key="decisions" context={context} span={5} />,
     recommended: (
       <Card key="recommended" span={5} title="Recommended" eyebrow="Computed here" prov="agent" subtitle="Derived from records in this workspace, never inferred">
         {insights.length === 0 ? (
@@ -810,14 +819,15 @@ function CompanyGoals({ context, state }: { context: ScreenContext; state: strin
       {rows.map((objective) => {
         const target = Number(objective.fields.target ?? 0);
         const current = Number(objective.fields.current ?? 0);
-        const ratio = target === 0 ? 0 : current / target;
+        const progress = objectiveProgress(objective);
+        const ratio = progress.ratio;
         return (
           <Card
             key={objective.id}
             span={6}
             title={objective.title}
             subtitle={objective.summary}
-            actions={<Pill tone={ratio >= 1 ? "success" : ratio >= 0.6 ? "info" : "warning"}>{target ? `${Math.round(ratio * 100)}%` : "No target"}</Pill>}
+            actions={<Pill tone={ratio >= 1 ? "success" : ratio >= 0.6 ? "info" : "warning"}>{progress.source === "none" ? "No target" : `${Math.round(ratio * 100)}%`}</Pill>}
             footer={<>
               <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Goal editor", { id: objective.id })}>Edit</Button>
               <Button size="sm" variant="ghost" onClick={() => context.openOverlay("target change review", { id: objective.id })}>Change target</Button>
@@ -827,14 +837,11 @@ function CompanyGoals({ context, state }: { context: ScreenContext; state: strin
             </>}
           >
             <Stack gap={3}>
-              <Meter value={current} max={target || 1} label={objective.title} tone={ratio >= 1 ? "success" : ratio < 0.5 ? "warning" : undefined} />
+              <ObjectiveKeyResults context={context} objective={objective} />
               <Properties rows={[
-                { label: "Measure", value: String(objective.fields.measure ?? "Not set") },
-                { label: "Current", value: String(current) },
-                { label: "Target", value: target ? String(target) : "Not set" },
+                { label: "Measure", value: `${String(objective.fields.measure ?? "Not set")}: ${current}${target ? ` of ${target}` : ""}` },
                 { label: "Owner", value: objective.ownerName },
                 { label: "Mission", value: missions.find((mission) => mission.id === objective.fields.missionId)?.title ?? "None linked" },
-                ...(objective.fields.confidence ? [{ label: "Confidence", value: <Pill tone={objective.fields.confidence === "on_track" ? "success" : objective.fields.confidence === "at_risk" ? "warning" : "danger"}>{String(objective.fields.confidence).replace(/_/g, " ")}</Pill> }] : []),
               ]} />
               {ratio >= 1 && objective.status !== "achieved" && (
                 <Notice tone="info">The measure has reached its target. Marking an objective achieved requires confirming the measure, not a summary.</Notice>
@@ -954,7 +961,9 @@ function CompanyTimeline({ context, lens }: { context: ScreenContext; lens: stri
                 <button type="button" className="ds-grow" style={{ textAlign: "start", fontWeight: 650 }} aria-pressed={context.selectedId === event.id} onClick={() => context.select(event.id)}>{event.title}</button>
                 <Pill tone="neutral">{String(event.fields.kind ?? "event")}</Pill>
               </Row>
-              <p className="ds-subtle" style={{ marginBlockStart: 4 }}>{event.summary}</p>
+              {String(event.fields.kind ?? "") === "decision" && (event.fields.decidedBy || event.fields.linkedRoute || event.fields.reviewBy) ? (
+                <ul className="hqc-list" style={{ marginBlockStart: 4 }}><DecisionRow context={context} event={event} withHeading={false} /></ul>
+              ) : <p className="ds-subtle" style={{ marginBlockStart: 4 }}>{event.summary}</p>}
               <Row gap={2} style={{ marginBlockStart: "var(--space-3)" }}>
                 <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Event inspector", { id: event.id })}>Inspect source</Button>
                 <Button size="sm" variant="ghost" onClick={() => context.openOverlay("add annotation", { id: event.id })}>Annotate</Button>
@@ -1281,12 +1290,15 @@ export const hqApp = registerApp({
         { id: "drill into metric", label: "Inspect a metric", placement: "overflow", run: (context) => context.openOverlay("metric inspector", { metric: "receivable" }) },
         { id: "dismiss recommendation", label: "Dismiss a recommendation", placement: "overflow", run: (context) => context.openOverlay("recommendations") },
         { id: "save view", label: "Save this view", placement: "overflow", run: (context) => context.openOverlay("save view dialog") },
+        { id: "log decision", label: "Log a decision", placement: "overflow", run: (context) => context.openOverlay("log decision") },
       ],
       overlays: [
         { id: "Widget picker", kind: "drawer", title: "Arrange cards", description: "Choose what Executive Home shows, and in what order.", render: ({ close, ...context }) => <ArrangeCards context={context} close={close} />, footer: submitFooter("hq-arrange", "Save arrangement") },
         { id: "recommendations", kind: "drawer", title: "Recommendations", width: 480, render: ({ ...context }) => <RecommendationsDrawer context={context} /> },
         { id: "metric inspector", kind: "drawer", title: "Where this figure comes from", width: 520, render: ({ ...context }) => <MetricInspector context={context} /> },
         { id: "save view dialog", kind: "modal", title: "Save this view", width: 460, render: ({ close, ...context }) => <SaveViewDialog context={context} close={close} />, footer: submitFooter("save-view", "Save view") },
+        { id: "key results", kind: "modal", title: "Objective check-in", width: 640, render: ({ close, ...context }) => <KeyResultsEditor context={context} close={close} /> },
+        { id: "log decision", kind: "modal", title: "Log a decision", width: 580, render: ({ close, ...context }) => <DecisionEditor context={context} close={close} /> },
       ],
     },
 
@@ -1455,6 +1467,7 @@ export const hqApp = registerApp({
         { id: "update measure", label: "Update the measure", placement: "overflow", run: (context) => context.openOverlay("target change review") },
         { id: "review goal", label: "Review a goal", placement: "overflow", run: (context) => context.openOverlay("review goal") },
         { id: "related work", label: "Related work", placement: "overflow", run: (context) => context.openOverlay("related work inspector") },
+        { id: "check in", label: "Check in on key results", placement: "overflow", guard: (context) => guardSelection(context, "an objective"), run: (context) => context.openOverlay("key results", { id: context.selectedId }) },
       ],
       overlays: [
         { id: "Goal editor", kind: "modal", title: "Objective", width: 560, render: ({ close, ...context }) => <GoalEditor context={context} close={close} />, footer: submitFooter("goal-editor", "Save objective") },
@@ -1462,6 +1475,7 @@ export const hqApp = registerApp({
         { id: "related work inspector", kind: "drawer", title: "Related work", render: ({ ...context }) => <RelatedWork context={context} /> },
         { id: "link mission", kind: "modal", title: "Link a mission", width: 520, render: ({ close, ...context }) => <LinkMission context={context} close={close} />, footer: submitFooter("hq-link-mission", "Link mission") },
         { id: "review goal", kind: "modal", title: "Review a goal", width: 540, render: ({ close, ...context }) => <ReviewGoal context={context} close={close} />, footer: submitFooter("hq-review-goal", "Record review") },
+        { id: "key results", kind: "modal", title: "Objective check-in", width: 640, render: ({ close, ...context }) => <KeyResultsEditor context={context} close={close} /> },
       ],
     },
 
@@ -1510,8 +1524,10 @@ export const hqApp = registerApp({
         { id: "export history", label: "Export history", placement: "secondary", capability: "export_data", run: (context) => context.openOverlay("export selection") },
         { id: "Filter", label: "Filter", placement: "secondary", run: (context) => context.openOverlay("timeline filter") },
         { id: "inspect source", label: "Inspect source", placement: "overflow", guard: (context) => guardSelection(context, "an event"), run: (context) => context.openOverlay("Event inspector", { id: context.selectedId }) },
+        { id: "log decision", label: "Log a decision", placement: "secondary", run: (context) => context.openOverlay("log decision") },
       ],
       overlays: [
+        { id: "log decision", kind: "modal", title: "Log a decision", width: 580, render: ({ close, ...context }) => <DecisionEditor context={context} close={close} /> },
         { id: "Event inspector", kind: "drawer", title: "Event", render: ({ ...context }) => {
           const payload = context.overlayPayload as { id?: string } | undefined;
           return <EventInspector id={payload?.id} context={context} />;

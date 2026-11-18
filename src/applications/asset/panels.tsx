@@ -1,37 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState } from "react";
 import { Image, Images, ShieldAlert, Wand2 } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Segmented,
+  Button, Card, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row,
   Select, Stack, Stat, StatRow, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
-import { clockIso, clockNow, daysBetween } from "@/platform/clock";
+import { clockIso } from "@/platform/clock";
+import { csvList, licence, type LicenceState } from "./library-model";
 import type { Rec } from "@/domain/types";
-import { AssetPreview, FileStateTag, assetPreviewUri, fileState, palette, storedBytes } from "./thumbs";
+import { AssetPreview, AssetViewer, FileStateTag, assetPreviewUri, fileState, palette, storedBytes, uploadedFileName } from "./thumbs";
+import { FolderLine, LinkedRecords, TagEditor, useAssetGrouping, type AssetGrouping } from "./library";
 
 /* ====================================================================== *
  * ASSET panels — the media library: browse, inspect, brand kits,
  * transformations and governance.
  * ====================================================================== */
 
-/* A tiny shared store so the contract "group" action and the toolbar control are one setting. */
-export type AssetGrouping = "none" | "kind" | "licence" | "tag";
-let grouping: AssetGrouping = "none";
-const groupingListeners = new Set<() => void>();
-export function setAssetGrouping(next: AssetGrouping): void {
-  grouping = next;
-  for (const listener of groupingListeners) listener();
-}
-function useAssetGrouping(): [AssetGrouping, (next: AssetGrouping) => void] {
-  const [, bump] = useState(0);
-  useEffect(() => {
-    const listener = () => bump((value) => value + 1);
-    groupingListeners.add(listener);
-    return () => { groupingListeners.delete(listener); };
-  }, []);
-  return [grouping, setAssetGrouping];
-}
+export { setAssetGrouping, type AssetGrouping } from "./library";
 
 export const ASSET_COLLECTIONS = ["assets", "brands", "transforms", "campaigns", "products", "documents"];
 
@@ -39,27 +25,8 @@ export function useAssets(): Record<string, Rec[]> {
   return useCollections(ASSET_COLLECTIONS);
 }
 
-export function csvList(value: unknown): string[] {
-  return typeof value === "string" && value.trim().length > 0
-    ? value.split(",").map((part) => part.trim()).filter(Boolean)
-    : [];
-}
-
-export type LicenceState = "owned" | "ok" | "expiring" | "expired" | "unknown";
-
-export function licence(record: Rec, now: Date): { state: LicenceState; days?: number; label: string } {
-  const kind = String(record.fields.licence ?? "");
-  const expiry = String(record.fields.licenceExpiry ?? "");
-  if (!expiry) {
-    if (kind === "owned") return { state: "owned", label: "Owned outright" };
-    if (kind === "royalty_free") return { state: "owned", label: "Royalty free" };
-    return { state: kind ? "ok" : "unknown", label: kind ? `${kind.replace(/_/g, " ")}, no expiry recorded` : "No licence recorded" };
-  }
-  const days = daysBetween(now, new Date(expiry));
-  if (days < 0) return { state: "expired", days, label: `Expired ${Math.abs(days)} days ago` };
-  if (days <= 30) return { state: "expiring", days, label: `Expires in ${days} days` };
-  return { state: "ok", days, label: `Licensed until the expiry date` };
-}
+export { csvList, licence };
+export type { LicenceState };
 
 export function licenceTone(state: LicenceState): "success" | "warning" | "danger" | "neutral" {
   return state === "expired" ? "danger" : state === "expiring" ? "warning" : state === "unknown" ? "neutral" : "success";
@@ -79,181 +46,6 @@ function formatBytes(bytes: number | undefined): string {
 export { formatBytes };
 
 /* ---------------------------- ASSET-001 ---------------------------- */
-
-type LibraryTab = "All" | "Mine" | "Approved" | "Brand" | "Archived";
-
-export function AssetLibrary({ context, tab }: { context: ScreenContext; tab: LibraryTab }) {
-  const data = useAssets();
-  const { now, actor } = useWorkspace();
-  const [view, setView] = useState<"grid" | "list">("grid");
-  const [group, setGroup] = useAssetGrouping();
-  const [query, setQuery] = useState("");
-
-  const base = useMemo(() => {
-    const all = data.assets;
-    if (tab === "Archived") return all.filter((row) => row.status === "archived");
-    const live = all.filter((row) => row.status !== "archived");
-    if (tab === "Mine") return live.filter((row) => row.ownerName === actor || String(row.fields.photographer ?? "") === actor);
-    if (tab === "Approved") return live.filter((row) => row.status === "approved");
-    if (tab === "Brand") return live.filter((row) => row.tags.includes("brand") || Boolean(row.fields.brandId));
-    return live;
-  }, [data.assets, tab, actor]);
-
-  const rows = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return base;
-    return base.filter((row) => `${row.title} ${row.summary} ${row.tags.join(" ")} ${String(row.fields.kind ?? "")} ${String(row.fields.licensor ?? "")}`.toLowerCase().includes(needle));
-  }, [base, query]);
-
-  const groups = useMemo(() => {
-    if (group === "none") return [{ label: `${rows.length} assets`, rows }];
-    const key = (row: Rec) => (group === "kind" ? String(row.fields.kind ?? "other") : group === "licence" ? String(row.fields.licence ?? "unrecorded") : row.tags[0] ?? "untagged");
-    const map = new Map<string, Rec[]>();
-    for (const row of rows) {
-      const label = key(row);
-      const bucket = map.get(label);
-      if (bucket) bucket.push(row);
-      else map.set(label, [row]);
-    }
-    return [...map.entries()].map(([label, group_]) => ({ label, rows: group_ })).sort((a, b) => b.rows.length - a.rows.length);
-  }, [rows, group]);
-
-  const expired = rows.filter((row) => licence(row, now).state === "expired");
-
-  const toolbar = (
-    <Row gap={2} wrap>
-      <TextInput aria-label="Search the library" placeholder="Search name, tag, licensor" value={query} onChange={(event) => setQuery(event.target.value)} style={{ width: "auto", minWidth: 240, flex: "1 1 240px" }} />
-      <Segmented
-        label="Layout"
-        value={view}
-        onChange={setView}
-        options={[{ value: "grid", label: "Grid" }, { value: "list", label: "List" }]}
-      />
-      <Select aria-label="Group by" value={group} onChange={(event) => setGroup(event.target.value as typeof group)} style={{ width: "auto", minWidth: 170 }}>
-        <option value="none">No grouping</option>
-        <option value="kind">Group by type</option>
-        <option value="licence">Group by licence</option>
-        <option value="tag">Group by first tag</option>
-      </Select>
-    </Row>
-  );
-
-  return (
-    <Stack gap={4}>
-      <LibraryStats context={context} />
-      {expired.length > 0 && (
-        <Notice
-          tone="warning"
-          title={`${expired.length} ${expired.length === 1 ? "asset has" : "assets have"} an expired licence`}
-          actions={<Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/asset/governance?tab=Rights`)}>Rights report</Button>}
-        >
-          {expired.map((row) => row.title).join("; ")} may not be used in anything published. Downloads and transformation jobs that
-          include them are refused.
-        </Notice>
-      )}
-
-      {view === "list" ? (
-        <Card eyebrow="LIBRARY" prov="posted" title={tab} subtitle={`${rows.length} of ${data.assets.length} assets`} flush>
-          <DataGrid
-            rows={rows}
-            rowId={(row) => row.id}
-            label="Asset library"
-            selectedId={context.selectedId}
-            onSelect={context.select}
-            onOpen={(id) => context.navigate(`/o/${context.org.slug}/asset/assets/${id}`)}
-            rowTone={(row) => (licence(row, now).state === "expired" ? "danger" : licence(row, now).state === "expiring" ? "warning" : undefined)}
-            toolbar={toolbar}
-            filterable={false}
-            columns={[
-              {
-                key: "title", header: "Asset", primary: true,
-                cell: (row) => (
-                  <Row gap={3}>
-                    <div style={{ width: 56, flex: "none" }}><AssetPreview record={row} height={38} /></div>
-                    <div>
-                      <strong>{row.title}</strong>
-                      <p className="ds-subtle ds-truncate" style={{ maxWidth: "48ch" }}>{row.summary}</p>
-                    </div>
-                  </Row>
-                ),
-                sortValue: (row) => row.title,
-              },
-              { key: "kind", header: "Type", cell: (row) => <Pill>{String(row.fields.kind ?? "")} · {String(row.fields.format ?? "").toUpperCase()}</Pill>, sortValue: (row) => String(row.fields.kind ?? "") },
-              { key: "size", header: "Dimensions", hideBelow: 1100, cell: (row) => (row.fields.width ? `${String(row.fields.width)} × ${String(row.fields.height)}` : "—") },
-              { key: "file", header: "File", hideBelow: 1200, cell: (row) => <FileStateTag record={row} /> },
-              { key: "licence", header: "Licence", cell: (row) => <Pill tone={licenceTone(licence(row, now).state)}>{licence(row, now).label}</Pill>, sortValue: (row) => String(row.fields.licenceExpiry ?? "~") },
-              { key: "uses", header: "Uses", align: "end", cell: (row) => String(usedIn(row).length), sortValue: (row) => usedIn(row).length },
-              { key: "updated", header: "Changed", align: "end", hideBelow: 1280, cell: (row) => <span className="ds-num">{context.relative(row.updatedAt)}</span>, sortValue: (row) => row.updatedAt },
-            ]}
-            bulkActions={[
-              { label: "Inspect", onRun: (selected) => { context.select(selected[0]?.id); context.openOverlay("asset inspector", { id: selected[0]?.id }); }, disabled: (selected) => selected.length !== 1 },
-              { label: "Check rights", onRun: (selected) => { context.select(selected[0]?.id); context.openOverlay("rights check", { ids: selected.map((row) => row.id) }); } },
-              {
-                label: "Archive",
-                tone: "danger",
-                onRun: (selected) => {
-                  void Promise.all(selected.filter((row) => row.status !== "archived").map((row) => context.mutate.patch(row.id, { status: "archived", fields: { ...row.fields, archivedBy: context.actor, archivedAt: clockIso() } }, { event: `Asset archived: ${row.title}` })))
-                    .then(() => context.toast("Archived", "Archived assets stay resolvable so older documents still find them."));
-                },
-                disabled: (selected) => selected.every((row) => row.status === "archived"),
-              },
-            ]}
-            empty={<Empty title="Nothing here" icon={<Images size={20} />}>Upload an image or clear the search.</Empty>}
-          />
-        </Card>
-      ) : (
-        <Stack gap={4}>
-          <Card eyebrow="LIBRARY" prov="posted" title={tab} subtitle={`${rows.length} of ${data.assets.length} assets`}>{toolbar}</Card>
-          {groups.map((bucket) => (
-            <Stack key={bucket.label} gap={3}>
-              {group !== "none" && <h3 style={{ textTransform: "capitalize" }}>{bucket.label.replace(/_/g, " ")} · {bucket.rows.length}</h3>}
-              <Grid>
-                {bucket.rows.map((row) => {
-                  const state = licence(row, now);
-                  return (
-                    <Card
-                      key={row.id}
-                      eyebrow={`${String(row.fields.kind ?? "asset")}`.toUpperCase()}
-                      prov={fileState(row) === "metadata_only" ? "unknown" : row.fields.proposedBy ? "agent" : "human"}
-                      span={3}
-                      className={context.selectedId === row.id ? "ds-panel" : undefined}
-                      title={
-                        <button
-                          type="button"
-                          onClick={() => { context.select(row.id); context.openOverlay("asset inspector", { id: row.id }); }}
-                          style={{ all: "unset", cursor: "pointer", fontWeight: 650, fontSize: "var(--text-md)" }}
-                        >
-                          {row.title}
-                        </button>
-                      }
-                      subtitle={[String(row.fields.kind ?? "asset"), String(row.fields.format ?? "").toUpperCase()].filter(Boolean).join(" · ")}
-                    >
-                      <Stack gap={3}>
-                        <AssetPreview record={row} height={132} fit={String(row.fields.kind) === "template" ? "contain" : "cover"} />
-                        <Row gap={1} wrap>
-                          <Pill tone={licenceTone(state.state)}>{state.state === "expired" ? "Licence expired" : state.state === "expiring" ? `Expires in ${state.days}d` : String(row.fields.licence ?? "unrecorded").replace(/_/g, " ")}</Pill>
-                          {row.status === "pending_review" && <Pill tone="warning">Needs review</Pill>}
-                          {row.status === "archived" && <Pill>Archived</Pill>}
-                          {usedIn(row).length > 0 && <Pill tone="info">{usedIn(row).length} uses</Pill>}
-                        </Row>
-                        <FileStateTag record={row} />
-                        <Row gap={2}>
-                          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/asset/assets/${row.id}`)}>Open</Button>
-                          <Button size="sm" variant="ghost" onClick={() => { context.select(row.id); context.openOverlay("asset inspector", { id: row.id }); }}>Inspect</Button>
-                        </Row>
-                      </Stack>
-                    </Card>
-                  );
-                })}
-              </Grid>
-              {bucket.rows.length === 0 && <Empty title="Nothing in this group" icon={<Images size={20} />}>Try another grouping.</Empty>}
-            </Stack>
-          ))}
-        </Stack>
-      )}
-    </Stack>
-  );
-}
 
 export function LibraryStats({ context }: { context: ScreenContext }) {
   const data = useAssets();
@@ -277,136 +69,9 @@ export function LibraryStripLine({ context }: { context: ScreenContext }) {
   const latest = [...data.assets].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
   return (
     <>
-      <span>Previews are drawn in this browser from each record</span>
-      <span>nothing is uploaded anywhere</span>
-      <span>library last changed <strong className="ds-num">{latest ? context.relative(latest.updatedAt) : "never"}</strong></span>
-      <span className="ds-grow" />
-      <span>An expired licence blocks publishing, not browsing</span>
+      <span>Files and previews stay in this browser</span>
+      <span>last change <strong className="ds-num">{latest ? context.relative(latest.updatedAt) : "never"}</strong></span>
     </>
-  );
-}
-
-export function MediaImport({ context, close }: { context: ScreenContext; close: () => void }) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [name, setName] = useState("");
-  const [dataUrl, setDataUrl] = useState<string | null>(null);
-  const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
-  const [format, setFormat] = useState("png");
-  const [bytes, setBytes] = useState(0);
-  const [licenceKind, setLicenceKind] = useState("owned");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  function read(file: File) {
-    setError("");
-    if (!file.type.startsWith("image/")) {
-      setError("Only images can be previewed in this browser. Anything else can be catalogued as metadata only.");
-      return;
-    }
-    if (file.size > 400_000) {
-      setError(`That file is ${formatBytes(file.size)}. Keep uploads under 400 kB: everything is held in this browser's storage.`);
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result ?? "");
-      setDataUrl(result);
-      setBytes(file.size);
-      setFormat(file.type.replace("image/", ""));
-      if (!name) setName(file.name.replace(/\.[^.]+$/, ""));
-      const image = new window.Image();
-      image.onload = () => setDimensions({ width: image.naturalWidth, height: image.naturalHeight });
-      image.src = result;
-    };
-    reader.onerror = () => setError("That file could not be read.");
-    reader.readAsDataURL(file);
-  }
-
-  return (
-    <Stack gap={4}>
-      <Notice tone="info" title="The file is kept in this browser">
-        Nothing is uploaded anywhere. The image is stored with the asset record in this device's storage, which is also why there is a
-        size limit.
-      </Notice>
-      <div
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          event.preventDefault();
-          const file = event.dataTransfer.files[0];
-          if (file) read(file);
-        }}
-        className="ds-panel"
-        style={{ padding: "var(--space-5)", textAlign: "center", borderStyle: "dashed" }}
-      >
-        <Stack gap={3}>
-          <span className="ds-subtle">Drop an image here, or choose one. Both routes do the same thing.</span>
-          <Row gap={2} style={{ justifyContent: "center" }}>
-            <Button variant="secondary" onClick={() => fileRef.current?.click()}>Choose a file</Button>
-          </Row>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            aria-label="Image to import"
-            style={{ position: "absolute", width: 1, height: 1, opacity: 0 }}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) read(file);
-            }}
-          />
-        </Stack>
-      </div>
-      {error && <Notice tone="warning" title="Not imported">{error}</Notice>}
-      {dataUrl && (
-        <Row gap={3} style={{ alignItems: "flex-start" }}>
-          <img src={dataUrl} alt="The image you chose" style={{ width: 160, height: 110, objectFit: "cover", borderRadius: "var(--radius-md)", border: "1px solid var(--border-default)" }} />
-          <Properties rows={[
-            { label: "Size", value: formatBytes(bytes) },
-            { label: "Dimensions", value: dimensions ? `${dimensions.width} × ${dimensions.height}` : "Reading…" },
-            { label: "Format", value: format.toUpperCase() },
-          ]} />
-        </Row>
-      )}
-      <Field label="Name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} required /></Field>
-      <Field label="Licence">
-        <Select value={licenceKind} onChange={(event) => setLicenceKind(event.target.value)}>
-          {["owned", "licensed", "stock", "royalty_free"].map((entry) => <option key={entry} value={entry}>{entry.replace(/_/g, " ")}</option>)}
-        </Select>
-      </Field>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
-          variant="primary"
-          busy={busy}
-          disabled={!dataUrl || !name.trim()}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              const record = await context.mutate.create({
-                collection: "assets",
-                title: name,
-                status: "pending_review",
-                summary: `Imported in this browser on ${context.date(clockNow())}. Held locally; nothing was uploaded.`,
-                tags: ["imported"],
-                fields: {
-                  kind: "image", format, fileState: "uploaded",
-                  width: dimensions?.width ?? 0, height: dimensions?.height ?? 0,
-                  licence: licenceKind, licensor: context.org.name, checksum: `local-${bytes}-${name.length}`,
-                  usedIn: "", importedBy: context.actor,
-                },
-                body: { dataUrl },
-              }, `Asset imported: ${name}`);
-              context.toast("Imported", `${name} is in the library as needing review, with the file held in this browser.`);
-              context.select(record.id);
-              close();
-            } finally { setBusy(false); }
-          }}
-        >
-          Add to the library
-        </Button>
-      </Row>
-    </Stack>
   );
 }
 
@@ -437,10 +102,15 @@ export function AssetInspector({ context }: { context: ScreenContext }) {
         { label: "Version", value: String(record.fields.version ?? 1) },
         { label: "Used in", value: uses.length ? uses.join(", ") : "Nothing yet" },
         { label: "Tags", value: record.tags.join(", ") || "None" },
+        ...(record.fields.altText ? [{ label: "Alt text", value: String(record.fields.altText) }] : []),
       ]} />
+      <FolderLine record={record} />
+      <LinkedRecords context={context} record={record} compact />
       <Row gap={2} wrap>
         <Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/asset/assets/${record.id}`)}>Open the asset</Button>
-        <Button variant="secondary" onClick={() => context.openOverlay("rights check", { ids: [record.id] })}>Check rights</Button>
+        <Button variant="secondary" onClick={() => context.openOverlay("asset editor", { id: record.id })}>Edit details</Button>
+        <Button variant="secondary" onClick={() => downloadAsset(context, record, now)}>Download</Button>
+        <Button variant="ghost" onClick={() => context.openOverlay("rights check", { ids: [record.id] })}>Check rights</Button>
       </Row>
     </Stack>
   );
@@ -530,7 +200,7 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
       <Grid>
         <Card eyebrow="PREVIEW" prov={fileState(record) === "metadata_only" ? "unknown" : "human"} span={7} title="Preview" subtitle={`${String(record.fields.width ?? "?")} × ${String(record.fields.height ?? "?")} · ${String(record.fields.format ?? "").toUpperCase()}`}>
           <Stack gap={3}>
-            <AssetPreview record={record} height={340} fit={String(record.fields.kind) === "template" ? "contain" : "cover"} />
+            <AssetViewer record={record} height={340} fit={["template", "logo", "icon"].includes(String(record.fields.kind)) ? "contain" : "cover"} />
             <FileStateTag record={record} />
             {fileState(record) === "generated_preview" && (
               <Notice tone="info" title="This preview is drawn here">
@@ -546,8 +216,10 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
           </Stack>
         </Card>
         <Stack gap={4} className="ds-col-5">
-          <Card eyebrow="METADATA" prov="posted" span={5} title="Metadata">
+          <Card eyebrow="METADATA" prov="posted" span={5} title="Metadata" actions={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("asset editor", { id: record.id })}>Edit details</Button>}>
             <Properties rows={[
+              ...(uploadedFileName(record) ? [{ label: "File name", value: uploadedFileName(record) }] : []),
+              ...(record.fields.altText ? [{ label: "Alt text", value: String(record.fields.altText) }] : []),
               { label: "Type", value: String(record.fields.kind ?? "") },
               { label: "Format", value: String(record.fields.format ?? "").toUpperCase() },
               { label: "Stored bytes", value: formatBytes(storedBytes(record)) },
@@ -559,7 +231,16 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
               { label: "Last changed", value: `${context.relative(record.updatedAt)} by ${record.updatedBy}` },
             ]} />
           </Card>
-          <Card eyebrow="PALETTE" prov="posted" span={5} title="Palette in the record">
+          <Card eyebrow="ORGANISE" prov="human" span={5} title="Folder and tags">
+            <Stack gap={3}>
+              <FolderLine record={record} />
+              <TagEditor context={context} record={record} />
+            </Stack>
+          </Card>
+          <Card eyebrow="LINKED" prov="human" span={5} title="Linked records" subtitle="Projects, campaigns, products and documents this asset belongs to">
+            <LinkedRecords context={context} record={record} />
+          </Card>
+          {fileState(record) !== "uploaded" && <Card eyebrow="PALETTE" prov="posted" span={5} title="Palette in the record">
             <Row gap={2} wrap>
               {palette(record).map((colour) => (
                 <Row key={colour} gap={1}>
@@ -568,7 +249,7 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
                 </Row>
               ))}
             </Row>
-          </Card>
+          </Card>}
           {parent && (
             <Card eyebrow="LINEAGE" prov="posted" span={5} title="Derived from">
               <Row gap={2}>
@@ -630,6 +311,9 @@ export function AssetDetail({ context, tab }: { context: ScreenContext; tab: Det
           )}
         </Card>
         <Stack gap={4} className="ds-col-5">
+          <Card eyebrow="LINKED" prov="human" span={5} title="Linked records" subtitle="Records this asset is attached to">
+            <LinkedRecords context={context} record={record} />
+          </Card>
           <Card eyebrow="REPLACEMENT" prov="human" span={5} title="Replacing this asset">
             <Stack gap={3}>
               <p className="ds-subtle">Replacing a shared asset changes every surface above at once.</p>
@@ -940,7 +624,8 @@ export function downloadAsset(context: ScreenContext, record: Rec | undefined, n
   }
   const link = document.createElement("a");
   link.href = uri;
-  link.download = `${record.title.replace(/\W+/g, "-").toLowerCase()}.${fileState(record) === "uploaded" ? String(record.fields.format ?? "png") : "svg"}`;
+  link.download = (fileState(record) === "uploaded" ? uploadedFileName(record) : undefined)
+    ?? `${record.title.replace(/\W+/g, "-").toLowerCase()}.${fileState(record) === "uploaded" ? String(record.fields.format ?? "png") : "svg"}`;
   link.click();
   void context.mutate.log(`Asset downloaded: ${record.title}.`, { entityId: record.id, type: "asset.download", capability: "ready_local" });
   context.toast("Downloaded", fileState(record) === "uploaded" ? "The file you imported was written back out." : "The stored or drawn SVG was written to a file.");
@@ -973,6 +658,7 @@ export function GroupAssets({ close }: { close: () => void }) {
           <option value="kind">Type</option>
           <option value="licence">Licence</option>
           <option value="tag">First tag</option>
+          <option value="folder">Folder</option>
         </Select>
       </Field>
       <Row gap={2}>

@@ -5,7 +5,7 @@ import { getRecord } from "@/platform/repo";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { AssetPreview, FileStateTag } from "./thumbs";
 import {
-  ArchiveAsset, AssetDetail, AssetInspector, AssetLibrary, GroupAssets, LibraryStripLine, MediaImport, ReplacementImpact,
+  ArchiveAsset, AssetDetail, AssetInspector, GroupAssets, LibraryStripLine, ReplacementImpact,
   RightsCheck, RightsForm, VariantEditor, downloadAsset, licence, licenceTone, useAssets,
 } from "./panels";
 import {
@@ -14,6 +14,7 @@ import {
   Transformations, UsageInspector,
 } from "./governance";
 import { clockIso } from "@/platform/clock";
+import { AssetEditor, AssetLibrary, BulkEdit, FolderEditor, LinkRecords, MediaImport } from "./library";
 
 /* ====================================================================== *
  * ASSET — Assets, Media Library & Brand Resources
@@ -62,6 +63,7 @@ function AssetInspectorPanel({ context }: { context: ScreenContext }) {
       <Row gap={2} wrap>
         <Button size="sm" variant="secondary" onClick={() => downloadAsset(context, record, now)}>Download</Button>
         <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Variant editor", { id: record.id })}>New variant</Button>
+        <Button size="sm" variant="ghost" onClick={() => context.openOverlay("asset editor", { id: record.id })}>Edit details</Button>
       </Row>
     </Stack>
   );
@@ -97,6 +99,9 @@ export const assetApp = registerApp({
       actions: [
         { id: "Upload", label: "Upload", placement: "primary", run: (context) => context.openOverlay("Media import") },
         { id: "inspect", label: "Inspect", placement: "secondary", guard: (context) => (context.selectedId ? undefined : "Select an asset"), run: (context) => context.openOverlay("asset inspector", { id: context.selectedId }) },
+        { id: "edit", label: "Edit details", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select an asset"), run: (context) => context.openOverlay("asset editor", { id: context.selectedId }) },
+        { id: "link", label: "Link to a record", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select an asset"), run: (context) => context.openOverlay("link records", { id: context.selectedId }) },
+        { id: "new folder", label: "New folder", placement: "overflow", run: (context) => context.openOverlay("folder editor") },
         { id: "search", label: "Search the library", placement: "overflow", run: () => { window.setTimeout(() => document.querySelector<HTMLInputElement>('input[aria-label="Search the library"]')?.focus(), 60); } },
         { id: "group", label: "Group the library", placement: "overflow", run: (context) => context.openOverlay("group assets") },
         {
@@ -112,6 +117,10 @@ export const assetApp = registerApp({
         { id: "rights check", kind: "modal", title: "Rights check", width: 620, render: ({ close: _close, ...context }) => <RightsCheck context={context} /> },
         { id: "replacement impact", kind: "modal", title: "Replace this asset", width: 680, render: ({ close, ...context }) => <ReplacementImpact context={context} close={close} /> },
         { id: "group assets", kind: "modal", title: "Group the library", width: 440, render: ({ close }) => <GroupAssets close={close} /> },
+        { id: "asset editor", kind: "modal", title: "Asset details", width: 600, render: ({ close, ...context }) => <AssetEditor context={context} close={close} /> },
+        { id: "link records", kind: "modal", title: "Link to a record", width: 600, render: ({ close, ...context }) => <LinkRecords context={context} close={close} /> },
+        { id: "folder editor", kind: "modal", title: (context) => ((context.overlayPayload as { id?: string } | undefined)?.id ? "Edit folder" : "New folder"), width: 480, render: ({ close, ...context }) => <FolderEditor context={context} close={close} /> },
+        { id: "bulk edit", kind: "modal", title: "Move or tag assets", width: 560, render: ({ close, ...context }) => <BulkEdit context={context} close={close} /> },
       ],
     },
 
@@ -128,7 +137,9 @@ export const assetApp = registerApp({
       })),
       actions: [
         { id: "Download", placement: "primary", run: (context) => context.openOverlay("download") },
+        { id: "edit", label: "Edit details", placement: "secondary", run: (context) => context.openOverlay("asset editor", { id: context.params.id }) },
         { id: "create variant", label: "Create a variant", placement: "secondary", run: (context) => context.openOverlay("Variant editor", { id: context.params.id }) },
+        { id: "link", label: "Link to a record", placement: "overflow", run: (context) => context.openOverlay("link records", { id: context.params.id }) },
         { id: "update rights", label: "Update rights", placement: "overflow", run: (context) => context.openOverlay("rights form", { id: context.params.id }) },
         { id: "archive", label: "Archive", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("archive asset") },
         { id: "replace", label: "Replace across uses", placement: "overflow", run: (context) => context.openOverlay("replacement impact", { id: context.params.id }) },
@@ -139,6 +150,9 @@ export const assetApp = registerApp({
         { id: "replacement impact", kind: "modal", title: "Replace this asset", width: 680, render: ({ close, ...context }) => <ReplacementImpact context={context} close={close} /> },
         { id: "download", kind: "modal", title: "Download", width: 520, render: ({ close, ...context }) => <DownloadOverlay context={context} close={close} /> },
         { id: "archive asset", kind: "modal", title: "Archive this asset", width: 580, tone: "danger", render: ({ close, ...context }) => <ArchiveAsset context={context} close={close} /> },
+        { id: "asset editor", kind: "modal", title: "Asset details", width: 600, render: ({ close, ...context }) => <AssetEditor context={context} close={close} /> },
+        { id: "link records", kind: "modal", title: "Link to a record", width: 600, render: ({ close, ...context }) => <LinkRecords context={context} close={close} /> },
+        { id: "rights check", kind: "modal", title: "Rights check", width: 620, render: ({ close: _close, ...context }) => <RightsCheck context={context} /> },
       ],
     },
 
