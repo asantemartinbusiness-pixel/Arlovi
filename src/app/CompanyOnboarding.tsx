@@ -26,10 +26,12 @@ interface Setup {
   dailyBriefing: boolean;
   approvalMode: "review_all" | "supervised_drafts";
   goal: string;
+  businessType: "services" | "retail" | "creative" | "technology" | "nonprofit" | "other";
+  teamSize: "solo" | "small" | "growing" | "established";
 }
 const KEY = "arlovi-company-setup-draft-v1";
-const STEP_KEY = "arlovi-company-setup-step-v1";
-const STEPS = ["Company", "Identity", "Knowledge", "Departments", "People", "Intelligence", "Applications", "Collaboration", "Authority", "Launch"];
+const STEP_KEY = "arlovi-company-setup-step-v2";
+const STEPS = ["Company identity", "Operating model", "People & intelligence", "Review & create"];
 const DEFAULT: Setup = {
   company: "", slug: "", owner: "", territory: "GB", currency: "GBP",
   timezone: "Europe/London", accent: "#234FE8", description: "",
@@ -38,7 +40,7 @@ const DEFAULT: Setup = {
   knowledgeNotes: "", colleagues: "",
   preferredApps: ["Headquarters", "AI Workforce", "Missions", "Finance", "CRM", "Projects", "Communications", "Docs", "Sheets", "Design"],
   teamChannels: ["Company Updates", "Leadership", "Operations"],
-  dailyBriefing: true, approvalMode: "review_all", goal: "",
+  dailyBriefing: true, approvalMode: "review_all", goal: "", businessType: "services", teamSize: "growing",
 };
 const TERRITORIES: Record<Territory, { currency: string; timezone: string; locale: string; label: string }> = {
   GB: { currency: "GBP", timezone: "Europe/London", locale: "en-GB", label: "United Kingdom" },
@@ -77,7 +79,7 @@ export function CompanyOnboarding() {
   const previous = previousSlug ? orgBySlug(previousSlug) : undefined;
   const [setup, setSetup] = useState<Setup>(restored);
   const [step, setStep] = useState(() => {
-    try { return Math.min(9, Math.max(0, Number(localStorage.getItem(STEP_KEY)) || 0)); } catch { return 0; }
+    try { return Math.min(3, Math.max(0, Number(localStorage.getItem(STEP_KEY)) || 0)); } catch { return 0; }
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -104,7 +106,7 @@ export function CompanyOnboarding() {
       if (!isOrganizationSlugAvailable(setup.slug)) return "Choose an available company address using letters, numbers and hyphens.";
       if (!setup.owner.trim()) return "Enter the name of the person managing this workspace.";
     }
-    if (at === 3 && setup.departments.length === 0) return "Select at least one department.";
+    if (at === 1 && setup.departments.length === 0) return "Select at least one department.";
     return "";
   }
   function next() {
@@ -114,8 +116,8 @@ export function CompanyOnboarding() {
     setError("");
   }
   async function finish() {
-    const issue = validate(0) || validate(3);
-    if (issue) { setError(issue); setStep(issue.includes("department") ? 3 : 0); return; }
+    const issue = validate(0) || validate(1);
+    if (issue) { setError(issue); setStep(issue.includes("department") ? 1 : 0); return; }
     setBusy(true); setError("");
     const now = clockIso();
     const orgId = "org-" + crypto.randomUUID();
@@ -134,7 +136,7 @@ export function CompanyOnboarding() {
     });
     const organization = { ...build("organizations", profile.name, "active", {
       slug: profile.slug, locale: profile.locale, legalName: profile.name, executionPaused: true,
-      jurisdiction: profile.jurisdiction, timezone: profile.timezone, brandAccent: profile.accent,
+      jurisdiction: profile.jurisdiction, timezone: profile.timezone, brandAccent: profile.accent, businessType: setup.businessType, teamSize: setup.teamSize,
     }, setup.description.trim()), id: orgId };
     const records: Rec[] = [organization];
     records.push(build("members", setup.owner.trim(), "active", { kind: "human", role: "owner", workspaceOnly: true }, "Owner view for the local workplace."));
@@ -197,177 +199,190 @@ export function CompanyOnboarding() {
     } finally { setBusy(false); }
   }
 
+
+  const presets: Record<Setup["businessType"], string[]> = {
+    services: ["Headquarters", "CRM", "Projects", "Customer Care", "Finance", "People", "Docs"],
+    retail: ["Headquarters", "Commerce", "Procurement", "Finance", "Customer Care", "Marketing", "People"],
+    creative: ["Headquarters", "Projects", "Design", "Docs", "Marketing", "Present", "Finance"],
+    technology: ["Headquarters", "Projects", "App Builder", "Automation", "Analytics", "IT Operations", "CRM"],
+    nonprofit: ["Headquarters", "Projects", "People", "Finance", "Communications", "Forms", "Docs"],
+    other: ["Headquarters", "Projects", "Finance", "CRM", "People", "Docs"],
+  };
+  function selectIndustry(value: Setup["businessType"]) {
+    setSetup(current => ({ ...current, businessType: value, preferredApps: [...new Set([...current.preferredApps, ...presets[value]])] }));
+    setError("");
+  }
+
   return (
-    <main className="onb" id="main">
+    <main className="onb onb-reimagined" id="main">
       <header className="onb-top">
-        <Link className="onb-logo" to="/" aria-label="Arlovi home"><ArloviMark size={34}/><strong>arlovi.</strong></Link>
-        <span className="onb-topnote">Company headquarters setup</span>
-        {previous && <Link to={"/o/" + previous.slug + "/hq/home"}>Return to {previous.shortName}</Link>}
+        <Link className="onb-logo" to="/welcome" aria-label="Arlovi home"><ArloviMark size={34}/><strong>arlovi.</strong></Link>
+        <span className="onb-topnote">Build your company's headquarters</span>
+        {previous && <Link to={"/o/" + previous.slug + "/workspace/home"}>Return to {previous.shortName}</Link>}
+        {!previous && <Link to="/choose-workspace">Workspaces</Link>}
       </header>
       <div className="onb-layout">
-        <aside className="onb-intro">
-          <div className="onb-eyebrow">ONE COMPANY. ONE OPERATING HOME.</div>
-          <h1>Bring your organization together.</h1>
-          <p>Design your company's headquarters: people, AI specialists, departments and a shared starting point for all 35 native applications.</p>
-          <div className="onb-art" aria-hidden="true">
-            <div className="onb-orbit onb-orbit-one"/><div className="onb-orbit onb-orbit-two"/>
-            <div className="onb-node onb-node-one"/><div className="onb-node onb-node-two"/><div className="onb-node onb-node-three"/>
+        <aside className="onb-intro" aria-label="Company blueprint preview">
+          <div className="onb-eyebrow">YOUR COMPANY BLUEPRINT</div>
+          <h1>One operating home, built around your business.</h1>
+          <p>Establish the essentials first. We'll prepare your operating structure, applications, team and AI specialist drafts, all ready for your review.</p>
+          <div className="onb-blueprint">
+            <div className="onb-blueprint-head"><strong>{setup.company.trim() || "Your future headquarters"}</strong><span>Live preview</span></div>
+            <div className="onb-blueprint-stat"><span>Business</span><strong>{setup.businessType.charAt(0).toUpperCase() + setup.businessType.slice(1)}</strong></div>
+            <div className="onb-blueprint-stat"><span>Organization</span><strong>{setup.teamSize === "solo" ? "Independent" : setup.teamSize === "small" ? "Small team" : setup.teamSize === "growing" ? "Growing team" : "Established"}</strong></div>
+            <div className="onb-blueprint-counters">
+              <div><strong>{setup.departments.length}</strong><span>Departments</span></div>
+              <div><strong>{setup.preferredApps.length}</strong><span>Pinned apps</span></div>
+              <div><strong>{setup.agents.length}</strong><span>AI drafts</span></div>
+            </div>
+            <div className="onb-blueprint-foot">All native applications stay available. AI execution, cloud accounts and external invitations are not activated by setup.</div>
           </div>
-          <p className="onb-scope">This setup creates a working browser-local company. Team invitations, cloud sync, live AI models and external services require future connections.</p>
+          <p className="onb-scope">Your answers are saved in this browser as you go. This version creates a browser-local company, not a verified cloud account. You can return to Company Setup after entering the workspace.</p>
         </aside>
         <section className="onb-form" aria-label="Company setup">
-          <nav className="onb-progress" aria-label="Company setup steps">
-            {STEPS.map((label, index) => (
-              <button type="button" key={label} disabled={index > step}
-                className={index === step ? "onb-step current" : "onb-step"} aria-current={index === step ? "step" : undefined}
-                onClick={() => { setStep(index); setError(""); }}>
-                <span>{String(index + 1).padStart(2,"0")}</span>{label}
+          <nav className="onb-progress" aria-label="Company setup stages">
+            {STEPS.map((label,index) => (
+              <button type="button" key={label} disabled={index>step || busy} className={index===step ? "onb-step current" : "onb-step"}
+                aria-current={index===step ? "step" : undefined} onClick={() => {setStep(index);setError("");}}>
+                <span>{String(index+1).padStart(2,"0")}</span>{label}
               </button>
             ))}
           </nav>
           <div className="onb-stepbody">
-            {step === 0 && <>
-              <div className="onb-caption">01 / COMPANY</div><h2>Start with your business.</h2>
-              <p>The same company identity will be available to Finance, CRM, People, Studio and the AI workforce.</p>
+            {step===0 && <>
+              <div className="onb-caption">01 / COMPANY IDENTITY</div>
+              <h2>Tell us about your company.</h2>
+              <p>Start with the essentials. You can refine your identity, brand and operating details at any time.</p>
               <label className="onb-field">Company name
-                <input required aria-label="Company name" value={setup.company} onChange={(e) => {
-                  const name=e.target.value;setSetup(v=>({...v, company:name, slug:slugify(name)}));setError("");
+                <input required autoComplete="organization" value={setup.company} onChange={e => {
+                  const name=e.target.value;setSetup(v=>({...v,company:name,slug:slugify(name)}));setError("");
                 }} placeholder="Your company name"/>
               </label>
-              <label className="onb-field">Company address
-                <span className="onb-hint">arlovi / o / {setup.slug || "your-company"}</span>
-                <input required aria-label="Company address" value={setup.slug} onChange={(e)=>change("slug",slugify(e.target.value))} placeholder="your-company"/>
-              </label>
               <label className="onb-field">Your name
-                <input required aria-label="Your name" value={setup.owner} onChange={(e)=>change("owner",e.target.value)} placeholder="Workspace owner"/>
+                <input required autoComplete="name" value={setup.owner} onChange={e=>change("owner",e.target.value)} placeholder="Workspace creator"/>
+              </label>
+              <label className="onb-field">What does your company do?
+                <textarea value={setup.description} onChange={e=>change("description",e.target.value)} rows={3} placeholder="A short description of your services, products or work"/>
               </label>
               <label className="onb-field">Country or region
-                <select aria-label="Country or region" value={setup.territory} onChange={(e)=>{
-                  const territory=e.target.value as Territory; const regional=TERRITORIES[territory];
+                <select value={setup.territory} onChange={e=>{
+                  const territory=e.target.value as Territory;const regional=TERRITORIES[territory];
                   setSetup(v=>({...v,territory,currency:regional.currency,timezone:regional.timezone}));
                 }}>
-                  {Object.entries(TERRITORIES).map(([code,value])=><option key={code} value={code}>{value.label}</option>)}
+                  {Object.entries(TERRITORIES).map(([code,value])=><option value={code} key={code}>{value.label}</option>)}
                 </select>
               </label>
-              <label className="onb-field">Operating currency
-                <select aria-label="Operating currency" value={setup.currency} onChange={(e)=>change("currency",e.target.value)}>
-                  {["GBP","USD","EUR","CAD","AUD","XCD"].map(code=><option key={code} value={code}>{code}</option>)}
+              <details className="onb-detail"><summary>Company address, region and branding preferences</summary>
+                <label className="onb-field">Company workspace address
+                  <span className="onb-hint">/o/{setup.slug || "your-company"}</span>
+                  <input required aria-label="Workspace address" value={setup.slug} onChange={e=>change("slug",slugify(e.target.value))}/>
+                </label>
+                <div className="onb-inline-fields">
+                  <label className="onb-field">Operating currency
+                    <select value={setup.currency} onChange={e=>change("currency",e.target.value)}>{["GBP","USD","EUR","CAD","AUD","XCD"].map(code=><option key={code}>{code}</option>)}</select>
+                  </label>
+                  <label className="onb-field">Timezone
+                    <select value={setup.timezone} onChange={e=>change("timezone",e.target.value)}>
+                      {[setup.timezone,"UTC","Europe/London","America/Tortola","America/New_York","America/Los_Angeles","Europe/Paris","Asia/Singapore"].filter((v,i,a)=>a.indexOf(v)===i).map(zone=><option value={zone} key={zone}>{zone}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <fieldset className="onb-colors"><legend>Company accent</legend><div>{COLORS.map(color=><button key={color} type="button" aria-label={"Choose accent "+color} aria-pressed={setup.accent===color} className={setup.accent===color?"onb-color onb-color-selected":"onb-color"} style={{background:color}} onClick={()=>change("accent",color)}/>)}</div></fieldset>
+              </details>
+            </>}
+            {step===1 && <>
+              <div className="onb-caption">02 / OPERATING MODEL</div>
+              <h2>How does your company work?</h2>
+              <p>Choose a starting model. Arlovi will suggest relevant applications while keeping the complete suite available.</p>
+              <label className="onb-field">Main type of business
+                <select value={setup.businessType} onChange={e=>selectIndustry(e.target.value as Setup["businessType"])}>
+                  <option value="services">Professional or service business</option>
+                  <option value="retail">Retail or commerce</option>
+                  <option value="creative">Creative studio or agency</option>
+                  <option value="technology">Technology or software</option>
+                  <option value="nonprofit">Nonprofit or community organization</option>
+                  <option value="other">Other or mixed activity</option>
                 </select>
               </label>
-              <label className="onb-field">Company timezone
-                <select aria-label="Company timezone" value={setup.timezone} onChange={(e)=>change("timezone",e.target.value)}>
-                  {[setup.timezone,"UTC","Europe/London","Europe/Paris","America/Tortola","America/New_York","America/Los_Angeles","Asia/Singapore"].filter((entry,index,all)=>all.indexOf(entry)===index).map(zone=><option key={zone} value={zone}>{zone}</option>)}
-                </select>
-              </label>
-            </>}
-            {step === 1 && <>
-              <div className="onb-caption">02 / IDENTITY</div><h2>Make it yours.</h2>
-              <p>Your palette and company story are shared across your native workspaces and creative tools.</p>
-              <label className="onb-field">What does your company do?
-                <textarea value={setup.description} aria-label="Company overview" onChange={(e)=>change("description",e.target.value)} rows={5} placeholder="Describe your services, clients and goals. This stays a draft knowledge source until you review it."/>
-              </label>
-              <fieldset className="onb-colors"><legend>Company accent</legend><div>
-                {COLORS.map(color=><button key={color} type="button" aria-label={"Select accent "+color} aria-pressed={setup.accent===color}
-                  className={setup.accent===color?"onb-color onb-color-selected":"onb-color"} style={{background:color}} onClick={()=>change("accent",color)}/>)}
-              </div></fieldset>
-              <div className="onb-note">Brand rules, typography, logos, assets and advanced customization remain editable inside Arlovi.</div>
-            </>}
-            {step === 2 && <>
-              <div className="onb-caption">03 / KNOWLEDGE</div><h2>Introduce your company to Arlovi.</h2>
-              <p>Store your founding context as a source awaiting human review. Arlovi will not treat this text as verified company knowledge until approved in Company Brain.</p>
-              <label className="onb-field">Company knowledge and operating instructions
-                <textarea rows={6} aria-label="Company knowledge" value={setup.knowledgeNotes} onChange={(e)=>change("knowledgeNotes",e.target.value)} placeholder="Products, services, audiences, policies, priorities, company history, or anything your teams should understand." />
-              </label>
-              <div className="onb-note">Importing external documents, websites and cloud drives requires a connected provider. Your written notes are saved locally for review.</div>
-            </>}
-            {step === 3 && <>
-              <div className="onb-caption">04 / DEPARTMENTS</div><h2>Organize your headquarters.</h2>
-              <p>Choose the teams you want shown in your company structure. All 35 native applications remain available.</p>
-              <div className="onb-options">
-                {DEPARTMENTS.map(name=><label key={name} className="onb-option">
-                  <input type="checkbox" checked={setup.departments.includes(name)} onChange={()=>toggle("departments",name)}/>
-                  <span>{name}</span>
-                </label>)}
-              </div>
-            </>}
-            {step === 4 && <>
-              <div className="onb-caption">05 / PEOPLE</div><h2>Bring your people into the plan.</h2>
-              <p>Create a local invitation draft for each colleague. Invitations will not be sent until email and account services are connected and authorized.</p>
-              <label className="onb-field">Colleagues (one name or email per line)
-                <textarea rows={6} aria-label="Colleagues" value={setup.colleagues} onChange={(e)=>change("colleagues",e.target.value)} placeholder={"Jordan Smith\nPriya Patel\nteam@example.com"}/>
-              </label>
-              <div className="onb-note">People appear as pending invitation drafts in the company directory. No access is granted or message delivered by this step.</div>
-            </>}
-            {step === 5 && <>
-              <div className="onb-caption">06 / INTELLIGENCE</div><h2>Plan your AI workforce.</h2>
-              <p>Create initial specialist employee profiles. They remain drafts with no execution authority until configured and approved.</p>
-              <div className="onb-options">
-                {AGENTS.map(name=><label key={name} className="onb-option">
-                  <input type="checkbox" checked={setup.agents.includes(name)} onChange={()=>toggle("agents",name)}/>
-                  <span>{name}</span>
-                </label>)}
-              </div>
-              <div className="onb-note">AI employees are clearly differentiated from human staff. No real model execution or automated outreach is claimed.</div>
-            </>}
-            {step === 6 && <>
-              <div className="onb-caption">07 / APPLICATIONS</div><h2>Design your everyday workspace.</h2>
-              <p>All 35 native applications are included. Pin the ones your company will use most frequently; the complete suite remains accessible.</p>
-              <div className="onb-options">
-                {APPS.map(name=><label key={name} className="onb-option">
-                  <input type="checkbox" checked={setup.preferredApps.includes(name)} onChange={()=>toggle("preferredApps",name)}/><span>{name}</span>
-                </label>)}
-              </div>
-              <div className="onb-note">Third-party connections remain optional and cannot be activated without their providers.</div>
-            </>}
-            {step === 7 && <>
-              <div className="onb-caption">08 / COLLABORATION</div><h2>Give your team a place to work.</h2>
-              <p>Set up internal collaboration spaces and a local executive briefing preference.</p>
-              <div className="onb-options">
-                {CHANNELS.map(name=><label key={name} className="onb-option">
-                  <input type="checkbox" checked={setup.teamChannels.includes(name)} onChange={()=>toggle("teamChannels",name)}/><span>{name}</span>
-                </label>)}
-              </div>
-              <label className="onb-option" style={{ marginTop: 20 }}><input type="checkbox" checked={setup.dailyBriefing} onChange={(e)=>change("dailyBriefing",e.target.checked)}/><span>Prepare a local daily executive briefing</span></label>
-              <div className="onb-note">These channels are private records in this browser. Real-time multiplayer communication, email and mobile notifications require connected services.</div>
-            </>}
-            {step === 8 && <>
-              <div className="onb-caption">09 / AUTHORITY</div><h2>Decide how your AI team works.</h2>
-              <p>Arlovi starts with external execution disabled. Human approvals, spend controls and the emergency pause remain available in Administration.</p>
-              <fieldset className="onb-colors"><legend>Default supervision policy</legend>
-                <div className="onb-options">
-                  <label className="onb-option"><input type="radio" name="approval-mode" checked={setup.approvalMode==="review_all"} onChange={()=>change("approvalMode","review_all")}/><span>Review every AI action</span></label>
-                  <label className="onb-option"><input type="radio" name="approval-mode" checked={setup.approvalMode==="supervised_drafts"} onChange={()=>change("approvalMode","supervised_drafts")}/><span>Allow local drafts, review consequential actions</span></label>
+              <fieldset className="onb-choices"><legend>How is your team organized?</legend>
+                <div className="onb-team-choices">
+                  {([
+                    ["solo","Independent","Just me, or a small independent practice"],
+                    ["small","Small team","A handful of people sharing responsibilities"],
+                    ["growing","Growing organization","Several teams or expanding responsibilities"],
+                    ["established","Established company","Defined departments and reporting structures"]
+                  ] as const).map(([value,label,description])=>(
+                    <label className="onb-team-choice" key={value} data-checked={setup.teamSize===value}>
+                      <input type="radio" name="teamSize" checked={setup.teamSize===value} onChange={()=>change("teamSize",value)} />
+                      <span><strong>{label}</strong><small>{description}</small></span>
+                    </label>
+                  ))}
                 </div>
               </fieldset>
-              <div className="onb-note">No AI model has been connected. Neither policy permits unapproved payment, sending, publishing, external requests or autonomous execution.</div>
+              <details className="onb-detail" open><summary>Departments ({setup.departments.length} selected)</summary>
+                <p className="onb-detail-description">These become local company departments. You can edit their responsibilities later.</p>
+                <div className="onb-options">{DEPARTMENTS.map(name=><label key={name} className="onb-option"><input type="checkbox" checked={setup.departments.includes(name)} onChange={()=>toggle("departments",name)}/><span>{name}</span></label>)}</div>
+              </details>
+              <details className="onb-detail"><summary>Favorite applications ({setup.preferredApps.length} selected)</summary>
+                <p className="onb-detail-description">Pin the applications you expect to use first. No native application is removed.</p>
+                <div className="onb-options">{APPS.map(name=><label key={name} className="onb-option"><input type="checkbox" checked={setup.preferredApps.includes(name)} onChange={()=>toggle("preferredApps",name)}/><span>{name}</span></label>)}</div>
+              </details>
             </>}
-            {step === 9 && <>
-              <div className="onb-caption">10 / LAUNCH</div><h2>Your headquarters is ready to create.</h2>
-              <p>Review the foundations. Your work remains editable throughout Arlovi.</p>
-              <dl className="onb-review">
-                <div><dt>Company</dt><dd>{setup.company}</dd></div>
-                <div><dt>Region</dt><dd>{TERRITORIES[setup.territory].label} · {setup.currency}</dd></div>
-                <div><dt>Departments</dt><dd>{setup.departments.join(", ")}</dd></div>
-                <div><dt>AI employee drafts</dt><dd>{setup.agents.join(", ") || "None"}</dd></div>
-                <div><dt>Colleagues to invite</dt><dd>{setup.colleagues.split("\n").filter((item)=>item.trim()).length} local draft(s)</dd></div>
-                <div><dt>Favourite applications</dt><dd>{setup.preferredApps.length} of 35 pinned</dd></div>
-                <div><dt>Collaboration rooms</dt><dd>{setup.teamChannels.join(", ") || "None"}</dd></div>
-                <div><dt>AI autonomy</dt><dd>{setup.approvalMode==="review_all"?"Human review for all actions":"Supervised local drafts"}</dd></div>
-              </dl>
-              <label className="onb-field">Your first mission
-                <textarea aria-label="First mission" value={setup.goal} rows={3} onChange={(e)=>change("goal",e.target.value)}
-                  placeholder="What would you like your team to accomplish?"/>
+            {step===2 && <>
+              <div className="onb-caption">03 / PEOPLE & INTELLIGENCE</div>
+              <h2>Prepare your people and tools.</h2>
+              <p>Your team, company knowledge, collaboration and AI specialists should work from the same business context. You control what becomes active.</p>
+              <details className="onb-detail" open><summary>Team invitations</summary>
+                <label className="onb-field">Colleagues (one name or email address per line)
+                  <textarea rows={3} value={setup.colleagues} onChange={e=>change("colleagues",e.target.value)} placeholder={"Jordan Smith\nteam@example.com"}/>
+                </label>
+                <div className="onb-note">These are invitation drafts only. No email is sent and no access is granted.</div>
+              </details>
+              <details className="onb-detail"><summary>Company Brain knowledge</summary>
+                <label className="onb-field">Key company knowledge or operating instructions
+                  <textarea rows={4} value={setup.knowledgeNotes} onChange={e=>change("knowledgeNotes",e.target.value)} placeholder="Business priorities, products, policies or information the team should understand"/>
+                </label>
+                <div className="onb-note">Knowledge is stored as unverified source material awaiting human review.</div>
+              </details>
+              <details className="onb-detail"><summary>AI employee drafts ({setup.agents.length})</summary>
+                <div className="onb-options">{AGENTS.map(name=><label key={name} className="onb-option"><input type="checkbox" checked={setup.agents.includes(name)} onChange={()=>toggle("agents",name)}/><span>{name}</span></label>)}</div>
+                <div className="onb-note">No model is connected, and no AI specialist receives autonomous authority at creation.</div>
+              </details>
+              <details className="onb-detail"><summary>Collaboration and daily briefings</summary>
+                <div className="onb-options">{CHANNELS.map(name=><label key={name} className="onb-option"><input type="checkbox" checked={setup.teamChannels.includes(name)} onChange={()=>toggle("teamChannels",name)}/><span>{name}</span></label>)}</div>
+                <label className="onb-option onb-briefing"><input type="checkbox" checked={setup.dailyBriefing} onChange={e=>change("dailyBriefing",e.target.checked)}/><span>Prepare a local executive briefing</span></label>
+              </details>
+              <details className="onb-detail" open><summary>AI supervision and authority</summary>
+                <div className="onb-options">
+                  <label className="onb-option"><input type="radio" name="approval-mode" checked={setup.approvalMode==="review_all"} onChange={()=>change("approvalMode","review_all")}/><span>Review every AI action</span></label>
+                  <label className="onb-option"><input type="radio" name="approval-mode" checked={setup.approvalMode==="supervised_drafts"} onChange={()=>change("approvalMode","supervised_drafts")}/><span>Allow local drafts with human review</span></label>
+                </div>
+                <div className="onb-note">External actions, payments and publishing remain blocked until independently authorized and connected.</div>
+              </details>
+            </>}
+            {step===3 && <>
+              <div className="onb-caption">04 / REVIEW & CREATE</div>
+              <h2>Your headquarters is taking shape.</h2>
+              <p>Review the foundations of your operating environment. Nothing here sends invitations, activates AI or connects outside providers.</p>
+              <div className="onb-review-cards">
+                <div><strong>Company identity</strong><p>{setup.company} · {TERRITORIES[setup.territory].label} · {setup.currency}</p><button type="button" onClick={()=>setStep(0)}>Edit identity</button></div>
+                <div><strong>Organization</strong><p>{setup.departments.length} departments · {setup.teamSize} company</p><button type="button" onClick={()=>setStep(1)}>Edit structure</button></div>
+                <div><strong>People and collaboration</strong><p>{setup.colleagues.split("\n").filter(Boolean).length} invitation drafts · {setup.teamChannels.length} channels</p><button type="button" onClick={()=>setStep(2)}>Edit people</button></div>
+                <div><strong>Apps and AI workforce</strong><p>{setup.preferredApps.length} pinned apps · {setup.agents.length} AI drafts</p><button type="button" onClick={()=>setStep(2)}>Review intelligence</button></div>
+              </div>
+              <label className="onb-field">Your first business objective (optional)
+                <textarea rows={3} value={setup.goal} onChange={e=>change("goal",e.target.value)} placeholder="What should your company focus on first?"/>
               </label>
-              <div className="onb-note">This mission is saved as a draft awaiting review; nothing runs or leaves the browser.</div>
+              <div className="onb-note">Your first objective is saved as a draft. There is no automatic execution. The permanent Company Setup Centre will remain available once you enter your headquarters.</div>
             </>}
           </div>
           {error && <p className="onb-error" role="alert">{error}</p>}
           <div className="onb-actions">
-            <button type="button" className="onb-secondary" disabled={step===0 || busy} onClick={()=>{setStep(s=>s-1);setError("");}}>Back</button>
-            <span className="onb-counter">{step+1} of {STEPS.length}</span>
+            <button type="button" className="onb-secondary" disabled={step===0 || busy} onClick={()=>{setStep(v=>v-1);setError("");}}>Back</button>
+            <span className="onb-counter">Stage {step+1} of {STEPS.length} · Saved locally</span>
             {step<STEPS.length-1
-              ? <button type="button" className="onb-primary" onClick={next}>Continue</button>
-              : <button type="button" className="onb-primary" disabled={busy} onClick={()=>{void finish();}}>{busy?"Creating company…":"Enter headquarters"}</button>}
+              ? <button type="button" className="onb-primary" disabled={busy} onClick={next}>Continue</button>
+              : <button type="button" className="onb-primary" disabled={busy} onClick={()=>{void finish();}}>{busy?"Creating headquarters…":"Create my headquarters"}</button>}
           </div>
         </section>
       </div>
