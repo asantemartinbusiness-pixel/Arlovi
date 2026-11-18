@@ -44,7 +44,11 @@ describe("editable access matrix — proposal only",()=>{
     expect(plannedPermission("client","HR",page.id,"edit",draft).allowed).toBe(true);
     draft=updateRolePermission(draft,"page",page.id,"view","deny");
     expect(plannedPermission("client","HR",page.id,"edit",draft).allowed).toBe(false);
+    // Denying View also intentionally drops dependent edit grants on this page.
+    expect(draft.pageRules[page.id].edit).toBeUndefined();
     draft=updateRolePermission(draft,"page",page.id,"view","allow");
+    expect(plannedPermission("client","HR",page.id,"edit",draft).allowed).toBe(false);
+    draft=updateRolePermission(draft,"page",page.id,"edit","allow");
     expect(plannedPermission("client","HR",page.id,"edit",draft).allowed).toBe(true);
   });
   it("can remove an override by returning to inherit",()=>{
