@@ -6,7 +6,7 @@ import {
   groupNotificationUpdates, isSnoozed, mayInterrupt, notificationCategory,
   notificationSurface,
 } from "@/platform/notificationPolicy";
-import type { AttentionItem } from "@/platform/attention";
+import { buildAttention, type AttentionItem } from "@/platform/attention";
 import { prepareNotificationEvent, publishLocalNotification } from "@/platform/notificationEvents";
 import type { Rec } from "@/domain/types";
 
@@ -16,6 +16,24 @@ const base: AttentionItem = {
   acknowledged: false, resolved: false, group: "Studio", entityId: "doc-7",
 };
 describe("platform notifications contracts", () => {
+  it("defaults sensitive unaddressed events to appropriate local role views", () => {
+    const records = ["HR", "FIN", "ADMIN", "IT", "LEGAL", "CRM"].map(appCode => ({
+      id: appCode, fields: { appCode }, title: appCode + " event", summary: "Local update",
+      status: "active", at: "2026-11-18T12:00:00Z", updatedAt: "2026-11-18T12:00:00Z",
+    } as unknown as Rec));
+    const items = buildAttention({
+      notifications: records, invoices: [], bills: [], tasks: [], missions: [], approvals: [],
+      orgSlug: "northline", now: new Date("2026-11-18T13:00:00Z"),
+    });
+    const roles = (id: string) => items.find(item => item.id === id)?.audience;
+    expect(roles("HR")).toEqual(["owner", "people"]);
+    expect(roles("FIN")).toEqual(["owner", "finance"]);
+    expect(roles("ADMIN")).toEqual(["owner"]);
+    expect(roles("IT")).toEqual(["owner"]);
+    expect(roles("LEGAL")).toEqual(["owner"]);
+    expect(roles("CRM")).toEqual([]);
+  });
+
   it("covers each registered native application exactly once", () => {
     const expected = NAV_GROUPS.flatMap(group => group.apps.map(app => app.code)).sort();
     const configured = Object.values(NATIVE_APP_NOTIFICATION_SOURCES).flat().sort();
