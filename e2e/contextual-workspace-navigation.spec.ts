@@ -36,9 +36,9 @@ test("workspace detail tabs are deep-linked, durable, and in contextual navigati
   await page.getByRole("button",{name:"Files",exact:true}).click();
   await expect(page).toHaveURL(/\?tab=files/);
   await page.reload();
-  await expect(page.getByRole("heading",{name:"Resources"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Files & resources"})).toBeVisible();
   const detailNavigation=page.getByRole("navigation",{name:/navigation$/}).filter({has:page.getByRole("link",{name:"Files",exact:true})});
   await expect(detailNavigation.getByRole("link",{name:"Files",exact:true})).toHaveAttribute("aria-current","page");
   await page.goto(detail+"?tab=people");
-  await expect(page.getByRole("heading",{name:"Workspace people"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"People & collaboration"})).toBeVisible();
 });
