@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Users } from "lucide-react";
 import {
-  Avatar, Button, Card, DataGrid, Empty, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Meter,
+  Avatar, Button, Card, DataGrid, Empty, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Meter,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useEvents, useRecord, useWorkspace } from "@/platform/workspace";
@@ -681,7 +681,7 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
           Close lost instead
         </Button>
         <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
       </ModalActions>
       <span className="ds-subtle" style={{ fontSize: "var(--text-xs)" }}>
         {stageOf(deal).label} → {wonStage.label}. The same stage validation runs here as on the board.
