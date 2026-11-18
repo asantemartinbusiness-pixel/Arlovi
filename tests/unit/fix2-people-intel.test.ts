@@ -11,7 +11,7 @@ import { csvCell } from "@/applications/hr/decisions";
 function meeting(id: string, start: string, minutes: number, attendees: string, status = "scheduled"): Rec {
   return {
     id, organizationId: "org", collection: "meetings", title: id, status, summary: "", fields: { attendees },
-    createdAt: start, updatedAt: start, createdBy: "x", updatedBy: "x", ownerName: "x", revision: 1, tags: [], currency: "GBP",
+    createdAt: start, updatedAt: start, createdBy: "x", updatedBy: "x", ownerName: "x", revision: 1, tags: [], currency: "GBP", history: [],
     startAt: start, endAt: new Date(Date.parse(start) + minutes * 60_000).toISOString(),
   } as Rec;
 }
