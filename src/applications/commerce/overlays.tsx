@@ -666,17 +666,21 @@ export function CancellationImpact({ context, close }: { context: ScreenContext;
 }
 
 export function RefundConfirmation({ context }: { context: ScreenContext }) {
-  const data = useCommerceData();
-  const order = useRecord(context.params.id) ?? data.orders[0];
-  if (!order) return <Empty title="No order" />;
+  const payload = context.overlayPayload as { id?: unknown } | undefined;
+  const id = typeof payload?.id === "string" ? payload.id : context.params.id ?? context.selectedId;
+  const selected = useRecord(id);
+  const order = selected?.organizationId === context.org.id && selected.collection === "orders" ? selected : undefined;
+  if (!order) return <Empty title="No order selected">Choose the order whose refund proposal you want to review. Another order will not be substituted.</Empty>;
+  const proposedMinor = Number(order.fields.refundProposedMinor ?? 0);
   return (
     <Stack gap={4}>
       <Properties rows={[
         { label: "Order", value: order.title },
-        { label: "Proposed refund", value: context.money(Number(order.fields.refundProposedMinor ?? 0)) },
+        { label: "Proposed refund", value: proposedMinor > 0 ? context.money(proposedMinor) : "No amount proposed" },
         { label: "Proposed by", value: String(order.fields.refundProposedBy ?? "Nobody yet") },
         { label: "Executed", value: <Pill tone="warning">Not possible here</Pill> },
       ]} />
+      {proposedMinor <= 0 && <Notice tone="info" title="No refund proposal to confirm">A proposed amount and an author must be recorded against this order before a payment can be arranged outside Arlovi.</Notice>}
       <ProviderBoundary id="payment.capture" title="The refund stops at the same boundary as the payment">
         Money cannot leave this browser. The proposal, its amount and its reason are on the order so the studio can send the refund and record it against the ledger.
       </ProviderBoundary>
