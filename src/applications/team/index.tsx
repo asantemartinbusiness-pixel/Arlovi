@@ -14,7 +14,8 @@ import { SAFETY_SCORE, activationBlockers, assertionsOf, latestRunFor, runScenar
 import type { Rec } from "@/domain/types";
 import { clockIso } from "@/platform/clock";
 import { AssignmentHistory, ContractEditor, ExecutionAvailabilityCard } from "./ContractPanels";
-import { AgentTeamForm, AgentTeamsOf, AgentTeamsOrgCard, AgentTeamsSection } from "./AgentTeamsPanels";
+import { AgentOverviewCard } from "./AgentOverviewCard";
+import { AgentTeamForm, AgentTeamsOrgCard, AgentTeamsSection } from "./AgentTeamsPanels";
 
 /* ====================================================================== *
  * TEAM — AI Workforce & Agent Academy
@@ -392,20 +393,14 @@ function AgentProfile({ context, view }: { context: ScreenContext; view: "Overvi
 
   return (
     <Grid>
-      <Card span={7} machine={agent.status === "active"} title={<Row gap={3}><Avatar name={agent.title} kind="ai" size="lg" />{agent.title}</Row>} subtitle={`${String(agent.fields.role ?? "")} · ${agent.status}`}>
-        <Stack gap={3}>
-          <p className="ds-prose">{agent.summary}</p>
-          <Properties rows={[
-            { label: "Reports to", value: String(agent.fields.manager ?? "Unassigned") },
-            { label: "Department", value: data.departments.find((department) => department.id === agent.fields.departmentId)?.title ?? "Unassigned" },
-            { label: "Autonomy", value: String(agent.fields.autonomy ?? "draft") },
-            { label: "Spend ceiling", value: context.money(Number(agent.fields.spendCapMinor ?? 0)) },
-            { label: "Model", value: <Pill tone="warning">Not connected</Pill> },
-            { label: "Permitted actions", value: String((body.authority ?? []).length) },
-            { label: "Agent teams", value: <AgentTeamsOf agentId={agent.id} /> },
-          ]} />
-        </Stack>
-      </Card>
+      <AgentOverviewCard
+        agent={agent}
+        department={data.departments.find((department) => department.id === agent.fields.departmentId)?.title ?? "Unassigned"}
+        spendCeiling={context.money(Number(agent.fields.spendCapMinor ?? 0))}
+        permittedActions={(body.authority ?? []).length}
+        grantedTools={(body.tools ?? []).filter((tool) => tool.granted).length}
+        totalTools={(body.tools ?? []).length}
+      />
       <Card span={5} eyebrow="ACTIVATION" prov={blockers.length === 0 ? "posted" : "unknown"} title="Can it be activated?" subtitle={blockers.length === 0 ? "No blockers · everything required is recorded" : `${blockers.length} blocker${blockers.length === 1 ? "" : "s"}`}>
         {blockers.length === 0 ? (
           <Notice tone="success" title="Ready">This contract has a role, a manager, a bounded ceiling, at least one skill, a granted tool and a passing evaluation.</Notice>
