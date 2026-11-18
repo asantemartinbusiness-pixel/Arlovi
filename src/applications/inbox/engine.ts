@@ -173,8 +173,8 @@ export function useInboxData(): InboxData {
     const items = (filterForRole(all, role) as InboxItem[]).map((item) => {
       const personal = receipts[attentionReceiptKey(org.id, actor, item.id)];
       return { ...item,
-        read: item.read || personal?.read === true,
-        acknowledged: item.acknowledged || personal?.acknowledged === true,
+        read: typeof personal?.read === "boolean" ? personal.read : item.read,
+        acknowledged: typeof personal?.acknowledged === "boolean" ? personal.acknowledged : item.acknowledged,
         snoozed: item.snoozed || attentionSnoozed(item, receipts, org.id, actor, now),
       };
     });
