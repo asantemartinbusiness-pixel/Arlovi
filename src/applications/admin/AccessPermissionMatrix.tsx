@@ -6,7 +6,7 @@ import { useCollectionState } from "@/platform/workspace";
 import { can } from "@/platform/policy";
 import { ROLE_TEMPLATES, roleTemplate, type AccessScope } from "@/platform/accessModel";
 import {
-  MATRIX_ACTIONS, countDraftChanges, emptyRolePermissionDraft, parseRolePermissionDraft,
+  countDraftChanges, emptyRolePermissionDraft, parseRolePermissionDraft,
   plannedPermission, updateRolePermission, updateRoleScope,
   type MatrixAction, type PermissionChoice, type RolePermissionDraft,
 } from "@/platform/accessMatrix";
