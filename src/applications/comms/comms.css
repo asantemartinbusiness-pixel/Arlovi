@@ -143,3 +143,23 @@
 
 .cm-mail-setup-help { grid-column: 1 / -1; padding: var(--space-3); border: 1px solid var(--border-subtle); background: var(--bg-inset); border-radius: var(--radius-md); }
 .cm-mail-setup-help p { margin: var(--space-2) 0 0; }
+
+
+/* Mailbox workflow views and related business records */
+.cm-mail-views { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
+.cm-mail-view {
+  border: 1px solid transparent; border-radius: var(--radius-full);
+  padding: 6px 11px; background: transparent; color: var(--fg-subtle);
+  cursor: pointer; font: inherit; font-size: var(--text-sm);
+}
+.cm-mail-view:hover { background: var(--bg-hover); color: var(--fg-default); }
+.cm-mail-view[aria-pressed="true"] {
+  background: var(--bg-selected); border-color: var(--border-default);
+  color: var(--fg-default); font-weight: 650;
+}
+.cm-mail-view:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cm-mail-preview-context {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-3); background: var(--bg-inset); border-radius: var(--radius-md);
+}
+.cm-mail-preview-context p { margin: 0; }
