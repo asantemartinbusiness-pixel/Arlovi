@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { Rec } from "@/domain/types";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections } from "@/platform/workspace";
+import { listByCollection } from "@/platform/repo";
 import {
   evaluateAssertions, readGraph, runWorkflow,
   type PendingWrite, type RunResult, type StoredRun, type WorkflowGraph,
@@ -19,16 +20,24 @@ export const AUTOMATION_COLLECTIONS = [
  * Only the collections the graph names are read, so an automation never pulls
  * the whole workspace into memory.
  */
+export function graphCollections(graph: WorkflowGraph): string[] {
+  const set = new Set<string>();
+  for (const node of graph.nodes) {
+    if (node.config?.collection) set.add(node.config.collection);
+    if (node.config?.target && AUTOMATION_COLLECTIONS.includes(node.config.target)) set.add(node.config.target);
+  }
+  if (set.size === 0) set.add("invoices");
+  return [...set].sort();
+}
+
+/** The same records as useGraphRecords, read once, for an action outside a component. */
+export async function loadGraphRecords(organizationId: string, graph: WorkflowGraph): Promise<Rec[]> {
+  const lists = await Promise.all(graphCollections(graph).map((name) => listByCollection(organizationId, name)));
+  return lists.flat();
+}
+
 export function useGraphRecords(graph: WorkflowGraph): Rec[] {
-  const names = useMemo(() => {
-    const set = new Set<string>();
-    for (const node of graph.nodes) {
-      if (node.config?.collection) set.add(node.config.collection);
-      if (node.config?.target && AUTOMATION_COLLECTIONS.includes(node.config.target)) set.add(node.config.target);
-    }
-    if (set.size === 0) set.add("invoices");
-    return [...set].sort();
-  }, [graph]);
+  const names = useMemo(() => graphCollections(graph), [graph]);
   const data = useCollections(names);
   return useMemo(() => names.flatMap((name) => data[name] ?? []), [names, data]);
 }

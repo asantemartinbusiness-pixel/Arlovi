@@ -20,7 +20,7 @@ import {
   swapShift, validateRun, verifyCompletion, viewEmployee,
 } from "./actions";
 import { listByCollection } from "@/platform/repo";
-import { planOnboardingLaunch } from "./decisions";
+import { csvCell, planOnboardingLaunch } from "./decisions";
 import { planShiftMove, planTimesheetApprovals } from "./workforce";
 import { scopedDetailRecord } from "@/platform/recordScope";
 import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
@@ -1100,7 +1100,7 @@ function ExportHours({ context }: { context: ScreenContext }) {
         onClick={() => {
           const header = "date,person,hours,billable,approved,against\n";
           const body = rows.map((row) => [row.startAt ?? "", String(row.fields.employeeName ?? ""), String(row.fields.hours ?? 0), String(row.fields.billable ?? false), String(row.fields.approved ?? false), row.summary]
-            .map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")).join("\n");
+            .map((cell) => csvCell(cell)).join(",")).join("\n");
           const blob = new Blob([header + body], { type: "text/csv" });
           const url = URL.createObjectURL(blob);
           const link = document.createElement("a");

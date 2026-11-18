@@ -357,7 +357,7 @@ export function QueuePriority({ context, close }: { context: ScreenContext; clos
       <Button
         variant="primary"
         onClick={async () => {
-          await context.mutate.patch(workflow.id, { fields: { ...workflow.fields, concurrency: value } }, { expectRevision: workflow.revision, event: "Concurrency changed" });
+          if (!await context.mutate.patch(workflow.id, { fields: { ...workflow.fields, concurrency: value } }, { expectRevision: workflow.revision, event: "Concurrency changed" })) return;
           context.toast("Concurrency changed", `${workflow.title} allows ${value} parallel run${value === 1 ? "" : "s"}.`);
           close();
         }}

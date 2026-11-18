@@ -358,7 +358,9 @@ export function runExplore(spec: ExploreSpec, records: Rec[], now: Date): Explor
     ? left.key.localeCompare(right.key)
     : (right.value ?? -Infinity) - (left.value ?? -Infinity) || left.key.localeCompare(right.key)));
   const hiddenGroups = Math.max(0, rows.length - spec.limit);
-  if (hiddenGroups > 0) rows = rows.slice(0, spec.limit);
+  // A time dimension keeps its most recent groups (still oldest first); any
+  // other grouping keeps the first by its sort.
+  if (hiddenGroups > 0) rows = chronological ? rows.slice(-spec.limit) : rows.slice(0, spec.limit);
 
   const allValues = included.map(numberOf).filter((value): value is number => value !== undefined);
   const total = aggregate(spec.agg, allValues, included.length);
@@ -376,7 +378,7 @@ export function runExplore(spec: ExploreSpec, records: Rec[], now: Date): Explor
     spec.agg === "count"
       ? `Counted ${included.length} record${included.length === 1 ? "" : "s"}.`
       : `${AGG_LABELS[spec.agg]} ${schema.find((field) => field.key === aggField)?.label.toLowerCase() ?? aggField} over ${included.length - missingValue} record${included.length - missingValue === 1 ? "" : "s"}${missingValue ? `; ${missingValue} had no value and were left out, not counted as zero` : ""}.`,
-    spec.groupBy === "none" ? "Not grouped." : `Grouped into ${groups.size} group${groups.size === 1 ? "" : "s"}${hiddenGroups ? `; the ${spec.limit} shown are the first by ${spec.sort === "label" || chronological ? "label" : "value"}, ${hiddenGroups} more are in the CSV` : ""}.`,
+    spec.groupBy === "none" ? "Not grouped." : `Grouped into ${groups.size} group${groups.size === 1 ? "" : "s"}${hiddenGroups ? `; the ${spec.limit} shown are ${chronological ? "the most recent" : `the first by ${spec.sort === "label" ? "label" : "value"}`}, ${hiddenGroups} more are in the CSV` : ""}.`,
   ];
 
   return {
@@ -390,10 +392,22 @@ export function runExplore(spec: ExploreSpec, records: Rec[], now: Date): Explor
   };
 }
 
+/**
+ * One quoted CSV cell. Text that a spreadsheet would read as a formula (it
+ * starts with = + - @, a tab or a carriage return) is prefixed with an
+ * apostrophe; plain numbers pass through untouched.
+ */
+export function exploreCsvCell(cell: string | number): string {
+  const text = String(cell);
+  const numeric = typeof cell === "number" || /^-?\d+(\.\d+)?$/.test(text);
+  const guarded = !numeric && /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  return `"${guarded.replace(/"/g, '""')}"`;
+}
+
 /** Every group (not only the shown ones) as CSV, with the formula on top. */
 export function exploreCsv(spec: ExploreSpec, records: Rec[], now: Date, format: (value: number | null) => string): string {
   const full = runExplore({ ...spec, limit: Number.MAX_SAFE_INTEGER }, records, now);
-  const escape = (cell: string | number) => `"${String(cell).replace(/"/g, '""')}"`;
+  const escape = exploreCsvCell;
   const lines = [
     [escape("Formula"), escape(full.formula)].join(","),
     [escape("Source"), escape("This workspace's records")].join(","),

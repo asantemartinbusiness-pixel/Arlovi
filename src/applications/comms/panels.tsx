@@ -13,6 +13,7 @@ import { sameDay } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { ChannelList, Conversation } from "./chat";
 import { CalendarSurface, type CalendarView } from "./calendar";
+import { localDate } from "./schedule";
 
 export function useCommsData() {
   return useCollections(["channels", "messages", "emailThreads", "meetings", "calls", "announcements", "preferences", "members", "employees", "contacts", "documents"]);
@@ -484,7 +485,7 @@ export function Calendar({ context, lens }: { context: ScreenContext; lens: "Day
       meetings={meetings}
       view={lens as CalendarView}
       onPick={(meeting) => context.navigate(`/o/${org.slug}/comms/meetings/${meeting.id}`)}
-      onCreateAt={(day, time) => context.openOverlay("Event editor", { date: day.toISOString().slice(0, 10), time })}
+      onCreateAt={(day, time) => context.openOverlay("Event editor", { date: localDate(day), time })}
       onEdit={(meeting) => context.openOverlay("edit event", { id: meeting.id })}
     />
   );

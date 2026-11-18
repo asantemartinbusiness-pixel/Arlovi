@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Rec } from "@/domain/types";
 import {
-  defaultExploreSpec, displayKey, exploreCsv, inferSchema, matchesFilter, rangeWindow, readExplore, runExplore,
+  defaultExploreSpec, displayKey, exploreCsv, exploreCsvCell, inferSchema, matchesFilter, rangeWindow, readExplore, runExplore,
   type ExploreSpec,
 } from "@/applications/analytics/explore";
 
@@ -101,5 +101,30 @@ describe("spec storage", () => {
     expect(rangeWindow({ preset: "ytd" }, NOW).from).toBe("2026-01-01T00:00:00.000Z");
     expect(rangeWindow({ preset: "custom", from: "2026-11-01", to: "2026-11-02" }, NOW)).toEqual({ from: "2026-11-01T00:00:00.000Z", to: "2026-11-02T23:59:59.999Z" });
     expect(rangeWindow({ preset: "all" }, NOW)).toEqual({});
+  });
+});
+
+describe("explore CSV and time limits", () => {
+  it("guards CSV cells against spreadsheet formula injection", () => {
+    expect(exploreCsvCell('=HYPERLINK("x")')).toBe(`"'=HYPERLINK(""x"")"`);
+    expect(exploreCsvCell("+1")).toBe(`"'+1"`);
+    expect(exploreCsvCell("@SUM(A1)")).toBe(`"'@SUM(A1)"`);
+    expect(exploreCsvCell("\tcmd")).toBe(`"'\tcmd"`);
+    expect(exploreCsvCell("\rcmd")).toBe(`"'\rcmd"`);
+    expect(exploreCsvCell("-2+3")).toBe(`"'-2+3"`);
+    expect(exploreCsvCell("-12.5")).toBe(`"-12.5"`);
+    expect(exploreCsvCell(-3)).toBe(`"-3"`);
+    expect(exploreCsvCell("Paid")).toBe(`"Paid"`);
+    const hostile = [rec("x", { status: "=cmd|' /C calc'!A0", amountMinor: 100, at: "2026-11-01T00:00:00Z" })];
+    const csv = exploreCsv(base({ groupBy: "status", range: { preset: "all" } }), hostile, NOW, (value) => String(value));
+    expect(csv).not.toMatch(/(^|,)"=/m);
+    expect(csv).toContain(`"'=cmd|' /C calc'!A0"`);
+  });
+
+  it("keeps the most recent groups when a time dimension is limited", () => {
+    const result = runExplore(base({ agg: "count", groupBy: "month", limit: 2, range: { preset: "all" } }), records.filter((row) => row.at), NOW);
+    expect(result.hiddenGroups).toBe(1);
+    expect(result.rows.map((row) => row.key)).toEqual(["2026-10", "2026-11"]);
+    expect(result.steps.join(" ")).toMatch(/the 2 shown are the most recent, 1 more are in the CSV/);
   });
 });

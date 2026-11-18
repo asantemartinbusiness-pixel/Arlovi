@@ -109,13 +109,15 @@ export function FormRuntime({
   mode: "live" | "preview";
   onSubmitted?: (id: string) => void;
   /** Preview only: called with the visible answers when a run passes validation. Nothing is written as a submission. */
-  onPreviewComplete?: (run: { answers: [string, string][]; hidden: number }) => Promise<void> | void;
+  /** Resolve false when the run could not be kept (the form changed elsewhere). */
+  onPreviewComplete?: (run: { answers: [string, string][]; hidden: number }) => Promise<boolean | void> | boolean | void;
 }) {
   const [answers, setAnswers] = useState<Answers>({});
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [page, setPage] = useState(0);
   const [done, setDone] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [previewKept, setPreviewKept] = useState(true);
 
   const { visible, required } = evaluate(model, answers);
   const pageList = pages(model);
@@ -136,7 +138,9 @@ export function FormRuntime({
             {mode === "live"
               ? `A submission record was created against ${record.title}, answering version ${model.settings.version}.`
               : onPreviewComplete
-                ? "Kept as a preview run on this form. It is not a response: the inbox, analytics and exports never count it."
+                ? previewKept
+                  ? "Kept as a preview run on this form. It is not a response: the inbox, analytics and exports never count it."
+                  : "This preview run was not kept: the form changed elsewhere before it could be saved. Reload the form and run the preview again."
                 : "Nothing was written: this is the preview, and it stops before the record."}
           </p>
           {model.settings.notifyEnabled && mode === "live" && (
@@ -178,10 +182,11 @@ export function FormRuntime({
           const shown = answerable.filter((field) => visible.has(field.id));
           setBusy(true);
           try {
-            await onPreviewComplete?.({
+            const kept = await onPreviewComplete?.({
               answers: shown.map((field) => [field.label, answerText(answers[field.id])]),
               hidden: answerable.length - shown.length,
             });
+            setPreviewKept(kept !== false);
           } finally {
             setBusy(false);
           }

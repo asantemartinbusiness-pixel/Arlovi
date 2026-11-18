@@ -19,6 +19,7 @@ import {
   InsightDetail, InsightsOverview, MetricInspector, QuestionComposer, SaveView, ScenarioEditor,
 } from "./overview";
 import { allMeasures, formatMeasure, measureById, runQuery } from "./metrics";
+import { exploreCsvCell } from "./explore";
 import {
   AdjustInputs, CiteFigures, CompareMeasures, CompareScenarios, DeployModel, GrantDataset, RefreshDataset, RefreshModel,
   ResizeTile, SetFilter, TestMeasure, ValidateModel,
@@ -44,7 +45,7 @@ const submitFooter = (formId: string, label: string) => ({ close }: { close: () 
 );
 
 function downloadCsv(name: string, header: string[], rows: (string | number)[][], context: ScreenContext) {
-  const escape = (cell: string | number) => `"${String(cell).replace(/"/g, '""')}"`;
+  const escape = exploreCsvCell;
   const text = [header.map(escape).join(","), ...rows.map((row) => row.map(escape).join(","))].join("\n");
   const blob = new Blob([text], { type: "text/csv" });
   const url = URL.createObjectURL(blob);

@@ -11,7 +11,7 @@ import { can as roleCan, ROLE_LABELS, type Capability } from "@/platform/policy"
 import type { Rec, Role } from "@/domain/types";
 import { AccessRequests, EffectiveAccess } from "./access";
 import {
-  appsForRole, CAPABILITIES, capabilityLabel, csvList, ofKind, ROLES, RoleReach, StepUp,
+  appsForRole, CAPABILITIES, capabilityLabel, csvCell, csvList, ofKind, ROLES, RoleReach, StepUp,
   useAdmin, useOrganisationRecord, useSeeded, useSeededList,
 } from "./pieces";
 import { LeaverHandoffs, completeHandoffs, useLeaverHandoffs } from "./leavers";
@@ -437,7 +437,7 @@ export function MembersScreen({ context, tab }: { context: ScreenContext; tab: "
               label: "Export CSV",
               onRun: (selected) => {
                 const header = "name,role,status,department,last seen\n";
-                const body = selected.map((row) => [row.title, String(row.fields.role ?? ""), row.status, String(row.fields.departmentId ?? ""), String(row.fields.lastAccessAt ?? "")].map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")).join("\n");
+                const body = selected.map((row) => [row.title, String(row.fields.role ?? ""), row.status, String(row.fields.departmentId ?? ""), String(row.fields.lastAccessAt ?? "")].map((cell) => csvCell(cell)).join(",")).join("\n");
                 const blob = new Blob([header + body], { type: "text/csv" });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement("a");
@@ -590,7 +590,8 @@ export function RoleImpact({ context, close }: { context: ScreenContext; close: 
           onClick={async () => {
             setBusy(true);
             try {
-              await context.mutate.patch(member.id, { fields: { ...member.fields, role } }, { event: `Role view changed from ${current} to ${role} for ${member.title}`, expectRevision: member.revision });
+              const saved = await context.mutate.patch(member.id, { fields: { ...member.fields, role } }, { event: `Role view changed from ${current} to ${role} for ${member.title}`, expectRevision: member.revision });
+              if (!saved) return;
               context.toast("Role changed", `${member.title} now holds the ${ROLE_LABELS[role]} view, and the change is in the audit trail.`);
               close();
             } finally {
@@ -625,26 +626,43 @@ export function RevokeConfirmation({ context, close }: { context: ScreenContext;
       onConfirm={async () => {
         setBusy(true);
         try {
+          // A patch returns null when the record changed elsewhere (the helper
+          // has already said so). Only a member whose suspension saved has
+          // their sessions and keys revoked and their leaver step closed.
+          const suspended: Rec[] = [];
           for (const member of members) {
-            await context.mutate.patch(member.id, {
+            const saved = await context.mutate.patch(member.id, {
               status: "suspended",
               fields: { ...member.fields, suspendedBy: context.actor, suspendedAt: clockIso() },
             }, { event: `Access suspended for ${member.title}`, expectRevision: member.revision });
+            if (saved) suspended.push(member);
           }
-          for (const session of sessions) {
-            await context.mutate.patch(session.id, {
+          if (suspended.length === 0) return;
+          const names = suspended.map((member) => member.title);
+          let revokedSessions = 0;
+          for (const session of sessions.filter((row) => names.includes(String(row.fields.member)))) {
+            const saved = await context.mutate.patch(session.id, {
               status: "revoked",
               fields: { ...session.fields, revokedBy: context.actor, revokedAt: clockIso() },
-            }, { event: `Session revoked during offboarding: ${session.title}` });
+            }, { event: `Session revoked during offboarding: ${session.title}`, expectRevision: session.revision });
+            if (saved) revokedSessions += 1;
           }
-          for (const key of keys) {
-            await context.mutate.patch(key.id, {
+          let revokedKeys = 0;
+          for (const key of keys.filter((row) => names.includes(String(row.fields.createdBy)))) {
+            const saved = await context.mutate.patch(key.id, {
               status: "revoked",
               fields: { ...key.fields, revokedBy: context.actor, revokedAt: clockIso() },
-            }, { event: `API key revoked during offboarding: ${key.title}` });
+            }, { event: `API key revoked during offboarding: ${key.title}`, expectRevision: key.revision });
+            if (saved) revokedKeys += 1;
           }
-          const closed = await completeHandoffs(context, handoffs, members.map((member) => member.title), `member suspended, ${sessions.length} sessions and ${keys.length} keys revoked`);
-          context.toast("Offboarded", `${members.length} suspended, ${sessions.length} ${sessions.length === 1 ? "session" : "sessions"} revoked, ${keys.length} ${keys.length === 1 ? "key" : "keys"} revoked.${closed ? ` ${closed} leaver ${closed === 1 ? "step" : "steps"} closed in People.` : ""}`);
+          const failed = members.length - suspended.length;
+          const closed = await completeHandoffs(context, handoffs, names, `member suspended, ${revokedSessions} sessions and ${revokedKeys} keys revoked`);
+          context.toast(
+            failed ? "Partly offboarded" : "Offboarded",
+            `${suspended.length} suspended, ${revokedSessions} ${revokedSessions === 1 ? "session" : "sessions"} revoked, ${revokedKeys} ${revokedKeys === 1 ? "key" : "keys"} revoked.${closed ? ` ${closed} leaver ${closed === 1 ? "step" : "steps"} closed in People.` : ""}${failed ? ` ${failed} ${failed === 1 ? "member was" : "members were"} not suspended because the record changed elsewhere; reload and try again.` : ""}`,
+            failed ? "blocked" : "ok",
+          );
+          if (failed) return;
           close();
         } finally {
           setBusy(false);
