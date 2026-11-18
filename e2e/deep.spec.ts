@@ -225,11 +225,14 @@ for (const code of apps) {
     const page = await context.newPage();
     const errors = watch(page);
     const results: ScreenResult[] = [];
-    mkdirSync(OUT, { recursive: true });
+    // Evidence is written only when requested (`npm run evidence`), so a
+    // routine run never leaves partial sweep files in the working tree.
+    const writeEvidence = process.env.ARLOVI_WRITE_EVIDENCE === "1";
+    if (writeEvidence) mkdirSync(OUT, { recursive: true });
     for (const screen of screens) {
       results.push(await sweepScreen(page, screen, errors));
       // Written after every screen, so a timeout never discards finished work.
-      writeFileSync(new URL(`${code}.json`, OUT), `${JSON.stringify(results, null, 1)}\n`);
+      if (writeEvidence) writeFileSync(new URL(`${code}.json`, OUT), `${JSON.stringify(results, null, 1)}\n`);
     }
     await context.close();
 
