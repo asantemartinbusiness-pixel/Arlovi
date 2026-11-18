@@ -21,21 +21,21 @@ export function attentionReceiptKey(orgId: string, role: Role, itemId: string, a
 
 export type PresentedAttentionItem = AttentionItem & { snoozedUntil?: string; snoozed?: boolean };
 
-export function applyAttentionReceipts(
-  items: AttentionItem[],
+export function applyAttentionReceipts<T extends AttentionItem>(
+  items: T[],
   receipts: Record<string, AttentionReceipt>,
   orgId: string,
   role: Role,
   actor?: string,
   now = new Date(),
-): PresentedAttentionItem[] {
+): (T & PresentedAttentionItem)[] {
   return items.map((item) => {
     const receipt = receipts[attentionReceiptKey(orgId, role, item.id, actor)];
     if (!receipt) return item;
     return {
       ...item,
-      read: item.read || receipt.read === true,
-      acknowledged: item.acknowledged || receipt.acknowledged === true,
+      read: receipt.read ?? item.read,
+      acknowledged: receipt.acknowledged ?? item.acknowledged,
       snoozedUntil: receipt.snoozedUntil,
       snoozed: isSnoozed(receipt.snoozedUntil, now),
     };
