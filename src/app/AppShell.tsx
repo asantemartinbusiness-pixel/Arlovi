@@ -25,9 +25,12 @@ import { canOpen } from "@/platform/policy";
 import { ORGS } from "@/platform/org";
 import { useCollections, useWorkspace, useMutations } from "@/platform/workspace";
 import { buildAttention, filterForRole, headerAttentionCounts } from "@/platform/attention";
+import { DEFAULT_NOTIFICATION_PREFERENCES, isUrgent, mayInterrupt } from "@/platform/notificationPolicy";
 import { applyAttentionReceipts } from "@/platform/attentionReceipts";
 import { useUi } from "@/runtime/ui";
 import { DisplayPreferences } from "@/app/DisplayPreferences";
+import { NotificationToastStack } from "@/app/NotificationToastStack";
+import { NotificationBanner } from "@/app/NotificationBanner";
 import { ProfileMenu } from "@/app/ProfileMenu";
 import type { Role } from "@/domain/types";
 import "@/app/shell.css";
@@ -37,7 +40,7 @@ export function AppShell() {
   const ui = useUi();
   const location = useLocation();
   const navigate = useNavigate();
-  const { org, role, now } = useWorkspace();
+  const { org, role, actor, now } = useWorkspace();
   const mutate = useMutations();
   const [navOpen, setNavOpenState] = useState(false);
   /* The path the drawer was opened on. Route changes close the drawer, but the
@@ -51,7 +54,7 @@ export function AppShell() {
   }, []);
   const [displayOpen, setDisplayOpen] = useState(false);
   const closeDisplay = useCallback(() => setDisplayOpen(false), []);
-  const [attentionView, setAttentionView] = useState<"for-you" | "approvals" | "updates">("for-you");
+  const [attentionView, setAttentionView] = useState<"for-you" | "approvals" | "updates" | "settings">("for-you");
   const searchTrigger = useRef<HTMLButtonElement>(null);
   const keyboardHint = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.userAgent) ? "⌘K" : "Ctrl+K";
 
@@ -126,12 +129,40 @@ export function AppShell() {
     workflowApprovals: data.workflowApprovals,
     orgSlug: org.slug,
     now,
-  }), role), ui.attentionReceipts, org.id, role), [data, org.slug, org.id, now, role, ui.attentionReceipts]);
+  }), role), ui.attentionReceipts, org.id, role, actor, now), [data, org.slug, org.id, now, role, actor, ui.attentionReceipts]);
   const contextVisible = isWorkspaceArea && ["project","department"].includes(location.pathname.split("/")[5]);
   const {decisions, unreadUpdates: updates} = headerAttentionCounts(attention);
+  // Start from the current feed. Only events arriving after this view mounts may
+  // produce transient feedback; loading historical notifications never spams toasts.
+  const arrivalTracker = useRef<{ scope: string; seen: Set<string> } | null>(null);
+  useEffect(() => {
+    const scope = `${org.id}:${encodeURIComponent(actor)}:${role}`;
+    if (!arrivalTracker.current || arrivalTracker.current.scope !== scope) {
+      arrivalTracker.current = { scope, seen: new Set(attention.map(item => item.id)) };
+      return;
+    }
+    const fresh = attention.filter(item => !arrivalTracker.current!.seen.has(item.id));
+    fresh.forEach(item => arrivalTracker.current!.seen.add(item.id));
+    const personal = ui.notificationSettings[`${org.id}:${encodeURIComponent(actor)}`] ?? DEFAULT_NOTIFICATION_PREFERENCES;
+    const eligible = fresh.filter(item => mayInterrupt(item, personal,
+      Boolean(item.route) && item.route!.split("?")[0] === location.pathname));
+    if (!eligible.length) return;
+    const mostImportant = [...eligible].sort((a,b)=>a.priority.localeCompare(b.priority))[0];
+    const privateSummary = personal.preview === "private";
+    ui.pushToast({
+      title: privateSummary ? (isUrgent(mostImportant.priority) ? "Urgent notification" : "New notification") : mostImportant.title,
+      body: privateSummary ? `${eligible.length} new item(s) need your attention. Open notifications to review.`
+        : eligible.length > 1 ? `${eligible.length} new updates · ${mostImportant.body}` : mostImportant.body,
+      tone: isUrgent(mostImportant.priority) ? "blocked" : "info",
+      durationMs: isUrgent(mostImportant.priority) ? 0 : 6000,
+      actionLabel: "Review",
+      onAction: () => { setAttentionView(mostImportant.kind === "approval" || mostImportant.kind === "assignment" ? "approvals" : "updates");
+        ui.setCommand(false); ui.setAsk(false); ui.setNotes(true); },
+    });
+  }, [attention, org.id, actor, role, location.pathname, ui.notificationSettings, ui.pushToast, ui.setNotes, ui.setAsk, ui.setCommand]);
   function openCommand() { ui.setAsk(false); ui.setNotes(false); ui.setCommand(true); }
   function openAsk() { ui.setCommand(false); ui.setNotes(false); ui.setAsk(true); }
-  function openAttention(view: "for-you" | "approvals" | "updates") {
+  function openAttention(view: "for-you" | "approvals" | "updates" | "settings") {
     if (ui.notes && attentionView === view) {ui.setNotes(false);return;}
     setAttentionView(view);ui.setCommand(false);ui.setAsk(false);ui.setNotes(true);
   }
@@ -303,6 +334,7 @@ export function AppShell() {
         <ProfileMenu
           onRoleViewChange={chooseRoleView}
           onOpenDisplay={() => setDisplayOpen(true)}
+          onOpenNotificationPreferences={() => openAttention("settings")}
           onStartTour={() => window.dispatchEvent(new Event("arlovi:start-tour"))}
           activeApplication={activeScreen && APP_ENTRIES[activeCode] ? {
             name: APP_ENTRIES[activeCode].short,
@@ -408,35 +440,23 @@ export function AppShell() {
           <div className="hq-scroll">
           {applicationLoadFailures().length > 0 && (
             <div className="hq-banners">
-              <div className="ds-notice" data-tone="danger" role="alert">
-                <div>
-                  <strong className="ds-notice-title">Some applications could not be loaded</strong>
-                  {applicationLoadFailures().map((failure) => `${failure.group}: ${failure.message}`).join(" · ")}
-                  {" "}Every other application is working normally.
-                </div>
-              </div>
+              <NotificationBanner tone="danger" title="Some applications could not be loaded">
+                {applicationLoadFailures().map(failure => `${failure.group}: ${failure.message}`).join(" · ")}
+                {" "}Other applications remain available.
+              </NotificationBanner>
             </div>
           )}
           {(ui.offline || paused) && (
             <div className="hq-banners">
-              {ui.offline && (
-                <div className="ds-notice" data-tone="info" role="status">
-                  <div><strong className="ds-notice-title">Offline</strong>This workspace is in your browser, so it keeps working. Nothing is sent anywhere.</div>
-                </div>
-              )}
-              {paused && (
-                <div className="ds-notice" data-tone="warning" role="status">
-                  <div className="ds-grow">
-                    <strong className="ds-notice-title">Mission dispatch is paused</strong>
-                    New autonomous steps will not start. Actions already accepted elsewhere cannot be confirmed from here.
-                  </div>
-                  {role === "owner" && (
-                    <Button size="sm" onClick={() => mutate.patch(org.id, { fields: { ...data.organizations.find((item) => item.id === org.id)?.fields, executionPaused: false } }, { event: "Mission dispatch resumed" })}>
-                      Resume dispatch
-                    </Button>
-                  )}
-                </div>
-              )}
+              {ui.offline && <NotificationBanner tone="info" title="Working offline">
+                Your browser-local workspace remains accessible. External actions cannot be confirmed.
+              </NotificationBanner>}
+              {paused && <NotificationBanner tone="warning" title="Mission dispatch is paused"
+                action={role === "owner" ? <Button size="sm" onClick={() => mutate.patch(org.id, {
+                  fields: { ...data.organizations.find(item => item.id === org.id)?.fields, executionPaused: false }
+                }, { event: "Mission dispatch resumed" })}>Resume dispatch</Button> : undefined}>
+                New autonomous steps will not start. Already accepted external actions cannot be confirmed here.
+              </NotificationBanner>}
             </div>
           )}
           {org.ownerName && (location.pathname === `/o/${org.slug}/hq/home` || location.pathname === workAreaPath(org.slug,"home")) && <FirstRunGuide />}
@@ -465,17 +485,7 @@ export function AppShell() {
       {ui.notes && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening attention centre…</div>}><AttentionCentre key={attentionView} initialView={attentionView} items={attention} onClose={() => ui.setNotes(false)} /></Suspense>}
       {ui.ask && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening assistant…</div>}><AskPanel onClose={() => ui.setAsk(false)} seed={ui.askSeed} /></Suspense>}
 
-      <div className="ds-toasts" aria-live="polite" aria-atomic="false">
-        {ui.toasts.map((toast) => (
-          <div key={toast.id} className="ds-toast" data-tone={toast.tone}>
-            <div className="ds-grow">
-              <strong>{toast.title}</strong>
-              <p>{toast.body}</p>
-            </div>
-            <Button variant="ghost" size="sm" iconOnly aria-label="Dismiss" onClick={() => ui.dismissToast(toast.id)}><X size={14} /></Button>
-          </div>
-        ))}
-      </div>
+      <NotificationToastStack />
     </div>
   );
 }

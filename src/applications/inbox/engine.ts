@@ -4,6 +4,8 @@ import {
   buildAttention, filterForRole, PRIORITY_LABEL, PRIORITY_TONE, type AttentionItem, type Priority,
 } from "@/platform/attention";
 import { useCollections, useWorkspace, type Mutations } from "@/platform/workspace";
+import { applyAttentionReceipts } from "@/platform/attentionReceipts";
+import { useUi } from "@/runtime/ui";
 
 /* ====================================================================== *
  * INBOX engine — one attention model for every screen in this module.
@@ -125,7 +127,8 @@ export interface InboxData {
 
 export function useInboxData(): InboxData {
   const data = useCollections(INBOX_COLLECTIONS);
-  const { org, now, role } = useWorkspace();
+  const { org, now, role, actor } = useWorkspace();
+  const receipts = useUi(state => state.attentionReceipts);
 
   return useMemo(() => {
     const raw = buildAttention({
@@ -167,7 +170,7 @@ export function useInboxData(): InboxData {
       return merged;
     });
 
-    const items = filterForRole(all, role) as InboxItem[];
+    const items = applyAttentionReceipts(filterForRole(all, role) as InboxItem[], receipts, org.id, role, actor, now);
     return {
       items,
       all,
@@ -179,7 +182,7 @@ export function useInboxData(): InboxData {
       digests: data.preferences.filter((record) => record.fields.kind === "digest"),
       quietHours: data.preferences.filter((record) => record.fields.kind === "quietHours"),
     };
-  }, [data, org.slug, now, role]);
+  }, [data, org.slug, org.id, now, role, actor, receipts]);
 }
 
 /**
