@@ -117,10 +117,31 @@ function MiniSlide({ deck, slide, width }: { deck: Deck; slide: Slide; width: nu
 }
 
 function SlideSorter({ editor, context }: { editor: DeckEditor; context: ScreenContext }) {
+  const [dragging, setDragging] = useState<number | null>(null);
+  const [over, setOver] = useState<number | null>(null);
+  const drop = (to: number) => {
+    if (dragging !== null && dragging !== to) {
+      const slide = editor.deck.slides[dragging];
+      editor.commit(moveSlide(editor.deck, slide.id, to), "Reorder slides");
+    }
+    setDragging(null);
+    setOver(null);
+  };
   return (
     <>
       {editor.deck.slides.map((slide, index) => (
-        <div key={slide.id} className="px-thumb-row">
+        <div
+          key={slide.id}
+          className="px-thumb-row"
+          draggable
+          data-dragging={dragging === index || undefined}
+          data-drop={over === index && dragging !== null && dragging !== index ? (dragging < index ? "after" : "before") : undefined}
+          onDragStart={(event) => { setDragging(index); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", slide.id); }}
+          onDragOver={(event) => { if (dragging === null) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; if (over !== index) setOver(index); }}
+          onDragLeave={() => { if (over === index) setOver(null); }}
+          onDrop={(event) => { event.preventDefault(); drop(index); }}
+          onDragEnd={() => { setDragging(null); setOver(null); }}
+        >
           <button
             type="button"
             className="px-thumb"
@@ -153,7 +174,7 @@ function SlideSorter({ editor, context }: { editor: DeckEditor; context: ScreenC
         <Button size="sm" variant="ghost" icon={<Copy size={14} />} onClick={() => editor.commit(duplicateSlide(editor.deck, editor.slide.id), "Duplicate slide")}>Copy</Button>
         <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} disabled={editor.deck.slides.length <= 1} onClick={() => editor.commit(removeSlide(editor.deck, editor.slide.id), "Delete slide")}>Delete</Button>
       </Row>
-      <p className="ds-subtle" style={{ fontSize: "var(--text-2xs)" }}>Alt with the up or down arrow reorders the focused slide from the keyboard.</p>
+      <p className="ds-subtle" style={{ fontSize: "var(--text-2xs)" }}>Drag a slide to reorder it, or use Alt with the up or down arrow on the focused slide.</p>
     </>
   );
 }
@@ -1410,16 +1431,54 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
   const next = visible[position + 1];
 
   const advance = (delta: number) => { advanceSlides(editor, delta); };
+  const [blackout, setBlackout] = useState(false);
+  const [jump, setJump] = useState("");
+  const [viewport, setViewport] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
+
+  /* Leave the browser's full screen together with the audience display. */
+  const endDisplay = () => {
+    setFullscreen(false);
+    setBlackout(false);
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+  };
 
   useEffect(() => {
+    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    /* Escape in browser full screen never reaches the page; follow the change instead. */
+    const onChange = () => { if (!document.fullscreenElement && presenterUi.get().fullscreen) presenterUi.set((state) => ({ ...state, fullscreen: false })); };
+    window.addEventListener("resize", onResize);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => { window.removeEventListener("resize", onResize); document.removeEventListener("fullscreenchange", onChange); };
+  }, []);
+
+  /* The keyboard drives the slides on the audience display and on the
+     presenter and audience views: arrows, space and page keys step; Home and
+     End jump to the ends; a number then Enter goes to that slide; B blanks
+     the room; Escape ends the display. */
+  useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (!fullscreen) return;
+      if (!fullscreen && tab === "Rehearsal") return;
       const target = event.target;
       if (target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      if (target instanceof HTMLElement && target.tagName === "BUTTON" && (event.key === " " || event.key === "Enter")) return;
+      if (document.querySelector("[role='dialog'][aria-modal='true']")) return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
-      if (event.key === "ArrowRight" || event.key === " " || event.key === "PageDown") { event.preventDefault(); advance(1); }
-      if (event.key === "ArrowLeft" || event.key === "PageUp") { event.preventDefault(); advance(-1); }
-      if (event.key === "Escape") { event.preventDefault(); setFullscreen(false); }
+      const key = event.key;
+      if (/^[0-9]$/.test(key)) { setJump((value) => (value + key).slice(-3)); return; }
+      if (key === "Enter" && jump) {
+        event.preventDefault();
+        const wanted = Math.max(1, Math.min(visible.length, Number(jump)));
+        advance(wanted - 1 - position);
+        setJump("");
+        return;
+      }
+      if (key === "ArrowRight" || key === "ArrowDown" || key === " " || key === "PageDown" || key === "n" || key === "N") { event.preventDefault(); setBlackout(false); advance(1); }
+      else if (key === "ArrowLeft" || key === "ArrowUp" || key === "PageUp" || key === "p" || key === "P") { event.preventDefault(); setBlackout(false); advance(-1); }
+      else if (key === "Home") { event.preventDefault(); advance(-visible.length); }
+      else if (key === "End") { event.preventDefault(); advance(visible.length); }
+      else if ((key === "b" || key === "B" || key === ".") && fullscreen) { event.preventDefault(); setBlackout((value) => !value); }
+      else if (key === "Escape" && fullscreen) { event.preventDefault(); endDisplay(); }
+      setJump("");
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1431,11 +1490,14 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
   const clock = `${String(Math.floor(elapsed / 60)).padStart(2, "0")}:${String(elapsed % 60).padStart(2, "0")}`;
 
   if (fullscreen) {
+    const scale = Math.min(2, (viewport.w - 40) / SLIDE_W, (viewport.h - 96) / SLIDE_H);
     return (
       <>
-        <div className="px-audience" role="region" aria-label="Audience display">
-          <SlideCanvas deck={editor.deck} slide={current} selectedIds={[]} onSelect={() => undefined} onTransform={() => undefined} readOnly scale={Math.min(1.6, (window.innerWidth - 40) / SLIDE_W)} showGuides={false} />
-          {(session.annotations[current.id] ?? []).length > 0 && (
+        <div className="px-audience" role="region" aria-label="Audience display" data-blackout={blackout || undefined}>
+          {blackout
+            ? <span className="px-blackout-note">Screen blanked · press B to show the slide</span>
+            : <SlideCanvas deck={editor.deck} slide={current} selectedIds={[]} onSelect={() => undefined} onTransform={() => undefined} readOnly scale={scale} showGuides={false} />}
+          {!blackout && (session.annotations[current.id] ?? []).length > 0 && (
             <div className="px-annotations" role="note" aria-label="Live annotations" style={{ position: "absolute", insetInline: 24, bottom: 72, display: "grid", gap: 6 }}>
               {(session.annotations[current.id] ?? []).map((item) => (
                 <div key={item.id} style={{ background: "var(--papaya-300, #FFAE7C)", color: "var(--ink-900, #1A1917)", padding: "6px 10px", borderRadius: 6, fontWeight: 600, justifySelf: "start" }}>{item.text}</div>
@@ -1444,11 +1506,15 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
           )}
         </div>
         <div className="px-audience-bar">
-          <Button size="sm" variant="secondary" onClick={() => advance(-1)}>Back</Button>
-          <Button size="sm" variant="primary" onClick={() => advance(1)}>Advance</Button>
-          <span className="ds-grow ds-num" style={{ color: "var(--paper-0)" }}>Slide {position + 1} of {visible.length} · {clock}</span>
-          <span style={{ color: "var(--paper-300)", fontSize: "var(--text-2xs)" }}>Speaker notes are not on this display</span>
-          <Button size="sm" variant="ghost" onClick={() => setFullscreen(false)}>End</Button>
+          <div className="px-progress" role="progressbar" aria-label="Position in the deck" aria-valuemin={1} aria-valuemax={visible.length} aria-valuenow={position + 1}>
+            <span style={{ width: `${((position + 1) / visible.length) * 100}%` }} />
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => advance(-1)} disabled={position === 0}>Back</Button>
+          <Button size="sm" variant="primary" onClick={() => advance(1)} disabled={position >= visible.length - 1}>Advance</Button>
+          <Button size="sm" variant="secondary" aria-pressed={blackout} onClick={() => setBlackout((value) => !value)}>{blackout ? "Show slide" : "Blank (B)"}</Button>
+          <span className="ds-grow ds-num" style={{ color: "var(--paper-0)" }} aria-live="polite">Slide {position + 1} of {visible.length} · {clock}{jump ? ` · go to ${jump}…` : ""}</span>
+          <span className="px-audience-hint">← → step · Home/End · number + Enter jumps · Esc ends</span>
+          <Button size="sm" variant="ghost" onClick={endDisplay}>End</Button>
         </div>
       </>
     );
@@ -1553,8 +1619,10 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
         </Card>
         <Card eyebrow="REMOTE" title="Remote control" subtitle="Keyboard only">
           <Properties rows={[
-            { label: "Advance", value: "Right arrow, space or Page down" },
-            { label: "Back", value: "Left arrow or Page up" },
+            { label: "Advance", value: "Right or down arrow, space, Page down or N" },
+            { label: "Back", value: "Left or up arrow, Page up or P" },
+            { label: "Jump", value: "Home, End, or a slide number then Enter" },
+            { label: "Blank the room", value: "B (audience display)" },
             { label: "End", value: "Escape" },
           ]} />
           <Notice tone="warning" title="No phone remote is connected">
@@ -2642,6 +2710,9 @@ function DisplaySelector({ context, close }: { context: ScreenContext; close: ()
         if (!acknowledged) return;
         context.setTab("Audience");
         presenterUi.set((state) => ({ ...state, fullscreen: true, running: true }));
+        /* The submit is a user gesture, so the browser allows full screen here.
+           If it refuses (an iframe, a policy), the display still fills the window. */
+        void document.documentElement.requestFullscreen?.().catch(() => undefined);
         void context.mutate.log(`Presenting ${record.title}`, { entityId: record.id, type: "present" });
         close();
       }}
