@@ -3,7 +3,7 @@ import {
   BookOpen, CalendarDays, ClipboardCheck, GraduationCap, Inbox, UserPlus, Users,
 } from "lucide-react";
 import {
-  Avatar, BarChart, Button, Card, Checkbox, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice,
+  Avatar, BarChart, Button, Card, Checkbox, DataGrid, DonutChart, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, Notice, OverlayCancel,
   Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
@@ -3068,14 +3068,26 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
   const [deciding, setDeciding] = useState(false);
   const [error, setError] = useState("");
   const pending = data.leaveRequests.filter((request) => request.status === "requested");
-  const explicitId = payload?.id ?? context.selectedId;
-  const chosen = explicitId
-    ? pending.find((request) => request.id === explicitId)
-    : pending[0];
-  if (!chosen) return <Empty title={explicitId ? "The selected leave request is unavailable" : "Nothing is waiting for a decision"}
-    icon={<ClipboardCheck size={20} />}>
-    {explicitId ? "A request may have been decided in another view. Select a current request and try again." : "New leave requests appear here for a named human reviewer."}
-  </Empty>;
+  const [selectedRequestId, setSelectedRequestId] = useState(payload?.id ?? context.selectedId ?? "");
+  const chosen = selectedRequestId ? pending.find((request) => request.id === selectedRequestId) : undefined;
+  if (!chosen) return (
+    <Stack gap={3}>
+      <Notice tone={selectedRequestId ? "warning" : "info"} title={selectedRequestId ? "This request is no longer available" : "Choose the leave request to review"}>
+        {selectedRequestId ? "The request may already have been decided or is outside this workspace. Select an available request instead." : "Choose an actual request before recording an approval or decline. No other request is substituted."}
+      </Notice>
+      {pending.length > 0 ? (
+        <Field label="Pending leave request">
+          <Select aria-label="Pending leave request" value={selectedRequestId}
+            onChange={(event) => { setSelectedRequestId(event.target.value); setReviewed(false); setError(""); }}>
+            <option value="">Select a request</option>
+            {pending.map(request => <option key={request.id} value={request.id}>{leavePerson(request, data.employees)} · {context.date(request.startAt)}–{context.date(request.endAt)}</option>)}
+          </Select>
+        </Field>
+      ) : <Empty title="No leave requests awaiting approval" icon={<ClipboardCheck size={20} />}>
+        New requests appear here for a named reviewer.
+      </Empty>}
+    </Stack>
+  );
   const employee = data.employees.find((row) => row.id === chosen.fields.employeeId);
   const count = leaveDays(chosen);
   const balance = employee ? leaveBalance(employee) : undefined;
@@ -3109,6 +3121,8 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
   };
   return (
     <Stack gap={4}>
+      <DrawerInFlight when={deciding} />
+      <DrawerUnsavedChanges when={reviewed} />
       <PeopleDialogLead eyebrow="PEOPLE / LEAVE DECISION" title="Review a leave request"
         description="Confirm the applicant, dates, available evidence and your responsibility before recording a decision."
         status={<Pill tone="warning">Decision required</Pill>} />
@@ -3134,6 +3148,10 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
           ? balance.left >= count ? `${balance.left - count} days` : "Insufficient recorded allowance"
           : annual ? "Unavailable until allowance is verified" : "Annual balance unchanged" },
       ]} />
+      <Button variant="secondary" size="sm" disabled={reviewed || deciding}
+        onClick={() => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/hr/scheduling?tab=Roster`); }}>
+        Check team roster before deciding
+      </Button>
       {!canApprove && <Notice tone="warning" title="Human reviewer role required">
         The current role view cannot approve or decline a request. Review it from an authorised People role.
       </Notice>}
@@ -3142,12 +3160,12 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
       <Checkbox checked={reviewed} onChange={(event) => setReviewed(event.target.checked)}
         label={`I, ${context.actor}, reviewed this request, recorded balance and available coverage evidence.`} />
       {error && <Notice tone="danger" title="Decision could not be saved">{error}</Notice>}
-      <Row gap={2} wrap>
+      <DrawerActions>
         <Button variant="primary" disabled={!canApprove || !reviewed || deciding} onClick={() => decision("approved")}>{deciding ? "Saving…" : "Approve"}</Button>
         <Button variant="outline-danger" disabled={!canApprove || !reviewed || deciding} onClick={() => decision("declined")}>Decline</Button>
         <span className="ds-grow" />
-        <Button variant="secondary" onClick={() => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/hr/scheduling?tab=Roster`); }}>Check roster</Button>
-      </Row>
+        <OverlayCancel disabled={deciding}>Close review</OverlayCancel>
+      </DrawerActions>
       <Notice tone="info">This records a local review. The request and employee balance are updated atomically; no external calendar or payroll provider is connected.</Notice>
       </PeopleDialogSection>
     </Stack>
