@@ -4,7 +4,8 @@
  * measurements, focus outlines, overlays and sticky positioning stay native.
  */
 :root {
-  --interface-scale: 1;
+  /* New UI 100 equals the former 80% visual baseline, including first paint. */
+  --interface-scale: 0.8;
   --space-1: calc(4px * var(--interface-scale));
   --space-2: calc(8px * var(--interface-scale));
   --space-3: calc(12px * var(--interface-scale));
