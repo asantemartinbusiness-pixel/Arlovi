@@ -1,7 +1,7 @@
-import { useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
   LayoutTemplate, FileText, Rows3, Type as TypeIcon, Printer, MousePointer2,
-  Image as ImageIcon, Square, Link2, Plus,
+  Image as ImageIcon, Square, Link2, Plus, Undo2, Redo2, ZoomIn, ZoomOut, FileImage,
 } from "lucide-react";
 import {
   Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties,
@@ -19,7 +19,10 @@ import {
   preflight, preflightBlocks, threadFrames, threadHeads, toMm,
   type Box, type Composition, type Frame, type ParagraphStyle, type PreflightIssue, type PublicationDoc,
 } from "./flow";
-import { PageView, dragFrame, useCompositions } from "./spread";
+import { PageView, dragFrame, resizeFrame, useCompositions } from "./spread";
+import { ArrangePanel, FrameStory, GridPanel, LayersPanel, exportPageSvg, useLayoutKeys, type AlignTarget } from "./editorParts";
+import { removeFrame } from "./arrange";
+import "./layout.css";
 import {
   BASE_STYLES, layoutUi, newImageFrame, newShapeFrame, newTextFrame,
   parsePublication, selectFrame, setLayoutTool, starterPublication, type LayoutTool,
@@ -145,7 +148,8 @@ function PublicationLibrary({ context, lens }: { context: ScreenContext; lens: "
 function PublicationEditor({ context, actions }: { context: ScreenContext; actions: ActionDef[] }) {
   const { record, handle, compositions } = usePublication(context);
   const ui = useStore(layoutUi);
-  if (!record) return <div className="pg-body"><MissingPublication context={context} /></div>;
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  useLayoutKeys(handle);
   const doc = handle.doc;
   const tab = context.tab;
   const activeIndex = doc ? Math.max(0, doc.pages.findIndex((page) => page.id === doc.activePageId)) : 0;
@@ -154,8 +158,38 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
     : [doc.pages[activeIndex]].filter(Boolean)) : [];
   const overset = [...compositions.values()].filter((composition) => composition.oversetChars > 0);
 
+  const fitZoom = () => {
+    const host = stageRef.current;
+    if (!doc || !host) return;
+    const width = (doc.size.width + doc.bleed * 2) * spreadPages.length + 10 * (spreadPages.length - 1);
+    const height = doc.size.height + doc.bleed * 2;
+    const zoom = Math.min((host.clientWidth - 48) / width, (host.clientHeight - 48) / height);
+    layoutUi.set((current) => ({ ...current, zoom: Math.max(0.15, Math.min(2.5, Math.round(zoom * 100) / 100)) }));
+  };
+
+  /* Open each publication fitted to the window once, then leave zoom alone. */
+  const fittedFor = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!doc || !record || fittedFor.current === record.id) return;
+    fittedFor.current = record.id;
+    fitZoom();
+  });
+
+  const onHandleDown = (frame: Frame, which: Parameters<typeof resizeFrame>[2], event: ReactPointerEvent) => {
+    if (!doc) return;
+    resizeFrame(event, frame, which, doc, ui.zoom, (box, committed) => {
+      if (committed) { handle.beginGesture(); return; }
+      handle.live((current) => ({
+        ...current,
+        pages: current.pages.map((page) => ({ ...page, frames: page.frames.map((item) => (item.id === frame.id ? { ...item, box } : item)) })),
+      }));
+    });
+  };
+
   const onFrameDown = (frame: Frame, event: ReactPointerEvent) => {
     if (!doc) return;
+    /* With a placing tool, a press on a frame places a new one there. */
+    if (ui.tool === "text" || ui.tool === "image" || ui.tool === "shape") return;
     event.stopPropagation();
     if (ui.tool === "thread" && frame.kind === "text") {
       if (!ui.threadFrom) { layoutUi.set((current) => ({ ...current, threadFrom: frame.id })); return; }
@@ -183,6 +217,7 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
     });
   };
 
+  if (!record) return <div className="pg-body"><MissingPublication context={context} /></div>;
   return (
     <EditorFrame
       context={context}
@@ -192,32 +227,46 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
       subtitle={<Row gap={2} wrap><SaveState handle={handle} />{doc && <span><span className="ds-num">{doc.pages.length}</span> pages · {doc.size.name}</span>}</Row>}
       backTo={{ label: "Layout", to: `/o/${context.org.slug}/layout/publications` }}
       tools={
-        <>
+        <div className="lx-tools">
           <Toolbar label="Frame tools">
             {([
-              { tool: "select", label: "Select", icon: <MousePointer2 size={15} /> },
-              { tool: "text", label: "Text frame", icon: <TypeIcon size={15} /> },
-              { tool: "image", label: "Image frame", icon: <ImageIcon size={15} /> },
-              { tool: "shape", label: "Shape", icon: <Square size={15} /> },
+              { tool: "select", label: "Select (V)", icon: <MousePointer2 size={15} /> },
+              { tool: "text", label: "Text frame (T)", icon: <TypeIcon size={15} /> },
+              { tool: "image", label: "Image frame (F)", icon: <ImageIcon size={15} /> },
+              { tool: "shape", label: "Shape (R)", icon: <Square size={15} /> },
               { tool: "thread", label: "Thread two text frames", icon: <Link2 size={15} /> },
             ] as { tool: LayoutTool; label: string; icon: React.ReactNode }[]).map((item) => (
               <Tool key={item.tool} label={item.label} icon={item.icon} active={ui.tool === item.tool} onClick={() => setLayoutTool(item.tool)} />
             ))}
+            <ToolbarSeparator />
+            <Tool label="Undo (⌘Z)" icon={<Undo2 size={15} />} disabled={!handle.canUndo} onClick={handle.undo} />
+            <Tool label="Redo (⇧⌘Z)" icon={<Redo2 size={15} />} disabled={!handle.canRedo} onClick={handle.redo} />
           </Toolbar>
-          <ToolbarSeparator />
           <Toolbar label="View">
-            <Button size="sm" variant={ui.spread ? "primary" : "ghost"} onClick={() => layoutUi.set((c) => ({ ...c, spread: !c.spread }))}>Spread</Button>
-            <Button size="sm" variant={ui.showGuides ? "primary" : "ghost"} onClick={() => layoutUi.set((c) => ({ ...c, showGuides: !c.showGuides }))}>Guides</Button>
-            <Button size="sm" variant={ui.showBaseline ? "primary" : "ghost"} onClick={() => layoutUi.set((c) => ({ ...c, showBaseline: !c.showBaseline }))}>Baseline</Button>
-            <Button size="sm" variant="ghost" onClick={() => layoutUi.set((c) => ({ ...c, zoom: Math.min(2.5, c.zoom * 1.15) }))}>Zoom in</Button>
-            <Button size="sm" variant="ghost" onClick={() => layoutUi.set((c) => ({ ...c, zoom: Math.max(0.15, c.zoom / 1.15) }))}>Zoom out</Button>
+            <Tool label="Facing-page spread" active={ui.spread} onClick={() => layoutUi.set((c) => ({ ...c, spread: !c.spread }))}>Spread</Tool>
+            <Tool label="Margin and column guides" active={ui.showGuides} onClick={() => layoutUi.set((c) => ({ ...c, showGuides: !c.showGuides }))}>Guides</Tool>
+            <Tool label="Baseline grid" active={ui.showBaseline} onClick={() => layoutUi.set((c) => ({ ...c, showBaseline: !c.showBaseline }))}>Baseline</Tool>
+            <ToolbarSeparator />
+            <Tool label="Zoom out" icon={<ZoomOut size={15} />} onClick={() => layoutUi.set((c) => ({ ...c, zoom: Math.max(0.15, c.zoom / 1.15) }))} />
+            <span className="lx-zoom ds-num" aria-live="polite">{Math.round(ui.zoom * 100)}%</span>
+            <Tool label="Zoom in" icon={<ZoomIn size={15} />} onClick={() => layoutUi.set((c) => ({ ...c, zoom: Math.min(2.5, c.zoom * 1.15) }))} />
+            <Tool label="Fit the spread in the window" onClick={() => fitZoom()}>Fit</Tool>
+            <ToolbarSeparator />
+            <Tool
+              label="Export the pages on screen as SVG"
+              icon={<FileImage size={15} />}
+              disabled={!doc}
+              onClick={() => {
+                if (!doc) return;
+                const numbers = spreadPages.map((page) => doc.pages.findIndex((item) => item.id === page.id) + 1);
+                const count = exportPageSvg(stageRef.current, record.title, numbers);
+                context.toast(count ? "SVG written" : "Nothing to export", count ? `${count} page${count === 1 ? "" : "s"} saved as SVG by your browser, without guides or selection.` : "Open a page first.");
+              }}
+            >
+              SVG
+            </Tool>
           </Toolbar>
-          <ToolbarSeparator />
-          <Toolbar label="History">
-            <Button size="sm" variant="ghost" disabled={!handle.canUndo} onClick={handle.undo}>Undo</Button>
-            <Button size="sm" variant="ghost" disabled={!handle.canRedo} onClick={handle.redo}>Redo</Button>
-          </Toolbar>
-        </>
+        </div>
       }
       left={
         <Stack gap={3}>
@@ -257,6 +306,7 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
               </div>
             )}
           </PanelGroup>
+          <LayersPanel handle={handle} />
           {overset.length > 0 && (
             <Notice tone="danger" title={`${overset.reduce((sum, item) => sum + item.oversetChars, 0)} characters of overset text`} actions={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("overset warning")}>Show it</Button>}>
               The copy does not fit the frames it is threaded through. It is kept, never dropped.
@@ -268,9 +318,10 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
       right={
         tab === "Type" ? <TypePanel handle={handle} context={context} />
           : tab === "Review" ? <ReviewPanel handle={handle} compositions={compositions} context={context} />
-            : <FramePanel handle={handle} context={context} compositions={compositions} />
+            : tab === "Layout" ? <GridPanel handle={handle} />
+              : <FramePanel handle={handle} context={context} compositions={compositions} />
       }
-      rightLabel={tab === "Type" ? "Type" : tab === "Review" ? "Review" : "Frame"}
+      rightLabel={tab === "Type" ? "Type" : tab === "Review" ? "Review" : tab === "Layout" ? "Page grid" : "Frame"}
       status={
         <>
           <span>Tool: {ui.tool}</span>
@@ -278,31 +329,44 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
           {doc && <span>Page <span className="ds-num">{activeIndex + 1}</span> of <span className="ds-num">{doc.pages.length}</span></span>}
           <span className="ds-grow" />
           {ui.threadFrom && <span>Pick the frame the copy should flow into</span>}
-          <span>Drag a frame to move it · ⌘ while dragging turns snapping off</span>
+          <span>Drag to move, handles to resize · arrows nudge 1pt (⇧ 10pt) · ⌘ while dragging turns snapping off</span>
         </>
       }
     >
       <div
-        style={{ position: "absolute", inset: 0, overflow: "auto", display: "grid", placeContent: "center", padding: 24, background: "var(--bg-sunken)" }}
+        ref={stageRef}
+        className="lx-stage"
+        data-tool={ui.tool}
         onPointerDown={(event) => {
           if (!doc) return;
           if (ui.tool === "select" || ui.tool === "thread") { selectFrame(undefined); return; }
-          const host = (event.currentTarget.querySelector("svg") as SVGSVGElement | null)?.getBoundingClientRect();
-          if (!host) return;
-          const x = (event.clientX - host.left) / ui.zoom - doc.bleed;
-          const y = (event.clientY - host.top) / ui.zoom - doc.bleed;
-          const box = { x: Math.max(0, x), y: Math.max(0, y), w: mm(60), h: mm(40) };
-          const frame = ui.tool === "text" ? newTextFrame(box, doc.stories[0]?.id ?? "story-1") : ui.tool === "image" ? newImageFrame(box) : newShapeFrame(box);
+          const svg = (event.target as Element).closest?.("svg[data-page-svg]") as SVGSVGElement | null
+            ?? stageRef.current?.querySelector<SVGSVGElement>(`svg[data-page-svg="${doc.activePageId}"]`)
+            ?? stageRef.current?.querySelector<SVGSVGElement>("svg[data-page-svg]") ?? null;
+          if (!svg) return;
+          const pageId = svg.getAttribute("data-page-svg") ?? doc.activePageId;
+          const host = svg.getBoundingClientRect();
+          const bleed = ui.showBleed ? doc.bleed : 0;
+          const x = (event.clientX - host.left) / ui.zoom - bleed;
+          const y = (event.clientY - host.top) / ui.zoom - bleed;
+          const w = ui.tool === "text" ? mm(80) : mm(60);
+          const h = ui.tool === "text" ? mm(50) : mm(40);
+          const box = { x: Math.max(0, Math.min(doc.size.width - w, x)), y: Math.max(0, Math.min(doc.size.height - h, y)), w, h };
+          const storyId = `st-${wallMs().toString(36)}`;
+          const frame = ui.tool === "text" ? newTextFrame(box, storyId) : ui.tool === "image" ? newImageFrame(box) : newShapeFrame(box);
           handle.edit((current) => ({
             ...current,
-            pages: current.pages.map((page) => (page.id === current.activePageId ? { ...page, frames: [...page.frames, frame] } : page)),
+            stories: ui.tool === "text" ? [...current.stories, { id: storyId, name: `Story ${current.stories.length + 1}`, text: "" }] : current.stories,
+            activePageId: pageId,
+            pages: current.pages.map((page) => (page.id === pageId ? { ...page, frames: [...page.frames, frame] } : page)),
           }), `Add a ${ui.tool} frame`);
           selectFrame(frame.id);
           setLayoutTool("select");
+          if (!ui.spread || context.tab !== "Pages") context.setTab("Pages");
         }}
       >
         {doc && (
-          <div style={{ display: "flex", gap: 10 }}>
+          <div className="lx-spread">
             {spreadPages.map((page) => {
               const index = doc.pages.findIndex((item) => item.id === page.id);
               return (
@@ -315,6 +379,7 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
                   zoom={ui.zoom}
                   interactive
                   onFrameDown={onFrameDown}
+                  onHandleDown={onHandleDown}
                   showGuides={ui.showGuides}
                   showBleed={ui.showBleed}
                   showBaseline={ui.showBaseline}
@@ -330,6 +395,7 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
 
 function FramePanel({ handle, context, compositions }: { handle: DocHandle<PublicationDoc>; context: ScreenContext; compositions: Map<string, Composition> }) {
   const ui = useStore(layoutUi);
+  const [alignTarget, setAlignTarget] = useState<AlignTarget>("margins");
   const doc = handle.doc;
   if (!doc) return null;
   const page = doc.pages.find((item) => item.id === doc.activePageId);
@@ -375,6 +441,7 @@ function FramePanel({ handle, context, compositions }: { handle: DocHandle<Publi
           {frame.next && <Pill tone="accent">threaded</Pill>}
         </Row>
       </PanelGroup>
+      <ArrangePanel handle={handle} frame={frame} target={alignTarget} onTarget={setAlignTarget} />
       <PanelGroup title="Geometry (mm)">
         <div className="vx-fieldrow">
           {(["x", "y", "w", "h"] as const).map((key) => (
@@ -392,6 +459,7 @@ function FramePanel({ handle, context, compositions }: { handle: DocHandle<Publi
           ))}
         </div>
       </PanelGroup>
+      <FrameStory handle={handle} frame={frame} />
       {frame.kind === "text" && (
         <PanelGroup title="Text frame">
           <Field label="Columns">
@@ -465,7 +533,7 @@ function FramePanel({ handle, context, compositions }: { handle: DocHandle<Publi
           </Field>
         </PanelGroup>
       )}
-      <Button size="sm" variant="ghost" onClick={() => { handle.edit((current) => ({ ...current, pages: current.pages.map((item) => ({ ...item, frames: item.frames.filter((entry) => entry.id !== frame.id) })) }), "Delete the frame"); selectFrame(undefined); }}>Delete the frame</Button>
+      <Button size="sm" variant="ghost" onClick={() => { handle.edit((current) => removeFrame(current, frame.id), "Delete the frame"); selectFrame(undefined); }}>Delete the frame</Button>
     </Stack>
   );
 }
