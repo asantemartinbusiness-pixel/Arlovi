@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Archive, CalendarClock, FileSignature, FileText, Gavel, Scale, ShieldAlert } from "lucide-react";
 import {
-  Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Checkbox, Empty, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayCancel, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useRecord } from "@/platform/workspace";
@@ -220,38 +220,86 @@ function ReviewerPicker({ context, close }: { context: ScreenContext; close: () 
 
 function ESignRequest({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useLegalData();
-  const contract = useRecord(context.params.id ?? context.selectedId) ?? data.contracts.find((row) => row.status === "approved") ?? data.contracts[0];
-  if (!contract) return <Empty title="Select a contract" icon={<FileSignature size={20} />} />;
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const [selectedId, setSelectedId] = useState(payload?.id ?? context.params.id ?? context.selectedId ?? "");
+  const candidate = useRecord(selectedId || undefined);
+  const contract = candidate?.organizationId === context.org.id && candidate.collection === "contracts"
+    ? candidate : undefined;
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const approved = data.contracts.filter(row => row.status === "approved");
+  if (!contract) return (
+    <Stack gap={3}>
+      <Notice tone={selectedId ? "warning" : "info"}
+        title={selectedId ? "Selected contract unavailable" : "Choose a contract ready for signature"}>
+        {selectedId ? "This contract cannot be found in the current company. No other document was substituted." :
+          "Choose an approved contract before recording a signature request. No request is sent to an external party."}
+      </Notice>
+      {approved.length ? (
+        <Field label="Approved contract">
+          <Select aria-label="Approved contract" value={selectedId}
+            onChange={event => { setSelectedId(event.target.value); setAcknowledged(false); setError(""); }}>
+            <option value="">Select an approved contract</option>
+            {approved.map(row => <option key={row.id} value={row.id}>{row.title}</option>)}
+          </Select>
+        </Field>
+      ) : <Empty title="No approved contracts">Complete the contract approval process before marking anything for signature.</Empty>}
+      <ModalActions><OverlayCancel>Cancel</OverlayCancel></ModalActions>
+    </Stack>
+  );
+  const ready = contract.status === "approved";
   return (
     <Stack gap={4}>
+      <ModalUnsavedChanges when={acknowledged} />
+      <ModalInFlight when={busy} />
       <Properties rows={[
         { label: "Contract", value: contract.title },
-        { label: "Counterparty", value: String(contract.fields.counterparty ?? "") },
-        { label: "Status", value: <Pill tone="neutral">{lifecycleLabel(contract.status)}</Pill> },
-        { label: "Provider", value: <Pill tone="warning" dot>Not connected</Pill> },
+        { label: "Counterparty", value: String(contract.fields.counterparty ?? "Not recorded") },
+        { label: "Current status", value: <Pill tone={ready ? "success" : "warning"}>{lifecycleLabel(contract.status)}</Pill> },
+        { label: "Signature provider", value: <Pill tone="warning" dot>Not connected</Pill> },
+        { label: "Recorded contract version", value: String(contract.fields.version ?? contract.revision) },
       ]} />
+      {!ready && <Notice tone="warning" title="This contract is not approved for signing">
+        Only an approved contract can be moved to awaiting signature. Current status is {lifecycleLabel(contract.status)}.
+      </Notice>}
       <SignatureBoundary />
-      <Notice tone="info" title="What this button does">
-        It moves the contract to awaiting signature and records that {context.actor} asked for it. The parties still have to sign
-        somewhere real, and somebody records the date here afterwards.
+      <Notice tone="info" title="This records a local handover only">
+        Marking the contract awaiting signature does not notify a counterparty, verify a signer
+        or create a signed document. External signature evidence must be collected and recorded separately.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
+      <Checkbox checked={acknowledged} disabled={busy || !ready}
+        onChange={event => setAcknowledged(event.target.checked)}
+        label={`I reviewed ${contract.title}, its counterparty and approved status, and understand no signature request is delivered.`} />
+      {error && <Notice tone="danger" title="Signature request not recorded">{error}</Notice>}
+      <ModalActions>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
         <span className="ds-grow" />
-        <Button
-          variant="primary"
+        <Button variant="primary" busy={busy}
+          disabled={busy || !ready || !acknowledged || !context.can("view_legal")}
           onClick={async () => {
-            await context.mutate.patch(contract.id, {
-              status: "awaiting_signature",
-              fields: { ...contract.fields, signatureRequestedBy: context.actor, signatureRequestedAt: clockIso() },
-            }, { expectRevision: contract.revision, event: `${contract.title} marked awaiting signature by ${context.actor}` });
-            context.toast("Marked awaiting signature", "The record changed. Nothing was sent to anybody.");
-            close();
-          }}
-        >
+            if (busy || !ready || !acknowledged || !context.can("view_legal")) return;
+            setBusy(true);
+            setError("");
+            try {
+              const saved = await context.mutate.patch(contract.id, {
+                status: "awaiting_signature",
+                fields: { ...contract.fields,
+                  signatureRequestedBy: context.actor, signatureRequestedAt: clockIso() },
+              }, { expectRevision: contract.revision,
+                event: `${contract.title} marked awaiting signature locally by ${context.actor}` });
+              if (!saved) { setError("The contract changed. Reopen it before recording this handover."); return; }
+              context.toast("Awaiting signature recorded", "The local contract status changed. No invitation or signature request was sent.");
+              close();
+            } catch (cause) {
+              const message = cause instanceof Error ? cause.message : "Review the contract and try again.";
+              setError(message);
+              context.toast("Signature handover not saved", message, "failed");
+            } finally { setBusy(false); }
+          }}>
           Mark awaiting signature
         </Button>
-      </Row>
+      </ModalActions>
     </Stack>
   );
 }
