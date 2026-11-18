@@ -24,8 +24,8 @@ export function applyAttentionReceipts(
     return receipt
       ? {
           ...item,
-          read: item.read || receipt.read === true,
-          acknowledged: item.acknowledged || receipt.acknowledged === true,
+          read: typeof receipt.read === "boolean" ? receipt.read : item.read,
+          acknowledged: typeof receipt.acknowledged === "boolean" ? receipt.acknowledged : item.acknowledged,
         }
       : item;
   });
