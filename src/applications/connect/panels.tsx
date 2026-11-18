@@ -7,7 +7,7 @@ import {
   Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
-import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
+import { useCollection, useCollectionState, useEvents, useWorkspace } from "@/platform/workspace";
 import { CAPABILITY_LABELS, CAPABILITY_TONE } from "@/platform/capability";
 import { clockIso, freshness } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
@@ -61,7 +61,7 @@ function StateCell({ entry }: { entry: ConnectorEntry }) {
  * ================================================================ */
 
 export function Marketplace({ context, lens }: { context: ScreenContext; lens: "Featured" | "Categories" | "Installed" | "Custom" }) {
-  const records = useCollection("connectors");
+  const { rows: records, loaded } = useCollectionState("connectors");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<"All" | ConnectorEntry["category"]>("Communication");
   const accessibleCount = CONNECTOR_ENTRIES.length;
@@ -164,13 +164,13 @@ export function Marketplace({ context, lens }: { context: ScreenContext; lens: "
       action={<Button variant="secondary" onClick={() => { setQuery(""); setCategory("All"); }}>Clear filters</Button>}>
       Search by provider, capability or operation, or choose another category.
     </Empty> : <div className="connect-marketplace-grid" aria-label="Integration catalogue">
-      {matched.map(entry => <ConnectorCard key={entry.capability.id} entry={entry} context={context} records={records} />)}
+      {matched.map(entry => <ConnectorCard key={entry.capability.id} entry={entry} context={context} records={records} loaded={loaded} />)}
     </div>}
     <p className="connect-marketplace-boundary"><strong>Every provider here is not connected.</strong> Reviewing an integration or recording an install request does not grant access, send data or activate a sync.</p>
   </Stack>;
 }
 
-function ConnectorCard({ entry, context, records }: { entry: ConnectorEntry; context: ScreenContext; records: Rec[] }) {
+function ConnectorCard({ entry, context, records, loaded }: { entry: ConnectorEntry; context: ScreenContext; records: Rec[]; loaded: boolean }) {
   const actions = entry.operations.filter(operation => operation.direction === "action").length;
   const reads = entry.operations.filter(operation => operation.direction === "read").length;
   const writes = entry.scopes.filter(scope => scope.kind === "write").length;
@@ -190,7 +190,7 @@ function ConnectorCard({ entry, context, records }: { entry: ConnectorEntry; con
     </div>
     <div className="connect-card-fallback"><strong>Available locally</strong><span>{entry.capability.localEquivalent}</span></div>
     <div className="connect-marketplace-card-foot">
-      <Button size="sm" variant="secondary" onClick={() => openConnector(context, records, entry, "marketplace")}>View details</Button>
+      <Button size="sm" variant="secondary" disabled={!loaded} title={loaded ? undefined : "Reading this workspace\u2019s connections"} onClick={() => openConnector(context, records, entry, "marketplace")}>View details</Button>
       <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Connector preview", { id: entry.capability.id })}>What it needs</Button>
       <Pill tone={entry.risk.level === "high" ? "danger" : entry.risk.level === "medium" ? "warning" : "neutral"}>{entry.risk.level} risk</Pill>
     </div>

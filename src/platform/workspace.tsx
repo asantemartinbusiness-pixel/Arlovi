@@ -92,6 +92,17 @@ export function useCollection(collection: string): Rec[] {
   return useLiveQuery(() => repo.listByCollection(org.id, collection), [org.id, collection]) ?? [];
 }
 
+/**
+ * Records of one collection plus whether the read has returned. Use this when
+ * an empty list must not be mistaken for "none exist" (a click that would
+ * otherwise act on missing records while the first read is still in flight).
+ */
+export function useCollectionState(collection: string): { rows: Rec[]; loaded: boolean } {
+  const { org } = useWorkspace();
+  const rows = useLiveQuery(() => repo.listByCollection(org.id, collection), [org.id, collection]);
+  return { rows: rows ?? [], loaded: rows !== undefined };
+}
+
 /** Several collections at once without reading the whole database. */
 export function useCollections(collections: string[]): Record<string, Rec[]> {
   const { org } = useWorkspace();
