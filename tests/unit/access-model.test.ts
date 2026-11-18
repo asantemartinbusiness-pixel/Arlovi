@@ -19,7 +19,7 @@ const resource:AccessResource={
 };
 describe("Arlovi access design contracts",()=>{
  it("covers all registered applications and screen inventory",()=>{
-  const codes=NAV_GROUPS.flatMap(g=>g.codes).sort();
+  const codes=NAV_GROUPS.flatMap(g=>g.apps.map(app=>app.code)).sort();
   expect(allRegisteredApplicationCodes().sort()).toEqual(codes);
   expect(screenAccessCatalogue()).toHaveLength(screens.length);
   expect(screens.length).toBe(316);
