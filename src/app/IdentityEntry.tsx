@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowRight, Building2, CheckCircle2, ChevronRight, KeyRound, LockKeyhole, Mail, ShieldCheck, Users } from "lucide-react";
+import { ArrowRight, Building2, ChevronRight, KeyRound, LockKeyhole, Mail } from "lucide-react";
 import { ArloviMark } from "@/app/brand";
 import { ORGS } from "@/platform/org";
 import "./entry-experience.css";
@@ -90,20 +90,19 @@ export function IdentityEntry({ mode }: { mode: EntryMode }) {
         <span className="entry-top-actions"><Link to="/auth/sign-in">Account sign in</Link><Link to="/choose-workspace">Local workspaces</Link><Link to="/setup">Create a company <ArrowRight size={15}/></Link></span>
       </header>
       <div className="entry-columns">
-        <aside className="entry-story">
-          <span className="entry-eyebrow">ONE COMPANY. ONE OPERATING HOME.</span>
-          <h2>Your business,<br/>working together.</h2>
-          <p>Bring your people, applications, information and intelligence into one thoughtful operating environment.</p>
-          <div className="entry-product" aria-label="Illustration of connected business applications">
-            <div className="entry-product-top"><span className="entry-dot"/><strong>Executive Home</strong><span>Workspace overview</span></div>
-            <div className="entry-product-cards">
-              <div><Building2 size={18}/><strong>Company</strong><small>One operating home</small></div>
-              <div><Users size={18}/><strong>People</strong><small>Shared responsibilities</small></div>
-              <div><CheckCircle2 size={18}/><strong>Work</strong><small>Clear next actions</small></div>
-            </div>
-            <div className="entry-product-bottom"><span className="entry-product-pulse"/> Your applications, connected by the same company context</div>
+        <aside className="entry-story" aria-label="About the Arlovi workspace">
+          <div className="entry-story-topline"><span>ARLOVI / OPERATING ENVIRONMENT</span><span>01 — 03</span></div>
+          <div className="entry-story-main">
+            <span className="entry-eyebrow">ONE OPERATING HOME</span>
+            <h2>Make room for <em>what matters.</em></h2>
+            <p>A clear place for the work, people and decisions that keep your business moving.</p>
           </div>
-          <div className="entry-story-foot"><ShieldCheck size={17}/> Designed for clarity, control and confidence.</div>
+          <div className="entry-editorial-index" aria-label="The Arlovi operating areas">
+            <div className="entry-editorial-row"><span>01</span><strong>People</strong><small>Your team and responsibilities</small></div>
+            <div className="entry-editorial-row"><span>02</span><strong>Work</strong><small>Projects, applications and actions</small></div>
+            <div className="entry-editorial-row"><span>03</span><strong>Decisions</strong><small>Visibility, permissions and oversight</small></div>
+          </div>
+          <div className="entry-story-foot"><span className="entry-story-mark" aria-hidden="true"/> THE BUSINESS OPERATING SYSTEM</div>
         </aside>
         <section className="entry-panel" aria-labelledby="entry-title">
           <div className="entry-form">
