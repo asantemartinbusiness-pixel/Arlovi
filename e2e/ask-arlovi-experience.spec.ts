@@ -12,7 +12,7 @@ test.describe("Ask Arlovi workspace assistant", () => {
     await expect(dialog.getByText("Using local workspace records")).toBeVisible();
     await expect(dialog.getByText("No language model is connected", { exact: false })).toBeVisible();
     await expect(dialog.getByRole("heading", { name: "How can I help?" })).toBeVisible();
-    for (const label of ["Priorities", "Finance", "Missions", "Commitments"]) {
+    for (const label of ["Finance", "Inventory", "Bookings", "Customer care"]) {
       await expect(dialog.getByRole("button", { name: new RegExp(label) })).toBeVisible();
     }
     await expect(dialog.getByLabel("Ask about Northline Atelier")).toBeVisible();
@@ -20,13 +20,22 @@ test.describe("Ask Arlovi workspace assistant", () => {
 
   test("suggestion generates a local answer and new conversation resets the panel", async ({ page }) => {
     const dialog = page.getByRole("dialog", { name: "Ask Arlovi" });
-    await dialog.getByRole("button", { name: /Priorities/ }).click();
+    await dialog.getByRole("button", { name: /Finance/ }).click();
     await expect(dialog.getByRole("log", { name: "Conversation" })).toBeVisible();
-    await expect(dialog.getByText("What needs attention today?")).toBeVisible();
+    await expect(dialog.getByText("Which invoices are awaiting payment?")).toBeVisible();
     await expect(dialog.getByRole("heading", { name: "How can I help?" })).toHaveCount(0);
     await dialog.getByRole("button", { name: "New conversation" }).click();
     await expect(dialog.getByRole("heading", { name: "How can I help?" })).toBeVisible();
     await expect(dialog.getByRole("log", { name: "Conversation" })).toHaveCount(0);
+  });
+
+  test("conversation history restores local turns without an AI connection", async ({ page }) => {
+    const dialog = page.getByRole("dialog", { name: "Ask Arlovi" });
+    await dialog.getByRole("button", { name: /Finance/ }).click();
+    await dialog.getByRole("button", { name: "New conversation" }).click();
+    await dialog.getByRole("button", { name: "Conversation history" }).click();
+    await dialog.getByRole("button", { name: /Which invoices are awaiting payment/ }).click();
+    await expect(dialog.getByRole("log", { name: "Conversation" })).toContainText("Which invoices are awaiting payment?");
   });
 
   test("Enter sends, Shift+Enter adds a line, and empty submissions are disabled", async ({ page }) => {
