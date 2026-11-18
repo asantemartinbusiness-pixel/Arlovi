@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("switching companies from project Files returns to the target company's Work area", async ({page})=>{
   await page.goto("/o/northline/workspace/work");
-  const project=page.locator('.ws-entry-list a[href*="/workspace/work/project/"]').first();
+  const project=page.locator('.ww-projects a[href*="/workspace/work/project/"]').first();
   await expect(project).toBeVisible();
   await project.click();
   await page.getByRole("button",{name:"Files",exact:true}).click();
