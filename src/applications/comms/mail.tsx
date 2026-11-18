@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Mail, PlugZap, UserRound, Link2, ShieldAlert } from "lucide-react";
+import { Mail, PlugZap, UserRound, Link2, ShieldAlert, ChevronDown, ChevronUp, FilePenLine, Save, Signature } from "lucide-react";
 import {
   Avatar, Button, DataGrid, Empty, Field, Notice, Pill, Row, Stack, TextArea, TextInput,
 } from "@/design-system";
@@ -208,6 +208,8 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
   const [dirty, setDirty] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [failure, setFailure] = useState("");
+  const [showCc, setShowCc] = useState(false);
+  const [showSignature, setShowSignature] = useState(false);
   const idRef = useRef<string | undefined>(payload?.id);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
   const identities = configuredIdentities(useCommsData().preferences, context.actor);
@@ -220,6 +222,7 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
   if (existing && existing.collection === "emailThreads" && loadedFrom !== existing.id) {
     setLoadedFrom(existing.id);
     setDraft(draftInput(existing));
+    setShowCc(Boolean(existing.fields.cc));
     setIdentityId(String(existing.fields.senderIdentityId ?? ""));
     setSavedAt(String(existing.fields.savedLocallyAt ?? existing.updatedAt));
   }
@@ -270,7 +273,7 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
   return (
     <form
       id="cm-compose"
-      className="ds-stack ds-gap-4"
+      className="cm-compose"
       onSubmit={async (event) => {
         event.preventDefault();
         setDirty(false);
@@ -281,29 +284,61 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
         close();
       }}
     >
-      <Row gap={2} wrap>
-        <span className="ds-subtle ds-grow">Draft from {identity?.name ?? context.actor} &lt;{from}&gt;</span>
-        <span role="status" aria-live="polite">{status}</span>
-      </Row>
-      <Field label="Sender identity" hint="Configured addresses are display-only until independently authorised by the email provider.">
-        <select className="cm-mail-identity-select" value={identityId} onChange={(event) => { setIdentityId(event.target.value); setDirty(true); }}>
-          <option value="">Default workspace placeholder ({from.includes(".example") ? from : senderAddress(context.actor, context.org.slug)})</option>
-          {identities.map((item) => <option key={item.id} value={item.id}>{item.name} — {item.address} (not verified)</option>)}
-        </select>
-      </Field>
-      {identity?.signature && <Notice tone="info" title="Signature preview"><span className="cm-mail-preview-body">{signaturePreview(draft.body, identity.signature)}</span></Notice>}
-      <Field label="To" hint="Separate addresses with a comma.">
-        <TextInput value={draft.to} onChange={(event) => edit({ to: event.target.value })} invalid={check.invalid.some((value) => draft.to.includes(value))} />
-      </Field>
-      <Field label="Cc"><TextInput value={draft.cc ?? ""} onChange={(event) => edit({ cc: event.target.value })} invalid={check.invalid.some((value) => (draft.cc ?? "").includes(value))} /></Field>
-      <Field label="Subject"><TextInput value={draft.subject} onChange={(event) => edit({ subject: event.target.value })} /></Field>
-      <Field label="Message"><TextArea value={draft.body} onChange={(event) => edit({ body: event.target.value })} rows={7} /></Field>
+      <div className="cm-compose-heading">
+        <span className="cm-compose-mark"><FilePenLine size={17} /></span>
+        <div><strong>New message</strong><small>Compose within Arlovi · Draft only</small></div>
+        <span className="cm-compose-state" role="status" aria-live="polite"><Save size={13}/>{status}</span>
+      </div>
+      <div className="cm-compose-fields">
+        <div className="cm-compose-row">
+          <label htmlFor="cm-sender">From</label>
+          <div className="cm-compose-control">
+            <select id="cm-sender" className="cm-mail-identity-select" value={identityId}
+              onChange={(event) => { setIdentityId(event.target.value); setDirty(true); }}>
+              <option value="">{context.actor} · {senderAddress(context.actor, context.org.slug)} (placeholder)</option>
+              {identities.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.address} (unverified)</option>)}
+            </select>
+            <small className="cm-compose-help">Provider authorisation required before sending.</small>
+          </div>
+        </div>
+        <div className="cm-compose-row">
+          <label htmlFor="cm-to">To</label>
+          <div className="cm-compose-recipient">
+            <TextInput id="cm-to" value={draft.to} onChange={(event) => edit({ to: event.target.value })}
+              placeholder="name@company.com" invalid={check.invalid.some((value) => draft.to.includes(value))} />
+            <button type="button" className="cm-compose-inline" onClick={() => setShowCc((value) => !value)}
+              aria-expanded={showCc} aria-controls="cm-cc">{showCc ? "Hide Cc" : "Cc"} {showCc ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}</button>
+          </div>
+        </div>
+        {(showCc || Boolean(draft.cc)) && <div className="cm-compose-row" id="cm-cc">
+          <label htmlFor="cm-cc-input">Cc</label>
+          <TextInput id="cm-cc-input" value={draft.cc ?? ""} onChange={(event) => edit({ cc: event.target.value })}
+            placeholder="Optional recipients" invalid={check.invalid.some((value) => (draft.cc ?? "").includes(value))}/>
+        </div>}
+        <div className="cm-compose-row">
+          <label htmlFor="cm-subject">Subject</label>
+          <TextInput id="cm-subject" value={draft.subject} onChange={(event) => edit({ subject: event.target.value })}
+            placeholder="What is this message about?" />
+        </div>
+        <div className="cm-compose-editor">
+          <label htmlFor="cm-message">Message</label>
+          <TextArea id="cm-message" value={draft.body} onChange={(event) => edit({ body: event.target.value })}
+            rows={7} placeholder="Write your message…" />
+          <div className="cm-compose-editor-tools">
+            <span>{draft.body.length} characters</span>
+            <button type="button" disabled={!identity?.signature} onClick={() => setShowSignature((value) => !value)} aria-expanded={showSignature}>
+              <Signature size={13}/> {showSignature ? "Hide signature" : "Preview signature"}
+            </button>
+          </div>
+          {showSignature && identity?.signature && <div className="cm-compose-signature"><strong>Signature preview</strong><p>{identity.signature}</p></div>}
+        </div>
+      </div>
       {check.invalid.length > 0 && <Notice tone="danger" title="One of those is not an address">{check.blocking[0]}. The draft is not saved until every recipient is an email address.</Notice>}
       {failure && <Notice tone="danger" title="Draft not saved">{failure}</Notice>}
       {check.invalid.length === 0 && check.warnings.length > 0 && (draft.to || draft.subject || draft.body) && (
         <p className="ds-subtle">Before it could be sent: {check.warnings.join(" ")}</p>
       )}
-      <NotSentNotice context={context} />
+      <div className="cm-compose-connect"><ShieldAlert size={16}/><div><strong>Draft only — provider not connected</strong><small>Saved in this browser. Nothing is delivered to recipients.</small></div><Button type="button" size="sm" variant="secondary" onClick={() => void requestMailboxConnection(context)}>Request connection</Button></div>
       {idRef.current && (
         <Row gap={2}>
           <Button type="button" size="sm" variant="outline-danger" onClick={async () => {
