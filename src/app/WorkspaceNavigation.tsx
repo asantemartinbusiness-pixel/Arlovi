@@ -2,6 +2,7 @@ import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ArrowRight, Building2, ChevronRight, FolderKanban, Grid2X2, Home, Layers, Megaphone, Plus, Users, LockKeyhole, Activity, CheckCircle2, CircleDot, FileText, MessageSquare, Sparkles, Clock3 } from "lucide-react";
 import { ContextualCreate } from "@/app/ContextualCreate";
+const WorkspaceTaskDesk = lazy(() => import("@/app/WorkspaceTaskDesk").then(module => ({ default: module.WorkspaceTaskDesk })));
 const WorkspaceWork = lazy(() => import("@/app/WorkspaceWork").then(module => ({ default: module.WorkspaceWork })));
 const WorkspaceHome = lazy(() => import("@/app/WorkspaceHome").then(module => ({ default: module.WorkspaceHome })));
 const WorkspaceContinuity = lazy(() => import("@/app/WorkspaceContinuity").then(module => ({ default: module.WorkspaceContinuity })));
@@ -58,6 +59,7 @@ function WorkList({ title, records, slug, fallback }: { title: string; records: 
   return <section className="ws-section"><h2>{title}</h2>{records.length ? <div className="ws-entry-list">{records.map(record => <RowLink key={record.id} title={record.title} detail={`${record.status.replace(/_/g, " ")} · ${record.ownerName}`} to={routeForRecord(record, slug) ?? workAreaPath(slug, "work")} />)}</div> : <p className="ws-empty">{fallback}</p>}</section>;
 }
 function SpaceDetail({ record, kind, all, slug }: { record: Rec; kind: "department" | "project"; all: Record<string, Rec[]>; slug: string }) {
+  const { actor } = useWorkspace();
   const [params, setParams] = useSearchParams();
   const requestedTab = params.get("tab") ?? "overview";
   const linked = (group: string) => (all[group] ?? empty).filter(item => item.parentId === record.id || item.fields.departmentId === record.id || item.fields.projectId === record.id);
@@ -92,7 +94,7 @@ function SpaceDetail({ record, kind, all, slug }: { record: Rec; kind: "departme
       <aside className="ws-detail-secondary"><section className="ws-detail-panel"><span className="ws-detail-kicker">SPACE DETAILS</span><h2>At a glance</h2><dl><div><dt>Status</dt><dd>{record.status.replace(/_/g," ")}</dd></div><div><dt>Responsible</dt><dd>{record.ownerName || "Unassigned"}</dd></div><div><dt>Last updated</dt><dd>{new Date(record.updatedAt).toLocaleDateString()}</dd></div><div><dt>Channels</dt><dd>{channels.length}</dd></div></dl></section>
       <section className="ws-detail-panel"><span className="ws-detail-kicker">COLLABORATION</span><h2>People & coordination</h2><div className="ws-detail-quicklinks"><button onClick={() => changeTab("people")}><Users size={16}/> People <ArrowRight size={15}/></button><button onClick={() => changeTab("conversations")}><MessageSquare size={16}/> Conversations <ArrowRight size={15}/></button><button onClick={() => changeTab("approvals")}><CheckCircle2 size={16}/> Approvals <ArrowRight size={15}/></button><button onClick={() => changeTab("activity")}><Clock3 size={16}/> Activity <ArrowRight size={15}/></button></div></section></aside>
     </div>}
-    {tab === "work" && <div className="ws-stack">{kind === "department" && <section className="ws-section"><h2>Projects</h2>{projects.length ? <div className="ws-entry-list">{projects.map(project => <RowLink key={project.id} to={`${workAreaPath(slug, "work")}/project/${project.id}`} title={project.title} icon={FolderKanban}/>)}</div> : <p className="ws-empty">No department projects yet.</p>}</section>}<WorkList title="Tasks in this space" records={tasks} slug={slug} fallback="No tasks linked to this space yet. Use Create in this space to add one." /></div>}
+    {tab === "work" && <div className="ws-stack"><DeferredPanel><WorkspaceTaskDesk tasks={tasks} slug={slug} actor={actor} kind={kind} id={record.id} title={record.title}/></DeferredPanel>{kind === "department" && <section className="ws-detail-panel"><h2>Department projects</h2>{projects.length ? <div className="ws-entry-list">{projects.map(project => <RowLink key={project.id} to={`${workAreaPath(slug,"work")}/project/${project.id}`} title={project.title} detail={project.status} icon={FolderKanban}/>)}</div> : <p className="ws-empty">No linked projects.</p>}</section>}</div>}
     {tab === "ai workforce" && <DeferredPanel><AgentWorkBoard scope={{type:kind,id:record.id}}/></DeferredPanel>}
     {tab === "approvals" && <DeferredPanel><TaskApprovalBoard scope={{type: kind, id: record.id}}/></DeferredPanel>}
     {tab === "people" && <div className="ws-stack"><DeferredPanel><CompanyPeople scope={{type:kind,id:record.id,title:record.title}}/></DeferredPanel><WorkList title="AI collaborators" records={agents} slug={slug} fallback="No AI collaborators linked." /></div>}
