@@ -10,6 +10,8 @@ import type { Rec } from "@/domain/types";
 import { requestMailboxConnection } from "./actions";
 import { useCommsData } from "./panels";
 import { configuredIdentities, validateIdentity } from "./mailIdentities";
+import { ComposeTools, RecipientPicker } from "./ComposeAddons";
+import type { ComposeReference } from "./composeTools";
 import { filterMailView, relatedMailContext, type MailView } from "./mailViews";
 import {
   MAIL_FOLDERS, checkDraft, draftInput, draftRecord, folderCounts, folderOf, searchThreads, senderAddress,
@@ -210,9 +212,12 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
   const [failure, setFailure] = useState("");
   const [showCc, setShowCc] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
+  const [references, setReferences] = useState<ComposeReference[]>([]);
   const idRef = useRef<string | undefined>(payload?.id);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
-  const identities = configuredIdentities(useCommsData().preferences, context.actor);
+  const commsData = useCommsData();
+  const identities = configuredIdentities(commsData.preferences, context.actor);
+  const contacts = [...commsData.contacts, ...commsData.employees, ...commsData.members];
   const [identityId, setIdentityId] = useState("");
   const identity = identities.find((item) => item.id === identityId);
   const from = identity?.address ?? senderAddress(context.actor, context.org.slug);
@@ -223,6 +228,7 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
     setLoadedFrom(existing.id);
     setDraft(draftInput(existing));
     setShowCc(Boolean(existing.fields.cc));
+    setReferences(Array.isArray(existing.fields.documentReferences) ? existing.fields.documentReferences as ComposeReference[] : []);
     setIdentityId(String(existing.fields.senderIdentityId ?? ""));
     setSavedAt(String(existing.fields.savedLocallyAt ?? existing.updatedAt));
   }
@@ -237,7 +243,7 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
       try {
         if (idRef.current) {
           const previous = existing && existing.id === idRef.current ? existing : undefined;
-          await context.mutate.patch(idRef.current, { ...draftRecord(value, from, at, previous), fields: { ...draftRecord(value, from, at, previous).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderSignature: identity?.signature ?? "", senderVerified: false } }, { event: `Email draft updated by ${context.actor}` });
+          await context.mutate.patch(idRef.current, { ...draftRecord(value, from, at, previous), fields: { ...draftRecord(value, from, at, previous).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderSignature: identity?.signature ?? "", senderVerified: false, documentReferences: references, documentReferences: references } }, { event: `Email draft updated by ${context.actor}` });
         } else {
           const created = await context.mutate.create({ collection: "emailThreads", tags: ["draft"], ...{ ...draftRecord(value, from, at), fields: { ...draftRecord(value, from, at).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderSignature: identity?.signature ?? "", senderVerified: false } } }, `Email draft saved by ${context.actor}`);
           idRef.current = created.id;
@@ -304,16 +310,17 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
         <div className="cm-compose-row">
           <label htmlFor="cm-to">To</label>
           <div className="cm-compose-recipient">
-            <TextInput id="cm-to" value={draft.to} onChange={(event) => edit({ to: event.target.value })}
-              placeholder="name@company.com" invalid={check.invalid.some((value) => draft.to.includes(value))} />
+            <RecipientPicker id="cm-to" label="To" value={draft.to} onChange={(value) => edit({ to: value })}
+              contacts={contacts} invalid={check.invalid.some((value) => draft.to.includes(value))} />
             <button type="button" className="cm-compose-inline" onClick={() => setShowCc((value) => !value)}
               aria-expanded={showCc} aria-controls="cm-cc">{showCc ? "Hide Cc" : "Cc"} {showCc ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}</button>
           </div>
         </div>
         {(showCc || Boolean(draft.cc)) && <div className="cm-compose-row" id="cm-cc">
           <label htmlFor="cm-cc-input">Cc</label>
-          <TextInput id="cm-cc-input" value={draft.cc ?? ""} onChange={(event) => edit({ cc: event.target.value })}
-            placeholder="Optional recipients" invalid={check.invalid.some((value) => (draft.cc ?? "").includes(value))}/>
+          <RecipientPicker id="cm-cc-input" label="Cc" value={draft.cc ?? ""}
+            onChange={(value) => edit({ cc: value })} contacts={contacts}
+            invalid={check.invalid.some((value) => (draft.cc ?? "").includes(value))}/>
         </div>}
         <div className="cm-compose-row">
           <label htmlFor="cm-subject">Subject</label>
@@ -324,6 +331,9 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
           <label htmlFor="cm-message">Message</label>
           <TextArea id="cm-message" value={draft.body} onChange={(event) => edit({ body: event.target.value })}
             rows={7} placeholder="Write your message…" />
+          <ComposeTools documents={commsData.documents} references={references}
+            onReferencesChange={(next) => { setReferences(next); setDirty(true); }}
+            message={draft.body} onMessageChange={(next) => edit({ body: next })} />
           <div className="cm-compose-editor-tools">
             <span>{draft.body.length} characters</span>
             <button type="button" disabled={!identity?.signature} onClick={() => setShowSignature((value) => !value)} aria-expanded={showSignature}>
