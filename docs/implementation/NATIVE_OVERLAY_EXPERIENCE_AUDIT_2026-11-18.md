@@ -92,3 +92,14 @@ The first pass established app ownership and data scope. This follow-on change m
 | Design · Export | Selected page, filename, file format, resolution, previewed dimensions and raster safety checks | SVG is vector, PNG is scaled raster; limits overly large image exports and only claims local downloads. |
 
 The shared Drawer now has `DrawerInFlight` to prevent close/Escape/scrim dismissal during a pending write. The new browser cases check missing targets and application-specific controls. The PR remains a scoped implementation pass, not an assertion that every overlay in the 957-entry registry has been manually QA-certified.
+
+## Third pass — procurement approvals, stock movements, local session safety and Legal handovers
+
+| Native overlay | Refinements | Verified boundary |
+|---|---|---|
+| Procurement / requisition decision | Explicit pending requisition selection rather than the first order, approval limit and separation-of-duties evidence, distinct rejection reason, docked decisions, stale revision and in-flight error handling | Approval records a purchasing decision only, not a supplier payment; client role checks do not replace server authorisation |
+| Procurement / stock movement | Explicit product and warehouse, signed whole-number quantity, movement-type sign validation, projected balance, supporting reason, reviewer acknowledgement and guarded save | Counts derive from recorded movements, not a connected warehouse system; the projected balance is an estimate and still requires reconciliation |
+| Administration / emergency session revoke | Explicit scope (one selected or all *other* active sessions), affected record preview, typed REVOKE, cancellable dialog, atomic revision-checked writes | Only Arlovi's local session records change; no remote identity-provider session is terminated |
+| Legal / signature handover | A selected approved contract and actual counterparty/status/version, acknowledgement, stale-revision handling and anchored actions | Status changes locally to awaiting signature; no signing email, certificate or external request is sent |
+
+Regressions include explicit-selection and provider-boundary checks for these overlays. The previous shared UI work remains unchanged, and this is not an assertion that all 957 catalogue entries have undergone manual review.
