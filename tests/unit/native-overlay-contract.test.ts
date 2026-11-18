@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { applications } from "@/app/catalog";
-import { NATIVE_OVERLAY_DOMAINS, nativeOverlayDomain } from "@/app/OverlayExperience";
+import { applications, screens } from "@/app/catalog";
+import { NATIVE_OVERLAY_DOMAINS, OVERLAY_ENTITY_LABELS, nativeOverlayDomain } from "@/app/OverlayExperience";
 
 describe("native overlay identity contract", () => {
   it("covers every registered native app with a purposeful identity", () => {
@@ -14,6 +14,12 @@ describe("native overlay identity contract", () => {
       expect(domain.entity.trim().length).toBeGreaterThan(1);
       expect(domain.group.trim().length).toBeGreaterThan(1);
     }
+  });
+
+  it("has precise record labels for every registered collection", () => {
+    const collections = [...new Set(screens.map(screen => screen.collection))].sort();
+    expect(Object.keys(OVERLAY_ENTITY_LABELS).sort()).toEqual(collections);
+    expect(collections).toHaveLength(89);
   });
 
   it("does not invent a native identity for an unregistered application", () => {
