@@ -1,7 +1,9 @@
 import { Fragment, useMemo, useState } from "react";
 import { Hash, Lock, MessageSquare, Paperclip, Pin } from "lucide-react";
-import { Avatar, Button, Empty, Notice, Pill, Row, Stack, TextArea } from "@/design-system";
+import { Avatar, Button, Empty, Notice, Pill, Row, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
+import { useCollections } from "@/platform/workspace";
+import { completeMention, matchesConversation, mentionCandidates, mentionQuery, mentionsIn } from "./compose";
 import type { Rec } from "@/domain/types";
 import { clockIso } from "@/platform/clock";
 
@@ -93,12 +95,30 @@ export function Conversation({
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const directory = useCollections(["employees", "members"]);
+  const people = useMemo(() => [...new Set([
+    ...directory.employees.filter((row) => row.status !== "alumni").map((row) => row.title),
+    ...directory.members.map((row) => row.title),
+  ])], [directory.employees, directory.members]);
+  const typing = mentionQuery(draft);
+  const suggestions = typing === null ? [] : mentionCandidates(typing, people).filter((name) => name.toLowerCase() !== typing.toLowerCase());
 
-  const roots = useMemo(
+  const allRoots = useMemo(
     () => messages.filter((message) => !message.fields.threadRootId).sort((a, b) => (a.at ?? "").localeCompare(b.at ?? "")),
     [messages],
   );
-  const repliesOf = (id: string) => messages.filter((message) => message.fields.threadRootId === id).sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
+  const allRepliesOf = (id: string) => messages.filter((message) => message.fields.threadRootId === id).sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
+  const searching = search.trim().length > 0;
+  const roots = searching
+    ? allRoots.filter((root) => matchesConversation(root, search) || allRepliesOf(root.id).some((reply) => matchesConversation(reply, search)))
+    : allRoots;
+  const repliesOf = (id: string) => {
+    const replies = allRepliesOf(id);
+    const root = allRoots.find((message) => message.id === id);
+    return !searching || (root && matchesConversation(root, search)) ? replies : replies.filter((reply) => matchesConversation(reply, search));
+  };
+  const hitCount = searching ? messages.filter((message) => matchesConversation(message, search)).length : 0;
 
   const declared = Number(channel.fields.memberCount ?? 0);
   const listed = String(channel.fields.members ?? "").split(",").filter(Boolean).length;
@@ -118,7 +138,10 @@ export function Conversation({
     if (!text) return;
     setBusy(true);
     try {
-      const mentioned = text.match(/@([A-Z][a-z]+ [A-Z][a-z]+)/g)?.map((hit) => hit.slice(1)) ?? [];
+      const mentioned = [...new Set([
+        ...mentionsIn(text, people),
+        ...(text.match(/@([A-Z][a-z]+ [A-Z][a-z]+)/g)?.map((hit) => hit.slice(1)) ?? []),
+      ])];
       const root = replyTo ? messages.find((message) => message.id === replyTo) : undefined;
       await context.mutate.create({
         collection: "messages",
@@ -228,8 +251,23 @@ export function Conversation({
         </Notice>
       )}
 
+      {allRoots.length > 0 && (
+        <Row gap={2} wrap className="cm-search">
+          <TextInput
+            type="search"
+            aria-label={`Search ${channel.title}`}
+            placeholder="Search this conversation"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          {searching && <span className="ds-subtle" role="status"><span className="ds-num">{hitCount}</span> {hitCount === 1 ? "message matches" : "messages match"}</span>}
+          {searching && <Button size="sm" variant="ghost" onClick={() => setSearch("")}>Clear</Button>}
+        </Row>
+      )}
+
       <div className="cm-thread">
-        {roots.length === 0 && <Empty title="Nothing has been said here yet" icon={<MessageSquare size={20} />}>Write the first message below.</Empty>}
+        {allRoots.length === 0 && <Empty title="Nothing has been said here yet" icon={<MessageSquare size={20} />}>Write the first message below.</Empty>}
+        {allRoots.length > 0 && roots.length === 0 && <Empty title="No message matches" icon={<MessageSquare size={20} />}>Nothing in {channel.title} contains &ldquo;{search.trim()}&rdquo;.</Empty>}
         {roots.map((message) => (
           <Fragment key={message.id}>
             {renderMessage(message, false)}
@@ -261,11 +299,23 @@ export function Conversation({
           aria-label={`Message ${channel.title}`}
           placeholder={`Message ${channel.fields.kind === "group" ? channel.title : `#${channel.title}`}. Type a full name after @ to mention someone.`}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void send(); }
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void send(); return; }
+            if ((event.key === "Tab" || event.key === "Enter") && suggestions.length > 0) { event.preventDefault(); setDraft(completeMention(draft, suggestions[0])); }
           }}
         />
+        {suggestions.length > 0 && (
+          <div className="cm-mentions" role="listbox" aria-label="Mention somebody">
+            {suggestions.map((name, index) => (
+              <button key={name} type="button" role="option" aria-selected={index === 0} className="cm-mention-option" onClick={() => setDraft(completeMention(draft, name))}>
+                <Avatar name={name} size="sm" />
+                <span>{name}</span>
+              </button>
+            ))}
+            <span className="ds-subtle">Tab or Enter picks the first.</span>
+          </div>
+        )}
         <Row gap={2}>
-          <span className="ds-subtle ds-grow">Messages stay in this browser. Mentioning somebody notifies them here and grants them nothing.</span>
+          <span className="ds-subtle ds-grow">Posted to this workspace only: no email, push or chat provider is connected, so nothing is delivered elsewhere. A mention lists the message on that person&rsquo;s Communications home and grants them nothing.</span>
           <Button type="submit" variant="primary" busy={busy} disabled={!draft.trim()}>Send</Button>
         </Row>
       </form>
