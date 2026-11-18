@@ -11,7 +11,7 @@ export function destinationForOrganization(pathname: string, search: string, tar
   const workspace = /^\/o\/[^/]+\/workspace\/([^/]+)(?:\/(.*))?$/.exec(pathname);
   if (workspace) {
     const section = workspace[1];
-    if (!workspace[2] && ["home", "company", "spaces", "work", "apps", "recent", "resources", "people", "account", "health"].includes(section)) {
+    if (!workspace[2] && ["home", "company", "spaces", "work", "apps", "recent", "resources", "people", "account", "health", "setup"].includes(section)) {
       return `/o/${targetSlug}/workspace/${section}`;
     }
     if (section === "work") return `/o/${targetSlug}/workspace/work`;
