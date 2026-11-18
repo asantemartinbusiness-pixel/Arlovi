@@ -13,6 +13,8 @@ import { clockIso, freshness } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { downloadCsv } from "@/applications/t6kit/kit";
 import "./integrations.css";
+import { ConnectionStatePill, MappingPanel, capabilityIdOf } from "./mappingPanel";
+import { STATE_LABELS, connectionState, readMapping } from "./mapping";
 import {
   CATEGORIES, CONNECTOR_ENTRIES, adapterChecks, adapterOperations, authorisationSteps, entryById, entryForRecord,
   type ConnectorEntry,
@@ -725,6 +727,10 @@ export function Connections({ context, lens }: { context: ScreenContext; lens: "
             return entry ? <StateCell entry={entry} /> :
               <Pill tone="warning" dot>{String(row.fields.capability ?? row.status).replace(/_/g, " ")}</Pill>;
           } },
+          { key: "setup", header: "Setup", cell: row => {
+            const entry = entryForRecord(row.fields);
+            return <ConnectionStatePill state={connectionState(row, entry?.capability.state ?? "", capabilityIdOf(row, entry?.capability.id))} />;
+          } },
           { key: "local", header: "Local alternative", cell: row => row.summary },
         ]}
         onOpen={id => context.navigate(`/o/${org.slug}/connect/connections/${id}`)}
@@ -776,6 +782,8 @@ export function ConnectionDetail({ context, lens }: { context: ScreenContext; le
 
   if (lens === "Sync") {
     return (
+      <Stack gap={4}>
+      <MappingPanel key={record.id} context={context} record={record} capabilityId={capabilityIdOf(record, entry.capability.id)} capabilityState={entry.capability.state} />
       <Grid>
         <Card span={7} eyebrow="SYNC" prov="unknown" title="Ingestion" subtitle="Nothing to ingest">
           <Properties rows={[
@@ -800,6 +808,7 @@ export function ConnectionDetail({ context, lens }: { context: ScreenContext; le
           </Notice>
         </Card>
       </Grid>
+      </Stack>
     );
   }
 
@@ -862,6 +871,7 @@ export function ConnectionDetail({ context, lens }: { context: ScreenContext; le
     <Grid>
       <Card span={7} eyebrow="CONNECTION" prov="unknown" title={record.title} subtitle={entry.capability.provider} actions={<StateCell entry={entry} />}>
         <Properties rows={[
+          { label: "Setup state", value: <Row gap={2} wrap><ConnectionStatePill state={connectionState(record, entry.capability.state, entry.capability.id)} /><Button size="sm" variant="ghost" onClick={() => context.setTab("Sync")}>Edit the data mapping</Button></Row> },
           { label: "Account identity", value: <Pill tone="warning">no account linked</Pill> },
           { label: "Capability", value: entry.capability.label },
           { label: "Owner", value: record.ownerName },
@@ -1085,6 +1095,35 @@ export function SyncCentre({ context, lens }: { context: ScreenContext; lens: "J
     return (
       <Stack gap={4}>
         {overview}
+        <section className="ds-stack ds-gap-3" aria-label="Mappings per connection">
+          <h3 style={{ margin: 0, fontSize: "var(--text-md)" }}>Mappings per connection</h3>
+          {records.length === 0 ? <p className="ds-subtle">No connection records yet.</p> : (
+            <div className="t6-matrix-wrap">
+              <table className="t6-matrix">
+                <caption className="ds-sr-only">Data mapping state of each connection</caption>
+                <thead><tr><th scope="col">Connection</th><th scope="col">State</th><th scope="col">Fields mapped</th><th scope="col">Lands in</th><th scope="col"><span className="ds-sr-only">Open</span></th></tr></thead>
+                <tbody>
+                  {records.map((record) => {
+                    const entry = entryForRecord(record.fields);
+                    const capabilityId = capabilityIdOf(record, entry?.capability.id);
+                    const mapping = readMapping(record, capabilityId);
+                    const state = connectionState(record, entry?.capability.state ?? "", capabilityId);
+                    return (
+                      <tr key={record.id}>
+                        <th scope="row">{record.title}</th>
+                        <td><ConnectionStatePill state={state} /></td>
+                        <td className="ds-num">{mapping.savedAt ? `${mapping.rows.filter((row) => row.target).length} of ${mapping.rows.length}` : "—"}</td>
+                        <td><code>{mapping.collection}</code></td>
+                        <td><Button size="sm" variant="ghost" aria-label={`Edit the mapping for ${record.title}`} onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections/${record.id}?tab=Sync`)}>Edit mapping</Button></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="ds-subtle">States: {Object.values(STATE_LABELS).join(", ")}. Only Connected means data has been read from a provider.</p>
+        </section>
         <Notice tone="info" title="A mapping is written before a sync, not after">
           Each row below says which workspace collection a capability's records would land in, and what makes two records the same thing.
         </Notice>
