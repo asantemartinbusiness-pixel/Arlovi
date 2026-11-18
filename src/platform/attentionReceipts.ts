@@ -1,4 +1,5 @@
 import type { AttentionItem } from "@/platform/attention";
+import type { Rec } from "@/domain/types";
 
 /** Local personal state. Does not resolve, approve or mutate the underlying business event. */
 export interface AttentionReceipt {
@@ -39,5 +40,23 @@ export function attentionSnoozed(
 ): boolean {
   if (item.priority === "P0" && item.kind === "system") return false;
   const receipt = receipts[attentionReceiptKey(orgId, actor, item.id)];
-  return Boolean(receipt?.snoozedUntil && Date.parse(receipt.snoozedUntil) > now.getTime());
+  const local = receipt?.snoozedUntil;
+  const itemSnooze = "snoozedUntil" in item && typeof item.snoozedUntil === "string" ? item.snoozedUntil : undefined;
+  return Boolean((local && Date.parse(local) > now.getTime()) || (itemSnooze && Date.parse(itemSnooze) > now.getTime()));
+}
+
+/** Keep the global bell aligned with locally triaged items from the full Inbox. */
+export function applyInboxAttentionState(items: AttentionItem[], stateRecords: Rec[]): AttentionItem[] {
+  const states = new Map(stateRecords.map((row) => [String(row.fields.itemId ?? ""), row]));
+  return items.map((item) => {
+    const row = states.get(item.id);
+    if (!row) return item;
+    return {
+      ...item,
+      read: item.read || row.fields.read === true,
+      acknowledged: item.acknowledged || row.fields.acknowledged === true,
+      resolved: item.resolved || row.fields.resolved === true,
+      snoozedUntil: typeof row.fields.snoozedUntil === "string" ? row.fields.snoozedUntil : undefined,
+    };
+  });
 }
