@@ -793,6 +793,7 @@ export function DataRequestOverlay({ context, close }: { context: ScreenContext;
         { label: "Basis", value: String(request.fields.lawfulBasis ?? "") },
         { label: "Handler", value: String(request.fields.handler ?? "Unassigned") },
         { label: "Records matched now", value: counting ? "Counting records from every application…" : `${matching.length} across ${collections.length} collections` },
+        ...(counting ? [] : [{ label: "Where they are", value: collections.map((collection) => `${collection} ${matching.filter((row) => row.collection === collection).length}`).join(" · ") }]),
       ]} />
       {hold && (
         <Notice tone="danger" title="A legal hold applies">

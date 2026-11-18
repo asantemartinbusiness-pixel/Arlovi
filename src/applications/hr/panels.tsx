@@ -11,6 +11,7 @@ import { useCollection, useCollections, useRecord, useWorkspace } from "@/platfo
 import { addDays, clockIso, daysBetween, startOfMonth, startOfWeek } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { EmploymentPill, RoleViewNote, leaveBalance, salaryText } from "./kit";
+import { LeaverChecklist } from "./leaver";
 import { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 import { leaveRequestDays, planLeaveDecision } from "./decisions";
 import { planTimesheetApprovals } from "./workforce";
@@ -883,6 +884,7 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
             Pending access requests are rescinded in this workspace; connected identity and building systems must still be checked separately.
           </Notice>
         )}
+        <LeaverChecklist context={context} employee={employee} tasks={data.tasks} />
         {requests.length === 0 ? (
           <Empty title="No access requests recorded" icon={<ClipboardCheck size={20} />}>
             Employment status and department membership do not establish that an account or physical grant exists.

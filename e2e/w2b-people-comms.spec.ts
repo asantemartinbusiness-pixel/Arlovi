@@ -147,6 +147,66 @@ test("COMMS meeting: answers are recorded by name, actions become tasks", async 
   await expect(main(page).getByLabel("Answer for Theo Marsh")).toHaveValue("accepted");
 });
 
+test("HR leaver checklist hands workspace access to ADMIN, which closes it by suspending", async ({ page }) => {
+  await open(page, "/hr/employees/nl-employees-022?tab=Access", "Employee profile");
+  await expect(main(page).getByText("Sable Nguyen").first()).toBeVisible();
+  await main(page).getByRole("button", { name: "Start offboarding" }).click();
+  const modal = dialog(page);
+  await expect(modal.getByLabel("Leaver checklist that will be created")).toContainText("Workspace access suspended in Administration");
+  await modal.getByRole("textbox", { name: "Reason for offboarding" }).fill("Resigned to start her own studio; handover agreed.");
+  const checks = modal.getByRole("checkbox");
+  for (let i = 0; i < 3; i += 1) await checks.nth(i).check();
+  await modal.getByRole("button", { name: "Record departure" }).click();
+  await expect(dialog(page)).toHaveCount(0);
+
+  const checklist = main(page).locator(".ds-card").filter({ hasText: "LEAVER CHECKLIST" });
+  await expect(checklist.getByText("0 of 4 steps done")).toBeVisible();
+  await expect(checklist.getByRole("checkbox", { name: "Workspace access suspended in Administration" })).toBeDisabled();
+  await checklist.getByRole("checkbox", { name: "Equipment, keys and documents returned" }).click();
+  await expect(checklist.getByText("1 of 4 steps done")).toBeVisible();
+  await reload(page);
+  await expect(main(page).getByRole("checkbox", { name: "Equipment, keys and documents returned" })).toBeChecked();
+
+  await dismissToasts(page);
+  await main(page).getByRole("button", { name: "Open Members in Administration" }).click();
+  await expect(page).toHaveURL(/\/admin\/members/);
+  const handoff = main(page).getByRole("group", { name: "Leaver Sable Nguyen" });
+  await expect(handoff).toContainText("Member active");
+  await handoff.getByRole("button", { name: "Review and suspend Sable Nguyen" }).click();
+  await expect(dialog(page).getByText(/Closed on Sable Nguyen's record/)).toBeVisible();
+  await dialog(page).getByLabel("Type OFFBOARD to confirm").fill("offboard");
+  await dialog(page).getByRole("button", { name: "Suspend Sable Nguyen" }).click();
+  await expect(page.getByText(/1 leaver step closed in People/)).toBeVisible();
+  await expect(main(page).getByRole("group", { name: "Leaver Sable Nguyen" })).toHaveCount(0);
+
+  await open(page, "/hr/employees/nl-employees-022?tab=Access", "Employee profile");
+  await expect(main(page).getByRole("checkbox", { name: "Workspace access suspended in Administration" })).toBeChecked();
+  await expect(main(page).getByText("2 of 4 steps done")).toBeVisible();
+});
+
+test("ADMIN teams: add a team, name its lead, move a member", async ({ page }) => {
+  await open(page, "/admin/members?tab=Teams", "Members & Invitations");
+  await main(page).getByLabel("Team name").fill("Lighting lab");
+  await main(page).getByLabel("Lead", { exact: true }).selectOption("Theo Marsh");
+  await main(page).getByLabel("What the team does").fill("Prototype fittings and compliance tests.");
+  await main(page).getByRole("button", { name: "Add team" }).click();
+  const lab = main(page).locator(".ds-card").filter({ has: page.getByRole("heading", { name: "Lighting lab", exact: true }) });
+  await expect(lab).toContainText("lead Theo Marsh");
+  await main(page).getByLabel("Team for Amara Diallo").selectOption({ label: "Lighting lab" });
+  await expect(lab).toContainText("Amara Diallo");
+  await reload(page);
+  await expect(main(page).locator(".ds-card").filter({ has: page.getByRole("heading", { name: "Lighting lab", exact: true }) })).toContainText("Amara Diallo");
+});
+
+test("ADMIN privacy register counts each request only once every app's records are in", async ({ page }) => {
+  await open(page, "/admin/privacy?tab=Requests", "Privacy & Data Controls");
+  const rowan = main(page).getByRole("row", { name: /Rowan Pike — erasure/ });
+  await expect(rowan).toContainText(/ERASURE\s*11/i);
+  await rowan.getByText("Rowan Pike — erasure of personal data").click();
+  await main(page).getByRole("button", { name: "Review request" }).click();
+  await expect(dialog(page).getByText("members 1 · employees 1 · payrollRuns 2 · leaveRequests 7")).toBeVisible();
+});
+
 test.describe("mobile", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
