@@ -38,7 +38,7 @@ export function isAddress(value: string): boolean {
   return ADDRESS.test(value.trim());
 }
 
-export interface DraftInput { to: string; cc?: string; subject: string; body: string }
+export interface DraftInput { to: string; cc?: string; bcc?: string; subject: string; body: string }
 
 export interface DraftCheck {
   /** Addresses that cannot be an email address. */
@@ -58,7 +58,8 @@ export interface DraftCheck {
 export function checkDraft(input: DraftInput): DraftCheck {
   const to = parseRecipients(input.to);
   const cc = parseRecipients(input.cc ?? "");
-  const invalid = [...to, ...cc].filter((value) => !isAddress(value));
+  const bcc = parseRecipients(input.bcc ?? "");
+  const invalid = [...to, ...cc, ...bcc].filter((value) => !isAddress(value));
   const blocking: string[] = [];
   const warnings: string[] = [];
   if (invalid.length) blocking.push(`${invalid.length === 1 ? "One address is" : `${invalid.length} addresses are`} not valid: ${invalid.join(", ")}`);
@@ -66,14 +67,14 @@ export function checkDraft(input: DraftInput): DraftCheck {
   if (to.length === 0) warnings.push("No recipient yet.");
   if (!input.subject.trim()) warnings.push("No subject.");
   if (!input.body.trim()) warnings.push("The message is empty.");
-  if (to.length + cc.length > 4) warnings.push(`${to.length + cc.length} recipients is a bulk send; check the list before it goes anywhere.`);
-  return { invalid, blocking, warnings, recipients: to.length + cc.length };
+  if (to.length + cc.length + bcc.length > 4) warnings.push(`${to.length + cc.length + bcc.length} recipients is a bulk send; check the list before it goes anywhere.`);
+  return { invalid, blocking, warnings, recipients: to.length + cc.length + bcc.length };
 }
 
 function threadText(thread: Rec): string {
   const messages = (thread.body as { messages?: StoredMessage[] } | undefined)?.messages ?? [];
   return [
-    thread.title, thread.summary, thread.fields.from, thread.fields.to, thread.fields.cc, thread.fields.labels,
+    thread.title, thread.summary, thread.fields.from, thread.fields.to, thread.fields.cc, thread.fields.bcc, thread.fields.labels,
     ...messages.map((message) => `${message.from ?? ""} ${message.body ?? ""}`),
   ].map((value) => String(value ?? "")).join(" ").toLowerCase();
 }
@@ -111,6 +112,7 @@ export function senderAddress(actor: string, orgSlug: string): string {
 export function draftRecord(input: DraftInput, from: string, at: string, previous?: Rec) {
   const to = parseRecipients(input.to);
   const cc = parseRecipients(input.cc ?? "");
+  const bcc = parseRecipients(input.bcc ?? "");
   return {
     title: input.subject.trim() || "(no subject)",
     summary: input.body.trim().slice(0, 160),
@@ -118,7 +120,7 @@ export function draftRecord(input: DraftInput, from: string, at: string, previou
     at,
     fields: {
       ...(previous?.fields ?? {}),
-      folder: "drafts", from, to: to.join(", "), cc: cc.join(", "), unread: false,
+      folder: "drafts", from, to: to.join(", "), cc: cc.join(", "), bcc: bcc.join(", "), unread: false,
       risk: String(previous?.fields.risk ?? "none"), labels: String(previous?.fields.labels ?? "draft"),
       delivery: "not_connected", messageCount: 1, savedLocallyAt: at,
     },
@@ -132,6 +134,7 @@ export function draftInput(thread: Rec): DraftInput {
   return {
     to: String(thread.fields.to ?? ""),
     cc: String(thread.fields.cc ?? ""),
+    bcc: String(thread.fields.bcc ?? ""),
     subject: thread.title === "(no subject)" ? "" : thread.title,
     body: String(messages.at(-1)?.body ?? thread.summary ?? ""),
   };
