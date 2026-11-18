@@ -9,6 +9,7 @@
  * ====================================================================== */
 
 import { clamp, type Pt, type Rect } from "@/applications/visual/geometry";
+import { drawMaskAligned, frameOf } from "./maskSpace";
 
 export type BlendMode =
   | "normal" | "multiply" | "screen" | "overlay" | "darken" | "lighten"
@@ -69,6 +70,8 @@ export interface PhotoLayer {
   /** Greyscale PNG data URL: white shows, black hides. */
   mask?: string;
   maskEnabled?: boolean;
+  /** The layer geometry the mask was painted for; the mask follows the layer from there. */
+  maskFrame?: { x: number; y: number; w: number; h: number; rotation: number; flipX?: boolean };
   x: number;
   y: number;
   w: number;
@@ -645,7 +648,8 @@ export function compositeDoc(
       const maskCtx = context2d(buffer);
       maskCtx.save();
       maskCtx.globalCompositeOperation = "destination-in";
-      maskCtx.drawImage(maskImage, 0, 0, buffer.width, buffer.height);
+      maskCtx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
+      drawMaskAligned(maskCtx, maskImage, layer, doc);
       maskCtx.restore();
       ctx.save();
       ctx.globalAlpha = 1;
@@ -730,6 +734,28 @@ export async function bakeCrop(doc: RasterDoc, rect: Rect, angle: number): Promi
       x: 0, y: 0, w: rect.w, h: rect.h,
       naturalWidth: Math.round(rect.w), naturalHeight: Math.round(rect.h),
     });
+  }
+  /* Masks are cut by the same crop and turned by the same straighten as the
+     pixels they cover, then recorded as painted for the layer's new place. */
+  for (let index = 0; index < layers.length; index += 1) {
+    const before = doc.layers[index];
+    const after = layers[index];
+    if (!before.mask || after.kind === "adjustment") continue;
+    try {
+      const mask = await loadImage(before.mask);
+      const canvas = makeCanvas(Math.round(rect.w), Math.round(rect.h));
+      const ctx = context2d(canvas);
+      if (before.kind === "pixel" && before.src) {
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate((angle * Math.PI) / 180);
+        ctx.translate(-canvas.width / 2, -canvas.height / 2);
+      }
+      ctx.translate(-rect.x, -rect.y);
+      drawMaskAligned(ctx, mask, before, doc);
+      layers[index] = { ...after, mask: canvas.toDataURL("image/png"), maskFrame: frameOf(after) };
+    } catch {
+      /* An undecodable mask is kept as it was; the layer panel reports it. */
+    }
   }
   return {
     ...doc, width: Math.round(rect.w), height: Math.round(rect.h), layers,

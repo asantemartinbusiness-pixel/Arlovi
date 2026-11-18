@@ -28,6 +28,7 @@ import {
 } from "./model";
 import { clockIso, wallMs } from "@/platform/clock";
 import { ImageTools } from "./imageTools";
+import { frameOf } from "./maskSpace";
 import "./photo.css";
 
 /* ====================================================================== *
@@ -380,7 +381,7 @@ function MasksScreen({ context, actions }: { context: ScreenContext; actions: Ac
     }
     ctx.fill();
     const data = canvas.toDataURL("image/png");
-    handle.edit((current) => patchLayer(current, layer.id, { mask: data, maskEnabled: true }), "Turn the selection into a mask");
+    handle.edit((current) => patchLayer(current, layer.id, { mask: data, maskEnabled: true, maskFrame: frameOf(layerById(current, layer.id) ?? layer) }), "Turn the selection into a mask");
     bumpPixels();
     context.toast("Mask created", `${layer.name} is now masked by the selection, feathered by ${doc.selection.feather}px.`);
   };
@@ -449,7 +450,7 @@ function MasksScreen({ context, actions }: { context: ScreenContext; actions: Ac
                 <Stack gap={2}>
                   <img src={layer.mask} alt={`Mask on ${layer.name}`} style={{ width: "100%", border: "1px solid var(--border-default)", borderRadius: 4 }} />
                   <Checkbox label="Mask enabled" checked={Boolean(layer.maskEnabled)} onChange={(event) => handle.edit((current) => patchLayer(current, layer.id, { maskEnabled: event.target.checked }), "Toggle the mask")} />
-                  <Button size="sm" variant="ghost" onClick={() => handle.edit((current) => patchLayer(current, layer.id, { mask: undefined, maskEnabled: false }), "Delete the mask")}>Delete the mask</Button>
+                  <Button size="sm" variant="ghost" onClick={() => handle.edit((current) => patchLayer(current, layer.id, { mask: undefined, maskEnabled: false, maskFrame: undefined }), "Delete the mask")}>Delete the mask</Button>
                 </Stack>
               ) : (
                 <Stack gap={2}>
@@ -1351,7 +1352,7 @@ function QuickMask({ context }: { context: ScreenContext }) {
             const ctx = context2d(canvas);
             ctx.fillStyle = "#ffffff";
             ctx.fillRect(0, 0, doc.width, doc.height);
-            handle.edit((current) => patchLayer(current, layer!.id, { mask: canvas.toDataURL("image/png"), maskEnabled: true }), "Add a mask");
+            handle.edit((current) => patchLayer(current, layer!.id, { mask: canvas.toDataURL("image/png"), maskEnabled: true, maskFrame: frameOf(layerById(current, layer!.id) ?? layer!) }), "Add a mask");
             bumpPixels();
           }}
         >

@@ -319,7 +319,7 @@ export function LayerProperties({ handle }: { handle: DocHandle<RasterDoc> }) {
       {layer.mask && (
         <PanelGroup title="Mask">
           <Button size="sm" variant="secondary" onClick={() => set({ maskEnabled: !layer.maskEnabled }, "Toggle the mask")}>{layer.maskEnabled ? "Disable" : "Enable"} the mask</Button>
-          <Button size="sm" variant="ghost" onClick={() => set({ mask: undefined, maskEnabled: false }, "Delete the mask")}>Delete the mask</Button>
+          <Button size="sm" variant="ghost" onClick={() => set({ mask: undefined, maskEnabled: false, maskFrame: undefined }, "Delete the mask")}>Delete the mask</Button>
           <img src={layer.mask} alt={`Mask for ${layer.name}`} style={{ width: "100%", borderRadius: 4, border: "1px solid var(--border-default)" }} />
         </PanelGroup>
       )}

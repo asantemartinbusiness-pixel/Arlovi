@@ -41,8 +41,11 @@ describe("WS5 photo whole-image transforms", () => {
     expect([back.width, back.height]).toEqual([400, 200]);
   });
 
-  it("refuses to turn an image whose masks would no longer line up", () => {
-    expect(transformBlocked(doc([pixel("a", { x: 0, y: 0, w: 1, h: 1 }, { mask: "data:", maskEnabled: true })]))).toMatch(/mask/);
+  it("turns masks with the image; only an undecodable mask blocks the turn", () => {
+    /* W2E: masks are now redrawn for the new orientation, so a mask alone no longer blocks. */
+    const masked = doc([pixel("a", { x: 0, y: 0, w: 1, h: 1 }, { mask: "data:", maskEnabled: true })]);
+    expect(transformBlocked(masked)).toBeUndefined();
+    expect(transformBlocked(masked, ["a"])).toMatch(/mask/);
     expect(transformBlocked(doc([pixel("a", { x: 0, y: 0, w: 1, h: 1 })]))).toBeUndefined();
   });
 

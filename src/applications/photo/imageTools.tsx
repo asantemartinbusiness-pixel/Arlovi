@@ -4,8 +4,8 @@ import { Tool, Toolbar } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { downloadBlob, slug, type DocHandle } from "@/applications/visual/kit";
 import { uid } from "@/applications/visual/geometry";
-import { exportComposite, loadImage, type RasterDoc } from "./raster";
-import { placePhoto, transformBlocked, transformImage, type ImageTransform } from "./transform";
+import { exportComposite, loadImage, makeCanvas, type RasterDoc } from "./raster";
+import { placePhoto, transformBlocked, transformImage, transformMaskImage, type ImageTransform } from "./transform";
 import { bumpPixels, unsupportedReason } from "./model";
 import type { ImageBank } from "./canvas";
 
@@ -64,12 +64,30 @@ export function ImageTools({ context, handle, bank, title }: { context: ScreenCo
     }
   };
 
-  const transform = (id: ImageTransform, label: string) => {
+  const transform = async (id: ImageTransform, label: string) => {
     const current = handle.doc;
     if (!current) return;
-    const blocked = transformBlocked(current);
+    /* Every mask — enabled or not — is turned with the picture so it stays
+       over the same pixels when it is switched back on. */
+    const masked = current.layers.filter((layer) => layer.mask);
+    const turned: Record<string, string> = {};
+    const undecodable: string[] = [];
+    if (masked.length > 0) setBusy(true);
+    try {
+      for (const layer of masked) {
+        try {
+          const source = await loadImage(layer.mask!);
+          turned[layer.id] = transformMaskImage(source, current, id, makeCanvas);
+        } catch {
+          undecodable.push(layer.id);
+        }
+      }
+    } finally {
+      if (masked.length > 0) setBusy(false);
+    }
+    const blocked = transformBlocked(current, undecodable);
     if (blocked) { context.toast("The image cannot be turned yet", blocked, "blocked"); return; }
-    handle.edit(transformImage(current, id), label);
+    handle.edit(transformImage(current, id, turned), masked.length > 0 ? `${label} (with ${masked.length === 1 ? "its mask" : `${masked.length} masks`})` : label);
     bumpPixels();
   };
 
@@ -102,7 +120,7 @@ export function ImageTools({ context, handle, bank, title }: { context: ScreenCo
       />
       <Tool label="Open a photo from this device" icon={<ImagePlus size={15} />} disabled={!doc || busy} onClick={() => input.current?.click()} />
       {TRANSFORMS.map((item) => (
-        <Tool key={item.id} label={item.label} icon={item.icon} disabled={!doc || busy} onClick={() => transform(item.id, item.label)} />
+        <Tool key={item.id} label={item.label} icon={item.icon} disabled={!doc || busy} onClick={() => { void transform(item.id, item.label); }} />
       ))}
       <Tool label="Export the composite as PNG" icon={<Download size={15} />} disabled={!doc || !bank.ready || busy} onClick={() => { void exportPng(); }}>PNG</Tool>
     </Toolbar>
