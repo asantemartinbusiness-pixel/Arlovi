@@ -52,7 +52,7 @@ export function ModalInFlight({ when }: { when: boolean }) {
  * Escape and focus return. Dismissal of edited forms requires confirmation.
  */
 export function Modal({
-  open, onOpenChange, title, description, children, footer, width = 560, tone, blocking,
+  open, onOpenChange, title, description, children, footer, width = 560, tone, blocking, origin, head, application,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -63,6 +63,9 @@ export function Modal({
   width?: number;
   tone?: "danger";
   blocking?: boolean;
+  origin?: ReactNode;
+  head?: ReactNode;
+  application?: string;
 }) {
   const [footerTarget, setFooterTarget] = useState<HTMLElement | null>(null);
   const [isDirty, setDirty] = useState(false);
@@ -86,12 +89,14 @@ export function Modal({
             <Dialog.Overlay className="ds-overlay" />
             <Dialog.Content
               className="ds-modal"
+              data-native-app={application}
               style={{ ["--modal-w" as string]: `${width}px` }}
               onEscapeKeyDown={(event) => { if (blocking || inFlight) event.preventDefault(); }}
               onInteractOutside={(event) => { if (blocking || inFlight || fromToast(event)) event.preventDefault(); }}
             >
               <header className="ds-overlay-head">
                 <div className="ds-grow">
+                  {origin}
                   <Dialog.Title asChild>
                     <h2 style={tone === "danger" ? { color: "var(--danger)" } : undefined}>{title}</h2>
                   </Dialog.Title>
@@ -99,6 +104,7 @@ export function Modal({
                     ? <Dialog.Description className="ds-card-sub">{description}</Dialog.Description>
                     : <Dialog.Description className="ds-overlay-visually-hidden">Review the details and available actions in this dialog.</Dialog.Description>}
                 </div>
+                {head}
                 <Dialog.Close asChild>
                   <Button variant="ghost" size="sm" iconOnly aria-label="Close" title="Close dialog" disabled={blocking || inFlight}>
                     <X size={16} aria-hidden="true" />
@@ -171,7 +177,7 @@ export function DrawerUnsavedChanges({ when }: { when: boolean }) {
  * At narrow viewport widths the same content becomes a bottom sheet.
  */
 export function Drawer({
-  open, onOpenChange, title, subtitle, children, footer, width = 440, head,
+  open, onOpenChange, title, subtitle, children, footer, width = 440, head, origin, application,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -181,6 +187,8 @@ export function Drawer({
   footer?: ReactNode;
   width?: number;
   head?: ReactNode;
+  origin?: ReactNode;
+  application?: string;
 }) {
   const [footerTarget, setFooterTarget] = useState<HTMLElement | null>(null);
   const [isDirty, setDirty] = useState(false);
@@ -201,11 +209,13 @@ export function Drawer({
             <Dialog.Overlay className="ds-overlay ds-drawer-scrim" />
             <Dialog.Content
               className="ds-drawer"
+              data-native-app={application}
               style={{ ["--drawer-w" as string]: `${width}px` }}
               onInteractOutside={(event) => { if (fromToast(event)) event.preventDefault(); }}
             >
               <header className="ds-overlay-head">
                 <div className="ds-grow">
+                  {origin}
                   <Dialog.Title asChild><h2>{title}</h2></Dialog.Title>
                   {subtitle
                     ? <Dialog.Description className="ds-card-sub">{subtitle}</Dialog.Description>
