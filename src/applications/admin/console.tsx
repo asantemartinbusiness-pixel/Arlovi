@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Database, FileClock, KeyRound, Lock, Scale, Server } from "lucide-react";
 import {
-  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill,
+  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, ModalActions, ModalInFlight, Notice, OverlayCancel, Pill,
   Properties, Row, Select, Stack, Stat, StatRow, Switch, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
@@ -11,6 +11,7 @@ import { ROLE_LABELS } from "@/platform/policy";
 import type { Audit, Rec } from "@/domain/types";
 import { csvCell, csvList, ofKind, SeedsFailedNotice, StepUp, useAdmin, useSeeded, useSeedStatus, useSettledOrgRecords } from "./pieces";
 import { clockIso } from "@/platform/clock";
+import { revisedRecord } from "@/platform/repo";
 
 /* ====================================================================== *
  * ADMIN console — security, audit, privacy, billing, recovery, developer.
@@ -269,36 +270,91 @@ export function ProviderSetup({ context, close }: { context: ScreenContext; clos
 export function EmergencyRevoke({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const single = data.sessions.find((row) => row.id === (payload?.id ?? context.selectedId));
-  const others = data.sessions.filter((row) => row.status === "active" && row.fields.current !== true);
+  const initialId = payload?.id ?? context.selectedId ?? "";
+  const active = data.sessions.filter(row => row.status === "active" && row.fields.current !== true);
+  const [scope, setScope] = useState<"single" | "all" | "none">(initialId ? "single" : "none");
+  const [selectedId, setSelectedId] = useState(initialId);
+  const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
-  const target = single && single.fields.current !== true ? [single] : others;
+  const [error, setError] = useState("");
+  const target = scope === "all" ? active : scope === "single"
+    ? active.filter(row => row.id === selectedId) : [];
+  const canSubmit = context.can("manage_policy") && !busy && target.length > 0 && confirmation === "REVOKE";
 
   return (
-    <StepUp
-      word="REVOKE"
-      label={target.length === 1 ? `Revoke ${target[0].title}` : `Revoke ${target.length} sessions`}
-      busy={busy}
-      onConfirm={async () => {
-        setBusy(true);
-        try {
-          for (const session of target) {
-            await context.mutate.patch(session.id, {
-              status: "revoked",
-              fields: { ...session.fields, revokedBy: context.actor, revokedAt: context.now.toISOString() },
-            }, { event: `Session revoked: ${session.title}`, expectRevision: session.revision });
-          }
-          context.toast("Revoked", `${target.length} ${target.length === 1 ? "session record" : "session records"} marked revoked. Your own session is untouched.`);
-          close();
-        } finally { setBusy(false); }
-      }}
-    >
+    <Stack gap={4}>
+      <ModalInFlight when={busy} />
+      <Notice tone="warning" title="Record a session revocation — not a live provider logout">
+        This action changes Arlovi's local session records. No identity provider is connected,
+        so it cannot terminate a remote device session or force a user to sign out.
+      </Notice>
+      <Field label="Revocation scope" required>
+        <Select aria-label="Revocation scope" value={scope} disabled={busy}
+          onChange={event => { setScope(event.target.value as "single" | "all" | "none"); setConfirmation(""); setError(""); }}>
+          <option value="none">Choose which sessions to record</option>
+          <option value="single">One other active session</option>
+          <option value="all">All other active sessions ({active.length})</option>
+        </Select>
+      </Field>
+      {scope === "single" && (
+        <Field label="Session" required>
+          <Select aria-label="Session" value={selectedId} disabled={busy}
+            onChange={event => { setSelectedId(event.target.value); setConfirmation(""); setError(""); }}>
+            <option value="">Select an active session</option>
+            {active.map(row => <option key={row.id} value={row.id}>{row.title}</option>)}
+          </Select>
+        </Field>
+      )}
+      {scope === "all" && <Notice tone="danger" title="Bulk revocation affects every other active session">
+        {active.length} active session record(s) will be marked revoked. The current local session remains unchanged.
+      </Notice>}
       <Properties rows={[
-        { label: "Sessions affected", value: target.map((row) => row.title).join("; ") || "None" },
-        { label: "Your session", value: "Left alone, so you are not locked out of the console" },
-        { label: "What this does here", value: "Marks the session records revoked. With no server, nothing is torn down remotely." },
+        { label: "Affected session records", value: String(target.length) },
+        { label: "Sessions", value: target.map(row => row.title).join("; ") || "None selected" },
+        { label: "Current session", value: "Not included in the revocation" },
+        { label: "Real provider sign-out", value: "Not connected; no remote session termination" },
       ]} />
-    </StepUp>
+      {target.length > 0 && (
+        <Field label="Type REVOKE to confirm" required>
+          <TextInput aria-label="Type REVOKE to confirm" value={confirmation}
+            disabled={busy} autoComplete="off"
+            onChange={event => setConfirmation(event.target.value.toUpperCase())} />
+        </Field>
+      )}
+      {error && <Notice tone="danger" title="Revocation could not be recorded">{error}</Notice>}
+      <ModalActions>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
+        <span className="ds-grow" />
+        <Button variant="danger" busy={busy} disabled={!canSubmit}
+          onClick={async () => {
+            if (!canSubmit) return;
+            setBusy(true);
+            setError("");
+            try {
+              const editor = { actor: context.actor, now: clockIso() };
+              const records = target.map(row => revisedRecord(row, {
+                status: "revoked", fields: { ...row.fields,
+                  revokedBy: context.actor, revokedAt: editor.now },
+              }, editor));
+              await context.mutate.putMany(
+                records,
+                target.map(row => `Session revocation recorded for ${row.title} by ${context.actor}`),
+                Object.fromEntries(target.map(row => [row.id, row.revision])),
+                target.map(() => "update"),
+              );
+              context.toast("Session records marked revoked",
+                `${target.length} session record(s) updated locally. No remote identity provider was contacted.`);
+              close();
+            } catch (cause) {
+              const message = cause instanceof Error ? cause.message : "The sessions may have changed. Reload before retrying.";
+              setError(message);
+              context.toast("Revocation not recorded", message, "failed");
+            } finally { setBusy(false); }
+          }}>
+          Record revocation{target.length > 0 ? ` (${target.length})` : ""}
+        </Button>
+      </ModalActions>
+    </Stack>
   );
 }
 
