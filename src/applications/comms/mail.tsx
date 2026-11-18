@@ -394,10 +394,10 @@ export function MailConnectionSetup({ context }: { context: ScreenContext }) {
         if (!canManage) { setError("You do not have connector management permission."); return; }
         const normalizedDomain = domain.trim().toLowerCase();
         const normalizedMailbox = mailbox.trim().toLowerCase();
-        if (normalizedDomain && !/^(?!-)[a-z0-9-]+(\\.[a-z0-9-]+)+$/.test(normalizedDomain)) {
+        if (normalizedDomain && !/^(?!-)[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(normalizedDomain)) {
           setError("Enter a valid company domain without https:// or a path."); return;
         }
-        if (provider !== "transactional" && !/^[^\\s@<>(),;]+@[^\\s@<>(),;]+\\.[^\\s@<>(),;]+$/.test(normalizedMailbox)) {
+        if (provider !== "transactional" && !/^[^\s@<>(),;]+@[^\s@<>(),;]+\.[^\s@<>(),;]+$/.test(normalizedMailbox)) {
           setError("Enter the existing mailbox address."); return;
         }
         if (provider === "transactional" && !normalizedDomain) {
