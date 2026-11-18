@@ -1,0 +1,55 @@
+/* MISSION-003/004 brief, milestones, timeline, participants. Layout only; colours from tokens. */
+
+.mission-brief { margin: 0; display: grid; gap: var(--space-3); }
+.mission-brief > div { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: var(--space-3); }
+.mission-brief dt { color: var(--fg-muted); font-size: var(--text-sm); }
+.mission-brief dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mission-brief-form { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.mission-exec { margin: 0; padding-inline-start: var(--space-4); display: flex; flex-direction: column; gap: var(--space-1); }
+
+.mission-ms-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-3); }
+.mission-ms { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-surface); min-width: 0; }
+.mission-ms-head { display: flex; align-items: center; gap: var(--space-2); }
+.mission-ms-form { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius-md); background: var(--bg-inset); }
+.mission-ms-formrow { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--space-3); }
+.mission-ms-tasks { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+
+.mission-tl { position: relative; height: 150px; margin: var(--space-2) var(--space-6) var(--space-4); }
+.mission-tl-axis { position: absolute; inset-inline: 0; top: 108px; height: 2px; background: var(--border-default); border-radius: 1px; }
+.mission-tl-tick { position: absolute; top: 118px; transform: translateX(-50%); font-size: var(--text-xs); color: var(--fg-subtle); white-space: nowrap; }
+.mission-tl-today, .mission-tl-due { position: absolute; top: 0; bottom: 36px; width: 0; border-inline-start: 2px dashed var(--accent); }
+.mission-tl-due { border-inline-start-color: var(--fg-muted); }
+.mission-tl-today > span, .mission-tl-due > span { position: absolute; top: -2px; inset-inline-start: 4px; font-size: var(--text-2xs); color: var(--fg-muted); white-space: nowrap; text-transform: uppercase; letter-spacing: var(--tracking-label); }
+.mission-tl-ms { position: absolute; top: 100px; transform: translateX(-9px); display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 4px; }
+.mission-tl-ms[data-row="1"] .mission-tl-label { margin-bottom: 22px; }
+.mission-tl-ms[data-row="2"] .mission-tl-label { margin-bottom: 44px; }
+.mission-tl-dot { width: 18px; height: 18px; border-radius: var(--radius-full); border: 3px solid var(--bg-surface); background: var(--info); box-shadow: 0 0 0 1px var(--border-default); }
+.mission-tl-ms[data-state="reached"] .mission-tl-dot { background: var(--success); }
+.mission-tl-ms[data-state="at_risk"] .mission-tl-dot { background: var(--warning); }
+.mission-tl-ms[data-state="overdue"] .mission-tl-dot { background: var(--danger); }
+.mission-tl-ms[data-state="empty"] .mission-tl-dot { background: var(--fg-subtle); }
+.mission-tl-label { position: absolute; bottom: 24px; inset-inline-start: 0; font-size: var(--text-xs); font-weight: 600; white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; background: var(--bg-surface); padding: 0 4px; border-radius: var(--radius-xs); }
+.mission-tl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); border-top: 1px solid var(--border-subtle); padding-top: var(--space-3); }
+.mission-tl-list li { display: flex; align-items: center; gap: var(--space-3); }
+.mission-tl-list .ds-num { width: 110px; flex: none; color: var(--fg-muted); }
+
+.mission-pt-form { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: var(--space-3); align-items: end; padding: var(--space-3); border-radius: var(--radius-md); background: var(--bg-inset); }
+.mission-pt-form > .ds-notice, .mission-pt-form > [class*="notice"] { grid-column: 1 / -1; }
+.mission-pt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-3); }
+.mission-pt-grid .ds-select { width: auto; }
+
+@media (max-width: 599px) {
+  .mission-brief > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .mission-ms-formrow, .mission-pt-form { grid-template-columns: minmax(0, 1fr); }
+  .mission-tl { margin-inline: var(--space-3); }
+  .mission-tl-label { max-width: 96px; }
+  .mission-tl-list .ds-num { width: 84px; }
+}
+
+.mission-tl-label { max-width: 240px; }
+.mission-tl-ms[data-edge="end"] .mission-tl-label { inset-inline-start: auto; inset-inline-end: -4px; }
+.mission-tl-ms[data-edge="end"] { align-items: flex-end; transform: translateX(-9px); }
+@media (max-width: 599px) { .mission-tl-label { max-width: 110px; } }
+.mission-tl-due > span { inset-inline-start: auto; inset-inline-end: 4px; }
+.mission-pt-exec { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
