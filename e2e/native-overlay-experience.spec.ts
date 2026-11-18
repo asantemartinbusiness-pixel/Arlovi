@@ -86,3 +86,40 @@ test("a design export is tied to a real page and reports its output format", asy
   await expect(dialog.getByRole("button", { name: "Download SVG" })).toBeEnabled();
   await expect(dialog.getByRole("combobox", { name: "Image resolution" })).toHaveCount(0);
 });
+
+test("a stock movement requires an explicit product and warehouse", async ({ page }) => {
+  await page.goto("/o/northline/proc/movements?overlay=authorization");
+  const dialog = page.getByRole("dialog", { name: "Authorise stock movement" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("combobox", { name: "Product" })).toHaveValue("");
+  await expect(dialog.getByRole("combobox", { name: "Warehouse" })).toHaveValue("");
+  await expect(dialog.getByRole("button", { name: "Record stock movement" })).toBeDisabled();
+  await expect(dialog).toContainText("No inventory provider is connected");
+});
+
+test("procurement approval does not silently use the first requisition", async ({ page }) => {
+  await page.goto("/o/northline/proc/home?overlay=Requisition");
+  const drawer = page.getByRole("dialog", { name: "Requisition review" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toContainText("Choose a requisition to review");
+  await expect(drawer.getByRole("button", { name: "Approve requisition" })).toHaveCount(0);
+});
+
+test("emergency revocation requires scope and typed confirmation", async ({ page }) => {
+  await page.goto("/o/northline/admin/security?overlay=emergency%20revoke");
+  const dialog = page.getByRole("dialog", { name: "Revoke sessions" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("combobox", { name: "Revocation scope" })).toHaveValue("none");
+  await expect(dialog.getByRole("button", { name: /Record revocation/ })).toBeDisabled();
+  await expect(dialog).toContainText("No identity provider is connected");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
+test("signature handover never substitutes an approved contract without selection", async ({ page }) => {
+  await page.goto("/o/northline/legal/contracts?overlay=e-sign%20request");
+  const dialog = page.getByRole("dialog", { name: "Signature handover" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("Choose a contract ready for signature");
+  await expect(dialog.getByRole("button", { name: "Mark awaiting signature" })).toHaveCount(0);
+});
