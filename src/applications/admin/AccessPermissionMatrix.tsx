@@ -42,6 +42,7 @@ export function AccessPermissionMatrix({ roleId, context }: { roleId:string; con
   const [filter,setFilter] = useState("");
   const [group,setGroup] = useState("All");
   const [changedOnly,setChangedOnly] = useState(false);
+  const [showAdvanced,setShowAdvanced] = useState(false);
   const [dirty,setDirty] = useState(false);
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState("");
@@ -67,6 +68,7 @@ export function AccessPermissionMatrix({ roleId, context }: { roleId:string; con
   const tableRows = view==="apps"
     ? apps.map(app=>({ key:app.code, app:app.code, pageId:undefined as string|undefined, title:app.name }))
     : currentPages.map(page=>({ key:page.id, app:page.applicationCode, pageId:page.id as string|undefined, title:page.title }));
+  const visibleActions=showAdvanced?GRID_ACTIONS:GRID_ACTIONS.filter(action=>action==="view"||action==="edit");
   const edits=countDraftChanges(draft);
   const applyRule=(level:"application"|"page",key:string,action:MatrixAction,choice:PermissionChoice)=>{
     setDraft(previous=>updateRolePermission(previous,level,key,action,choice));
@@ -138,12 +140,13 @@ export function AccessPermissionMatrix({ roleId, context }: { roleId:string; con
             {applications.map(app=><option key={app.code} value={app.code}>{app.name}</option>)}
           </select>}
       <label className="aw-perm-filtercheck"><input type="checkbox" checked={changedOnly} onChange={e=>setChangedOnly(e.target.checked)}/> Changed only</label>
+      <button type="button" className="aw-perm-advanced" aria-pressed={showAdvanced} onClick={()=>setShowAdvanced(v=>!v)}>{showAdvanced?"Show core rights":"Show advanced actions"}</button>
     </div>}
-    {(view==="apps"||view==="pages")&&<div className="aw-perm-scroll" role="region" aria-label={view==="apps"?"Application permission table":"Page permission table"} tabIndex={0}>
+    {(view==="apps"||view==="pages")&&<div className="aw-perm-scroll" data-advanced={showAdvanced} role="region" aria-label={view==="apps"?"Application permission table":"Page permission table"} tabIndex={0}>
       <table className="aw-perm-table">
         <thead><tr><th scope="col">{view==="apps"?"Application":"Page / screen"}</th>
           <th scope="col">Effective view*</th><th scope="col">Effective edit*</th>
-          {GRID_ACTIONS.map(a=><th key={a} scope="col">{a[0].toUpperCase()+a.slice(1)}</th>)}
+          {visibleActions.map(a=><th key={a} scope="col">{a[0].toUpperCase()+a.slice(1)}</th>)}
           {view==="apps"&&<th scope="col">Data scope</th>}
         </tr></thead>
         <tbody>{tableRows.map(item=>{
@@ -162,7 +165,7 @@ export function AccessPermissionMatrix({ roleId, context }: { roleId:string; con
             </div></th>
             <td><span className="aw-perm-status" data-allowed={viewDecision.allowed}>{viewDecision.allowed?"View":"No view"}</span></td>
             <td><span className="aw-perm-status" data-allowed={editDecision.allowed}>{editDecision.allowed?"Edit":"No edit"}</span></td>
-            {GRID_ACTIONS.map(a=><td key={a}><PermissionSelect
+            {visibleActions.map(a=><td key={a}><PermissionSelect
               value={row[a]??"inherit"}
               label={`${view==="apps"?"Application":"Page"} ${key} ${a} rule`}
               disabled={!writable}
