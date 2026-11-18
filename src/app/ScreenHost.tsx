@@ -391,7 +391,7 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
   const origin = <OverlayOrigin context={ctx} />;
   const recordContext = found.presentation?.noRecordContext
     ? undefined
-    : <OverlayRecordContext context={ctx} selection={found.presentation?.selectedRecord} />;
+    : <OverlayRecordContext context={ctx} selection={found.presentation?.selectedRecord} collection={found.presentation?.collection} />;
   const description = found.description ?? found.presentation?.guidance;
   // This is a local presentation guard, not a substitute for authenticated API checks.
   if (found.capability && !ctx.can(found.capability)) {
