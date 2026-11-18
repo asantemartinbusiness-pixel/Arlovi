@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Briefcase, CalendarDays, ClipboardCheck, GraduationCap, Receipt, UserPlus, Users, Clock } from "lucide-react";
 import {
-  Button, Checkbox, DataGrid, Empty, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Checkbox, DataGrid, Empty, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
@@ -111,7 +111,7 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
       </PeopleDialogSection>
       {error && <Notice tone="danger" title="Departure could not be completed">{error}</Notice>}
       <ModalActions>
-        <Button variant="ghost" onClick={close} disabled={saving}>Cancel</Button>
+        <OverlayCancel disabled={saving}>Cancel</OverlayCancel>
         <span className="ds-grow" />
         <Button
           variant="danger"
