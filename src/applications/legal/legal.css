@@ -53,3 +53,23 @@
   .lg-cal-day { min-height: 68px; }
   .lg-matrix { grid-template-columns: 70px repeat(3, minmax(0, 1fr)); }
 }
+
+/* Contract register filters and the contract workspace cards. */
+.lg-register-filters { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.lg-register-filters select { min-width: 0; max-width: 220px; }
+
+.lg-ob-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.lg-ob-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--space-2); align-items: center; padding: var(--space-2) 0; border-bottom: 1px solid var(--border-default); }
+.lg-ob-row:last-child { border-bottom: 0; }
+.lg-ob-row[data-done="true"] .lg-ob-main strong { color: var(--fg-subtle); text-decoration: line-through; }
+.lg-ob-main { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.lg-inline-form { border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: var(--space-3); background: var(--bg-inset); }
+
+.lg-rounds { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); border-top: 1px solid var(--border-default); padding-top: var(--space-3); }
+.lg-rounds p { margin: 2px 0 0; }
+
+@media (max-width: 560px) {
+  .lg-register-filters select { max-width: none; flex: 1 1 100%; }
+  .lg-ob-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .lg-ob-row > button { grid-column: 1 / -1; justify-self: start; }
+}

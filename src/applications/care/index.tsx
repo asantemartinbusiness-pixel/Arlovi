@@ -844,9 +844,13 @@ export const careApp = registerApp({
         { id: "reopen", label: "Reopen", placement: "overflow", run: (context) => reopenCase(context) },
         { id: "assign specialist", label: "Assign a specialist", placement: "overflow", run: (context) => context.openOverlay("assign specialist") },
         { id: "request refund", label: "Request a refund", placement: "overflow", run: (context) => context.openOverlay("refund request") },
+        { id: "escalate", label: "Escalate", placement: "overflow", run: (context) => context.openOverlay("escalation", { id: context.params.id }) },
+        { id: "link record", label: "Link a customer or order", placement: "overflow", run: (context) => context.openOverlay("link record", { id: context.params.id }) },
       ],
       overlays: [
         ...kitOverlays,
+        { id: "escalation", kind: "modal", title: "Escalate this case", width: 560, render: ({ close, ...context }) => <Escalation context={context} close={close} />, footer: submitFooter("cr-escalate", "Escalate") },
+        { id: "link record", kind: "modal", title: "Link a record", width: 520, render: ({ close, ...context }) => <LinkRecord context={context} close={close} />, footer: submitFooter("cr-link", "Save the link") },
         { id: "assign specialist", kind: "modal", title: "Assign a specialist", width: 540, render: ({ close, ...context }) => <AssignSpecialist context={context} close={close} />, footer: submitFooter("cr-specialist", "Assign") },
         { id: "Response composer", kind: "modal", title: "Reply", width: 680, render: ({ close, ...context }) => <ResponseComposer context={context} close={close} />, footer: submitFooter("cr-response", "Record the reply") },
         { id: "internal note", kind: "modal", title: "Internal note", width: 560, render: ({ close, ...context }) => <InternalNote context={context} close={close} />, footer: submitFooter("cr-note", "Add the note") },
