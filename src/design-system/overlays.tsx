@@ -7,6 +7,21 @@ import { X } from "lucide-react";
 import { Button } from "./primitives";
 
 
+/**
+ * Use in app-owned form footers for Cancel. Radix routes the close request
+ * through the existing dirty/in-flight guard, unlike calling close() directly.
+ * Successful mutations can still call their supplied close() callback.
+ */
+export function OverlayCancel({
+  children = "Cancel", disabled = false,
+}: { children?: ReactNode; disabled?: boolean }) {
+  return (
+    <Dialog.Close asChild>
+      <Button variant="ghost" disabled={disabled}>{children}</Button>
+    </Dialog.Close>
+  );
+}
+
 /** A press on a toast is not an intent to leave the dialog. */
 function fromToast(event: { target: EventTarget | null }): boolean {
   return event.target instanceof Element && Boolean(event.target.closest(".ds-toasts"));
