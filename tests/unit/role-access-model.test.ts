@@ -83,6 +83,14 @@ describe("Arlovi role and access-control contract", () => {
     expect(evaluateAccess(query({action:"approve",amountMinor:100000}),[grant]).outcome).toBe("approval_required");
     expect(evaluateAccess(query({action:"approve"}),[{...grant,requiresApproval:true}]).outcome).toBe("approval_required");
   });
+  it("prevents transaction self-approval and requires human approval for powerful AI actions",()=>{
+    expect(evaluateAccess(query({action:"approve",resource:{...resource,submittedById:principal.id}}),[grant]).outcome).toBe("deny");
+    const agent={...principal,id:"agent-1",kind:"ai_agent" as const};
+    expect(evaluateAccess(query({principal:agent,action:"approve",amountMinor:10000}),
+      [{...grant,agentEligible:true}]).outcome).toBe("approval_required");
+    expect(evaluateAccess(query({principal:agent,action:"view"}),
+      [{...grant,agentEligible:true}]).outcome).toBe("allow");
+  });
   it("expires grants and blocks malformed expiry",()=>{
     expect(evaluateAccess(query(),[{...grant,expiresAt:"2026-11-18T18:00:00Z"}]).outcome).toBe("deny");
     expect(evaluateAccess(query(),[{...grant,expiresAt:"invalid"}]).outcome).toBe("deny");
