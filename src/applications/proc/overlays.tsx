@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, MoneyInput, Notice, Pill, Properties, Row,
+  Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, MoneyInput, Notice, OverlayCancel, Pill, Properties, Row,
   Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
@@ -164,10 +164,31 @@ export function RequisitionReview({ context, close }: { context: ScreenContext; 
   const data = useProcData();
   const { org, now, actor } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const requisition = useRecord(payload?.id ?? context.selectedId) ?? data.purchaseOrders.find((item) => item.status === "awaiting_approval");
-  const supplier = findSupplier(data, String(requisition?.fields.supplierId ?? ""));
+  const [selectedId, setSelectedId] = useState(payload?.id ?? context.selectedId ?? "");
   const [reason, setReason] = useState("");
-  if (!requisition) return <Empty title="Nothing to review" />;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const pendingRecords = data.purchaseOrders.filter(item => item.status === "awaiting_approval");
+  const requisition = selectedId ? data.purchaseOrders.find(item => item.id === selectedId) : undefined;
+  const supplier = findSupplier(data, String(requisition?.fields.supplierId ?? ""));
+  if (!requisition) return (
+    <Stack gap={3}>
+      <Notice tone={selectedId ? "warning" : "info"}
+        title={selectedId ? "Selected requisition unavailable" : "Choose a requisition to review"}>
+        {selectedId ? "This requisition is no longer available. It may have changed since you opened the panel." :
+          "No requisition has been selected. Choose one awaiting review; Arlovi will not substitute the first order."}
+      </Notice>
+      {pendingRecords.length ? (
+        <Field label="Requisition awaiting a decision">
+          <Select aria-label="Requisition awaiting a decision" value={selectedId}
+            onChange={event => { setSelectedId(event.target.value); setReason(""); setError(""); }}>
+            <option value="">Select a requisition</option>
+            {pendingRecords.map(item => <option key={item.id} value={item.id}>{item.title} · {context.money(item.amountMinor ?? 0)}</option>)}
+          </Select>
+        </Field>
+      ) : <Empty title="No requisitions awaiting approval">New requests appear when submitted by the purchasing team.</Empty>}
+    </Stack>
+  );
   const totals = poTotals(requisition, supplier, org.jurisdiction);
   const needed = approverFor(totals.grossMinor);
   const limit = approvalLimitFor(context);
@@ -178,6 +199,8 @@ export function RequisitionReview({ context, close }: { context: ScreenContext; 
 
   return (
     <Stack gap={4}>
+      <DrawerUnsavedChanges when={Boolean(reason.trim())} />
+      <DrawerInFlight when={busy} />
       <Properties rows={[
         { label: "Requisition", value: <span className="ds-num">{requisition.title}</span> },
         { label: "Requester", value: String(requisition.fields.requester ?? requisition.ownerName) },
@@ -218,39 +241,59 @@ export function RequisitionReview({ context, close }: { context: ScreenContext; 
               Separation of duties keeps a requester from approving their own spend. The owner is the last approver in the chain, with no one above to pass it to, so an owner approval of their own requisition is allowed but recorded as a self-approval on the requisition and in the audit trail.
             </Notice>
           )}
-          <Field label="Note for the record"><TextInput value={reason} onChange={(event) => setReason(event.target.value)} /></Field>
-          <Row gap={2}>
+          <Field label="Note for the record" hint="Required when declining; optional when approving."><TextInput value={reason} disabled={busy} onChange={(event) => setReason(event.target.value)} /></Field>
+          {error && <Notice tone="danger" title="Decision could not be recorded">{error}</Notice>}
+          <DrawerActions>
             <Button
               variant="primary"
-              disabled={!pending || !withinLimit || Boolean(separation.refused)}
-              title={separation.refused}
+              busy={busy}
+              disabled={busy || !canApprove || !pending || !withinLimit || Boolean(separation.refused) || totals.hasUnknownRate}
+              title={separation.refused || (totals.hasUnknownRate ? "Resolve unknown tax rates before approving" : undefined)}
               onClick={async () => {
-                if (separation.refused) return;
-                await context.mutate.patch(requisition.id, {
-                  status: "approved",
-                  fields: { ...requisition.fields, approver: actor, approverRole: limit.role, approvedAt: now.toISOString(), approvalNote: reason, selfApproved: separation.ownerSelfApproval },
-                }, { expectRevision: requisition.revision, event: `${requisition.title} approved by ${actor}${separation.ownerSelfApproval ? " (self-approval by the owner, who raised it)" : ""}` });
-                context.toast("Approved", `${requisition.title} can now be converted into a purchase order with this approval attached.`);
-                close();
+                if (busy || !canApprove || !pending || !withinLimit || separation.refused || totals.hasUnknownRate) return;
+                setBusy(true);
+                setError("");
+                try {
+                  const saved = await context.mutate.patch(requisition.id, {
+                    status: "approved",
+                    fields: { ...requisition.fields, approver: actor, approverRole: limit.role,
+                      approvedAt: now.toISOString(), approvalNote: reason.trim(),
+                      selfApproved: separation.ownerSelfApproval },
+                  }, { expectRevision: requisition.revision,
+                    event: `${requisition.title} approved by ${actor}${separation.ownerSelfApproval ? " (self-approval by owner)" : ""}` });
+                  if (!saved) { setError("The requisition changed. Reload before approving it."); return; }
+                  context.toast("Requisition approved", `${requisition.title} may now be converted to a purchase order. No supplier payment was sent.`);
+                  close();
+                } catch (cause) {
+                  setError(cause instanceof Error ? cause.message : "Review and retry the approval.");
+                } finally { setBusy(false); }
               }}
-            >
-              Approve
-            </Button>
+            >Approve requisition</Button>
             <Button
               variant="outline-danger"
-              disabled={!reason.trim() || !pending}
+              busy={busy}
+              disabled={busy || !canApprove || !pending || !reason.trim()}
               onClick={async () => {
-                await context.mutate.patch(requisition.id, {
-                  status: "rejected",
-                  fields: { ...requisition.fields, approver: actor, approvedAt: now.toISOString(), rejectionReason: reason },
-                }, { expectRevision: requisition.revision, event: `${requisition.title} rejected by ${actor}: ${reason}` });
-                context.toast("Rejected", "The reason is recorded on the requisition so the requester can see why.");
-                close();
+                if (busy || !canApprove || !pending || !reason.trim()) return;
+                setBusy(true);
+                setError("");
+                try {
+                  const saved = await context.mutate.patch(requisition.id, {
+                    status: "rejected",
+                    fields: { ...requisition.fields, approver: actor,
+                      approvedAt: now.toISOString(), rejectionReason: reason.trim() },
+                  }, { expectRevision: requisition.revision,
+                    event: `${requisition.title} rejected by ${actor}: ${reason.trim()}` });
+                  if (!saved) { setError("The requisition changed. Reload before rejecting it."); return; }
+                  context.toast("Requisition rejected", "The reason was saved on the record for the requester.");
+                  close();
+                } catch (cause) {
+                  setError(cause instanceof Error ? cause.message : "Review and retry the rejection.");
+                } finally { setBusy(false); }
               }}
-            >
-              Reject — a reason is required
-            </Button>
-          </Row>
+            >Reject with reason</Button>
+            <OverlayCancel disabled={busy}>Close review</OverlayCancel>
+          </DrawerActions>
         </>
       )}
     </Stack>
