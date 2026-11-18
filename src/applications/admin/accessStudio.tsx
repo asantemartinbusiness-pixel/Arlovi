@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { ArrowUpRight, BriefcaseBusiness, ChevronRight, Eye, LockKeyhole, Search, ShieldCheck, ShieldX, Users } from "lucide-react";
 import { Button, Notice, Pill, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
+import { useCollection } from "@/platform/workspace";
+import type { Role } from "@/domain/types";
 import { ROLE_TEMPLATES, templateOffersApp } from "@/platform/accessModel";
 import { ACCESS_APPLICATION_INVENTORY, accessInventoryCoverage } from "@/platform/accessInventory";
 import { canOpen, ROLE_LABELS } from "@/platform/policy";
@@ -25,12 +27,17 @@ const ACTIONS = [
 ];
 
 export function AccessStudio({ context }: { context: ScreenContext }) {
+  const members = useCollection("members").filter(member => member.status !== "archived");
+  const [memberId, setMemberId] = useState("");
   const [roleId, setRoleId] = useState("managing_director");
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState("All");
   const [selectedApp, setSelectedApp] = useState("FIN");
   const [onlyIncluded, setOnlyIncluded] = useState(false);
   const selectedRole = ROLE_TEMPLATES.find(role => role.id === roleId) ?? ROLE_TEMPLATES[0];
+  const selectedMember = members.find(member => member.id === memberId);
+  const memberRoleText = String(selectedMember?.fields.role ?? context.role);
+  const currentRole: Role = memberRoleText in ROLE_LABELS ? memberRoleText as Role : context.role;
   const allGroups = Array.from(new Set(ACCESS_APPLICATION_INVENTORY.map(app => app.group)));
   const matches = useMemo(() => ACCESS_APPLICATION_INVENTORY.filter(app =>
     (group === "All" || app.group === group)
@@ -70,6 +77,15 @@ export function AccessStudio({ context }: { context: ScreenContext }) {
             <ChevronRight size={14}/>
           </button>)}
         </div>
+        <div className="ax-member-check">
+          <label htmlFor="ax-member-select">Inspect existing workspace member</label>
+          <select id="ax-member-select" value={memberId} onChange={event => setMemberId(event.target.value)}>
+            <option value="">Current role view</option>
+            {members.map(member => <option key={member.id} value={member.id}>{member.title}</option>)}
+          </select>
+          <small>{selectedMember ? ROLE_LABELS[currentRole] + " · " + selectedMember.status : "Current role: " + ROLE_LABELS[currentRole]}</small>
+          <small>{ACCESS_APPLICATION_INVENTORY.filter(app => canOpen(currentRole, app.code)).length} apps in the legacy role view. Not identity verification.</small>
+        </div>
       </section>
       <div className="ax-primary">
         <div className="ax-current">
@@ -95,14 +111,14 @@ export function AccessStudio({ context }: { context: ScreenContext }) {
         <div className="ax-app-matrix" aria-label="Native application access matrix">
           {matches.map(app => {
             const suggested = templateOffersApp(roleId, app.code);
-            const current = canOpen(context.role, app.code);
+            const current = canOpen(currentRole, app.code);
             return <button type="button" key={app.code} onClick={() => setSelectedApp(app.code)}
               aria-pressed={selectedApp === app.code} className="ax-app">
               <span className="ax-app-status">{suggested?<ShieldCheck size={18}/>:<LockKeyhole size={18}/>}</span>
               <span><strong>{app.short}</strong><small>{app.pages.length} pages · {app.group}</small></span>
               <span className="ax-app-permissions">
                 <em data-suggested={suggested}>{suggested?"Suggested":"Not default"}</em>
-                <small>Current {ROLE_LABELS[context.role]}: {current?"shown":"hidden"}</small>
+                <small>Current {ROLE_LABELS[currentRole]}: {current?"shown":"hidden"}</small>
               </span>
             </button>;
           })}
@@ -140,7 +156,7 @@ export function AccessStudio({ context }: { context: ScreenContext }) {
       </section>
     </div>
     <Notice tone="info" title="Current role view">
-      Your selected browser role is {ROLE_LABELS[context.role]}. Its existing application and capability rules are shown separately
+      {selectedMember ? selectedMember.title + " holds the local " + ROLE_LABELS[currentRole] + " role view." : "Your selected browser role is " + ROLE_LABELS[currentRole] + "."} Its existing application and capability rules are shown separately
       from these proposed job-title templates. No role has been assigned and no policy has been published.
     </Notice>
   </section>;
