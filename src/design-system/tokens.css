@@ -40,32 +40,35 @@
   --app-finance: #166b50;
 
   /* ---- Brand ramps ---- */
-  --cobalt-50: #eef1fc;
-  --cobalt-100: #dde3f9;
-  --cobalt-200: #bcc8f4;
-  --cobalt-300: #93a7ec;
-  --cobalt-400: #6480e4;
-  --cobalt-500: #234fe8;
-  --cobalt-600: #1c3fc2;
-  --cobalt-700: #1b359b;
-  --cobalt-800: #1a2e7a;
-  --cobalt-900: #172960;
+  /* Deprecated cobalt variable names map to Seafoam, avoiding blue in older apps. */
+  --cobalt-50: var(--seafoam-50);
+  --cobalt-100: var(--seafoam-100);
+  --cobalt-200: var(--seafoam-200);
+  --cobalt-300: var(--seafoam-300);
+  --cobalt-400: var(--seafoam-500);
+  --cobalt-500: var(--seafoam-700);
+  --cobalt-600: var(--seafoam-800);
+  --cobalt-700: var(--seafoam-900);
+  --cobalt-800: #123b37;
+  --cobalt-900: #0e302c;
 
-  --papaya-100: #ffe8d7;
-  --papaya-200: #ffcdae;
-  --papaya-300: #ffae7c;
-  --papaya-400: #f68c4c;
-  --papaya-500: #de6c28;
-  --papaya-600: #b4511c;
-  --papaya-700: #8c3e18;
+  /* Peach support: small elements, never a full application background. */
+  --papaya-100: var(--pastel-peach);
+  --papaya-200: #f4d1bf;
+  --papaya-300: #eebda4;
+  --papaya-400: #d48b65;
+  --papaya-500: #a45136;
+  --papaya-600: #805137;
+  --papaya-700: #653c27;
 
-  --aqua-100: #d4f4f0;
-  --aqua-200: #a4e8e0;
-  --aqua-300: #64d8ce;
-  --aqua-400: #36c5ba;
-  --aqua-500: #16a097;
-  --aqua-600: #0d7c76;
-  --aqua-700: #10625e;
+  /* Aqua aliases remain for older application selectors. */
+  --aqua-100: var(--seafoam-50);
+  --aqua-200: var(--seafoam-100);
+  --aqua-300: var(--seafoam-200);
+  --aqua-400: var(--seafoam-300);
+  --aqua-500: var(--seafoam-700);
+  --aqua-600: var(--seafoam-800);
+  --aqua-700: var(--seafoam-900);
 
   /* ---- Neutral axis (true neutrals; names kept for existing references) ---- */
   --paper-0: #ffffff;
@@ -236,7 +239,7 @@
   /* ---- Machine surfaces: the dark connected stage ---- */
   --grad-intelligence: #0d0d0d;
   --grad-horizon: linear-gradient(118deg, #174a44 0%, #2d6b65 60%, #d7f0e8 100%);
-  --grad-ember: linear-gradient(118deg, #8c3e18 0%, #de6c28 52%, #ffcdae 100%);
+  --grad-ember: linear-gradient(118deg, #805137 0%, #a45136 52%, #fce7d6 100%);
   --dot-field: radial-gradient(rgb(255 255 255 / 16%) 1px, transparent 1.2px);
   --hatch-agent: repeating-linear-gradient(135deg, var(--seafoam-700) 0 1.5px, transparent 1.5px 4px);
 
@@ -355,6 +358,56 @@
   --accent-soft-fg: #c5e6da; --accent-border: #477f6e;
   --selected-bg: rgb(103 176 153 / 16%);
   --selected-fg: #c5e6da;
+}
+
+
+/* Preset accents stay legible when a user opts into dark appearance. */
+:root[data-theme="dark"][data-palette="sage"] {
+  --accent: #bfdec5; --accent-hover: #d4ead7; --accent-active: #ebf5ed;
+  --accent-soft-fg: #bfdec5; --accent-border: #507c5e;
+  --selected-fg: #bfdec5; --fg-link: #bfdec5;
+}
+:root[data-theme="dark"][data-palette="lilac"] {
+  --accent: #d4c4f3; --accent-hover: #e7dbf9; --accent-active: #f1eafb;
+  --accent-soft: rgb(162 132 212 / 17%); --accent-soft-fg: #d4c4f3;
+  --accent-border: #776393; --selected-bg: rgb(162 132 212 / 17%);
+  --selected-fg: #d4c4f3; --fg-link: #d4c4f3;
+}
+:root[data-theme="dark"][data-palette="butter"] {
+  --accent: #f0dc9a; --accent-hover: #f6e8b6; --accent-active: #fff4dc;
+  --accent-soft: rgb(207 178 96 / 17%); --accent-soft-fg: #f0dc9a;
+  --accent-border: #85713e; --selected-bg: rgb(207 178 96 / 17%);
+  --selected-fg: #f0dc9a; --fg-link: #f0dc9a;
+}
+:root[data-theme="dark"][data-palette="peach"] {
+  --accent: #f2c7b1; --accent-hover: #f8d8c7; --accent-active: #ffeadf;
+  --accent-soft: rgb(209 143 106 / 17%); --accent-soft-fg: #f2c7b1;
+  --accent-border: #936a58; --selected-bg: rgb(209 143 106 / 17%);
+  --selected-fg: #f2c7b1; --fg-link: #f2c7b1;
+}
+:root[data-theme="dark"][data-palette="mulberry"] {
+  --accent: #e8b5d4; --accent-hover: #f0cbe2; --accent-active: #f9e6f0;
+  --accent-soft: rgb(187 102 153 / 17%); --accent-soft-fg: #e8b5d4;
+  --accent-border: #9b587f; --selected-bg: rgb(187 102 153 / 17%);
+  --selected-fg: #e8b5d4; --fg-link: #e8b5d4;
+}
+:root[data-theme="dark"][data-palette="terracotta"] {
+  --accent: #e5ad93; --accent-hover: #f1c8b2; --accent-active: #fbe9df;
+  --accent-soft: rgb(187 108 73 / 17%); --accent-soft-fg: #e5ad93;
+  --accent-border: #8d5d47; --selected-bg: rgb(187 108 73 / 17%);
+  --selected-fg: #e5ad93; --fg-link: #e5ad93;
+}
+:root[data-theme="dark"][data-palette="forest"] {
+  --accent: #c7ddaa; --accent-hover: #d9e8c4; --accent-active: #f0f6e8;
+  --accent-soft: rgb(140 169 102 / 17%); --accent-soft-fg: #c7ddaa;
+  --accent-border: #627f4a; --selected-bg: rgb(140 169 102 / 17%);
+  --selected-fg: #c7ddaa; --fg-link: #c7ddaa;
+}
+:root[data-theme="dark"][data-palette="monochrome"] {
+  --accent: #e7ebe8; --accent-hover: #f4f7f5; --accent-active: #ffffff;
+  --accent-soft: rgb(231 235 232 / 10%); --accent-soft-fg: #e7ebe8;
+  --accent-border: #6c756e; --selected-bg: rgb(231 235 232 / 10%);
+  --selected-fg: #e7ebe8; --fg-link: #e7ebe8;
 }
 
 :root[data-density="compact"] {
