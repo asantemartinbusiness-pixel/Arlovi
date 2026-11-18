@@ -183,7 +183,7 @@ export const crmApp = registerApp({
       overlays: [
         { id: "Account editor", kind: "modal", title: "Account", width: 640, render: ({ close, ...context }) => <AccountEditor context={context} close={close} /> },
         { id: "relationship inspector", kind: "drawer", title: "Relationships", width: 720, render: ({ ...context }) => <><RelationshipInspector context={context} /><CampaignsPanel context={context} /></> },
-        { id: "merge preview", kind: "drawer", title: "Merge two accounts", width: 720, render: ({ close, ...context }) => <CompanyMergePreview context={context} close={close} /> },
+        { id: "merge preview", kind: "drawer", title: "Merge two accounts", width: 760, capability: "edit_pipeline", presentation: { noRecordContext: true, guidance: "Choose both source and retained companies, review every conflicting field and affected relationship before committing the merge." }, render: ({ close, ...context }) => <CompanyMergePreview context={context} close={close} /> },
         { id: "export accounts", kind: "modal", title: "Export accounts", width: 520, render: ({ close, ...context }) => <CompanyExport context={context} close={close} run={(rows, data) => exportCompanies(context, data, rows)} /> },
       ],
     },
