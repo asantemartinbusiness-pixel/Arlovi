@@ -356,3 +356,35 @@ export function backlinks(records: Rec[], id: string): Rec[] {
 export function reviewEvent(input: Omit<ReviewEvent, "id">, seed: number): ReviewEvent {
   return { id: `rv-${seed.toString(36)}-${Math.random().toString(36).slice(2, 7)}`, ...input };
 }
+
+/* ------------------------- Loose retrieval for questions ------------------------- */
+
+const STOPWORDS = new Set(("a an and are as at be by can do does for from how i in is it me my of on or our should the their them there this to us we what when where which who why will with you your "
+  + "tell know about give show please").split(" "));
+
+/**
+ * Rank knowledge records for a natural-language question. Deterministic:
+ * counts question words found in the title, tags, summary and content.
+ * Archived records are never returned. This is retrieval, not generation.
+ */
+export function rankKnowledge(records: Rec[], question: string, limit = 3): { record: Rec; score: number; matched: string[] }[] {
+  const terms = [...new Set(tokens(question).filter((term) => term.length > 2 && !STOPWORDS.has(term))
+    .map((term) => (term.length > 3 && term.endsWith("s") ? term.slice(0, -1) : term)))];
+  if (terms.length === 0) return [];
+  const ranked: { record: Rec; score: number; matched: string[] }[] = [];
+  for (const record of records) {
+    if (record.collection !== KNOWLEDGE || statusOf(record) === "archived") continue;
+    const body = knowledgeBody(record);
+    const title = record.title.toLowerCase();
+    const tags = record.tags.join(" ").toLowerCase();
+    const text = `${record.summary} ${body.content}`.toLowerCase();
+    let score = 0;
+    const matched: string[] = [];
+    for (const term of terms) {
+      const hit = title.includes(term) ? 3 : tags.includes(term) ? 2 : text.includes(term) ? 1 : 0;
+      if (hit) { score += hit; matched.push(term); }
+    }
+    if (score >= 2) ranked.push({ record, score: score + (statusOf(record) === "verified" ? 1 : 0), matched });
+  }
+  return ranked.sort((a, b) => b.score - a.score || a.record.title.localeCompare(b.record.title)).slice(0, limit);
+}

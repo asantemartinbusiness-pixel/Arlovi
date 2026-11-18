@@ -294,6 +294,9 @@ export function TurnList({
             <Pill tone={turn.role === "person" ? "neutral" : turn.role === "note" ? "info" : "accent"} dot>{turn.author}</Pill>
             <span className="ds-subtle">{context.dateTime(turn.at)} · {context.relative(turn.at)}</span>
             <span className="ds-grow" />
+            {(turn.role === "arlovi" || turn.role === "agent") && turn.kind !== "message" && (
+              <span className="ds-subtle" title="Composed by a deterministic local function from the records named below. No language model was called.">Local computation · no model</span>
+            )}
             {turn.kind === "blocked" && <Pill tone="warning">Stopped at the provider boundary</Pill>}
             {turn.kind === "clarify" && <Pill tone="warning">Needs clarification</Pill>}
             {onInspect && (
@@ -361,6 +364,7 @@ export function TurnList({
 
 const T2_ROUTES: Record<string, (slug: string, id: string) => string> = {
   facts: (slug) => `/o/${slug}/brain/facts`,
+  knowledge: (slug, id) => `/o/${slug}/brain/home?tab=Overview&record=${encodeURIComponent(id)}`,
   sources: (slug, id) => `/o/${slug}/brain/sources/${id}`,
   conflicts: (slug) => `/o/${slug}/brain/conflicts`,
   decisions: (slug) => `/o/${slug}/brain/decisions`,

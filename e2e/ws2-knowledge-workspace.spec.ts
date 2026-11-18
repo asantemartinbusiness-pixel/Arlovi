@@ -105,6 +105,19 @@ test("create, review, verify and re-review a record; it persists across a reload
   await expect(page.getByRole("region", { name: "Knowledge record", exact: true }).getByText("Needs review", { exact: true })).toBeVisible();
 });
 
+test("Ask Arlovi quotes knowledge records as local computation, not model output", async ({ page }) => {
+  await openHome(page);
+  await page.goto(`/o/northline/ai/chat?${CLOCK}`);
+  const main = page.getByRole("main");
+  await main.getByLabel("Ask about Northline").fill("What is our shade warranty?");
+  await main.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(main.getByText(/“Shade warranty: what we cover” \(verified\)/)).toBeVisible();
+  await expect(main.getByText("Local computation · no model").last()).toBeVisible();
+  await main.getByRole("button", { name: "knowledge · Shade warranty: what we cover" }).first().click();
+  await expect(page).toHaveURL(/brain\/home\?tab=Overview&record=nl-knowledge-001/);
+  await expect(page.getByRole("region", { name: "Knowledge record", exact: true }).getByRole("heading", { name: "Shade warranty: what we cover" })).toBeVisible();
+});
+
 test.describe("narrow viewport", () => {
   test.use({ viewport: { width: 390, height: 844 } });
   test("list and record take turns on a phone", async ({ page }) => {
