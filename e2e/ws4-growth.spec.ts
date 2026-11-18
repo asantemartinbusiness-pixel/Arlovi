@@ -173,6 +173,37 @@ test.describe("PROC quotes and trail", () => {
   });
 });
 
+test.describe("COMMERCE variants", () => {
+  test("generate variants from options, validate, price and save", async ({ page }) => {
+    await page.goto(`${ORG}/commerce/products/nl-products-620?tab=Variants`);
+    const list = main(page).getByRole("list", { name: "Variants" });
+    await expect(list.getByRole("listitem")).toHaveCount(2);
+    await main(page).getByRole("textbox", { name: "Option name" }).fill("Shade");
+    await main(page).getByRole("textbox", { name: /Values, comma separated/ }).fill("Linen");
+    await main(page).getByRole("button", { name: "Add option" }).click();
+    // Finish (two values) × Shade (one value): two combinations, neither a variant yet.
+    await main(page).getByRole("button", { name: "Add 2 missing variants" }).click();
+    await expect(list.getByRole("listitem")).toHaveCount(4);
+    const skus = list.getByRole("textbox", { name: "SKU" });
+    await expect(skus.nth(2)).toHaveValue("BCN-01-NB-LIN");
+    // A duplicate SKU blocks saving.
+    await skus.nth(3).fill("BCN-01-NB");
+    await expect(main(page).getByText("Another variant uses this SKU")).toBeVisible();
+    await expect(main(page).getByRole("button", { name: "Save variants" })).toBeDisabled();
+    await skus.nth(3).fill("BCN-01-BB-LIN");
+    await list.getByRole("textbox", { name: "Price difference for Blackened brass / Linen" }).fill("22.50");
+    await main(page).getByRole("button", { name: "Remove Natural brass / Linen" }).click();
+    await expect(list.getByRole("listitem")).toHaveCount(3);
+    await main(page).getByRole("button", { name: "Save variants" }).click();
+    await expect(page.getByText("Variants saved")).toBeVisible();
+    await page.reload();
+    const after = main(page).getByRole("list", { name: "Variants" });
+    await expect(after.getByRole("listitem")).toHaveCount(3);
+    await expect(after.getByRole("textbox", { name: "SKU" }).nth(2)).toHaveValue("BCN-01-BB-LIN");
+    await expect(after.getByText("£207.50")).toBeVisible();
+  });
+});
+
 test.describe("mobile", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 

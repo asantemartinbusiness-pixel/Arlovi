@@ -1,0 +1,16 @@
+/* COMMERCE variants workspace. Tokens only. */
+.t4-option-row { padding: var(--space-2) 0; border-bottom: 1px solid var(--border-default); }
+.t4-option-add { display: flex; gap: var(--space-2); align-items: end; flex-wrap: wrap; }
+.t4-option-add .ds-field { flex: 1 1 200px; }
+.t4-variant-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.t4-variant-row {
+  display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(140px, 0.9fr) minmax(110px, auto) auto;
+  gap: var(--space-2) var(--space-3); align-items: end; padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-surface);
+}
+.t4-variant-figures { display: flex; flex-direction: column; align-items: flex-end; padding-bottom: var(--space-1); }
+@media (max-width: 760px) {
+  .t4-variant-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .t4-variant-figures { align-items: flex-start; }
+}
+.t4-foot-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); width: 100%; }

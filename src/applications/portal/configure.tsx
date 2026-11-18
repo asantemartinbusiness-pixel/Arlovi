@@ -64,10 +64,10 @@ export function SharingStateCard({ context, portal }: { context: ScreenContext; 
   return (
     <Card eyebrow="SHARING" prov="human" title="Is this portal reachable?" subtitle="What a client could open today, stated plainly"
       actions={<Pill tone={state.tone} dot>{state.label}</Pill>}
-      footer={<>
+      footer={<div className="t4-foot-wrap">
         <Button size="sm" variant="secondary" onClick={() => testPortal(context)}>Run the access test</Button>
         <Button size="sm" variant="ghost" onClick={() => context.openOverlay("publish review")}>Publish review</Button>
-      </>}>
+      </div>}>
       <Stack gap={3}>
         <Properties rows={[
           { label: "Link reaches a client", value: <Pill tone="warning">No — hosting is not connected</Pill> },
@@ -111,11 +111,11 @@ function NavigationEditorForm({ context, portal, saved }: { context: ScreenConte
   return (
     <Card eyebrow="NAVIGATION" prov="human" title="Pages and their order" subtitle="The sections a client sees across the top of the portal"
       actions={dirty ? <Pill tone="warning" dot>Unsaved changes</Pill> : <Pill tone="success" dot>Saved</Pill>}
-      footer={<>
+      footer={<div className="t4-foot-wrap">
         <Button size="sm" variant="ghost" disabled={!dirty} onClick={() => { setPages(saved); setNote("Changes discarded."); }}>Discard</Button>
         <span className="ds-grow" />
         <Button size="sm" variant="primary" disabled={!dirty || invalid} onClick={save}>Save navigation</Button>
-      </>}>
+      </div>}>
       <Stack gap={3}>
         <ol className="t4-nav-list" aria-label="Portal pages in navigation order">
           {pages.map((page, index) => (
