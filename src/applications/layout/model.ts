@@ -22,6 +22,8 @@ export interface LayoutUi {
   /** Frame waiting to be linked to the next one. */
   threadFrom?: string;
   previewMode: boolean;
+  /** Guide lines shown while a drag snaps, in page points. */
+  snapGuide?: { pageId: string; x?: number; y?: number };
 }
 
 export const layoutUi: Store<LayoutUi> = createStore<LayoutUi>({

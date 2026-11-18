@@ -1,0 +1,6 @@
+/* Raster editor tool strip: the tool, history and image groups share one
+   compact row that wraps, instead of stacking full-width toolbars. */
+.ph-tools { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; width: 100%; }
+.ph-tools .ds-toolbar { border-bottom: 0; padding: 0; min-height: 0; background: transparent; }
+.ph-tools .ds-toolbar + .ds-toolbar { border-inline-start: 1px solid var(--border-default); padding-inline-start: var(--space-3); }
+.ph-tools .ds-tool { min-width: 30px; padding-inline: var(--space-2); font-size: var(--text-xs); }

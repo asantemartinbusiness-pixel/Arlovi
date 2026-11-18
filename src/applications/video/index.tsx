@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Film, Clapperboard, FolderOpen, SlidersHorizontal, Captions, Palette,
-  Download, MessageSquare, Scissors, MousePointer2, MoveHorizontal, Split,
+  Download, MessageSquare, Scissors, MousePointer2, MoveHorizontal, Split, ZoomIn, ZoomOut,
 } from "lucide-react";
 import {
   Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill, Properties,
-  Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Tool, Toolbar, ToolbarSeparator,
+  Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Tool, Toolbar,
 } from "@/design-system";
 import { registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
@@ -23,7 +23,8 @@ import {
   type Clip, type MediaSource, type RenderJob, type VideoDoc,
 } from "./timeline";
 import { contactSheet, frameDataUrl, frameScopes, playSamples, recorderSupport } from "./render";
-import { MixWaveform, PreviewMonitor, TimelineView, TransportBar, transportKeys, useTransport } from "./parts";
+import { FittedMonitor, MixWaveform, PreviewMonitor, TimelineView, TransportBar, transportKeys, useTransport } from "./parts";
+import "./video.css";
 import { parseVideo, setPlayhead, setVideoTool, starterVideo, videoUi, type VideoTool } from "./model";
 import { clockIso, wallMs } from "@/platform/clock";
 
@@ -153,6 +154,21 @@ function ProjectThumb({ doc }: { doc: VideoDoc }) {
 function TimelineScreen({ context, actions }: { context: ScreenContext; actions: ActionDef[] }) {
   const { record, handle } = useVideoDoc(context);
   const ui = useStore(videoUi);
+  /* Undo and redo answer anywhere in the editor, not only when the timeline
+     has focus: a trim made from the clip panel is undone with ⌘Z too. The
+     timeline handles its own keys, so its events are left to it. */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z" || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest?.("[role='application'], input, textarea, select, [contenteditable='true']")) return;
+      if (document.querySelector("[role='dialog'][aria-modal='true']")) return;
+      event.preventDefault();
+      if (event.shiftKey) handle.redo(); else handle.undo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handle]);
   if (!record) return <div className="pg-body"><MissingProject context={context} /></div>;
   const doc = handle.doc;
   const tab = context.tab;
@@ -167,21 +183,20 @@ function TimelineScreen({ context, actions }: { context: ScreenContext; actions:
       subtitle={<Row gap={2} wrap><SaveState handle={handle} />{doc && <span><span className="ds-num">{timecode(doc.duration, doc.fps)}</span> · <span className="ds-num">{doc.width}×{doc.height}</span> · <span className="ds-num">{doc.fps}</span> fps</span>}</Row>}
       backTo={{ label: "Video", to: `/o/${context.org.slug}/video/projects` }}
       tools={
-        <>
+        <div className="vd-tools">
           <Toolbar label="Edit tools">
             {VIDEO_TOOLS.map((item) => (
               <Tool key={item.tool} label={`${item.label} (${item.key})`} icon={item.icon} active={ui.tool === item.tool} onClick={() => setVideoTool(item.tool)} />
             ))}
           </Toolbar>
-          <ToolbarSeparator />
           <Toolbar label="View">
-            <Button size="sm" variant={ui.snapToClips ? "primary" : "ghost"} onClick={() => videoUi.set((c) => ({ ...c, snapToClips: !c.snapToClips }))}>Snap</Button>
-            <Button size="sm" variant={ui.showCaptions ? "primary" : "ghost"} onClick={() => videoUi.set((c) => ({ ...c, showCaptions: !c.showCaptions }))}>Captions</Button>
-            <Button size="sm" variant={ui.showGuides ? "primary" : "ghost"} onClick={() => videoUi.set((c) => ({ ...c, showGuides: !c.showGuides }))}>Safe areas</Button>
-            <Button size="sm" variant="ghost" onClick={() => videoUi.set((c) => ({ ...c, zoom: Math.min(8, c.zoom * 1.4) }))}>Zoom in</Button>
-            <Button size="sm" variant="ghost" onClick={() => videoUi.set((c) => ({ ...c, zoom: Math.max(0.25, c.zoom / 1.4) }))}>Zoom out</Button>
+            <Tool label="Snap to clip edges" active={ui.snapToClips} onClick={() => videoUi.set((c) => ({ ...c, snapToClips: !c.snapToClips }))}>Snap</Tool>
+            <Tool label="Show captions on the monitor" active={ui.showCaptions} onClick={() => videoUi.set((c) => ({ ...c, showCaptions: !c.showCaptions }))}>Captions</Tool>
+            <Tool label="Title and action safe areas" active={ui.showGuides} onClick={() => videoUi.set((c) => ({ ...c, showGuides: !c.showGuides }))}>Safe areas</Tool>
+            <Tool label="Zoom the timeline out" icon={<ZoomOut size={15} />} onClick={() => videoUi.set((c) => ({ ...c, zoom: Math.max(0.25, c.zoom / 1.4) }))} />
+            <Tool label="Zoom the timeline in" icon={<ZoomIn size={15} />} onClick={() => videoUi.set((c) => ({ ...c, zoom: Math.min(8, c.zoom * 1.4) }))} />
           </Toolbar>
-        </>
+        </div>
       }
       left={
         <Stack gap={3}>
@@ -230,13 +245,8 @@ function TimelineScreen({ context, actions }: { context: ScreenContext; actions:
         }}
         style={{ position: "absolute", inset: 0, display: "grid", gridTemplateRows: "minmax(0, 1fr) auto", outline: "none" }}
       >
-        <div style={{ display: "grid", placeContent: "center", background: "#07070A", minHeight: 0, padding: 10 }}>
-          {doc && (
-            <Stack gap={2}>
-              <PreviewMonitor doc={doc} time={ui.playhead} height={280} captions={ui.showCaptions} guides={ui.showGuides} bypassEffects={ui.bypassEffects} />
-              <TransportBar doc={doc} handle={handle} />
-            </Stack>
-          )}
+        <div style={{ position: "relative", background: "#07070A", minHeight: 0 }}>
+          {doc && <FittedMonitor doc={doc} handle={handle} time={ui.playhead} captions={ui.showCaptions} guides={ui.showGuides} bypassEffects={ui.bypassEffects} />}
         </div>
         <div style={{ borderTop: "1px solid var(--border-default)", background: "var(--bg-surface)" }}>
           {doc && <TimelineView handle={handle} height={240} onSelect={(id) => videoUi.set((current) => ({ ...current, selectedClipId: id }))} />}
