@@ -1,16 +1,44 @@
 /* ==========================================================================
    Arlovi design tokens — "Connected work" system
 
-   Light-first and architectural: white and near-black carry the page, thin
-   grotesk type carries the confidence, capsules carry the actions. Colour
-   belongs to the things doing the work — blush marks what is selected, and
-   cobalt, papaya and aqua stay with data, people and agents.
+   Light-first, Seafoam-led and restrained. Neutral surfaces own workspaces;
+   pastel Seafoam marks selection and deep Seafoam marks primary interactions.
+   Lilac, Butter, Peach and Sage have small, intentional supporting roles.
+   Aim for 90/7/3 neutral/pastel/strong colour on operational surfaces.
 
    Signature (kept from the original system): an element that asserts a fact
    carries a provenance edge — posted, human, agent or unknown.
    ========================================================================== */
 
 :root {
+  /* Seafoam brand and intentional supporting pastel family */
+  --seafoam-50: #eaf7f2;
+  --seafoam-100: #d7f0e8;
+  --seafoam-200: #c5e6da;
+  --seafoam-300: #a6d9ca;
+  --seafoam-500: #4b927f;
+  --seafoam-700: #2d6b65;
+  --seafoam-800: #245a55;
+  --seafoam-900: #174a44;
+  --pastel-lilac: #e9dffa;
+  --pastel-butter: #fff0c8;
+  --pastel-peach: #fce7d6;
+  --pastel-sage: #ddeddc;
+  --lilac-ink: #5d4b84;
+  --butter-ink: #6e5c28;
+  --peach-ink: #805137;
+  --sage-ink: #3f624d;
+  --brand-primary: var(--seafoam-100);
+  --brand-subtle: var(--seafoam-50);
+  --brand-ink: var(--seafoam-900);
+  --brand-interactive: var(--seafoam-700);
+  --app-platform: var(--seafoam-700);
+  --app-people: var(--lilac-ink);
+  --app-growth: var(--peach-ink);
+  --app-planning: var(--butter-ink);
+  --app-intelligence: var(--seafoam-700);
+  --app-finance: #166b50;
+
   /* ---- Brand ramps ---- */
   --cobalt-50: #eef1fc;
   --cobalt-100: #dde3f9;
@@ -41,50 +69,49 @@
 
   /* ---- Neutral axis (true neutrals; names kept for existing references) ---- */
   --paper-0: #ffffff;
-  --paper-25: #fafafa;
-  --paper-50: #fafafa;
-  --paper-100: #f3f3f3;
-  --paper-200: #e7e7e7;
-  --paper-300: #cfcfcf;
-  --paper-400: #9a9a9a;
-  --graphite-500: #6e6e6e;
-  --graphite-600: #565656;
-  --graphite-700: #3d3d3d;
-  --graphite-800: #1f1f1f;
-  --graphite-900: #0d0d0d;
+  --paper-25: #fafbfa;
+  --paper-50: #fafbfa;
+  --paper-100: #f5f7f5;
+  --paper-200: #e7ebe8;
+  --paper-300: #cbd5cf;
+  --paper-400: #a1aaa4;
+  --graphite-500: #6d7871;
+  --graphite-600: #626c66;
+  --graphite-700: #434f47;
+  --graphite-800: #29372e;
+  --graphite-900: #1f2723;
 
-  /* ---- Blush: the one selection colour ---- */
-  --blush: #ffc9ff;
-  --blush-soft: #fff0ff;
-  --blush-edge: #f0a6f0;
-  --mint: #b5e9ca;
-  --mint-ink: #004232;
+  /* Compatibility aliases for native apps; deprecated, now Seafoam. */
+  --blush: var(--seafoam-100);
+  --blush-soft: var(--seafoam-50);
+  --blush-edge: var(--seafoam-200);
+  --mint: var(--seafoam-100);
+  --mint-ink: var(--seafoam-900);
 
-  /* ---- Surfaces ---- */
+  /* ---- Neutral surfaces and restrained interaction hierarchy ---- */
   --bg-canvas: var(--paper-25);
   --bg-surface: var(--paper-0);
   --bg-raised: var(--paper-0);
   --bg-sunken: var(--paper-100);
   --bg-inset: var(--paper-25);
-  --bg-overlay: rgb(13 13 13 / 52%);
-  --bg-hover: #f3f3f3;
-  --bg-selected: var(--blush-soft);
-  --bg-stage: #0d0d0d;
+  --bg-overlay: rgb(31 39 35 / 48%);
+  --bg-hover: var(--paper-100);
+  --bg-selected: var(--seafoam-50);
+  --bg-stage: var(--graphite-900);
 
-  /* ---- Actions: ink capsules; blush when selected ---- */
-  --action-bg: #0d0d0d;
+  --action-bg: var(--seafoam-900);
   --action-fg: #ffffff;
-  --action-hover-bg: #3d3d3d;
-  --selected-bg: var(--blush);
-  --selected-fg: #0d0d0d;
+  --action-hover-bg: var(--seafoam-700);
+  --selected-bg: var(--seafoam-50);
+  --selected-fg: var(--seafoam-900);
 
   /* ---- Text ---- */
-  --fg-default: #0d0d0d;
+  --fg-default: var(--graphite-900);
   --fg-strong: var(--graphite-900);
   --fg-muted: var(--graphite-600);
   --fg-subtle: var(--graphite-500);
   --fg-on-accent: #ffffff;
-  --fg-link: var(--cobalt-600);
+  --fg-link: var(--seafoam-700);
   --fg-on-stage: #ffffff;
 
   /* ---- Lines ---- */
@@ -92,53 +119,52 @@
   --border-default: var(--paper-200);
   --border-strong: var(--paper-300);
 
-  /* ---- Accent ---- */
-  --accent: var(--cobalt-500);
-  --accent-hover: var(--cobalt-600);
-  --accent-active: var(--cobalt-700);
-  --accent-soft: var(--cobalt-50);
-  --accent-soft-fg: var(--cobalt-700);
-  --accent-border: var(--cobalt-200);
+  /* Brand identity is separate from operational status colours. */
+  --accent: var(--seafoam-700);
+  --accent-hover: var(--seafoam-800);
+  --accent-active: var(--seafoam-900);
+  --accent-soft: var(--seafoam-50);
+  --accent-soft-fg: var(--seafoam-900);
+  --accent-border: var(--seafoam-200);
 
-  /* ---- Status (semantic, independent of brand hue) ---- */
-  --success: #004232;
-  --success-soft: #b5e9ca;
-  --success-border: #b5e9ca;
-  --warning: #8a5a00;
-  --warning-soft: #fbf1df;
-  --warning-border: #e8cd9c;
-  --danger: #b0271c;
-  --danger-soft: #fbeae7;
-  --danger-border: #eeb2ab;
-  --info: var(--cobalt-700);
-  --info-soft: var(--cobalt-50);
-  --info-border: var(--cobalt-200);
+  --success: #166b50;
+  --success-soft: #edf8f2;
+  --success-border: #b8dcc8;
+  --warning: #895800;
+  --warning-soft: #fff5e3;
+  --warning-border: #e9d4aa;
+  --danger: #b42332;
+  --danger-soft: #fff0ef;
+  --danger-border: #f1c1bd;
+  --info: #5d4b84;
+  --info-soft: #f4effb;
+  --info-border: #dacbed;
   --neutral-soft: var(--paper-100);
   --neutral-fg: var(--graphite-600);
 
   /* ---- Provenance materials: the signature device ---- */
-  --mat-posted: #0d0d0d;
-  --mat-human: var(--cobalt-500);
-  --mat-agent: var(--aqua-500);
+  --mat-posted: var(--graphite-900);
+  --mat-human: var(--lilac-ink);
+  --mat-agent: var(--seafoam-700);
   --mat-unknown: var(--warning);
   --mat-width: 2px;
 
-  /* ---- Data series (never reused for status) ---- */
-  --series-1: #234fe8;
-  --series-2: #16a097;
-  --series-3: #de6c28;
-  --series-4: #6a53c9;
-  --series-5: #0d7c76;
-  --series-6: #a63d62;
-  --series-7: #8d8577;
-  --series-8: #9b7b1f;
+  /* Chart series: distinct from statuses, support line styles + labels. */
+  --series-1: #2d6b65;
+  --series-2: #705a95;
+  --series-3: #a45136;
+  --series-4: #895800;
+  --series-5: #166b50;
+  --series-6: #76566b;
+  --series-7: #4f5f3c;
+  --series-8: #635869;
 
   /* ---- Elevation: outlines do the work; only floating layers cast a shadow ---- */
   --shadow-1: none;
   --shadow-2: 0 4px 16px -6px rgb(13 13 13 / 14%);
   --shadow-3: 0 24px 56px -16px rgb(13 13 13 / 30%), 0 2px 8px rgb(13 13 13 / 8%);
   --shadow-panel: 0 6px 24px -10px rgb(13 13 13 / 20%), 0 1px 3px rgb(13 13 13 / 8%);
-  --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px #4786ff;
+  --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--accent);
 
   /* ---- Geometry (4px scale) ---- */
   --space-0: 0px;
@@ -209,121 +235,126 @@
 
   /* ---- Machine surfaces: the dark connected stage ---- */
   --grad-intelligence: #0d0d0d;
-  --grad-horizon: linear-gradient(118deg, #1b359b 0%, #234fe8 46%, #ffae7c 100%);
+  --grad-horizon: linear-gradient(118deg, #174a44 0%, #2d6b65 60%, #d7f0e8 100%);
   --grad-ember: linear-gradient(118deg, #8c3e18 0%, #de6c28 52%, #ffcdae 100%);
   --dot-field: radial-gradient(rgb(255 255 255 / 16%) 1px, transparent 1.2px);
-  --hatch-agent: repeating-linear-gradient(135deg, var(--aqua-500) 0 1.5px, transparent 1.5px 4px);
+  --hatch-agent: repeating-linear-gradient(135deg, var(--seafoam-700) 0 1.5px, transparent 1.5px 4px);
 
   color-scheme: light;
 }
 
-/* Dark: the near-black stage. The primary action inverts to a white capsule. */
+/* Dark is opt-in; semantics and legibility survive theme changes. */
 :root[data-theme="dark"] {
-  --bg-canvas: #0d0d0d;
-  --bg-surface: #161616;
-  --bg-raised: #1c1c1c;
-  --bg-sunken: #0a0a0a;
-  --bg-inset: #131313;
+  --bg-canvas: #131c18;
+  --bg-surface: #1c2621;
+  --bg-raised: #25322b;
+  --bg-sunken: #111a15;
+  --bg-inset: #18221c;
   --bg-overlay: rgb(0 0 0 / 70%);
-  --bg-hover: rgb(255 255 255 / 7%);
-  --bg-selected: rgb(255 201 255 / 14%);
-  --bg-stage: #000000;
-
+  --bg-hover: rgb(221 244 232 / 7%);
+  --bg-selected: rgb(103 176 153 / 16%);
+  --bg-stage: #0e1712;
   --action-bg: #ffffff;
-  --action-fg: #0d0d0d;
-  --action-hover-bg: #f3f3f3;
-  --selected-bg: #ffc9ff;
-  --selected-fg: #0d0d0d;
-
-  --fg-default: #f3f3f3;
+  --action-fg: #174a44;
+  --action-hover-bg: #eaf7f2;
+  --selected-bg: rgb(103 176 153 / 16%);
+  --selected-fg: #c5e6da;
+  --fg-default: #f0f6f1;
   --fg-strong: #ffffff;
-  --fg-muted: #b8b8b8;
-  --fg-subtle: #9c9c9c;
-  --fg-link: #93a7ec;
-
-  --border-subtle: #262626;
-  --border-default: #3a3a3a;
-  --border-strong: #565656;
-
-  --accent: #6e8bf5;
-  --accent-hover: #8aa2f7;
-  --accent-active: #a6b8f9;
-  --fg-on-accent: #0d0d0d;
-  --accent-soft: rgb(110 139 245 / 16%);
-  --accent-soft-fg: #b4c3fb;
-  --accent-border: #3b4a86;
-
-  --success: #b5e9ca;
-  --success-soft: rgb(181 233 202 / 14%);
-  --success-border: rgb(181 233 202 / 32%);
+  --fg-muted: #bcc8c0;
+  --fg-subtle: #a4b1a9;
+  --fg-link: #a6d9ca;
+  --border-subtle: #29372e;
+  --border-default: #37463d;
+  --border-strong: #546459;
+  --accent: #a6d9ca;
+  --accent-hover: #c5e6da;
+  --accent-active: #eaf7f2;
+  --fg-on-accent: #174a44;
+  --accent-soft: rgb(103 176 153 / 16%);
+  --accent-soft-fg: #c5e6da;
+  --accent-border: #477f6e;
+  --success: #98d9b6;
+  --success-soft: rgb(88 180 123 / 14%);
+  --success-border: rgb(152 217 182 / 32%);
   --warning: #e8c27a;
   --warning-soft: rgb(232 194 122 / 13%);
   --warning-border: rgb(232 194 122 / 32%);
   --danger: #f59a8d;
   --danger-soft: rgb(245 154 141 / 13%);
   --danger-border: rgb(245 154 141 / 32%);
-  --info: #93a7ec;
-  --info-soft: rgb(147 167 236 / 13%);
-  --info-border: rgb(147 167 236 / 30%);
-  --neutral-soft: #242424;
-  --neutral-fg: #b8b8b8;
-
+  --info: #d4c4f3;
+  --info-soft: rgb(212 196 243 / 13%);
+  --info-border: rgb(212 196 243 / 30%);
+  --neutral-soft: #29372e;
+  --neutral-fg: #bcc8c0;
   --mat-posted: #ffffff;
-  --mat-human: #6e8bf5;
-  --mat-agent: #36c5ba;
+  --mat-human: #c9b6e9;
+  --mat-agent: #a6d9ca;
   --mat-unknown: #e8c27a;
-
-  --series-1: #7b95f5;
-  --series-2: #36c5ba;
-  --series-3: #f0a06a;
-  --series-4: #a08ff0;
-  --series-5: #b5e9ca;
-  --series-6: #ffc9ff;
-  --series-7: #a8a8a8;
-  --series-8: #d9b45e;
-
+  --series-1: #a6d9ca;
+  --series-2: #c9b6e9;
+  --series-3: #f4bba1;
+  --series-4: #e8c27a;
+  --series-5: #98d9b6;
+  --series-6: #dcb5cc;
+  --series-7: #b7ca99;
+  --series-8: #beb0c1;
   --shadow-2: 0 4px 16px -6px rgb(0 0 0 / 60%);
   --shadow-3: 0 24px 56px -16px rgb(0 0 0 / 75%);
   --shadow-panel: 0 6px 24px -10px rgb(0 0 0 / 70%);
-  --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px #4786ff;
-  --hatch-agent: repeating-linear-gradient(135deg, #36c5ba 0 1.5px, transparent 1.5px 4px);
-
+  --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--accent);
+  --hatch-agent: repeating-linear-gradient(135deg, #a6d9ca 0 1.5px, transparent 1.5px 4px);
   color-scheme: dark;
 }
 
-/* Alternative approved brand directions. Status roles stay semantic. */
-:root[data-palette="ember"] {
-  --accent: #a33a63; --accent-hover: #8d3056; --accent-active: #75264a;
-  --accent-soft: #f9eef2; --accent-soft-fg: #8d3056; --accent-border: #eccedc;
-  --mat-human: #a33a63; --grad-horizon: var(--grad-ember);
+/* Personal appearance overrides use hue-specific foregrounds and pale tints. */
+:root[data-palette="sage"] {
+  --accent: #3f624d; --accent-hover: #32523f; --accent-active: #264433;
+  --accent-soft: #f0f7ef; --accent-soft-fg: #264433; --accent-border: #c8dfca;
 }
-:root[data-palette="ultraviolet"] {
-  --accent: #5b4dff; --accent-hover: #4a3de0; --accent-active: #3c31bb;
-  --accent-soft: #eeedfb; --accent-soft-fg: #4a3de0; --accent-border: #d3d0f6;
-  --mat-human: #5b4dff;
+:root[data-palette="lilac"] {
+  --accent: #5d4b84; --accent-hover: #4d3d70; --accent-active: #3d315d;
+  --accent-soft: #f4effb; --accent-soft-fg: #4d3d70; --accent-border: #d9c9eb;
 }
-:root[data-palette="teal"] {
-  --accent: #0f766e; --accent-hover: #0c5f59; --accent-active: #0a4c47;
-  --accent-soft: #e6f2f0; --accent-soft-fg: #0c5f59; --accent-border: #b5ded9;
-  --mat-human: #0f766e;
+:root[data-palette="butter"] {
+  --accent: #6e5c28; --accent-hover: #5b4c20; --accent-active: #463b18;
+  --accent-soft: #fff8e6; --accent-soft-fg: #5b4c20; --accent-border: #ecdca9;
 }
-:root[data-palette="berry"] {
-  --accent: #a81fb4; --accent-hover: #8d1897; --accent-active: #74147c;
-  --accent-soft: #f8edf9; --accent-soft-fg: #8d1897; --accent-border: #eccbef;
-  --mat-human: #a81fb4;
+:root[data-palette="peach"] {
+  --accent: #805137; --accent-hover: #6b412b; --accent-active: #563422;
+  --accent-soft: #fdf3ec; --accent-soft-fg: #6b412b; --accent-border: #f0d3c2;
 }
-:root[data-palette="carbon"] {
+:root[data-palette="mulberry"] {
+  --accent: #7c2d58; --accent-hover: #692348; --accent-active: #531a38;
+  --accent-soft: #f8edf2; --accent-soft-fg: #692348; --accent-border: #edcadc;
+}
+:root[data-palette="terracotta"] {
+  --accent: #a14f36; --accent-hover: #89402b; --accent-active: #713222;
+  --accent-soft: #fdf1e9; --accent-soft-fg: #713222; --accent-border: #efd2c1;
+}
+:root[data-palette="forest"] {
   --accent: #41631a; --accent-hover: #355114; --accent-active: #2a4110;
   --accent-soft: #eef3e5; --accent-soft-fg: #355114; --accent-border: #d0e2b6;
-  --mat-human: #41631a;
 }
-:root[data-palette="ember"][data-theme="dark"],
-:root[data-palette="ultraviolet"][data-theme="dark"],
-:root[data-palette="teal"][data-theme="dark"],
-:root[data-palette="berry"][data-theme="dark"],
-:root[data-palette="carbon"][data-theme="dark"] {
-  --accent-soft: rgb(255 255 255 / 9%);
-  --accent-soft-fg: #f3f3f3;
+:root[data-palette="monochrome"] {
+  --accent: #29372e; --accent-hover: #1f2723; --accent-active: #151e19;
+  --accent-soft: #f0f2f0; --accent-soft-fg: #29372e; --accent-border: #d8ded9;
+}
+:root[data-palette]:not([data-palette="seafoam"]):not([data-theme="dark"]) {
+  --selected-bg: var(--accent-soft);
+  --selected-fg: var(--accent-soft-fg);
+  --bg-selected: var(--accent-soft);
+  --action-bg: var(--accent-active);
+  --action-hover-bg: var(--accent);
+  --fg-link: var(--accent);
+}
+:root[data-theme="dark"][data-palette] {
+  --accent: #a6d9ca; --accent-hover: #c5e6da; --accent-active: #eaf7f2;
+  --accent-soft: rgb(103 176 153 / 16%);
+  --accent-soft-fg: #c5e6da; --accent-border: #477f6e;
+  --selected-bg: rgb(103 176 153 / 16%);
+  --selected-fg: #c5e6da;
 }
 
 :root[data-density="compact"] {

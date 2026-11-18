@@ -14,11 +14,11 @@ export function ArloviMark({ size = 28, title }: { size?: number; title?: string
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" role={title ? "img" : undefined} aria-hidden={title ? undefined : true} aria-label={title}>
       {title && <title>{title}</title>}
-      <rect width="64" height="64" rx="32" fill="#0d0d0d" />
-      <path d="M18 43 C26 43 26 21 34 21 H46" fill="none" stroke="#ffc9ff" strokeWidth="2.5" strokeLinecap="round" />
+      <rect width="64" height="64" rx="32" fill="#1F2723" />
+      <path d="M18 43 C26 43 26 21 34 21 H46" fill="none" stroke="#D7F0E8" strokeWidth="2.5" strokeLinecap="round" />
       <circle cx="18" cy="43" r="6" fill="#ffffff" />
-      <circle cx="34" cy="21" r="5" fill="#36C5BA" />
-      <circle cx="47" cy="21" r="5" fill="#FFAE7C" />
+      <circle cx="34" cy="21" r="5" fill="#E9DFFA" />
+      <circle cx="47" cy="21" r="5" fill="#FFF0C8" />
     </svg>
   );
 }
@@ -33,12 +33,15 @@ export function ArloviWordmark({ compact }: { compact?: boolean }) {
 }
 
 export const palettes = [
-  { id: "cobalt", label: "Electric cobalt" },
-  { id: "ember", label: "Ember and plum" },
-  { id: "ultraviolet", label: "Ultraviolet" },
-  { id: "teal", label: "Neo teal" },
-  { id: "berry", label: "Electric berry" },
-  { id: "carbon", label: "Carbon and citron" },
+  { id: "seafoam", label: "Seafoam", color: "#2D6B65", soft: "#D7F0E8" },
+  { id: "sage", label: "Sage Milk", color: "#3F624D", soft: "#DDEDDC" },
+  { id: "lilac", label: "Lilac Cloud", color: "#5D4B84", soft: "#E9DFFA" },
+  { id: "butter", label: "Buttercream", color: "#6E5C28", soft: "#FFF0C8" },
+  { id: "peach", label: "Peach Cream", color: "#805137", soft: "#FCE7D6" },
+  { id: "mulberry", label: "Mulberry", color: "#7C2D58", soft: "#EFC9D9" },
+  { id: "terracotta", label: "Terracotta", color: "#A14F36", soft: "#F2D9C9" },
+  { id: "forest", label: "Forest", color: "#41631A", soft: "#DDE9CC" },
+  { id: "monochrome", label: "Monochrome", color: "#29372E", soft: "#DDDADD" },
 ] as const;
 
 export type PaletteId = (typeof palettes)[number]["id"];

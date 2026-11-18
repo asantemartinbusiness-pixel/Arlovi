@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { PaletteId } from "@/brand";
+import { palettes, type PaletteId } from "@/brand";
 import type { Role } from "@/domain/types";
 import type { AttentionReceipt } from "@/platform/attentionReceipts";
 import type { PersonalNotificationPreferences } from "@/platform/notificationPolicy";
@@ -61,12 +61,23 @@ function storedUi(): Partial<UiState> & { interfaceScaleVersion?: number } {
 }
 const initial = storedUi();
 
+/** Retire cobalt as the default while preserving the intent of earlier choices. */
+function normalizePalette(value: unknown): PaletteId {
+  const migrated: Record<string, PaletteId> = {
+    cobalt: "seafoam", ember: "terracotta", ultraviolet: "lilac",
+    teal: "seafoam", berry: "mulberry", carbon: "forest",
+  };
+  if (typeof value !== "string") return "seafoam";
+  if (Object.prototype.hasOwnProperty.call(migrated, value)) return migrated[value];
+  return palettes.some(item => item.id === value) ? value as PaletteId : "seafoam";
+}
+
 export const useUi = create<UiState>((set) => ({
   role: initial.role ?? "owner",
   theme: initial.theme ?? "light",
   density: initial.density ?? "balanced",
   interfaceScale: readInterfaceScale(initial.interfaceScale, initial.interfaceScaleVersion),
-  palette: initial.palette ?? "cobalt",
+  palette: normalizePalette(initial.palette),
   collapsed: initial.collapsed ?? false,
   mobileNav: false,
   command: false,
