@@ -1,0 +1,98 @@
+/* Shared transactional overlay refinements. Applies to modal dialogs in all native
+   applications; keeps the existing brand tokens and 80% visual baseline. */
+.ds-modal {
+  width: min(var(--modal-w, 560px), calc(100vw - 32px));
+  max-width: min(100vw, calc(var(--modal-w, 560px) + 1px));
+  max-height: min(90dvh, 880px);
+  min-width: 0;
+  min-height: 0;
+  isolation: isolate;
+}
+.ds-modal .ds-overlay-head {
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: calc(64px * var(--interface-scale, 1));
+  padding: var(--space-4) var(--space-6);
+  background: var(--bg-surface);
+}
+.ds-modal .ds-overlay-head h2 {
+  font-size: var(--text-xl);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.22;
+  overflow-wrap: anywhere;
+}
+.ds-modal .ds-overlay-head .ds-card-sub {
+  max-width: 68ch;
+  line-height: 1.45;
+  margin-block-start: var(--space-1);
+}
+.ds-modal .ds-overlay-head button[data-icon-only="true"] { flex: none; }
+.ds-modal .ds-overlay-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: var(--space-6);
+}
+.ds-modal-foot {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: calc(60px * var(--interface-scale, 1));
+  padding: var(--space-3) var(--space-6);
+  background: var(--bg-surface);
+  box-shadow: 0 -8px 24px rgb(0 0 0 / 2%);
+  flex-wrap: wrap;
+}
+.ds-modal-foot:empty { display: none; }
+.ds-modal-action-row {
+  display: flex;
+  flex: 1 1 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.ds-modal .ds-overlay-body :is(input, textarea, select, button, a):focus-visible,
+.ds-modal .ds-overlay-head button:focus-visible,
+.ds-modal .ds-modal-foot :is(button, a):focus-visible {
+  outline: 2px solid var(--fg-default);
+  outline-offset: 3px;
+}
+.ds-discard-overlay { z-index: 110; }
+.ds-discard-modal { z-index: 111; width: min(440px, calc(100vw - 32px)); }
+
+/* Compact transient menu/popover grammar; prevent long menu items overflowing. */
+.ds-popover { max-height: min(70dvh, 560px); overflow: auto; overscroll-behavior: contain; }
+.ds-menu-item { min-height: max(36px, var(--control-h-sm)); line-height: 1.4; }
+.ds-menu-item > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 599px) {
+  .ds-modal {
+    inset: auto 0 0 0;
+    transform: none;
+    width: 100vw;
+    max-width: 100vw;
+    max-height: min(96dvh, 100dvh);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
+  .ds-modal .ds-overlay-head { min-height: 60px; padding: var(--space-4); }
+  .ds-modal .ds-overlay-body { padding: var(--space-4); scrollbar-gutter: auto; }
+  .ds-modal-foot {
+    padding-inline: var(--space-4);
+    padding-block-end: max(var(--space-4), env(safe-area-inset-bottom));
+  }
+  .ds-modal-action-row > .ds-btn { flex: 1 1 auto; }
+  .ds-discard-modal { width: 100vw; }
+  .ds-popover { max-width: calc(100vw - 16px); }
+}
+@media (max-height: 560px) and (min-width: 600px) {
+  .ds-modal .ds-overlay-head { min-height: 48px; padding-block: var(--space-2); }
+  .ds-modal .ds-overlay-body { padding-block: var(--space-3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ds-modal, .ds-discard-overlay, .ds-popover { animation: none !important; }
+}
