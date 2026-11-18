@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Avatar, Button, Checkbox, Empty, Field, ModalActions, ModalInFlight, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Avatar, Button, Checkbox, Empty, Field, ModalActions, ModalInFlight, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
@@ -521,7 +521,7 @@ export function SendConfirmation({ context, close }: { context: ScreenContext; c
       {needsCheck && <Checkbox label={`I have checked these ${request.to.length} recipients and they should receive this`} checked={checked} onChange={(event) => setChecked(event.target.checked)} />}
       <Boundary id="email.send" />
       <ModalActions>
-        <Button variant="ghost" onClick={close} disabled={busy}>Cancel</Button>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
         <span className="ds-grow" />
         <Button
           variant="primary"
