@@ -16,7 +16,7 @@ import {
 import type { CrmData } from "./data";
 import { ActivityPill, ConsentPill, Money, StagePill } from "./parts";
 import { clockIso } from "@/platform/clock";
-import { AccountProfileView } from "./account";
+import { AccountProfileView, accountHref } from "./account";
 
 /* ---------------------------- CRM-004 ---------------------------- */
 
@@ -93,7 +93,7 @@ export function CompaniesTable({ context, tab }: { context: ScreenContext; tab: 
         onSelect={(id) => context.select(id)}
         rowTone={(row) => (row.status === "archived" ? "warning" : undefined)}
         columns={[
-          { key: "name", header: "Account", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
+          { key: "name", header: "Account", primary: true, cell: (row) => <Link to={accountHref(org.slug, row.id)} onClick={(event) => event.stopPropagation()} style={{ color: "inherit", fontWeight: 600 }}>{row.title}</Link>, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
           { key: "industry", header: "Industry", cell: (row) => String(row.fields.industry ?? "—"), filterValue: (row) => String(row.fields.industry ?? "") },
           { key: "city", header: "Location", hideBelow: 1200, cell: (row) => String(row.fields.city ?? "—") },
           { key: "contacts", header: "Contacts", align: "end", cell: (row) => <span className="ds-num">{contactsOfCompany(data, row.id).length}</span> },

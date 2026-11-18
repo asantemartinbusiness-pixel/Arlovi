@@ -10,7 +10,7 @@ import { accountCode, accountMovements, budgetVariance, cashBalance, periodLabel
 import type { VarianceRow } from "@/domain/fin-ledger";
 import { useFinData } from "./data";
 import type { FinData } from "./data";
-import { Amount, SourceNote, StatementRow } from "./parts";
+import { Amount, BooksLoading, SourceNote, StatementRow } from "./parts";
 import { clockIso, wallMs } from "@/platform/clock";
 
 /* ---------------------------- FIN-010 ---------------------------- */
@@ -440,9 +440,11 @@ export function VarianceDrilldown({ context }: { context: ScreenContext }) {
   const movements = accountMovements(data.accounts, data.journals, code, period);
   const actual = movements.reduce((sum, item) => sum + item.netMinor, 0);
   const savedNote = String(budget?.fields.varianceNote ?? "");
-  const [note, setNote] = useState(savedNote);
+  const [draft, setNote] = useState<string>();
+  const note = draft ?? savedNote;
   const [busy, setBusy] = useState(false);
 
+  if (!data.ready) return <BooksLoading />;
   if (!account) return <Empty title="That account is not in the chart">Choose a line from the budget table.</Empty>;
   const pct = row ? variancePercent(row) : undefined;
 
