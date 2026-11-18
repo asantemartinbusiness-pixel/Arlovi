@@ -80,3 +80,15 @@
 body:has([role=dialog]) .nt-toast-stack.ds-toasts{inset-block-start:var(--space-3);inset-block-end:auto;inset-inline-end:var(--space-3);inset-inline-start:auto}
 @media(max-width:599px){.nt-toast-stack.ds-toasts{inset-inline:var(--space-3);inset-block-end:calc(74px + env(safe-area-inset-bottom));max-width:none}.nt-toast{max-width:none;width:100%}}
 @media(prefers-reduced-motion:reduce){.nt-toast{animation:none}}
+
+/* Persistent operational banners stay with the affected work area. */
+.nt-banner{display:flex;align-items:flex-start;gap:12px;padding:12px 15px;border:1px solid var(--border-default);border-left:3px solid var(--accent);border-radius:9px;background:var(--bg-surface);max-width:100%}
+.nt-banner>svg{flex:none;margin-top:2px;color:var(--fg-muted)}
+.nt-banner-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;font-size:12px;line-height:1.55;overflow-wrap:anywhere}
+.nt-banner-copy>strong{font-size:12px;font-weight:700}
+.nt-banner-copy>div{color:var(--fg-muted)}
+.nt-banner-action{flex:none;display:flex;align-self:center}
+.nt-banner[data-tone=danger]{border-left-color:var(--danger)}
+.nt-banner[data-tone=warning]{border-left-color:var(--warning)}
+.nt-banner[data-tone=success]{border-left-color:var(--success)}
+@media(max-width:599px){.nt-banner{flex-wrap:wrap}.nt-banner-action{margin-left:30px}}
