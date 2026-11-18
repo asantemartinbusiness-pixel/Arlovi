@@ -30,7 +30,7 @@ export const ORGS: OrgProfile[] = [
     timezone: "Europe/London",
     jurisdiction: "GB",
     registration: "GB 418 2275 61",
-    accent: "#234fe8",
+    accent: "#2D6B65",
   },
   {
     id: ORG_HARBOR,
@@ -117,7 +117,7 @@ export async function recoverLocalOrganizations(): Promise<string | null> {
       locale: String(record.fields.locale || "en-GB"),
       timezone: String(record.fields.timezone || "Europe/London"),
       jurisdiction: String(record.fields.jurisdiction || "GB"),
-      accent: String(record.fields.brandAccent || "#234fe8"),
+      accent: String(record.fields.brandAccent || "#2D6B65"),
     };
     if (ORGS.some((org) => org.slug === slug && org.id !== record.id)) continue;
     if (!ORGS.some((org) => org.id === record.id)) ORGS.push(profile);

@@ -67,7 +67,7 @@
   box-shadow: var(--shadow-3); overflow: hidden;
   border-radius: 4px;
 }
-.px-stage:focus-visible { outline: 3px solid var(--cobalt-400); outline-offset: 3px; }
+.px-stage:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 
 .px-object { position: absolute; box-sizing: border-box; cursor: move; }
 .px-object.px-locked { cursor: not-allowed; }
@@ -92,7 +92,7 @@
 .px-guide-y { left: 0; right: 0; height: 1px; }
 .px-guide-edge { background: var(--papaya-500); }
 .px-guide-centre { background: var(--aqua-500); }
-.px-guide-canvas { background: var(--cobalt-400); }
+.px-guide-canvas { background: var(--lilac-ink); }
 
 /* Presenter mode ------------------------------------------------------- */
 .px-presenter { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
