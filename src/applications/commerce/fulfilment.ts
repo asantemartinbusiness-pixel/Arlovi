@@ -112,6 +112,21 @@ export function shipmentProblems(order: Rec, request: Record<string, number>, in
   return problems;
 }
 
+/**
+ * A fresh id for an entry kept inside a record body (a shipment, a refund) or
+ * a short stock reference. Never derived from the workspace clock, which only
+ * ticks once a minute, and never one already in `taken`, so two entries made
+ * in the same minute cannot share an id and overwrite each other.
+ */
+export function freshEntryId(prefix: string, taken: Iterable<string> = [], length = 12, random: () => string = () => crypto.randomUUID()): string {
+  const used = new Set(taken);
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    const candidate = `${prefix}${random().replace(/-/g, "").slice(0, length)}`;
+    if (!used.has(candidate)) return candidate;
+  }
+  throw new Error(`Could not find a free ${prefix} id.`);
+}
+
 export function nextShipmentNumber(order: Rec): string {
   return `${order.title}-S${shipmentsOf(order).length + 1}`;
 }
@@ -156,7 +171,8 @@ export function refundableMinor(item: Rec | undefined): number {
 export function refundProblems(item: Rec, amountMinor: number, method: string, reference: string): string[] {
   const problems: string[] = [];
   if (item.tags.includes("disputed")) problems.push("A disputed return is escalated to a person with authority, not refunded here.");
-  if (!["approved", "completed", "in_review"].includes(item.status)) problems.push("Approve the return before recording a refund.");
+  // A return still in review has not been approved; the refund form never approves it.
+  if (!["approved", "completed"].includes(item.status)) problems.push("Approve the return before recording a refund.");
   if (!Number.isInteger(amountMinor) || amountMinor <= 0) problems.push("Enter the amount refunded.");
   else if (amountMinor > refundableMinor(item)) problems.push("That is more than remains to refund on this return.");
   if (!method) problems.push("Choose how the refund was made.");

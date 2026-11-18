@@ -9,7 +9,7 @@ import type { Rec } from "@/domain/types";
 import { bodyOf, onHandFor, useCommerceData, type OrderBody } from "./data";
 import {
   ADJUSTMENT_REASONS, adjustmentProblems, derivedFulfilment, lineProgress, nextShipmentNumber, nextShipmentState,
-  REFUND_METHODS, refundableMinor, refundedMinor, refundProblems, refundsOf, returnableQuantity, SHIPMENT_LABEL,
+  freshEntryId, REFUND_METHODS, refundableMinor, refundedMinor, refundProblems, refundsOf, returnableQuantity, SHIPMENT_LABEL,
   shipmentProblems, shipmentsOf, stockHistory, type FulfilmentBody, type RefundRecord, type Shipment, type ShipmentState,
 } from "./fulfilment";
 import "./commerce-operations.css";
@@ -114,7 +114,7 @@ function FulfilLinesForm({ context, close, order }: { context: ScreenContext; cl
       if (problems.length) { setError(problems[0]); return; }
       const body = bodyOf<FulfilmentBody>(order, {});
       const shipment: Shipment = {
-        id: `sh-${now.getTime().toString(36)}`,
+        id: freshEntryId("sh-", (body.shipments ?? []).map((item) => item.id)),
         number: nextShipmentNumber(order),
         state: "picking",
         lines: Object.entries(request).filter(([, quantity]) => quantity > 0).map(([lineId, quantity]) => ({ lineId, quantity })),
@@ -350,16 +350,18 @@ function RecordRefundForm({ context, close, item }: { context: ScreenContext; cl
     <form id="record-refund" className="ds-stack ds-gap-4" onSubmit={async (event) => {
       event.preventDefault();
       if (problems.length) { setError(problems[0]); return; }
-      const refund: RefundRecord = { id: `rf-${now.getTime().toString(36)}`, amountMinor: amount, method: method as RefundRecord["method"], reference: reference.trim(), note: note.trim(), at: now.toISOString(), by: actor };
+      const refund: RefundRecord = { id: freshEntryId("rf-", refundsOf(item).map((entry) => entry.id)), amountMinor: amount, method: method as RefundRecord["method"], reference: reference.trim(), note: note.trim(), at: now.toISOString(), by: actor };
       const refunds = [...refundsOf(item), refund];
       const total = refunds.reduce((sum, entry) => sum + entry.amountMinor, 0);
       const full = total >= (item.amountMinor ?? 0);
       const body = (item.body ?? {}) as Record<string, unknown>;
-      await context.mutate.patch(item.id, {
-        status: full ? "completed" : item.status === "in_review" ? "approved" : item.status,
+      // Approval belongs to the review step; recording a refund never changes it.
+      const saved = await context.mutate.patch(item.id, {
+        status: full ? "completed" : item.status,
         fields: { ...item.fields, refundState: full ? (method === "credit_note" ? "credit_note_local" : "refund_recorded") : "partly_refunded", refundedMinor: total, authorisedBy: actor },
         body: { ...body, refunds },
       }, { expectRevision: item.revision, event: `${context.money(amount)} refund recorded on ${item.title} (${REFUND_METHODS.find((entry) => entry.value === method)?.label})` });
+      if (!saved) { setError("The return changed elsewhere. Reopen it and record the refund again."); return; }
       context.toast("Refund recorded", `${context.money(amount)} is recorded on ${item.title}${full ? ", which is now settled" : `; ${context.money((item.amountMinor ?? 0) - total)} remains`}. No money moved from Arlovi.`);
       close();
     }}>
@@ -425,7 +427,7 @@ export function StockAdjustmentForm({ context, close }: { context: ScreenContext
     <form id="stock-adjustment" className="ds-stack ds-gap-4" onSubmit={async (event) => {
       event.preventDefault();
       if (problems.length) { setError(problems[0]); return; }
-      const reference = `ADJ-${now.getTime().toString().slice(-5)}`;
+      const reference = freshEntryId("ADJ-", data.stockMoves.map((move) => String(move.fields.reference ?? "")), 6, () => crypto.randomUUID().toUpperCase());
       await context.mutate.create({
         collection: "stockMoves", title: `${reasonInfo?.label ?? reason} · ${String(product?.fields.sku ?? "")}`, status: "posted", at: now.toISOString(),
         summary: note.trim() || `Adjusted by ${delta} at ${data.warehouses.find((warehouse) => warehouse.id === warehouseId)?.title ?? warehouseId}.`,

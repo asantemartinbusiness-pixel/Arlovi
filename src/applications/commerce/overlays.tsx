@@ -6,6 +6,7 @@ import {
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { resolveTaxCode, type TaxCategory } from "@/platform/money";
+import { newRecord, revisedRecord } from "@/platform/repo";
 import { RefundHistory } from "./operations";
 import { refundableMinor, refundedMinor, shipmentsOf } from "./fulfilment";
 import { ProviderBoundary, TAX_CATEGORIES, TotalsBlock } from "@/applications/market/kit";
@@ -899,7 +900,8 @@ export function ReturnInspector({ context, close }: { context: ScreenContext; cl
           variant="primary"
           disabled={disputed}
           onClick={async () => {
-            await context.mutate.patch(item.id, { status: "approved", fields: { ...item.fields, approvedAt: now.toISOString() } }, { expectRevision: item.revision, event: `${item.title} approved` });
+            const saved = await context.mutate.patch(item.id, { status: "approved", fields: { ...item.fields, approvedAt: now.toISOString() } }, { expectRevision: item.revision, event: `${item.title} approved` });
+            if (!saved) return;
             context.toast("Return approved", "The customer can send it back. No refund has moved.");
             close();
           }}
@@ -918,7 +920,7 @@ export function ReturnInspector({ context, close }: { context: ScreenContext; cl
 
 export function RestockAssessment({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCommerceData();
-  const { now } = useWorkspace();
+  const { now, actor, org } = useWorkspace();
   const payload = context.overlayPayload as { ids?: string[] } | undefined;
   const chosen = data.returns.filter((item) => (payload?.ids ?? []).includes(item.id));
   const [decisions, setDecisions] = useState<Record<string, boolean>>(() => Object.fromEntries(chosen.map((item) => [item.id, item.fields.restock === true])));
@@ -928,22 +930,39 @@ export function RestockAssessment({ context, close }: { context: ScreenContext; 
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
+        const failed: string[] = [];
         for (const item of chosen) {
           const restock = decisions[item.id];
           // A return is written back into stock once; re-saving the assessment never adds the units twice.
           const alreadyRestocked = Boolean(item.fields.restockedAt) || data.stockMoves.some((move) => String(move.fields.kind) === "return" && String(move.fields.reference) === item.title);
           const order = data.orders.find((candidate) => candidate.id === String(item.fields.orderId ?? ""));
-          await context.mutate.patch(item.id, { fields: { ...item.fields, restock, ...(restock && !alreadyRestocked ? { restockedAt: now.toISOString() } : {}) } }, { expectRevision: item.revision, event: `${item.title} marked ${restock ? "resaleable" : "not resaleable"}` });
-          if (restock && !alreadyRestocked) {
-            await context.mutate.create({
-              collection: "stockMoves",
-              title: `return to stock · ${item.title}`,
-              status: "posted",
-              at: now.toISOString(),
-              summary: `${item.title} returned to available stock.`,
-              fields: { productId: String(item.fields.productId), warehouseId: String(order?.fields.warehouseId ?? data.warehouses[0]?.id ?? ""), quantity: Number(item.fields.quantity ?? 1), kind: "return", reference: item.title },
-            }, `Stock returned for ${item.title}`);
+          const stamp = clockIso();
+          const assessed = revisedRecord(item, { fields: { ...item.fields, restock, ...(restock && !alreadyRestocked ? { restockedAt: now.toISOString() } : {}) } }, { actor, now: stamp });
+          const move = restock && !alreadyRestocked ? newRecord({
+            organizationId: org.id, currency: org.currency,
+            collection: "stockMoves",
+            title: `return to stock · ${item.title}`,
+            status: "posted",
+            at: now.toISOString(),
+            summary: `${item.title} returned to available stock.`,
+            fields: { productId: String(item.fields.productId), warehouseId: String(order?.fields.warehouseId ?? data.warehouses[0]?.id ?? ""), quantity: Number(item.fields.quantity ?? 1), kind: "return", reference: item.title },
+          }, { actor, now: stamp }) : undefined;
+          // The decision and its stock movement commit together, guarded by the
+          // return's revision: a conflict writes neither, so no unit is counted twice.
+          try {
+            await context.mutate.putMany(
+              move ? [assessed, move] : [assessed],
+              [`${item.title} marked ${restock ? "resaleable" : "not resaleable"}`, ...(move ? [`Stock returned for ${item.title}`] : [])],
+              { [item.id]: item.revision },
+              move ? ["update", "create"] : ["update"],
+            );
+          } catch {
+            failed.push(item.title);
           }
+        }
+        if (failed.length) {
+          context.toast("Assessment not saved", `${failed.join(", ")} changed elsewhere, so nothing was written for ${failed.length === 1 ? "it" : "them"}. Reopen and assess again.`, "blocked");
+          return;
         }
         context.toast("Assessment saved", "Resaleable items wrote a stock movement; the rest did not, so the level never counts a damaged unit.");
         close();
