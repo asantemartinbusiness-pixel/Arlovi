@@ -211,6 +211,7 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [failure, setFailure] = useState("");
   const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
   const [references, setReferences] = useState<ComposeReference[]>([]);
   const idRef = useRef<string | undefined>(payload?.id);
@@ -228,6 +229,7 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
     setLoadedFrom(existing.id);
     setDraft(draftInput(existing));
     setShowCc(Boolean(existing.fields.cc));
+    setShowBcc(Boolean(existing.fields.bcc));
     setReferences(parseComposeReferences(existing.fields.documentReferences));
     setIdentityId(String(existing.fields.senderIdentityId ?? ""));
     setSavedAt(String(existing.fields.savedLocallyAt ?? existing.updatedAt));
@@ -268,7 +270,7 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
 
   const status = failure
     ? <Pill tone="danger" dot>Not saved</Pill>
-    : check.blocking.length && (draft.to || draft.cc)
+    : check.blocking.length && (draft.to || draft.cc || draft.bcc)
       ? <Pill tone="danger" dot>Fix the addresses to save</Pill>
       : dirty
         ? <Pill tone="neutral" dot>Unsaved changes</Pill>
@@ -314,6 +316,8 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
               contacts={contacts} invalid={check.invalid.some((value) => draft.to.includes(value))} />
             <button type="button" className="cm-compose-inline" onClick={() => setShowCc((value) => !value)}
               aria-expanded={showCc} aria-controls="cm-cc">{showCc ? "Hide Cc" : "Cc"} {showCc ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}</button>
+            <button type="button" className="cm-compose-inline" onClick={() => setShowBcc((value) => !value)}
+              aria-expanded={showBcc} aria-controls="cm-bcc">{showBcc ? "Hide Bcc" : "Bcc"} {showBcc ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}</button>
           </div>
         </div>
         {(showCc || Boolean(draft.cc)) && <div className="cm-compose-row" id="cm-cc">
@@ -321,6 +325,12 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
           <RecipientPicker id="cm-cc-input" label="Cc" value={draft.cc ?? ""}
             onChange={(value) => edit({ cc: value })} contacts={contacts}
             invalid={check.invalid.some((value) => (draft.cc ?? "").includes(value))}/>
+        </div>}
+        {(showBcc || Boolean(draft.bcc)) && <div className="cm-compose-row" id="cm-bcc">
+          <label htmlFor="cm-bcc-input">Bcc</label>
+          <RecipientPicker id="cm-bcc-input" label="Bcc" value={draft.bcc ?? ""}
+            onChange={(value) => edit({ bcc: value })} contacts={contacts}
+            invalid={check.invalid.some((value) => (draft.bcc ?? "").includes(value))}/>
         </div>}
         <div className="cm-compose-row">
           <label htmlFor="cm-subject">Subject</label>
