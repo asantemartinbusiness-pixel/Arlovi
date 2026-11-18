@@ -160,7 +160,7 @@ export const connectApp = registerApp({
         { id: "scopes explained", label: "Scopes explained", placement: "overflow", run: (context) => context.openOverlay("scope explanation") },
       ],
       overlays: [
-        { id: "Authorization preview", kind: "drawer", title: "Authorisation", width: 560, render: ({ ...context }) => <ExternalOAuth context={context} /> },
+        { id: "Authorization preview", kind: "drawer", title: "Authorisation", width: 560, capability: "manage_connectors", presentation: { guidance: "Review provider access scopes, account identity and connection status; an unconnected provider cannot be authorised here." }, render: ({ ...context }) => <ExternalOAuth context={context} /> },
         { id: "scope explanation", kind: "drawer", title: "Scopes", width: 520, render: ({ ...context }) => <ScopeReview context={context} /> },
         { id: "provider limits", kind: "modal", title: "Provider limits", width: 560, render: ({ ...context }) => <ProviderLimits context={context} />, footer: closeFooter() },
         testConnection, requestCapability,
