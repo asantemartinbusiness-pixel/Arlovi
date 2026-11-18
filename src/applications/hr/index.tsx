@@ -11,7 +11,7 @@ import {
   LeaveForm, LeaveScreen, Learning, Onboarding, Payroll, PayrollReview, PeopleOverview, Performance,
   PositionEditor, Recruitment, Scheduling, SegmentedInspector, StaffingSummary,
 } from "./panels";
-import { RoleViewNote, submitFooter } from "./kit";
+import { RoleViewNote, leaveBalance, submitFooter } from "./kit";
 import { kitOverlays, needsSelection } from "./opsKit";
 import {
   AssignCourse, AssignReviewer, ApplicantMessage, BalanceAdjust, DirectoryFilter, MentorAssign, MetricDetail,
@@ -24,6 +24,7 @@ import { planOnboardingLaunch } from "./decisions";
 import { planShiftMove, planTimesheetApprovals } from "./workforce";
 import { scopedDetailRecord } from "@/platform/recordScope";
 import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
+import { LEAVER_KIND, leaverSteps } from "./offboarding";
 
 function payrollRecords(context: ScreenContext, collection: string) {
   return listByCollection(context.org.id, collection);
@@ -56,10 +57,18 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
   const [error, setError] = useState("");
   const fromRoute = useRecord(context.params.id);
   const employee = scopedDetailRecord(fromRoute, context.org.id, "employees");
-  const tasks = useCollections(["tasks"]).tasks;
+  const related = useCollections(["tasks", "members", "sessions"]);
+  const tasks = related.tasks;
   if (!employee) return <Empty title="Employee unavailable">Open a valid employee record before offboarding.</Empty>;
   if (employee.status === "alumni") return <Empty title="Already offboarded">This employee is already marked as alumni. Review their history instead of repeating the action.</Empty>;
   const queued = tasks.filter((task) => task.fields.employeeId === employee.id && task.fields.group === "IT access" && task.status !== "done" && task.status !== "rescinded");
+  const member = related.members.find((row) => row.title === employee.title);
+  const balance = leaveBalance(employee);
+  const steps = leaverSteps({
+    name: employee.title, manager: String(employee.fields.manager ?? ""), actor: context.actor,
+    leaveLeft: balance.known ? balance.left : null, hasMember: Boolean(member),
+    activeSessions: related.sessions.filter((session) => String(session.fields.member) === employee.title && session.status === "active").length,
+  });
   const canSubmit = reason.trim().length >= 10 && assetsReviewed && accessFollowUp && confirmed && !saving;
   return (
     <Stack gap={4}>
@@ -81,6 +90,14 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
         <Field label="Reason for offboarding" required hint="At least 10 characters. Avoid unnecessary personal or medical details.">
           <TextArea value={reason} onChange={(event) => setReason(event.target.value)} />
         </Field>
+        <div className="hr-leaver-preview" aria-label="Leaver checklist that will be created">
+          <strong>Leaver checklist created on save</strong>
+          <ul>
+            {steps.map((step) => (
+              <li key={step.key}><span>{step.title}</span> <span className="ds-subtle">· {step.group} · {step.assignee}</span></li>
+            ))}
+          </ul>
+        </div>
         <Checkbox checked={assetsReviewed} onChange={(event) => setAssetsReviewed(event.target.checked)} label="I have reviewed the equipment and document handover requirements." />
         <Checkbox checked={accessFollowUp} onChange={(event) => setAccessFollowUp(event.target.checked)} label="I will ensure external accounts, building access and other systems are separately reviewed and revoked where appropriate." />
       </PeopleDialogSection>
@@ -117,7 +134,17 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
               }, { expectRevision: employee.revision, event: `${employee.title} departure authorised by ${context.actor}; external access revocation not verified` });
               try {
                 const rescinded = await rescindQueuedGrants(context, employee.id, tasks);
-                context.toast("Departure recorded", `${employee.title} is now alumni. ${rescinded} pending local IT request${rescinded === 1 ? " was" : "s were"} rescinded. External access still requires follow-up.`);
+                for (const step of steps) {
+                  await context.mutate.create({
+                    collection: "tasks", title: step.title, status: step.status, parentId: employee.id,
+                    summary: `${step.group} leaver step for ${employee.title}. ${step.detail}`,
+                    fields: {
+                      kind: LEAVER_KIND, step: step.key, employeeId: employee.id, employeeName: employee.title, group: step.group,
+                      assignee: step.assignee, stage: step.status, memberId: step.group === "Admin access" ? member?.id ?? "" : "",
+                    },
+                  }, `Leaver step created for ${employee.title}: ${step.title}`);
+                }
+                context.toast("Departure recorded", `${employee.title} is now alumni. ${rescinded} pending local IT request${rescinded === 1 ? " was" : "s were"} rescinded. A ${steps.length}-step leaver checklist is open; workspace access is handed to Administration.`);
               } catch {
                 context.toast("Departure saved; IT follow-up needed", "Employee marked alumni, but one or more pending IT requests could not be rescinded. Review them manually.", "blocked");
               }

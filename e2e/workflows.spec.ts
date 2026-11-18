@@ -532,9 +532,9 @@ test("WF-06 Hire-to-onboard: offer on evidence, employee record, IT access decis
   await action(page, "Invite someone");
   await dialog(page).getByLabel("Name").fill("Marta Nowak");
   await dialog(page).getByLabel("Work email").fill("marta@northline.example");
-  await dialog(page).getByLabel("Role").fill("Maker — brass bench");
+  await dialog(page).getByLabel("Job title").fill("Maker — brass bench");
   await dialog(page).getByLabel("Start date").fill("2026-12-01");
-  await dialog(page).getByRole("button", { name: "Create the record" }).click();
+  await dialog(page).getByRole("button", { name: "Create employee record" }).click();
   await expect(main(page).getByText("Marta Nowak").first()).toBeVisible();
 
   // Onboarding checklist across People, the manager, IT access and Finance.
@@ -546,19 +546,23 @@ test("WF-06 Hire-to-onboard: offer on evidence, employee record, IT access decis
   await page.getByRole("tab", { name: "Waiting" }).click();
   const card = main(page).getByRole("tabpanel");
   await expect(card.getByText("Maker — brass bench · starts 1 Dec 2026")).toBeVisible();
-  for (const step of ["Payroll inputs added", "Workspace sign-in granted", "Mentor introduction with Rowan Patel", "Health and safety module"]) {
+  for (const step of ["Payroll inputs reviewed", "Request workspace sign-in access", "Mentor introduction with Rowan Patel", "Health and safety learning"]) {
     await expect(card.getByRole("checkbox", { name: step }).first()).toBeVisible();
   }
 
   // IT access request: a grant is a recorded decision, not provisioning.
   await action(page, "Decide access requests");
   await expect(dialog(page).getByText("Recording is not provisioning")).toBeVisible();
-  await expect(dialog(page).getByText("IT access step for Marta Nowak.")).toBeVisible();
+  // The reviewer attests that recording the decision does not grant external access.
+  const martaStep = /IT access checklist step for Marta Nowak\./;
+  await expect(dialog(page).getByText(martaStep)).toBeVisible();
   const request = dialog(page).locator("div")
-    .filter({ has: page.getByText("IT access step for Marta Nowak.", { exact: true }) })
-    .filter({ has: page.getByRole("button", { name: "Record the grant" }) }).last();
-  await request.getByRole("button", { name: "Record the grant" }).click();
-  await expect(dialog(page).locator("div").filter({ has: page.getByText("IT access step for Marta Nowak.", { exact: true }) }).last()).toContainText("DONE", { ignoreCase: true });
+    .filter({ has: page.getByText(martaStep) })
+    .filter({ has: page.getByRole("button", { name: "Record local review" }) }).last();
+  await expect(request.getByRole("button", { name: "Record local review" })).toBeDisabled();
+  await request.getByRole("checkbox", { name: /does not grant external access/ }).check();
+  await request.getByRole("button", { name: "Record local review" }).click();
+  await expect(dialog(page).locator("div").filter({ has: page.getByText(martaStep) }).last()).toContainText("DONE", { ignoreCase: true });
   await page.keyboard.press("Escape");
 
   // The grant is on the checklist after a reload.
@@ -568,13 +572,13 @@ test("WF-06 Hire-to-onboard: offer on evidence, employee record, IT access decis
     await page.getByRole("tab", { name: tab }).click();
     const marta = main(page).getByRole("tabpanel").locator("div")
       .filter({ has: page.getByText("Marta Nowak", { exact: true }) })
-      .filter({ has: page.getByRole("checkbox", { name: "Payroll inputs added" }) }).last();
+      .filter({ has: page.getByRole("checkbox", { name: "Payroll inputs reviewed" }) }).last();
     if (await marta.waitFor({ timeout: 4_000 }).then(() => true, () => false)) {
       found = true;
-      await expect(marta.getByRole("checkbox", { name: "Workspace sign-in granted" })).toBeChecked();
+      await expect(marta.getByRole("checkbox", { name: "Request workspace sign-in access" })).toBeChecked();
       // Payroll input step, then the manager signs off.
-      await tap(marta.getByRole("checkbox", { name: "Payroll inputs added" }), "/hr/onboarding 'Payroll inputs added' on Marta Nowak's checklist");
-      await expect(marta.getByRole("checkbox", { name: "Payroll inputs added" })).toBeChecked();
+      await tap(marta.getByRole("checkbox", { name: "Payroll inputs reviewed" }), "/hr/onboarding 'Payroll inputs reviewed' on Marta Nowak's checklist");
+      await expect(marta.getByRole("checkbox", { name: "Payroll inputs reviewed" })).toBeChecked();
       break;
     }
   }
@@ -589,7 +593,7 @@ test("WF-06 Hire-to-onboard: offer on evidence, employee record, IT access decis
   // Payroll: the new starter is an input to the next run.
   await open(page, "/hr/payroll?tab=Inputs", "Payroll");
   await expect(main(page).getByRole("row", { name: /Marta Nowak/ })).toContainText("full-time");
-  await expect(main(page).getByText("Nothing here is filed or paid")).toBeVisible();
+  await expect(main(page).getByText(/Nothing on this page is filed or paid/)).toBeVisible();
 });
 
 test("WF-10 Booking-to-service: atomic slot, deposit boundary, check-in, service history", async ({ page }) => {

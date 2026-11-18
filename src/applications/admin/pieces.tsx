@@ -1,4 +1,6 @@
-import { useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
+import * as repo from "@/platform/repo";
 import { Button, Field, Notice, Pill, Properties, Row, Stack, TextInput } from "@/design-system";
 import { applications } from "@/app/catalog";
 import { canOpen, can as roleCan, ROLE_LABELS, type Capability } from "@/platform/policy";
@@ -142,4 +144,46 @@ export function useSeededList(seedCsv: string): [string[], Dispatch<SetStateActi
     setValue(csvList(seedCsv));
   }
   return [value, setValue];
+}
+
+/* ------------------------------------------------------------------ *
+ * Settled workspace records.
+ *
+ * Every application's fixtures load in the background after start-up. A
+ * privacy register that counts the records a subject request covers must not
+ * report a figure (or let an export or an erasure run) while part of the
+ * workspace is still arriving: a partial count reads as a complete one, and a
+ * deletion would silently miss records. `useSettledOrgRecords` returns null
+ * until every application's records are in the store, then the live set.
+ * ------------------------------------------------------------------ */
+
+let seedsSettled = false;
+
+export function useSeedsSettled(): boolean {
+  const [settled, setSettled] = useState(seedsSettled);
+  useEffect(() => {
+    if (settled) return;
+    let live = true;
+    void import("@/applications")
+      .then((module) => module.loadAllSeeds())
+      .catch(() => undefined)
+      .then(() => {
+        seedsSettled = true;
+        if (live) setSettled(true);
+      });
+    return () => { live = false; };
+  }, [settled]);
+  return settled;
+}
+
+export function useSettledOrgRecords(): Rec[] | null {
+  const { org } = useWorkspace();
+  const settled = useSeedsSettled();
+  // The result is tagged with the settled flag it was read under, so a
+  // snapshot taken before the fixtures landed is never shown as complete.
+  const result = useLiveQuery(
+    () => (settled ? repo.listByOrg(org.id).then((rows) => ({ settled: true, rows })) : { settled: false, rows: [] as Rec[] }),
+    [org.id, settled],
+  );
+  return result?.settled ? result.rows : null;
 }

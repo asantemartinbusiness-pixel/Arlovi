@@ -4,6 +4,7 @@ import { Button, Empty, Notice, Pill, Row, Stack } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { addDays, sameDay, startOfDay, startOfMonth, startOfWeek } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
+import { clashingIds, people, upcomingByDay } from "./schedule";
 
 /* Every view below is positioned from `context.now`; no date is written down. */
 
@@ -66,11 +67,12 @@ export function MonthView({ context, meetings, month, onPick, onPickDay }: {
   );
 }
 
-export function WeekView({ context, meetings, weekStart, onPick }: {
-  context: ScreenContext; meetings: Rec[]; weekStart: Date; onPick: (meeting: Rec) => void;
+export function WeekView({ context, meetings, weekStart, onPick, onCreateAt }: {
+  context: ScreenContext; meetings: Rec[]; weekStart: Date; onPick: (meeting: Rec) => void; onCreateAt: (day: Date, time?: string) => void;
 }) {
   const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
   const hours = Array.from({ length: 12 }, (_, index) => index + 7);
+  const clashes = clashingIds(meetings);
   return (
     <div className="cm-week" role="grid" aria-label={`Week beginning ${context.date(weekStart)}`}>
       <div className="cm-week-hour" />
@@ -94,10 +96,26 @@ export function WeekView({ context, meetings, weekStart, onPick }: {
             return (
               <div key={day.toISOString() + hour} className="cm-week-cell" data-now={isNow ? "true" : undefined} role="gridcell">
                 {items.map((meeting) => (
-                  <button key={meeting.id} type="button" className="cm-event" data-state={meeting.status} onClick={() => onPick(meeting)}>
+                  <button
+                    key={meeting.id}
+                    type="button"
+                    className="cm-event"
+                    data-state={meeting.status}
+                    data-clash={clashes.has(meeting.id) ? "true" : undefined}
+                    title={`${meeting.title} · ${context.dateTime(meeting.startAt)}${clashes.has(meeting.id) ? " · clashes with another meeting" : ""}`}
+                    onClick={() => onPick(meeting)}
+                  >
                     {meeting.title}
                   </button>
                 ))}
+                {items.length === 0 && (
+                  <button
+                    type="button"
+                    className="cm-slot-add"
+                    aria-label={`Create an event on ${context.date(day, { weekday: "long", day: "numeric", month: "long" })} at ${String(hour).padStart(2, "0")}:00`}
+                    onClick={() => onCreateAt(day, `${String(hour).padStart(2, "0")}:00`)}
+                  />
+                )}
               </div>
             );
           })}
@@ -107,40 +125,115 @@ export function WeekView({ context, meetings, weekStart, onPick }: {
   );
 }
 
-export function DayView({ context, meetings, day, onPick }: {
-  context: ScreenContext; meetings: Rec[]; day: Date; onPick: (meeting: Rec) => void;
+function timeOf(context: ScreenContext, iso?: string): string {
+  return context.date(iso, { hour: "2-digit", minute: "2-digit" }).split(", ").pop() ?? "";
+}
+
+function MeetingCard({ context, meeting, clash, onPick, onEdit }: {
+  context: ScreenContext; meeting: Rec; clash: boolean; onPick: (meeting: Rec) => void; onEdit?: (meeting: Rec) => void;
 }) {
-  const items = eventsOn(meetings, day);
-  if (items.length === 0) {
-    return <Empty title={`Nothing on ${context.date(day, { weekday: "long", day: "numeric", month: "long" })}`} icon={<CalendarDays size={20} />}>An empty day is shown as empty rather than filled with suggestions.</Empty>;
-  }
   return (
-    <div className="cm-day-list">
-      {items.map((meeting) => (
-        <div key={meeting.id} className="cm-day-row">
-          <strong className="ds-num">{context.date(meeting.startAt, { hour: "2-digit", minute: "2-digit" }).split(", ").pop()}</strong>
-          <button
-            type="button"
-            className="ds-record-card"
-            onClick={() => onPick(meeting)}
-          >
-            <Row gap={2}>
-              <strong className="ds-grow" style={{ textAlign: "start" }}>{meeting.title}</strong>
-              <Pill tone={meeting.status === "tentative" ? "warning" : meeting.status === "finished" ? "neutral" : "info"} dot>{meeting.status}</Pill>
-            </Row>
-            <span className="ds-subtle">{String(meeting.fields.where ?? "")} · {String(meeting.fields.minutes ?? 0)} minutes · {String(meeting.fields.attendees ?? "").split(",").length} attendees</span>
-          </button>
-        </div>
-      ))}
+    <div className="cm-day-card">
+      <button type="button" className="ds-record-card" onClick={() => onPick(meeting)}>
+        <Row gap={2}>
+          <strong className="ds-grow" style={{ textAlign: "start" }}>{meeting.title}</strong>
+          {clash && <Pill tone="danger" dot>Clash</Pill>}
+          <Pill tone={meeting.status === "tentative" ? "warning" : meeting.status === "finished" ? "neutral" : "info"} dot>{meeting.status}</Pill>
+        </Row>
+        <span className="ds-subtle">
+          {timeOf(context, meeting.startAt)}–{timeOf(context, meeting.endAt)} · {String(meeting.fields.where ?? "")} · {people(meeting.fields.attendees).includes("Everyone") ? "everyone invited" : `${people(meeting.fields.attendees).length} attendees`}
+        </span>
+      </button>
+      {onEdit && meeting.status !== "finished" && (
+        <Button size="sm" variant="ghost" aria-label={`Edit ${meeting.title}`} onClick={() => onEdit(meeting)}>Edit</Button>
+      )}
     </div>
   );
 }
 
+export function DayView({ context, meetings, day, onPick, onCreateAt, onEdit }: {
+  context: ScreenContext; meetings: Rec[]; day: Date; onPick: (meeting: Rec) => void;
+  onCreateAt: (day: Date, time?: string) => void; onEdit?: (meeting: Rec) => void;
+}) {
+  const items = eventsOn(meetings, day);
+  const clashes = clashingIds(meetings);
+  const hours = Array.from({ length: 12 }, (_, index) => index + 7);
+  const hourOf = (meeting: Rec) => new Date(meeting.startAt ?? "").getHours();
+  const outside = items.filter((meeting) => hourOf(meeting) < 7 || hourOf(meeting) > 18);
+  const label = context.date(day, { weekday: "long", day: "numeric", month: "long" });
+  return (
+    <Stack gap={2}>
+      {items.length === 0 && (
+        <p className="ds-subtle">Nothing is recorded on {label}. Choose an hour to add an event.</p>
+      )}
+      <div className="cm-day-list" role="list" aria-label={`Timeline for ${label}`}>
+        {hours.map((hour) => {
+          const rows = items.filter((meeting) => hourOf(meeting) === hour);
+          const time = `${String(hour).padStart(2, "0")}:00`;
+          return (
+            <div key={hour} className="cm-day-row" role="listitem" data-now={sameDay(day, context.now) && context.now.getHours() === hour ? "true" : undefined}>
+              <strong className="ds-num">{time}</strong>
+              {rows.length > 0 ? (
+                <Stack gap={2}>
+                  {rows.map((meeting) => <MeetingCard key={meeting.id} context={context} meeting={meeting} clash={clashes.has(meeting.id)} onPick={onPick} onEdit={onEdit} />)}
+                </Stack>
+              ) : (
+                <button type="button" className="cm-day-free" onClick={() => onCreateAt(day, time)} aria-label={`Create an event on ${label} at ${time}`}>
+                  <span aria-hidden="true">+</span> Add at {time}
+                </button>
+              )}
+            </div>
+          );
+        })}
+        {outside.map((meeting) => (
+          <div key={meeting.id} className="cm-day-row" role="listitem">
+            <strong className="ds-num">{timeOf(context, meeting.startAt)}</strong>
+            <MeetingCard context={context} meeting={meeting} clash={clashes.has(meeting.id)} onPick={onPick} onEdit={onEdit} />
+          </div>
+        ))}
+      </div>
+    </Stack>
+  );
+}
+
+export function AgendaView({ context, meetings, onPick, onEdit }: {
+  context: ScreenContext; meetings: Rec[]; onPick: (meeting: Rec) => void; onEdit?: (meeting: Rec) => void;
+}) {
+  const days = upcomingByDay(meetings, context.now, 21);
+  const clashes = clashingIds(meetings);
+  if (days.length === 0) {
+    return <Empty title="Nothing in the next three weeks" icon={<CalendarDays size={20} />}>Events you create or are invited to appear here in date order.</Empty>;
+  }
+  return (
+    <Stack gap={4}>
+      {days.map((group) => {
+        const heading = context.date(`${group.day}T12:00:00.000Z`, { weekday: "long", day: "numeric", month: "long" });
+        return (
+          <section key={group.day} className="cm-agenda-day" aria-label={heading}>
+            <Row gap={2}>
+              <h3 className="ds-grow" style={{ margin: 0, fontSize: "var(--text-md)" }}>{heading}</h3>
+              <span className="ds-subtle">{group.meetings.length} {group.meetings.length === 1 ? "event" : "events"}</span>
+            </Row>
+            <div className="cm-day-list">
+              {group.meetings.map((meeting) => (
+                <div key={meeting.id} className="cm-day-row">
+                  <strong className="ds-num">{timeOf(context, meeting.startAt)}</strong>
+                  <MeetingCard context={context} meeting={meeting} clash={clashes.has(meeting.id)} onPick={onPick} onEdit={onEdit} />
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </Stack>
+  );
+}
+
 export function CalendarSurface({
-  context, meetings, view, onPick, onCreateAt,
+  context, meetings, view, onPick, onCreateAt, onEdit,
 }: {
   context: ScreenContext; meetings: Rec[]; view: CalendarView;
-  onPick: (meeting: Rec) => void; onCreateAt: (day: Date) => void;
+  onPick: (meeting: Rec) => void; onCreateAt: (day: Date, time?: string) => void; onEdit?: (meeting: Rec) => void;
 }) {
   const [offset, setOffset] = useState(0);
 
@@ -158,6 +251,22 @@ export function CalendarSurface({
 
   const step = view === "Month" ? "month" : view === "Week" ? "week" : "day";
 
+  const notice = (
+    <Notice tone="warning" title="Invite status is what this workspace recorded">
+      An attendee is shown as invited unless somebody recorded their answer here. No calendar provider is connected, so an
+      acceptance elsewhere is not known to this screen and is never assumed.
+    </Notice>
+  );
+
+  if (view === "Agenda") {
+    return (
+      <Stack gap={4}>
+        <AgendaView context={context} meetings={meetings} onPick={onPick} onEdit={onEdit} />
+        {notice}
+      </Stack>
+    );
+  }
+
   return (
     <Stack gap={4}>
       <Row gap={2} wrap>
@@ -168,13 +277,10 @@ export function CalendarSurface({
       </Row>
 
       {view === "Month" && <MonthView context={context} meetings={meetings} month={anchor} onPick={onPick} onPickDay={onCreateAt} />}
-      {view === "Week" && <WeekView context={context} meetings={meetings} weekStart={anchor} onPick={onPick} />}
-      {(view === "Day" || view === "Agenda") && <DayView context={context} meetings={meetings} day={anchor} onPick={onPick} />}
+      {view === "Week" && <WeekView context={context} meetings={meetings} weekStart={anchor} onPick={onPick} onCreateAt={onCreateAt} />}
+      {view === "Day" && <DayView context={context} meetings={meetings} day={anchor} onPick={onPick} onCreateAt={onCreateAt} onEdit={onEdit} />}
 
-      <Notice tone="warning" title="Invite status is what this workspace recorded">
-        An attendee is shown as invited unless somebody recorded their answer here. No calendar provider is connected, so an
-        acceptance elsewhere is not known to this screen and is never assumed.
-      </Notice>
+      {notice}
     </Stack>
   );
 }

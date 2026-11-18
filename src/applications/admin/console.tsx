@@ -9,7 +9,7 @@ import { useEvents, useOrgRecords, useWorkspace } from "@/platform/workspace";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, capabilityById } from "@/platform/capability";
 import { ROLE_LABELS } from "@/platform/policy";
 import type { Audit, Rec } from "@/domain/types";
-import { csvList, ofKind, StepUp, useAdmin, useSeeded } from "./pieces";
+import { csvList, ofKind, StepUp, useAdmin, useSeeded, useSettledOrgRecords } from "./pieces";
 import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
@@ -562,7 +562,9 @@ type PrivacyTab = "Retention" | "Consent" | "Requests" | "Processing" | "Residen
 export function PrivacyScreen({ context, tab }: { context: ScreenContext; tab: PrivacyTab }) {
   const data = useAdmin();
   const { now } = useWorkspace();
-  const records = useOrgRecords();
+  const settledRecords = useSettledOrgRecords();
+  const counting = settledRecords === null;
+  const records = settledRecords ?? [];
 
   if (tab === "Retention") {
     const schedules = ofKind(data.policies, "retention");
@@ -634,6 +636,14 @@ export function PrivacyScreen({ context, tab }: { context: ScreenContext; tab: P
   if (tab === "Requests") {
     return (
       <Card eyebrow="SUBJECT REQUESTS" prov="human" title={`${data.dataRequests.length} subject requests`} subtitle="Each one with its basis, its deadline and whether a hold applies" flush>
+        {counting ? (
+          <div style={{ padding: "var(--space-4)" }} role="status" aria-live="polite">
+            <Notice tone="info" title="Counting the records each request covers">
+              Records from every application are still arriving in this browser. The register appears once the count is complete, so a
+              partial figure is never shown as the whole.
+            </Notice>
+          </div>
+        ) : (
         <DataGrid
           rows={data.dataRequests}
           rowId={(row) => row.id}
@@ -652,6 +662,7 @@ export function PrivacyScreen({ context, tab }: { context: ScreenContext; tab: P
           ]}
           empty={<Empty title="No requests" icon={<Scale size={20} />}>Requests from people about their own data are recorded here.</Empty>}
         />
+        )}
       </Card>
     );
   }
@@ -663,7 +674,7 @@ export function PrivacyScreen({ context, tab }: { context: ScreenContext; tab: P
     }, {})).sort((a, b) => b[1] - a[1]).slice(0, 12);
     return (
       <Stack gap={4}>
-        <Card eyebrow="PROCESSING" prov="posted" title="What this workspace holds" subtitle={`${records.length} records in ${new Set(records.map((record) => record.collection)).size} collections`}>
+        <Card eyebrow="PROCESSING" prov="posted" title="What this workspace holds" subtitle={counting ? "Counting records from every application…" : `${records.length} records in ${new Set(records.map((record) => record.collection)).size} collections`}>
           <BarChart
             title="Records by collection, largest twelve"
             height={220}
@@ -759,7 +770,9 @@ export function subjectRecords(request: Rec, records: Rec[]): Rec[] {
 
 export function DataRequestOverlay({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
-  const records = useOrgRecords();
+  const settledRecords = useSettledOrgRecords();
+  const counting = settledRecords === null;
+  const records = settledRecords ?? [];
   const payload = context.overlayPayload as { id?: string } | undefined;
   const request = data.dataRequests.find((row) => row.id === (payload?.id ?? context.selectedId));
   const [busy, setBusy] = useState(false);
@@ -779,7 +792,8 @@ export function DataRequestOverlay({ context, close }: { context: ScreenContext;
         { label: "Due", value: request.dueAt ? `${context.date(request.dueAt)} (${context.relative(request.dueAt)})` : "No deadline recorded" },
         { label: "Basis", value: String(request.fields.lawfulBasis ?? "") },
         { label: "Handler", value: String(request.fields.handler ?? "Unassigned") },
-        { label: "Records matched now", value: `${matching.length} across ${collections.length} collections` },
+        { label: "Records matched now", value: counting ? "Counting records from every application…" : `${matching.length} across ${collections.length} collections` },
+        ...(counting ? [] : [{ label: "Where they are", value: collections.map((collection) => `${collection} ${matching.filter((row) => row.collection === collection).length}`).join(" · ") }]),
       ]} />
       {hold && (
         <Notice tone="danger" title="A legal hold applies">
@@ -791,6 +805,8 @@ export function DataRequestOverlay({ context, close }: { context: ScreenContext;
         <Button
           variant="primary"
           busy={busy}
+          disabled={counting}
+          title={counting ? "Wait until every record has been counted" : undefined}
           onClick={async () => {
             setBusy(true);
             try {
@@ -832,11 +848,20 @@ export function DataRequestOverlay({ context, close }: { context: ScreenContext;
 
 export function DeletionImpact({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
-  const records = useOrgRecords();
+  const settledRecords = useSettledOrgRecords();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const request = data.dataRequests.find((row) => row.id === (payload?.id ?? context.selectedId));
   const [busy, setBusy] = useState(false);
   if (!request) return <Empty title="Select a request" />;
+  if (settledRecords === null) {
+    return (
+      <Notice tone="info" title="Counting the records this request covers">
+        Records from every application are still arriving in this browser. Deletion is offered once the full set is known, so no record
+        is missed.
+      </Notice>
+    );
+  }
+  const records = settledRecords;
 
   const subject = String(request.fields.subject ?? "");
   const collections = csvList(request.fields.collections);

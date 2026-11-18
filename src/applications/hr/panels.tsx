@@ -11,6 +11,7 @@ import { useCollection, useCollections, useRecord, useWorkspace } from "@/platfo
 import { addDays, clockIso, daysBetween, startOfMonth, startOfWeek } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { EmploymentPill, RoleViewNote, leaveBalance, salaryText } from "./kit";
+import { LeaverChecklist } from "./leaver";
 import { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 import { leaveRequestDays, planLeaveDecision } from "./decisions";
 import { planTimesheetApprovals } from "./workforce";
@@ -883,6 +884,7 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
             Pending access requests are rescinded in this workspace; connected identity and building systems must still be checked separately.
           </Notice>
         )}
+        <LeaverChecklist context={context} employee={employee} tasks={data.tasks} />
         {requests.length === 0 ? (
           <Empty title="No access requests recorded" icon={<ClipboardCheck size={20} />}>
             Employment status and department membership do not establish that an account or physical grant exists.
@@ -1391,7 +1393,7 @@ export function Onboarding({ context, lens }: { context: ScreenContext; lens: "I
           ))}
           {selected.map((group) => (
             <Card key={group.employeeId} eyebrow="STARTER"
-              title={<Row gap={2}><Avatar name={group.employee?.title ?? "Unlinked starter"} size="sm" />{group.employee?.title ?? "Unlinked starter"}</Row>}
+              title={<Row gap={2}><Avatar name={group.employee?.title ?? "Unlinked starter"} size="sm" /><span>{group.employee?.title ?? "Unlinked starter"}</span></Row>}
               subtitle={`${String(group.employee?.fields.title || "Role not recorded")} · ${group.employee?.startAt ? `starts ${context.date(group.employee.startAt)}` : "start date not recorded"}`}
               actions={<Pill tone={group.state === "Completed" ? "success" : group.waiting ? "warning" : "info"}>
                 {group.done} of {group.steps.length} steps

@@ -81,3 +81,36 @@
 .cm-mention-option { display: inline-flex; align-items: center; gap: 6px; padding: 3px var(--space-3) 3px 3px; border: 1px solid var(--border-default); border-radius: var(--radius-full); background: var(--bg-surface); font: inherit; color: inherit; cursor: pointer; }
 .cm-mention-option[aria-selected="true"] { border-color: var(--accent); background: var(--bg-selected); }
 .cm-mention-option:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Calendar: clash markers, free-slot creation, day timeline and agenda. */
+.cm-event[data-clash="true"] { box-shadow: inset 3px 0 0 var(--danger); }
+.cm-slot-add { flex: 1; min-height: 28px; border: 0; background: transparent; border-radius: var(--radius-sm); cursor: pointer; }
+.cm-slot-add:hover { background: var(--bg-hover); }
+.cm-slot-add:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cm-day-row[data-now="true"] > strong { color: var(--accent); }
+.cm-day-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: start; }
+.cm-day-free {
+  min-height: 34px; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3);
+  border: 1px dashed var(--border-default); border-radius: var(--radius-md); background: transparent;
+  color: var(--fg-subtle); font: inherit; font-size: var(--text-sm); cursor: pointer; text-align: start;
+}
+.cm-day-free:hover { background: var(--bg-hover); color: var(--fg-default); }
+.cm-day-free:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cm-agenda-day { display: flex; flex-direction: column; gap: var(--space-2); }
+
+/* Meeting record: agenda items, attendee answers, linked records. */
+.cm-agenda-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; padding: var(--space-2) 0; border-bottom: 1px solid var(--border-subtle); }
+.cm-agenda-item:last-child, .cm-attendee:last-child { border-bottom: 0; }
+.cm-attendee { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; padding: var(--space-2) 0; border-bottom: 1px solid var(--border-subtle); }
+@media (max-width: 640px) {
+  .cm-day-card, .cm-attendee { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Mail: the not-sent notice wraps its action, and phones use the folder tabs. */
+.cm-mail-new { margin-block-start: var(--space-3); }
+.cm-notsent .ds-notice { flex-wrap: wrap; }
+.cm-notsent .ds-notice > .ds-grow { flex: 1 1 260px; }
+@media (max-width: 900px) {
+  .cm-mail-folder { display: none; }
+  .cm-mail-new { margin-block-start: 0; align-self: flex-start; }
+}
