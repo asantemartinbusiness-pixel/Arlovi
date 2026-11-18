@@ -1,123 +1,218 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Drawer, Pill, Segmented, Empty } from "@/design-system";
-import { attentionCounts, headerAttentionCounts, isDecisionItem, isNotificationItem, PRIORITY_LABEL, PRIORITY_TONE, type AttentionItem } from "@/platform/attention";
-import { useMutations, useWorkspace } from "@/platform/workspace";
-import { attentionReceiptKey } from "@/platform/attentionReceipts";
+import { ArrowRight, AtSign, Bell, CheckCheck, Clock3, Inbox, Search, Settings2, ShieldAlert, X } from "lucide-react";
+import { Button, Drawer, Pill } from "@/design-system";
+import {
+  attentionCounts, headerAttentionCounts, isDecisionItem, isNotificationItem,
+  PRIORITY_LABEL, PRIORITY_TONE, type AttentionItem,
+} from "@/platform/attention";
+import { attentionReceiptKey, attentionSnoozed } from "@/platform/attentionReceipts";
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES, normalizeNotificationPreferences,
+  notificationCategory, notificationPreferenceKey, safeNotificationPath,
+} from "@/platform/notificationExperience";
+import { useWorkspace } from "@/platform/workspace";
 import { appEntry } from "@/app/catalog";
 import { useUi } from "@/runtime/ui";
+import { NotificationSettings } from "@/app/NotificationSettings";
+import "./notification-experience.css";
 
-type View = "for-you" | "approvals" | "updates" | "resolved";
+export type AttentionView = "for-you" | "approvals" | "updates" | "urgent" | "history" | "settings";
 
-/**
- * Audit A06: scoped to the active organisation and routed to the active role,
- * with priority, grouping, and read / acknowledged / resolved kept apart.
- * Marking an item read never approves the thing it points at.
- */
-export function AttentionCentre({ items, onClose, initialView = "for-you" }: { items: AttentionItem[]; onClose: () => void; initialView?: "for-you" | "approvals" | "updates" }) {
+const VIEW_LABELS: { value: AttentionView; label: string }[] = [
+  { value: "for-you", label: "For you" },
+  { value: "approvals", label: "Actions" },
+  { value: "updates", label: "Updates" },
+  { value: "urgent", label: "Urgent" },
+  { value: "history", label: "History" },
+];
+
+function safeSummary(item: AttentionItem, detailed: boolean): string {
+  if (!detailed && (notificationCategory(item) === "security" || /payroll|personal|confidential/i.test(item.group))) {
+    return "Open the authorised record to see sensitive details.";
+  }
+  return item.body;
+}
+
+export function AttentionCentre({
+  items, onClose, initialView = "for-you",
+}: {
+  items: AttentionItem[];
+  onClose: () => void;
+  initialView?: AttentionView;
+}) {
   const navigate = useNavigate();
-  const { org, role, relative } = useWorkspace();
-  const setReceipt = useUi((state) => state.setAttentionReceipt);
-  const mutate = useMutations();
-  const [view, setView] = useState<View>(initialView);
+  const { org, role, actor, relative } = useWorkspace();
+  const receipts = useUi((s) => s.attentionReceipts);
+  const updateReceipt = useUi((s) => s.setAttentionReceipt);
+  const updateReceipts = useUi((s) => s.setAttentionReceipts);
+  const prefKey = notificationPreferenceKey(org.id, actor);
+  const savedPrefs = useUi((s) => s.notificationPreferences[prefKey]);
+  const prefs = normalizeNotificationPreferences(savedPrefs ?? DEFAULT_NOTIFICATION_PREFERENCES);
+  const [view, setView] = useState<AttentionView>(initialView);
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [query, setQuery] = useState("");
+  const [detailsId, setDetailsId] = useState<string | null>(null);
+  const now = new Date();
   const counts = attentionCounts(items);
-  const pendingDecisions = headerAttentionCounts(items).decisions;
+  const { decisions } = headerAttentionCounts(items);
 
   const shown = useMemo(() => {
-    const live = items.filter((item) => !item.resolved);
-    if (view === "approvals") return live.filter(isDecisionItem);
-    if (view === "updates") return live.filter(isNotificationItem);
-    if (view === "resolved") return items.filter((item) => item.resolved);
-    return live;
-  }, [items, view]);
+    if (view === "settings") return [];
+    return items.filter((item) => {
+      const snoozed = attentionSnoozed(item, receipts, org.id, actor, now);
+      if (view === "history") {
+        if (!item.resolved && !snoozed) return false;
+      } else if (item.resolved || snoozed) return false;
+      if (view === "approvals" && !isDecisionItem(item)) return false;
+      if (view === "updates" && !isNotificationItem(item)) return false;
+      if (view === "urgent" && item.priority !== "P0" && item.priority !== "P1") return false;
+      if (unreadOnly && item.read) return false;
+      const text = [item.title, item.body, item.group, item.kind].join(" ").toLowerCase();
+      return text.includes(query.trim().toLowerCase());
+    });
+  }, [items, view, unreadOnly, query, receipts, org.id, actor]);
 
   const groups = useMemo(() => {
-    const map = new Map<string, AttentionItem[]>();
+    const byGroup = new Map<string, AttentionItem[]>();
     for (const item of shown) {
-      const list = map.get(item.group) ?? [];
-      list.push(item);
-      map.set(item.group, list);
+      const group = item.group || "Other activity";
+      const rows = byGroup.get(group) ?? [];
+      rows.push(item);
+      byGroup.set(group, rows);
     }
-    return [...map.entries()];
+    return [...byGroup.entries()];
   }, [shown]);
 
-  async function markRead(item: AttentionItem) {
-    // A generated alert is not the backing invoice, mission or approval record.
-    setReceipt(attentionReceiptKey(org.id, role, item.id), { read: true });
-    if (item.kind === "update" && item.sourceId === item.id) {
-      await mutate.patch(item.sourceId, { fields: { read: true } }, { skipHistory: true });
-    }
+  function receiptKey(item: AttentionItem) {
+    return attentionReceiptKey(org.id, actor, item.id);
   }
-
+  function markRead(item: AttentionItem, value: boolean) {
+    updateReceipt(receiptKey(item), { read: value });
+  }
   function acknowledge(item: AttentionItem) {
-    // Acknowledgement is not authorization, approval or resolution.
-    setReceipt(attentionReceiptKey(org.id, role, item.id), { read: true, acknowledged: true });
+    updateReceipt(receiptKey(item), { read: true, acknowledged: true });
+  }
+  function snooze(item: AttentionItem, hours: number) {
+    updateReceipt(receiptKey(item), { snoozedUntil: new Date(Date.now() + hours * 3600000).toISOString() });
+  }
+  function markVisibleRead() {
+    const changes: Record<string, { read: boolean }> = {};
+    for (const item of shown) if (!item.read) changes[receiptKey(item)] = { read: true };
+    updateReceipts(changes);
+  }
+  function openItem(item: AttentionItem) {
+    const route = safeNotificationPath(item.route, org.slug);
+    if (!route) return;
+    if (!item.read) markRead(item, true);
+    navigate(route);
+    onClose();
   }
 
   return (
     <Drawer
       open
       onOpenChange={(next) => { if (!next) onClose(); }}
-      title={view === "approvals" ? "Inbox & decisions" : view === "updates" ? "Notifications" : "Attention"}
-      subtitle={`${org.name} · ${counts.unread} unread · ${pendingDecisions} actionable items`}
-      width={440}
-      footer={<div className="ds-row ds-gap-2" style={{width:"100%",justifyContent:"space-between",alignItems:"center"}}><span className="ds-subtle">Reading is not approval.</span><Button size="sm" variant="secondary" onClick={()=>{navigate(appEntry("INBOX",org.slug));onClose();}}>Open full Inbox</Button></div>}
+      width={475}
+      title={view === "settings" ? "Notification settings" : view === "approvals" ? "Inbox & decisions" : "Notifications"}
+      subtitle={org.name + " · " + counts.unread + " unread · " + decisions + " awaiting action"}
+      footer={<div className="an-footer">
+        <span>Reading a notification never approves work.</span>
+        <Button size="sm" variant="secondary" onClick={() => { navigate(appEntry("INBOX", org.slug)); onClose(); }}>Open full Inbox <ArrowRight size={14}/></Button>
+      </div>}
     >
-      <div className="ds-stack ds-gap-4">
-        <Segmented
-          label="Attention view"
-          value={view}
-          onChange={setView}
-          options={[
-            { value: "for-you", label: `For you (${counts.total})` },
-            { value: "approvals", label: "Decisions & assignments" },
-            { value: "updates", label: "Updates" },
-            { value: "resolved", label: "Resolved" },
-          ]}
-        />
+      <div className="an-root">
+        <div className="an-topline">
+          <div className="an-topline-heading"><Bell size={17}/><span>{view === "settings" ? "Control your attention" : "What needs your attention"}</span></div>
+          <button type="button" className="an-icon-btn" onClick={() => setView(view === "settings" ? "for-you" : "settings")}
+            aria-label={view === "settings" ? "Back to notifications" : "Notification settings"} title="Notification preferences">
+            {view === "settings" ? <X size={16}/> : <Settings2 size={16}/>}
+          </button>
+        </div>
 
-        {groups.length === 0 && (
-          <Empty title="Nothing is waiting" >
-            Items appear here when something in {org.name} needs a decision, passes a date, or is addressed to the {org.shortName} role you are viewing.
-          </Empty>
-        )}
-
-        {groups.map(([group, groupItems]) => (
-          <section key={group} className="ds-stack ds-gap-2">
-            <h3 style={{ fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--fg-subtle)" }}>
-              {group} · {groupItems.length}
-            </h3>
-            {groupItems.map((item) => {
-              const read = item.read;
-              const actionable = isDecisionItem(item);
-              return (
-                <article
-                  key={item.id}
-                  className="ds-panel"
-                  style={{ padding: "var(--space-3)", borderInlineStartWidth: 3, borderInlineStartColor: read ? "var(--border-default)" : "var(--accent)" }}
-                >
-                  <div className="ds-row ds-gap-2" style={{ alignItems: "flex-start" }}>
-                    <Pill tone={PRIORITY_TONE[item.priority]}>{PRIORITY_LABEL[item.priority]}</Pill>
-                    <span className="ds-grow" />
-                    <span className="ds-subtle">{relative(item.at)}</span>
-                  </div>
-                  <strong style={{ display: "block", marginBlock: 6, fontWeight: read ? 550 : 680 }}>{item.title}</strong>
-                  <p className="ds-subtle">{item.body}</p>
-                  <div className="ds-row ds-gap-2" style={{ marginBlockStart: "var(--space-3)" }}>
-                    {item.route && (
-                      <Button size="sm" variant="secondary" onClick={() => { navigate(item.route!); onClose(); }}>
-                        {item.kind === "approval" ? "Review request" : "Open"}
-                      </Button>
-                    )}
-                    {!read && <Button size="sm" variant="ghost" onClick={() => { void markRead(item); }}>Mark read</Button>}
-                    {actionable && read && <span className="ds-subtle" style={{alignSelf:"center"}}>Still requires action</span>}
-                    {!item.acknowledged && <Button size="sm" variant="ghost" onClick={() => acknowledge(item)}>Acknowledge</Button>}
-                  </div>
-                </article>
-              );
-            })}
-          </section>
-        ))}
+        {view === "settings" ? <NotificationSettings/> : <>
+          <div className="an-view-tabs" role="group" aria-label="Notification filters">
+            {VIEW_LABELS.map((option) =>
+              <button key={option.value} type="button" aria-pressed={view === option.value}
+                onClick={() => { setView(option.value); setDetailsId(null); }}>
+                {option.label}{option.value === "approvals" && decisions > 0 ? <span>{decisions > 99 ? "99+" : decisions}</span> : null}
+              </button>
+            )}
+          </div>
+          <div className="an-tools">
+            <label className="an-search">
+              <Search size={15} aria-hidden="true"/>
+              <span className="ds-sr-only">Search notifications</span>
+              <input type="search" value={query} onChange={e => setQuery(e.target.value)}
+                placeholder="Search notifications" aria-label="Search notifications"/>
+            </label>
+            <label className="an-unread-toggle"><input type="checkbox" checked={unreadOnly} onChange={e => setUnreadOnly(e.target.checked)}/> Unread</label>
+          </div>
+          <div className="an-list-heading">
+            <span>{shown.length} {shown.length === 1 ? "item" : "items"} · {prefs.focusMode ? "Focus mode on" : "Current workspace"}</span>
+            {shown.some(item => !item.read) &&
+              <button type="button" onClick={markVisibleRead}><CheckCheck size={14}/> Mark shown read</button>
+            }
+          </div>
+          {groups.length === 0 && (
+            <div className="an-empty" role="status">
+              <span><CheckCheck size={26}/></span>
+              <h3>You're all caught up</h3>
+              <p>{view === "history" ? "No resolved or snoozed items match your filters." : "Nothing in this view right now. Important activity will appear here when it concerns you."}</p>
+              {(query || unreadOnly) && <button type="button" onClick={() => { setQuery(""); setUnreadOnly(false); }}>Clear filters</button>}
+            </div>
+          )}
+          {groups.map(([name, rows]) => (
+            <section className="an-section" key={name} aria-label={name}>
+              <h3>{name} <span>{rows.length}</span></h3>
+              <div className="an-events">
+                {rows.map(item => {
+                  const actionable = isDecisionItem(item);
+                  const urgent = item.priority === "P0" || item.priority === "P1";
+                  const route = safeNotificationPath(item.route, org.slug);
+                  const snoozed = attentionSnoozed(item, receipts, org.id, actor, now);
+                  const why = detailsId === item.id;
+                  return (
+                    <article className="an-event" key={item.id} data-unread={!item.read} data-priority={item.priority}>
+                      <div className="an-event-main">
+                        <span className="an-event-icon" aria-hidden="true">
+                          {urgent ? <ShieldAlert size={18}/> : item.kind === "mention" ? <AtSign size={18}/> :
+                            actionable ? <Inbox size={18}/> : <Bell size={18}/>}
+                        </span>
+                        <div className="an-event-content">
+                          <div className="an-event-meta"><span>{name}</span><time>{relative(item.at)}</time></div>
+                          <strong>{item.title}{!item.read && <span className="an-unread-dot" aria-label="Unread"/>}</strong>
+                          <p>{safeSummary(item, prefs.previews === "full")}</p>
+                          <div className="an-event-badges">
+                            {urgent && <Pill tone={PRIORITY_TONE[item.priority]}>{PRIORITY_LABEL[item.priority]}</Pill>}
+                            {actionable && <span className="an-action-label">Needs action</span>}
+                            {snoozed && <span className="an-action-label">Snoozed</span>}
+                          </div>
+                          <div className="an-event-actions">
+                            {route && <button type="button" className="an-primary-action" onClick={() => openItem(item)}>{actionable ? "Review" : "Open"} <ArrowRight size={13}/></button>}
+                            {!item.read && <button type="button" onClick={() => markRead(item, true)}>Mark read</button>}
+                            {item.read && !item.resolved && <button type="button" onClick={() => markRead(item, false)}>Unread</button>}
+                            {!item.acknowledged && !item.resolved && <button type="button" onClick={() => acknowledge(item)}>Acknowledge</button>}
+                            {!urgent && !item.resolved && !snoozed && <button type="button" onClick={() => snooze(item, 1)}><Clock3 size={13}/> Snooze 1h</button>}
+                            <button type="button" aria-expanded={why} onClick={() => setDetailsId(why ? null : item.id)}>Why me?</button>
+                          </div>
+                          {why && <div className="an-why">
+                            <strong>Why you're seeing this</strong>
+                            <p>{item.assignee ? "Assigned to " + item.assignee + ". " : item.audience.length ? "Sent to the " + item.audience.join(", ") + " role view. " : "Relevant to this workspace. "}
+                              {item.group} · {PRIORITY_LABEL[item.priority]} priority. Reading or acknowledging does not change its underlying business status.
+                            </p>
+                            {!route && <p>This notification has no verified destination in the current organisation.</p>}
+                          </div>}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+          <p className="an-local-note">Read, acknowledgement, focus and snooze preferences are browser-local. They do not authorise business actions or sync between devices yet.</p>
+        </>}
       </div>
     </Drawer>
   );
