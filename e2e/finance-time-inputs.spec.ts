@@ -41,6 +41,10 @@ test("Finance reviews approved Project time without creating an invoice or ledge
   // Capture the invoice baseline after seeded demo records have loaded.
   // Finance review must not increase invoice or journal counts.
   const baseline = await page.evaluate(async () => {
+    // Fixtures from every application now load in the background after start-up
+    // (portal and analytics also add invoices), so wait for them before counting.
+    const appsPath = "/src/applications/index.ts";
+    await (await import(/* @vite-ignore */ appsPath) as typeof import("../src/applications/index")).loadAllSeeds();
     const repoPath = "/src/platform/repo.ts";
     const repo = await import(/* @vite-ignore */ repoPath) as typeof import("../src/platform/repo");
     return {
