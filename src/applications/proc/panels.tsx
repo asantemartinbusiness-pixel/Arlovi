@@ -16,6 +16,7 @@ import {
   type ContractBody, type PoBody, type SupplierBody,
 } from "./data";
 import { QuoteRequests } from "./actions";
+import { SuppliedItemsCard, SupplierPerformanceCard } from "./supplierInsights";
 
 /* ====================================================================== *
  * PROC panels — suppliers, requisitions with approval, purchase orders,
@@ -314,8 +315,6 @@ export function SupplierDetail({ context, lens }: { context: ScreenContext; lens
     );
   }
 
-  const deliveries = body.deliveries ?? [];
-  const late = deliveries.filter((delivery) => delivery.lateDays > 0);
   return (
     <Grid>
       <Card span={5} eyebrow="SUPPLIER" prov="human" title={supplier.title} subtitle={supplier.summary}
@@ -330,21 +329,8 @@ export function SupplierDetail({ context, lens }: { context: ScreenContext; lens
           { label: "Approved by", value: String(supplier.fields.approvedBy || "Not approved") },
         ]} />
       </Card>
-      <Card span={7} eyebrow="PERFORMANCE" prov="posted" title="Delivery performance" subtitle={`${deliveries.length} recorded deliveries, ${late.length} late`}>
-        <Stack gap={3}>
-          <StatRow>
-            <Stat label="On time" value={`${supplier.fields.onTimeRatePct ?? "—"}%`} prov="posted" meta={`${deliveries.length - late.length} of ${deliveries.length} on the promised date`} />
-            <Stat label="Quality accepted" value={`${supplier.fields.qualityRatePct ?? "—"}%`} prov="posted" meta="Receipts accepted without a damage flag" />
-            <Stat label="Orders placed" value={String(supplier.fields.ordersPlaced ?? 0)} prov="posted" meta="Since the record was opened" />
-            <Stat label="Spend to date" value={context.money(Number(supplier.fields.spendToDateMinor ?? 0))} prov="posted" meta="Excludes cancelled orders" />
-          </StatRow>
-          {late.length > 0 && (
-            <Notice tone="warning" title={`${late.length} deliveries arrived late`}>
-              The longest was {Math.max(...late.map((delivery) => delivery.lateDays))} days after the promised date. Lead times on this record are what the supplier states, not what they have achieved.
-            </Notice>
-          )}
-        </Stack>
-      </Card>
+      <SupplierPerformanceCard context={context} supplier={supplier} />
+      <SuppliedItemsCard context={context} supplier={supplier} />
       <Card span={12} eyebrow="BANK DETAIL" prov={String(supplier.fields.bankLast4) ? "posted" : "unknown"} title="Payment details" subtitle="Changed only through a separate verification">
         <Stack gap={3}>
           <Properties rows={[
@@ -592,6 +578,7 @@ export function Receiving({ context, state }: { context: ScreenContext; state: s
         bulkActions={[
           { label: "Record a count", disabled: (selected) => selected.length !== 1 || selected[0].status === "complete", onRun: (selected) => context.openOverlay("Scan overlay", { id: selected[0].id }) },
           { label: "Flag a discrepancy", disabled: (selected) => selected.length !== 1, onRun: (selected) => context.openOverlay("discrepancy", { id: selected[0].id }) },
+          { label: "Return to supplier", disabled: (selected) => selected.length !== 1 || selected[0].status === "expected", onRun: (selected) => context.openOverlay("quality return", { id: selected[0].id }) },
         ]}
       />
     </Stack>

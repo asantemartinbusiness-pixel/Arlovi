@@ -300,8 +300,8 @@ export function BookingCalendar({ context, lens }: { context: ScreenContext; len
           onCreate={(_columnId, startAt) => context.openOverlay("Booking form", { resourceId: active.id, startAt })}
         />
       )}
-      <Notice tone="info" title="Two people cannot take the same slot">
-        Every move and every new booking is checked against the existing bookings for that resource, and for any resource linked to it, before it is written. A clash is refused with the booking that already holds the slot.
+      <Notice tone="info" title="No resource is booked past its capacity">
+        Every move and every new booking is checked against the existing bookings for that resource, and for any resource linked to it, before it is written. A single-seat resource takes one booking at a time; a multi-seat resource such as the showroom floor takes bookings side by side until its seats are full. A clash is refused with the booking that already holds the slot.
       </Notice>
     </Stack>
   );

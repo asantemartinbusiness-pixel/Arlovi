@@ -9,6 +9,7 @@ import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import type { TaxCategory } from "@/platform/money";
 import { applyScenario, approvalLimitFor } from "./actions";
+import { ReceiptStockLinks } from "./supplierInsights";
 import {
   approverFor, APPROVAL_LIMITS, billTotals, bodyOf, findSupplier, isPurchaseOrder, MATCH_LABEL, matchTone, resolveSupplierId,
   outstandingFor, poTotals, statusTone, threeWayMatch, useProcData,
@@ -1106,6 +1107,7 @@ export function ReceiptConfirmation({ context }: { context: ScreenContext }) {
             { key: "condition", header: "Condition", cell: (row) => <Pill tone={row.condition === "good" ? "success" : "danger"}>{row.condition || "not recorded"}</Pill> },
           ]} />
       )}
+      {receipt.status !== "expected" && <ReceiptStockLinks context={context} receipt={receipt} />}
       <Notice tone="info" title="De-duplication">
         Each scanned code is recorded once on a receipt. Scanning the same code again is refused with a message rather than counted, which is what protects a count taken offline and re-entered later.
       </Notice>

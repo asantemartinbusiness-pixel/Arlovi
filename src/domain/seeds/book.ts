@@ -38,7 +38,7 @@ registerSeed("book", (ctx) => {
     { n: 22, title: "Installation survey", minutes: 60, price: 90_00, deposit: 30_00, status: "active", category: "On site", buffer: 30, slug: "install-survey",
       summary: "Measure, check fixings and confirm the method.", resources: ["nl-resources-002"] },
     { n: 23, title: "Trade sample morning", minutes: 120, price: 0, deposit: 0, status: "active", category: "Showroom", buffer: 0, slug: "trade-morning",
-      summary: "Group session for up to six practices. Seats, not slots.", resources: ["nl-resources-001"] },
+      summary: "Group session for up to six practices. Seats, not slots.", resources: [R(25)] },
     { n: 24, title: "Restoration clinic", minutes: 30, price: 45_00, deposit: 0, status: "draft", category: "Workshop", buffer: 15, slug: "restoration-clinic",
       summary: "Bench time for a single fitting. Pricing not settled.", resources: [] },
     { n: 25, title: "Evening design hour", minutes: 60, price: 60_00, deposit: 20_00, status: "archived", category: "Showroom", buffer: 15, slug: "design-hour",
@@ -80,6 +80,7 @@ registerSeed("book", (ctx) => {
     { n: 21, title: "Theo Marsh", kind: "person", summary: "Workshop lead. Takes installation surveys.", capacity: 1, hours: "Mon–Fri 08:00–16:00" },
     { n: 22, title: "Maya Chen", kind: "person", summary: "Owner. Takes specification visits for hotel work.", capacity: 1, hours: "Mon–Thu 09:00–17:00" },
     { n: 23, title: "Survey kit", kind: "equipment", summary: "Laser measure, sample case and ladder. One kit only.", capacity: 1, hours: "Mon–Sat 08:00–19:00", linked: "nl-resources-621" },
+    { n: 25, title: "Showroom floor", kind: "room", summary: "Open floor for group sessions. Seats six practices at once.", capacity: 6, hours: "Tue–Sat 10:00–18:00" },
     { n: 24, title: "Van", kind: "equipment", summary: "Shared with deliveries, so on-site visits compete with dispatch.", capacity: 1, hours: "Mon–Sat 07:00–19:00" },
   ];
   for (const resource of resources) {
@@ -106,7 +107,8 @@ registerSeed("book", (ctx) => {
     { n: 22, title: "Walk-in hold", service: 20, resource: R(20), days: 0, hour: 16, status: "hold", notes: "Held at the desk, not confirmed with the customer." },
     { n: 23, title: "Studio Vellum · install survey", service: 22, resource: R(21), days: 1, hour: 9, status: "confirmed", contact: 22, deposit: 30_00, depositState: "paid_local" },
     { n: 24, title: "Fenwick & Gray · specification", service: 21, resource: R(22), days: 1, hour: 13, status: "confirmed", contact: 24, deposit: 60_00, depositState: "awaiting_payment" },
-    { n: 25, title: "Trade sample morning", service: 23, resource: "nl-resources-001", days: 2, hour: 10, status: "confirmed", seats: 4, notes: "Four of six seats taken." },
+    { n: 25, title: "Trade sample morning", service: 23, resource: R(25), days: 2, hour: 10, status: "confirmed", seats: 4, notes: "Four practices booked as a group." },
+    { n: 36, title: "Oriel Architects · trade morning seat", service: 23, resource: R(25), days: 2, hour: 11, status: "confirmed", contact: 24, seats: 1, notes: "Joins the trade morning late; one seat on the showroom floor." },
     { n: 26, title: "Nadia Brandt · consultation", service: 20, resource: R(20), days: 2, hour: 15, status: "confirmed", contact: 25 },
     { n: 27, title: "Yusuf Demir · consultation", service: 20, resource: "nl-resources-001", days: 3, hour: 11, status: "confirmed", contact: 29 },
     { n: 28, title: "Ledbury Hotel Group · specification", service: 21, resource: R(22), days: 4, hour: 10, status: "confirmed", contact: 30, deposit: 60_00, depositState: "awaiting_payment" },

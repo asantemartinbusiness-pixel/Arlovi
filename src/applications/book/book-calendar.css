@@ -1,0 +1,10 @@
+/* BOOK calendar refinements: side-by-side lanes and free-seat affordance. */
+.t4-booking[data-lanes] { padding-inline: 3px; }
+.t4-booking[data-lanes] strong,
+.t4-booking[data-lanes] span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t4-day-more {
+  position: absolute; inset-block: 2px; inset-inline-end: 2px; width: 26px; z-index: 3;
+  border: 1px dashed var(--border-default); border-radius: var(--radius-sm); background: var(--bg-surface);
+  font-size: var(--text-2xs); color: var(--fg-subtle); font-variant-numeric: tabular-nums;
+}
+.t4-day-more:hover, .t4-day-more:focus-visible { border-color: var(--accent); color: var(--accent-soft-fg); background: var(--bg-selected); }

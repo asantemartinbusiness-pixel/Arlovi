@@ -3,6 +3,8 @@ import { Button, Notice, Pill, Row, Stack } from "@/design-system";
 import { addDays, sameDay, startOfWeek } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { bodyOf, conflictsWithLinks, statusTone, workingHours, type ResourceBody } from "./data";
+import "./book-calendar.css";
+import { bookingLanes, resourceCapacity, seatsInUse, seatsOf, type BookingLane } from "./availability";
 
 /* ====================================================================== *
  * Availability grid — a real day or week calendar over the working hours
@@ -64,6 +66,20 @@ export function AvailabilityGrid({
     const endHour = Math.max(...windows.map((window) => window.endHour), 18);
     return Array.from({ length: Math.max(1, endHour - startHour) }, (_, index) => startHour + index);
   }, [columns, resources, resourceForColumn]);
+
+  // Overlapping bookings on one resource and day are laid out side by side,
+  // so a resource that holds several bookings at once never stacks them.
+  const laneCache = new Map<string, Map<string, BookingLane>>();
+  function lanesFor(resourceId: string, day: Date): Map<string, BookingLane> {
+    const key = resourceId + "|" + day.toDateString();
+    let lanes = laneCache.get(key);
+    if (!lanes) {
+      lanes = bookingLanes(bookings.filter((booking) => String(booking.fields.resourceId) === resourceId
+        && booking.startAt && sameDay(new Date(booking.startAt), day)), slotMinutes);
+      laneCache.set(key, lanes);
+    }
+    return lanes;
+  }
 
   function slotStart(day: Date, hour: number): Date {
     const date = new Date(day);
@@ -158,6 +174,10 @@ export function AvailabilityGrid({
               });
               const blackout = bodyOf<ResourceBody>(resource, {}).blackouts?.find((item) => slot.toISOString() < item.to && item.from < slotEnd.toISOString());
               const key = `${column.id}-${hour}`;
+              const capacity = resourceCapacity(resource);
+              const used = capacity > 1 ? seatsInUse(bookings, resourceId, slot.toISOString()) : 0;
+              const roomLeft = capacity > 1 && here.length > 0 && used < capacity && !closed && !blackout;
+              const lanes = lanesFor(resourceId, day);
               return (
                 <div
                   key={key}
@@ -180,10 +200,19 @@ export function AvailabilityGrid({
                       Free
                     </button>
                   )}
+                  {roomLeft && onCreate && (
+                    <button type="button" className="t4-day-more" aria-label={`Add booking at ${String(hour).padStart(2, "0")}:00, ${capacity - used} of ${capacity} seats free`}
+                      onClick={() => onCreate(mode === "week" ? columns[0]?.id ?? column.id : column.id, slot.toISOString())}>
+                      +{capacity - used}
+                    </button>
+                  )}
                   {blackout && here.length === 0 && <span className="t4-day-free" style={{ borderStyle: "solid" }}>{blackout.reason}</span>}
                   {here.map((booking, index) => {
                     const minutes = booking.endAt ? (new Date(booking.endAt).getTime() - new Date(booking.startAt!).getTime()) / 60_000 : slotMinutes;
                     const top = (new Date(booking.startAt!).getMinutes() / 60) * HOUR_PX;
+                    const lane = lanes.get(booking.id) ?? { lane: 0, lanes: 1 };
+                    const reserve = roomLeft ? 30 : 0;
+                    const laneWidth = `(100% - ${4 + reserve}px) / ${lane.lanes}`;
                     const clash = conflictsWithLinks(bookings, resources, orgId, resourceId, booking.startAt!, booking.endAt ?? booking.startAt!, booking.id).length > 0;
                     return (
                       <button
@@ -194,16 +223,23 @@ export function AvailabilityGrid({
                         data-grabbed={grabbed?.id === booking.id ? "true" : undefined}
                         draggable={booking.status !== "cancelled"}
                         aria-grabbed={grabbed?.id === booking.id || undefined}
-                        style={{ top: top + index * 4, height: Math.max(20, (minutes / 60) * HOUR_PX - 3) }}
+                        data-lanes={lane.lanes > 1 ? String(lane.lanes) : undefined}
+                        style={{
+                          top: top + (lane.lanes > 1 ? 0 : index * 4),
+                          height: Math.max(20, (minutes / 60) * HOUR_PX - 3),
+                          insetInlineStart: `calc(2px + ${laneWidth} * ${lane.lane})`,
+                          insetInlineEnd: "auto",
+                          width: `calc(${laneWidth} - 2px)`,
+                        }}
                         onDragStart={(event) => event.dataTransfer.setData("text/plain", booking.id)}
                         onKeyDown={(event) => onBookingKey(event, booking, columnIndex)}
                         onClick={() => onOpen?.(booking.id)}
                         onFocus={() => onSelect?.(booking.id)}
                         data-selected={selectedId === booking.id ? "true" : undefined}
-                        title={`${booking.title} · ${new Date(booking.startAt!).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`}
+                        title={`${booking.title} · ${new Date(booking.startAt!).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}${capacity > 1 ? ` · ${seatsOf(booking)} of ${capacity} seats` : ""}`}
                       >
                         <strong>{booking.title}</strong>
-                        <span className="ds-num">{new Date(booking.startAt!).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} · {minutes}m</span>
+                        <span className="ds-num">{new Date(booking.startAt!).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} · {minutes}m{capacity > 1 ? ` · ${seatsOf(booking)}/${capacity} seats` : ""}</span>
                       </button>
                     );
                   })}
@@ -217,7 +253,7 @@ export function AvailabilityGrid({
         <Pill tone="success" dot>Confirmed</Pill>
         <Pill tone="warning" dot>Held, not confirmed</Pill>
         <Pill tone="danger" dot>Conflicting</Pill>
-        <span className="ds-subtle">Shaded slots are outside the resource's recorded working hours or inside a blackout.</span>
+        <span className="ds-subtle">Bookings that share a multi-seat resource sit side by side; +N marks seats still free. Shaded slots are outside the resource's recorded working hours or inside a blackout.</span>
       </Row>
       <p aria-live="assertive" className="ds-subtle" style={{ minHeight: "1.4em" }}>
         {message || "Drag a booking to another slot, or focus one and press Enter to move it with the arrow keys. Every move is checked for a conflict before it is applied."}

@@ -6,6 +6,8 @@ import {
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { resolveTaxCode, type TaxCategory } from "@/platform/money";
+import { RefundHistory } from "./operations";
+import { refundableMinor, refundedMinor, shipmentsOf } from "./fulfilment";
 import { ProviderBoundary, TAX_CATEGORIES, TotalsBlock } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import { setStoreLayout, useStorefront } from "./actions";
@@ -371,50 +373,6 @@ export function PublishProduct({ context, close }: { context: ScreenContext; clo
 
 /* ---------------- COMMERCE-004 ---------------- */
 
-export function StockAdjustment({ context, close }: { context: ScreenContext; close: () => void }) {
-  const data = useCommerceData();
-  const { now } = useWorkspace();
-  const [productId, setProductId] = useState(data.products[0]?.id ?? "");
-  const [warehouseId, setWarehouseId] = useState(data.warehouses[0]?.id ?? "");
-  const [quantity, setQuantity] = useState("0");
-  const [reason, setReason] = useState("count");
-  const product = data.products.find((item) => item.id === productId);
-  const onHand = onHandFor(data.stockMoves, productId, warehouseId);
-  const delta = Number(quantity) || 0;
-  const wouldBe = onHand + delta;
-  const invalid = !productId || !Number.isInteger(delta) || delta === 0 || wouldBe < 0;
-  return (
-    <form
-      id="stock-adjustment"
-      className="ds-stack ds-gap-4"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        if (invalid) return;
-        await context.mutate.create({
-          collection: "stockMoves",
-          title: `${reason} · ${String(product?.fields.sku ?? "")}`,
-          status: "posted",
-          at: now.toISOString(),
-          summary: `Adjusted by ${delta} at ${data.warehouses.find((warehouse) => warehouse.id === warehouseId)?.title ?? warehouseId}.`,
-          fields: { productId, warehouseId, quantity: delta, kind: reason, reference: `ADJ-${now.getTime().toString().slice(-5)}` },
-        }, `Stock adjusted for ${product?.title} by ${delta}`);
-        context.toast("Stock adjusted", `${product?.title} is now ${wouldBe} at that location. The movement is the record; the level is derived from it.`);
-        close();
-      }}
-    >
-      <Field label="Product"><Select value={productId} onChange={(event) => setProductId(event.target.value)}>{data.products.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</Select></Field>
-      <Field label="Location"><Select value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)}>{data.warehouses.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</Select></Field>
-      <Field label="Adjustment" required hint={`${onHand} on hand now; this movement would make it ${wouldBe}`} error={wouldBe < 0 ? "That would take the location below zero" : undefined}>
-        <TextInput value={quantity} inputMode="numeric" align="end" invalid={wouldBe < 0} onChange={(event) => setQuantity(event.target.value)} />
-      </Field>
-      <Field label="Reason"><Select value={reason} onChange={(event) => setReason(event.target.value)}>{["count", "damage", "shrinkage", "found", "correction"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
-      <Notice tone="info" title="The level is never edited directly">
-        Stock is the sum of its movements, so every change leaves a traceable row with a reason and a reference. A movement that would take a location below zero is refused.
-      </Notice>
-    </form>
-  );
-}
-
 export function TransferApproval({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCommerceData();
   const { now } = useWorkspace();
@@ -614,6 +572,7 @@ export function ShippingLabel({ context, close }: { context: ScreenContext; clos
   const awaitingPayment = String(order.fields.payment) === "not_connected";
   const lines = bodyOf<OrderBody>(order, {}).lines ?? [];
   const alreadyMoved = data.stockMoves.some((move) => String(move.fields.reference) === order.title && String(move.fields.kind) === "sale");
+  const inShipments = shipmentsOf(order).length > 0;
   return (
     <Stack gap={4}>
       <Properties rows={[
@@ -624,6 +583,7 @@ export function ShippingLabel({ context, close }: { context: ScreenContext; clos
         { label: "Label", value: labelRef || "None yet — a local reference is issued at handover" },
         { label: "Stock", value: alreadyMoved ? "Sale movements already recorded" : `${lines.reduce((sum, line) => sum + line.quantity, 0)} units leave stock as sale movements` },
       ]} />
+      {inShipments && <Notice tone="warning" title="This order is being fulfilled in shipments">Advance each shipment from the order's Fulfilment tab instead. A whole-order handover here would move the same units out of stock twice.</Notice>}
       {awaitingPayment && <Notice tone="danger" title="This order is awaiting payment">Nothing ships before payment is recorded, so the financial and physical states cannot drift apart.</Notice>}
       <Field label="Carrier"><Select value={carrier} onChange={(event) => setCarrier(event.target.value)}>{["Pallet North", "Evri Business", "Royal Mail", "Collection"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
       {existing ? (
@@ -637,7 +597,7 @@ export function ShippingLabel({ context, close }: { context: ScreenContext; clos
       )}
       <Button
         variant="primary"
-        disabled={Boolean(existing) || awaitingPayment}
+        disabled={Boolean(existing) || awaitingPayment || inShipments}
         onClick={async () => {
           const reference = labelRef || `LOCAL-${order.title.replace(/[^A-Z0-9]/gi, "")}`;
           const body = bodyOf<OrderBody>(order, {});
@@ -947,7 +907,11 @@ export function ReturnInspector({ context, close }: { context: ScreenContext; cl
           Approve the return
         </Button>
         <Button variant="ghost" onClick={() => context.openOverlay("restock assessment", { ids: [item.id] })}>Assess restocking</Button>
+        <Button variant="ghost" disabled={disputed || refundableMinor(item) === 0} onClick={() => context.openOverlay("refund authorization", { id: item.id })}>Record a refund</Button>
       </Row>
+      <Card title="Refunds recorded" subtitle={`${context.money(refundedMinor(item))} of ${context.money(item.amountMinor)} refunded`} flush>
+        <div className="ds-card-body"><RefundHistory context={context} item={item} /></div>
+      </Card>
     </Stack>
   );
 }
@@ -966,15 +930,18 @@ export function RestockAssessment({ context, close }: { context: ScreenContext; 
         event.preventDefault();
         for (const item of chosen) {
           const restock = decisions[item.id];
-          await context.mutate.patch(item.id, { fields: { ...item.fields, restock } }, { expectRevision: item.revision, event: `${item.title} marked ${restock ? "resaleable" : "not resaleable"}` });
-          if (restock) {
+          // A return is written back into stock once; re-saving the assessment never adds the units twice.
+          const alreadyRestocked = Boolean(item.fields.restockedAt) || data.stockMoves.some((move) => String(move.fields.kind) === "return" && String(move.fields.reference) === item.title);
+          const order = data.orders.find((candidate) => candidate.id === String(item.fields.orderId ?? ""));
+          await context.mutate.patch(item.id, { fields: { ...item.fields, restock, ...(restock && !alreadyRestocked ? { restockedAt: now.toISOString() } : {}) } }, { expectRevision: item.revision, event: `${item.title} marked ${restock ? "resaleable" : "not resaleable"}` });
+          if (restock && !alreadyRestocked) {
             await context.mutate.create({
               collection: "stockMoves",
               title: `return to stock · ${item.title}`,
               status: "posted",
               at: now.toISOString(),
               summary: `${item.title} returned to available stock.`,
-              fields: { productId: String(item.fields.productId), warehouseId: "nl-warehouses-001", quantity: Number(item.fields.quantity ?? 1), kind: "return", reference: item.title },
+              fields: { productId: String(item.fields.productId), warehouseId: String(order?.fields.warehouseId ?? data.warehouses[0]?.id ?? ""), quantity: Number(item.fields.quantity ?? 1), kind: "return", reference: item.title },
             }, `Stock returned for ${item.title}`);
           }
         }
@@ -994,42 +961,6 @@ export function RestockAssessment({ context, close }: { context: ScreenContext; 
           )}
         </Card>
       ))}
-    </form>
-  );
-}
-
-export function RefundAuthorization({ context, close }: { context: ScreenContext; close: () => void }) {
-  const data = useCommerceData();
-  const { actor } = useWorkspace();
-  const payload = context.overlayPayload as { id?: string } | undefined;
-  const item = useRecord(payload?.id ?? context.selectedId) ?? data.returns[0];
-  const [confirmed, setConfirmed] = useState(false);
-  if (!item) return <Empty title="Select a return" />;
-  const highValue = (item.amountMinor ?? 0) > 50_000;
-  return (
-    <form
-      id="refund-authorization"
-      className="ds-stack ds-gap-4"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        if (!confirmed) return;
-        await context.mutate.patch(item.id, {
-          status: "completed",
-          fields: { ...item.fields, refundState: "credit_note_local", authorisedBy: actor },
-        }, { expectRevision: item.revision, event: `${item.title} refunded as a credit note by ${actor}` });
-        context.toast("Credit note recorded", `${context.money(item.amountMinor)} is recorded against ${item.title}. No money moved from this browser.`);
-        close();
-      }}
-    >
-      <Properties rows={[
-        { label: "Return", value: item.title },
-        { label: "Value", value: context.money(item.amountMinor) },
-        { label: "Risk", value: highValue ? <Pill tone="warning">High value</Pill> : <Pill tone="success">Routine</Pill> },
-        { label: "Authorised by", value: actor },
-      ]} />
-      <ProviderBoundary id="payment.capture" title="A refund is recorded as a credit note" />
-      {highValue && <Notice tone="warning" title="Above the routine threshold">A refund over £500 is recorded with the name of the person who authorised it, so the decision is traceable.</Notice>}
-      <Checkbox label={`I authorise a credit note of ${context.money(item.amountMinor)}`} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
     </form>
   );
 }
