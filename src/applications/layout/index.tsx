@@ -467,18 +467,6 @@ function FramePanel({ handle, context, compositions }: { handle: DocHandle<Publi
       <ArrangePanel handle={handle} frame={frame} target={alignTarget} onTarget={setAlignTarget} />
       <PanelGroup title="Geometry (mm)">
         <div className="vx-fieldrow">
-          <div>
-            <label className="vx-label" htmlFor="frame-rotation">Rotation (°)</label>
-            <input
-              id="frame-rotation"
-              className="vx-num"
-              type="number"
-              step={1}
-              disabled={frame.locked}
-              value={frame.rotation ?? 0}
-              onChange={(event) => set({ rotation: normaliseAngle(Number(event.target.value)) || undefined }, "Rotate the frame")}
-            />
-          </div>
           {(["x", "y", "w", "h"] as const).map((key) => (
             <div key={key}>
               <label className="vx-label" htmlFor={`frame-${key}`}>{key.toUpperCase()}</label>
@@ -492,6 +480,18 @@ function FramePanel({ handle, context, compositions }: { handle: DocHandle<Publi
               />
             </div>
           ))}
+          <div>
+            <label className="vx-label" htmlFor="frame-rotation">Rotation (°)</label>
+            <input
+              id="frame-rotation"
+              className="vx-num"
+              type="number"
+              step={1}
+              disabled={frame.locked}
+              value={frame.rotation ?? 0}
+              onChange={(event) => set({ rotation: normaliseAngle(Number(event.target.value)) || undefined }, "Rotate the frame")}
+            />
+          </div>
         </div>
       </PanelGroup>
       <FrameStory handle={handle} frame={frame} />
