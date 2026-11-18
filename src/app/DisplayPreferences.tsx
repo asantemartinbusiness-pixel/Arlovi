@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Minus, Plus, RotateCcw, X } from "lucide-react";
 import { useUi } from "@/runtime/ui";
+import { SCALE_DEFAULT, SCALE_MAX, SCALE_MIN, SCALE_STEP } from "@/runtime/interfaceScale";
 import "./display-preferences.css";
 
 type Density = "compact" | "balanced" | "comfortable";
@@ -19,7 +20,7 @@ export function DisplayPreferences({ onClose }: { onClose: () => void }) {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
       if (event.key !== "Tab" || !panel.current) return;
-      const elements = Array.from(panel.current.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled])'));
+      const elements = Array.from(panel.current.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled])'));
       if (!elements.length) return;
       if (event.shiftKey && document.activeElement === elements[0]) { event.preventDefault(); elements[elements.length - 1].focus(); }
       else if (!event.shiftKey && document.activeElement === elements[elements.length - 1]) { event.preventDefault(); elements[0].focus(); }
@@ -43,13 +44,13 @@ export function DisplayPreferences({ onClose }: { onClose: () => void }) {
             <label htmlFor="display-scale">Interface scale</label>
             <output htmlFor="display-scale" aria-live="off">{scale}%</output>
           </div>
-          <p className="display-help">Adjust text, spacing and controls across every application.</p>
+          <p className="display-help">100% is Arlovi’s new standard size (formerly 80%). Reduce it to make the interface smaller; 0% keeps a usable minimum.</p>
           <div className="display-range-row">
-            <button type="button" className="display-icon-button" aria-label="Decrease interface scale by 5 percent" disabled={scale <= 75} onClick={() => setScale(scale - 5)}><Minus size={17}/></button>
-            <input id="display-scale" type="range" min={75} max={150} step={5} value={scale} onChange={event => setScale(Number(event.target.value))} aria-valuetext={`${scale} percent`}/>
-            <button type="button" className="display-icon-button" aria-label="Increase interface scale by 5 percent" disabled={scale >= 150} onClick={() => setScale(scale + 5)}><Plus size={17}/></button>
+            <button type="button" className="display-icon-button" aria-label="Decrease interface scale by 5 percent" disabled={scale <= SCALE_MIN} onClick={() => setScale(scale - SCALE_STEP)}><Minus size={17}/></button>
+            <input id="display-scale" type="range" min={SCALE_MIN} max={SCALE_MAX} step={SCALE_STEP} value={scale} onChange={event => setScale(Number(event.target.value))} aria-valuetext={scale === SCALE_DEFAULT ? "100 percent, standard size" : scale === SCALE_MIN ? "0 percent, minimum usable size" : `${scale} percent of adjustable size range`}/>
+            <button type="button" className="display-icon-button" aria-label="Increase interface scale by 5 percent" disabled={scale >= SCALE_MAX} onClick={() => setScale(scale + SCALE_STEP)}><Plus size={17}/></button>
           </div>
-          <div className="display-range-labels"><span>75% · Smaller</span><span>150% · Larger</span></div>
+          <div className="display-range-labels"><span>0% · Minimum</span><span>100% · Default</span></div>
           <fieldset className="display-density">
             <legend>Interface density</legend>
             <p className="display-help">Choose how closely information is arranged.</p>
@@ -74,7 +75,7 @@ export function DisplayPreferences({ onClose }: { onClose: () => void }) {
           <p className="display-help">Your choices are saved in this browser. Browser zoom and operating-system accessibility settings remain available.</p>
         </div>
         <footer className="display-panel-footer">
-          <button type="button" className="display-reset" onClick={() => { setScale(100); setDensity("balanced"); }}><RotateCcw size={15}/> Reset defaults</button>
+          <button type="button" className="display-reset" onClick={() => { setScale(SCALE_DEFAULT); setDensity("balanced"); }}><RotateCcw size={15}/> Reset defaults</button>
           <button type="button" className="display-done" onClick={onClose}>Done</button>
         </footer>
       </section>

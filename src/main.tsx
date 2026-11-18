@@ -8,6 +8,7 @@ import { ClockProvider } from "@/platform/clock";
 import { WorkspaceProvider } from "@/platform/workspace";
 import { ensureSeed } from "@/runtime/db";
 import { useUi } from "@/runtime/ui";
+import { effectiveInterfaceScale } from "@/runtime/interfaceScale";
 import "@/design-system";
 import "@/design-system/interface-scale.css";
 import { loadCoreApplications, loadAllSeeds } from "@/applications";
@@ -54,8 +55,11 @@ function Boot() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.dataset.density = density;
-    document.documentElement.style.setProperty("--interface-scale", String(interfaceScale / 100));
-    document.documentElement.dataset.scaleTier = interfaceScale >= 120 ? "large" : interfaceScale <= 85 ? "small" : "standard";
+    const effectiveScale = effectiveInterfaceScale(interfaceScale);
+    document.documentElement.style.setProperty("--interface-scale", String(effectiveScale));
+    // Keep layout breakpoints tied to rendered size, not the relabelled slider.
+    const originalPercent = effectiveScale * 100;
+    document.documentElement.dataset.scaleTier = originalPercent >= 120 ? "large" : originalPercent <= 85 ? "small" : "standard";
     document.documentElement.dataset.palette = palette;
   }, [theme, density, palette, interfaceScale]);
 
