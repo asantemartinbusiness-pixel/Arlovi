@@ -17,6 +17,7 @@ import {
   type AppModel, type ComponentKind, type Entity, type EntityField, type ScreenComponent,
 } from "./model";
 import { ScreenPreview } from "./preview";
+import { DeviceLayoutPreview } from "./devicePreview";
 import { saveApp, useBuildUi } from "./state";
 import { wallMs } from "@/platform/clock";
 
@@ -238,6 +239,7 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
         <Notice tone="info" title="The generated layout uses the same twelve-column grid as this workspace">
           Each component declares a span. The grid collapses to one column under 900px, so what you see below is what the built screen does.
         </Notice>
+        <DeviceLayoutPreview components={(screen?.components ?? []).map((item) => ({ id: item.id, title: item.title, span: item.span }))} />
         <Grid>
           {(screen?.components ?? []).map((item) => (
             <Card key={item.id} span={item.span} title={item.title} subtitle={`span ${item.span} of 12`}>

@@ -36,6 +36,7 @@ function FieldInspectorOverlay({ context }: { context: ScreenContext }) {
       field={field}
       model={model}
       onEdit={(patch) => void saveForm(context, record, { ...model, fields: model.fields.map((item) => (item.id === field.id ? { ...item, ...patch } : item)) }, `Edited ${field.label}`)}
+      onLogic={(logic, label) => void saveForm(context, record, { ...model, logic }, label)}
     />
   );
 }

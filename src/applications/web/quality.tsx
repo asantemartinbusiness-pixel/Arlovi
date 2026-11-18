@@ -15,6 +15,7 @@ import {
 } from "./model";
 import { NoSite, useSiteRecord } from "./panels";
 import { saveSite } from "./state";
+import { SeoFieldsEditor } from "./seoEditor";
 import "./websites.css";
 
 /* ================================================================ *
@@ -94,6 +95,8 @@ export function QualityReport({ context, area }: { context: ScreenContext; area:
           meta={lastRun ? context.relative(lastRun) : "Run the audit to record a result"}
         />
       </StatRow>
+
+      {area === "SEO" && <SeoFieldsEditor context={context} record={record} site={site} />}
 
       {area === "Accessibility" && (
         <Notice tone="warning" title="These checks are not a compliance statement">
