@@ -49,7 +49,7 @@ test("profile menu keeps local role views and appearance settings separate from 
   await page.goto("/o/northline/workspace/home");
   await page.getByRole("button",{name:/Profile and preferences/}).click();
   await expect(page.getByText(/Role view \(not a security boundary\)/)).toBeVisible();
-  await page.getByRole("menuitem",{name:"Account & data readiness"}).click();
+  await page.getByRole("menuitem",{name:/Account & data readiness/}).click();
   await expect(page).toHaveURL(/\/workspace\/account$/);
 });
 

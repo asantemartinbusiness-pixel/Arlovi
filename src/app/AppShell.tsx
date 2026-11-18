@@ -1,9 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, ChevronDown, Menu as MenuIcon, Sparkles, Search, Bell, Inbox, X, UserRound } from "lucide-react";
+import { ArrowLeft, ChevronDown, Menu as MenuIcon, Sparkles, Search, Bell, Inbox, X } from "lucide-react";
 import { Button, Pill, Row } from "@/design-system";
 import { Menu } from "@/design-system/overlays";
-import { ArloviMark, brand, palettes } from "@/app/brand";
+import { ArloviMark, brand } from "@/app/brand";
 import { NAV_GROUPS, APP_ENTRIES } from "@/app/nav";
 import { appEntry, findScreen, nativeNavPath, screens } from "@/app/catalog";
 import { destinationForOrganization } from "@/app/organizationNavigation";
@@ -21,13 +21,14 @@ const AskPanel = lazy(() => import("@/app/AskPanel").then(module => ({ default: 
 import { ExecutionTray } from "@/app/ExecutionTray";
 import { HeaderContextBar } from "@/app/HeaderContextBar";
 import { getApp, useApplicationRegistryRevision } from "@/platform/registry";
-import { canOpen, ROLE_LABELS } from "@/platform/policy";
+import { canOpen } from "@/platform/policy";
 import { ORGS } from "@/platform/org";
 import { useCollections, useWorkspace, useMutations } from "@/platform/workspace";
 import { buildAttention, filterForRole, headerAttentionCounts } from "@/platform/attention";
 import { applyAttentionReceipts } from "@/platform/attentionReceipts";
 import { useUi } from "@/runtime/ui";
 import { DisplayPreferences } from "@/app/DisplayPreferences";
+import { ProfileMenu } from "@/app/ProfileMenu";
 import type { Role } from "@/domain/types";
 import "@/app/shell.css";
 
@@ -299,38 +300,15 @@ export function AppShell() {
           </div>
         </div>
 
-        <Menu
-          label="Account and preferences"
-          trigger={<Button variant="ghost" size="sm" iconOnly aria-label={`Profile and preferences. Local role view ${ROLE_LABELS[role]}`}>
-            <span className="hq-profile-avatar"><UserRound size={15} aria-hidden="true"/></span>
-          </Button>}
-          items={[
-            {label: `${org.ownerName ?? "Local workspace profile"} · ${org.name}`, group:"Account (browser-local)", disabled:true},
-            {label:"Account & data readiness",group:"Account",onSelect:()=>navigate(`/o/${org.slug}/workspace/account`)},
-            ...(["owner", "finance", "sales", "people", "member", "client"] as Role[]).map((item) => ({
-              label: item === role ? `${ROLE_LABELS[item]} · current view` : ROLE_LABELS[item],
-              group: "Role view (not a security boundary)",
-              onSelect: () => chooseRoleView(item),
-            })),
-            { label: "Take a guided tour", group: "Help", separatorBefore: true, onSelect: () => window.dispatchEvent(new Event("arlovi:start-tour")) },
-            ...(activeScreen && APP_ENTRIES[activeCode] ? [{
-              label: `${activePinned ? "Remove" : "Pin"} ${APP_ENTRIES[activeCode].short} ${activePinned ? "from" : "to"} favourites`,
-              group: "Navigation", separatorBefore: true, onSelect: () => { void toggleFavourite(); },
-            }] : []),
-            ...(org.ownerName ? [{ label: "Review company setup", group: "Navigation", onSelect: () => navigate(`/o/${org.slug}/hq/home?gettingStarted=1`) }] : []),
-            { label: `Display & scaling · ${ui.interfaceScale}%`, group: "Appearance", separatorBefore: true, onSelect: () => setDisplayOpen(true) },
-            { label: ui.theme === "light" ? "Dark appearance" : "Light appearance", group: "Appearance", onSelect: () => ui.setTheme(ui.theme === "light" ? "dark" : "light") },
-            ...(["comfortable", "balanced", "compact"] as const).map((item) => ({
-              label: item === ui.density ? `Density: ${item} · current` : `Density: ${item}`,
-              group: "Appearance",
-              onSelect: () => ui.setDensity(item),
-            })),
-            ...palettes.map((item) => ({
-              label: item.id === ui.palette ? `${item.label} · current` : item.label,
-              group: "Brand direction",
-              onSelect: () => ui.setPalette(item.id),
-            })),
-          ]}
+        <ProfileMenu
+          onRoleViewChange={chooseRoleView}
+          onOpenDisplay={() => setDisplayOpen(true)}
+          onStartTour={() => window.dispatchEvent(new Event("arlovi:start-tour"))}
+          activeApplication={activeScreen && APP_ENTRIES[activeCode] ? {
+            name: APP_ENTRIES[activeCode].short,
+            pinned: activePinned,
+            onToggleFavourite: () => { void toggleFavourite(); },
+          } : undefined}
         />
 
 
