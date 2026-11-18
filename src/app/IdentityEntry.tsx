@@ -87,7 +87,7 @@ export function IdentityEntry({ mode }: { mode: EntryMode }) {
     <main className="entry-screen">
       <header className="entry-top">
         <Link className="entry-wordmark" to="/welcome" aria-label="Arlovi welcome"><ArloviMark size={29}/><strong>arlovi.</strong></Link>
-        <span className="entry-top-actions"><Link to="/choose-workspace">Local workspaces</Link><Link to="/setup">Create a company <ArrowRight size={15}/></Link></span>
+        <span className="entry-top-actions"><Link to="/auth/sign-in">Account sign in</Link><Link to="/choose-workspace">Local workspaces</Link><Link to="/setup">Create a company <ArrowRight size={15}/></Link></span>
       </header>
       <div className="entry-columns">
         <aside className="entry-story">
