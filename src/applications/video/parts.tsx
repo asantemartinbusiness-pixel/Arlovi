@@ -444,4 +444,29 @@ export function TransportBar({ doc, handle }: { doc: VideoDoc; handle: DocHandle
   );
 }
 
+/**
+ * The programme monitor sized to the room it has: the picture takes the
+ * height left after the transport, so play, the frame steps and undo stay
+ * on screen whatever the window height.
+ */
+export function FittedMonitor({ doc, handle, time, captions, guides, bypassEffects }: {
+  doc: VideoDoc; handle: DocHandle<VideoDoc>; time: number; captions: boolean; guides: boolean; bypassEffects: boolean;
+}) {
+  const [frameRef, size] = useMeasure<HTMLDivElement>();
+  const transport = 44;
+  const byHeight = size.height - transport - 20;
+  const byWidth = ((size.width - 20) * doc.height) / doc.width;
+  const height = Math.max(90, Math.floor(Math.min(420, byHeight, byWidth)));
+  return (
+    <div ref={frameRef} className="vd-monitor">
+      {size.height > 0 && (
+        <>
+          <PreviewMonitor doc={doc} time={time} height={height} captions={captions} guides={guides} bypassEffects={bypassEffects} />
+          <TransportBar doc={doc} handle={handle} />
+        </>
+      )}
+    </div>
+  );
+}
+
 export type { Track };

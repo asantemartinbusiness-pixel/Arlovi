@@ -2,7 +2,7 @@
    whole spread reachable, and the frames list. Tokens only. */
 
 .lx-tools { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; width: 100%; }
-.lx-tools .ds-toolbar { border-bottom: 0; padding: 0; min-height: 0; background: transparent; }
+.lx-tools .ds-toolbar { border-bottom: 0; padding: 0; min-height: 0; background: transparent; gap: var(--space-2); }
 .lx-tools .ds-tool { min-width: 30px; padding-inline: var(--space-2); font-size: var(--text-xs); }
 .lx-zoom { min-width: 3.4em; text-align: center; font-size: var(--text-2xs); color: var(--fg-muted); }
 
