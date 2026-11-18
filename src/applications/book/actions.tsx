@@ -166,41 +166,9 @@ export async function raiseBookingInvoice(context: ScreenContext, id: string | u
 
 /* ---------------- cancel ---------------- */
 
-export async function cancelBooking(context: ScreenContext) {
-  const booking = await load(context, context.selectedId);
-  if (!booking) return;
-  const service = booking.fields.serviceId ? await getRecord(String(booking.fields.serviceId)) : undefined;
-  const notice = Number(service?.fields.cancellationNoticeHours ?? 24);
-  const feeBp = Number(service?.fields.cancellationFeeBp ?? 0);
-  const hoursAway = booking.startAt ? (new Date(booking.startAt).getTime() - context.now.getTime()) / 3_600_000 : 0;
-  const inside = hoursAway < notice;
-  const fee = inside ? Math.round(((service?.amountMinor ?? 0) * feeBp) / 10_000) : 0;
-  const depositPaid = String(booking.fields.depositState) === "paid_local";
-  confirm(context, {
-    title: `Cancel ${booking.title}`,
-    tone: "danger",
-    consequence: inside
-      ? `This is ${Math.max(0, Math.round(hoursAway))} hours before the start, inside the ${notice} hour notice period. The recorded policy allows a fee of ${context.money(fee)}; it is recorded as due for a person to decide, and the slot is released.`
-      : `This is outside the ${notice} hour notice period, so no fee applies. The slot is released for someone else.`,
-    facts: [
-      { label: "Starts", value: context.dateTime(booking.startAt) },
-      { label: "Fee inside notice", value: feeBp ? `${(feeBp / 100).toFixed(0)}% (${context.money(Math.round(((service?.amountMinor ?? 0) * feeBp) / 10_000))})` : "None" },
-      { label: "Deposit", value: DEPOSIT_LABEL[String(booking.fields.depositState ?? "none")] ?? "—" },
-    ],
-    blocked: ["cancelled", "completed", "no_show"].includes(booking.status) ? `${booking.title} is already ${booking.status.replace("_", " ")}.` : undefined,
-    boundary: depositPaid ? "payment.capture" : "email.send",
-    boundaryTitle: depositPaid ? "Returning the deposit cannot be done here" : "The customer is not notified automatically",
-    confirmLabel: "Cancel booking",
-    run: async () => {
-      const saved = await context.mutate.patch(booking.id, {
-        status: "cancelled",
-        fields: { ...booking.fields, cancelledBy: context.actor, cancelledAt: iso(context), cancellationFeeMinor: fee, cancellationInsideNotice: inside },
-        body: message(bodyOf<BookingBody>(booking, {}), iso(context), `Cancelled by ${context.actor}${inside ? `, inside the notice period (fee ${context.money(fee)} for a person to decide)` : ""}. Kept as a local record; no message was sent.`),
-      }, { expectRevision: booking.revision, event: `${booking.title} cancelled by ${context.actor}${inside ? ` inside notice, fee ${fee}` : ""}` });
-      if (!saved) return CHANGED_ELSEWHERE;
-      context.toast("Cancelled", `${booking.title} is cancelled and its slot is free.${depositPaid ? " The deposit has to be returned outside this browser." : ""}`);
-    },
-  });
+/** Cancelling asks for a reason first; the form shows the notice policy and fee before anything changes. */
+export function cancelBooking(context: ScreenContext) {
+  context.openOverlay("cancel booking", { id: context.selectedId });
 }
 
 /* ---------------- reschedule notice ---------------- */

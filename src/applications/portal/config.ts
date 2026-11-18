@@ -162,8 +162,10 @@ export function exposureRows(portal: Rec, pools: Record<string, Rec[]>, aliasIds
       if (record.organizationId !== portal.organizationId) continue;
       const attached = ids.has(String(record.fields.portalId ?? ""));
       const owner = String(record.fields.contactId ?? "");
-      if (granted.has(record.id)) rows.push({ collection, record, exposed: true, source: "granted" });
-      else if (attached) rows.push({ collection, record, exposed: true, source: "attached" });
+      // A record attached by its own portal link stays visible whatever this
+      // list says, so it is reported as attached, never as a removable grant.
+      if (attached) rows.push({ collection, record, exposed: true, source: "attached" });
+      else if (granted.has(record.id)) rows.push({ collection, record, exposed: true, source: "granted" });
       else if (contactId && owner && owner !== contactId) rows.push({ collection, record, exposed: false, source: "other_account" });
       else if (contactId && owner === contactId) rows.push({ collection, record, exposed: false, source: "available" });
     }

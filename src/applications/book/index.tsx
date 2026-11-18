@@ -10,6 +10,7 @@ import {
   sendReminder, testBookingPage,
 } from "./actions";
 import "@/applications/market/growth.css";
+import { CancelBooking } from "./cancel";
 import { conflictsWithLinks, DEPOSIT_LABEL, statusTone, useBookData } from "./data";
 import {
   BookingCalendar, BookingDetail, BookingReports, BookingsOverview, PublicBookingPage,
@@ -110,6 +111,7 @@ export const bookApp = registerApp({
         { id: "conflict review", kind: "drawer", title: "Conflicts", width: 640, render: ({ ...context }) => <ConflictReview context={context} /> },
         { id: "reschedule notice", kind: "modal", title: "Reschedule notice", width: 580, render: ({ close, ...context }) => <RescheduleNotice context={context} close={close} />, footer: submitFooter("reschedule-notice", "Keep as a draft") },
         { id: "Reschedule", kind: "modal", title: "Move booking", width: 620, render: ({ close, ...context }) => <RescheduleBooking context={context} close={close} />, footer: submitFooter("reschedule", "Move booking") },
+        { id: "cancel booking", kind: "modal", title: "Cancel booking", tone: "danger", width: 600, render: ({ close, ...context }) => <CancelBooking context={context} close={close} />, footer: submitFooter("cancel-booking", "Cancel booking") },
         confirmOverlay,
       ],
     },
@@ -131,9 +133,11 @@ export const bookApp = registerApp({
         { id: "raise invoice", label: "Raise an invoice", placement: "secondary", run: (context) => raiseBookingInvoice(context, context.params.id) },
         { id: "message", label: "Message the customer", placement: "overflow", run: (context) => context.openOverlay("customer message") },
         { id: "cancellation", label: "Cancellation policy", placement: "overflow", run: (context) => context.openOverlay("refund rule") },
+        { id: "cancel booking", label: "Cancel booking", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("cancel booking", { id: context.params.id }) },
       ],
       overlays: [
         { id: "Reschedule", kind: "modal", title: "Reschedule", width: 620, render: ({ close, ...context }) => <RescheduleBooking context={context} close={close} />, footer: submitFooter("reschedule", "Move booking") },
+        { id: "cancel booking", kind: "modal", title: "Cancel booking", tone: "danger", width: 600, render: ({ close, ...context }) => <CancelBooking context={context} close={close} />, footer: submitFooter("cancel-booking", "Cancel booking") },
         { id: "refund rule", kind: "drawer", title: "Cancellation and fees", width: 560, render: ({ ...context }) => <RefundRule context={context} /> },
         { id: "customer message", kind: "modal", title: "Message the customer", width: 600, render: ({ close, ...context }) => <CustomerMessage context={context} close={close} />, footer: submitFooter("customer-message", "Record message") },
         { id: "take deposit", kind: "modal", title: "Deposit", width: 580, render: ({ close, ...context }) => <TakeDeposit context={context} close={close} /> },

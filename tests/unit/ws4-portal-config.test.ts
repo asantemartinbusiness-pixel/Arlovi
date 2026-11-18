@@ -77,7 +77,7 @@ describe("portal branding", () => {
 
 describe("portal exposure", () => {
   const portal = rec("p1", "portals", { contactId: "c1", canonicalFor: "p-stub" }, {
-    body: { shared: [{ collection: "invoices", ids: ["inv-granted"] }] },
+    body: { shared: [{ collection: "invoices", ids: ["inv-granted"] }, { collection: "documents", ids: ["doc-attached"] }] },
   });
   const pools = {
     invoices: [
@@ -88,6 +88,10 @@ describe("portal exposure", () => {
     ],
     documents: [rec("doc-attached", "documents", { portalId: "p-stub" }), rec("doc-unrelated", "documents", {})],
   };
+
+  it("reports a granted record that is also attached as attached, since withdrawing the grant would not hide it", () => {
+    expect(exposureRows(portal, pools, ["p-stub"]).find((row) => row.record.id === "doc-attached")?.source).toBe("attached");
+  });
 
   it("classifies every candidate record and never offers another account's record", () => {
     const rows = exposureRows(portal, pools, ["p-stub"]);

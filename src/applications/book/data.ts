@@ -1,6 +1,7 @@
 import { useCollections } from "@/platform/workspace";
 import { findBookingConflict, overlaps } from "@/domain/ops";
 import type { Rec } from "@/domain/types";
+import { capacityConflict, resourceCapacity, seatsOf } from "./availability";
 
 /* ---------------- Record body shapes used by BOOK ---------------- */
 
@@ -79,6 +80,7 @@ export function conflictsWithLinks(
   startAt: string,
   endAt: string,
   ignoreId?: string,
+  seats = 1,
 ): { resourceId: string; booking: Rec }[] {
   const linked = new Set<string>([resourceId]);
   const resource = resources.find((item) => item.id === resourceId);
@@ -88,18 +90,24 @@ export function conflictsWithLinks(
   }
   const found: { resourceId: string; booking: Rec }[] = [];
   for (const candidate of linked) {
-    const booking = conflictFor(bookings, orgId, candidate, startAt, endAt, ignoreId);
+    // A resource with room for several (a workshop table for six) takes
+    // concurrent bookings up to its capacity; a capacity of one is the shared
+    // double-booking rule from src/domain/ops.ts.
+    const target = resources.find((item) => item.id === candidate);
+    const booking = resourceCapacity(target) > 1
+      ? capacityConflict(bookings, orgId, target, candidate, startAt, endAt, ignoreId, candidate === resourceId ? seats : 1)
+      : conflictFor(bookings, orgId, candidate, startAt, endAt, ignoreId);
     if (booking) found.push({ resourceId: candidate, booking });
   }
   return found;
 }
 
-/** Minutes a resource is booked inside a window, for utilisation. */
+/** Seat-minutes a resource is booked inside a window, for utilisation (a booking of one seat counts its minutes once). */
 export function bookedMinutes(bookings: Rec[], resourceId: string, from: Date, to: Date): number {
   return bookings
     .filter((booking) => String(booking.fields.resourceId) === resourceId && isLive(booking) && booking.startAt && booking.endAt)
     .filter((booking) => overlaps(booking.startAt!, booking.endAt!, from.toISOString(), to.toISOString()))
-    .reduce((sum, booking) => sum + (new Date(booking.endAt!).getTime() - new Date(booking.startAt!).getTime()) / 60_000, 0);
+    .reduce((sum, booking) => sum + ((new Date(booking.endAt!).getTime() - new Date(booking.startAt!).getTime()) / 60_000) * seatsOf(booking), 0);
 }
 
 export function blackoutFor(resource: Rec | undefined, startAt: string, endAt: string): { from: string; to: string; reason: string } | undefined {

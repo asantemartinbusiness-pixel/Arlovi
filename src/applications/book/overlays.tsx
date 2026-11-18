@@ -7,12 +7,13 @@ import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { addDays, clockIso } from "@/platform/clock";
 import { computeInvoice } from "@/platform/money";
-import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
+import { CHANGED_ELSEWHERE, ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import {
   blackoutFor, bodyOf, conflictsWithLinks, DEPOSIT_LABEL, isBookable, isLive, rememberResource, statusTone, useBookData,
   workingHours, type BookingBody, type PublicPageBody, type ResourceBody, type ServiceBody,
 } from "./data";
 import { ConflictNotice, SlotPicker } from "./calendar";
+import { overlappingOn, reasonError, reasonLabel, RESCHEDULE_REASONS, resourceCapacity, seatsOf, slotProblems } from "./availability";
 import { recordTestSend } from "./actions";
 import type { Rec } from "@/domain/types";
 
@@ -73,25 +74,33 @@ export function BookingForm({ context, close }: { context: ScreenContext; close:
   );
   const [title, setTitle] = useState(existing?.title ?? "");
   const [hold, setHold] = useState(existing?.status === "hold");
+  const [seatsText, setSeatsText] = useState(String(existing ? seatsOf(existing) : 1));
 
   const service = data.services.find((item) => item.id === serviceId);
   const resource = data.resources.find((item) => item.id === resourceId);
   const minutes = Number(service?.fields.minutes ?? 45) + Number(service?.fields.bufferMinutes ?? 0);
   const start = new Date(startAt);
   const end = new Date(start.getTime() + minutes * 60_000);
+  const capacity = resourceCapacity(resource);
+  const seats = capacity > 1 ? Math.floor(Number(seatsText)) : 1;
+  const seatsError = capacity > 1 && (!Number.isFinite(seats) || seats < 1) ? "Enter at least one place" : capacity > 1 && seats > capacity ? `${resource?.title} holds ${capacity} at a time` : undefined;
   const clashes = useMemo(
     () => (resourceId && !Number.isNaN(start.getTime())
-      ? conflictsWithLinks(data.bookings, data.resources, org.id, resourceId, start.toISOString(), end.toISOString(), existing?.id)
+      ? conflictsWithLinks(data.bookings, data.resources, org.id, resourceId, start.toISOString(), end.toISOString(), existing?.id, Math.max(1, seats || 1))
       : []),
-    [data.bookings, data.resources, org.id, resourceId, startAt, minutes, existing?.id],
+    [data.bookings, data.resources, org.id, resourceId, startAt, minutes, existing?.id, seats],
   );
+  const inPast = !existing && !Number.isNaN(start.getTime()) && start < now;
+  const usedSeats = capacity > 1 && !Number.isNaN(start.getTime())
+    ? overlappingOn(data.bookings, org.id, resourceId, start.toISOString(), end.toISOString(), existing?.id).reduce((sum, item) => sum + seatsOf(item), 0)
+    : 0;
   const blackout = blackoutFor(resource, start.toISOString(), end.toISOString());
   const outsideHours = (() => {
     const window = workingHours(resource);
     return !window.days.includes(start.getDay()) || start.getHours() < window.startHour || end.getHours() > window.endHour;
   })();
   const suggestions = freeSlots(data.bookings, data.resources, org.id, resourceId, minutes, now);
-  const invalid = !serviceId || !resourceId || clashes.length > 0 || Boolean(blackout) || Number.isNaN(start.getTime());
+  const invalid = !serviceId || !resourceId || clashes.length > 0 || Boolean(blackout) || Number.isNaN(start.getTime()) || inPast || Boolean(seatsError);
 
   return (
     <form
@@ -110,7 +119,7 @@ export function BookingForm({ context, close }: { context: ScreenContext; close:
           depositMinor: Number(service?.fields.depositMinor ?? 0),
           depositState: Number(service?.fields.depositMinor ?? 0) ? "not_requested" : "none",
           payment: "not_connected",
-          seats: 1,
+          seats: Math.max(1, seats || 1),
           reminderState: contactId ? "queued_local" : "not_sent",
           source: "internal",
           checkedIn: false,
@@ -160,9 +169,14 @@ export function BookingForm({ context, close }: { context: ScreenContext; close:
           {data.contacts.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
         </Select>
       </Field>
-      <Field label="Starts" required hint={`Ends ${end.toLocaleTimeString(org.locale, { hour: "2-digit", minute: "2-digit" })} including a ${service?.fields.bufferMinutes ?? 0} minute buffer`}>
-        <TextInput type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} required />
+      <Field label="Starts" required error={inPast ? "That time has already passed" : undefined} hint={Number.isNaN(end.getTime()) ? undefined : `Ends ${end.toLocaleTimeString(org.locale, { hour: "2-digit", minute: "2-digit" })} including a ${service?.fields.bufferMinutes ?? 0} minute buffer`}>
+        <TextInput type="datetime-local" value={startAt} invalid={inPast} onChange={(event) => setStartAt(event.target.value)} required />
       </Field>
+      {capacity > 1 && (
+        <Field label="Places" required error={seatsError} hint={`${resource?.title} holds ${capacity} at a time · ${usedSeats} already taken in this window`}>
+          <TextInput value={seatsText} inputMode="numeric" align="end" invalid={Boolean(seatsError)} onChange={(event) => setSeatsText(event.target.value)} />
+        </Field>
+      )}
       <Field label="Label" hint="Shown on the calendar. Left empty it is built from the customer and the service.">
         <TextInput value={title} onChange={(event) => setTitle(event.target.value)} />
       </Field>
@@ -289,14 +303,29 @@ function RescheduleForm({ context, close, booking }: { context: ScreenContext; c
   const service = data.services.find((item) => item.id === String(booking?.fields.serviceId ?? ""));
   const minutes = booking?.startAt && booking?.endAt ? (new Date(booking.endAt).getTime() - new Date(booking.startAt).getTime()) / 60_000 : Number(service?.fields.minutes ?? 45);
   const [startAt, setStartAt] = useState((booking?.startAt ?? now.toISOString()).slice(0, 16));
+  const [reasonCode, setReasonCode] = useState("");
   const [reason, setReason] = useState("");
+  const [touched, setTouched] = useState(false);
   if (!booking) return <Empty title="No booking" />;
+  const resourceId = String(booking.fields.resourceId);
+  const resource = data.resources.find((item) => item.id === resourceId);
   const start = new Date(startAt);
   const end = new Date(start.getTime() + minutes * 60_000);
-  const clashes = conflictsWithLinks(data.bookings, data.resources, org.id, String(booking.fields.resourceId), start.toISOString(), end.toISOString(), booking.id);
-  const suggestions = freeSlots(data.bookings, data.resources, org.id, String(booking.fields.resourceId), minutes, now);
+  const valid = !Number.isNaN(start.getTime());
+  const seats = seatsOf(booking);
+  const clashes = valid ? conflictsWithLinks(data.bookings, data.resources, org.id, resourceId, start.toISOString(), end.toISOString(), booking.id, seats) : [];
+  const problems = slotProblems({
+    startAt: start, endAt: end, now, hours: workingHours(resource),
+    blackout: valid ? blackoutFor(resource, start.toISOString(), end.toISOString()) : undefined,
+    seats, capacity: resourceCapacity(resource),
+  });
+  const blocking = problems.filter((problem) => problem.blocking);
+  const unchanged = valid && booking.startAt === start.toISOString();
+  const reasonProblem = reasonError(reasonCode, reason);
+  const suggestions = freeSlots(data.bookings, data.resources, org.id, resourceId, minutes, now);
   const noticeHours = Number(service?.fields.cancellationNoticeHours ?? 24);
   const hoursAway = booking.startAt ? (new Date(booking.startAt).getTime() - now.getTime()) / 3_600_000 : 0;
+  const finished = ["cancelled", "completed", "no_show"].includes(booking.status);
 
   return (
     <form
@@ -304,14 +333,25 @@ function RescheduleForm({ context, close, booking }: { context: ScreenContext; c
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (clashes.length > 0) return;
+        setTouched(true);
+        if (finished || clashes.length > 0 || blocking.length > 0 || unchanged || reasonProblem) return;
         const body = bodyOf<BookingBody>(booking, {});
-        await context.mutate.patch(booking.id, {
+        const label = reasonLabel(RESCHEDULE_REASONS, reasonCode);
+        const saved = await context.mutate.patch(booking.id, {
           startAt: start.toISOString(),
           endAt: end.toISOString(),
           at: start.toISOString(),
-          body: { ...body, messages: [...(body.messages ?? []), { at: now.toISOString(), direction: "out", body: `Moved to ${start.toLocaleString()}${reason ? `: ${reason}` : ""}. Kept as a local record; no message was sent.` }] },
-        }, { expectRevision: booking.revision, event: `${booking.title} moved to ${start.toISOString()}` });
+          fields: {
+            ...booking.fields,
+            previousStartAt: booking.startAt ?? "",
+            rescheduleCount: Number(booking.fields.rescheduleCount ?? 0) + 1,
+            rescheduleReason: reasonCode,
+            rescheduledBy: context.actor,
+            rescheduledAt: now.toISOString(),
+          },
+          body: { ...body, messages: [...(body.messages ?? []), { at: now.toISOString(), direction: "out", body: `Moved from ${context.dateTime(booking.startAt)} to ${context.dateTime(start)} by ${context.actor}: ${label}${reason.trim() ? ` — ${reason.trim()}` : ""}. Kept as a local record; no message was sent.` }] },
+        }, { expectRevision: booking.revision, event: `${booking.title} moved to ${start.toISOString()}: ${label}` });
+        if (!saved) { context.toast("Changed elsewhere", CHANGED_ELSEWHERE, "failed"); return; }
         context.toast("Rescheduled", `${booking.title} is now ${context.dateTime(start)}. The customer has not been told: no provider is connected.`);
         close();
       }}
@@ -320,16 +360,30 @@ function RescheduleForm({ context, close, booking }: { context: ScreenContext; c
         { label: "Booking", value: booking.title },
         { label: "Currently", value: <span className="ds-num">{context.dateTime(booking.startAt)}</span> },
         { label: "Length", value: <span className="ds-num">{minutes} minutes</span> },
+        { label: "Resource", value: `${resource?.title ?? "—"}${resourceCapacity(resource) > 1 ? ` · holds ${resourceCapacity(resource)} at a time` : ""}` },
+        ...(Number(booking.fields.rescheduleCount ?? 0) > 0 ? [{ label: "Moved before", value: <span className="ds-num">{String(booking.fields.rescheduleCount)} time{Number(booking.fields.rescheduleCount) === 1 ? "" : "s"}</span> }] : []),
       ]} />
-      <Field label="New start" required><TextInput type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} required /></Field>
+      {finished && <Notice tone="warning" title="This booking cannot move">{booking.title} is {booking.status.replace("_", " ")}.</Notice>}
+      <Field label="New start" required error={unchanged && touched ? "Choose a different time" : blocking[0]?.message}>
+        <TextInput type="datetime-local" value={startAt} invalid={blocking.length > 0} onChange={(event) => setStartAt(event.target.value)} required />
+      </Field>
       <ConflictNotice clashes={clashes} resources={data.resources} />
-      {clashes.length > 0 && <SlotPicker suggestions={suggestions} onPick={(iso) => setStartAt(iso.slice(0, 16))} />}
+      {problems.filter((problem) => !problem.blocking).map((problem) => <Notice key={problem.kind} tone="warning" title="Check the time">{problem.message} {resource?.title} works {String(resource?.fields.workingHours ?? "unrecorded hours")}.</Notice>)}
+      {(clashes.length > 0 || blocking.length > 0) && <SlotPicker suggestions={suggestions} onPick={(iso) => setStartAt(iso.slice(0, 16))} />}
       {hoursAway < noticeHours && hoursAway > 0 && (
         <Notice tone="warning" title={`Inside the ${noticeHours} hour notice period`}>
           Moving an appointment this close is treated as a courtesy, not an entitlement. The fee recorded on the service is {(Number(service?.fields.cancellationFeeBp ?? 0) / 100).toFixed(0)}% and is shown before anything is changed.
         </Notice>
       )}
-      <Field label="Reason, for the record"><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} /></Field>
+      <Field label="Reason" required error={touched && !reasonCode ? "Choose a reason" : undefined}>
+        <Select value={reasonCode} onChange={(event) => setReasonCode(event.target.value)}>
+          <option value="">Choose a reason</option>
+          {RESCHEDULE_REASONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+        </Select>
+      </Field>
+      <Field label="Note for the record" required={reasonCode === "other"} error={touched && reasonCode === "other" && reasonProblem ? reasonProblem : undefined}>
+        <TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} />
+      </Field>
       <ProviderBoundary id="email.send" title="The customer is not notified automatically" />
     </form>
   );
@@ -637,7 +691,10 @@ export function ResourceEditor({ context, close }: { context: ScreenContext; clo
   const [hours, setHours] = useState(String(existing?.fields.workingHours ?? "Mon–Fri 09:00–17:00"));
   const [linked, setLinked] = useState(String(existing?.fields.linkedResourceId ?? ""));
   const [bookable, setBookable] = useState(existing ? isBookable(existing) : true);
-  const invalid = !title.trim() || !/\d{2}:\d{2}\D+\d{2}:\d{2}/.test(hours);
+  const [capacityText, setCapacityText] = useState(String(existing ? resourceCapacity(existing) : 1));
+  const capacity = Math.floor(Number(capacityText));
+  const capacityError = !Number.isFinite(capacity) || capacity < 1 || capacity > 200 ? "Enter a whole number from 1 to 200" : undefined;
+  const invalid = !title.trim() || !/\d{2}:\d{2}\D+\d{2}:\d{2}/.test(hours) || Boolean(capacityError);
   return (
     <form
       id="resource-editor"
@@ -645,7 +702,7 @@ export function ResourceEditor({ context, close }: { context: ScreenContext; clo
       onSubmit={async (event) => {
         event.preventDefault();
         if (invalid) return;
-        const fields = { kind, capacity: 1, workingHours: hours.trim(), timezone: org.timezone, linkedResourceId: linked, bookable };
+        const fields = { kind, capacity, workingHours: hours.trim(), timezone: org.timezone, linkedResourceId: linked, bookable };
         if (existing) {
           await context.mutate.patch(existing.id, { title: title.trim(), fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Resource ${title.trim()} edited` });
         } else {
@@ -659,6 +716,9 @@ export function ResourceEditor({ context, close }: { context: ScreenContext; clo
       <Field label="Kind"><Select value={kind} onChange={(event) => setKind(event.target.value)}>{["person", "room", "equipment"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
       <Field label="Working hours" required hint="For example Tue–Sat 10:00–18:00. The calendar shades everything outside it." error={invalid && hours ? "Include start and end times as HH:MM" : undefined}>
         <TextInput value={hours} invalid={invalid && Boolean(hours)} onChange={(event) => setHours(event.target.value)} required />
+      </Field>
+      <Field label="Capacity" required error={capacityError} hint="How many bookings it takes at once. A person or a single kit is 1; a workshop table might be 6.">
+        <TextInput value={capacityText} inputMode="numeric" align="end" invalid={Boolean(capacityError)} onChange={(event) => setCapacityText(event.target.value)} />
       </Field>
       <Field label="Linked resource" hint="A booking on either one blocks the other.">
         <Select value={linked} onChange={(event) => setLinked(event.target.value)}>
