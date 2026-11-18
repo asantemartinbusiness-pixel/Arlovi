@@ -207,8 +207,10 @@ describe("ageing, budget variance and consolidation", () => {
     const buckets = ageBuckets(open, NOW);
     expect(buckets.map((bucket) => bucket.bucket)).toEqual(["Current", "1–30 days", "31–60 days", "61–90 days", "Over 90 days"]);
     expect(buckets.reduce((sum, bucket) => sum + bucket.count, 0)).toBe(open.length);
+    // Ageing is of what is still owed, so it ties to the receivable figure.
+    expect(open.some((invoice) => Number(invoice.fields.paidMinor ?? 0) > 0)).toBe(true);
     expect(buckets.reduce((sum, bucket) => sum + bucket.amountMinor, 0))
-      .toBe(open.reduce((sum, invoice) => sum + Number(invoice.amountMinor ?? 0), 0));
+      .toBe(open.reduce((sum, invoice) => sum + Number(invoice.amountMinor ?? 0) - Number(invoice.fields.paidMinor ?? 0), 0));
     expect(buckets.some((bucket) => bucket.bucket !== "Current" && bucket.count > 0)).toBe(true);
   });
 

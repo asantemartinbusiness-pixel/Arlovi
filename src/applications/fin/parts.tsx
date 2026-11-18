@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
-import { Notice, Pill, Properties, Row, Stack } from "@/design-system";
+import { Notice, Pill, Properties, Row, Skeleton, Stack } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, capabilityById } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
 import type { Rec } from "@/domain/types";
@@ -187,6 +187,22 @@ export function LedgerHealth({ context, booksBalance, equationHolds, difference 
         ]} />
       </Stack>
     </Notice>
+  );
+}
+
+/**
+ * Shown in place of ledger figures until the posted books are fully read, so a
+ * total is never printed from a partial ledger and then silently changed.
+ */
+export function BooksLoading({ what = "posted journals" }: { what?: string }) {
+  return (
+    <div role="status" aria-live="polite" aria-busy="true">
+      <Stack gap={2}>
+        <span className="ds-subtle">Reading the {what}…</span>
+        <Skeleton height={14} width="60%" />
+        <Skeleton height={14} width="40%" />
+      </Stack>
+    </div>
   );
 }
 

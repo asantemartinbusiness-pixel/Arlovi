@@ -14,7 +14,7 @@ import {
 } from "@/domain/fin-ledger";
 import type { AccountType, TrialRow } from "@/domain/fin-ledger";
 import { openInvoices, outstandingMinor, useFinData } from "./data";
-import { Amount, LedgerHealth, SourceNote, StatementRow } from "./parts";
+import { Amount, BooksLoading, LedgerHealth, SourceNote, StatementRow } from "./parts";
 import { statementCsv } from "./statementExport";
 
 /* ---------------------------- FIN-012 ---------------------------- */
@@ -79,6 +79,7 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
         }}>Export</Button>
       </Row>
 
+      {!data.ready ? <BooksLoading /> : <>
       <LedgerHealth
         context={context}
         booksBalance={data.statements.booksBalance}
@@ -242,6 +243,7 @@ export function StatementsTab({ context }: { context: ScreenContext }) {
           </Card>
         </Grid>
       )}
+      </>}
     </Stack>
   );
 }

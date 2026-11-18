@@ -12,7 +12,7 @@ import {
 } from "@/domain/fin-ledger";
 import type { JLine, PostCheck } from "@/domain/fin-ledger";
 import { useFinData } from "./data";
-import { AccountLabel, Amount, SourceNote } from "./parts";
+import { AccountLabel, Amount, BooksLoading, SourceNote } from "./parts";
 import { clockIso, wallMs } from "@/platform/clock";
 
 /* ---------------------------- FIN-003 ---------------------------- */
@@ -782,6 +782,7 @@ export function LedgerStrip({ context }: { context: ScreenContext }) {
     type,
     minor: data.trialRows.filter((row) => row.type === type).reduce((sum, row) => sum + row.balanceMinor, 0),
   }));
+  if (!data.ready) return <BooksLoading />;
   return (
     <Row gap={4} wrap>
       <Pill tone={data.statements.booksBalance ? "success" : "danger"} dot>
