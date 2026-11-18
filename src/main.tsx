@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
 import { CompanyOnboarding } from "@/app/CompanyOnboarding";
+import { IdentityEntry, WorkspaceChooser } from "@/app/IdentityEntry";
 import { orgBySlug, recoverLocalOrganizations } from "@/platform/org";
 import { ClockProvider } from "@/platform/clock";
 import { WorkspaceProvider } from "@/platform/workspace";
@@ -17,7 +18,7 @@ function WorkspaceEntry({ recoveredSlug }: { recoveredSlug: string | null }) {
   let slug: string | null = null;
   try { slug = localStorage.getItem("arlovi-last-workspace"); } catch { /* browser privacy settings */ }
   const preferred = slug && orgBySlug(slug) ? slug : recoveredSlug;
-  const target = preferred && orgBySlug(preferred) ? `/o/${preferred}/workspace/home` : "/setup";
+  const target = preferred && orgBySlug(preferred) ? `/o/${preferred}/workspace/home` : "/welcome";
   return <Navigate to={target} replace />;
 }
 
@@ -84,7 +85,18 @@ function Boot() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<WorkspaceEntry recoveredSlug={recoveredSlug} />} />
+        <Route path="/welcome" element={<IdentityEntry mode="welcome"/>} />
+        <Route path="/choose-workspace" element={<WorkspaceChooser/>} />
+        <Route path="/auth/sign-in" element={<IdentityEntry mode="sign-in"/>} />
+        <Route path="/auth/sign-up" element={<IdentityEntry mode="sign-up"/>} />
+        <Route path="/auth/recover" element={<IdentityEntry mode="recover"/>} />
+        <Route path="/auth/verify" element={<IdentityEntry mode="verify"/>} />
+        <Route path="/auth/security" element={<IdentityEntry mode="security"/>} />
+        <Route path="/auth/invite" element={<IdentityEntry mode="invite"/>} />
         <Route path="/setup" element={<CompanyOnboarding />} />
+        <Route path="/setup/company" element={<Navigate to="/setup" replace/>} />
+        <Route path="/setup/organization" element={<Navigate to="/setup" replace/>} />
+        <Route path="/setup/review" element={<Navigate to="/setup" replace/>} />
         <Route
           path="/o/:org/*"
           element={
