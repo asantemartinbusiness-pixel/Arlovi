@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MoreHorizontal } from "lucide-react";
-import { OverlayOrigin, OverlayRecordContext } from "@/app/OverlayExperience";
+import { OverlayOrigin, OverlayRecordContext, nativeOverlayDomain } from "@/app/OverlayExperience";
 import "@/app/native-overlay-experience.css";
 import { Breadcrumbs, Button, Drawer, Menu, Modal, Notice, Tabs, TabPanel } from "@/design-system";
 import { appEntry, findScreen, type ScreenInfo } from "@/app/catalog";
@@ -376,8 +376,16 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
   }
   const overlayContext = { ...ctx, close: onClose };
   const payloadId = (ctx.overlayPayload as { id?: unknown } | undefined)?.id;
-  const ids = [typeof payloadId === "string" ? payloadId : undefined, ctx.selectedId, ctx.params.id].filter((id): id is string => Boolean(id));
-  const body = <PrimedOverlayBody ids={ids} orgId={ctx.org.id} render={() => found.render(overlayContext)} />;
+  const ids = [typeof payloadId === "string" ? payloadId : undefined, ctx.params.id, ctx.selectedId].filter((id): id is string => Boolean(id));
+  const requiredId = found.presentation?.selectedRecord ? ids[0] : undefined;
+  const requiredCollection = found.presentation?.collection;
+  const body = found.presentation?.selectedRecord && !requiredId
+    ? <Notice tone="warning" title="Choose a record first">
+        Select the {nativeOverlayDomain(ctx.screen.applicationCode).entity.toLowerCase()} to work with before opening this {found.kind}.
+        Nothing has been selected or changed.
+      </Notice>
+    : <PrimedOverlayBody ids={ids} orgId={ctx.org.id} requiredId={requiredId}
+        requiredCollection={requiredCollection} render={() => found.render(overlayContext)} />;
   const overlayTitle = typeof found.title === "function" ? found.title(ctx) : found.title ?? found.id;
   const appCode = ctx.screen.applicationCode;
   const origin = <OverlayOrigin context={ctx} />;
@@ -427,16 +435,27 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
  * render. Most opens are already primed by the list they came from; a deep
  * link waits for one indexed read.
  */
-function PrimedOverlayBody({ ids, orgId, render }: { ids: string[]; orgId: string; render: () => ReactNode }) {
+function PrimedOverlayBody({ ids, orgId, requiredId, requiredCollection, render }: {
+  ids: string[]; orgId: string; requiredId?: string; requiredCollection?: string; render: () => ReactNode;
+}) {
   const key = ids.join("|");
-  const ready = useLiveQuery(async () => {
-    await Promise.all(ids.map((id) => getRecordInOrg(orgId, id)));
-    return true;
-  }, [key, orgId], ids.every((id) => {
-    const cached = knownRecord(id);
-    return cached !== undefined && cached.organizationId === orgId;
-  }) || ids.length === 0);
-  if (!ready) return <div className="ds-muted" role="status">Loading…</div>;
+  const cached = ids.map(id => knownRecord(id));
+  const cachedReady = cached.every(record => record !== undefined && record.organizationId === orgId)
+    && (!requiredId || cached.some(record =>
+      record?.id === requiredId && (!requiredCollection || record.collection === requiredCollection)));
+  const state = useLiveQuery(async () => {
+    const records = await Promise.all(ids.map(id => getRecordInOrg(orgId, id)));
+    const selected = requiredId ? records.find(record => record?.id === requiredId) : undefined;
+    if (requiredId && (!selected || (requiredCollection && selected.collection !== requiredCollection))) return "unavailable" as const;
+    return "ready" as const;
+  }, [key, orgId, requiredId, requiredCollection], cachedReady ? "ready" as const : undefined);
+  if (!state) return <div className="ds-muted" role="status">Checking the selected record…</div>;
+  if (state === "unavailable") return (
+    <Notice tone="warning" title="The selected record is unavailable">
+      The record was not found in this company or does not belong to this workflow.
+      No other record was substituted. Return to the list and select the correct item.
+    </Notice>
+  );
   return <OverlayBody render={render} />;
 }
 
