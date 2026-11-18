@@ -29,6 +29,7 @@ import { applyAttentionReceipts } from "@/platform/attentionReceipts";
 import { useUi } from "@/runtime/ui";
 import { DisplayPreferences } from "@/app/DisplayPreferences";
 import { NotificationToastStack } from "@/app/NotificationToastStack";
+import { NotificationBanner } from "@/app/NotificationBanner";
 import type { Role } from "@/domain/types";
 import "@/app/shell.css";
 
@@ -432,35 +433,23 @@ export function AppShell() {
           <div className="hq-scroll">
           {applicationLoadFailures().length > 0 && (
             <div className="hq-banners">
-              <div className="ds-notice" data-tone="danger" role="alert">
-                <div>
-                  <strong className="ds-notice-title">Some applications could not be loaded</strong>
-                  {applicationLoadFailures().map((failure) => `${failure.group}: ${failure.message}`).join(" · ")}
-                  {" "}Every other application is working normally.
-                </div>
-              </div>
+              <NotificationBanner tone="danger" title="Some applications could not be loaded">
+                {applicationLoadFailures().map(failure => `${failure.group}: ${failure.message}`).join(" · ")}
+                {" "}Other applications remain available.
+              </NotificationBanner>
             </div>
           )}
           {(ui.offline || paused) && (
             <div className="hq-banners">
-              {ui.offline && (
-                <div className="ds-notice" data-tone="info" role="status">
-                  <div><strong className="ds-notice-title">Offline</strong>This workspace is in your browser, so it keeps working. Nothing is sent anywhere.</div>
-                </div>
-              )}
-              {paused && (
-                <div className="ds-notice" data-tone="warning" role="status">
-                  <div className="ds-grow">
-                    <strong className="ds-notice-title">Mission dispatch is paused</strong>
-                    New autonomous steps will not start. Actions already accepted elsewhere cannot be confirmed from here.
-                  </div>
-                  {role === "owner" && (
-                    <Button size="sm" onClick={() => mutate.patch(org.id, { fields: { ...data.organizations.find((item) => item.id === org.id)?.fields, executionPaused: false } }, { event: "Mission dispatch resumed" })}>
-                      Resume dispatch
-                    </Button>
-                  )}
-                </div>
-              )}
+              {ui.offline && <NotificationBanner tone="info" title="Working offline">
+                Your browser-local workspace remains accessible. External actions cannot be confirmed.
+              </NotificationBanner>}
+              {paused && <NotificationBanner tone="warning" title="Mission dispatch is paused"
+                action={role === "owner" ? <Button size="sm" onClick={() => mutate.patch(org.id, {
+                  fields: { ...data.organizations.find(item => item.id === org.id)?.fields, executionPaused: false }
+                }, { event: "Mission dispatch resumed" })}>Resume dispatch</Button> : undefined}>
+                New autonomous steps will not start. Already accepted external actions cannot be confirmed here.
+              </NotificationBanner>}
             </div>
           )}
           {org.ownerName && (location.pathname === `/o/${org.slug}/hq/home` || location.pathname === workAreaPath(org.slug,"home")) && <FirstRunGuide />}
