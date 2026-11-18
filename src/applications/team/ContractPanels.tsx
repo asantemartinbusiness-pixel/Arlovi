@@ -100,7 +100,8 @@ export function ContractEditor({ context, agent, queued }: { context: ScreenCont
       if (!result) return;
       if (reauth) {
         for (const task of queued) {
-          await context.mutate.patch(task.id, { fields: { ...task.fields, reauthorisationRequired: true } }, { event: `${task.title} needs re-authorisation after ${agent.title}'s contract changed` });
+          // patch merges fields, so naming only the flag cannot revert a newer save of the task.
+          await context.mutate.patch(task.id, { fields: { reauthorisationRequired: true } }, { event: `${task.title} needs re-authorisation after ${agent.title}'s contract changed` });
         }
       }
       context.toast("Contract saved", reauth && queued.length > 0

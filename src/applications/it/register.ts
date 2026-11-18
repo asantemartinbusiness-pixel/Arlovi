@@ -78,7 +78,7 @@ export function withEntry(record: Rec, entry: TimelineEntry): { body: Record<str
 }
 
 export interface StageFacts {
-  /** Diagnostics have been run since the incident was opened. */
+  /** A workspace diagnostics run was recorded since the incident was opened (workspace-wide, not incident-specific). */
   verified: boolean;
   /** Text supplied with the transition (a mitigation step, or the postmortem). */
   note: string;
@@ -107,7 +107,7 @@ export function stageBlockers(record: Rec, target: Stage, facts: StageFacts): st
   }
   if (target === "resolve") {
     if (!timeline.some((entry) => entry.kind === "mitigation") && !facts.note.trim()) blockers.push("Record what fixed it.");
-    if (!facts.verified) blockers.push("Run the diagnostics after the incident was opened, so the fix is verified by a check.");
+    if (!facts.verified) blockers.push("Run the workspace diagnostics after the incident was opened. They check the whole workspace, not this incident alone.");
   }
   if (target === "postmortem") {
     const text = facts.note.trim() || str(record.fields.postmortem).trim();
@@ -161,9 +161,16 @@ export function changeFactors(record: Rec): RiskFactors {
 }
 
 /** Why the given person may not approve this change; undefined when they may. */
-export function approvalBlocker(record: Rec, approver: string): string | undefined {
+/**
+ * Why an approval cannot be recorded. Separation of duties covers both the
+ * named approver and the person recording it: a requester cannot approve
+ * their own change by naming somebody else.
+ */
+export function approvalBlocker(record: Rec, approver: string, actor?: string): string | undefined {
   if (record.status !== "submitted") return "Only a submitted change can be decided.";
-  if (str(record.fields.requestedBy) === approver) return "The person who requested a change cannot approve it.";
+  const requester = str(record.fields.requestedBy) || record.createdBy;
+  if (requester === approver) return "The person who requested a change cannot approve it.";
+  if (actor !== undefined && requester === actor) return "You requested this change, so you cannot record its approval. Ask someone else to record it.";
   const risk = riskOf(changeFactors(record));
   if (risk.level !== "low" && !str(record.fields.rollbackPlan).trim()) return "A medium or high risk change needs a rollback plan before approval.";
   return undefined;

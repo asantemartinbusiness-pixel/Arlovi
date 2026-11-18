@@ -120,6 +120,14 @@ describe("IT change requests, configuration and access reviews", () => {
     expect(approvalBlocker(ready, "Ada Fernsby")).toBeUndefined();
   });
 
+  it("blocks the requester from recording an approval in someone else's name", () => {
+    const ready = rec({ status: "submitted", title: "Move diary", fields: { requestedBy: "Maya Chen", scope: "single", reversible: true, tested: true, plan: "x", window: "2026-11-20" } });
+    expect(approvalBlocker(ready, "Ada Fernsby", "Maya Chen")).toMatch(/You requested this change/);
+    expect(approvalBlocker(ready, "Ada Fernsby", "Jonah Adeyemi")).toBeUndefined();
+    const noRequester = rec({ ...ready, createdBy: "Theo Marsh", fields: { ...ready.fields, requestedBy: "" } });
+    expect(approvalBlocker(noRequester, "Theo Marsh", "Maya Chen")).toMatch(/cannot approve/);
+  });
+
   it("parses configuration and reports a diff", () => {
     const before = parseConfig("os = 14\nencryption = off");
     const after = parseConfig("os = 15\nowner = Ada\n");

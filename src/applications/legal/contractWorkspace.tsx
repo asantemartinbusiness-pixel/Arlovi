@@ -9,7 +9,7 @@ import { clockIso } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import type { Version } from "./redline";
 import {
-  DECISION_LABEL, decideRound, obligationState, openRound, renewalInfo, reviewsOf, statusAfterDecision, suggestCompany,
+  DECISION_LABEL, decideRound, obligationState, openRound, renewalInfo, reviewDecisionBlocker, reviewsOf, statusAfterDecision, suggestCompany,
   type ReviewDecision,
 } from "./register";
 
@@ -49,14 +49,17 @@ export function KeyDatesCard({ context, contract }: { context: ScreenContext; co
             event.preventDefault();
             const form = new FormData(event.currentTarget);
             const decision = String(form.get("decision") ?? "");
+            const decisionChanged = decision !== String(contract.fields.renewalDecision ?? "");
             const patch: Partial<Rec> = {
               fields: {
                 ...contract.fields,
                 noticeDays: Math.max(0, Number(form.get("notice") ?? 0) || 0),
                 autoRenew: form.get("autoRenew") === "on",
                 renewalDecision: decision,
-                renewalDecidedBy: decision ? context.actor : "",
-                renewalDecidedAt: decision ? clockIso() : "",
+                // Re-stamp who decided only when the decision itself changed.
+                ...(decisionChanged
+                  ? { renewalDecidedBy: decision ? context.actor : "", renewalDecidedAt: decision ? clockIso() : "" }
+                  : {}),
               },
             };
             if (!signed) {
@@ -64,8 +67,9 @@ export function KeyDatesCard({ context, contract }: { context: ScreenContext; co
               patch.endAt = atNine(String(form.get("end") ?? ""));
               patch.dueAt = patch.endAt;
             }
-            await context.mutate.patch(contract.id, patch, { expectRevision: contract.revision, event: `Key dates on ${contract.title} updated by ${context.actor}${decision ? `; renewal decision: ${decision}` : ""}` });
-            context.toast("Key dates saved", decision ? `The renewal decision "${decision}" is recorded. No notice was served on the counterparty.` : "The dates and notice period are on the contract.");
+            const saved = await context.mutate.patch(contract.id, patch, { expectRevision: contract.revision, event: `Key dates on ${contract.title} updated by ${context.actor}${decisionChanged ? `; renewal decision: ${decision || "not decided"}` : ""}` });
+            if (!saved) return;
+            context.toast("Key dates saved", decision && decisionChanged ? `The renewal decision "${decision}" is recorded. No notice was served on the counterparty.` : "The dates and notice period are on the contract.");
             setEditing(false);
           }}
         >
@@ -242,18 +246,22 @@ export function ReviewCycleCard({ context, contract }: { context: ScreenContext;
   const signed = contract.fields.immutableSigned === true;
   const legacyReviewer = !open && contract.status === "in_review" ? String(contract.fields.reviewer ?? "") : "";
   const needsNote = decision !== "approved";
+  const requester = open ? open.requestedBy : String(contract.fields.reviewRequestedBy ?? "");
+  const blocker = reviewDecisionBlocker(requester, decision, context.actor);
 
   async function record() {
     if (needsNote && !note.trim()) return;
+    if (blocker) return;
     const at = clockIso();
     const base = open ? reviews : [{ id: crypto.randomUUID(), round: reviews.length + 1, reviewer: legacyReviewer || context.actor, requestedBy: String(contract.fields.reviewRequestedBy ?? context.actor), requestedAt: String(contract.fields.reviewRequestedAt ?? at) }];
     const next = decideRound(base, decision, context.actor, at, note.trim());
     const status = statusAfterDecision(contract.status, decision);
-    await context.mutate.patch(contract.id, {
+    const saved = await context.mutate.patch(contract.id, {
       status,
       fields: { ...contract.fields, reviewDecision: decision, reviewDecidedBy: context.actor, reviewDecidedAt: at, ...(decision === "approved" ? { approvedBy: context.actor, approvedAt: at } : {}) },
       body: { ...(contract.body as object ?? {}), reviews: next },
     }, { expectRevision: contract.revision, event: `${contract.title}: review ${DECISION_LABEL[decision].toLowerCase()} by ${context.actor}${note.trim() ? ` — ${note.trim()}` : ""}` });
+    if (!saved) return;
     context.toast(`Review: ${DECISION_LABEL[decision].toLowerCase()}`, decision === "approved" ? "The contract is approved internally. Signing is a separate step." : "The contract is back in draft with the reason on the record.");
     setNote("");
   }
@@ -281,8 +289,9 @@ export function ReviewCycleCard({ context, contract }: { context: ScreenContext;
                 <Field label={needsNote ? "Reason (required)" : "Note"}>
                   <TextArea rows={2} value={note} onChange={(event) => setNote(event.target.value)} />
                 </Field>
+                {blocker && <Notice tone="warning" title="Cannot be approved by you">{blocker}</Notice>}
                 {reviewer !== context.actor && <Notice tone="info">You are recording this as {context.actor}; the round names {reviewer} as the reviewer.</Notice>}
-                <Row gap={2}><span className="ds-grow" /><Button variant="primary" disabled={needsNote && !note.trim()} onClick={() => void record()}>Record the decision</Button></Row>
+                <Row gap={2}><span className="ds-grow" /><Button variant="primary" disabled={Boolean(blocker) || (needsNote && !note.trim())} onClick={() => void record()}>Record the decision</Button></Row>
               </div>
             )}
           </Stack>

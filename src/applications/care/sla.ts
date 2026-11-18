@@ -98,13 +98,17 @@ export function slaState(ticket: Rec, policy: Rec | undefined, now: Date): SlaSt
     const target = Number(policy.fields.firstResponseHours ?? 0) * 60;
     const used = businessMinutesBetween(opened, now, hours);
     const remaining = target - used;
+    // A reply recorded with no provider connected never reached the customer,
+    // so it does not stop the first-response clock; the label says so.
+    const recordedOnly = Boolean(ticket.fields.firstResponseRecordedAt);
+    const prefix = recordedOnly ? "Reply recorded, not delivered — first response" : "First response";
     return {
       which: "first response",
       targetMinutes: target,
       usedMinutes: used,
       remainingMinutes: remaining,
       status: remaining < 0 ? "breached" : remaining < target * 0.25 ? "at_risk" : "due",
-      label: remaining < 0 ? `First response ${formatMinutes(remaining)} over` : `First response in ${formatMinutes(remaining)}`,
+      label: remaining < 0 ? `${prefix} ${formatMinutes(remaining)} over` : `${prefix} in ${formatMinutes(remaining)}`,
     };
   }
 

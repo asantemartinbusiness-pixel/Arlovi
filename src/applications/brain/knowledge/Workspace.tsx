@@ -13,7 +13,7 @@ import { internalPeople } from "../people";
 import {
   DEFAULT_FILTERS, KNOWLEDGE, KNOWLEDGE_COLLECTIONS, PROVENANCE_LABEL, STATUS_LABEL, TIMING_LABEL,
   backlinks, draftFromRecord, draftProblems, emptyDraft, filterKnowledge, intervalFor, isSubstantiveChange,
-  knowledgeBody, parseTags, provenanceOf, reviewEvent, reviewRequestProblems, reviewTiming, sortKnowledge,
+  knowledgeBody, nextOriginProvenance, originProvenanceOf, parseTags, provenanceChoices, provenanceOf, reviewEvent, reviewRequestProblems, reviewTiming, sortKnowledge,
   statusAfterEdit, statusOf, summarize, verificationBlockers,
   type KnowledgeBody, type KnowledgeDraft, type KnowledgeFilters, type KnowledgeProvenance, type KnowledgeSort,
   type KnowledgeStatus, type ReviewEvent, type ReviewTiming, type SourceRef,
@@ -605,6 +605,7 @@ function RecordEditor({ context, data, collections, record, initial, onCancel, o
   const current = { ...draft, tags: parseTags(tags) };
   const substantive = record ? isSubstantiveChange(initial, current) : false;
   const nextStatus = statusAfterEdit(status, substantive);
+  const origin = record ? originProvenanceOf(record) : "human";
 
   const patch = (change: Partial<KnowledgeDraft>) => setDraft((value) => ({ ...value, ...change }));
   const setSource = (index: number, change: Partial<SourceRef>) => patch({ sources: draft.sources.map((item, i) => (i === index ? { ...item, ...change } : item)) });
@@ -625,6 +626,7 @@ function RecordEditor({ context, data, collections, record, initial, onCancel, o
         ...(record?.fields ?? {}),
         collectionId: current.collectionId,
         provenance: current.provenance,
+        originProvenance: nextOriginProvenance(record, current.provenance),
         reviewIntervalDays: current.reviewIntervalDays === "" ? 0 : current.reviewIntervalDays,
       };
       const sources = current.sources.map((item) => {
@@ -690,9 +692,11 @@ function RecordEditor({ context, data, collections, record, initial, onCancel, o
             {collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.title}</option>)}
           </Select>
         </Field>
-        <Field label="Provenance" hint={draft.provenance === "model_generated" ? "Needs a cited source before it can be verified." : undefined}>
+        <Field label="Provenance" hint={origin !== "human"
+          ? `This text was ${origin === "imported" ? "imported" : "model-generated"}, so it cannot be relabelled as written by a person and needs a cited source before it can be verified.`
+          : draft.provenance === "model_generated" ? "Needs a cited source before it can be verified." : undefined}>
           <Select value={draft.provenance} onChange={(event) => patch({ provenance: event.target.value as KnowledgeProvenance })}>
-            {(Object.keys(PROVENANCE_LABEL) as KnowledgeProvenance[]).map((value) => <option key={value} value={value}>{PROVENANCE_LABEL[value]}</option>)}
+            {provenanceChoices(origin).map((value) => <option key={value} value={value}>{PROVENANCE_LABEL[value]}</option>)}
           </Select>
         </Field>
       </div>

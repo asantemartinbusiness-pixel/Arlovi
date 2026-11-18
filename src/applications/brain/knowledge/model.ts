@@ -98,6 +98,28 @@ export function provenanceOf(record: Pick<Rec, "fields">): KnowledgeProvenance {
   return value === "model_generated" || value === "imported" ? value : "human";
 }
 
+/**
+ * Where the text first came from. Once a record has been model-generated or
+ * imported, that origin is kept in `originProvenance` and cannot be edited
+ * back to "human": relabelling it would not change where the words came from.
+ */
+export function originProvenanceOf(record: Pick<Rec, "fields">): KnowledgeProvenance {
+  const origin = String(record.fields.originProvenance ?? "");
+  return origin === "model_generated" || origin === "imported" ? origin : provenanceOf(record);
+}
+
+/** The origin to store after an edit: a non-human origin is sticky. */
+export function nextOriginProvenance(record: Pick<Rec, "fields"> | undefined, chosen: KnowledgeProvenance): KnowledgeProvenance {
+  const origin = record ? originProvenanceOf(record) : "human";
+  return origin !== "human" ? origin : chosen;
+}
+
+/** Provenance options the editor offers: text that did not come from a person cannot be relabelled as human. */
+export function provenanceChoices(origin: KnowledgeProvenance): KnowledgeProvenance[] {
+  const all = Object.keys(PROVENANCE_LABEL) as KnowledgeProvenance[];
+  return origin === "human" ? all : all.filter((value) => value !== "human");
+}
+
 export function reviewIntervalOf(record: Pick<Rec, "fields">, collection?: Pick<Rec, "fields">): number {
   const own = Number(record.fields.reviewIntervalDays);
   if (Number.isFinite(own) && own > 0) return Math.round(own);
@@ -147,7 +169,8 @@ export function reviewTiming(record: Pick<Rec, "status" | "fields" | "dueAt">, n
 export function verificationBlockers(record: Pick<Rec, "status" | "fields" | "body" | "title">, reviewer: string, canVerify: boolean): string[] {
   const problems: string[] = [];
   const body = knowledgeBody(record);
-  const provenance = provenanceOf(record);
+  // The origin, not the editable label, decides whether a source is required.
+  const provenance = originProvenanceOf(record);
   if (!canVerify) problems.push("Your role cannot verify knowledge. Ask an owner to review it.");
   if (statusOf(record) !== "needs_review") problems.push("Only a record that is in review can be verified. Request a review first.");
   if (!record.title.trim()) problems.push("The record has no title.");

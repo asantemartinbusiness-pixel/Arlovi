@@ -308,13 +308,17 @@ export function OmnichannelInbox({ context, lens }: { context: ScreenContext; le
       at: context.now.toISOString(),
       fields: { kind: "ticket", author: actor, side: "agent", channel: internal ? "internal" : String(active.fields.channel ?? "email"), internal, delivery: internal ? "internal" : "not_sent" },
     }, `${internal ? "Internal note added" : "Reply recorded (not sent, no provider)"} on ${String(active.fields.ref ?? active.title)} by ${actor}`);
-    if (!internal && !active.fields.firstResponseAt) {
-      await context.mutate.patch(active.id, {
+    // No provider is connected, so the reply never reached the customer: it is
+    // recorded as a first response but does not stop the first-response clock.
+    if (!internal && !active.fields.firstResponseAt && !active.fields.firstResponseRecordedAt) {
+      const saved = await context.mutate.patch(active.id, {
         status: active.status === "new" ? "open" : active.status,
-        fields: { ...active.fields, firstResponseAt: context.now.toISOString(), assignee: String(active.fields.assignee || actor), replyDraft: "" },
-      }, { event: `First response recorded on ${String(active.fields.ref ?? "")}` });
+        fields: { firstResponseRecordedAt: context.now.toISOString(), assignee: String(active.fields.assignee || actor), replyDraft: "" },
+      }, { event: `First reply recorded (not delivered) on ${String(active.fields.ref ?? "")}` });
+      if (!saved) return;
     } else if (active.fields.replyDraft) {
-      await context.mutate.patch(active.id, { fields: { ...active.fields, replyDraft: "" } }, { event: `Saved reply draft cleared on ${String(active.fields.ref ?? "")}` });
+      const saved = await context.mutate.patch(active.id, { fields: { replyDraft: "" } }, { event: `Saved reply draft cleared on ${String(active.fields.ref ?? "")}` });
+      if (!saved) return;
     }
     setDraft("");
     setActiveId(active.id);
@@ -590,7 +594,7 @@ export function TicketDetail({ context, lens }: { context: ScreenContext; lens: 
       <Stack gap={4}>
         <Properties rows={[
           { label: "Opened", value: `${context.dateTime(ticket.at)} by ${ticket.createdBy}` },
-          { label: "First response", value: ticket.fields.firstResponseAt ? context.dateTime(String(ticket.fields.firstResponseAt)) : "Not yet" },
+          { label: "First response", value: ticket.fields.firstResponseAt ? context.dateTime(String(ticket.fields.firstResponseAt)) : ticket.fields.firstResponseRecordedAt ? `Reply recorded ${context.dateTime(String(ticket.fields.firstResponseRecordedAt))}, not delivered` : "Not yet" },
           { label: "Resolved", value: ticket.fields.resolvedAt ? context.dateTime(String(ticket.fields.resolvedAt)) : "Not yet" },
           { label: "Reopened", value: ticket.fields.reopened === true ? "Yes, at least once" : "No" },
           { label: "Revisions", value: String(ticket.revision) },
@@ -1140,11 +1144,13 @@ export function ResponseComposer({ context, close }: { context: ScreenContext; c
           at: context.now.toISOString(),
           fields: { kind: "ticket", author: context.actor, side: "agent", channel: String(ticket.fields.channel ?? "email"), internal: false, delivery: "not_sent" },
         }, `Reply recorded on ${String(ticket.fields.ref ?? ticket.title)} by ${context.actor}`);
-        if (!ticket.fields.firstResponseAt) {
-          await context.mutate.patch(ticket.id, {
+        if (!ticket.fields.firstResponseAt && !ticket.fields.firstResponseRecordedAt) {
+          // Recorded, not delivered: the first-response clock keeps running.
+          const saved = await context.mutate.patch(ticket.id, {
             status: ticket.status === "new" ? "open" : ticket.status,
-            fields: { ...ticket.fields, firstResponseAt: context.now.toISOString(), assignee: String(ticket.fields.assignee || context.actor) },
-          }, { event: `First response recorded on ${String(ticket.fields.ref ?? "")}` });
+            fields: { firstResponseRecordedAt: context.now.toISOString(), assignee: String(ticket.fields.assignee || context.actor) },
+          }, { event: `First reply recorded (not delivered) on ${String(ticket.fields.ref ?? "")}` });
+          if (!saved) return;
         }
         if (macro) {
           await context.mutate.patch(macro.id, { fields: { ...macro.fields, uses: Number(macro.fields.uses ?? 0) + 1 } }, { event: `${macro.title} used` });

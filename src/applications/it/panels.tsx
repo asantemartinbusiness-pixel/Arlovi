@@ -525,7 +525,7 @@ export function RemediationPanel({ context, record }: { context: ScreenContext; 
           <Button
             variant="primary"
             disabled={!verified || record.status === "resolved"}
-            title={!verified ? "Run the diagnostics after the incident was opened first" : undefined}
+            title={!verified ? "Run the workspace diagnostics after the incident was opened first" : undefined}
             onClick={async () => {
               await context.mutate.patch(record.id, {
                 status: "resolved",

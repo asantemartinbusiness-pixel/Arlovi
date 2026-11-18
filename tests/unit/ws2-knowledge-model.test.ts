@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Rec } from "@/domain/types";
 import {
   DEFAULT_FILTERS, backlinks, draftFromRecord, draftProblems, filterKnowledge, isSubstantiveChange, matchScore,
+  nextOriginProvenance, originProvenanceOf, provenanceChoices,
   reviewRequestProblems, reviewTiming, sortKnowledge, statusAfterEdit, summarize, verificationBlockers,
 } from "@/applications/brain/knowledge/model";
 
@@ -44,6 +45,17 @@ describe("verification rules", () => {
   });
   it("allows model-generated text once a source is cited", () => {
     expect(verificationBlockers(inReview({ provenance: "model_generated" }, { content: "Text", sources: [{ id: "s", label: "Price list" }] }), "Maya Chen", true)).toEqual([]);
+  });
+  it("keeps the model-generated origin when the label is switched to human", () => {
+    const relabelled = inReview({ provenance: "human", originProvenance: "model_generated" }, { content: "Text" });
+    expect(originProvenanceOf(relabelled)).toBe("model_generated");
+    expect(verificationBlockers(relabelled, "Maya Chen", true).join(" ")).toMatch(/Model-generated text cannot be verified/);
+    expect(nextOriginProvenance(relabelled, "human")).toBe("model_generated");
+    expect(nextOriginProvenance(rec({ id: "b", fields: { provenance: "imported" } }), "human")).toBe("imported");
+    expect(nextOriginProvenance(rec({ id: "c", fields: { provenance: "human" } }), "model_generated")).toBe("model_generated");
+    expect(nextOriginProvenance(undefined, "human")).toBe("human");
+    expect(provenanceChoices("model_generated")).not.toContain("human");
+    expect(provenanceChoices("human")).toContain("human");
   });
   it("requires a review request, content and the capability", () => {
     expect(verificationBlockers(rec({ id: "a", title: "x", status: "draft", body: { content: "x" } }), "Maya", true)).toHaveLength(1);

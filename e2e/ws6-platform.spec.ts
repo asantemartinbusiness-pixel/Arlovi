@@ -99,12 +99,17 @@ test("IT: change approval is separated from the requester, and access reviews re
   await page.goto("/o/northline/it/home?tab=Changes");
   const changes = page.getByLabel("Change requests");
   await changes.getByRole("button", { name: /Move the showroom diary/ }).click();
+  // Maya Chen requested this change; naming someone else does not let her record its approval.
   await changes.getByLabel("Approver").selectOption("Ada Fernsby");
-  await changes.getByRole("button", { name: "Record approval" }).click();
-  await expect(changes).toContainText("Approved by");
+  await expect(changes).toContainText("You requested this change, so you cannot record its approval");
+  await expect(changes.getByRole("button", { name: "Record approval" })).toBeDisabled();
+  await changes.getByLabel("Decision note").fill("Hold until the studio calendar owner signs off");
+  await changes.getByRole("button", { name: "Record rejection" }).click();
+  await expect(changes).toContainText("Submit for approval");
   await page.reload();
-  await expect(page.getByLabel("Change requests")).toContainText("Approved by");
-  await expect(page.getByLabel("Change requests").getByRole("button", { name: "Record as implemented" })).toBeVisible();
+  await page.getByLabel("Change requests").getByRole("button", { name: /Move the showroom diary/ }).click();
+  await expect(page.getByLabel("Change requests").getByRole("button", { name: "Submit for approval" })).toBeVisible();
+  await expect(page.getByLabel("Change requests").getByRole("button", { name: "Record approval" })).toHaveCount(0);
 
   await page.goto("/o/northline/it/security?tab=Access");
   const reviews = page.getByLabel("Access reviews");
