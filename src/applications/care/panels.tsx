@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { BookOpen, Headphones, Inbox, MessageSquare, Smile, Timer, Wand2 } from "lucide-react";
 import {
   Avatar, BarChart, Button, Card, Checkbox, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice,
@@ -261,7 +262,18 @@ export function ServiceOverview({ context, lens }: { context: ScreenContext; len
 export function OmnichannelInbox({ context, lens }: { context: ScreenContext; lens: "Unassigned" | "Mine" | "Team" | "Waiting" | "Closed" }) {
   const data = useCareData();
   const { now, actor, org } = useWorkspace();
-  const [activeId, setActiveId] = useState("");
+  /* The open case lives in the URL, so a reload, Back or a shared link reopens
+     the same conversation (and its saved draft) instead of whichever case
+     currently sorts first. */
+  const [params, setParams] = useSearchParams();
+  const activeId = params.get("case") ?? "";
+  const setActiveId = useCallback((id: string) => {
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      if (id) next.set("case", id); else next.delete("case");
+      return next;
+    }, { replace: true });
+  }, [setParams]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [view, setView] = useState<InboxView>("all");
   const [sort, setSort] = useState<InboxSort>("sla");

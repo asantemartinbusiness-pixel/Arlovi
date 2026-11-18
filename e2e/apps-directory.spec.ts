@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { revealInNavigation } from "./helpers/navigation";
 
 test("Apps directory exposes all tools with capability search and category navigation", async ({ page }) => {
   await page.goto("/o/northline/workspace/apps");
@@ -78,10 +79,10 @@ test("Platform category offers real work-area shortcuts and preserves category n
   await sidebar.getByRole("link", { name: "IT Operations" }).click();
   await expect(page).toHaveURL(/\/o\/northline\/it\/home$/);
   // Route transitions close the mobile drawer; reopen it before returning.
-  const reopenNavigation = page.getByRole("button", { name: "Open navigation" });
-  if (await reopenNavigation.isVisible()) await reopenNavigation.click();
-  await page.getByRole("navigation", { name: "IT Operations navigation" })
-    .getByRole("link", { name: "All applications" }).click();
+  const allApplications = page.getByRole("navigation", { name: "IT Operations navigation" })
+    .getByRole("link", { name: "All applications" });
+  await revealInNavigation(page, allApplications);
+  await allApplications.click();
   await expect(page).toHaveURL(/category=Platform/);
   await expect(page.locator(".apps-directory-open")).toHaveCount(5);
 });

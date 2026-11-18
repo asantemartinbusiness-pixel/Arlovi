@@ -1389,9 +1389,16 @@ test.describe("Journeys", () => {
   test("an invoice can be created, issued, and found in the ledger after reload", async ({ page }) => {
     await open(page, "/fin/invoices", "Invoice List");
     await action(page, "Create an invoice");
-    const hint = (await dialog(page).getByText(/Next free number is INV-\d+/).textContent()) ?? "";
-    const next = /INV-\d+/.exec(hint)?.[0] ?? "";
-    await expect.soft(dialog(page).getByLabel("Invoice number"), "DEFECT: /fin/invoices 'Create an invoice' prefills INV-1001 while stating the next free number; the number is initialised before the invoices load").toHaveValue(next);
+    // The suggestion follows the invoices as they finish loading in the
+    // background; read the hint and the prefilled number together until they
+    // agree, so the journey uses the settled next free number.
+    let next = "";
+    await expect(async () => {
+      const hint = (await dialog(page).getByText(/Next free number is INV-\d+/).textContent()) ?? "";
+      next = /INV-\d+/.exec(hint)?.[0] ?? "";
+      expect(next).not.toBe("");
+      await expect(dialog(page).getByLabel("Invoice number"), "the prefilled number is the stated next free number").toHaveValue(next, { timeout: 500 });
+    }).toPass({ timeout: 15_000 });
     await dialog(page).getByLabel("Invoice number").fill(next);
     await dialog(page).getByLabel("Customer").selectOption({ label: "Marcus Pike · domestic" });
     await dialog(page).getByLabel("First line").fill("Studio day rate");

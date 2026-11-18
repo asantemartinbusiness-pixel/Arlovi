@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { revealInNavigation } from "./helpers/navigation";
 
 /** Uses the actual off-canvas navigation on small screens, never force-clicks
  * invisible sidebar controls. */
@@ -30,9 +31,10 @@ for (const width of [390, 820, 1440]) {
     await expect(page).toHaveURL(/\/fin\/invoices$/);
     await expect(page.getByRole("tab", { name: "Draft", exact: true }))
       .toHaveAttribute("aria-selected", "true");
-    await openNativeSidebar(page);
-    await page.getByRole("navigation", { name: "Finance navigation" })
-      .getByRole("link", { name: "Finance Overview", exact: true }).click();
+    const overview = page.getByRole("navigation", { name: "Finance navigation" })
+      .getByRole("link", { name: "Finance Overview", exact: true });
+    await revealInNavigation(page, overview);
+    await overview.click();
     await expect(page).toHaveURL(/\/fin\/home$/);
     await expect(page.getByRole("tab", { name: "Overview", exact: true }))
       .toHaveAttribute("aria-selected", "true");

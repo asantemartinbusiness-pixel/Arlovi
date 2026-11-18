@@ -1033,7 +1033,10 @@ export function NewInvoice({ context, close }: { context: ScreenContext; close: 
     return `INV-${(Math.max(1000, ...numbers) + 1)}`;
   }, [data.invoices]);
 
-  const number = typedNumber ?? suggested;
+  // Never suggest (or allow) a number before the existing invoices are read:
+  // an empty first read would offer INV-1001 even when it is already taken.
+  const numbersKnown = data.ready;
+  const number = typedNumber ?? (numbersKnown ? suggested : "");
 
   const customer = data.contacts.find((contact) => contact.id === contactId);
   const status = statusFor(undefined, customer);
@@ -1082,7 +1085,7 @@ export function NewInvoice({ context, close }: { context: ScreenContext; close: 
       }}
     >
       <Row gap={3} wrap>
-        <Field label="Invoice number" required hint={`Next free number is ${suggested}`}>
+        <Field label="Invoice number" required hint={numbersKnown ? `Next free number is ${suggested}` : "Reading the numbers already used…"}>
           <TextInput aria-label="Invoice number" value={number} invalid={duplicate} onChange={(event) => setNumber(event.target.value)} required />
         </Field>
         <Field label="Payment terms" hint="Days from today">
@@ -1112,7 +1115,7 @@ export function NewInvoice({ context, close }: { context: ScreenContext; close: 
       </Card>
 
       <Row gap={2}>
-        <Button type="submit" variant="primary" busy={busy} disabled={duplicate || !number.trim()}>Create draft</Button>
+        <Button type="submit" variant="primary" busy={busy} disabled={!numbersKnown || duplicate || !number.trim()}>Create draft</Button>
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </form>
