@@ -35,7 +35,6 @@ export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string 
   const [prompt, setPrompt] = useState(seed);
   const [turns, setTurns] = useState<Turn[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
-  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const recordCount = useMemo(() => records.length, [records]);
   const replyContext = context === "Workspace" ? org.name : context;
@@ -62,7 +61,7 @@ export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string 
   function newConversation() {
     setTurns([]);
     setPrompt("");
-    composerRef.current?.focus();
+    document.querySelector<HTMLTextAreaElement>(".ask-composer textarea")?.focus();
   }
 
   return (
@@ -76,7 +75,6 @@ export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string 
         <div className="ask-composer-wrap">
           <form className="ask-composer" onSubmit={(event) => { event.preventDefault(); ask(prompt); }}>
             <TextArea
-              ref={composerRef}
               aria-label={`Ask about ${org.name}`}
               placeholder={`Ask about ${org.shortName}…`}
               value={prompt}
