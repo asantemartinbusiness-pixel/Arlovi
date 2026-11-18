@@ -1,4 +1,5 @@
-import { FileQuestion } from "lucide-react";
+import { File, FileQuestion, FileText, Film, Music, Type } from "lucide-react";
+import type { CSSProperties } from "react";
 import { Pill, Row } from "@/design-system";
 import type { Rec } from "@/domain/types";
 
@@ -149,11 +150,43 @@ export function assetPreviewUri(record: Rec): string | undefined {
   return `data:image/svg+xml;utf8,${encodeURIComponent(drawn(record))}`;
 }
 
+/** The MIME type of an uploaded file, from the body or the record's fields. */
+export function uploadedMime(record: Rec): string {
+  const body = record.body as { mime?: string; dataUrl?: string } | undefined;
+  if (body?.mime) return body.mime;
+  if (record.fields.mime) return String(record.fields.mime);
+  const match = /^data:([^;,]+)/.exec(body?.dataUrl ?? "");
+  return match ? match[1] : "";
+}
+
+export function uploadedFileName(record: Rec): string | undefined {
+  const body = record.body as { fileName?: string } | undefined;
+  return body?.fileName ?? (record.fields.fileName ? String(record.fields.fileName) : undefined);
+}
+
+function FileTile({ record, style }: { record: Rec; style: CSSProperties }) {
+  const mime = uploadedMime(record);
+  const kind = String(record.fields.kind ?? "");
+  const Icon = mime.startsWith("video/") ? Film : mime.startsWith("audio/") ? Music : kind === "font" ? Type : mime === "application/pdf" || mime.startsWith("text/") || kind === "document" ? FileText : File;
+  return (
+    <div
+      style={{ ...style, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, color: "var(--fg-muted)", textAlign: "center", padding: "var(--space-3)" }}
+      role="img"
+      aria-label={`${record.title}: ${String(record.fields.format ?? "file").toUpperCase()} file held in this browser`}
+    >
+      <Icon size={22} aria-hidden="true" />
+      <strong style={{ fontSize: "var(--text-sm)" }}>{String(record.fields.format ?? "file").toUpperCase()}</strong>
+      <span className="ds-subtle ds-truncate" style={{ maxWidth: "100%" }}>{uploadedFileName(record) ?? "File held in this browser"}</span>
+    </div>
+  );
+}
+
 export function AssetPreview({
   record, height = 140, rounded = true, fit = "cover",
 }: { record: Rec; height?: number | string; rounded?: boolean; fit?: "cover" | "contain" }) {
   const uri = assetPreviewUri(record);
   const state = fileState(record);
+  const mime = state === "uploaded" ? uploadedMime(record) : "";
   const style = {
     height,
     width: "100%",
@@ -175,6 +208,13 @@ export function AssetPreview({
     );
   }
 
+  if (state === "uploaded" && mime && !mime.startsWith("image/")) {
+    if (mime.startsWith("video/")) {
+      return <video src={uri} muted playsInline preload="metadata" aria-label={`${record.title} — video held in this browser`} style={{ ...style, objectFit: fit, display: "block" }} />;
+    }
+    return <FileTile record={record} style={style} />;
+  }
+
   return (
     <img
       src={uri}
@@ -182,6 +222,44 @@ export function AssetPreview({
       style={{ ...style, objectFit: fit, display: "block" }}
     />
   );
+}
+
+function decodeText(uri: string): string {
+  try {
+    const comma = uri.indexOf(",");
+    const raw = uri.slice(comma + 1);
+    if (uri.slice(0, comma).includes(";base64")) return new TextDecoder().decode(Uint8Array.from(atob(raw), (c) => c.charCodeAt(0)));
+    return decodeURIComponent(raw);
+  } catch {
+    return "";
+  }
+}
+
+/** Full-size viewer for the detail page: plays video and audio, shows a PDF, reads short text. */
+export function AssetViewer({ record, height = 340, fit = "contain" }: { record: Rec; height?: number; fit?: "cover" | "contain" }) {
+  const state = fileState(record);
+  const uri = assetPreviewUri(record);
+  const mime = state === "uploaded" ? uploadedMime(record) : "";
+  const frame = { width: "100%", height, borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)", background: "var(--bg-inset)", display: "block" } as const;
+  if (uri && mime.startsWith("video/")) return <video src={uri} controls playsInline aria-label={`${record.title} — video`} style={{ ...frame, objectFit: "contain" }} />;
+  if (uri && mime.startsWith("audio/")) {
+    return (
+      <div style={{ ...frame, height: "auto", padding: "var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+        <FileTile record={record} style={{ height: 120 }} />
+        <audio src={uri} controls aria-label={`${record.title} — audio`} style={{ width: "100%" }} />
+      </div>
+    );
+  }
+  if (uri && mime === "application/pdf") return <iframe src={uri} title={`${record.title} — PDF`} style={frame} />;
+  if (uri && (mime.startsWith("text/") || mime === "application/json")) {
+    const text = decodeText(uri);
+    return (
+      <pre aria-label={`${record.title} — text`} style={{ ...frame, overflow: "auto", padding: "var(--space-3)", margin: 0, fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)", whiteSpace: "pre-wrap" }}>
+        {text.slice(0, 20_000) || "This text file could not be decoded."}
+      </pre>
+    );
+  }
+  return <AssetPreview record={record} height={height} fit={fit} />;
 }
 
 export function FileStateTag({ record }: { record: Rec }) {

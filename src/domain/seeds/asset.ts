@@ -215,6 +215,32 @@ registerSeed("asset", (ctx) => {
     tags: ["template"],
   });
 
+  /* ---------------- Folders: grouping only, an asset lives in at most one ---------------- */
+  const folder = (org: "nl" | "hb", n: number, title: string, summary: string, members: number[]) => {
+    const id = ctx.id(org, "assetFolders", n);
+    records.push(ctx.rec({ org, collection: "assetFolders", n, title, summary, status: "active", at: at(320) }));
+    for (const member of members) {
+      const asset_ = records.find((row) => row.id === ctx.id(org, "assets", member));
+      if (asset_) asset_.fields = { ...asset_.fields, folderId: id };
+    }
+  };
+  folder("nl", 1, "Brand marks", "Logos, marks, icons and the templates built on them.", [20, 21, 22, 23, 35, 36, 40]);
+  folder("nl", 2, "Product photography", "Studio shots of the collection and their production variants.", [24, 25, 30, 32, 33, 34]);
+  folder("nl", 3, "Sites and process", "Installs, the showroom and the workshop, shot on location.", [26, 28, 29, 31, 39]);
+  folder("nl", 4, "Campaign archive", "Material from earlier campaigns, kept so old sends still resolve.", [27, 41]);
+  folder("hb", 1, "Harbor brand", "Harbor's own mark and layouts.", [20, 22]);
+
+  /* ---------------- Links to the work each asset belongs to ---------------- */
+  const link = (n: number, ids: string[]) => {
+    const asset_ = records.find((row) => row.id === ctx.id("nl", "assets", n));
+    if (asset_) asset_.fields = { ...asset_.fields, linkedIds: ids.join(",") };
+  };
+  link(24, ["nl-projects-001", "nl-campaigns-001", "nl-products-001"]);
+  link(25, ["nl-products-001"]);
+  link(29, ["nl-campaigns-001"]);
+  link(35, ["nl-deals-001"]);
+  link(36, ["nl-documents-001"]);
+
   /* ---------------- Brand kits ---------------- */
   records.push(ctx.rec({
     org: "nl", collection: "brands", n: 20, title: "Northline — master", status: "active",
