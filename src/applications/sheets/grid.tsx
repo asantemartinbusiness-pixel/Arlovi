@@ -1,8 +1,16 @@
 import {
   useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
-import { cellAddress, columnName, parseAddress, type CellResult, type RangeBox } from "./engine";
-import { displayValue, type CellStyle, type FormatContext, type Sheet } from "./model";
+import { boxLabel, cellAddress, columnName, FUNCTION_HELP, parseAddress, type CellResult, type RangeBox } from "./engine";
+import {
+  applySuggestion, displayValue, edgeJump, formulaWantsReference, functionSuggestions, usedBox,
+  type CellStyle, type FormatContext, type Sheet,
+} from "./model";
+
+/** Keyboard commands the grid hands back to the editor that owns the workbook. */
+export type GridShortcut = "undo" | "redo" | "fillDown" | "fillRight" | "bold" | "italic";
+
+const FUNCTION_NAMES = FUNCTION_HELP.map((item) => item.name);
 
 /* ====================================================================== *
  * Virtualised worksheet grid.
@@ -60,6 +68,8 @@ export interface SheetGridProps {
   height?: number;
   /** Raised when the editor should start from the formula bar. */
   editRequest?: { address: string; initial: string; token: number };
+  /** Ctrl/⌘ shortcuts: undo, redo, fill down (D), fill right (R), bold (B), italic (I). */
+  onShortcut?: (action: GridShortcut, box: RangeBox) => void;
 }
 
 function columnWidth(sheet: Sheet, col: number): number {
@@ -74,7 +84,7 @@ function columnOffsets(sheet: Sheet): number[] {
 
 export function SheetGrid({
   sheet, values, format, selection, onSelectionChange, onCommit, onClear, onPaste, onCopy,
-  hiddenRows, comments, protectedAddresses, readOnly, highlighted, height = 520, editRequest,
+  hiddenRows, comments, protectedAddresses, readOnly, highlighted, height = 520, editRequest, onShortcut,
 }: SheetGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const colHeadRef = useRef<HTMLDivElement>(null);
@@ -84,6 +94,10 @@ export function SheetGrid({
   const [viewport, setViewport] = useState({ width: 900, height });
   const [editing, setEditing] = useState<{ col: number; row: number; value: string } | null>(null);
   const dragging = useRef(false);
+  /* Pointing: while a formula is typed, clicking or dragging over cells writes their reference. */
+  const pointing = useRef<{ insertAt: number; from: { col: number; row: number }; dragging: boolean } | null>(null);
+  const [suggestion, setSuggestion] = useState(0);
+  const [dismissedAt, setDismissedAt] = useState<string | null>(null);
 
   const offsets = useMemo(() => columnOffsets(sheet), [sheet]);
   const freezeCols = Math.min(sheet.freeze.cols, 6);
@@ -138,6 +152,7 @@ export function SheetGrid({
     if (readOnly) return;
     const address = cellAddress(col, row);
     if (protectedAddresses?.has(address)) return;
+    pointing.current = null;
     setEditing({ col, row, value: initial ?? sheet.cells[address] ?? "" });
   }, [readOnly, protectedAddresses, sheet.cells]);
 
@@ -186,16 +201,45 @@ export function SheetGrid({
     scrollIntoView(target.col, target.row);
   }, [selection, sheet.cols, sheet.rows, onSelectionChange, scrollIntoView]);
 
+  /* Ctrl/⌘ + arrow jumps to the edge of the data block, as spreadsheets do. */
+  const jump = useCallback((dCol: number, dRow: number, extend: boolean) => {
+    const from = extend ? { col: selection.box.toCol, row: selection.box.toRow } : selection.active;
+    const target = edgeJump(sheet, from.col, from.row, dCol, dRow);
+    onSelectionChange(extend ? extendSelection(selection, target.col, target.row) : singleSelection(target.col, target.row));
+    scrollIntoView(target.col, target.row);
+  }, [selection, sheet, onSelectionChange, scrollIntoView]);
+
   function onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (editing) return;
     const meta = event.metaKey || event.ctrlKey;
     const { active } = selection;
     if (meta && event.key.toLowerCase() === "k") return;
+    if (meta && !event.altKey) {
+      const letter = event.key.toLowerCase();
+      const command: GridShortcut | undefined = letter === "z" ? (event.shiftKey ? "redo" : "undo")
+        : letter === "y" ? "redo"
+        : letter === "d" ? "fillDown"
+        : letter === "r" ? "fillRight"
+        : letter === "b" ? "bold"
+        : letter === "i" ? "italic"
+        : undefined;
+      if (command && onShortcut && (!readOnly || command === "undo" || command === "redo")) {
+        event.preventDefault(); event.stopPropagation();
+        onShortcut(command, selection.box);
+        return;
+      }
+      if (letter === "a") {
+        event.preventDefault(); event.stopPropagation();
+        const box = usedBox(sheet);
+        onSelectionChange({ active: { col: box.fromCol, row: box.fromRow }, box });
+        return;
+      }
+    }
     switch (event.key) {
-      case "ArrowDown": event.preventDefault(); event.stopPropagation(); move(0, meta ? 10 : 1, event.shiftKey); return;
-      case "ArrowUp": event.preventDefault(); event.stopPropagation(); move(0, meta ? -10 : -1, event.shiftKey); return;
-      case "ArrowLeft": event.preventDefault(); event.stopPropagation(); move(meta ? -5 : -1, 0, event.shiftKey); return;
-      case "ArrowRight": event.preventDefault(); event.stopPropagation(); move(meta ? 5 : 1, 0, event.shiftKey); return;
+      case "ArrowDown": event.preventDefault(); event.stopPropagation(); if (meta) jump(0, 1, event.shiftKey); else move(0, 1, event.shiftKey); return;
+      case "ArrowUp": event.preventDefault(); event.stopPropagation(); if (meta) jump(0, -1, event.shiftKey); else move(0, -1, event.shiftKey); return;
+      case "ArrowLeft": event.preventDefault(); event.stopPropagation(); if (meta) jump(-1, 0, event.shiftKey); else move(-1, 0, event.shiftKey); return;
+      case "ArrowRight": event.preventDefault(); event.stopPropagation(); if (meta) jump(1, 0, event.shiftKey); else move(1, 0, event.shiftKey); return;
       case "Tab": event.preventDefault(); event.stopPropagation(); move(event.shiftKey ? -1 : 1, 0, false); return;
       case "Home": event.preventDefault(); event.stopPropagation(); onSelectionChange(singleSelection(0, active.row)); scrollIntoView(0, active.row); return;
       case "PageDown": event.preventDefault(); event.stopPropagation(); move(0, 20, event.shiftKey); return;
@@ -289,11 +333,34 @@ export function SheetGrid({
         }}
         onMouseDown={(event) => {
           event.preventDefault();
+          /* Pointing mode: a formula waiting for an operand takes this cell's reference. */
+          if (editing && !(editing.col === col && editing.row === row) && formulaWantsReference(editing.value)) {
+            pointing.current = { insertAt: editing.value.length, from: { col, row }, dragging: true };
+            setEditing({ ...editing, value: editing.value + cellAddress(col, row) });
+            requestAnimationFrame(() => inputRef.current?.focus());
+            return;
+          }
+          if (editing && pointing.current && !(editing.col === col && editing.row === row)) {
+            /* Clicking again while pointing replaces the reference just written. */
+            const at = pointing.current.insertAt;
+            pointing.current = { insertAt: at, from: { col, row }, dragging: true };
+            setEditing({ ...editing, value: editing.value.slice(0, at) + cellAddress(col, row) });
+            requestAnimationFrame(() => inputRef.current?.focus());
+            return;
+          }
           scrollRef.current?.focus();
           if (event.shiftKey) onSelectionChange(extendSelection(selection, col, row));
           else { onSelectionChange(singleSelection(col, row)); dragging.current = true; }
         }}
-        onMouseEnter={() => { if (dragging.current) onSelectionChange(extendSelection(selection, col, row)); }}
+        onMouseEnter={() => {
+          const point = pointing.current;
+          if (editing && point?.dragging) {
+            const box = { fromCol: Math.min(point.from.col, col), fromRow: Math.min(point.from.row, row), toCol: Math.max(point.from.col, col), toRow: Math.max(point.from.row, row) };
+            setEditing({ ...editing, value: editing.value.slice(0, point.insertAt) + boxLabel(box) });
+            return;
+          }
+          if (dragging.current) onSelectionChange(extendSelection(selection, col, row));
+        }}
         onDoubleClick={() => startEdit(col, row)}
       >
         <span className="sx-cell-text">{text}</span>
@@ -301,6 +368,8 @@ export function SheetGrid({
       </div>
     );
   }
+
+  const suggestions = editing && editing.value !== dismissedAt ? functionSuggestions(editing.value, FUNCTION_NAMES) : [];
 
   const bodyCells = [];
   for (let row = firstRow; row <= lastRow; row += 1) {
@@ -329,7 +398,7 @@ export function SheetGrid({
   }
 
   useEffect(() => {
-    function onUp() { dragging.current = false; }
+    function onUp() { dragging.current = false; if (pointing.current) pointing.current = { ...pointing.current, dragging: false }; }
     window.addEventListener("mouseup", onUp);
     return () => window.removeEventListener("mouseup", onUp);
   }, []);
@@ -434,17 +503,60 @@ export function SheetGrid({
           ref={inputRef}
           className="sx-editor ds-num"
           aria-label={`Edit ${cellAddress(editing.col, editing.row)}`}
+          aria-autocomplete="list"
+          aria-controls={suggestions.length ? "sx-fn-suggestions" : undefined}
+          aria-expanded={suggestions.length > 0}
           value={editing.value}
-          style={{ left: editingLeft, top: editingTop, width: columnWidth(sheet, editing.col), height: ROW_H }}
-          onChange={(event) => setEditing({ ...editing, value: event.target.value })}
+          style={{ left: editingLeft, top: editingTop, width: Math.max(columnWidth(sheet, editing.col), editing.value.startsWith("=") ? 220 : 0), height: ROW_H }}
+          onChange={(event) => { pointing.current = null; setSuggestion(0); setEditing({ ...editing, value: event.target.value }); }}
           onBlur={() => commitEdit("none")}
           onKeyDown={(event) => {
             event.stopPropagation();
+            if (suggestions.length) {
+              if (event.key === "ArrowDown") { event.preventDefault(); setSuggestion((index) => (index + 1) % suggestions.length); return; }
+              if (event.key === "ArrowUp") { event.preventDefault(); setSuggestion((index) => (index - 1 + suggestions.length) % suggestions.length); return; }
+              if (event.key === "Tab" || event.key === "Enter") {
+                event.preventDefault();
+                setEditing({ ...editing, value: applySuggestion(editing.value, suggestions[Math.min(suggestion, suggestions.length - 1)]) });
+                setSuggestion(0);
+                return;
+              }
+              if (event.key === "Escape") { event.preventDefault(); setDismissedAt(editing.value); return; }
+            }
             if (event.key === "Enter") { event.preventDefault(); commitEdit("down"); }
             if (event.key === "Tab") { event.preventDefault(); commitEdit("right"); }
             if (event.key === "Escape") { event.preventDefault(); setEditing(null); requestAnimationFrame(() => scrollRef.current?.focus()); }
           }}
         />
+      )}
+      {editing && suggestions.length > 0 && (
+        <ul
+          id="sx-fn-suggestions"
+          className="sx-suggest"
+          role="listbox"
+          aria-label="Matching functions"
+          style={{ left: editingLeft, top: editingTop + ROW_H + 2 }}
+        >
+          {suggestions.map((name, index) => {
+            const help = FUNCTION_HELP.find((item) => item.name === name);
+            return (
+              <li
+                key={name}
+                role="option"
+                aria-selected={index === Math.min(suggestion, suggestions.length - 1)}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  setEditing({ ...editing, value: applySuggestion(editing.value, name) });
+                  setSuggestion(0);
+                  inputRef.current?.focus();
+                }}
+              >
+                <span className="ds-num">{help?.signature ?? name}</span>
+                <span className="sx-suggest-summary">{help?.summary}</span>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );

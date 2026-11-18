@@ -382,7 +382,7 @@ function CanvasScreen({ context, actions }: { context: ScreenContext; actions: A
           <span>Zoom {Math.round(ui.view.zoom * 100)}%</span>
           <span className="ds-grow" />
           <span>{handle.canUndo ? `Undo: ${handle.lastLabel}` : "No history yet"}</span>
-          <span>Arrow keys nudge · Alt+arrows resize · ⌘[ / ⌘] reorder · ⌘G group</span>
+          <span title="⌘A select all · ⌘C / ⌘X / ⌘V copy, cut, paste · ⌘D duplicate · ⇧⌘G ungroup · ⇧⌘H hide · ⇧⌘L lock · ⇧⌘[ / ⇧⌘] send to back or front">Arrow keys nudge · Alt+arrows resize · ⌘[ / ⌘] reorder · ⌘G / ⇧⌘G group · ⌘C ⌘V copy</span>
         </>
       }
     >

@@ -618,6 +618,23 @@ function GridEditorScreen({ context }: { context: ScreenContext }) {
             comments={sheetComments.map((comment) => ({ address: comment.address, resolved: comment.resolved }))}
             protectedAddresses={guarded}
             height={560}
+            onShortcut={(action, box) => {
+              if (action === "undo") { if (editor.canUndo) editor.undo(); return; }
+              if (action === "redo") { if (editor.canRedo) editor.redo(); return; }
+              if (action === "fillDown") {
+                if (box.fromRow === box.toRow) { context.toast("Nothing to fill", "Select the source row and the rows below it, then fill down.", "info"); return; }
+                editor.commitSheet(fillRange(editor.sheet, box, "down"), "Fill down");
+                return;
+              }
+              if (action === "fillRight") {
+                if (box.fromCol === box.toCol) { context.toast("Nothing to fill", "Select the source column and the columns to its right, then fill right.", "info"); return; }
+                editor.commitSheet(fillRange(editor.sheet, box, "right"), "Fill right");
+                return;
+              }
+              const first = editor.sheet.styles[cellAddress(box.fromCol, box.fromRow)];
+              if (action === "bold") editor.commitSheet(styleRange(editor.sheet, box, { bold: !first?.bold }), first?.bold ? "Not bold" : "Bold");
+              if (action === "italic") editor.commitSheet(styleRange(editor.sheet, box, { italic: !first?.italic }), first?.italic ? "Not italic" : "Italic");
+            }}
           />
           <SheetTabs editor={editor} context={context} />
           <StatusStrip editor={editor} />

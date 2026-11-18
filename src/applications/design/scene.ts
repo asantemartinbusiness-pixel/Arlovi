@@ -441,6 +441,65 @@ function structuredCloneSafe<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+/* ------------------------------ clipboard ------------------------------ */
+
+/** Copied layers with their descendants; roots carry page-absolute positions. */
+export interface SceneClip {
+  roots: string[];
+  nodes: Record<string, SceneNode>;
+  children: Record<string, string[]>;
+}
+
+/** Copy layers (and everything inside them) so they can be pasted on any page. */
+export function copyNodes(page: ScenePage, ids: string[]): SceneClip | null {
+  /* A layer inside another selected layer comes along with its parent. */
+  const roots = ids.filter((id) => page.nodes[id] && !ids.some((other) => other !== id && descendants(page, other).includes(id)));
+  if (roots.length === 0) return null;
+  const nodes: Record<string, SceneNode> = {};
+  const children: Record<string, string[]> = {};
+  for (const root of roots) {
+    const abs = absoluteRect(page, page.nodes[root]);
+    nodes[root] = { ...structuredCloneSafe(page.nodes[root]), x: abs.x, y: abs.y };
+    for (const id of descendants(page, root)) {
+      nodes[id] = structuredCloneSafe(page.nodes[id]);
+    }
+    for (const id of [root, ...descendants(page, root)]) {
+      if (page.children[id]?.length) children[id] = [...page.children[id]];
+    }
+  }
+  return { roots, nodes, children };
+}
+
+/** Paste a clip at the top level of a page with fresh ids, offset from where it was copied. */
+export function pasteNodes(page: ScenePage, clip: SceneClip, offset = 16): { page: ScenePage; ids: string[] } {
+  let next = page;
+  const made: string[] = [];
+  const place = (sourceId: string, parent: string, isRoot: boolean) => {
+    const source = clip.nodes[sourceId];
+    if (!source) return;
+    const copy: SceneNode = {
+      ...structuredCloneSafe(source),
+      id: uid(source.kind),
+      x: source.x + (isRoot ? offset : 0),
+      y: source.y + (isRoot ? offset : 0),
+    };
+    next = addNode(next, copy, parent);
+    if (isRoot) made.push(copy.id);
+    for (const child of clip.children[sourceId] ?? []) place(child, copy.id, false);
+  };
+  for (const root of clip.roots) place(root, page.id, true);
+  return { page: next, ids: made };
+}
+
+/** Where a selection aligns: its own bounds for two or more layers, the parent frame for one. */
+export function alignTarget(page: ScenePage, ids: string[]): Rect | null {
+  if (ids.length >= 2) return selectionBounds(page, ids);
+  if (ids.length !== 1) return null;
+  const parent = parentOf(page, ids[0]);
+  const parentNode = parent && parent !== page.id ? page.nodes[parent] : undefined;
+  return parentNode ? absoluteRect(page, parentNode) : null;
+}
+
 /* ------------------------------ auto layout ------------------------------ */
 
 /**

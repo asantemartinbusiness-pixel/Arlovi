@@ -1233,3 +1233,67 @@ export function pushHistory(history: History, entry: HistoryEntry, coalesceWith?
   }
   return { past: [...history.past.slice(-80), entry], future: [] };
 }
+
+/* ----------------------------- Autoformat ----------------------------- */
+
+const AUTOFORMAT: { pattern: RegExp; type: BlockType }[] = [
+  { pattern: /^###\s$/, type: "heading3" },
+  { pattern: /^##\s$/, type: "heading2" },
+  { pattern: /^#\s$/, type: "heading1" },
+  { pattern: /^[-*•]\s$/, type: "bulletItem" },
+  { pattern: /^1[.)]\s$/, type: "numberItem" },
+  { pattern: /^>\s$/, type: "quote" },
+];
+
+/**
+ * Markdown-style shortcuts typed at the start of a paragraph: "# " makes a
+ * heading, "- " a bullet, "1. " a numbered item, "> " a quote. Returns null
+ * when nothing applies; never runs in suggesting mode, where the change has to
+ * be proposed rather than made.
+ */
+export function autoformat(model: DocModel, position: DocPosition): CommandResult | null {
+  if (model.suggestMode) return null;
+  const index = blockIndex(model, position.blockId);
+  const block = model.blocks[index];
+  if (!block || block.type !== "paragraph") return null;
+  const before = blockText(block).slice(0, position.offset);
+  const rule = AUTOFORMAT.find((item) => item.pattern.test(before));
+  if (!rule) return null;
+  const runs = sliceRuns(block.runs, before.length, blockText(block).length);
+  const next = replaceBlock(model, block.id, { ...block, type: rule.type, runs: runs.length ? runs : [{ text: "", marks: [] }] });
+  return { model: remapComments(next, block.id, 0, before.length, 0), selection: collapsed({ blockId: block.id, offset: 0 }) };
+}
+
+/* ----------------------------- Table structure ----------------------------- */
+
+export type TableEdit =
+  | { kind: "addRow"; after: number }
+  | { kind: "addColumn"; after: number }
+  | { kind: "removeRow"; at: number }
+  | { kind: "removeColumn"; at: number };
+
+/** Add or remove a table row or column. A table keeps at least one row and one column. */
+export function editTable(model: DocModel, blockId: string, edit: TableEdit): DocModel {
+  const block = model.blocks[blockIndex(model, blockId)];
+  if (!block?.table) return model;
+  const rows = block.table.rows.map((row) => [...row]);
+  const width = rows.reduce((max, row) => Math.max(max, row.length), 0);
+  if (edit.kind === "addRow") {
+    const at = Math.max(0, Math.min(rows.length, edit.after + 1));
+    rows.splice(at, 0, new Array<string>(Math.max(1, width)).fill(""));
+  } else if (edit.kind === "addColumn") {
+    const at = Math.max(0, Math.min(width, edit.after + 1));
+    for (const row of rows) {
+      while (row.length < width) row.push("");
+      row.splice(at, 0, "");
+    }
+  } else if (edit.kind === "removeRow") {
+    const minimum = block.table.header ? 2 : 1;
+    if (rows.length <= minimum || edit.at < 0 || edit.at >= rows.length) return model;
+    rows.splice(edit.at, 1);
+  } else {
+    if (width <= 1 || edit.at < 0 || edit.at >= width) return model;
+    for (const row of rows) row.splice(edit.at, 1);
+  }
+  return replaceBlock(model, blockId, { ...block, table: { ...block.table, rows } });
+}

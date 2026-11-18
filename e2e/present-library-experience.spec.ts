@@ -104,8 +104,14 @@ test("An unknown presentation URL never opens a different deck", async ({ page }
   await page.goto("/o/northline/present/decks");
   const id = "missing-deck-" + Date.now();
   await page.goto(`/o/northline/present/decks/${id}`);
-  await expect(page.locator("#main")).toContainText("No deck is open");
+  /* The shell's record guard (src/app/ScreenHost.tsx, commit 4e05eff) now
+     answers every unknown detail ID before the application mounts, with one
+     truthful state for all apps. The contract is unchanged: no other deck is
+     substituted and no slide editor is mounted. */
+  await expect(page.locator("#main").getByRole("heading", { name: "Record not found" })).toBeVisible();
+  await expect(page.locator("#main")).toContainText("No other record was substituted.");
   await expect(page.locator("#main").getByLabel("Active slide context")).toHaveCount(0);
+  await expect(page.locator("#main .px-thumb-row")).toHaveCount(0);
 });
 
 test("Review approval records do not imply identity verification or publish automatically", async ({ page }) => {
