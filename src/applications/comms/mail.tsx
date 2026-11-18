@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Mail, PlugZap } from "lucide-react";
+import { Mail, PlugZap, UserRound, Link2, ShieldAlert } from "lucide-react";
 import {
   Avatar, Button, DataGrid, Empty, Field, Notice, Pill, Row, Stack, TextArea, TextInput,
 } from "@/design-system";
@@ -9,6 +9,7 @@ import { clockIso } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { requestMailboxConnection } from "./actions";
 import { useCommsData } from "./panels";
+import { configuredIdentities, signaturePreview, validateIdentity } from "./mailIdentities";
 import {
   MAIL_FOLDERS, checkDraft, draftInput, draftRecord, folderCounts, folderOf, searchThreads, senderAddress,
   type DraftInput, type MailFolder,
@@ -47,10 +48,14 @@ export function MailWorkspace({ context, lens }: { context: ScreenContext; lens:
   const data = useCommsData();
   const { org } = useWorkspace();
   const [query, setQuery] = useState("");
+  const [manageIdentities, setManageIdentities] = useState(false);
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const folder = lens.toLowerCase();
   const searching = query.trim().length > 0;
   const rows = searchThreads(data.emailThreads, query, folder);
   const counts = folderCounts(data.emailThreads);
+  const preview = data.emailThreads.find((thread) => thread.id === previewId) ?? null;
+  const previewMessages = (preview?.body as { messages?: { from?: string; body?: string; at?: string }[] } | undefined)?.messages ?? [];
   const openRow = (id: string) => {
     const row = data.emailThreads.find((thread) => thread.id === id);
     if (row && folderOf(row) === "drafts") context.openOverlay("Compose window", { id });
@@ -76,8 +81,12 @@ export function MailWorkspace({ context, lens }: { context: ScreenContext; lens:
         <Button size="sm" variant="primary" className="cm-mail-new" onClick={() => context.openOverlay("Compose window")}>
           New draft
         </Button>
+        <Button size="sm" variant="secondary" onClick={() => setManageIdentities((value) => !value)}>
+          <UserRound size={14} /> Sender identities
+        </Button>
       </aside>
       <Stack gap={3}>
+        {manageIdentities && <MailIdentityManager context={context} />}
         {folder === "drafts" && !searching && <NotSentNotice context={context} />}
         <DataGrid
           rows={rows}
@@ -120,7 +129,7 @@ export function MailWorkspace({ context, lens }: { context: ScreenContext; lens:
             { key: "labels", header: "Labels", cell: (row) => <Row gap={1} wrap>{String(row.fields.labels ?? "").split(",").filter(Boolean).map((label) => <Pill key={label}>{label}</Pill>)}</Row>, hideBelow: 1100 },
             { key: "when", header: "When", align: "end", cell: (row) => context.date(row.at), sortValue: (row) => row.at ?? "" },
           ]}
-          onSelect={(id) => context.select(id)}
+          onSelect={(id) => { context.select(id); setPreviewId(id); }}
           onOpen={openRow}
           empty={searching
             ? <Empty title="No mail matches" icon={<Mail size={20} />}>Nothing in any folder contains “{query.trim()}”. Search looks at subjects, addresses, labels and message text.</Empty>
@@ -132,6 +141,26 @@ export function MailWorkspace({ context, lens }: { context: ScreenContext; lens:
             { label: "Mark read", onRun: (selected) => selected.forEach((thread) => { void context.mutate.patch(thread.id, { fields: { ...thread.fields, unread: false } }, { event: `${thread.title} marked read` }); }) },
           ]}
         />
+        {preview && (
+          <section className="cm-mail-preview" aria-label="Selected email preview">
+            <Row gap={2} wrap>
+              <strong className="ds-grow">{preview.title}</strong>
+              <Button size="sm" variant="ghost" onClick={() => setPreviewId(null)}>Close preview</Button>
+              <Button size="sm" variant="secondary" onClick={() => openRow(preview.id)}>Open conversation</Button>
+            </Row>
+            <p className="ds-subtle">From: {String(preview.fields.from ?? "Unknown")} · To: {String(preview.fields.to ?? "Not specified")}</p>
+            {previewMessages.map((message, index) => (
+              <article className="cm-mail-preview-message" key={index}>
+                <p className="ds-subtle">{message.from ?? "Unknown"} {message.at ? "· " + context.dateTime(message.at) : ""}</p>
+                <p className="cm-mail-preview-body">{message.body ?? ""}</p>
+              </article>
+            ))}
+            {previewMessages.length === 0 && <p>{preview.summary}</p>}
+            <Notice tone="info" title="Connected business context">
+              Linked customers, invoices, projects and assigned work will appear here only when matching records are authorised. This local email does not grant access to other applications.
+            </Notice>
+          </section>
+        )}
       </Stack>
     </div>
   );
@@ -154,13 +183,17 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
   const [failure, setFailure] = useState("");
   const idRef = useRef<string | undefined>(payload?.id);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
-  const from = senderAddress(context.actor, context.org.slug);
+  const identities = configuredIdentities(useCommsData().preferences, context.actor);
+  const [identityId, setIdentityId] = useState("");
+  const identity = identities.find((item) => item.id === identityId);
+  const from = identity?.address ?? senderAddress(context.actor, context.org.slug);
   const check = checkDraft(draft);
 
   // Read an existing draft into the editor once, when it arrives.
   if (existing && existing.collection === "emailThreads" && loadedFrom !== existing.id) {
     setLoadedFrom(existing.id);
     setDraft(draftInput(existing));
+    setIdentityId(String(existing.fields.senderIdentityId ?? ""));
     setSavedAt(String(existing.fields.savedLocallyAt ?? existing.updatedAt));
   }
 
@@ -174,9 +207,9 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
       try {
         if (idRef.current) {
           const previous = existing && existing.id === idRef.current ? existing : undefined;
-          await context.mutate.patch(idRef.current, draftRecord(value, from, at, previous), { event: `Email draft updated by ${context.actor}` });
+          await context.mutate.patch(idRef.current, { ...draftRecord(value, from, at, previous), fields: { ...draftRecord(value, from, at, previous).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderVerified: false } }, { event: `Email draft updated by ${context.actor}` });
         } else {
-          const created = await context.mutate.create({ collection: "emailThreads", tags: ["draft"], ...draftRecord(value, from, at) }, `Email draft saved by ${context.actor}`);
+          const created = await context.mutate.create({ collection: "emailThreads", tags: ["draft"], ...{ ...draftRecord(value, from, at), fields: { ...draftRecord(value, from, at).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderVerified: false } } }, `Email draft saved by ${context.actor}`);
           idRef.current = created.id;
         }
         setSavedAt(at);
@@ -222,9 +255,16 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
       }}
     >
       <Row gap={2} wrap>
-        <span className="ds-subtle ds-grow">From {from}</span>
+        <span className="ds-subtle ds-grow">Draft from {identity?.name ?? context.actor} &lt;{from}&gt;</span>
         <span role="status" aria-live="polite">{status}</span>
       </Row>
+      <Field label="Sender identity" hint="Configured addresses are display-only until independently authorised by the email provider.">
+        <select className="cm-mail-identity-select" value={identityId} onChange={(event) => { setIdentityId(event.target.value); setDirty(true); }}>
+          <option value="">Default workspace placeholder ({from.includes(".example") ? from : senderAddress(context.actor, context.org.slug)})</option>
+          {identities.map((item) => <option key={item.id} value={item.id}>{item.name} — {item.address} (not verified)</option>)}
+        </select>
+      </Field>
+      {identity?.signature && <Notice tone="info" title="Signature preview"><span className="cm-mail-preview-body">{signaturePreview(draft.body, identity.signature)}</span></Notice>}
       <Field label="To" hint="Separate addresses with a comma.">
         <TextInput value={draft.to} onChange={(event) => edit({ to: event.target.value })} invalid={check.invalid.some((value) => draft.to.includes(value))} />
       </Field>
@@ -250,5 +290,59 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
         </Row>
       )}
     </form>
+  );
+}
+
+/** Persist local sender presentation only; never treat an arbitrary From address as verified. */
+export function MailIdentityManager({ context }: { context: ScreenContext }) {
+  const data = useCommsData();
+  const identities = configuredIdentities(data.preferences, context.actor);
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [department, setDepartment] = useState("");
+  const [signature, setSignature] = useState("");
+  const [error, setError] = useState("");
+  return (
+    <section className="cm-mail-identities" aria-label="Sender identity configuration">
+      <Row gap={2}><UserRound size={16} /><strong>Sender identity presentation</strong></Row>
+      <Notice tone="warning" title="Not connected or authorised">
+        These settings save an identity and signature in this browser only. Domain DNS, mailboxes, OAuth, send-as permissions and delivery must be verified by the real provider before sending can be enabled.
+      </Notice>
+      {identities.map((identity) => (
+        <Row key={identity.id} gap={2} wrap>
+          <span className="ds-grow">{identity.name} · {identity.address} {identity.department ? "· " + identity.department : ""}</span>
+          <Pill tone="warning">Unverified</Pill>
+          <Button size="sm" variant="ghost" onClick={async () => {
+            await context.mutate.remove(identity.id, `Sender identity ${identity.address} removed by ${context.actor}`);
+          }}>Remove</Button>
+        </Row>
+      ))}
+      <form className="cm-mail-identity-form" onSubmit={async (event) => {
+        event.preventDefault();
+        const issue = validateIdentity(name, address);
+        if (issue) { setError(issue); return; }
+        if (identities.some((item) => item.address.toLowerCase() === address.trim().toLowerCase())) {
+          setError("That address has already been configured."); return;
+        }
+        try {
+          await context.mutate.create({
+            collection: "preferences", title: name.trim(), status: "draft",
+            summary: `Unverified sender presentation for ${address.trim()}`,
+            fields: { kind: "mailIdentity", person: context.actor, displayName: name.trim(), address: address.trim(), department: department.trim(), signature: signature.trim(), verified: false },
+          }, `Local sender presentation saved by ${context.actor}`);
+          setName(""); setAddress(""); setDepartment(""); setSignature(""); setError("");
+          context.toast("Identity saved locally", "Provider permission and domain authentication are still required. Sending remains disabled.");
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "The identity could not be saved.");
+        }
+      }}>
+        <Field label="Display name"><TextInput value={name} onChange={(event) => setName(event.target.value)} required /></Field>
+        <Field label="Email address"><TextInput type="email" value={address} onChange={(event) => setAddress(event.target.value)} required /></Field>
+        <Field label="Department"><TextInput value={department} onChange={(event) => setDepartment(event.target.value)} /></Field>
+        <Field label="Signature"><TextArea rows={3} value={signature} onChange={(event) => setSignature(event.target.value)} /></Field>
+        {error && <Notice tone="danger"><ShieldAlert size={14} /> {error}</Notice>}
+        <Button type="submit" size="sm" variant="primary"><Link2 size={14} /> Save local identity</Button>
+      </form>
+    </section>
   );
 }
