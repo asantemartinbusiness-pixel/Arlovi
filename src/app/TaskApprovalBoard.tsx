@@ -35,6 +35,8 @@ export function TaskApprovalBoard({ scope = null }: { scope?: Scope }) {
   const history = [...allRequests].filter(r => r.status !== "awaiting_approval")
     .sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)).slice(0,5);
 
+  const reviewable = relevantTasks.filter(task => !["completed","cancelled","archived"].includes(task.status));
+  const [showHistory,setShowHistory] = useState(false);
   async function submit(task: Rec) {
     setBusyId(task.id);setError("");
     try { await requestTaskCompletion(org.id,task.id,actor);toast("Review requested",`Completion of ${task.title} is awaiting a decision.`,"info"); }
@@ -54,7 +56,9 @@ export function TaskApprovalBoard({ scope = null }: { scope?: Scope }) {
     finally {setBusyId(null);}
   }
   return <section className="ws-section ws-approvals" aria-label="Task completion approvals">
-    <div className="ws-approval-intro"><div><h2>Task approvals</h2><p>Review completion before changing a task's final status. Every decision is recorded.</p></div><ShieldCheck size={22} aria-hidden="true"/></div>
+    <div className="ws-approval-intro"><div><span className="ws-approval-eyebrow">GOVERNANCE / HUMAN DECISIONS</span><h2>Approvals & decisions</h2><p>Review completion requests, make explicit decisions and keep a clear local audit trail.</p></div><ShieldCheck size={25} aria-hidden="true"/></div>
+    <div className="ws-approval-overview" aria-label="Approval overview"><div><span>Awaiting review</span><strong>{pending.length}</strong><small>Needs a decision</small></div><div><span>Eligible tasks</span><strong>{reviewable.length}</strong><small>Available for review</small></div><div><span>Recorded decisions</span><strong>{allRequests.filter(r=>r.status==="approved"||r.status==="rejected").length}</strong><small>In this workspace</small></div></div>
+    {pending.length===0 && <div className="ws-approval-empty"><CheckCircle2 size={19}/><div><strong>No approvals awaiting review</strong><p>Completion requests will appear here for an explicit decision.</p></div></div>}
     {error && <p role="alert" className="ws-approval-error">{error}</p>}
     {pending.length>0 && <div className="ws-approval-block">
       <h3><Clock3 size={15}/> Awaiting review ({pending.length})</h3>
@@ -71,9 +75,9 @@ export function TaskApprovalBoard({ scope = null }: { scope?: Scope }) {
         </div>;
       })}
     </div>}
-    {relevantTasks.length>0 && <div className="ws-approval-block">
+    {reviewable.length>0 && <div className="ws-approval-block">
       <h3>Tasks</h3>
-      {relevantTasks.filter(task=>!["completed","cancelled","archived"].includes(task.status)).slice(0,20).map(task => {
+      {reviewable.slice(0,20).map(task => {
         const requested=pending.some(r=>r.fields.taskId===task.id);
         return <div className="ws-approval-row" key={task.id}>
           <div className="ws-approval-label"><strong>{task.title}</strong><small>{task.status.replace(/_/g," ")} · {task.ownerName}</small></div>
@@ -86,8 +90,8 @@ export function TaskApprovalBoard({ scope = null }: { scope?: Scope }) {
     </div>}
     {pending.length===0 && relevantTasks.length===0 && <p className="ws-empty">No tasks or pending completion reviews in this space.</p>}
     {history.length>0 && <div className="ws-approval-block">
-      <h3><RotateCcw size={15}/> Recent decisions</h3>
-      {history.map(request=><div className="ws-approval-row" key={request.id}><div className="ws-approval-label"><strong>{request.title}</strong><small>{request.status} · {request.fields.decidedBy??"Reviewer"} · {new Date(request.updatedAt).toLocaleDateString()}</small></div></div>)}
+      <button type="button" className="ws-approval-history-toggle" aria-expanded={showHistory} onClick={()=>setShowHistory(v=>!v)}><RotateCcw size={15}/> Recent decisions ({history.length}) <span>{showHistory?"Hide":"Show"}</span></button>
+      {showHistory && <div>{history.map(request=><div className="ws-approval-row" key={request.id}><div className="ws-approval-label"><strong>{request.title}</strong><small>{request.status} · {request.fields.decidedBy??"Reviewer"} · {new Date(request.updatedAt).toLocaleDateString()}</small></div></div>)}</div>}
     </div>}
     <p className="ws-approval-muted">Local workflow demonstration: reviewer role selection is not server-enforced identity or authorisation.</p>
   </section>;
