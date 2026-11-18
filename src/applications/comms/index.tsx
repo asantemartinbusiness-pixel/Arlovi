@@ -557,7 +557,7 @@ export const commsApp = registerApp({
         { id: "forward", kind: "modal", title: "Forward", width: 600, render: ({ ...context }) => <ForwardMail context={context} />, footer: submitFooter("cm-forward", "Check recipients") },
         { id: "label", kind: "modal", title: "Label this thread", width: 480, render: ({ close, ...context }) => <LabelThread context={context} close={close} />, footer: submitFooter("cm-label", "Save labels") },
         { id: "Compose window", kind: "modal", title: "Compose email", width: 760, render: ({ close, ...context }) => <DraftComposer context={context} close={close} />, footer: submitFooter("cm-compose", "Save as a draft") },
-        { id: "send confirmation", kind: "modal", title: "Confirm the recipients", width: 560, render: ({ close, ...context }) => <SendConfirmation context={context} close={close} /> },
+        { id: "send confirmation", kind: "modal", title: "Confirm the recipients", width: 600, presentation: { noRecordContext: true, guidance: "Review recipients, external destinations and sensitive content before queuing a local draft." }, render: ({ close, ...context }) => <SendConfirmation context={context} close={close} /> },
         { id: "rule editor", kind: "modal", title: "Mail rule", width: 560, render: ({ close, ...context }) => <RuleEditor context={context} close={close} />, footer: submitFooter("cm-rule", "Save rule") },
       ],
     },
