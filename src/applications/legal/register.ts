@@ -138,6 +138,18 @@ export function decideRound(reviews: ReviewRound[], decision: ReviewDecision, by
   return reviews.map((round) => (round.id === open.id ? { ...round, decision, decidedBy: by, decidedAt: at, note } : round));
 }
 
+/**
+ * Separation of duties on a review: whoever asked for the review cannot be the
+ * one who approves it. They may still send it back (request changes or
+ * reject), which is how a requester withdraws a contract from review.
+ */
+export function reviewDecisionBlocker(requestedBy: string, decision: ReviewDecision, actor: string): string | undefined {
+  if (decision === "approved" && requestedBy.trim() && requestedBy === actor) {
+    return "You requested this review, so you cannot approve it. The reviewer, or someone else, records the approval.";
+  }
+  return undefined;
+}
+
 export function startRound(reviews: ReviewRound[], reviewer: string, by: string, at: string, id: string): ReviewRound[] {
   const open = openRound(reviews);
   // Re-requesting while a round is open replaces its reviewer rather than stacking rounds.

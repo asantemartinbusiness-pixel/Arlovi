@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Rec } from "@/domain/types";
 import {
-  counterpartiesOf, decideRound, matchesRegister, obligationState, openRound, renewalInfo, startRound,
+  counterpartiesOf, decideRound, matchesRegister, obligationState, openRound, renewalInfo, reviewDecisionBlocker, startRound,
   statusAfterDecision, suggestCompany, EMPTY_FILTER,
 } from "@/applications/legal/register";
 import {
   allowedMoves, canMove, deliveryOf, isBreachingOrAtRisk, queueCounts, triageCompare,
 } from "@/applications/care/triage";
-import type { SlaState } from "@/applications/care/sla";
+import { slaState, type SlaState } from "@/applications/care/sla";
 import {
   addChecklistItem, healthCheck, moveChecklistItem, removeChecklistItem, unfinishedDependencies, withoutDependency,
 } from "@/applications/project/taskWork";
@@ -56,6 +56,14 @@ describe("LEGAL contract register", () => {
     expect(rows.filter((row) => matchesRegister(row, { ...EMPTY_FILTER, window: "notice_30" }, NOW))).toEqual([a]);
     expect(rows.filter((row) => matchesRegister(row, { ...EMPTY_FILTER, query: "lease" }, NOW))).toEqual([b]);
     expect(counterpartiesOf(rows)).toEqual(["Marchbank", "Thames Timber"]);
+  });
+
+  it("does not let the person who requested a review approve it", () => {
+    expect(reviewDecisionBlocker("Maya Chen", "approved", "Maya Chen")).toMatch(/cannot approve/);
+    expect(reviewDecisionBlocker("Maya Chen", "changes_requested", "Maya Chen")).toBeUndefined();
+    expect(reviewDecisionBlocker("Maya Chen", "rejected", "Maya Chen")).toBeUndefined();
+    expect(reviewDecisionBlocker("Maya Chen", "approved", "Rowan Patel")).toBeUndefined();
+    expect(reviewDecisionBlocker("", "approved", "Maya Chen")).toBeUndefined();
   });
 
   it("runs a review cycle: one open round, a decision, and the status it implies", () => {
@@ -119,6 +127,22 @@ describe("CARE triage", () => {
     expect(deliveryOf(rec({ collection: "messages", status: "recorded", fields: { side: "agent", internal: false, delivery: "not_sent" } }))).toBe("not_sent");
     expect(deliveryOf(rec({ collection: "messages", status: "note", fields: { side: "agent", internal: true } }))).toBe("internal");
     expect(deliveryOf(rec({ collection: "messages", status: "received", fields: { side: "customer" } }))).toBe("received");
+  });
+
+  it("keeps the first-response clock running for a reply recorded but not delivered", () => {
+    const policy = rec({ collection: "slas", fields: { firstResponseHours: 1, resolutionHours: 16, businessHours: "00:00-23:59" } });
+    // Opened two weekday hours before a Friday-noon clock, so the 1h target is passed.
+    const now = new Date(2026, 10, 13, 12, 0);
+    const opened = new Date(2026, 10, 13, 10, 0).toISOString();
+    const recorded = rec({ collection: "tickets", status: "open", at: opened, fields: { firstResponseRecordedAt: new Date(2026, 10, 13, 10, 30).toISOString() } });
+    const recordedState = slaState(recorded, policy, now);
+    expect(recordedState.which).toBe("first response");
+    expect(recordedState.status).toBe("breached");
+    expect(recordedState.label).toMatch(/not delivered/);
+    const counts = queueCounts([recorded], "Maya Chen", (ticket) => slaState(ticket, policy, now));
+    expect(counts.breaching).toBe(1);
+    const delivered = rec({ collection: "tickets", status: "open", at: opened, fields: { firstResponseAt: new Date(2026, 10, 13, 10, 30).toISOString() } });
+    expect(slaState(delivered, policy, now).which).toBe("resolution");
   });
 });
 

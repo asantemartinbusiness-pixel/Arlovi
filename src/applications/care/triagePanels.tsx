@@ -68,7 +68,8 @@ export function TriageCard({ context, ticket, state }: { context: ScreenContext;
   const ref = String(ticket.fields.ref ?? ticket.title);
 
   async function patch(fields: Record<string, string | number | boolean>, status: string | undefined, event: string, toast: string) {
-    await context.mutate.patch(ticket.id, { ...(status ? { status } : {}), fields: { ...ticket.fields, ...fields } }, { expectRevision: ticket.revision, event });
+    const saved = await context.mutate.patch(ticket.id, { ...(status ? { status } : {}), fields: { ...ticket.fields, ...fields } }, { expectRevision: ticket.revision, event });
+    if (!saved) return;
     context.toast("Case updated", toast);
   }
 
@@ -144,7 +145,8 @@ export function ResolutionCard({ context, ticket }: { context: ScreenContext; ti
             <Button variant="secondary" onClick={() => context.openOverlay("internal note")}>Reopen this case</Button>
             {ticket.status === "resolved" && (
               <Button variant="ghost" onClick={async () => {
-                await context.mutate.patch(ticket.id, { status: "closed" }, { expectRevision: ticket.revision, event: `${ref} closed by ${context.actor}` });
+                const saved = await context.mutate.patch(ticket.id, { status: "closed" }, { expectRevision: ticket.revision, event: `${ref} closed by ${context.actor}` });
+                if (!saved) return;
                 context.toast("Case closed", "It moves to the archive. Reopening is still possible.");
               }}>Close the case</Button>
             )}
@@ -167,10 +169,11 @@ export function ResolutionCard({ context, ticket }: { context: ScreenContext; ti
           <Button
             variant="primary"
             onClick={async () => {
-              await context.mutate.patch(ticket.id, {
+              const saved = await context.mutate.patch(ticket.id, {
                 status: "resolved",
                 fields: { ...ticket.fields, resolvedAt: context.now.toISOString(), resolvedBy: context.actor, assignee: String(ticket.fields.assignee || context.actor), resolutionReason: reason, resolutionNote: note.trim(), replyDraft: "" },
               }, { expectRevision: ticket.revision, event: `${ref} resolved by ${context.actor}: ${reason}` });
+              if (!saved) return;
               context.toast("Case resolved", "The record changed and the clock stopped. The customer was not told from here.");
             }}
           >
