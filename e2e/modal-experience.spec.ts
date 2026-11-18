@@ -18,7 +18,7 @@ test("deposit modal shows truthful payment summary and sticky actions", async ({
   await expect(dialog).toContainText("Payment collection is not connected");
   await expect(dialog).toContainText("No card details are entered");
   await expect(dialog.locator(".ds-modal-foot")).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Record deposit request" })).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "Request already recorded" })).toBeDisabled();
   await expect(dialog.getByRole("button", { name: "Money received elsewhere" })).toBeEnabled();
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect(dialog).toHaveCount(0);
@@ -29,6 +29,7 @@ test("deposit amount edit cannot be dismissed without a choice", async ({ page }
   const dialog = await openDeposit(page);
   const amount = dialog.getByRole("textbox", { name: "Deposit amount" });
   await amount.fill("65.00");
+  await expect(dialog.getByRole("button", { name: "Update deposit request" })).toBeEnabled();
   await page.keyboard.press("Escape");
   const confirm = page.getByRole("dialog", { name: "Discard unsaved changes?" });
   await expect(confirm).toBeVisible();
@@ -47,7 +48,7 @@ test("external payment receipt requires a second deliberate confirmation", async
   await expect(dialog).toContainText("Only confirm receipt if the payment is visible");
   await expect(dialog.getByRole("button", { name: "Confirm external receipt" })).toBeVisible();
   await dialog.getByRole("button", { name: "Back" }).click();
-  await expect(dialog.getByRole("button", { name: "Record deposit request" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Request already recorded" })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Confirm external receipt" })).toHaveCount(0);
 });
 
@@ -58,7 +59,7 @@ test("modals remain within mobile viewport and keep their actions reachable", as
   expect(bounds).not.toBeNull();
   expect(bounds!.x).toBeGreaterThanOrEqual(-1);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(391);
-  await expect(dialog.getByRole("button", { name: "Record deposit request" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Request already recorded" })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Close" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
