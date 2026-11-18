@@ -1250,7 +1250,11 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
     && accountType(account) === "asset"
     && (account.tags.includes("cash") || accountCode(account).startsWith("10")));
   useEffect(() => { setAccountId((current) => current || cashAccounts[0]?.id || ""); }, [cashAccounts]);
-  useEffect(() => { setAmount(outstanding); }, [outstanding]);
+  // Pre-fill the outstanding balance until the person edits the amount. The
+  // balance can be recalculated after the form opens (records still loading),
+  // and that must never overwrite a part payment someone has typed.
+  const [amountEdited, setAmountEdited] = useState(false);
+  useEffect(() => { if (!amountEdited) setAmount(outstanding); }, [outstanding, amountEdited]);
 
   if (!invoice) return <Empty title="No invoice selected" />;
   const ar = data.accounts.find((account) => accountCode(account) === "1100");
@@ -1281,7 +1285,7 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
       />
       <Row gap={3} wrap>
         <Field label="Amount received" required>
-          <MoneyInput label="Amount received" currency={context.org.currency} valueMinor={amount} onChangeMinor={setAmount} />
+          <MoneyInput label="Amount received" currency={context.org.currency} valueMinor={amount} onChangeMinor={(minor) => { setAmountEdited(true); setAmount(minor); }} />
         </Field>
         <Field label="Date received" required>
           <TextInput aria-label="Date received" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
