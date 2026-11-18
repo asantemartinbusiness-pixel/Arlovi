@@ -694,7 +694,7 @@ export function RolesScreen({ context, tab }: { context: ScreenContext; tab: "Ro
   if (tab === "Roles") {
     return (
       <Stack gap={4}>
-        <AccessWorkspace />
+        <AccessWorkspace context={context} />
         <Card eyebrow="CUSTOM ROLES" prov="human" title={`Custom roles · ${custom.length}`} subtitle="Narrower views defined in this workspace" flush>
           <DataGrid
             rows={custom}
@@ -742,7 +742,7 @@ export function RolesScreen({ context, tab }: { context: ScreenContext; tab: "Ro
     );
   }
 
-  if (tab === "Effective access") return <Stack gap={4}><AccessWorkspace detailed /><EffectiveAccess context={context} /></Stack>;
+  if (tab === "Effective access") return <Stack gap={4}><AccessWorkspace detailed context={context} /><EffectiveAccess context={context} /></Stack>;
 
   const exceptions = custom.filter((role) => csvList(role.fields.deny).length > 0 || role.status === "draft");
   return (

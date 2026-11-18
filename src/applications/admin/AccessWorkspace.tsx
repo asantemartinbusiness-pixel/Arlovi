@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, LockKeyhole, Search, ShieldCheck, UserCog, Users } from "lucide-react";
+import { ArrowRight, CheckCircle2, Eye, EyeOff, FilePenLine, KeyRound, LockKeyhole, Search, ShieldCheck, UserCog, Users } from "lucide-react";
 import { applications } from "@/app/catalog";
 import { NAV_GROUPS } from "@/app/nav";
 import { useWorkspace } from "@/platform/workspace";
@@ -9,15 +9,17 @@ import {
   evaluateAccess, screenAccessCatalogue, isSensitiveScreen, type AccessAction,
   type AccessPrincipal, type AccessScope, type AccessResource, type ResourceClassification,
 } from "@/platform/accessModel";
+import type { ScreenContext } from "@/platform/registry";
+import { AccessPermissionMatrix } from "./AccessPermissionMatrix";
 import "./access-workspace.css";
 
-type Lens = "applications" | "pages" | "simulation";
+type Lens = "applications" | "pages" | "simulation" | "permissions";
 const ACTIONS:AccessAction[]=["discover","open","view","create","edit","comment","assign","approve","publish","export","share","delete","manage"];
 const SCOPES:AccessScope[]=["none","own","assigned","team","department","business_unit","organization","explicit"];
 const CLASSES:ResourceClassification[]=["public","internal","confidential","restricted"];
 const PERMISSION_HELP = "Preview only. Your signed-in identity, actual data permissions and backend authorisation are not configured in this browser-local product.";
 
-export function AccessWorkspace({ detailed = false }: { detailed?: boolean }) {
+export function AccessWorkspace({ detailed = false, context }: { detailed?: boolean; context: ScreenContext }) {
   const { org, role } = useWorkspace();
   const [selectedRole,setSelectedRole]=useState(defaultLegacyTemplate(role));
   const [lens,setLens]=useState<Lens>(detailed?"simulation":"applications");
@@ -74,13 +76,16 @@ export function AccessWorkspace({ detailed = false }: { detailed?: boolean }) {
         {ROLE_TEMPLATES.map(template=><option key={template.id} value={template.id}>{template.name}</option>)}
       </select>
       <div className="aw-selected-summary"><Users size={15}/>{ROLE_TEMPLATES.find(t=>t.id===selectedRole)?.description}</div>
+      <button type="button" className="aw-perm-open" onClick={()=>setLens("permissions")}><FilePenLine size={15}/> Configure view & edit rights <ArrowRight size={14}/></button>
     </div>
     <div className="aw-tabs" role="group" aria-label="Permission exploration mode">
+      <button type="button" aria-pressed={lens==="permissions"} onClick={()=>{setLens("permissions");setQuery("");}}><FilePenLine size={15}/> View & edit rights</button>
       <button type="button" aria-pressed={lens==="applications"} onClick={()=>setLens("applications")}><UserCog size={15}/> Applications</button>
       <button type="button" aria-pressed={lens==="pages"} onClick={()=>{setLens("pages");setQuery("");}}><Eye size={15}/> Pages & sensitive data</button>
       <button type="button" aria-pressed={lens==="simulation"} onClick={()=>{setLens("simulation");setQuery("");}}><KeyRound size={15}/> Permission simulator</button>
     </div>
-    {lens!=="simulation"&&<div className="aw-filter">
+    {lens==="permissions"&&<AccessPermissionMatrix key={selectedRole} roleId={selectedRole} context={context}/>}
+    {lens!=="simulation"&&lens!=="permissions"&&<div className="aw-filter">
       <label className="aw-search"><Search size={15}/><input type="search" placeholder={lens==="pages"?"Find a screen":"Find applications"} value={query} onChange={e=>setQuery(e.target.value)} aria-label="Search access catalogue"/></label>
       {lens==="applications"&&<select aria-label="Application category" value={category} onChange={e=>setCategory(e.target.value)}>
         <option value="All">All application groups</option>{NAV_GROUPS.map(g=><option key={g.label} value={g.label}>{g.label}</option>)}
