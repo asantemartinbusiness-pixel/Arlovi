@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Building2, KeyRound, ShieldCheck, Users } from "lucide-react";
 import {
-  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill,
+  BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, Notice, OverlayCancel, Pill,
   Properties, Row, Select, Stack, Stat, StatRow, Switch, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
@@ -555,6 +555,7 @@ export function RoleImpact({ context, close }: { context: ScreenContext; close: 
   const [roleValue, setRole] = useSeeded(String(member?.fields.role ?? "member"));
   const role = roleValue as Role;
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   if (!member) return <Empty title="Select a member" icon={<Users size={20} />}>Choose a person to see what a role change would do.</Empty>;
 
   const current = (member.fields.role as Role) ?? "member";
@@ -563,7 +564,9 @@ export function RoleImpact({ context, close }: { context: ScreenContext; close: 
 
   return (
     <Stack gap={4}>
-      <h3>{member.title}</h3>
+      <DrawerUnsavedChanges when={role !== current} />
+      <DrawerInFlight when={busy} />
+      <Properties rows={[{ label: "Member", value: member.title }, { label: "Current role view", value: ROLE_LABELS[current] }, { label: "Proposed role view", value: ROLE_LABELS[role] }]} />
       <Field label="Role view">
         <Select value={role} onChange={(event) => setRole(event.target.value as Role)}>
           {ROLES.map((entry) => <option key={entry} value={entry}>{ROLE_LABELS[entry]}</option>)}
@@ -582,20 +585,29 @@ export function RoleImpact({ context, close }: { context: ScreenContext; close: 
         Changing a view changes what this interface offers. It does not enforce anything on a server, and nobody should treat it as a
         security control.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
+      {error && <Notice tone="danger" title="Role view could not be saved">{error}</Notice>}
+      <DrawerActions>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
         <span className="ds-grow" />
         <Button
           variant="primary"
           busy={busy}
-          disabled={role === current}
+          disabled={busy || role === current || !context.can("manage_policy")}
+          title={!context.can("manage_policy") ? "Administration permission required" : undefined}
           onClick={async () => {
+            if (busy || role === current || !context.can("manage_policy")) return;
             setBusy(true);
+            setError("");
             try {
               const saved = await context.mutate.patch(member.id, { fields: { ...member.fields, role } }, { event: `Role view changed from ${current} to ${role} for ${member.title}`, expectRevision: member.revision });
-              if (!saved) return;
-              context.toast("Role changed", `${member.title} now holds the ${ROLE_LABELS[role]} view, and the change is in the audit trail.`);
+              if (!saved) {
+                setError("The member record changed elsewhere. Reload it before applying another change.");
+                return;
+              }
+              context.toast("Role view updated", `${member.title} now holds the ${ROLE_LABELS[role]} view in this workspace. This does not change provider-side access.`);
               close();
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : "Review the role and try again.");
             } finally {
               setBusy(false);
             }
@@ -603,7 +615,7 @@ export function RoleImpact({ context, close }: { context: ScreenContext; close: 
         >
           Change role view
         </Button>
-      </Row>
+      </DrawerActions>
     </Stack>
   );
 }
