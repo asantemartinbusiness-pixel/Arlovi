@@ -10,6 +10,7 @@ import { useWorkspace } from "@/platform/workspace";
 import { attentionReceiptKey, type PresentedAttentionItem } from "@/platform/attentionReceipts";
 import { DEFAULT_NOTIFICATION_PREFERENCES, groupNotificationUpdates, isUrgent, notificationCategory } from "@/platform/notificationPolicy";
 import { appEntry } from "@/app/catalog";
+import { clockNow } from "@/platform/clock";
 import { useUi } from "@/runtime/ui";
 import { NotificationPreferencesPanel } from "./NotificationPreferencesPanel";
 import "./notifications.css";
@@ -51,7 +52,7 @@ export function AttentionCentre({ items, onClose, initialView = "for-you" }: {
   function acknowledge(item: AttentionItem) { receipt(item, { read: true, acknowledged: true }); }
   function snooze(item: AttentionItem) {
     if (isUrgent(item.priority) || notificationCategory(item) === "security") return;
-    const until = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const until = new Date(clockNow().getTime() + 60 * 60 * 1000).toISOString();
     receipt(item, { read: true, snoozedUntil: until });
   }
   function explain(item: AttentionItem): string {
