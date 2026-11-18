@@ -231,8 +231,11 @@ export function ActivationReview({ context, close }: { context: ScreenContext; c
   const rows = useWorkflowRows();
   const workflows = useCollection("workflows");
   const pool = useTriggerPool(workflows);
-  const row = rows.find((item) => item.record.id === context.selectedId) ?? rows[0];
+  const payload = context.overlayPayload as { id?: unknown } | undefined;
+  const requestedId = typeof payload?.id === "string" ? payload.id : context.selectedId ?? context.params.id;
+  const row = requestedId ? rows.find((item) => item.record.id === requestedId) : undefined;
   const [acknowledged, setAcknowledged] = useState(false);
+  const [busy, setBusy] = useState(false);
   if (!row) return <Empty title="No automation selected" />;
   const issues = validateWorkflow(row.graph, pool);
   const errors = issues.filter((issue) => issue.severity === "error");
@@ -241,6 +244,7 @@ export function ActivationReview({ context, close }: { context: ScreenContext; c
 
   return (
     <Stack gap={4}>
+      <ModalInFlight when={busy} />
       <Properties rows={[
         { label: "Automation", value: row.record.title },
         { label: "Current status", value: row.record.status },
@@ -274,15 +278,27 @@ export function ActivationReview({ context, close }: { context: ScreenContext; c
         checked={acknowledged}
         onChange={(event) => setAcknowledged(event.target.checked)}
       />
-      <Row gap={2}>
+      <ModalActions>
         <Button
           variant="primary"
           icon={<PlayCircle size={15} />}
-          disabled={errors.length > 0 || !acknowledged}
+          disabled={errors.length > 0 || !acknowledged || busy}
+          busy={busy}
           onClick={async () => {
-            if (!await context.mutate.patch(row.record.id, { status: "active" }, { expectRevision: row.record.revision, event: "Automation activated after review" })) return;
-            context.toast("Activated", `${row.record.title} is active. The record now reads active; nothing has been scheduled outside this browser.`);
-            close();
+            if (busy) return;
+            setBusy(true);
+            try {
+              if (!await context.mutate.patch(row.record.id, { status: "active" }, { expectRevision: row.record.revision, event: "Automation activated after review" })) {
+                context.toast("Activation not saved", "The automation changed since you opened it. Reload before activating.", "blocked");
+                return;
+              }
+              context.toast("Activated", `${row.record.title} is active. No scheduler or external action was started.`);
+              close();
+            } catch (error) {
+              context.toast("Activation failed", error instanceof Error ? error.message : "Review and retry.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Activate
@@ -291,16 +307,29 @@ export function ActivationReview({ context, close }: { context: ScreenContext; c
           <Button
             variant="secondary"
             icon={<PauseCircle size={15} />}
+            busy={busy}
+            disabled={busy}
             onClick={async () => {
-              if (!await context.mutate.patch(row.record.id, { status: "paused" }, { expectRevision: row.record.revision, event: "Automation paused from the activation review" })) return;
-              context.toast("Paused", `${row.record.title} will not start a new run.`);
-              close();
+              if (busy) return;
+              setBusy(true);
+              try {
+                if (!await context.mutate.patch(row.record.id, { status: "paused" }, { expectRevision: row.record.revision, event: "Automation paused from the activation review" })) {
+                  context.toast("Pause not saved", "This automation changed. Reload before retrying.", "blocked");
+                  return;
+                }
+                context.toast("Paused", `${row.record.title} will not start a new run.`);
+                close();
+              } catch (error) {
+                context.toast("Pause failed", error instanceof Error ? error.message : "Review and retry.", "failed");
+              } finally {
+                setBusy(false);
+              }
             }}
           >
             Pause instead
           </Button>
         )}
-      </Row>
+      </ModalActions>
     </Stack>
   );
 }
