@@ -45,6 +45,37 @@ export const NATIVE_OVERLAY_DOMAINS = {
   IT: { name: "IT", entity: "IT service", group: "governance" },
 } as const;
 
+/** Documented collection names become precise labels on record-backed overlays. */
+export const OVERLAY_ENTITY_LABELS: Readonly<Record<string, string>> = {
+  accounts: "Account", activities: "Activity", agents: "AI employee",
+  announcements: "Announcement", appProjects: "App project", applicants: "Applicant",
+  approvals: "Approval", articles: "Article", assets: "Asset", audiences: "Audience",
+  bankTransactions: "Bank transaction", bills: "Bill", bookings: "Booking",
+  brands: "Brand", budgets: "Budget", calls: "Call", campaigns: "Campaign",
+  channels: "Channel", companies: "Company", conflicts: "Conflict",
+  connectors: "Connection", contacts: "Contact", contracts: "Contract",
+  conversations: "Conversation", datasets: "Dataset", deals: "Deal",
+  decisions: "Decision", decks: "Presentation", departments: "Department",
+  designs: "Design document", documents: "Document", emailThreads: "Email thread",
+  employees: "Employee", evaluations: "Evaluation", expenses: "Expense",
+  facts: "Fact", forms: "Form", incidents: "Incident", invoices: "Invoice",
+  journals: "Journal", leads: "Lead", leaveRequests: "Leave request",
+  legalEntities: "Legal entity", locations: "Location", macros: "Macro",
+  meetings: "Meeting", members: "Member", messages: "Message", missions: "Mission",
+  motions: "Composition", notifications: "Notification", objectives: "Objective",
+  obligations: "Obligation", orders: "Order", payrollRuns: "Payroll run",
+  photos: "Image", policies: "Policy", portals: "Portal", preferences: "Preference",
+  products: "Product", projects: "Project", promotions: "Promotion",
+  publications: "Publication", purchaseOrders: "Purchase order", quotes: "Quote",
+  receipts: "Receipt", resources: "Resource", returns: "Return",
+  reviews: "Review", risks: "Risk", services: "Service", shifts: "Shift",
+  sites: "Site", skills: "Skill", slas: "SLA", socialPosts: "Social post",
+  sources: "Source", stockMoves: "Stock movement", suppliers: "Supplier",
+  tasks: "Task", taxCodes: "Tax code", templates: "Template", tickets: "Case",
+  timelineEvents: "Timeline event", videos: "Video", warehouses: "Warehouse",
+  workbooks: "Workbook", workflowRuns: "Workflow run", workflows: "Workflow",
+};
+
 type Domain = { name: string; entity: string; group: string };
 export function nativeOverlayDomain(appCode: string): Domain {
   return NATIVE_OVERLAY_DOMAINS[appCode as keyof typeof NATIVE_OVERLAY_DOMAINS]
@@ -81,7 +112,7 @@ export function OverlayRecordContext({
   const domain = nativeOverlayDomain(context.screen.applicationCode);
   return (
     <span className="native-overlay-record" title={record.title}>
-      <span className="native-overlay-record-type">{domain.entity}</span>
+      <span className="native-overlay-record-type">{OVERLAY_ENTITY_LABELS[record.collection] ?? domain.entity}</span>
       <strong className="native-overlay-record-title">{record.title}</strong>
       {record.status && <span className="native-overlay-record-state">{record.status.replaceAll("_", " ")}</span>}
     </span>
