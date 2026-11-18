@@ -14,6 +14,7 @@ import {
 import { InvoiceTotalsCard, usePortal } from "./panels";
 import { ReportPayment } from "./actions";
 import { clockIso, wallMs } from "@/platform/clock";
+import { acceptedRequestTypes, REQUEST_TYPES } from "./config";
 
 /* ====================================================================== *
  * PORTAL overlays. Every grant is explicit: nothing is shared by a rule.
@@ -346,7 +347,19 @@ export function AccessRequest({ context, close }: { context: ScreenContext; clos
   const { portal } = usePortal(context);
   const { actor } = useWorkspace();
   const [what, setWhat] = useState("");
+  const accepted = acceptedRequestTypes(portal);
+  const [type, setType] = useState("");
   if (!portal) return <Empty title="No portal" />;
+  const chosenType = accepted.includes(type) ? type : accepted[0] ?? "";
+  if (accepted.length === 0) {
+    return (
+      <form id="access-request" className="ds-stack ds-gap-4" onSubmit={(event) => event.preventDefault()}>
+        <Notice tone="warning" title="This portal does not take requests">
+          The studio has switched the request form off for this portal. Use the message thread instead.
+        </Notice>
+      </form>
+    );
+  }
   return (
     <form
       id="access-request"
@@ -361,8 +374,8 @@ export function AccessRequest({ context, close }: { context: ScreenContext; clos
           summary: what.trim(),
           at: clockIso(),
           parentId: portal.id,
-          tags: ["portal", "request"],
-          fields: { portalId: portal.id, direction: "in", kind: "request", author: actor, delivery: "not_connected", attachments: 0, internalOnly: false },
+          tags: ["portal", "request", chosenType],
+          fields: { portalId: portal.id, direction: "in", kind: "request", requestType: chosenType, author: actor, delivery: "not_connected", attachments: 0, internalOnly: false },
           body: { text: what.trim() },
         }, `Access request recorded on ${portal.title}`);
         context.toast("Request recorded", "The studio decides what to share. Asking never grants anything by itself.");
@@ -372,6 +385,11 @@ export function AccessRequest({ context, close }: { context: ScreenContext; clos
       <Notice tone="info" title="A request is a message, not a switch">
         Nothing here changes what this portal can see. The studio reads the request and grants a specific record if they agree.
       </Notice>
+      <Field label="Type of request">
+        <Select value={chosenType} onChange={(event) => setType(event.target.value)}>
+          {accepted.map((value) => <option key={value} value={value}>{REQUEST_TYPES.find((item) => item.value === value)?.label ?? value}</option>)}
+        </Select>
+      </Field>
       <Field label="What do you need?" required><TextArea value={what} rows={4} onChange={(event) => setWhat(event.target.value)} required /></Field>
     </form>
   );
@@ -694,7 +712,8 @@ export function ExternalInvite({ context, close }: { context: ScreenContext; clo
         <Field label="Portal role">
           <Select value={portalRole} onChange={(event) => setPortalRole(event.target.value)}>
             <option value="portal_member">Member — sees the pages that are open to any member</option>
-            <option value="portal_admin">Administrator — also sees billing</option>
+            <option value="billing_contact">Billing contact — also sees billing pages</option>
+            <option value="portal_admin">Administrator — sees every page, including admin-only</option>
           </Select>
         </Field>
         <Field label="Access expires in days"><TextInput value={days} inputMode="numeric" align="end" onChange={(event) => setDays(event.target.value)} /></Field>

@@ -3,10 +3,10 @@ import type { Rec } from "@/domain/types";
 import { marketAreaCounts } from "@/applications/market/marketAreaModel";
 import { searchAudienceSegments } from "@/applications/market/AudienceSegmentsLibrary";
 
-function makeRecord(id: string, collection: string, status: string, fields: Rec["fields"] = {}, body?: unknown): Rec {
+function makeRecord(id: string, collection: string, status: string, fields: Rec["fields"] = {}, body?: unknown, summary = ""): Rec {
   return {
     id, organizationId: "northline", collection, status, fields, body,
-    title: id, summary: "Trade audience", ownerName: "Team", amountMinor: 0,
+    title: id, summary, ownerName: "Team", amountMinor: 0,
     currency: "GBP", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z",
     revision: 1, createdBy: "Team", updatedBy: "Team", tags: [], history: [],
   };
@@ -23,8 +23,8 @@ const data = {
     makeRecord("search1", "campaigns", "active", {}, { channels: [{ network: "search" }] }),
   ],
   audiences: [
-    makeRecord("Trade accounts", "audiences", "active", {}, { rules: [{ field: "segment", op: "is", value: "trade" }], exclusions: ["suppressed"] }),
-    makeRecord("Newsletter buyers", "audiences", "active", {}, { rules: [{ field: "tag", op: "has", value: "newsletter" }] }),
+    makeRecord("Trade accounts", "audiences", "active", {}, { rules: [{ field: "segment", op: "is", value: "trade" }], exclusions: ["suppressed"] }, "Wholesale and trade buyers"),
+    makeRecord("Newsletter buyers", "audiences", "active", {}, { rules: [{ field: "tag", op: "has", value: "newsletter" }] }, "Opted-in email readers"),
   ],
   templates: [makeRecord("welcome email", "templates", "approved", { kind: "email" })],
   contacts: [
@@ -64,6 +64,8 @@ describe("Marketing work-area context", () => {
   it("searches segment rule details without changing source record order", () => {
     expect(searchAudienceSegments(data.audiences, "TRADE").map(row => row.title)).toEqual(["Trade accounts"]);
     expect(searchAudienceSegments(data.audiences, "tag newsletter").map(row => row.title)).toEqual(["Newsletter buyers"]);
+    expect(searchAudienceSegments(data.audiences, "email readers").map(row => row.title)).toEqual(["Newsletter buyers"]);
+    expect(searchAudienceSegments(data.audiences, "suppressed").map(row => row.title)).toEqual(["Trade accounts"]);
     expect(searchAudienceSegments(data.audiences, "missing rule")).toEqual([]);
     expect(data.audiences.map(row => row.title)).toEqual(["Trade accounts", "Newsletter buyers"]);
   });

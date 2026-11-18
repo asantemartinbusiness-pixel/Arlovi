@@ -1,3 +1,4 @@
+import { VariantsWorkspace } from "./VariantsWorkspace";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -327,18 +328,7 @@ export function ProductDetail({ context, lens }: { context: ScreenContext; lens:
   const margin = marginOf(product);
 
   if (lens === "Variants") {
-    return variants.length === 0
-      ? <Empty title="No variants" icon={<Package size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Variant editor")}>Add a variant</Button>} />
-      : (
-        <DataGrid rows={variants} rowId={(row) => row.id} label="Variants" filterable={false}
-          columns={[
-            { key: "name", header: "Variant", primary: true, cell: (row) => row.name },
-            { key: "sku", header: "SKU", cell: (row) => <code>{row.sku}</code> },
-            { key: "delta", header: "Price difference", align: "end", cell: (row) => (row.priceDeltaMinor === 0 ? "—" : `+${context.money(row.priceDeltaMinor)}`) },
-            { key: "price", header: "Price", align: "end", cell: (row) => context.money((product.amountMinor ?? 0) + row.priceDeltaMinor) },
-            { key: "tax", header: "Tax", cell: () => <Pill>{taxCode.code}</Pill> },
-          ]} />
-      );
+    return <VariantsWorkspace context={context} product={product} taxCode={taxCode.code} />;
   }
 
   if (lens === "Media") {
