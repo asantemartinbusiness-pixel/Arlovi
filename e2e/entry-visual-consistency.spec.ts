@@ -12,9 +12,14 @@ test("entry uses Executive Home typography, action tokens and no simulated dashb
   await expect(page.locator(".entry-editorial-row")).toHaveCount(3);
   const style = await page.locator(".entry-primary").first().evaluate(el => {
     const css = getComputedStyle(el);
-    return { background:css.backgroundColor, radius:Number.parseFloat(css.borderTopLeftRadius), color:css.color };
+    const probe = document.createElement("div");
+    probe.style.backgroundColor = "var(--action-bg)";
+    document.body.appendChild(probe);
+    const tokenBackground = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return { background:css.backgroundColor, tokenBackground, radius:Number.parseFloat(css.borderTopLeftRadius), color:css.color };
   });
-  expect(style.background).toBe("rgb(13, 13, 13)");
+  expect(style.background).toBe(style.tokenBackground);
   expect(style.radius).toBeGreaterThanOrEqual(20);
   expect(style.color).toBe("rgb(255, 255, 255)");
 });
