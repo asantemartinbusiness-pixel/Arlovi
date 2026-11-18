@@ -99,8 +99,8 @@ export function OverlayOrigin({ context }: { context: ScreenContext }) {
  * list must never silently substitute its first record or leak another tenant.
  */
 export function OverlayRecordContext({
-  context, selection = false,
-}: { context: ScreenContext; selection?: boolean }) {
+  context, selection = false, collection,
+}: { context: ScreenContext; selection?: boolean; collection?: string }) {
   const payload = context.overlayPayload as { id?: unknown } | undefined;
   const payloadId = typeof payload?.id === "string" ? payload.id : undefined;
   const id = payloadId ?? context.params.id ?? (selection ? context.selectedId : undefined);
@@ -108,7 +108,7 @@ export function OverlayRecordContext({
     () => id ? getRecordInOrg(context.org.id, id) : Promise.resolve(undefined),
     [context.org.id, id],
   );
-  if (!record) return null;
+  if (!record || (collection && record.collection !== collection)) return null;
   const domain = nativeOverlayDomain(context.screen.applicationCode);
   return (
     <span className="native-overlay-record" title={record.title}>
