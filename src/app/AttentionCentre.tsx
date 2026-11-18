@@ -42,7 +42,7 @@ export function AttentionCentre({
   initialView?: AttentionView;
 }) {
   const navigate = useNavigate();
-  const { org, actor, relative } = useWorkspace();
+  const { org, actor, relative, now } = useWorkspace();
   const receipts = useUi((s) => s.attentionReceipts);
   const updateReceipt = useUi((s) => s.setAttentionReceipt);
   const updateReceipts = useUi((s) => s.setAttentionReceipts);
@@ -53,8 +53,7 @@ export function AttentionCentre({
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [query, setQuery] = useState("");
   const [detailsId, setDetailsId] = useState<string | null>(null);
-  const now = new Date();
-  const counts = attentionCounts(items);
+  const counts = attentionCounts(items.filter(item => !attentionSnoozed(item, receipts, org.id, actor, now)));
   const { decisions } = headerAttentionCounts(items);
 
   const shown = useMemo(() => {
@@ -71,7 +70,7 @@ export function AttentionCentre({
       const text = [item.title, item.body, item.group, item.kind].join(" ").toLowerCase();
       return text.includes(query.trim().toLowerCase());
     });
-  }, [items, view, unreadOnly, query, receipts, org.id, actor]);
+  }, [items, view, unreadOnly, query, receipts, org.id, actor, now]);
 
   const groups = useMemo(() => {
     const byGroup = new Map<string, AttentionItem[]>();
