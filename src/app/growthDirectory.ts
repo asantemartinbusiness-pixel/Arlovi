@@ -3,6 +3,7 @@ import { appEntry, screens } from "@/app/catalog";
 /** Growth navigation is a capability index, not a transaction or data hand-off. */
 export const GROWTH_WORKFLOWS = {
   MARKET: {
+    appName: "Marketing & Growth",
     stage: "Reach",
     title: "Find and engage your audience",
     description: "Campaigns, publishing plans and attribution in one marketing workspace.",
@@ -10,6 +11,7 @@ export const GROWTH_WORKFLOWS = {
     peerLabel: "Explore products and orders",
   },
   COMMERCE: {
+    appName: "Commerce & Storefront",
     stage: "Sell",
     title: "Turn interest into orders",
     description: "Products, stock, checkout intent and fulfilment records.",
@@ -17,6 +19,7 @@ export const GROWTH_WORKFLOWS = {
     peerLabel: "Plan purchasing and replenishment",
   },
   BOOK: {
+    appName: "Bookings & Capacity",
     stage: "Serve",
     title: "Manage time and capacity",
     description: "Appointments, staff resources, availability and follow-up.",
@@ -24,6 +27,7 @@ export const GROWTH_WORKFLOWS = {
     peerLabel: "Open client and partner spaces",
   },
   PROC: {
+    appName: "Procurement & Receiving",
     stage: "Source",
     title: "Keep purchasing and stock moving",
     description: "Supplier records, approvals, goods receipts and stock movement.",
@@ -31,6 +35,7 @@ export const GROWTH_WORKFLOWS = {
     peerLabel: "Review catalogue and inventory",
   },
   PORTAL: {
+    appName: "Client & Partner Portals",
     stage: "Collaborate",
     title: "Work with clients and partners",
     description: "Create and review scoped spaces for external collaborators.",
