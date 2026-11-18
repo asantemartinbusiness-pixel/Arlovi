@@ -265,7 +265,7 @@ export const crmApp = registerApp({
       overlays: [
         { id: "Quote builder", kind: "drawer", title: "Quote builder", width: 1040, render: ({ close, ...context }) => <QuoteEditor context={context} close={close} /> },
         { id: "collaborator picker", kind: "drawer", title: "People and approvals", width: 620, render: ({ close, ...context }) => <><CollaboratorPicker context={context} close={close} /><RequestApproval context={context} close={close} /></> },
-        { id: "closure confirmation", kind: "modal", title: "Close the deal", width: 680, capability: "edit_pipeline", presentation: { selectedRecord: true, guidance: "Review customer, quote and tax evidence before closing won or handing over to Finance." }, render: ({ close, ...context }) => <ClosureConfirmation context={context} close={close} /> },
+        { id: "closure confirmation", kind: "modal", title: "Close the deal", width: 680, capability: "edit_pipeline", presentation: { selectedRecord: true, collection: "deals", guidance: "Review customer, quote and tax evidence before closing won or handing over to Finance." }, render: ({ close, ...context }) => <ClosureConfirmation context={context} close={close} /> },
         { id: "stage change validation", kind: "modal", title: "Stage change", width: 620, render: ({ close, ...context }) => <StageChangeValidation context={context} close={close} /> },
       ],
     },
