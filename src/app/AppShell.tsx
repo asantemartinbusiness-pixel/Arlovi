@@ -25,9 +25,12 @@ import { canOpen, ROLE_LABELS } from "@/platform/policy";
 import { ORGS } from "@/platform/org";
 import { useCollections, useWorkspace, useMutations } from "@/platform/workspace";
 import { buildAttention, filterForRole, headerAttentionCounts } from "@/platform/attention";
-import { applyAttentionReceipts } from "@/platform/attentionReceipts";
+import { applyAttentionReceipts, attentionSnoozed } from "@/platform/attentionReceipts";
+import { normalizeNotificationPreferences, notificationPreferenceKey } from "@/platform/notificationExperience";
 import { useUi } from "@/runtime/ui";
 import { DisplayPreferences } from "@/app/DisplayPreferences";
+import { NotificationToastStack } from "@/app/NotificationToastStack";
+import "@/app/notification-experience.css";
 import type { Role } from "@/domain/types";
 import "@/app/shell.css";
 
@@ -36,7 +39,7 @@ export function AppShell() {
   const ui = useUi();
   const location = useLocation();
   const navigate = useNavigate();
-  const { org, role, now } = useWorkspace();
+  const { org, role, actor, now } = useWorkspace();
   const mutate = useMutations();
   const [navOpen, setNavOpenState] = useState(false);
   /* The path the drawer was opened on. Route changes close the drawer, but the
@@ -50,7 +53,7 @@ export function AppShell() {
   }, []);
   const [displayOpen, setDisplayOpen] = useState(false);
   const closeDisplay = useCallback(() => setDisplayOpen(false), []);
-  const [attentionView, setAttentionView] = useState<"for-you" | "approvals" | "updates">("for-you");
+  const [attentionView, setAttentionView] = useState<"for-you" | "approvals" | "updates" | "settings">("for-you");
   const searchTrigger = useRef<HTMLButtonElement>(null);
   const keyboardHint = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.userAgent) ? "⌘K" : "Ctrl+K";
 
@@ -114,23 +117,26 @@ export function AppShell() {
     prefetchController.cancel();
   }
 
-  const data = useCollections(["notifications", "invoices", "bills", "tasks", "missions", "deals", "leaveRequests", "expenses", "workflowApprovals", "organizations", "preferences"]);
+  const data = useCollections(["notifications", "invoices", "bills", "tasks", "shifts", "missions", "deals", "leaveRequests", "expenses", "workflowApprovals", "organizations", "preferences"]);
   const attention = useMemo(() => applyAttentionReceipts(filterForRole(buildAttention({
     notifications: data.notifications,
     invoices: data.invoices,
     bills: data.bills,
     tasks: data.tasks,
+    shifts: data.shifts,
     missions: data.missions,
     approvals: [...data.invoices, ...data.bills, ...data.expenses, ...data.deals, ...data.leaveRequests, ...data.missions],
     workflowApprovals: data.workflowApprovals,
     orgSlug: org.slug,
     now,
-  }), role), ui.attentionReceipts, org.id, role), [data, org.slug, org.id, now, role, ui.attentionReceipts]);
+  }), role), ui.attentionReceipts, org.id, actor), [data, org.slug, org.id, now, role, actor, ui.attentionReceipts]);
   const contextVisible = isWorkspaceArea && ["project","department"].includes(location.pathname.split("/")[5]);
-  const {decisions, unreadUpdates: updates} = headerAttentionCounts(attention);
+  const personalPrefs = normalizeNotificationPreferences(ui.notificationPreferences[notificationPreferenceKey(org.id, actor)]);
+  const visibleAttention = attention.filter((item) => !attentionSnoozed(item, ui.attentionReceipts, org.id, actor, now));
+  const {decisions, unreadUpdates: updates} = headerAttentionCounts(visibleAttention);
   function openCommand() { ui.setAsk(false); ui.setNotes(false); ui.setCommand(true); }
   function openAsk() { ui.setCommand(false); ui.setNotes(false); ui.setAsk(true); }
-  function openAttention(view: "for-you" | "approvals" | "updates") {
+  function openAttention(view: "for-you" | "approvals" | "updates" | "settings") {
     if (ui.notes && attentionView === view) {ui.setNotes(false);return;}
     setAttentionView(view);ui.setCommand(false);ui.setAsk(false);ui.setNotes(true);
   }
@@ -285,14 +291,14 @@ export function AppShell() {
         </Button>
 
         <div className="hq-header-utils" role="group" aria-label="Inbox and notifications">
-          <div className="hq-bell">
+          <div className="hq-bell" data-kind="decisions">
             <Button variant="ghost" size="sm" iconOnly aria-label={`Inbox and decisions, ${decisions} awaiting action`} aria-expanded={ui.notes && attentionView === "approvals"} onClick={() => openAttention("approvals")}>
               <Inbox size={17}/>
             </Button>
             {decisions > 0 && <span className="hq-bell-count" aria-hidden="true">{decisions > 99 ? "99+" : decisions}</span>}
           </div>
-          <div className="hq-bell">
-            <Button variant="ghost" size="sm" iconOnly aria-label={`Notifications, ${updates} unread updates`} aria-expanded={ui.notes && attentionView === "updates"} onClick={() => openAttention("updates")}>
+          <div className="hq-bell" data-kind="updates" data-focus={personalPrefs.focusMode}>
+            <Button variant="ghost" size="sm" iconOnly aria-label={`Notifications, ${updates} unread updates${personalPrefs.focusMode ? ", focus mode on" : ""}`} aria-expanded={ui.notes && attentionView === "updates"} onClick={() => openAttention("updates")}>
               <Bell size={17}/>
             </Button>
             {updates > 0 && <span className="hq-bell-count" aria-hidden="true">{updates > 99 ? "99+" : updates}</span>}
@@ -318,7 +324,8 @@ export function AppShell() {
               group: "Navigation", separatorBefore: true, onSelect: () => { void toggleFavourite(); },
             }] : []),
             ...(org.ownerName ? [{ label: "Review company setup", group: "Navigation", onSelect: () => navigate(`/o/${org.slug}/hq/home?gettingStarted=1`) }] : []),
-            { label: `Display & scaling · ${ui.interfaceScale}%`, group: "Appearance", separatorBefore: true, onSelect: () => setDisplayOpen(true) },
+            { label: personalPrefs.focusMode ? "Notifications & focus · Focus on" : "Notifications & focus", group: "Appearance", separatorBefore: true, onSelect: () => openAttention("settings") },
+            { label: `Display & scaling · ${ui.interfaceScale}%`, group: "Appearance", onSelect: () => setDisplayOpen(true) },
             { label: ui.theme === "light" ? "Dark appearance" : "Light appearance", group: "Appearance", onSelect: () => ui.setTheme(ui.theme === "light" ? "dark" : "light") },
             ...(["comfortable", "balanced", "compact"] as const).map((item) => ({
               label: item === ui.density ? `Density: ${item} · current` : `Density: ${item}`,
@@ -487,17 +494,7 @@ export function AppShell() {
       {ui.notes && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening attention centre…</div>}><AttentionCentre key={attentionView} initialView={attentionView} items={attention} onClose={() => ui.setNotes(false)} /></Suspense>}
       {ui.ask && <Suspense fallback={<div className="hq-overlay-pending" role="status">Opening assistant…</div>}><AskPanel onClose={() => ui.setAsk(false)} seed={ui.askSeed} /></Suspense>}
 
-      <div className="ds-toasts" aria-live="polite" aria-atomic="false">
-        {ui.toasts.map((toast) => (
-          <div key={toast.id} className="ds-toast" data-tone={toast.tone}>
-            <div className="ds-grow">
-              <strong>{toast.title}</strong>
-              <p>{toast.body}</p>
-            </div>
-            <Button variant="ghost" size="sm" iconOnly aria-label="Dismiss" onClick={() => ui.dismissToast(toast.id)}><X size={14} /></Button>
-          </div>
-        ))}
-      </div>
+      <NotificationToastStack />
     </div>
   );
 }
