@@ -134,7 +134,7 @@ export function draftInput(thread: Rec): DraftInput {
   return {
     to: String(thread.fields.to ?? ""),
     cc: String(thread.fields.cc ?? ""),
-    bcc: String(thread.fields.bcc ?? ""),
+    ...(String(thread.fields.bcc ?? "").trim() ? { bcc: String(thread.fields.bcc) } : {}),
     subject: thread.title === "(no subject)" ? "" : thread.title,
     body: String(messages.at(-1)?.body ?? thread.summary ?? ""),
   };
