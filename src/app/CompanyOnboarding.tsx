@@ -222,22 +222,29 @@ export function CompanyOnboarding() {
         {!previous && <Link to="/choose-workspace">Workspaces</Link>}
       </header>
       <div className="onb-layout">
-        <aside className="onb-intro" aria-label="Company blueprint preview">
-          <div className="onb-eyebrow">YOUR COMPANY BLUEPRINT</div>
-          <h1>One operating home, built around your business.</h1>
-          <p>Establish the essentials first. We'll prepare your operating structure, applications, team and AI specialist drafts, all ready for your review.</p>
-          <div className="onb-blueprint">
-            <div className="onb-blueprint-head"><strong>{setup.company.trim() || "Your future headquarters"}</strong><span>Live preview</span></div>
-            <div className="onb-blueprint-stat"><span>Business</span><strong>{setup.businessType.charAt(0).toUpperCase() + setup.businessType.slice(1)}</strong></div>
-            <div className="onb-blueprint-stat"><span>Organization</span><strong>{setup.teamSize === "solo" ? "Independent" : setup.teamSize === "small" ? "Small team" : setup.teamSize === "growing" ? "Growing team" : "Established"}</strong></div>
-            <div className="onb-blueprint-counters">
-              <div><strong>{setup.departments.length}</strong><span>Departments</span></div>
-              <div><strong>{setup.preferredApps.length}</strong><span>Pinned apps</span></div>
-              <div><strong>{setup.agents.length}</strong><span>AI drafts</span></div>
-            </div>
-            <div className="onb-blueprint-foot">All native applications stay available. AI execution, cloud accounts and external invitations are not activated by setup.</div>
+        <aside className="onb-intro" aria-label="Company setup context">
+          <div className="onb-intro-index"><span>ARLOVI / COMPANY SETUP</span><span>{String(step + 1).padStart(2,"0")} — 04</span></div>
+          <div className="onb-intro-message">
+            <div className="onb-eyebrow">A CLEARER WAY TO BEGIN</div>
+            <h1>{["Start with your company.","Organize how you work.","Bring your people together.","Ready for the next step."][step]}</h1>
+            <p>{[
+              "Your company identity will follow you across Arlovi's applications and workspaces.",
+              "Choose a practical starting structure, then refine it as your business grows.",
+              "People, knowledge and AI capabilities begin with clear responsibilities and human control.",
+              "Review the foundations and move straight into your working environment.",
+            ][step]}</p>
           </div>
-          <p className="onb-scope">Your answers are saved in this browser as you go. This version creates a browser-local company, not a verified cloud account. You can return to Company Setup after entering the workspace.</p>
+          <div className="onb-blueprint" aria-label="Current company blueprint">
+            <div className="onb-blueprint-head"><strong>YOUR COMPANY</strong><span>Draft · Saved locally</span></div>
+            <div className="onb-blueprint-row"><span>Name</span><strong>{setup.company.trim() || "Not named yet"}</strong></div>
+            <div className="onb-blueprint-row"><span>Business</span><strong>{setup.businessType.charAt(0).toUpperCase() + setup.businessType.slice(1)}</strong></div>
+            <div className="onb-blueprint-row"><span>Team</span><strong>{setup.teamSize === "solo" ? "Independent" : setup.teamSize === "small" ? "Small team" : setup.teamSize === "growing" ? "Growing team" : "Established"}</strong></div>
+            <div className="onb-blueprint-row"><span>Departments</span><strong>{setup.departments.length} selected</strong></div>
+            <div className="onb-blueprint-row"><span>Applications</span><strong>{setup.preferredApps.length} pinned</strong></div>
+            <div className="onb-blueprint-row"><span>AI specialists</span><strong>{setup.agents.length} drafts</strong></div>
+            <p className="onb-blueprint-foot">All applications remain available. Invitations and AI execution are not activated by setup.</p>
+          </div>
+          <p className="onb-scope">Changes are saved in this browser. You can return to Company Setup from your headquarters.</p>
         </aside>
         <section className="onb-form" aria-label="Company setup">
           <nav className="onb-progress" aria-label="Company setup stages">
