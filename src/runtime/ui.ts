@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { PaletteId } from "@/brand";
 import type { Role } from "@/domain/types";
 import type { AttentionReceipt } from "@/platform/attentionReceipts";
+import { normaliseInterfaceScale, readInterfaceScale, SCALE_VERSION } from "./interfaceScale";
 
 export interface Toast {
   id: string;
@@ -43,10 +44,10 @@ interface UiState {
   dismissToast: (id: string) => void;
 }
 
-function storedUi(): Partial<UiState> {
+function storedUi(): Partial<UiState> & { interfaceScaleVersion?: number } {
   try {
     const stored = typeof localStorage === "undefined" ? null : localStorage.getItem("arlovi-ui");
-    return stored ? (JSON.parse(stored) as Partial<UiState>) : {};
+    return stored ? (JSON.parse(stored) as Partial<UiState> & { interfaceScaleVersion?: number }) : {};
   } catch {
     // Corrupted or blocked browser storage should not prevent the application from booting.
     return {};
@@ -58,7 +59,7 @@ export const useUi = create<UiState>((set) => ({
   role: initial.role ?? "owner",
   theme: initial.theme ?? "light",
   density: initial.density ?? "balanced",
-  interfaceScale: typeof initial.interfaceScale === "number" && Number.isFinite(initial.interfaceScale) ? Math.max(75, Math.min(150, Math.round(initial.interfaceScale / 5) * 5)) : 100,
+  interfaceScale: readInterfaceScale(initial.interfaceScale, initial.interfaceScaleVersion),
   palette: initial.palette ?? "cobalt",
   collapsed: initial.collapsed ?? false,
   mobileNav: false,
@@ -79,7 +80,7 @@ export const useUi = create<UiState>((set) => ({
   setRole: (role) => set({ role }),
   setTheme: (theme) => set({ theme }),
   setDensity: (density) => set({ density }),
-  setInterfaceScale: (value) => set({ interfaceScale: Number.isFinite(value) ? Math.max(75, Math.min(150, Math.round(value / 5) * 5)) : 100 }),
+  setInterfaceScale: (value) => set({ interfaceScale: normaliseInterfaceScale(value) }),
   setPalette: (palette) => set({ palette }),
   setCollapsed: (collapsed) => set({ collapsed }),
   setMobileNav: (mobileNav) => set({ mobileNav }),
@@ -103,6 +104,7 @@ useUi.subscribe((state) => {
       theme: state.theme,
       density: state.density,
       interfaceScale: state.interfaceScale,
+      interfaceScaleVersion: SCALE_VERSION,
       palette: state.palette,
       collapsed: state.collapsed,
       attentionReceipts: state.attentionReceipts,
