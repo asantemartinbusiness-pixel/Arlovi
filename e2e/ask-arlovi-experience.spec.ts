@@ -38,6 +38,23 @@ test.describe("Ask Arlovi workspace assistant", () => {
     await expect(dialog.getByRole("log", { name: "Conversation" })).toContainText("Which invoices are awaiting payment?");
   });
 
+  test("keeps temporary conversation history isolated by company and restores it after reopening", async ({ page }) => {
+    let dialog = page.getByRole("dialog", { name: "Ask Arlovi" });
+    await dialog.getByRole("button", { name: /Finance/ }).click();
+    await dialog.getByRole("button", { name: "Close" }).click();
+    await page.goto("/o/harbor/workspace/home");
+    await page.getByRole("button", { name: "Ask Arlovi" }).click();
+    dialog = page.getByRole("dialog", { name: "Ask Arlovi" });
+    await dialog.getByRole("button", { name: "Conversation history" }).click();
+    await expect(dialog.getByText("No conversations saved in this session.")).toBeVisible();
+    await dialog.getByRole("button", { name: "Close" }).click();
+    await page.goto("/o/northline/workspace/home");
+    await page.getByRole("button", { name: "Ask Arlovi" }).click();
+    dialog = page.getByRole("dialog", { name: "Ask Arlovi" });
+    await dialog.getByRole("button", { name: "Conversation history" }).click();
+    await expect(dialog.getByRole("button", { name: /Which invoices are awaiting payment/ })).toBeVisible();
+  });
+
   test("Enter sends, Shift+Enter adds a line, and empty submissions are disabled", async ({ page }) => {
     const dialog = page.getByRole("dialog", { name: "Ask Arlovi" });
     const composer = dialog.getByRole("textbox", { name: "Ask about Northline Atelier" });
