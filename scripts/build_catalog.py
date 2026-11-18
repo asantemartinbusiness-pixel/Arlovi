@@ -217,6 +217,11 @@ RULES: list[tuple[str, str]] = [
 ]
 
 
+APPROVED_TAB_EXTENSIONS = {
+    "ARL-COMMS-005": ["Shared inboxes", "Accounts & domains", "Sender identities"],
+}
+
+
 def collection_for(app: str, route: str) -> str:
     for frag, col in RULES:
         if frag in route:
@@ -250,7 +255,7 @@ def main() -> None:
                     "applicationName": app["name"],
                     "purpose": app["purpose"],
                     "regions": pg["regions"],
-                    "tabs": pg["tabs"],
+                    "tabs": list(dict.fromkeys([*pg["tabs"], *APPROVED_TAB_EXTENSIONS.get(pg["id"], [])])),
                     "actions": pg["actions"],
                     "overlays": pg["overlays"],
                     "ai": pg["ai"],
