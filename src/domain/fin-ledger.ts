@@ -482,7 +482,12 @@ export function matchCandidates(line: Rec, journals: Rec[], bankAccountId: strin
 export interface Reconciliation {
   bankAccountId?: string;
   bankAccountCode: string;
+  /** Posted balance on the bank account as at the statement's end date. */
   ledgerMinor: number;
+  /** Posted balance on the bank account today, including postings after the statement. */
+  bookBalanceMinor: number;
+  /** Posted journals moving the bank account after the statement's end date. */
+  postedAfterStatement: { journal: Rec; amountMinor: number }[];
   statement?: StatementSummary;
   statementClosingMinor?: number;
   /** Statement closing less the ledger balance on the same account. */
@@ -515,17 +520,27 @@ export function reconcile(input: {
     // lines from older months into the current statement's sign-off.
     && (!activeBatch || String(line.fields.importBatch ?? "") === String(activeBatch)));
   let ledgerMinor = 0;
+  let bookBalanceMinor = 0;
+  const postedAfterStatement: { journal: Rec; amountMinor: number }[] = [];
   if (account) {
     for (const journal of input.journals) {
       if (journal.status !== "posted") continue;
-      // Bank closing balances are as-of the statement date, not today's
-      // balance. Newer legitimate postings must not rewrite old statements.
-      if (statement?.to && journalDate(journal) > statement.to) continue;
+      let moves = 0;
       for (const entry of journalLines(journal)) {
-        if (entry.accountId === account.id) ledgerMinor += entry.debitMinor - entry.creditMinor;
+        if (entry.accountId === account.id) moves += entry.debitMinor - entry.creditMinor;
       }
+      bookBalanceMinor += moves;
+      // Bank closing balances are as-of the statement date, not today's
+      // balance. Newer legitimate postings must not rewrite old statements:
+      // they are listed as posted after the statement instead.
+      if (statement?.to && journalDate(journal) > statement.to) {
+        if (moves !== 0) postedAfterStatement.push({ journal, amountMinor: moves });
+        continue;
+      }
+      ledgerMinor += moves;
     }
   }
+  postedAfterStatement.sort((a, b) => journalDate(a.journal).localeCompare(journalDate(b.journal)));
   const matched = own.filter((line) => line.fields.matched === true);
   const open = own.filter((line) => line.fields.matched !== true);
   const suggested: { line: Rec; candidates: MatchCandidate[] }[] = [];
@@ -551,6 +566,8 @@ export function reconcile(input: {
     bankAccountId: account?.id,
     bankAccountCode: input.bankAccountCode,
     ledgerMinor,
+    bookBalanceMinor,
+    postedAfterStatement,
     statement,
     statementClosingMinor: statement?.closingMinor,
     differenceMinor,

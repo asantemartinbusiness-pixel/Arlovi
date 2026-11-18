@@ -1,5 +1,8 @@
 import { useMemo } from "react";
-import { useCollections, useWorkspace } from "@/platform/workspace";
+import { useLiveQuery } from "dexie-react-hooks";
+import { useWorkspace } from "@/platform/workspace";
+import { listByCollection } from "@/platform/repo";
+import { db, SEED_VERSION } from "@/runtime/db";
 import type { Rec } from "@/domain/types";
 import {
   accountCode, balanceSheet, cashBalance, ledger, lockedPeriods, periodOf, postedPeriods, profitAndLoss, trial,
@@ -12,6 +15,13 @@ const COLLECTIONS = [
 ];
 
 export interface FinData {
+  /**
+   * True once the posted books have been read from storage, including the
+   * workspace's finance fixtures. Until then every figure would be computed
+   * from a partial ledger, so headline figures show a loading state rather
+   * than a number that is about to change.
+   */
+  ready: boolean;
   accounts: Rec[];
   journals: Rec[];
   invoices: Rec[];
@@ -40,10 +50,26 @@ export interface FinData {
   draftJournals: Rec[];
 }
 
-/** One indexed read per collection, shared by every Finance screen. */
+const EMPTY: Record<string, Rec[]> = Object.fromEntries(COLLECTIONS.map((name) => [name, [] as Rec[]]));
+
+/**
+ * One indexed read per collection, shared by every Finance screen. Finance
+ * fixtures are added after start-up, so the same read also reports whether they
+ * are in place. Both come from one storage snapshot, so a screen never sees
+ * "ready" next to a ledger that is still missing journals.
+ */
+function useFinCollections(orgId: string): { ready: boolean; rows: Record<string, Rec[]> } {
+  const snapshot = useLiveQuery(async () => {
+    const seeded = (await db.meta.get("seed:fin"))?.value === SEED_VERSION;
+    const entries = await Promise.all(COLLECTIONS.map(async (name) => [name, await listByCollection(orgId, name)] as const));
+    return { ready: seeded, rows: Object.fromEntries(entries) as Record<string, Rec[]> };
+  }, [orgId]);
+  return snapshot ?? { ready: false, rows: EMPTY };
+}
+
 export function useFinData(): FinData {
-  const data = useCollections(COLLECTIONS);
   const { org, now } = useWorkspace();
+  const { ready, rows: data } = useFinCollections(org.id);
   const nowIso = now.toISOString();
 
   return useMemo(() => {
@@ -53,6 +79,7 @@ export function useFinData(): FinData {
     const report = ledger(accounts, journals, org.id);
     const tb = trial(accounts, journals, org.id);
     return {
+      ready,
       accounts,
       journals,
       invoices: data.invoices,
@@ -79,7 +106,7 @@ export function useFinData(): FinData {
       postedCount: journals.filter((journal) => journal.status === "posted").length,
       draftJournals: journals.filter((journal) => journal.status === "draft"),
     };
-  }, [data, org.id, nowIso]);
+  }, [data, ready, org.id, nowIso]);
 }
 
 export function contactOf(data: FinData, record: Rec | undefined): Rec | undefined {

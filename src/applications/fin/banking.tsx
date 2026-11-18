@@ -9,12 +9,12 @@ import { CAPABILITY_LABELS, PROVIDER_CAPABILITIES } from "@/platform/capability"
 import type { Rec } from "@/domain/types";
 import { touch } from "@/domain/types";
 import {
-  accountCode, accountType, isStatementLine, journalLines, matchCandidates, periodOf, reconcile, statementSummaries,
+  accountCode, accountType, isStatementLine, journalDate, journalLines, matchCandidates, periodOf, reconcile, statementSummaries,
 } from "@/domain/fin-ledger";
 import type { JLine, MatchCandidate, Reconciliation } from "@/domain/fin-ledger";
 import { useFinData } from "./data";
 import type { FinData } from "./data";
-import { AccountLabel, Amount, CapabilityNotice, CapabilityPill, SourceNote, StatementRow } from "./parts";
+import { AccountLabel, Amount, BooksLoading, CapabilityNotice, CapabilityPill, SourceNote, StatementRow } from "./parts";
 import { wallMs } from "@/platform/clock";
 import { commitStatementMatch, commitStatementUnmatch } from "./reconciliationLinks";
 import { reconciliationEvidence, reconciliationSignoffBlocker, reconciliationSignoffIsCurrent } from "@/domain/finance-signoff";
@@ -500,7 +500,7 @@ export function ReconciliationStrip({ context }: { context: ScreenContext }) {
   return (
     <Row gap={4} wrap>
       <span>Statement <Amount minor={recon.statementClosingMinor} context={context} bold /></span>
-      <span>Ledger <Amount minor={recon.ledgerMinor} context={context} bold /></span>
+      <span>Ledger at statement end <Amount minor={recon.ledgerMinor} context={context} bold /></span>
       <span>Difference <Amount minor={recon.differenceMinor} context={context} bold /></span>
       <span>
         Unexplained{" "}
@@ -519,6 +519,7 @@ export function ToReconcile({ context }: { context: ScreenContext }) {
   const recon = useReconciliation("1000");
   const [busy, setBusy] = useState<string>();
 
+  if (!data.ready) return <BooksLoading what="statement and posted journals" />;
   if (!recon.statement) {
     return (
       <Empty title="No statement imported for the current account" icon={<FileSpreadsheet size={20} />}
@@ -534,7 +535,8 @@ export function ToReconcile({ context }: { context: ScreenContext }) {
     <Stack gap={4}>
       <StatRow>
         <Stat prov="posted" label="Statement closing" value={context.money(recon.statementClosingMinor ?? 0)} meta={`${recon.statement.filename}`} />
-        <Stat prov="posted" label="Ledger balance" value={context.money(recon.ledgerMinor)} meta="Posted journals on 1000" />
+        <Stat prov="posted" label="Ledger balance" value={context.money(recon.bookBalanceMinor)} meta="Every posted journal on 1000, to date" />
+        <Stat prov="posted" label="Ledger at statement end" value={context.money(recon.ledgerMinor)} meta={recon.statement.to ? `Posted on 1000 up to ${context.date(recon.statement.to)}` : "Posted journals on 1000"} />
         <Stat prov="posted" label="Difference" value={context.money(recon.differenceMinor ?? 0)} meta={`${open.length} open lines`} />
         <Stat prov="posted"
           label="Unexplained"
@@ -607,8 +609,25 @@ export function ToReconcile({ context }: { context: ScreenContext }) {
         </Stack>
       )}
 
+      {recon.postedAfterStatement.length > 0 && (
+        <Card prov="posted" title="Posted after the statement end"
+          subtitle={`${recon.postedAfterStatement.length} posted journal${recon.postedAfterStatement.length === 1 ? "" : "s"} on 1000 dated after ${context.date(recon.statement.to ?? "")}. They are in the ledger balance but belong on the next statement, so they do not change this difference.`}
+          actions={<Amount minor={recon.postedAfterStatement.reduce((sum, item) => sum + item.amountMinor, 0)} context={context} bold />}>
+          <DataGrid
+            rows={recon.postedAfterStatement}
+            rowId={(row) => row.journal.id}
+            label="Journals posted after the statement end"
+            columns={[
+              { key: "date", header: "Ledger date", cell: (row) => <span className="ds-num">{context.date(journalDate(row.journal))}</span>, sortValue: (row) => journalDate(row.journal) },
+              { key: "journal", header: "Journal", primary: true, cell: (row) => row.journal.title, filterValue: (row) => row.journal.title },
+              { key: "amount", header: "Bank movement", align: "end", cell: (row) => <Amount minor={row.amountMinor} context={context} /> },
+            ]}
+          />
+        </Card>
+      )}
+
       <Notice tone={recon.unexplainedMinor === 0 ? "info" : "danger"} title="How the difference is explained">
-        Statement {context.money(recon.statementClosingMinor ?? 0)} less ledger {context.money(recon.ledgerMinor)} is {context.money(recon.differenceMinor ?? 0)}.
+        Statement {context.money(recon.statementClosingMinor ?? 0)} less ledger at the statement end {context.money(recon.ledgerMinor)} is {context.money(recon.differenceMinor ?? 0)}.
         The {recon.needsPosting.length} line{recon.needsPosting.length === 1 ? "" : "s"} with no ledger entry come to {context.money(recon.needsPostingMinor)}.
         That leaves {context.money(recon.unexplainedMinor ?? 0)} unexplained.
         {data.draftJournals.length > 0 && ` ${data.draftJournals.length} draft journals are excluded from the ledger figure.`}
