@@ -11,7 +11,7 @@ import { requestMailboxConnection } from "./actions";
 import { useCommsData } from "./panels";
 import { configuredIdentities, validateIdentity } from "./mailIdentities";
 import { ComposeTools, RecipientPicker } from "./ComposeAddons";
-import type { ComposeReference } from "./composeTools";
+import { parseComposeReferences, type ComposeReference } from "./composeTools";
 import { filterMailView, relatedMailContext, type MailView } from "./mailViews";
 import {
   MAIL_FOLDERS, checkDraft, draftInput, draftRecord, folderCounts, folderOf, searchThreads, senderAddress,
@@ -228,7 +228,7 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
     setLoadedFrom(existing.id);
     setDraft(draftInput(existing));
     setShowCc(Boolean(existing.fields.cc));
-    setReferences(Array.isArray(existing.fields.documentReferences) ? existing.fields.documentReferences as ComposeReference[] : []);
+    setReferences(parseComposeReferences(existing.fields.documentReferences));
     setIdentityId(String(existing.fields.senderIdentityId ?? ""));
     setSavedAt(String(existing.fields.savedLocallyAt ?? existing.updatedAt));
   }
@@ -243,9 +243,9 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
       try {
         if (idRef.current) {
           const previous = existing && existing.id === idRef.current ? existing : undefined;
-          await context.mutate.patch(idRef.current, { ...draftRecord(value, from, at, previous), fields: { ...draftRecord(value, from, at, previous).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderSignature: identity?.signature ?? "", senderVerified: false, documentReferences: references } }, { event: `Email draft updated by ${context.actor}` });
+          await context.mutate.patch(idRef.current, { ...draftRecord(value, from, at, previous), fields: { ...draftRecord(value, from, at, previous).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderSignature: identity?.signature ?? "", senderVerified: false, documentReferences: JSON.stringify(references) } }, { event: `Email draft updated by ${context.actor}` });
         } else {
-          const created = await context.mutate.create({ collection: "emailThreads", tags: ["draft"], ...{ ...draftRecord(value, from, at), fields: { ...draftRecord(value, from, at).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderSignature: identity?.signature ?? "", senderVerified: false, documentReferences: references } } }, `Email draft saved by ${context.actor}`);
+          const created = await context.mutate.create({ collection: "emailThreads", tags: ["draft"], ...{ ...draftRecord(value, from, at), fields: { ...draftRecord(value, from, at).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderSignature: identity?.signature ?? "", senderVerified: false, documentReferences: JSON.stringify(references) } } }, `Email draft saved by ${context.actor}`);
           idRef.current = created.id;
         }
         setSavedAt(at);
