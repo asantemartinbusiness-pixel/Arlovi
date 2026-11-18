@@ -300,3 +300,35 @@
 .cm-compose>.ds-notice{margin-top:12px}
 .cm-compose>.ds-row:last-child{margin-top:12px}
 @media(max-width:600px){.cm-compose-row{grid-template-columns:50px minmax(0,1fr);gap:8px}.cm-compose-heading{flex-wrap:wrap}.cm-compose-state{margin-left:44px}.cm-compose-connect{flex-wrap:wrap}.cm-compose-connect>button{margin-left:27px}}
+
+
+/* Composer workspace contacts, safe references and web links */
+.cm-compose-picker{position:relative;min-width:0;flex:1}
+.cm-compose-picker>input{width:100%}
+.cm-compose-suggestions{position:absolute;z-index:20;top:calc(100% + 4px);left:0;right:0;max-height:260px;overflow:auto;padding:6px;border:1px solid var(--border-default);border-radius:9px;background:var(--bg-surface);box-shadow:0 12px 28px rgba(0,0,0,.12)}
+.cm-compose-suggestions-heading{display:flex;align-items:center;gap:6px;padding:7px 9px;color:var(--fg-subtle);font-size:10px;font-weight:650;letter-spacing:.03em}
+.cm-compose-suggestions button{display:flex;width:100%;align-items:center;gap:9px;border:0;background:transparent;padding:8px;border-radius:6px;text-align:left;font:inherit;color:var(--fg-default);cursor:pointer}
+.cm-compose-suggestions button:hover,.cm-compose-suggestions button:focus-visible{background:var(--bg-hover)}
+.cm-compose-suggestions button>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:2px;min-width:0}
+.cm-compose-suggestions button strong{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-compose-suggestions button small{font-size:11px;color:var(--fg-subtle);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-compose-contact-avatar{width:27px;height:27px;display:flex;align-items:center;justify-content:center;background:var(--bg-selected);border-radius:8px;font-size:12px;font-weight:700}
+.cm-compose-tools{display:flex;flex-direction:column;gap:10px}
+.cm-compose-tool-buttons{display:flex;flex-wrap:wrap;gap:7px}
+.cm-compose-tool-buttons button{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border:1px solid var(--border-default);border-radius:6px;background:var(--bg-surface);color:var(--fg-subtle);font:inherit;font-size:11px;cursor:pointer}
+.cm-compose-tool-buttons button:hover,.cm-compose-tool-buttons button:focus-visible{background:var(--bg-hover);color:var(--fg-default)}
+.cm-compose-tool-panel{display:flex;flex-direction:column;gap:9px;padding:12px;border:1px solid var(--border-default);border-radius:8px;background:var(--bg-inset)}
+.cm-compose-tool-panel>label{font-size:11px;font-weight:650}
+.cm-compose-tool-entry{display:flex;gap:8px;align-items:center}
+.cm-compose-tool-entry>input{flex:1;min-width:0}
+.cm-compose-tool-panel small[role="alert"]{color:var(--danger);font-size:11px}
+.cm-compose-document-results{display:flex;flex-direction:column;max-height:170px;overflow:auto}
+.cm-compose-document-results button{display:flex;align-items:center;gap:8px;border:0;border-bottom:1px solid var(--border-subtle);padding:8px;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}
+.cm-compose-document-results button:hover{background:var(--bg-hover)}
+.cm-compose-document-results button span:nth-child(2){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm-compose-document-results button span:last-child{color:var(--fg-subtle);font-size:10px}
+.cm-compose-tool-muted{font-size:11px;color:var(--fg-subtle);line-height:1.5}
+.cm-compose-reference-list{display:flex;gap:6px;flex-wrap:wrap}
+.cm-compose-reference-list>span{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border-default);background:var(--bg-inset);padding:5px 8px;border-radius:6px;font-size:11px;max-width:100%;overflow-wrap:anywhere}
+.cm-compose-reference-list button{border:0;background:transparent;cursor:pointer;color:var(--fg-subtle);display:flex;padding:2px}
+@media(max-width:600px){.cm-compose-tool-entry{flex-wrap:wrap}.cm-compose-suggestions{min-width:0}}
