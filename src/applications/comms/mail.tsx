@@ -49,6 +49,7 @@ export function MailWorkspace({ context, lens }: { context: ScreenContext; lens:
   const { org } = useWorkspace();
   const [query, setQuery] = useState("");
   const [manageIdentities, setManageIdentities] = useState(false);
+  const [manageConnections, setManageConnections] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const folder = lens.toLowerCase();
   const searching = query.trim().length > 0;
@@ -81,11 +82,15 @@ export function MailWorkspace({ context, lens }: { context: ScreenContext; lens:
         <Button size="sm" variant="primary" className="cm-mail-new" onClick={() => context.openOverlay("Compose window")}>
           New draft
         </Button>
+        <Button size="sm" variant="secondary" onClick={() => setManageConnections((value) => !value)}>
+          <PlugZap size={14} /> Accounts & domains
+        </Button>
         <Button size="sm" variant="secondary" onClick={() => setManageIdentities((value) => !value)}>
           <UserRound size={14} /> Sender identities
         </Button>
       </aside>
       <Stack gap={3}>
+        {manageConnections && <MailConnectionSetup context={context} />}
         {manageIdentities && <MailIdentityManager context={context} />}
         {folder === "drafts" && !searching && <NotSentNotice context={context} />}
         <DataGrid
@@ -343,6 +348,92 @@ export function MailIdentityManager({ context }: { context: ScreenContext }) {
         {error && <Notice tone="danger"><ShieldAlert size={14} /> {error}</Notice>}
         <Button type="submit" size="sm" variant="primary"><Link2 size={14} /> Save local identity</Button>
       </form>
+    </section>
+  );
+}
+
+/**
+ * Setup records are intentionally configuration requests, not connections.
+ * Real OAuth callbacks, secret storage and DNS verification need a server.
+ */
+export function MailConnectionSetup({ context }: { context: ScreenContext }) {
+  const data = useCommsData();
+  const [provider, setProvider] = useState("google");
+  const [domain, setDomain] = useState("");
+  const [mailbox, setMailbox] = useState("");
+  const [error, setError] = useState("");
+  const requests = data.preferences.filter((item) =>
+    item.fields.kind === "mailProviderSetup" && item.fields.requestedBy === context.actor);
+  const providers: Record<string, string> = {
+    google: "Google Workspace / Gmail",
+    microsoft: "Microsoft 365 / Outlook",
+    other: "Other IMAP/SMTP provider",
+    transactional: "Domain-authenticated system messages",
+  };
+  const canManage = context.can("manage_connectors");
+  return (
+    <section className="cm-mail-identities" aria-label="Mail accounts and domain setup">
+      <Row gap={2} wrap><PlugZap size={16} /><strong className="ds-grow">Accounts & domain setup</strong><Pill tone="warning">Provider not connected</Pill></Row>
+      <Notice tone="info" title="Use the company's existing email provider">
+        Google and Microsoft accounts require OAuth with an approved backend callback. Other providers need secure server-side credentials. Domain DNS verification cannot be performed in this browser-only workspace.
+      </Notice>
+      {requests.length > 0 && (
+        <div className="ds-stack ds-gap-2">
+          <strong>Configuration requests</strong>
+          {requests.map((request) => (
+            <Row key={request.id} gap={2} wrap>
+              <span className="ds-grow">{providers[String(request.fields.provider)] ?? "Email provider"} · {String(request.fields.mailbox ?? request.fields.domain ?? "")}</span>
+              <Pill tone="warning">Configuration required</Pill>
+            </Row>
+          ))}
+        </div>
+      )}
+      <form className="cm-mail-identity-form" onSubmit={async (event) => {
+        event.preventDefault();
+        setError("");
+        if (!canManage) { setError("You do not have connector management permission."); return; }
+        const normalizedDomain = domain.trim().toLowerCase();
+        const normalizedMailbox = mailbox.trim().toLowerCase();
+        if (normalizedDomain && !/^(?!-)[a-z0-9-]+(\\.[a-z0-9-]+)+$/.test(normalizedDomain)) {
+          setError("Enter a valid company domain without https:// or a path."); return;
+        }
+        if (provider !== "transactional" && !/^[^\\s@<>(),;]+@[^\\s@<>(),;]+\\.[^\\s@<>(),;]+$/.test(normalizedMailbox)) {
+          setError("Enter the existing mailbox address."); return;
+        }
+        if (provider === "transactional" && !normalizedDomain) {
+          setError("Enter the company domain for system messages."); return;
+        }
+        try {
+          await context.mutate.create({
+            collection: "preferences",
+            title: `Mail provider setup: ${providers[provider]}`,
+            status: "configuration_required",
+            summary: "A configuration request only. No credentials or DNS changes have been made.",
+            fields: { kind: "mailProviderSetup", requestedBy: context.actor, provider, domain: normalizedDomain, mailbox: normalizedMailbox, state: "configuration_required", verified: false, connected: false },
+          }, `Email provider configuration requested by ${context.actor}`);
+          setDomain(""); setMailbox("");
+          context.toast("Configuration request recorded", "Nothing connected, no DNS records were changed and no email can be sent yet.");
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "Setup request could not be saved.");
+        }
+      }}>
+        <Field label="Provider">
+          <select className="cm-mail-identity-select" value={provider} onChange={(event) => setProvider(event.target.value)}>
+            {Object.entries(providers).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+          </select>
+        </Field>
+        <Field label="Existing company domain (optional for individual accounts)">
+          <TextInput value={domain} placeholder="company.com" onChange={(event) => setDomain(event.target.value)} />
+        </Field>
+        {provider !== "transactional" && <Field label="Existing mailbox address"><TextInput type="email" placeholder="jane@company.com" value={mailbox} onChange={(event) => setMailbox(event.target.value)} /></Field>}
+        <div className="cm-mail-setup-help">
+          <strong>What the live connection must verify</strong>
+          <p className="ds-subtle">Domain ownership and existing MX records; provider consent; mailbox access; approved send-as aliases; SPF/DKIM/DMARC alignment for any separate system-mail sender. Existing mail hosting must not be overwritten.</p>
+        </div>
+        {error && <Notice tone="danger">{error}</Notice>}
+        <Button type="submit" size="sm" variant="primary" disabled={!canManage}>Record setup request</Button>
+      </form>
+      {!canManage && <Notice tone="warning">Only connector administrators can request a provider setup.</Notice>}
     </section>
   );
 }
