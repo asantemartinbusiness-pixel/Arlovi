@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { PaletteId } from "@/brand";
 import type { Role } from "@/domain/types";
 import type { AttentionReceipt } from "@/platform/attentionReceipts";
+import { DEFAULT_NOTIFICATION_PREFERENCES, normalizeNotificationPreferences, type NotificationPreferences } from "@/platform/notificationExperience";
 
 export interface Toast {
   id: string;
@@ -26,7 +27,10 @@ interface UiState {
   offline: boolean;
   toasts: Toast[];
   attentionReceipts: Record<string, AttentionReceipt>;
+  notificationPreferences: Record<string, NotificationPreferences>;
   setAttentionReceipt: (key: string, update: AttentionReceipt) => void;
+  setAttentionReceipts: (updates: Record<string, AttentionReceipt>) => void;
+  setNotificationPreferences: (key: string, update: Partial<NotificationPreferences>) => void;
   setRole: (role: Role) => void;
   setTheme: (theme: "light" | "dark") => void;
   setDensity: (density: UiState["density"]) => void;
@@ -70,10 +74,20 @@ export const useUi = create<UiState>((set) => ({
   offline: typeof navigator !== "undefined" ? !navigator.onLine : false,
   toasts: [],
   attentionReceipts: initial.attentionReceipts ?? {},
+  notificationPreferences: initial.notificationPreferences ?? {},
   setAttentionReceipt: (key, update) => set((state) => ({
     attentionReceipts: {
       ...state.attentionReceipts,
       [key]: { ...state.attentionReceipts[key], ...update },
+    },
+  })),
+  setAttentionReceipts: (updates) => set((state) => ({
+    attentionReceipts: Object.fromEntries(Object.entries({ ...state.attentionReceipts, ...updates }).map(([key, receipt]) => [key, { ...state.attentionReceipts[key], ...receipt }])),
+  })),
+  setNotificationPreferences: (key, update) => set((state) => ({
+    notificationPreferences: {
+      ...state.notificationPreferences,
+      [key]: normalizeNotificationPreferences({ ...(state.notificationPreferences[key] ?? DEFAULT_NOTIFICATION_PREFERENCES), ...update }),
     },
   })),
   setRole: (role) => set({ role }),
@@ -106,6 +120,7 @@ useUi.subscribe((state) => {
       palette: state.palette,
       collapsed: state.collapsed,
       attentionReceipts: state.attentionReceipts,
+      notificationPreferences: state.notificationPreferences,
     }),
     );
   } catch {
