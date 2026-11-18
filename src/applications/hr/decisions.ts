@@ -2,6 +2,18 @@ import type { Rec, Snapshot } from "@/domain/types";
 import { daysBetween } from "@/platform/clock";
 import { newRecord } from "@/platform/repo";
 
+/**
+ * One quoted CSV cell. Text a spreadsheet would read as a formula (it starts
+ * with = + - @, a tab or a carriage return) is prefixed with an apostrophe;
+ * plain numbers pass through untouched.
+ */
+export function csvCell(value: unknown): string {
+  const text = String(value ?? "");
+  const numeric = typeof value === "number" || /^-?\d+(\.\d+)?$/.test(text);
+  const guarded = !numeric && /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  return `"${guarded.replace(/"/g, '""')}"`;
+}
+
 /** Pure, reviewable record plans; the caller commits the whole plan with
  * mutations.putMany so a stale revision rolls back every related change. */
 export interface PeopleDecisionContext {

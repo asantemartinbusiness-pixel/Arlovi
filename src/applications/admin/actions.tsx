@@ -6,7 +6,7 @@ import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useOrgRecords } from "@/platform/workspace";
 import { capabilityById, CAPABILITY_LABELS } from "@/platform/capability";
 import type { Rec } from "@/domain/types";
-import { ofKind, StepUp, useAdmin } from "./pieces";
+import { csvCell, ofKind, StepUp, useAdmin } from "./pieces";
 import { clockIso } from "@/platform/clock";
 
 /* ====================================================================== *
@@ -23,7 +23,7 @@ function download(name: string, text: string, mime = "text/csv") {
   URL.revokeObjectURL(url);
 }
 
-const cell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+const cell = (value: unknown) => csvCell(value);
 
 function boundary(id: string): string {
   const capability = capabilityById(id);

@@ -5,8 +5,8 @@ import type { Rec } from "@/domain/types";
  *
  * No calendar provider is connected. Clashes are computed only from meetings
  * recorded in this workspace, and an attendee's answer is only what a person
- * recorded here. Times are stored as ISO instants; the editor works in UTC to
- * match the seeded diary.
+ * recorded here. Times are stored as ISO instants (UTC); the editor shows and
+ * takes the browser's local wall-clock time, as the calendar grid does.
  * ====================================================================== */
 
 export function people(value: unknown): string[] {
@@ -19,8 +19,9 @@ export interface Clash { meeting: Rec; who: string[] }
 
 /**
  * Meetings that overlap the slot and share at least one person with it. A
- * meeting for "Everyone" clashes with anyone. Finished and cancelled meetings
- * are not clashes.
+ * meeting for "Everyone", on either side, clashes with anyone on the other
+ * side; `who` then names the other side's people (or "Everyone"). Finished and
+ * cancelled meetings are not clashes.
  */
 export function findClashes(meetings: Rec[], slot: Slot): Clash[] {
   const start = Date.parse(slot.startAt);
@@ -36,18 +37,45 @@ export function findClashes(meetings: Rec[], slot: Slot): Clash[] {
     const mEnd = Date.parse(meeting.endAt);
     if (!(mStart < end && mEnd > start)) continue;
     const theirs = people(meeting.fields.attendees);
-    const who = theirs.includes("Everyone") || everyoneInSlot
-      ? [...wanted]
-      : theirs.filter((name) => wanted.has(name));
+    const theirsEveryone = theirs.includes("Everyone");
+    const theirNames = theirs.filter((name) => name !== "Everyone");
+    const who = everyoneInSlot
+      ? (theirsEveryone ? ["Everyone"] : theirNames)
+      : theirsEveryone
+        ? [...wanted]
+        : theirNames.filter((name) => wanted.has(name));
     if (who.length > 0) clashes.push({ meeting, who });
   }
   return clashes.sort((a, b) => (a.meeting.startAt ?? "").localeCompare(b.meeting.startAt ?? ""));
 }
 
-/** An ISO instant from a date (yyyy-mm-dd) and a time (hh:mm), in UTC. */
+const pad = (value: number) => String(value).padStart(2, "0");
+
+/** A date as yyyy-mm-dd on the browser's local calendar. */
+export function localDate(value: Date): string {
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+}
+
+/** The local date (yyyy-mm-dd) and wall-clock time (hh:mm) of a stored ISO instant. */
+export function localParts(iso: string | undefined): { date: string; time: string } {
+  const value = iso ? new Date(iso) : undefined;
+  if (!value || Number.isNaN(value.getTime())) return { date: "", time: "" };
+  return { date: localDate(value), time: `${pad(value.getHours())}:${pad(value.getMinutes())}` };
+}
+
+/**
+ * An ISO instant (UTC) from a local date (yyyy-mm-dd) and wall-clock time
+ * (hh:mm). A time skipped by a clock change resolves forward, as the browser does.
+ */
 export function instant(date: string, time: string): string {
-  const parsed = new Date(`${date}T${time || "00:00"}:00.000Z`);
-  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
+  const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  const clock = /^(\d{2}):(\d{2})$/.exec(time || "00:00");
+  if (!day || !clock) return "";
+  const [year, month, dom, hour, minute] = [Number(day[1]), Number(day[2]), Number(day[3]), Number(clock[1]), Number(clock[2])];
+  if (month < 1 || month > 12 || dom < 1 || dom > 31 || hour > 23 || minute > 59) return "";
+  const parsed = new Date(year, month - 1, dom, hour, minute, 0, 0);
+  if (Number.isNaN(parsed.getTime()) || parsed.getDate() !== dom) return "";
+  return parsed.toISOString();
 }
 
 export function addMinutes(iso: string, minutes: number): string {
@@ -122,16 +150,16 @@ export function answerTally(meeting: Rec): Record<Answer, number> {
 
 export interface AgendaDay { day: string; meetings: Rec[] }
 
-/** Upcoming meetings for the next `days` days, grouped by UTC calendar day. */
+/** Upcoming meetings for the next `days` days, grouped by local calendar day. */
 export function upcomingByDay(meetings: Rec[], now: Date, days = 14): AgendaDay[] {
-  const from = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const to = from + days * 86_400_000;
+  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const to = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days).getTime();
   const groups = new Map<string, Rec[]>();
   for (const meeting of meetings) {
     if (!meeting.startAt || meeting.status === "cancelled") continue;
     const start = Date.parse(meeting.startAt);
     if (start < from || start >= to) continue;
-    const day = meeting.startAt.slice(0, 10);
+    const day = localDate(new Date(start));
     groups.set(day, [...(groups.get(day) ?? []), meeting]);
   }
   return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))

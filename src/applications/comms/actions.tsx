@@ -6,6 +6,7 @@ import type { Rec } from "@/domain/types";
 import { askFirst, Boundary, boundaryText, logBoundary, pickRecord, recordOf, selectedOf } from "@/applications/hr/opsKit";
 import { messagesOf, useCommsData } from "./panels";
 import { clockIso } from "@/platform/clock";
+import { instant, localDate, localParts } from "./schedule";
 
 /* ------------------------------------------------------------------ *
  * Contract actions for the Communications module that change records.
@@ -130,11 +131,11 @@ export function replyToMessage(context: ScreenContext): void {
 /* ---------------- ARL-COMMS-001 · Join meeting / ask summary / notifications ---------------- */
 
 export function joinMeeting(context: ScreenContext): void {
-  const today = context.now.toISOString().slice(0, 10);
+  const today = localDate(context.now);
   pickRecord(context, {
     title: "Join a meeting",
     collection: "meetings",
-    filter: (row) => Boolean(row.startAt && row.endAt) && row.status !== "finished" && new Date(row.endAt!) >= context.now && (row.startAt ?? "").slice(0, 10) <= today
+    filter: (row) => Boolean(row.startAt && row.endAt) && row.status !== "finished" && new Date(row.endAt!) >= context.now && localParts(row.startAt).date <= today
       && (String(row.fields.attendees ?? "") === "Everyone" || listOf(row.fields.attendees).includes(context.actor)),
     describe: (row) => `${context.dateTime(row.startAt)} · ${String(row.fields.where ?? "")}`,
     pickLabel: "Join",
@@ -730,9 +731,10 @@ export function RescheduleMeeting({ context, close }: { context: ScreenContext; 
   if (upcoming.length === 0) return <Empty title="Nothing upcoming to move" />;
   if (!meeting) return <Empty title="Choose a meeting" />;
   const length = new Date(meeting.endAt!).getTime() - new Date(meeting.startAt!).getTime();
-  const day = date || meeting.startAt!.slice(0, 10);
-  const at = time || meeting.startAt!.slice(11, 16);
-  const start = new Date(`${day}T${at}:00.000Z`);
+  const current = localParts(meeting.startAt);
+  const day = date || current.date;
+  const at = time || current.time;
+  const start = new Date(instant(day, at) || Number.NaN);
   const end = new Date(start.getTime() + length);
   const clashes = busy(data.meetings, listOf(meeting.fields.attendees), start, end, meeting.id);
   const past = start < context.now;
@@ -757,7 +759,7 @@ export function RescheduleMeeting({ context, close }: { context: ScreenContext; 
       <Field label="Meeting"><Select value={meetingId} onChange={(event) => { setMeetingId(event.target.value); setDate(""); setTime(""); }}>{upcoming.map((row) => <option key={row.id} value={row.id}>{row.title} · {context.dateTime(row.startAt)}</option>)}</Select></Field>
       <Row gap={3}>
         <Field label="New date"><TextInput type="date" value={day} onChange={(event) => setDate(event.target.value)} invalid={past} /></Field>
-        <Field label="Start (UTC)"><TextInput type="time" value={at} onChange={(event) => setTime(event.target.value)} /></Field>
+        <Field label="Start (local time)"><TextInput type="time" value={at} onChange={(event) => setTime(event.target.value)} /></Field>
       </Row>
       <Properties rows={[{ label: "Length kept", value: `${Math.round(length / 60_000)} minutes` }, { label: "Now", value: context.dateTime(meeting.startAt) }]} />
       {past && <Notice tone="danger" title="That time has passed">Choose a time after now.</Notice>}

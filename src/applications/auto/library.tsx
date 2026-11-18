@@ -280,7 +280,7 @@ export function ActivationReview({ context, close }: { context: ScreenContext; c
           icon={<PlayCircle size={15} />}
           disabled={errors.length > 0 || !acknowledged}
           onClick={async () => {
-            await context.mutate.patch(row.record.id, { status: "active" }, { expectRevision: row.record.revision, event: "Automation activated after review" });
+            if (!await context.mutate.patch(row.record.id, { status: "active" }, { expectRevision: row.record.revision, event: "Automation activated after review" })) return;
             context.toast("Activated", `${row.record.title} is active. The record now reads active; nothing has been scheduled outside this browser.`);
             close();
           }}
@@ -292,7 +292,7 @@ export function ActivationReview({ context, close }: { context: ScreenContext; c
             variant="secondary"
             icon={<PauseCircle size={15} />}
             onClick={async () => {
-              await context.mutate.patch(row.record.id, { status: "paused" }, { expectRevision: row.record.revision, event: "Automation paused from the activation review" });
+              if (!await context.mutate.patch(row.record.id, { status: "paused" }, { expectRevision: row.record.revision, event: "Automation paused from the activation review" })) return;
               context.toast("Paused", `${row.record.title} will not start a new run.`);
               close();
             }}
@@ -323,7 +323,7 @@ export function ArchiveWorkflow({ context, close }: { context: ScreenContext; cl
         variant="outline-danger"
         disabled={confirm.trim() !== row.record.title}
         onClick={async () => {
-          await context.mutate.patch(row.record.id, { status: "archived" }, { expectRevision: row.record.revision, event: "Automation archived" });
+          if (!await context.mutate.patch(row.record.id, { status: "archived" }, { expectRevision: row.record.revision, event: "Automation archived" })) return;
           context.toast("Archived", `${row.record.title} is archived. Its runs are still in the run history.`);
           close();
         }}

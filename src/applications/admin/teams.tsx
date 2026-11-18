@@ -34,8 +34,9 @@ export function TeamsManager({ context, members, departments }: { context: Scree
 
   const move = async (member: Rec, departmentId: string) => {
     const target = departments.find((department) => department.id === departmentId);
-    await context.mutate.patch(member.id, { fields: { ...member.fields, departmentId } },
+    const saved = await context.mutate.patch(member.id, { fields: { ...member.fields, departmentId } },
       { expectRevision: member.revision, event: `${member.title} moved to ${target?.title ?? "no team"} by ${context.actor}` });
+    if (!saved) return;
     context.toast("Team updated", `${member.title} is now in ${target?.title ?? "no team"}. Their role view is unchanged.`);
   };
 

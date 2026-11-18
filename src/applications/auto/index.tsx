@@ -29,6 +29,8 @@ import {
   type ExceptionTab,
 } from "./ops";
 import { getDraft } from "./store";
+import { loadGraphRecords } from "./runner";
+import { getRecordInOrg } from "@/platform/repo";
 import "./auto.css";
 
 /* ====================================================================== *
@@ -142,10 +144,12 @@ export const autoApp = registerApp({
         { id: "configure", label: "Configure a node", placement: "secondary", run: (context) => context.openOverlay("node configuration") },
         {
           id: "validate", label: "Validate", placement: "overflow",
-          run: (context) => {
+          run: async (context) => {
             const draft = getDraft(context.params.id ?? "");
             if (!draft) { context.toast("Nothing to validate", "Open an automation first.", "blocked"); return; }
-            const issues = validateWorkflow(draft.graph, []);
+            // References are checked against the trigger collection's records,
+            // as the builder's own panel does; with none, record.* is unchecked.
+            const issues = validateWorkflow(draft.graph, await loadGraphRecords(context.org.id, draft.graph));
             const errors = issues.filter((issue) => issue.severity === "error").length;
             context.toast(
               errors ? `${errors} error${errors === 1 ? "" : "s"}` : "The graph passes",
@@ -201,15 +205,22 @@ export const autoApp = registerApp({
           run: async (context) => {
             const id = context.params.id;
             if (!id) return;
-            const draft = getDraft(id);
-            if (draft) {
-              const errors = validateWorkflow(draft.graph, []).filter((issue) => issue.severity === "error");
-              if (errors.length) {
-                context.toast("Activation blocked", `${errors[0].title}. Fix it in the builder's validation panel.`, "blocked");
-                return;
-              }
+            const record = await getRecordInOrg(context.org.id, id);
+            if (!record) {
+              context.toast("Activation blocked", "This automation is not on record in this workspace.", "blocked");
+              return;
             }
-            await context.mutate.patch(id, { status: "active" }, { event: "Automation activated from the trigger screen" });
+            // Validate what the person is looking at: the open draft, or the
+            // stored graph when no draft is open. References are checked
+            // against the trigger collection's real records.
+            const graph = getDraft(id)?.graph ?? readGraph(record);
+            const errors = validateWorkflow(graph, await loadGraphRecords(context.org.id, graph)).filter((issue) => issue.severity === "error");
+            if (errors.length) {
+              context.toast("Activation blocked", `${errors[0].title}. Fix it in the builder's validation panel.`, "blocked");
+              return;
+            }
+            const saved = await context.mutate.patch(id, { status: "active" }, { event: "Automation activated from the trigger screen", expectRevision: record.revision });
+            if (!saved) return;
             context.toast("Activated", "The record reads active. Nothing has been registered with a scheduler, because there is none.");
           },
         },

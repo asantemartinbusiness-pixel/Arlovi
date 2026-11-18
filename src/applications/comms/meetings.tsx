@@ -9,7 +9,7 @@ import { routeForRecord } from "@/platform/attention";
 import type { Rec } from "@/domain/types";
 import { useCommsData } from "./panels";
 import {
-  addMinutes, agendaMinutes, agendaOf, answerOf, answerTally, findClashes, formatAgenda, instant, minutesBetween,
+  addMinutes, agendaMinutes, agendaOf, answerOf, answerTally, findClashes, formatAgenda, instant, localDate, localParts, minutesBetween,
   parseAgenda, people, responsesOf, type AgendaItem, type Answer, type RecordedAnswer,
 } from "./schedule";
 
@@ -46,7 +46,7 @@ export function EventForm({ context, close, formId = "cm-event" }: { context: Sc
 
   const [loaded, setLoaded] = useState<string | null>(null);
   const [title, setTitle] = useState("");
-  const [date, setDate] = useState(payload?.date ?? context.now.toISOString().slice(0, 10));
+  const [date, setDate] = useState(payload?.date ?? localDate(context.now));
   const [start, setStart] = useState(payload?.time ?? "10:00");
   const [minutes, setMinutes] = useState(30);
   const [where, setWhere] = useState("Studio table");
@@ -58,8 +58,10 @@ export function EventForm({ context, close, formId = "cm-event" }: { context: Sc
   if (editing && loaded !== editing.id) {
     setLoaded(editing.id);
     setTitle(editing.title);
-    setDate((editing.startAt ?? "").slice(0, 10));
-    setStart((editing.startAt ?? "").slice(11, 16));
+    // The form shows local wall-clock time; startAt is stored as UTC.
+    const parts = localParts(editing.startAt);
+    setDate(parts.date);
+    setStart(parts.time);
     setMinutes(minutesBetween(editing.startAt, editing.endAt) || Number(editing.fields.minutes ?? 30));
     setWhere(String(editing.fields.where ?? ""));
     setAttendees(people(editing.fields.attendees).filter((name) => name !== String(editing.fields.organizer ?? "")));
@@ -104,9 +106,13 @@ export function EventForm({ context, close, formId = "cm-event" }: { context: Sc
         const body = { ...((editing?.body as object | undefined) ?? {}), agendaItems: items };
         try {
           if (editing) {
-            await context.mutate.patch(editing.id, {
+            const saved = await context.mutate.patch(editing.id, {
               title: title.trim(), status, summary: fields.agenda, startAt, endAt, at: startAt, fields, body,
             }, { expectRevision: editing.revision, event: `${title.trim()} updated by ${context.actor}` });
+            if (!saved) {
+              setError("This event changed elsewhere before your edit was saved. Close it, reopen the event and apply the change again.");
+              return;
+            }
             context.toast("Event updated", clashes.length > 0 ? "Saved as tentative because of a clash. No updated invitation was sent." : "The calendar shows the new details. No updated invitation was sent.");
           } else {
             await context.mutate.create({

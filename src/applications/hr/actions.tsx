@@ -8,7 +8,7 @@ import { computePayroll } from "./panels";
 import { RoleViewNote, leaveBalance } from "./kit";
 import { recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 import { scopedDetailRecord } from "@/platform/recordScope";
-import { planHireApplicant, planLeaveDecision } from "./decisions";
+import { csvCell, planHireApplicant, planLeaveDecision } from "./decisions";
 import { newRecord } from "@/platform/repo";
 import { planShiftSwap, planTimesheetApprovals } from "./workforce";
 import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
@@ -779,7 +779,7 @@ export async function exportRun(context: ScreenContext, runs: Rec[], employees: 
   const run = runs.find((row) => row.status === "draft") ?? runs[0];
   const lines = computePayroll(employees);
   const header = "person,basis,gross,tax,ni,pension,net\n";
-  const body = lines.map((line) => [line.name, line.basis, line.grossMinor / 100, line.taxMinor / 100, line.niMinor / 100, line.pensionMinor / 100, line.netMinor / 100].map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const body = lines.map((line) => [line.name, line.basis, line.grossMinor / 100, line.taxMinor / 100, line.niMinor / 100, line.pensionMinor / 100, line.netMinor / 100].map((cell) => csvCell(cell)).join(",")).join("\n");
   const url = URL.createObjectURL(new Blob([header + body], { type: "text/csv" }));
   const link = document.createElement("a");
   link.href = url;

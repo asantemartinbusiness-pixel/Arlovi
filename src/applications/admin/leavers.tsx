@@ -17,16 +17,18 @@ export function useLeaverHandoffs(): Rec[] {
   return pendingAdminHandoffs(useCollections(["tasks"]).tasks);
 }
 
-/** Close every pending handoff for these member names, after a suspension. */
+/** Close every pending handoff for these member names, after a suspension. Returns how many closed. */
 export async function completeHandoffs(context: ScreenContext, handoffs: Rec[], names: string[], note: string): Promise<number> {
   const matching = handoffs.filter((task) => names.includes(String(task.fields.employeeName ?? "")));
+  let closed = 0;
   for (const task of matching) {
-    await context.mutate.patch(task.id, {
+    const saved = await context.mutate.patch(task.id, {
       status: "done",
       fields: { ...task.fields, stage: "done", completedBy: context.actor, completedAt: clockIso(), outcome: note },
     }, { expectRevision: task.revision, event: `Leaver access step for ${String(task.fields.employeeName)} completed in Administration by ${context.actor}: ${note}` });
+    if (saved) closed += 1;
   }
-  return matching.length;
+  return closed;
 }
 
 export function LeaverHandoffs({ context, members, sessions }: { context: ScreenContext; members: Rec[]; sessions: Rec[] }) {

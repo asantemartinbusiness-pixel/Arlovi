@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button, Notice, Pill, Row } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import type { Rec } from "@/domain/types";
-import { clockIso, wallMs } from "@/platform/clock";
+import { clockIso } from "@/platform/clock";
 import type { FormModel } from "./model";
 import { STRUCTURAL } from "./model";
 import { answeredCount, readPreviewRuns, staleLabels, withPreviewRun, type PreviewRun } from "./previewRuns";
@@ -15,9 +15,9 @@ function bodyOf(record: Rec): Record<string, unknown> {
 export async function keepPreviewRun(
   context: ScreenContext, record: Rec, model: FormModel, device: "mobile" | "desktop",
   run: { answers: [string, string][]; hidden: number },
-): Promise<void> {
+): Promise<boolean> {
   const entry: PreviewRun = {
-    id: `pr${wallMs().toString(36)}`,
+    id: `pr${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`,
     at: clockIso(),
     by: context.actor,
     version: model.settings.version,
@@ -26,10 +26,11 @@ export async function keepPreviewRun(
     hidden: run.hidden,
   };
   const previewRuns = withPreviewRun(readPreviewRuns(record), entry);
-  await context.mutate.patch(record.id, { body: { ...bodyOf(record), previewRuns } }, {
+  const saved = await context.mutate.patch(record.id, { body: { ...bodyOf(record), previewRuns } }, {
     expectRevision: record.revision,
     event: `Preview run of ${record.title} (version ${model.settings.version}) kept on the form; not a response`,
   });
+  return saved !== null;
 }
 
 export function PreviewRunsPanel({ context, record, model }: { context: ScreenContext; record: Rec; model: FormModel }) {
@@ -47,8 +48,8 @@ export function PreviewRunsPanel({ context, record, model }: { context: ScreenCo
         </div>
         {runs.length > 0 && (
           <Button size="sm" variant="ghost" onClick={async () => {
-            await context.mutate.patch(record.id, { body: { ...bodyOf(record), previewRuns: [] } }, { expectRevision: record.revision, event: `Preview runs of ${record.title} cleared` });
-            setOpenId("");
+            const saved = await context.mutate.patch(record.id, { body: { ...bodyOf(record), previewRuns: [] } }, { expectRevision: record.revision, event: `Preview runs of ${record.title} cleared` });
+            if (saved) setOpenId("");
           }}>Clear preview runs</Button>
         )}
       </Row>
