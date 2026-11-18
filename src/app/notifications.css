@@ -66,3 +66,17 @@
 .nt-pref-foot>span{font-size:10px;color:var(--fg-subtle)}
 @media(max-width:599px){.nt-tabs{padding-bottom:6px}.nt-item{padding:11px}.nt-drawer-footer span{display:none}.nt-summary>div{padding:9px}.nt-pref-category{padding:11px 9px}}
 @media(prefers-reduced-motion:reduce){.nt-item,.nt-tabs button{transition:none}}
+
+/* Toasts live above the execution tray and the mobile safe area. */
+.nt-toast-stack.ds-toasts{inset-inline-start:auto;inset-inline-end:var(--space-4);inset-block-end:calc(var(--space-4) + var(--statusbar-h, 40px));max-width:calc(100vw - 24px)}
+.nt-toast{align-items:flex-start;max-width:380px}
+.nt-toast-icon{flex:none;color:var(--fg-muted);margin-top:2px}
+.nt-toast[data-tone=ok] .nt-toast-icon{color:var(--success)}
+.nt-toast[data-tone=failed] .nt-toast-icon{color:var(--danger)}
+.nt-toast[data-tone=blocked] .nt-toast-icon{color:var(--warning)}
+.nt-toast-content{min-width:0;display:flex;flex-direction:column;gap:6px}
+.nt-toast-content p{margin:0;overflow-wrap:anywhere;line-height:1.5}
+.nt-toast-content button{align-self:flex-start}
+body:has([role=dialog]) .nt-toast-stack.ds-toasts{inset-block-start:var(--space-3);inset-block-end:auto;inset-inline-end:var(--space-3);inset-inline-start:auto}
+@media(max-width:599px){.nt-toast-stack.ds-toasts{inset-inline:var(--space-3);inset-block-end:calc(74px + env(safe-area-inset-bottom));max-width:none}.nt-toast{max-width:none;width:100%}}
+@media(prefers-reduced-motion:reduce){.nt-toast{animation:none}}
