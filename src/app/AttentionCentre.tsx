@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Bell, BellOff, CheckCheck, ChevronRight, Clock3, Inbox, Settings2, ShieldAlert } from "lucide-react";
 import { Button, Drawer, Pill, Empty } from "@/design-system";
 import {
-  attentionCounts, headerAttentionCounts, isDecisionItem, isNotificationItem, PRIORITY_LABEL,
+  headerAttentionCounts, isDecisionItem, isNotificationItem, PRIORITY_LABEL,
   PRIORITY_TONE, type AttentionItem,
 } from "@/platform/attention";
 import { useWorkspace } from "@/platform/workspace";
@@ -27,7 +27,6 @@ export function AttentionCentre({ items, onClose, initialView = "for-you" }: {
   const preferences = useUi(state => state.notificationSettings[scope]) ?? DEFAULT_NOTIFICATION_PREFERENCES;
   const [view, setView] = useState<View>(initialView);
   const [explanation, setExplanation] = useState<string | null>(null);
-  const counts = attentionCounts(items);
   const pendingDecisions = headerAttentionCounts(items).decisions;
 
   const shown = useMemo(() => {
