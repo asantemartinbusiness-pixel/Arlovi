@@ -75,3 +75,39 @@ export function drawMaskAligned(ctx: CanvasRenderingContext2D, mask: CanvasImage
 export function withMaskFrames(layers: PhotoLayer[]): PhotoLayer[] {
   return layers.map((layer) => (layer.mask && !layer.maskFrame ? { ...layer, maskFrame: frameOf(layer) } : layer));
 }
+
+/*
+ * A mask is stored as an opaque greyscale picture (white shows, black
+ * hides), but canvas compositing masks by alpha. The compositor uses this
+ * alpha version: each pixel's alpha becomes its brightness. Converted once
+ * per decoded mask image.
+ */
+const alphaCache = new WeakMap<object, HTMLCanvasElement>();
+
+export function luminanceToAlpha(data: Uint8ClampedArray): void {
+  for (let index = 0; index < data.length; index += 4) {
+    const light = 0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2];
+    data[index + 3] = Math.round((light * data[index + 3]) / 255);
+    data[index] = 255;
+    data[index + 1] = 255;
+    data[index + 2] = 255;
+  }
+}
+
+export function maskAlpha(mask: HTMLImageElement | HTMLCanvasElement): HTMLCanvasElement {
+  const cached = alphaCache.get(mask);
+  if (cached) return cached;
+  const width = mask instanceof HTMLImageElement ? mask.naturalWidth : mask.width;
+  const height = mask instanceof HTMLImageElement ? mask.naturalHeight : mask.height;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, width);
+  canvas.height = Math.max(1, height);
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return canvas;
+  ctx.drawImage(mask, 0, 0, canvas.width, canvas.height);
+  const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  luminanceToAlpha(pixels.data);
+  ctx.putImageData(pixels, 0, 0);
+  alphaCache.set(mask, canvas);
+  return canvas;
+}

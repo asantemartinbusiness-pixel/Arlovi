@@ -19,13 +19,14 @@ import {
   preflight, preflightBlocks, threadFrames, threadHeads, toMm,
   type Box, type Composition, type Frame, type ParagraphStyle, type PreflightIssue, type PublicationDoc,
 } from "./flow";
-import { PageView, dragFrame, resizeFrame, useCompositions } from "./spread";
-import { ArrangePanel, FrameStory, GridPanel, LayersPanel, exportPageSvg, useLayoutKeys, type AlignTarget } from "./editorParts";
-import { removeFrame } from "./arrange";
+import { PageView, dragFrame, dragFrames, resizeFrame, rotateFrameDrag, useCompositions } from "./spread";
+import { ArrangePanel, FrameStory, GridPanel, LayersPanel, MultiArrangePanel, exportPageSvg, useLayoutKeys, type AlignTarget } from "./editorParts";
+import { locateFrame, removeFrame, updateFrame } from "./arrange";
+import { normaliseAngle } from "./multi";
 import "./layout.css";
 import {
   BASE_STYLES, layoutUi, newImageFrame, newShapeFrame, newTextFrame,
-  parsePublication, selectFrame, setLayoutTool, starterPublication, type LayoutTool,
+  parsePublication, selectFrame, selectedFrameIds, setLayoutTool, starterPublication, toggleFrameSelection, type LayoutTool,
 } from "./model";
 import { wallMs } from "@/platform/clock";
 
@@ -186,11 +187,31 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
     });
   };
 
+  const onRotateDown = (frame: Frame, event: ReactPointerEvent) => {
+    rotateFrameDrag(event, frame, (rotation, committed) => {
+      if (committed) { handle.beginGesture(); return; }
+      handle.live((current) => updateFrame(current, frame.id, { rotation }));
+    });
+  };
+
   const onFrameDown = (frame: Frame, event: ReactPointerEvent) => {
     if (!doc) return;
     /* With a placing tool, a press on a frame places a new one there. */
     if (ui.tool === "text" || ui.tool === "image" || ui.tool === "shape") return;
     event.stopPropagation();
+    const onPage = doc.pages.some((page) => page.frames.some((item) => item.id === frame.id));
+    /* Shift-click adds a frame to the selection or takes it out. */
+    if (ui.tool === "select" && event.shiftKey && onPage) {
+      toggleFrameSelection(frame.id, (a, b) => locateFrame(doc, a)?.pageIndex === locateFrame(doc, b)?.pageIndex);
+      return;
+    }
+    const ids = selectedFrameIds(ui);
+    if (ui.tool === "select" && ids.length > 1 && ids.includes(frame.id)) {
+      dragFrames(event, ids, doc, ui.zoom, (next) => {
+        if (next === null) handle.beginGesture(); else handle.live(next);
+      });
+      return;
+    }
     if (ui.tool === "thread" && frame.kind === "text") {
       if (!ui.threadFrom) { layoutUi.set((current) => ({ ...current, threadFrom: frame.id })); return; }
       if (ui.threadFrom !== frame.id) {
@@ -380,6 +401,7 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
                   interactive
                   onFrameDown={onFrameDown}
                   onHandleDown={onHandleDown}
+                  onRotateDown={onRotateDown}
                   showGuides={ui.showGuides}
                   showBleed={ui.showBleed}
                   showBaseline={ui.showBaseline}
@@ -398,6 +420,7 @@ function FramePanel({ handle, context, compositions }: { handle: DocHandle<Publi
   const [alignTarget, setAlignTarget] = useState<AlignTarget>("margins");
   const doc = handle.doc;
   if (!doc) return null;
+  if (selectedFrameIds(ui).length > 1) return <MultiArrangePanel handle={handle} target={alignTarget} onTarget={setAlignTarget} />;
   const page = doc.pages.find((item) => item.id === doc.activePageId);
   const frame = page?.frames.find((item) => item.id === ui.selectedFrameId)
     ?? doc.pages.flatMap((item) => item.frames).find((item) => item.id === ui.selectedFrameId);
@@ -444,6 +467,18 @@ function FramePanel({ handle, context, compositions }: { handle: DocHandle<Publi
       <ArrangePanel handle={handle} frame={frame} target={alignTarget} onTarget={setAlignTarget} />
       <PanelGroup title="Geometry (mm)">
         <div className="vx-fieldrow">
+          <div>
+            <label className="vx-label" htmlFor="frame-rotation">Rotation (°)</label>
+            <input
+              id="frame-rotation"
+              className="vx-num"
+              type="number"
+              step={1}
+              disabled={frame.locked}
+              value={frame.rotation ?? 0}
+              onChange={(event) => set({ rotation: normaliseAngle(Number(event.target.value)) || undefined }, "Rotate the frame")}
+            />
+          </div>
           {(["x", "y", "w", "h"] as const).map((key) => (
             <div key={key}>
               <label className="vx-label" htmlFor={`frame-${key}`}>{key.toUpperCase()}</label>

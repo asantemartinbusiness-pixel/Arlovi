@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { apply } from "@/applications/visual/geometry";
-import { frameMatrix, frameOf, maskFollowMatrix, maskPlacement, withMaskFrames } from "@/applications/photo/maskSpace";
+import { frameMatrix, frameOf, luminanceToAlpha, maskFollowMatrix, maskPlacement, withMaskFrames } from "@/applications/photo/maskSpace";
 import { applyAffine, maskMatrix, transformImage, transformedSize, type ImageTransform } from "@/applications/photo/transform";
 import type { PhotoLayer, RasterDoc } from "@/applications/photo/raster";
 
@@ -91,5 +91,13 @@ describe("W2E photo: whole-image turns carry masks", () => {
       expect(maskPlacement(after).a).toBeCloseTo(1, 6);
       expect(maskPlacement(after).e).toBeCloseTo(0, 6);
     }
+  });
+});
+
+describe("W2E photo: masks hide by brightness", () => {
+  it("turns white into opaque, black into clear, grey into partial", () => {
+    const data = new Uint8ClampedArray([255, 255, 255, 255, 0, 0, 0, 255, 128, 128, 128, 255, 255, 255, 255, 0]);
+    luminanceToAlpha(data);
+    expect([data[3], data[7], data[11], data[15]]).toEqual([255, 0, 128, 0]);
   });
 });

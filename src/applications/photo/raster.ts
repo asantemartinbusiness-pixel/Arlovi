@@ -9,7 +9,7 @@
  * ====================================================================== */
 
 import { clamp, type Pt, type Rect } from "@/applications/visual/geometry";
-import { drawMaskAligned, frameOf } from "./maskSpace";
+import { drawMaskAligned, frameOf, maskAlpha } from "./maskSpace";
 
 export type BlendMode =
   | "normal" | "multiply" | "screen" | "overlay" | "darken" | "lighten"
@@ -649,7 +649,8 @@ export function compositeDoc(
       maskCtx.save();
       maskCtx.globalCompositeOperation = "destination-in";
       maskCtx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
-      drawMaskAligned(maskCtx, maskImage, layer, doc);
+      /* White shows, black hides: composite by the mask's brightness. */
+      drawMaskAligned(maskCtx, maskAlpha(maskImage), layer, doc);
       maskCtx.restore();
       ctx.save();
       ctx.globalAlpha = 1;
