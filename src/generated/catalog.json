@@ -4050,10 +4050,7 @@
         "Sent",
         "Drafts",
         "Archive",
-        "Spam",
-        "Shared inboxes",
-        "Accounts & domains",
-        "Sender identities"
+        "Spam"
       ],
       "actions": [
         "Compose",
