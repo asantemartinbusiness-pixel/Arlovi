@@ -10,6 +10,7 @@ import {
   SupplierCompare, SupplierInspect,
 } from "./actions";
 import "@/applications/market/growth.css";
+import { PurchaseTrail, QuoteComparison } from "./quotes";
 import { approverFor, statusTone } from "./data";
 import {
   ProcurementAnalytics, ProcurementOverview, PurchaseOrders, Receiving, Replenishment,
@@ -154,12 +155,14 @@ export const procApp = registerApp({
         { id: "approve", label: "Approve selected", placement: "secondary", capability: "approve_payment", guard: needsSelection, run: (context) => context.openOverlay("Requisition", { id: context.selectedId }) },
         { id: "reject", label: "Reject selected", placement: "secondary", capability: "approve_payment", guard: needsSelection, run: (context) => context.openOverlay("rejection reason", { id: context.selectedId }) },
         { id: "convert to PO", label: "Convert to a purchase order", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select an approved requisition"), run: (context) => convertToPo(context) },
+        { id: "compare quotes", label: "Compare quotes", placement: "secondary", guard: needsSelection, run: (context) => context.openOverlay("quote comparison", { id: context.selectedId }) },
         { id: "budget", label: "Budget check", placement: "overflow", run: (context) => context.openOverlay("budget check") },
       ],
       overlays: [
         { id: "Requisition form", kind: "drawer", title: "Requisition", width: 720, render: ({ close, ...context }) => <RequisitionForm context={context} close={close} />, footer: submitFooter("requisition-form", "Submit for approval") },
         { id: "Requisition", kind: "drawer", title: "Requisition review", width: 700, render: ({ close, ...context }) => <RequisitionReview context={context} close={close} /> },
         { id: "budget check", kind: "drawer", title: "Budget and limits", width: 660, render: ({ ...context }) => <BudgetCheck context={context} /> },
+        { id: "quote comparison", kind: "drawer", title: "Supplier quotes", width: 900, render: ({ ...context }) => <QuoteComparison context={context} /> },
         { id: "rejection reason", kind: "modal", title: "Reject with a reason", width: 600, render: ({ close, ...context }) => <RejectRequisition context={context} close={close} />, footer: submitFooter("reject-requisition", "Reject requisition") },
         { id: "PO editor", kind: "drawer", title: "Purchase order", width: 760, render: ({ close, ...context }) => <PoEditor context={context} close={close} />, footer: submitFooter("po-editor", "Save order") },
       ],
@@ -180,10 +183,13 @@ export const procApp = registerApp({
         { id: "revise", label: "Revise selected", placement: "secondary", guard: needsSelection, run: (context) => context.openOverlay("PO editor", { id: context.selectedId }) },
         { id: "close", label: "Close selected", placement: "overflow", tone: "danger", guard: needsSelection, run: (context) => closeOrder(context) },
         { id: "revisions", label: "Revision history", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("change impact", { id: context.selectedId }) },
+        { id: "purchase trail", label: "Purchase trail", placement: "secondary", guard: needsSelection, run: (context) => context.openOverlay("purchase trail", { id: context.selectedId }) },
       ],
       overlays: [
         { id: "PO editor", kind: "drawer", title: "Purchase order", width: 760, render: ({ close, ...context }) => <PoEditor context={context} close={close} />, footer: submitFooter("po-editor", "Save order") },
         { id: "change impact", kind: "drawer", title: "Revisions", width: 620, render: ({ ...context }) => <ChangeImpact context={context} /> },
+        { id: "purchase trail", kind: "drawer", title: "Purchase trail", width: 640, render: ({ ...context }) => <PurchaseTrail context={context} /> },
+        { id: "three-way match", kind: "drawer", title: "Three-way match", width: 780, render: ({ close, ...context }) => <ThreeWayMatch context={context} close={close} /> },
         { id: "send preview", kind: "drawer", title: "Issue the order", width: 680, render: ({ close, ...context }) => <SendPreview context={context} close={close} /> },
         { id: "receive", kind: "drawer", title: "Receive goods", width: 780, render: ({ close, ...context }) => <ScanOverlay context={context} close={close} />, footer: submitFooter("scan-overlay", "Record receipt") },
         confirmOverlay,

@@ -137,6 +137,42 @@ test.describe("BOOK cancellation and moves", () => {
   });
 });
 
+test.describe("PROC quotes and trail", () => {
+  test("record two quotes, compare and award the cheaper one; it persists", async ({ page }) => {
+    await page.goto(`${ORG}/proc/requisitions?tab=Awaiting%20approval`);
+    await main(page).getByRole("row", { name: /REQ-312/ }).getByText("REQ-312", { exact: true }).click();
+    await action(page, "Compare quotes");
+    const drawer = dialog(page);
+    await expect(drawer.getByText("No quotes recorded")).toBeVisible();
+    const record = async (supplier: string, price: string, lead: string) => {
+      await drawer.getByRole("combobox", { name: /Supplier/ }).selectOption({ label: supplier });
+      await drawer.getByRole("textbox", { name: /Brass collar, 60mm · unit price/ }).fill(price);
+      await drawer.getByRole("textbox", { name: /Lead time in days/ }).fill(lead);
+      await drawer.getByRole("button", { name: "Add to comparison" }).click();
+      await expect(page.getByText("Quote recorded").first()).toBeVisible();
+    };
+    await record("Thames Brass Founders", "9.10", "21");
+    await record("Kestrel Electrical", "8.75", "10");
+    const grid = drawer.getByRole("grid", { name: "Quote comparison" }).or(drawer.getByRole("table", { name: "Quote comparison" }));
+    await expect(grid.getByText("Lowest", { exact: true })).toHaveCount(1);
+    await drawer.getByRole("button", { name: "Award Kestrel Electrical" }).click();
+    await expect(page.getByText("Quote awarded")).toBeVisible();
+    await page.reload();
+    await main(page).getByRole("row", { name: /REQ-312/ }).getByText("REQ-312", { exact: true }).click();
+    await action(page, "Compare quotes");
+    await expect(dialog(page).getByRole("button", { name: "Award Kestrel Electrical" })).toHaveText("Awarded");
+  });
+
+  test("purchase trail shows a partial receipt state for an issued order", async ({ page }) => {
+    await page.goto(`${ORG}/proc/orders?tab=Sent`);
+    await main(page).getByRole("row", { name: /PO-206/ }).getByText("PO-206", { exact: true }).click();
+    await action(page, "Purchase trail");
+    const trail = dialog(page).getByRole("list", { name: "Purchase trail" });
+    await expect(trail.getByText("Goods received")).toBeVisible();
+    await expect(trail.getByText("Invoice matched")).toBeVisible();
+  });
+});
+
 test.describe("mobile", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
