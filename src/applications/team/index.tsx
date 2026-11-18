@@ -2393,7 +2393,7 @@ export const teamApp = registerApp({
       ],
       overlays: [
         { id: "Role edit", kind: "modal", title: "Edit the contract", width: 560, render: ({ close, ...context }) => <RoleEdit context={context} close={close} />, footer: submitFooter("role-edit", "Save contract") },
-        { id: "permission inspector", kind: "drawer", title: "Permissions", width: 560, render: ({ close, ...context }) => <PermissionInspector context={context} close={close} /> },
+        { id: "permission inspector", kind: "drawer", title: "Permissions", width: 560, presentation: { guidance: "Inspect the AI employee’s permitted tools, human oversight and execution boundaries." }, render: ({ close, ...context }) => <PermissionInspector context={context} close={close} /> },
         { id: "test panel", kind: "modal", title: "Run an evaluation", width: 680, render: ({ ...context }) => <TestPanel context={context} /> },
         { id: "reassign work", kind: "modal", title: "Reassign open work", width: 560, render: ({ close, ...context }) => <ReassignWork context={context} close={close} /> },
       ],
