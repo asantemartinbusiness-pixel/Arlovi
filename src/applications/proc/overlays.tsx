@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, MoneyInput, Notice, OverlayCancel, Pill, Properties, Row,
+  Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, MoneyInput, Notice, OverlayCancel, Pill, Properties, Row,
   Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
@@ -1194,46 +1194,120 @@ export function MovementInspector({ context }: { context: ScreenContext }) {
 export function MovementAuthorization({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useProcData();
   const { now, actor } = useWorkspace();
-  const [productId, setProductId] = useState(data.products[0]?.id ?? "");
-  const [warehouseId, setWarehouseId] = useState(data.warehouses[0]?.id ?? "");
-  const [quantity, setQuantity] = useState("0");
+  const [productId, setProductId] = useState("");
+  const [warehouseId, setWarehouseId] = useState("");
+  const [quantity, setQuantity] = useState("");
   const [kind, setKind] = useState("adjustment");
   const [reason, setReason] = useState("");
-  const onHand = data.stockMoves.filter((move) => String(move.fields.productId) === productId && String(move.fields.warehouseId) === warehouseId).reduce((sum, move) => sum + Number(move.fields.quantity ?? 0), 0);
-  const delta = Number(quantity) || 0;
-  const invalid = delta === 0 || !Number.isInteger(delta) || onHand + delta < 0 || !reason.trim();
+  const [reviewed, setReviewed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const product = data.products.find(row => row.id === productId);
+  const warehouse = data.warehouses.find(row => row.id === warehouseId);
+  const onHand = data.stockMoves
+    .filter(move => String(move.fields.productId) === productId && String(move.fields.warehouseId) === warehouseId)
+    .reduce((sum, move) => sum + Number(move.fields.quantity ?? 0), 0);
+  const delta = Number(quantity);
+  const validQuantity = /^-?\d+$/.test(quantity.trim()) && Number.isSafeInteger(delta) && delta !== 0;
+  const signError = (kind === "damage" || kind === "shrinkage") && delta > 0
+    ? "Damage and shrinkage must reduce the stock count (negative quantity)."
+    : kind === "found" && delta < 0
+      ? "Found stock must increase the stock count (positive quantity)."
+      : "";
+  const invalid = !product || !warehouse || !validQuantity || !Number.isSafeInteger(onHand)
+    || onHand + delta < 0 || Boolean(signError) || reason.trim().length < 10;
+  const permitted = context.can("approve_payment") || context.role === "owner";
+  const canRecord = !busy && !invalid && reviewed && permitted;
+
   return (
-    <form
-      id="movement-authorization"
-      className="ds-stack ds-gap-4"
+    <form id="movement-authorization" className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (invalid) return;
-        const product = data.products.find((item) => item.id === productId);
-        await context.mutate.create({
-          collection: "stockMoves",
-          title: `${kind} · ${String(product?.fields.sku ?? product?.title ?? "")}`,
-          status: "posted",
-          at: now.toISOString(),
-          summary: reason.trim(),
-          fields: { productId, warehouseId, quantity: delta, kind, reference: `ADJ-${now.getTime().toString().slice(-5)}`, authorisedBy: actor },
-        }, `Stock ${kind} of ${delta} authorised by ${actor}`);
-        context.toast("Movement recorded", `${product?.title} is now ${onHand + delta} at that site, with your name against the reason.`);
-        close();
-      }}
-    >
-      <Field label="Product"><Select value={productId} onChange={(event) => setProductId(event.target.value)}>{data.products.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</Select></Field>
-      <Field label="Site"><Select value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)}>{data.warehouses.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</Select></Field>
+        if (!canRecord || !product || !warehouse) return;
+        setBusy(true);
+        setError("");
+        try {
+          await context.mutate.create({
+            collection: "stockMoves",
+            title: `${kind} · ${String(product.fields.sku ?? product.title)}`,
+            status: "posted",
+            at: now.toISOString(),
+            summary: reason.trim(),
+            fields: {
+              productId, warehouseId, quantity: delta, kind,
+              reference: `ADJ-${now.getTime().toString().slice(-5)}`,
+              authorisedBy: actor,
+            },
+          }, `Stock ${kind} of ${delta} recorded by ${actor}`);
+          context.toast("Stock movement recorded",
+            `${product.title} at ${warehouse.title}: ${delta > 0 ? "+" : ""}${delta} recorded locally. Reconcile the warehouse count before relying on the new on-hand estimate.`);
+          close();
+        } catch (cause) {
+          const message = cause instanceof Error ? cause.message : "Review the movement and try again.";
+          setError(message);
+          context.toast("Stock movement not recorded", message, "failed");
+        } finally { setBusy(false); }
+      }}>
+      <ModalUnsavedChanges when={Boolean(productId || warehouseId || quantity || reason.trim() || reviewed)} />
+      <ModalInFlight when={busy} />
+      <Notice tone="info" title="Record a specific site movement">
+        Select a product and warehouse. Counts are calculated from recorded movements, not independently
+        verified warehouse stock. No inventory provider is connected.
+      </Notice>
+      <Field label="Product" required>
+        <Select aria-label="Product" value={productId} disabled={busy}
+          onChange={event => { setProductId(event.target.value); setReviewed(false); setError(""); }}>
+          <option value="">Select product</option>
+          {data.products.map(row => <option key={row.id} value={row.id}>{row.title}</option>)}
+        </Select>
+      </Field>
+      <Field label="Warehouse" required>
+        <Select aria-label="Warehouse" value={warehouseId} disabled={busy}
+          onChange={event => { setWarehouseId(event.target.value); setReviewed(false); setError(""); }}>
+          <option value="">Select warehouse</option>
+          {data.warehouses.map(row => <option key={row.id} value={row.id}>{row.title}</option>)}
+        </Select>
+      </Field>
       <Row gap={3} wrap>
-        <Field label="Kind"><Select value={kind} onChange={(event) => setKind(event.target.value)}>{["adjustment", "damage", "shrinkage", "found", "correction"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
-        <Field label="Quantity" hint={`${onHand} on hand; this would make it ${onHand + delta}`} error={onHand + delta < 0 ? "That would take the site below zero" : undefined}>
-          <TextInput value={quantity} inputMode="numeric" align="end" invalid={onHand + delta < 0} onChange={(event) => setQuantity(event.target.value)} />
+        <Field label="Movement type">
+          <Select aria-label="Movement type" value={kind} disabled={busy}
+            onChange={event => { setKind(event.target.value); setReviewed(false); }}>
+            {["adjustment", "damage", "shrinkage", "found", "correction"].map(option =>
+              <option key={option} value={option}>{option}</option>)}
+          </Select>
+        </Field>
+        <Field label="Signed quantity" required
+          hint="Use a negative number to remove stock and a positive number to add stock."
+          error={signError || ((product && warehouse && validQuantity && onHand + delta < 0) ? "This would produce a negative stock balance." : undefined)}>
+          <TextInput aria-label="Signed quantity" value={quantity} disabled={busy}
+            inputMode="numeric" align="end"
+            onChange={event => { setQuantity(event.target.value); setReviewed(false); setError(""); }} />
         </Field>
       </Row>
-      <Field label="Reason" required hint="Recorded on the movement with your name."><TextArea value={reason} rows={2} onChange={(event) => setReason(event.target.value)} required /></Field>
-      <Notice tone="warning" title="An adjustment is the least traceable kind of movement">
-        Everything else points at an order, a receipt or a count. An adjustment points at a person, which is why the reason is required and your name is stored with it.
-      </Notice>
+      <Properties rows={[
+        { label: "Current recorded on hand", value: product && warehouse ? String(onHand) : "Select a product and warehouse" },
+        { label: "Proposed movement", value: validQuantity ? `${delta > 0 ? "+" : ""}${delta}` : "Enter a whole number" },
+        { label: "Projected recorded on hand", value: product && warehouse && validQuantity ? String(onHand + delta) : "—" },
+        { label: "Authorising user", value: actor },
+      ]} />
+      <Field label="Reason for adjustment" required
+        hint="Minimum 10 characters. Include the source count, damage record or authorisation reference.">
+        <TextArea aria-label="Reason for adjustment" rows={2} value={reason} disabled={busy}
+          onChange={event => { setReason(event.target.value); setReviewed(false); setError(""); }} />
+      </Field>
+      {!permitted && <Notice tone="warning" title="A permitted procurement reviewer is required">
+        This local role view does not have approval capability. It is a UI guard, not server-side authorisation.
+      </Notice>}
+      <Checkbox checked={reviewed} disabled={busy || invalid}
+        onChange={event => setReviewed(event.target.checked)}
+        label="I checked the selected product, site, direction, quantity and supporting reason." />
+      {error && <Notice tone="danger" title="Movement could not be recorded">{error}</Notice>}
+      <ModalActions>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
+        <span className="ds-grow" />
+        <Button variant="primary" type="submit" form="movement-authorization"
+          disabled={!canRecord} busy={busy}>Record stock movement</Button>
+      </ModalActions>
     </form>
   );
 }
