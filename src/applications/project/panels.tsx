@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Activity, CalendarRange, FolderKanban, LayoutDashboard, ListChecks, Timer, Users } from "lucide-react";
 import {
-  Avatar, BarChart, Button, Card, Checkbox, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice,
+  Avatar, BarChart, Button, Card, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice,
   Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
@@ -15,6 +15,8 @@ import { BoardFilterNotice, PortfolioFilterNotice, TaskComments, boardFilter, ma
 import { Gantt, createsCycle, criticalPath, dependenciesOf } from "./timeline";
 import { OpsHeader, OpsMetric, OpsMetrics } from "@/applications/shared/operational-surfaces";
 import { planTimesheetApprovals } from "@/applications/hr/workforce";
+import { healthCheck, unfinishedDependencies, withoutDependency } from "./taskWork";
+import { HealthCheckCard, SubtaskEditor } from "./subtasks";
 
 export function useProjectData() {
   return useCollections(["projects", "tasks", "templates", "objectives", "shifts", "members", "departments", "documents"]);
@@ -255,7 +257,6 @@ export function ProjectOverview({ context, lens }: { context: ScreenContext; len
   const project = context.params.id
     ? (record?.collection === "projects" && record.organizationId === org.id ? record : undefined)
     : data.projects[0];
-  const events = useCollections(["tasks"]);
   if (!project) return <Empty title="No project" icon={<FolderKanban size={20} />} />;
   const tasks = tasksOf(data.tasks, project.id);
   const milestones = tasks.filter((task) => task.fields.kind === "milestone");
@@ -426,12 +427,7 @@ export function ProjectOverview({ context, lens }: { context: ScreenContext; len
           {tasks.filter((task) => stageOf(task) === "blocked").length === 0 && late.length === 0 && <span className="ds-subtle">Nothing is blocked and nothing is late.</span>}
         </Stack>
       </Card>
-      <Card span={12} title="Progress is counted, not estimated">
-        <Notice tone="info">
-          {progressOf(tasks)}% is the share of this project's {tasks.length} tasks in the Done lane, and {events.tasks.length > 0 ? "" : ""}
-          nothing else. A blocker is a task in the Blocked lane. Neither figure is a judgement.
-        </Notice>
-      </Card>
+      <HealthCheckCard context={context} project={project} check={healthCheck(project, tasks, now)} progress={progressOf(tasks)} taskCount={tasks.length} />
     </Grid>
   );
 }
@@ -564,7 +560,7 @@ function checklistOf(task: Rec): ChecklistItem[] {
 export function TaskDetail({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useProjectData();
   const record = useRecord(context.params.id);
-  const { org } = useWorkspace();
+  const { org, now } = useWorkspace();
   const task = context.params.id
     ? (record?.collection === "tasks" && record.organizationId === org.id ? record : undefined)
     : data.tasks[0];
@@ -573,6 +569,7 @@ export function TaskDetail({ context, lens }: { context: ScreenContext; lens: st
   const project = data.projects.find((row) => row.id === task.parentId);
   const dependencies = dependenciesOf(task).map((id) => data.tasks.find((row) => row.id === id)).filter((row): row is Rec => Boolean(row));
   const dependents = data.tasks.filter((row) => dependenciesOf(row).includes(task.id));
+  const waitingOn = unfinishedDependencies(task, data.tasks);
   const time = data.shifts.filter((entry) => entry.fields.kind === "time" && entry.fields.taskId === task.id);
   const checklist = checklistOf(task);
 
@@ -602,22 +599,7 @@ export function TaskDetail({ context, lens }: { context: ScreenContext; lens: st
   if (lens === "Subtasks") {
     return (
       <Stack gap={4}>
-        <Card title="Checklist" subtitle={`${checklist.filter((item) => item.done).length} of ${checklist.length} done`}>
-          <Stack gap={2}>
-            {checklist.length === 0 && <span className="ds-subtle">No checklist on this task.</span>}
-            {checklist.map((item, index) => (
-              <Checkbox
-                key={item.label}
-                label={item.label}
-                checked={item.done}
-                onChange={async (event) => {
-                  const next = checklist.map((entry, position) => (position === index ? { ...entry, done: event.target.checked } : entry));
-                  await context.mutate.patch(task.id, { body: { ...(task.body as object ?? {}), checklist: next } }, { expectRevision: task.revision, event: `Checklist item ${event.target.checked ? "ticked" : "unticked"} on ${task.title}` });
-                }}
-              />
-            ))}
-          </Stack>
-        </Card>
+        <SubtaskEditor context={context} task={task} checklist={checklist} />
         <Card title="Time logged" subtitle={`${time.reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0)} hours against this task`}>
           {time.length === 0 ? <span className="ds-subtle">No time has been logged.</span> : (
             <Stack gap={2}>
@@ -676,6 +658,7 @@ export function TaskDetail({ context, lens }: { context: ScreenContext; lens: st
             { label: "Priority", value: String(task.fields.priority ?? "normal") },
             { label: "Sprint", value: String(task.fields.sprint ?? "—") },
             { label: "Dates", value: <span className="ds-num">{context.date(task.startAt)} – {context.date(task.endAt)}</span> },
+            { label: "Due", value: task.dueAt ? <Row gap={2}><span className="ds-num">{context.date(task.dueAt)}</span>{stageOf(task) !== "done" && new Date(task.dueAt) < now && <Pill tone="danger" dot>overdue</Pill>}</Row> : <span className="ds-subtle">No due date — set one in Edit the task</span> },
             { label: "Estimate", value: <span className="ds-num">{String(task.fields.estimateHours ?? 0)} hours</span> },
             { label: "Logged", value: <span className="ds-num">{time.reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0)} hours</span> },
           ]} />
@@ -688,15 +671,35 @@ export function TaskDetail({ context, lens }: { context: ScreenContext; lens: st
               <Row key={dependency.id} gap={2}>
                 <Pill tone={stageOf(dependency) === "done" ? "success" : "warning"}>{stageOf(dependency)}</Pill>
                 <button type="button" className="ds-grow ds-truncate" style={{ textAlign: "start", background: "none", border: 0, font: "inherit", color: "inherit", cursor: "pointer" }} onClick={() => context.navigate(`/o/${org.slug}/project/tasks/${dependency.id}`)}>{dependency.title}</button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`Remove the link to ${dependency.title}`}
+                  onClick={async () => {
+                    await context.mutate.patch(task.id, { fields: { ...task.fields, dependsOn: withoutDependency(task, dependency.id) } }, { expectRevision: task.revision, event: `${task.title} no longer waits on ${dependency.title} (${context.actor})` });
+                    context.toast("Link removed", `${task.title} no longer waits on ${dependency.title}.`);
+                  }}
+                >
+                  Remove
+                </Button>
               </Row>
             ))}
+            {waitingOn.length > 0 && stageOf(task) !== "done" && (
+              <Notice tone="warning" title={`Waiting on ${waitingOn.length} unfinished ${waitingOn.length === 1 ? "task" : "tasks"}`}>
+                Starting before {waitingOn.map((row) => row.title).join(", ")} {waitingOn.length === 1 ? "is" : "are"} done means working on assumptions.
+              </Notice>
+            )}
+            {dependents.length > 0 && (
+              <span className="ds-subtle">Waiting on this: {dependents.map((row) => row.title).join(", ")}</span>
+            )}
             {dependencies.length === 0 && <span className="ds-subtle">Nothing has to happen first.</span>}
           </Stack>
           <Button size="sm" variant="secondary" onClick={() => context.openOverlay("dependency selector")}>Link work</Button>
         </Stack>
       </Card>
-      <Card span={12} title="Checklist" subtitle={`${checklist.filter((item) => item.done).length} of ${checklist.length} done`}>
+      <Card span={12} title="Checklist" subtitle={`${checklist.filter((item) => item.done).length} of ${checklist.length} done`} actions={<Button size="sm" variant="secondary" onClick={() => context.setTab("Subtasks")}>Edit subtasks</Button>}>
         <Stack gap={2}>
+          {checklist.length > 0 && <Meter value={checklist.filter((item) => item.done).length} max={checklist.length} label="Subtasks done" />}
           {checklist.map((item) => <Row key={item.label} gap={2}><Pill tone={item.done ? "success" : "neutral"}>{item.done ? "done" : "to do"}</Pill><span>{item.label}</span></Row>)}
           {checklist.length === 0 && <span className="ds-subtle">No checklist.</span>}
         </Stack>

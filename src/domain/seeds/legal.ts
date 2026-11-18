@@ -188,7 +188,7 @@ registerSeed("legal", (ctx) => {
       tags: [contract.type, contract.status],
       fields: {
         counterparty: contract.counterparty, type: contract.type, owner: contract.owner,
-        noticeDays: contract.noticeDays, signedAt: contract.signed === undefined ? "" : day(ctx.now, contract.signed),
+        noticeDays: contract.noticeDays, autoRenew: ["insurance", "saas", "customer"].includes(contract.type) && contract.noticeDays > 0, signedAt: contract.signed === undefined ? "" : day(ctx.now, contract.signed),
         signatureProvider: "not_connected", clauseCount: contract.clauses.length,
         versions: contract.priorText ? 2 : 1, immutableSigned: contract.signed !== undefined,
         valueMinor: contract.valueMinor,

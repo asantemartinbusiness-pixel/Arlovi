@@ -74,3 +74,10 @@
   .cm-week { grid-template-columns: 44px repeat(7, minmax(0, 1fr)); font-size: 11px; }
   .cm-cal-day { min-height: 72px; }
 }
+
+/* Conversation search and the @mention picker. */
+.cm-search > :first-child { flex: 1 1 220px; max-width: 320px; min-width: 0; }
+.cm-mentions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.cm-mention-option { display: inline-flex; align-items: center; gap: 6px; padding: 3px var(--space-3) 3px 3px; border: 1px solid var(--border-default); border-radius: var(--radius-full); background: var(--bg-surface); font: inherit; color: inherit; cursor: pointer; }
+.cm-mention-option[aria-selected="true"] { border-color: var(--accent); background: var(--bg-selected); }
+.cm-mention-option:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

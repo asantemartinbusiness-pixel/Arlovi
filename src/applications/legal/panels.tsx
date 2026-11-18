@@ -10,6 +10,9 @@ import { addDays, clockIso, daysBetween, startOfMonth, startOfWeek } from "@/pla
 import type { Rec } from "@/domain/types";
 import { RecordReview } from "./review";
 import { Redline, type Version } from "./redline";
+import { EMPTY_FILTER, counterpartiesOf, matchesRegister, renewalInfo, type RenewalWindow } from "./register";
+import { setRegisterFilter, useRegisterFilter } from "./registerFilter";
+import { AddVersion, KeyDatesCard, LinksCard, ObligationsCard, ReviewCycleCard } from "./contractWorkspace";
 
 export function useLegalData() {
   return useCollections(["contracts", "obligations", "risks", "documents", "policies", "employees", "members"]);
@@ -242,40 +245,109 @@ function ObligationTable({ context, rows, empty }: { context: ScreenContext; row
 export function ContractLibrary({ context, lens }: { context: ScreenContext; lens: "Draft" | "Review" | "Active" | "Expiring" | "Archived" }) {
   const data = useLegalData();
   const { now, org } = useWorkspace();
-  const rows = useMemo(() => {
+  const filter = useRegisterFilter();
+  const lensRows = useMemo(() => {
     if (lens === "Draft") return data.contracts.filter((contract) => contract.status === "draft");
     if (lens === "Review") return data.contracts.filter((contract) => ["in_review", "approved", "awaiting_signature"].includes(contract.status));
     if (lens === "Active") return data.contracts.filter((contract) => contract.status === "active");
     if (lens === "Archived") return data.contracts.filter((contract) => ["archived", "expired"].includes(contract.status));
     return data.contracts.filter((contract) => contract.status === "expiring" || ((daysUntil(contract.endAt, now) ?? 999) <= 90 && contract.status === "active"));
   }, [data.contracts, lens, now]);
+  const statuses = [...new Set(lensRows.map((row) => row.status))];
+  const effective = { ...filter, query: "", status: statuses.includes(filter.status) ? filter.status : "" };
+  const rows = lensRows.filter((contract) => matchesRegister(contract, effective, now));
+  const counterparties = counterpartiesOf(data.contracts);
+  const filtered = Boolean(effective.counterparty || effective.status || effective.window);
+  const alerts = data.contracts.filter((contract) => ["notice_passed", "notice_due"].includes(renewalInfo(contract, now).alert));
 
-  return rows.length === 0 ? (
-    <Empty title={`No ${lens.toLowerCase()} contracts`} icon={<FileText size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Contract upload")}>Add a contract</Button>} />
-  ) : (
-    <DataGrid
-      rows={rows}
-      rowId={(row) => row.id}
-      label={`${lens} contracts`}
-      selectedId={context.selectedId}
-      rowTone={(row) => ((daysUntil(row.endAt, now) ?? 999) < 30 && row.status !== "archived" ? "warning" : undefined)}
-      columns={[
-        { key: "title", header: "Contract", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${String(row.fields.counterparty ?? "")} ${row.summary}` },
-        { key: "counterparty", header: "Counterparty", cell: (row) => String(row.fields.counterparty ?? ""), sortValue: (row) => String(row.fields.counterparty ?? ""), hideBelow: 900 },
-        { key: "type", header: "Type", cell: (row) => <Pill tone="neutral">{String(row.fields.type ?? "")}</Pill>, hideBelow: 1100 },
-        { key: "owner", header: "Owner", cell: (row) => String(row.fields.owner ?? row.ownerName), hideBelow: 1200 },
-        { key: "value", header: "Value", align: "end", cell: (row) => <span className="ds-num">{row.amountMinor ? context.money(row.amountMinor) : "—"}</span>, sortValue: (row) => row.amountMinor ?? 0 },
-        { key: "ends", header: "Ends", align: "end", cell: (row) => <span className="ds-num">{context.date(row.endAt)}</span>, sortValue: (row) => row.endAt ?? "~" },
-        { key: "status", header: "Status", align: "end", cell: (row) => <Pill tone={STATUS_TONE[row.status] ?? "neutral"} dot>{lifecycleLabel(row.status)}</Pill>, sortValue: (row) => row.status },
-      ]}
-      onSelect={(id) => context.select(id)}
-      onOpen={(id) => context.navigate(`/o/${org.slug}/legal/contracts/${id}`)}
-      bulkActions={[
-        { label: "Assign a reviewer", onRun: () => context.openOverlay("reviewer picker") },
-        { label: "Send for signature", onRun: () => context.openOverlay("e-sign request") },
-      ]}
-      summary={<span className="ds-subtle"><span className="ds-num">{rows.filter((row) => (daysUntil(row.endAt, now) ?? 999) < 30).length}</span> ending inside a month</span>}
-    />
+  if (lensRows.length === 0) {
+    return (
+      <Empty title={`No ${lens.toLowerCase()} contracts`} icon={<FileText size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("Contract upload")}>Add a contract</Button>} />
+    );
+  }
+
+  return (
+    <Stack gap={4}>
+      {alerts.length > 0 && (
+        <Notice
+          tone={alerts.some((contract) => renewalInfo(contract, now).alert === "notice_passed") ? "danger" : "warning"}
+          title={`${alerts.length} ${alerts.length === 1 ? "contract needs" : "contracts need"} a renewal decision`}
+        >
+          {alerts.slice(0, 3).map((contract) => `${contract.title} — ${renewalInfo(contract, now).label.toLowerCase()}`).join(" · ")}
+          {alerts.length > 3 ? ` and ${alerts.length - 3} more.` : "."} A notice date is the end date less the notice period recorded on the contract.
+        </Notice>
+      )}
+      <DataGrid
+        rows={rows}
+        rowId={(row) => row.id}
+        label={`${lens} contracts`}
+        selectedId={context.selectedId}
+        rowTone={(row) => {
+          const alert = renewalInfo(row, now).alert;
+          return alert === "notice_passed" || alert === "ended" ? "danger" : alert === "notice_due" ? "warning" : undefined;
+        }}
+        toolbar={(
+          <div className="lg-register-filters" role="group" aria-label="Filter the register">
+            <Select aria-label="Counterparty" value={effective.counterparty} onChange={(event) => setRegisterFilter({ ...filter, counterparty: event.target.value })}>
+              <option value="">Any counterparty</option>
+              {counterparties.map((name) => <option key={name} value={name}>{name}</option>)}
+            </Select>
+            {statuses.length > 1 && (
+              <Select aria-label="Status" value={effective.status} onChange={(event) => setRegisterFilter({ ...filter, status: event.target.value })}>
+                <option value="">Any status</option>
+                {statuses.map((status) => <option key={status} value={status}>{lifecycleLabel(status)}</option>)}
+              </Select>
+            )}
+            <Select aria-label="Renewal window" value={effective.window} onChange={(event) => setRegisterFilter({ ...filter, window: event.target.value as RenewalWindow })}>
+              <option value="">Any renewal date</option>
+              <option value="notice_30">Notice due within 30 days</option>
+              <option value="notice_90">Notice due within 90 days</option>
+              <option value="ends_90">Ends within 90 days</option>
+              <option value="passed">Notice date passed or ended</option>
+            </Select>
+            {filtered && <Button size="sm" variant="ghost" onClick={() => setRegisterFilter(EMPTY_FILTER)}>Clear filters</Button>}
+          </div>
+        )}
+        empty={(
+          <Empty title="No contract matches these filters" icon={<FileText size={20} />} action={<Button variant="secondary" onClick={() => setRegisterFilter(EMPTY_FILTER)}>Clear filters</Button>}>
+            {lensRows.length} {lensRows.length === 1 ? "contract is" : "contracts are"} in {lens.toLowerCase()} without them.
+          </Empty>
+        )}
+        columns={[
+          { key: "title", header: "Contract", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${String(row.fields.counterparty ?? "")} ${row.summary} ${String(row.fields.owner ?? "")}` },
+          { key: "counterparty", header: "Counterparty", cell: (row) => String(row.fields.counterparty ?? ""), sortValue: (row) => String(row.fields.counterparty ?? ""), hideBelow: 900 },
+          { key: "type", header: "Type", cell: (row) => <Pill tone="neutral">{String(row.fields.type ?? "")}</Pill>, sortValue: (row) => String(row.fields.type ?? ""), hideBelow: 1280 },
+          { key: "owner", header: "Owner", cell: (row) => String(row.fields.owner ?? row.ownerName), sortValue: (row) => String(row.fields.owner ?? row.ownerName), hideBelow: 1400 },
+          { key: "value", header: "Value", align: "end", cell: (row) => <span className="ds-num">{row.amountMinor ? context.money(row.amountMinor) : "—"}</span>, sortValue: (row) => row.amountMinor ?? 0, hideBelow: 1100 },
+          { key: "ends", header: "Ends", align: "end", cell: (row) => <span className="ds-num">{context.date(row.endAt)}</span>, sortValue: (row) => row.endAt ?? "~" },
+          { key: "renewal", header: "Renewal", align: "end", cell: (row) => {
+            const info = renewalInfo(row, now);
+            return <span title={info.noticeBy ? `Notice by ${context.date(info.noticeBy)}` : undefined}><Pill tone={info.tone} dot><span className="ds-num">{info.label}</span></Pill></span>;
+          }, sortValue: (row) => renewalInfo(row, now).noticeInDays ?? 99_999 },
+          { key: "status", header: "Status", align: "end", cell: (row) => <Pill tone={STATUS_TONE[row.status] ?? "neutral"} dot>{lifecycleLabel(row.status)}</Pill>, sortValue: (row) => row.status, hideBelow: 760 },
+        ]}
+        card={(row) => {
+          const info = renewalInfo(row, now);
+          return (
+            <>
+              <strong>{row.title}</strong>
+              <span className="ds-subtle">{String(row.fields.counterparty ?? "")} · ends <span className="ds-num">{context.date(row.endAt)}</span></span>
+              <span className="ds-row ds-gap-2 ds-wrap">
+                <Pill tone={info.tone} dot><span className="ds-num">{info.label}</span></Pill>
+                <Pill tone={STATUS_TONE[row.status] ?? "neutral"}>{lifecycleLabel(row.status)}</Pill>
+              </span>
+            </>
+          );
+        }}
+        onSelect={(id) => context.select(id)}
+        onOpen={(id) => context.navigate(`/o/${org.slug}/legal/contracts/${id}`)}
+        bulkActions={[
+          { label: "Assign a reviewer", onRun: () => context.openOverlay("reviewer picker") },
+          { label: "Send for signature", onRun: () => context.openOverlay("e-sign request") },
+        ]}
+        summary={<span className="ds-subtle"><span className="ds-num">{rows.filter((row) => (daysUntil(row.endAt, now) ?? 999) < 30).length}</span> ending inside a month{filtered ? ` · filtered, ${rows.length} of ${lensRows.length}` : ""}</span>}
+      />
+    </Stack>
   );
 }
 
@@ -287,14 +359,12 @@ export function ContractDetail({ context, lens }: { context: ScreenContext; lens
   const data = useLegalData();
   const record = useRecord(context.params.id);
   const contract = record ?? data.contracts[0];
-  const { now } = useWorkspace();
   const [compare, setCompare] = useState(1);
   if (!contract) return <Empty title="No contract" icon={<FileText size={20} />} />;
   const clauses = clausesOf(contract);
   const versions = versionsOf(contract);
   const signatures = signaturesOf(contract);
   const obligations = data.obligations.filter((obligation) => obligation.fields.contractId === contract.id);
-  const days = daysUntil(contract.endAt, now);
 
   if (lens === "Clauses") {
     return (
@@ -417,6 +487,7 @@ export function ContractDetail({ context, lens }: { context: ScreenContext; lens
           { label: "Revision", value: <span className="ds-num">{String(contract.revision)}</span> },
           { label: "Stored versions", value: <span className="ds-num">{String(versions.length)}</span> },
         ]} />
+        <AddVersion context={context} contract={contract} versions={versions} />
         {versions.length > 0 && (
           <DataGrid
             rows={versions.map((version, index) => ({ ...version, id: `${contract.id}-v-${index}` }))}
@@ -464,11 +535,6 @@ export function ContractDetail({ context, lens }: { context: ScreenContext; lens
           { label: "Value", value: <span className="ds-num">{contract.amountMinor ? context.money(contract.amountMinor) : "Not a fixed value"}</span> },
           { label: "Signed", value: contract.fields.signedAt ? <span className="ds-num">{context.date(String(contract.fields.signedAt))}</span> : "Not signed" },
         ]} />
-        {days !== null && days <= 60 && days >= -1 && contract.status !== "archived" && (
-          <Notice tone="warning" title={`This ends in ${days} days`}>
-            Notice of {String(contract.fields.noticeDays ?? 0)} days is required, so the decision date has already passed if nobody has acted.
-          </Notice>
-        )}
       </Card>
       <Card span={6} eyebrow="CLAUSES" prov="human" title="Clause summary" subtitle={`${clauses.length} clauses, ${clauses.filter((clause) => clause.risk !== "standard").length} flagged`}>
         <Stack gap={3}>
@@ -485,20 +551,11 @@ export function ContractDetail({ context, lens }: { context: ScreenContext; lens
           <Button size="sm" variant="secondary" onClick={() => context.setTab("Clauses")}>Read the clauses</Button>
         </Stack>
       </Card>
-      <Card span={6} eyebrow="OBLIGATIONS" prov="human" title="Obligations from this contract" subtitle={`${obligations.length} tracked`}>
-        {obligations.length === 0 ? <span className="ds-subtle">No obligation has been extracted from this contract yet.</span> : (
-          <Stack gap={2}>
-            {obligations.map((obligation) => (
-              <Row key={obligation.id} gap={2}>
-                <span className="ds-grow ds-truncate">{obligation.title}</span>
-                <span className="ds-subtle ds-num">{context.date(obligation.dueAt, { day: "numeric", month: "short" })}</span>
-                <Pill tone={obligation.status === "done" ? "success" : (daysUntil(obligation.dueAt, now) ?? 1) < 0 ? "danger" : "neutral"} dot>{obligation.status}</Pill>
-              </Row>
-            ))}
-          </Stack>
-        )}
-      </Card>
-      <Card span={6} eyebrow="APPROVALS" prov="human" title="Where this sits">
+      <KeyDatesCard context={context} contract={contract} />
+      <ReviewCycleCard context={context} contract={contract} />
+      <ObligationsCard context={context} contract={contract} obligations={obligations} />
+      <LinksCard context={context} contract={contract} />
+      <Card span={12} eyebrow="APPROVALS" prov="human" title="Where this sits">
         <Stack gap={3}>
           <Properties rows={[
             { label: "Status", value: <Pill tone={STATUS_TONE[contract.status] ?? "neutral"} dot>{lifecycleLabel(contract.status)}</Pill> },
@@ -507,7 +564,7 @@ export function ContractDetail({ context, lens }: { context: ScreenContext; lens
           ]} />
           <Notice tone="info" title="Approving a step is not accepting the contract">
             A legal step recorded here says a named person reviewed something. Nothing in this workspace accepts a right or an
-            obligation on behalf of {context.org.shortName}.
+            obligation on behalf of {context.org.shortName}, and no signature or filing is made from here.
           </Notice>
         </Stack>
       </Card>
