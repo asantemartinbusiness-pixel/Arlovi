@@ -25,6 +25,9 @@ describe("knowledge record route", () => {
   it("opens the record inside the Company Brain workspace", () => {
     expect(routeForRecord(base, "northline")).toBe("/o/northline/brain/home?record=nl-knowledge-1");
   });
+  it("opens a CRM company on its account page", () => {
+    expect(routeForRecord({ ...base, id: "nl-companies-4", collection: "companies" } as Rec, "northline")).toBe("/o/northline/crm/companies?account=nl-companies-4");
+  });
 });
 
 describe("revisedRecord", () => {

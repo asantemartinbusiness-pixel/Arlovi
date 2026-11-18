@@ -259,7 +259,7 @@ function approverRoles(collection: string): Role[] {
 /** List and detail screens for each collection; checked against the catalogue in tests. */
 export const RECORD_ROUTES: Record<string, { list: string; detail?: string; query?: string }> = {
   invoices: { list: "fin/invoices", detail: "fin/invoices" }, bills: { list: "fin/bills" }, expenses: { list: "fin/expenses" }, journals: { list: "fin/ledger" },
-  deals: { list: "crm/deals", detail: "crm/deals" }, contacts: { list: "crm/contacts", detail: "crm/contacts" }, companies: { list: "crm/companies" }, quotes: { list: "crm/quotes" },
+  deals: { list: "crm/deals", detail: "crm/deals" }, contacts: { list: "crm/contacts", detail: "crm/contacts" }, companies: { list: "crm/companies", query: "account" }, quotes: { list: "crm/quotes" },
   employees: { list: "hr/employees", detail: "hr/employees" }, leaveRequests: { list: "hr/leave" }, candidates: { list: "hr/recruitment", detail: "hr/candidates" },
   projects: { list: "project/projects", detail: "project/projects" }, tasks: { list: "project/projects", detail: "project/tasks" },
   missions: { list: "mission/missions", detail: "mission/missions" }, agents: { list: "team/agents", detail: "team/agents" },
