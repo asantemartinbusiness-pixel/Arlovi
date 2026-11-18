@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MoreHorizontal } from "lucide-react";
+import { OverlayOrigin, OverlayRecordContext } from "@/app/OverlayExperience";
+import "@/app/native-overlay-experience.css";
 import { Breadcrumbs, Button, Drawer, Menu, Modal, Notice, Tabs, TabPanel } from "@/design-system";
 import { appEntry, findScreen, type ScreenInfo } from "@/app/catalog";
 import { runNativeScreenAction } from "@/app/screenActions";
@@ -321,7 +323,12 @@ export function ScreenHost() {
       <div className="pg-split">
         {page}
         <aside className="ds-inspector" aria-label={def.inspectorTitle ?? "Inspector"}>
-          <div className="ds-inspector-head"><h3 className="ds-grow">{def.inspectorTitle ?? "Details"}</h3></div>
+          <div className="ds-inspector-head native-inspector-head">
+            <div className="ds-grow">
+              <OverlayOrigin context={context} />
+              <h3>{def.inspectorTitle ?? "Details"}</h3>
+            </div>
+          </div>
           <div className="ds-inspector-body">{def.inspector(context)}</div>
         </aside>
       </div>
@@ -372,9 +379,25 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
   const ids = [typeof payloadId === "string" ? payloadId : undefined, ctx.selectedId, ctx.params.id].filter((id): id is string => Boolean(id));
   const body = <PrimedOverlayBody ids={ids} orgId={ctx.org.id} render={() => found.render(overlayContext)} />;
   const overlayTitle = typeof found.title === "function" ? found.title(ctx) : found.title ?? found.id;
+  const appCode = ctx.screen.applicationCode;
+  const origin = <OverlayOrigin context={ctx} />;
+  const recordContext = found.presentation?.noRecordContext
+    ? undefined
+    : <OverlayRecordContext context={ctx} selection={found.presentation?.selectedRecord} />;
+  const description = found.description ?? found.presentation?.guidance;
+  // This is a local presentation guard, not a substitute for authenticated API checks.
+  if (found.capability && !ctx.can(found.capability)) {
+    return <Modal open onOpenChange={(next) => { if (!next) onClose(); }}
+      title="This action is not available in your role view" origin={origin} application={appCode}>
+      <Notice tone="warning" title="Additional permission required">
+        This operation needs the {found.capability.replaceAll("_", " ")} permission. The current
+        browser role view cannot perform it. Ask an administrator for the required access.
+      </Notice>
+    </Modal>;
+  }
   if (found.kind === "drawer") {
     return (
-      <Drawer open onOpenChange={(next) => { if (!next) onClose(); }} title={overlayTitle} subtitle={found.description} width={found.width ?? 440} footer={found.footer?.(overlayContext)}>
+      <Drawer open onOpenChange={(next) => { if (!next) onClose(); }} title={overlayTitle} subtitle={description} origin={origin} head={recordContext} application={appCode} width={found.width ?? 440} footer={found.footer?.(overlayContext)}>
         {body}
       </Drawer>
     );
@@ -384,7 +407,10 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
       open
       onOpenChange={(next) => { if (!next) onClose(); }}
       title={overlayTitle}
-      description={found.description}
+      description={description}
+      origin={origin}
+      head={recordContext}
+      application={appCode}
       width={found.width ?? 560}
       tone={found.tone}
       blocking={found.blocking}
