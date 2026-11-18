@@ -20,7 +20,7 @@ test("deposit modal shows truthful payment summary and sticky actions", async ({
   await expect(dialog.locator(".ds-modal-foot")).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Record deposit request" })).toBeEnabled();
   await expect(dialog.getByRole("button", { name: "Money received elsewhere" })).toBeEnabled();
-  await dialog.getByRole("button", { name: "Close dialog" }).click();
+  await dialog.getByRole("button", { name: "Close" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page).toHaveURL(/\/book\/bookings\/nl-bookings-628/);
 });
@@ -35,7 +35,7 @@ test("deposit amount edit cannot be dismissed without a choice", async ({ page }
   await confirm.getByRole("button", { name: "Keep editing" }).first().click();
   await expect(dialog).toBeVisible();
   await expect(amount).toHaveValue("65.00");
-  await dialog.getByRole("button", { name: "Close dialog" }).click();
+  await dialog.getByRole("button", { name: "Close" }).click();
   await expect(confirm).toBeVisible();
   await confirm.getByRole("button", { name: "Discard changes" }).click();
   await expect(dialog).toHaveCount(0);
@@ -59,7 +59,7 @@ test("modals remain within mobile viewport and keep their actions reachable", as
   expect(bounds!.x).toBeGreaterThanOrEqual(-1);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(391);
   await expect(dialog.getByRole("button", { name: "Record deposit request" })).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Close dialog" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Close" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
 });
