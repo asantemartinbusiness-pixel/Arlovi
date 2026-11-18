@@ -7,6 +7,8 @@ import {
   notificationSurface,
 } from "@/platform/notificationPolicy";
 import type { AttentionItem } from "@/platform/attention";
+import { prepareNotificationEvent, publishLocalNotification } from "@/platform/notificationEvents";
+import type { Rec } from "@/domain/types";
 
 const base: AttentionItem = {
   id: "event-1", kind: "update", priority: "P3", title: "Document updated", body: "A colleague updated a file",
@@ -44,6 +46,27 @@ describe("platform notifications contracts", () => {
     expect(isSnoozed("2026-11-18T17:00:00Z",new Date("2026-11-18T16:00:00Z"))).toBe(true);
     expect(isSnoozed("2026-11-18T15:00:00Z",new Date("2026-11-18T16:00:00Z"))).toBe(false);
     expect(isSnoozed("not-a-date")).toBe(false);
+  });
+  it("publishes scoped in-app events with idempotency and no false external delivery", async () => {
+    const input = {
+      sourceApp: "FIN", sourceId: "invoice-101", category: "work",
+      kind: "approval" as const, priority: "P2" as const, title: "Review invoice",
+      summary: "A finance approval needs review.", group: "Finance",
+      route: "/o/northline/fin/invoices/invoice-101",
+      audience: ["owner" as const], dedupeKey: "invoice-101:approval",
+    };
+    const planned = prepareNotificationEvent(input, "northline");
+    expect(planned.fields.deliveryState).toBe("in_app_local");
+    expect(planned.fields.audience).toBe("owner");
+    expect(() => prepareNotificationEvent({ ...input, route: "/o/other/fin/invoices" }, "northline")).toThrow();
+    expect(() => prepareNotificationEvent({ ...input, sourceApp: "UNKNOWN" }, "northline")).toThrow();
+    const create = async () => ({ id: "new-event" } as Rec);
+    const existing = [{
+      id: "old-event", collection: "notifications", status: "open",
+      fields: { dedupeKey: "invoice-101:approval" }
+    }] as unknown as Rec[];
+    const duplicate = await publishLocalNotification({ create }, existing, input, "northline");
+    expect(duplicate).toEqual({ created: false, id: "old-event", reason: "A matching open event already exists." });
   });
   it("isolates read, acknowledgement and snooze by actor and preserves actions",()=>{
     const alice=attentionReceiptKey("org-1","owner",base.id,"Alice");
