@@ -85,7 +85,7 @@ export function updateRolePermission(
   if (choice === "inherit") delete updated[action]; else updated[action] = choice;
   // A view deny always dominates any deeper action allow.
   if (action === "view" && choice === "deny") {
-    for (const extra of MATRIX_ACTIONS) if (extra !== "view") delete updated[extra];
+    for (const extra of MATRIX_ACTIONS) if (extra !== "view" && updated[extra] === "allow") delete updated[extra];
   }
   const rules = { ...draft[field] };
   if (Object.keys(updated).length) rules[key] = updated; else delete rules[key];
