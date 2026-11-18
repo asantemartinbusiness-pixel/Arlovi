@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  absoluteRect, addNode, alignTarget, copyNodes, descendants, emptyPage, groupNodes, makeNode, pasteNodes,
+  absoluteRect, addNode, alignTarget, copyNodes, descendants, duplicateNodes, emptyPage, groupNodes, makeNode, pasteNodes, patchNode,
 } from "@/applications/design/scene";
 
 /* W2D — the design clipboard and single-layer alignment target. */
@@ -47,6 +47,66 @@ describe("copy and paste", () => {
 
   it("copies nothing for an empty selection", () => {
     expect(copyNodes(scene().page, [])).toBeNull();
+  });
+});
+
+function linked() {
+  let page = emptyPage("p1", "Page");
+  const screenA = makeNode("frame", { x: 0, y: 0, w: 300, h: 300 }, { name: "Screen A" });
+  const screenB = makeNode("frame", { x: 400, y: 0, w: 300, h: 300 }, { name: "Screen B" });
+  const button = makeNode("rect", { x: 10, y: 10, w: 80, h: 30 }, { name: "Next" });
+  const back = makeNode("rect", { x: 10, y: 10, w: 80, h: 30 }, { name: "Back" });
+  page = addNode(page, screenA);
+  page = addNode(page, screenB);
+  page = addNode(page, button, screenA.id);
+  page = addNode(page, back, screenB.id);
+  const link = (to: string) => ({ link: { to, trigger: "click" as const, transition: "dissolve" as const, duration: 300 } });
+  page = patchNode(page, button.id, link(screenB.id));
+  page = patchNode(page, back.id, link(screenA.id));
+  return { page, screenA, screenB, button, back };
+}
+
+describe("prototype links on duplicate and paste", () => {
+  it("duplicating linked screens together links the copies to each other", () => {
+    const { page, screenA, screenB, button, back } = linked();
+    const { page: next, ids } = duplicateNodes(page, [screenA.id, screenB.id]);
+    const [copyA, copyB] = ids;
+    const copyButton = descendants(next, copyA)[0];
+    const copyBack = descendants(next, copyB)[0];
+    expect(next.nodes[copyButton].link?.to).toBe(copyB);
+    expect(next.nodes[copyBack].link?.to).toBe(copyA);
+    // The originals still link to each other.
+    expect(next.nodes[button.id].link?.to).toBe(screenB.id);
+    expect(next.nodes[back.id].link?.to).toBe(screenA.id);
+  });
+
+  it("duplicating a parent with its selected child copies the child once", () => {
+    const { page, screenA, button } = linked();
+    const { page: next, ids } = duplicateNodes(page, [screenA.id, button.id]);
+    expect(ids).toHaveLength(1);
+    expect(descendants(next, ids[0])).toHaveLength(1);
+    expect(Object.keys(next.nodes)).toHaveLength(Object.keys(page.nodes).length + 2);
+  });
+
+  it("a duplicated layer keeps a link to a target outside the selection on the same page", () => {
+    const { page, screenA, screenB } = linked();
+    const { page: next, ids } = duplicateNodes(page, [screenA.id]);
+    expect(next.nodes[descendants(next, ids[0])[0]].link?.to).toBe(screenB.id);
+  });
+
+  it("pasting remaps links inside the clip and drops links whose target is not on the destination page", () => {
+    const { page, screenA, screenB } = linked();
+    const both = copyNodes(page, [screenA.id, screenB.id])!;
+    const other = emptyPage("p2", "Other");
+    const { page: pasted, ids } = pasteNodes(other, both, 0);
+    expect(pasted.nodes[descendants(pasted, ids[0])[0]].link?.to).toBe(ids[1]);
+    expect(pasted.nodes[descendants(pasted, ids[1])[0]].link?.to).toBe(ids[0]);
+    const one = copyNodes(page, [screenA.id])!;
+    const { page: alone, ids: aloneIds } = pasteNodes(other, one, 0);
+    expect(alone.nodes[descendants(alone, aloneIds[0])[0]].link).toBeUndefined();
+    // Pasted back on the same page, the link still reaches the original target.
+    const { page: same, ids: sameIds } = pasteNodes(page, one, 16);
+    expect(same.nodes[descendants(same, sameIds[0])[0]].link?.to).toBe(screenB.id);
   });
 });
 

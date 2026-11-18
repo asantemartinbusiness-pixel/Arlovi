@@ -11,7 +11,7 @@
  * preview can be frame accurate: the renderer is deterministic.
  * ====================================================================== */
 
-import { clamp } from "@/applications/visual/geometry";
+import { clamp, uid } from "@/applications/visual/geometry";
 
 export type TrackKind = "video" | "title" | "audio";
 
@@ -372,8 +372,11 @@ export function splitClip(doc: VideoDoc, clipId: string, time: number): { doc: V
   if (!isEditable(doc, clip)) return { doc };
   const cut = snapFrame(time, doc.fps);
   if (cut <= clip.start + 1 / doc.fps || cut >= clipEnd(clip) - 1 / doc.fps) return { doc };
-  const left: Clip = { ...clip, duration: snapFrame(cut - clip.start, doc.fps) };
-  const rightId = `${clip.id}-b${Math.round(cut * 1000)}`;
+  /* The fade out belongs to the clip's real end, now the right half's; the fade in stays on the left. */
+  const left: Clip = { ...clip, duration: snapFrame(cut - clip.start, doc.fps), fadeOut: 0 };
+  /* A fresh id: one built from the cut time repeats when the same clip is cut at the same time again. */
+  let rightId = uid(`${clip.id}-b`);
+  while (doc.clips.some((item) => item.id === rightId)) rightId = uid(`${clip.id}-b`);
   const right: Clip = {
     ...clip,
     id: rightId,

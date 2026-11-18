@@ -35,6 +35,11 @@ export function freePath(site: SiteModel, base: string): string {
   return `${stem}-${wallMs().toString(36)}`;
 }
 
+/** A unique redirect id; ids derived from paths collide (/a-b and /ab). */
+export function redirectId(): string {
+  return `r-${crypto.randomUUID()}`;
+}
+
 function mapLinks(links: NavLink[], fn: (link: NavLink) => NavLink | null): NavLink[] {
   return links.flatMap((link) => {
     const next = fn(link);
@@ -109,7 +114,7 @@ export function updatePage(site: SiteModel, pageId: string, patch: { name: strin
           ...next.nav.redirects
             .filter((redirect) => redirect.from !== path && redirect.from !== page.path)
             .map((redirect) => (redirect.to === page.path ? { ...redirect, to: path } : redirect)),
-          { id: `r-${pageId}-${path.replace(/\W+/g, "")}`, from: page.path, to: path, code: 301 as const },
+          { id: redirectId(), from: page.path, to: path, code: 301 as const },
         ],
       },
     };
@@ -148,8 +153,16 @@ export function deletePage(site: SiteModel, pageId: string, options: { redirectT
   if (options.redirectTo && !remaining.some((item) => item.path === options.redirectTo)) throw new Error("Redirect to a page that stays in the site.");
   const refs = inboundReferences(site, page.path);
   const drop = (link: NavLink) => (link.kind === "page" && link.target === page.path ? null : link);
-  const redirects = site.nav.redirects.filter((redirect) => redirect.from !== page.path && redirect.to !== page.path);
-  if (options.redirectTo) redirects.push({ id: `r-${pageId}-gone`, from: page.path, to: options.redirectTo, code: 301 });
+  // Redirects into the deleted page follow its own redirect (dropping any that would point at themselves);
+  // with no redirect they have nowhere to go and are removed.
+  const redirects = site.nav.redirects
+    .filter((redirect) => redirect.from !== page.path)
+    .flatMap((redirect) => {
+      if (redirect.to !== page.path) return [redirect];
+      if (!options.redirectTo || redirect.from === options.redirectTo) return [];
+      return [{ ...redirect, to: options.redirectTo }];
+    });
+  if (options.redirectTo) redirects.push({ id: redirectId(), from: page.path, to: options.redirectTo, code: 301 });
   const pages = remaining.map((item) => ({
     ...item,
     blocks: item.blocks.map((block) => (options.redirectTo && block.props.ctaTarget === page.path ? { ...block, props: { ...block.props, ctaTarget: options.redirectTo } } : block)),

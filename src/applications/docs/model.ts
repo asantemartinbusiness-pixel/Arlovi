@@ -1290,7 +1290,8 @@ export function editTable(model: DocModel, blockId: string, edit: TableEdit): Do
   } else if (edit.kind === "removeRow") {
     const minimum = block.table.header ? 2 : 1;
     if (rows.length <= minimum || edit.at < 0 || edit.at >= rows.length) return model;
-    rows.splice(edit.at, 1);
+    /* The header row stays: removing "it" removes the first body row instead. */
+    rows.splice(block.table.header && edit.at === 0 ? 1 : edit.at, 1);
   } else {
     if (width <= 1 || edit.at < 0 || edit.at >= width) return model;
     for (const row of rows) row.splice(edit.at, 1);

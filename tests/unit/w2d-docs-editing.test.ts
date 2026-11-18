@@ -75,6 +75,15 @@ describe("table structure", () => {
     expect(model.blocks[0].table?.rows).toEqual([["Item", "Qty"], ["Lamp", "2"]]);
   });
 
+  it("removing the header row removes the first body row and keeps the header", () => {
+    const three = doc([{ ...emptyBlock("table"), id: "t", table: { header: true, rows: [["Item", "Qty"], ["Lamp", "2"], ["Desk", "1"]] } }]);
+    const model = editTable(three, "t", { kind: "removeRow", at: 0 });
+    expect(model.blocks[0].table?.rows).toEqual([["Item", "Qty"], ["Desk", "1"]]);
+    expect(editTable(model, "t", { kind: "removeRow", at: 0 })).toBe(model);
+    const plain = doc([{ ...emptyBlock("table"), id: "t", table: { header: false, rows: [["a"], ["b"]] } }]);
+    expect(editTable(plain, "t", { kind: "removeRow", at: 0 }).blocks[0].table?.rows).toEqual([["b"]]);
+  });
+
   it("exports the edited table to Markdown", () => {
     const model = editTable(table(), "t", { kind: "addRow", after: 1 });
     expect(toMarkdown(model, "T")).toContain("| Lamp | 2 |");

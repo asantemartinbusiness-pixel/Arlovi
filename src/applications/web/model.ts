@@ -255,10 +255,17 @@ export function readSite(record: Rec | undefined): SiteModel {
     nav: {
       header: header.length ? header : live.map((page) => ({ id: `nav-${page.id}`, label: page.name, target: page.path, kind: "page" as const, children: [] })),
       footer: readNav(nav.footer),
-      redirects: (Array.isArray(nav.redirects) ? nav.redirects : []).map((item, index) => {
-        const row = asRecord(item);
-        return { id: str(row.id) || `r${index + 1}`, from: str(row.from), to: str(row.to), code: num(row.code, 301) === 302 ? 302 : 301 as 301 | 302 };
-      }),
+      redirects: (() => {
+        // Ids must be unique: the redirect table selects and deletes rows by id.
+        const seen = new Set<string>();
+        return (Array.isArray(nav.redirects) ? nav.redirects : []).map((item, index) => {
+          const row = asRecord(item);
+          let id = str(row.id) || `r${index + 1}`;
+          if (seen.has(id)) id = `${id}~${index + 1}`;
+          seen.add(id);
+          return { id, from: str(row.from), to: str(row.to), code: num(row.code, 301) === 302 ? 302 : 301 as 301 | 302 };
+        });
+      })(),
     },
     components: (Array.isArray(body.components) ? body.components : []).map((item, index) => {
       const row = asRecord(item);
