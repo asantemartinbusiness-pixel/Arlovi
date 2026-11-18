@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, FolderPlus, Link2, Plus, Search, X } from "lucide-react";
+import { ArrowLeft, BookOpen, FolderPlus, Link2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import {
   Button, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
   type Tone,
@@ -11,7 +11,8 @@ import { wallMs } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { internalPeople } from "../people";
 import {
-  DEFAULT_FILTERS, KNOWLEDGE, KNOWLEDGE_COLLECTIONS, PROVENANCE_LABEL, STATUS_LABEL, TIMING_LABEL,
+  DEFAULT_FILTERS, KNOWLEDGE, KNOWLEDGE_COLLECTIONS, NO_COLLECTION, PROVENANCE_LABEL, STATUS_LABEL, TIMING_LABEL,
+  collectionProblems, isUnfiled, recordsInCollection,
   backlinks, draftFromRecord, draftProblems, emptyDraft, filterKnowledge, intervalFor, isSubstantiveChange,
   knowledgeBody, nextOriginProvenance, originProvenanceOf, parseTags, provenanceChoices, provenanceOf, reviewEvent, reviewRequestProblems, reviewTiming, sortKnowledge,
   statusAfterEdit, statusOf, summarize, verificationBlockers,
@@ -72,6 +73,7 @@ export function KnowledgeWorkspace({ context }: { context: ScreenContext }) {
   const records = data[KNOWLEDGE];
   const collections = useMemo(() => [...data[KNOWLEDGE_COLLECTIONS]].sort((a, b) => a.title.localeCompare(b.title)), [data]);
   const filterContext = useMemo(() => ({ now: context.now, collections }), [context.now, collections]);
+  const unfiled = useMemo(() => records.filter((record) => statusOf(record) !== "archived" && isUnfiled(record, collections)).length, [records, collections]);
   const results = useMemo(
     () => sortKnowledge(filterKnowledge(records, filters, filterContext), filters.query.trim() ? sort : sort === "relevance" ? "updated" : sort, filterContext),
     [records, filters, filterContext, sort],
@@ -123,8 +125,28 @@ export function KnowledgeWorkspace({ context }: { context: ScreenContext }) {
                 </button>
               </li>
             ))}
+            {(unfiled > 0 || filters.collectionId === NO_COLLECTION) && (
+              <li>
+                <button type="button" className="brain-kw-col" aria-current={filters.collectionId === NO_COLLECTION ? "true" : undefined} onClick={() => set("collectionId", NO_COLLECTION)} title="Records whose collection was deleted or never set">
+                  <span className="ds-grow ds-truncate">No collection</span>
+                  <span className="ds-num">{unfiled}</span>
+                </button>
+              </li>
+            )}
           </ul>
-          {filters.collectionId && <CollectionNote collection={collections.find((item) => item.id === filters.collectionId)} />}
+          {filters.collectionId === NO_COLLECTION && (
+            <div className="brain-kw-colnote"><span className="ds-subtle">Records here kept their content, sources and review state when their collection was deleted. Edit a record to file it again.</span></div>
+          )}
+          {filters.collectionId && filters.collectionId !== NO_COLLECTION && (
+            <CollectionNote
+              key={filters.collectionId}
+              context={context}
+              collection={collections.find((item) => item.id === filters.collectionId)}
+              collections={collections}
+              records={records}
+              onDeleted={() => set("collectionId", NO_COLLECTION)}
+            />
+          )}
         </nav>
 
         <section className="brain-kw-list" aria-label="Knowledge records">
@@ -214,7 +236,7 @@ export function KnowledgeWorkspace({ context }: { context: ScreenContext }) {
         <section className="brain-kw-detail" aria-label="Knowledge record">
           {mode.kind === "new" ? (
             <RecordEditor context={context} data={data} collections={collections}
-              initial={emptyDraft(filters.collectionId || collections[0]?.id || "")}
+              initial={emptyDraft((filters.collectionId !== NO_COLLECTION && filters.collectionId) || collections[0]?.id || "")}
               onCancel={() => setMode({ kind: "view" })}
               onSaved={(id) => { select(id); }} />
           ) : selected && mode.kind === "edit" ? (
@@ -238,12 +260,86 @@ export function KnowledgeWorkspace({ context }: { context: ScreenContext }) {
   );
 }
 
-function CollectionNote({ collection }: { collection?: Rec }) {
+function CollectionNote({ context, collection, collections, records, onDeleted }: {
+  context: ScreenContext; collection?: Rec; collections: Rec[]; records: Rec[]; onDeleted: () => void;
+}) {
+  const [mode, setMode] = useState<"view" | "edit" | "delete">("view");
+  const [name, setName] = useState(collection?.title ?? "");
+  const [description, setDescription] = useState(collection?.summary ?? "");
+  const [interval, setInterval] = useState(String(collection?.fields.reviewIntervalDays ?? 90));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
   if (!collection) return null;
+  const members = recordsInCollection(records, collection.id);
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    const problems = collectionProblems({ name, interval }, collections, collection.id);
+    setErrors(problems);
+    if (Object.keys(problems).length > 0) return;
+    setBusy(true);
+    try {
+      const renamed = name.trim() !== collection.title;
+      const saved = await context.mutate.patch(collection.id, {
+        title: name.trim(), summary: description.trim(), fields: { ...collection.fields, reviewIntervalDays: Number(interval) },
+      }, { expectRevision: collection.revision, event: renamed ? `Knowledge collection “${collection.title}” renamed to “${name.trim()}”` : `Knowledge collection “${collection.title}” updated` });
+      if (saved) {
+        context.toast("Collection saved", renamed ? `${members.length} record${members.length === 1 ? "" : "s"} now show under ${saved.title}.` : `${saved.title} is updated.`);
+        setMode("view");
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    try {
+      for (const record of members) {
+        await context.mutate.patch(record.id, { fields: { ...record.fields, collectionId: "" } }, { event: `Moved to No collection: “${collection.title}” was deleted` });
+      }
+      await context.mutate.remove(collection.id, `Knowledge collection “${collection.title}” deleted; ${members.length} record${members.length === 1 ? "" : "s"} moved to No collection`);
+      context.toast("Collection deleted", `${members.length} record${members.length === 1 ? "" : "s"} moved to No collection. No record was deleted.`);
+      onDeleted();
+    } catch {
+      context.toast("Not deleted", "The collection could not be removed from this browser's storage. Records already moved stay under No collection.", "failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (mode === "edit") {
+    return (
+      <form className="brain-kw-newcol" onSubmit={save} aria-label="Edit collection">
+        <Field label="Name" error={errors.name} required><TextInput value={name} onChange={(event) => setName(event.target.value)} autoFocus /></Field>
+        <Field label="What belongs here"><TextInput value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
+        <Field label="Review every (days)" error={errors.interval}><TextInput type="number" min={1} max={730} value={interval} onChange={(event) => setInterval(event.target.value)} /></Field>
+        <Row gap={2}>
+          <Button size="sm" variant="primary" type="submit" busy={busy}>Save collection</Button>
+          <Button size="sm" variant="ghost" onClick={() => { setMode("view"); setErrors({}); }}>Cancel</Button>
+        </Row>
+      </form>
+    );
+  }
+
   return (
     <div className="brain-kw-colnote">
       {collection.summary && <p className="ds-subtle">{collection.summary}</p>}
       <span className="ds-subtle">Owner {collection.ownerName} · reviewed every {String(collection.fields.reviewIntervalDays ?? 90)} days</span>
+      {mode === "delete" ? (
+        <div className="brain-kw-confirm" role="alertdialog" aria-label={`Delete ${collection.title}`}>
+          <p>Delete “{collection.title}”? {members.length === 0 ? "It holds no records." : `Its ${members.length} record${members.length === 1 ? "" : "s"} move to No collection with their content, sources and review state unchanged.`} No record is deleted.</p>
+          <Row gap={2} wrap>
+            <Button size="sm" variant="outline-danger" busy={busy} onClick={() => void remove()}>Delete collection</Button>
+            <Button size="sm" variant="ghost" onClick={() => setMode("view")}>Keep it</Button>
+          </Row>
+        </div>
+      ) : (
+        <Row gap={1} wrap>
+          <Button size="sm" variant="ghost" icon={<Pencil size={13} />} onClick={() => setMode("edit")}>Rename or edit</Button>
+          <Button size="sm" variant="ghost" icon={<Trash2 size={13} />} onClick={() => setMode("delete")}>Delete</Button>
+        </Row>
+      )}
     </div>
   );
 }
@@ -259,11 +355,8 @@ function NewCollectionForm({ context, existing, onDone }: { context: ScreenConte
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const problems: Record<string, string> = {};
+    const problems = collectionProblems({ name, interval }, existing);
     const days = Number(interval);
-    if (!name.trim()) problems.name = "Name the collection.";
-    else if (existing.some((item) => item.title.toLowerCase() === name.trim().toLowerCase())) problems.name = "A collection with this name exists.";
-    if (!Number.isInteger(days) || days < 1 || days > 730) problems.interval = "Between 1 and 730 days.";
     setErrors(problems);
     if (Object.keys(problems).length > 0) return;
     setBusy(true);

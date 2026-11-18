@@ -307,12 +307,40 @@ export function intervalFor(record: Rec, collections: Rec[]): number {
   return reviewIntervalOf(record, collections.find((item) => item.id === record.fields.collectionId));
 }
 
+/** The filter value for records that belong to no existing collection. */
+export const NO_COLLECTION = "__none__";
+
+/** A record whose collection is unset or no longer exists is filed under "No collection". */
+export function isUnfiled(record: Rec, collections: Pick<Rec, "id">[]): boolean {
+  const id = String(record.fields.collectionId ?? "");
+  return !id || !collections.some((item) => item.id === id);
+}
+
+/** Problems with a collection's name and interval; `selfId` is the collection being renamed. */
+export function collectionProblems(input: { name: string; interval: string }, existing: Pick<Rec, "id" | "title">[], selfId?: string): Record<string, string> {
+  const problems: Record<string, string> = {};
+  const name = input.name.trim();
+  const days = Number(input.interval);
+  if (!name) problems.name = "Name the collection.";
+  else if (name.length > 80) problems.name = "Keep the name under 80 characters.";
+  else if (existing.some((item) => item.id !== selfId && item.title.toLowerCase() === name.toLowerCase())) problems.name = "A collection with this name exists.";
+  if (!Number.isInteger(days) || days < 1 || days > 730) problems.interval = "Between 1 and 730 days.";
+  return problems;
+}
+
+/** Deleting a collection never deletes records: these move to "No collection". */
+export function recordsInCollection(records: Rec[], collectionId: string): Rec[] {
+  return records.filter((record) => record.collection === KNOWLEDGE && record.fields.collectionId === collectionId);
+}
+
 export function filterKnowledge(records: Rec[], filters: KnowledgeFilters, context: FilterContext): Rec[] {
   const names = new Map(context.collections.map((item) => [item.id, item.title]));
   const scored: { record: Rec; score: number }[] = [];
   for (const record of records) {
     const status = statusOf(record);
-    if (filters.collectionId && record.fields.collectionId !== filters.collectionId) continue;
+    if (filters.collectionId === NO_COLLECTION) {
+      if (!isUnfiled(record, context.collections)) continue;
+    } else if (filters.collectionId && record.fields.collectionId !== filters.collectionId) continue;
     if (filters.status === "active" ? status === "archived" : filters.status && status !== filters.status) continue;
     if (filters.provenance && provenanceOf(record) !== filters.provenance) continue;
     if (filters.reviewer && String(record.fields.reviewer ?? "") !== filters.reviewer) continue;
