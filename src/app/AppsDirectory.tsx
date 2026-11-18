@@ -80,7 +80,7 @@ function ApplicationCard({
   const Icon = app.icon;
   const shortcuts = !focused ? [] : platform ? platformDestinations(app.code, slug)
     : growth ? growthDestinations(app.code, slug) : categoryDestinations(app.code, slug);
-  return <article className="apps-directory-card" data-platform={platform ? "true" : undefined}
+  return <article className="apps-directory-card" data-category={app.group.toLowerCase()} data-platform={platform ? "true" : undefined}
     data-growth={growth ? "true" : undefined} data-workareas={shortcuts.length ? "true" : undefined}>
     <Link className="apps-directory-open" to={appEntry(app.code, slug)} aria-label={app.short}>
       <span className="apps-directory-icon"><Icon size={20} strokeWidth={1.8} aria-hidden="true" /></span>
