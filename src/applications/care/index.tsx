@@ -778,7 +778,7 @@ export const careApp = registerApp({
         { id: "reassign case", kind: "modal", title: "Reassign a case", width: 560, render: ({ close, ...context }) => <ReassignCase context={context} close={close} />, footer: submitFooter("cr-reassign", "Reassign") },
         { id: "staffing", kind: "drawer", title: "Who covers which queue", width: 580, render: ({ close, ...context }) => <Staffing context={context} close={close} />, footer: submitFooter("cr-staffing", "Save the rota") },
         { id: "Queue rules", kind: "drawer", title: "How a case reaches a queue", width: 520, render: ({ ...context }) => <QueueRules context={context} /> },
-        { id: "SLA inspector", kind: "drawer", title: "Against the clock", width: 560, render: ({ ...context }) => <SlaInspector context={context} /> },
+        { id: "SLA inspector", kind: "drawer", title: "Against the clock", width: 560, presentation: { guidance: "Review response and resolution targets, elapsed time, ownership and escalation reasons." }, render: ({ ...context }) => <SlaInspector context={context} /> },
         { id: "service report", kind: "modal", title: "Service report", width: 640, render: ({ ...context }) => <ServiceReport context={context} /> },
       ],
     },
