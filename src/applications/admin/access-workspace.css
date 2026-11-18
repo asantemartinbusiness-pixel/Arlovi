@@ -129,3 +129,8 @@
 .aw-perm-foot>span:first-child{max-width:80ch}
 @media(max-width:750px){.aw-perm-head{align-items:stretch;flex-direction:column}.aw-perm-commands{width:100%}.aw-perm-filters>input{flex-basis:100%}.aw-perm-table{min-width:1220px}.aw-perm-review-row{flex-direction:column;gap:5px}.aw-perm-review-row span{text-align:left}}
 @media(prefers-reduced-motion:reduce){.aw-perm-editor *{scroll-behavior:auto;transition:none}}
+
+.aw-perm-advanced{padding:8px 11px;border:1px solid var(--border-default);border-radius:7px;background:var(--bg-surface);color:var(--fg-default);font:inherit;font-size:11px;font-weight:600;cursor:pointer}
+.aw-perm-advanced:hover,.aw-perm-advanced[aria-pressed=true]{background:var(--bg-selected)}
+.aw-perm-scroll[data-advanced=false] .aw-perm-table{min-width:660px}
+@media(max-width:750px){.aw-perm-scroll[data-advanced=false] .aw-perm-table{min-width:660px}}
