@@ -462,8 +462,7 @@ export function DocumentCanvas({
             </tbody>
           </table>
           {!readOnly && onTableEdit && (
-            <div className="dx-table-tools" role="toolbar" aria-label={`Table ${rows.length} by ${width}`}>
-              <span className="dx-table-where">{focused ? `Row ${focused.row + 1}, column ${focused.col + 1}` : `${rows.length} × ${width}`}</span>
+            <div className="dx-table-tools" role="toolbar" aria-label={`Table ${rows.length} by ${width}`} title={focused ? `Acts on row ${focused.row + 1}, column ${focused.col + 1}` : "Acts on the last row and column"}>
               <Button size="sm" variant="ghost" onClick={() => { const after = focused?.row ?? rows.length - 1; onTableEdit(tableId, { kind: "addRow", after }); focusCell(tableId, after + 1, focused?.col ?? 0); }}>Add row</Button>
               <Button size="sm" variant="ghost" onClick={() => { const after = focused?.col ?? width - 1; onTableEdit(tableId, { kind: "addColumn", after }); focusCell(tableId, focused?.row ?? 0, after + 1); }}>Add column</Button>
               <Button size="sm" variant="ghost" disabled={rows.length <= (block.table?.header ? 2 : 1)} onClick={() => { onTableEdit(tableId, { kind: "removeRow", at: focused?.row ?? rows.length - 1 }); setTableCell(null); }}>Remove row</Button>

@@ -1644,7 +1644,7 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
           {audienceWindowControls}
         </Row>
         {audienceWindowBlocked}
-        <SlideCanvas deck={editor.deck} slide={current} selectedIds={[]} onSelect={() => undefined} onTransform={() => undefined} readOnly scale={0.62} showGuides={false} />
+        <SlideCanvas deck={editor.deck} slide={current} selectedIds={[]} onSelect={() => undefined} onTransform={() => undefined} readOnly scale={viewport.w < 900 ? Math.max(0.2, (viewport.w - 40) / SLIDE_W) : 0.62} showGuides={false} />
       </div>
       <div className="px-presenter-side">
         <Card eyebrow="SPEAKER NOTES" prov="human" title="Speaker notes" subtitle={current.targetSeconds ? `Target ${current.targetSeconds}s` : "No target time set"}>

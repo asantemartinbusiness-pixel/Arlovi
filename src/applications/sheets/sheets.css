@@ -203,3 +203,10 @@
 .sx-suggest li { display: grid; gap: 2px; padding: var(--space-1) var(--space-3); cursor: pointer; font-size: var(--text-xs); }
 .sx-suggest li[aria-selected="true"], .sx-suggest li:hover { background: var(--bg-selected); }
 .sx-suggest-summary { color: var(--fg-muted); font-size: var(--text-2xs); }
+
+/* Narrow screens: keep the grid tall enough to work in (the page scrolls instead of
+   squeezing it to one row) and keep toolbar selects readable. */
+@media (max-width: 1279px) {
+  .sx-main .sx-wrap { flex: none; height: min(560px, 68vh) !important; }
+  .sx-shell .ds-toolbar .ds-select { flex: none; width: auto; min-width: 128px; }
+}
