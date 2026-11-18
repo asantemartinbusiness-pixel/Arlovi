@@ -462,7 +462,7 @@ export function AppShell() {
             </div>
           )}
           {org.ownerName && (location.pathname === `/o/${org.slug}/hq/home` || location.pathname === workAreaPath(org.slug,"home")) && <FirstRunGuide />}
-          {org.ownerName && (location.pathname === `/o/${org.slug}/hq/home` || location.pathname === workAreaPath(org.slug,"home")) && <RoleFirstRun />}
+          {org.ownerName && (location.pathname === `/o/${org.slug}/hq/home` || location.pathname === workAreaPath(org.slug,"home")) && <RoleFirstRun key={org.id + ":" + role} />}
           <ScreenErrorBoundary resetKey={location.pathname} label={isWorkspaceArea ? "Workspace" : activeScreen?.title ?? "This screen"}>
             {isWorkspaceArea ? <WorkspaceNavigation /> : <ScreenHost />}
           </ScreenErrorBoundary>
