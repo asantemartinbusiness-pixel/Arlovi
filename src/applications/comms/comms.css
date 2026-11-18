@@ -140,3 +140,6 @@
   .cm-mail-identity-form { grid-template-columns: minmax(0, 1fr); }
   .cm-mail-identity-form > * { grid-column: 1 / -1; }
 }
+
+.cm-mail-setup-help { grid-column: 1 / -1; padding: var(--space-3); border: 1px solid var(--border-subtle); background: var(--bg-inset); border-radius: var(--radius-md); }
+.cm-mail-setup-help p { margin: var(--space-2) 0 0; }
