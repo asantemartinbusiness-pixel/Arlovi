@@ -3,7 +3,7 @@ import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical,
   AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
   AlignVerticalDistributeCenter, ArrowDownToLine, ArrowUpToLine, BarChart3, Circle, Copy,
-  Eye, EyeOff, FileDown, Image as ImageIcon, LayoutTemplate, Lock, MessageSquare, Minus,
+  Eye, EyeOff, ExternalLink, FileDown, Image as ImageIcon, LayoutTemplate, Lock, MessageSquare, Minus,
   MonitorPlay, Palette, Play, Plus, Presentation, Redo2, Square, Table2, Trash2, Triangle,
   Type as TypeIcon, Undo2, Unlock, Wand2,
 } from "lucide-react";
@@ -28,6 +28,7 @@ import {
 import { ObjectBody, SlideCanvas, colour } from "./canvas";
 import { SAVE_LABEL, SAVE_TONE, useDeckEditor, type DeckEditor } from "./state";
 import { presenterUi, advanceSlides } from "./session";
+import { audienceUrl, isAudienceWindow, keyToNav, navDelta, useAudienceLink, usePresenterLink } from "./audienceLink";
 import {
   AlignObjects, Annotate, CreateLayout, MoveObject, ResizeObject, ResolveComments, SLIDE_ACTIONS, ShareDeck,
   advanceAction, endAction, formFooter, refreshCharts, sequenceSlide, toggleLabels, toggleReduceMotion,
@@ -1433,6 +1434,42 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
   const advance = (delta: number) => { advanceSlides(editor, delta); };
   const [blackout, setBlackout] = useState(false);
   const [jump, setJump] = useState("");
+
+  /* Second-window audience display, kept in step over a BroadcastChannel. */
+  const audienceAnnotations = current ? (session.annotations[current.id] ?? []).map((item) => item.text) : [];
+  const link = usePresenterLink(
+    record?.id,
+    current ? { slideId: current.id, position: position + 1, total: visible.length, blackout, annotations: audienceAnnotations } : null,
+    (message) => {
+      if (message.action === "blank") { setBlackout((value) => !value); return; }
+      setBlackout(false);
+      advance(navDelta(message, position, visible.length));
+    },
+  );
+  const openAudienceWindow = () => {
+    if (!record) return;
+    const opened = link.open(audienceUrl(context.org.slug, record.id), `arlovi-audience-${record.id}`);
+    if (opened) {
+      if (!running) setRunning(true);
+      void context.mutate.log(`Presenting ${record.title} in a second window`, { entityId: record.id, type: "present" });
+    }
+  };
+  const audienceWindowControls = link.supported ? (
+    link.connected ? (
+      <>
+        <Pill tone="success">Audience window connected</Pill>
+        <Button size="sm" variant="ghost" aria-pressed={blackout} onClick={() => setBlackout((value) => !value)}>{blackout ? "Show slide" : "Blank (B)"}</Button>
+        <Button size="sm" variant="ghost" onClick={() => { link.close(); setBlackout(false); }}>Close audience window</Button>
+      </>
+    ) : (
+      <Button size="sm" variant="secondary" icon={<ExternalLink size={14} />} onClick={openAudienceWindow}>Open audience window</Button>
+    )
+  ) : null;
+  const audienceWindowBlocked = link.blocked && !link.connected ? (
+    <Notice tone="warning" title="The browser blocked the audience window">
+      Allow pop-ups for this site and try again, or use the full-screen audience display in this window.
+    </Notice>
+  ) : null;
   const [viewport, setViewport] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
 
   /* Leave the browser's full screen together with the audience display. */
@@ -1476,7 +1513,7 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
       else if (key === "ArrowLeft" || key === "ArrowUp" || key === "PageUp" || key === "p" || key === "P") { event.preventDefault(); setBlackout(false); advance(-1); }
       else if (key === "Home") { event.preventDefault(); advance(-visible.length); }
       else if (key === "End") { event.preventDefault(); advance(visible.length); }
-      else if ((key === "b" || key === "B" || key === ".") && fullscreen) { event.preventDefault(); setBlackout((value) => !value); }
+      else if ((key === "b" || key === "B" || key === ".") && (fullscreen || link.connected)) { event.preventDefault(); setBlackout((value) => !value); }
       else if (key === "Escape" && fullscreen) { event.preventDefault(); endDisplay(); }
       setJump("");
     }
@@ -1535,11 +1572,13 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
           <div><span>Hidden slides</span><strong>{editor.deck.slides.length - visible.length}</strong></div>
           <div><span>Current position</span><strong>{position + 1}</strong></div>
         </div>
+        {audienceWindowBlocked}
         <Notice tone="warning" title="This is what the room sees">
           Speaker notes never render here. Opening the audience display asks for confirmation first, because a second screen is often already mirrored.
         </Notice>
         <Row gap={2} wrap>
           <Button variant="primary" icon={<MonitorPlay size={15} />} onClick={() => context.openOverlay("access confirmation")}>Open the audience display</Button>
+          {audienceWindowControls}
           <Button variant="secondary" onClick={() => advance(-1)} disabled={position === 0}>Back</Button>
           <Button variant="secondary" onClick={() => advance(1)} disabled={position >= visible.length - 1}>Advance</Button>
           <span className="ds-grow" />
@@ -1602,7 +1641,9 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
           <Button size="sm" variant="secondary" onClick={() => advance(-1)} disabled={position === 0}>Back</Button>
           <Button size="sm" variant="primary" onClick={() => advance(1)} disabled={position >= visible.length - 1}>Advance</Button>
           <Button size="sm" variant="ghost" icon={<MonitorPlay size={14} />} onClick={() => context.openOverlay("access confirmation")}>Audience display</Button>
+          {audienceWindowControls}
         </Row>
+        {audienceWindowBlocked}
         <SlideCanvas deck={editor.deck} slide={current} selectedIds={[]} onSelect={() => undefined} onTransform={() => undefined} readOnly scale={0.62} showGuides={false} />
       </div>
       <div className="px-presenter-side">
@@ -1622,15 +1663,98 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
             { label: "Advance", value: "Right or down arrow, space, Page down or N" },
             { label: "Back", value: "Left or up arrow, Page up or P" },
             { label: "Jump", value: "Home, End, or a slide number then Enter" },
-            { label: "Blank the room", value: "B (audience display)" },
+            { label: "Blank the room", value: "B (audience display or window)" },
             { label: "End", value: "Escape" },
           ]} />
           <Notice tone="warning" title="No phone remote is connected">
-            A remote would need a pairing service. The keyboard drives the audience display, and both views stay in this browser.
+            A remote would need a pairing service. The keyboard drives the audience display; an audience window opened from here follows this view, and both stay in this browser.
           </Notice>
         </Card>
       </div>
     </div>
+  );
+}
+
+/**
+ * The audience window: a second browser window on Presenter Mode with
+ * `display=window`. It renders the slide only — never notes — and follows the
+ * presenter window over a BroadcastChannel; its own keyboard steps the
+ * presentation too, by asking the presenter window to move.
+ */
+function AudienceWindow({ context }: { context: ScreenContext }) {
+  const record = useDeck(context);
+  const editor = useDeckEditor(context, record);
+  const link = useAudienceLink(record?.id);
+  const [viewport, setViewport] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
+  const [jump, setJump] = useState("");
+  const send = link.send;
+
+  useEffect(() => {
+    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    if (record) document.title = `Audience · ${record.title}`;
+  }, [record]);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.target instanceof HTMLElement && event.target.tagName === "BUTTON" && (event.key === " " || event.key === "Enter")) return;
+      if (/^[0-9]$/.test(event.key)) { setJump((value) => (value + event.key).slice(-3)); return; }
+      if (event.key === "Enter" && jump) { event.preventDefault(); send({ type: "nav", action: "goto", to: Number(jump) }); setJump(""); return; }
+      const message = keyToNav(event.key);
+      if (message) { event.preventDefault(); send(message); }
+      setJump("");
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [jump, send]);
+
+  if (!record) return <Empty title="No deck is open" icon={<Presentation size={20} />} />;
+  const state = link.state;
+  const visible = editor.deck.slides.filter((slide) => !slide.hidden);
+  const slide = (state && editor.deck.slides.find((item) => item.id === state.slideId)) ?? visible[0];
+  const scale = Math.min(2.4, (viewport.w - 24) / SLIDE_W, (viewport.h - 24) / SLIDE_H);
+  const waiting = !state;
+
+  return (
+    <>
+      <div className="px-audience px-audience-window" role="region" aria-label="Audience window" data-blackout={state?.blackout || undefined}>
+        {!link.supported ? (
+          <span className="px-blackout-note">This browser cannot link two windows. Use the full-screen audience display instead.</span>
+        ) : link.presenterGone ? (
+          <span className="px-blackout-note">The presenter closed the session. You can close this window.</span>
+        ) : state?.blackout ? (
+          <span className="px-blackout-note">Screen blanked</span>
+        ) : waiting ? (
+          <span className="px-blackout-note">Waiting for the presenter window. Open Presenter Mode on “{record.title}” in the other window.</span>
+        ) : slide ? (
+          <SlideCanvas deck={editor.deck} slide={slide} selectedIds={[]} onSelect={() => undefined} onTransform={() => undefined} readOnly scale={scale} showGuides={false} />
+        ) : null}
+        {state && !state.blackout && !link.presenterGone && state.annotations.length > 0 && (
+          <div className="px-annotations" role="note" aria-label="Live annotations" style={{ position: "absolute", insetInline: 24, bottom: 48, display: "grid", gap: 6 }}>
+            {state.annotations.map((text, index) => (
+              <div key={index} style={{ background: "var(--papaya-300, #FFAE7C)", color: "var(--ink-900, #1A1917)", padding: "6px 10px", borderRadius: 6, fontWeight: 600, justifySelf: "start" }}>{text}</div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="px-audience-bar px-audience-window-bar">
+        {state && (
+          <div className="px-progress" role="progressbar" aria-label="Position in the deck" aria-valuemin={1} aria-valuemax={state.total} aria-valuenow={state.position}>
+            <span style={{ width: `${(state.position / Math.max(1, state.total)) * 100}%` }} />
+          </div>
+        )}
+        <span className="ds-grow ds-num" style={{ color: "var(--paper-0)" }} aria-live="polite" data-testid="audience-window-position">
+          {state ? `Slide ${state.position} of ${state.total}` : "Not connected"}{jump ? ` · go to ${jump}…` : ""}
+        </span>
+        <span className="px-audience-hint">Follows the presenter window · ← → step · B blanks</span>
+        <Button size="sm" variant="secondary" onClick={() => { void document.documentElement.requestFullscreen?.().catch(() => undefined); }}>Full screen</Button>
+      </div>
+    </>
   );
 }
 
@@ -1781,7 +1905,10 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
           </Stack>
         </Card>
         <Card span={5} eyebrow="APPROVAL" prov="posted" title="Approvals" subtitle={`${editor.deck.approvals.length} recorded`}>
-          {editor.deck.approvals.length === 0 ? <Empty title="Not approved yet" /> : (
+          {/* One way in: the screen's "Record an approval" action, which also
+              applies the edit capability check. A second, unguarded copy of
+              the same button used to sit here. */}
+          {editor.deck.approvals.length === 0 ? <Empty title="Not approved yet">Use “Record an approval” at the top of this screen.</Empty> : (
             <Stack gap={2}>
               {editor.deck.approvals.map((approval) => (
                 <Row key={approval.id} gap={2}>
@@ -1792,7 +1919,6 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
               ))}
             </Stack>
           )}
-          <Button size="sm" variant="secondary" style={{ marginBlockStart: "var(--space-3)" }} onClick={() => context.openOverlay("approval")}>Record an approval</Button>
         </Card>
       </Grid>
       </Stack>
@@ -3042,7 +3168,10 @@ registerApp({
     "ARL-PRESENT-006": {
       id: "ARL-PRESENT-006",
       title: () => "Presenter mode",
-      tabs: (["Audience", "Presenter", "Rehearsal"] as const).map((id) => ({ id, render: (context) => <PresenterScreen context={context} tab={id} /> })),
+      tabs: (["Audience", "Presenter", "Rehearsal"] as const).map((id) => ({
+        id,
+        render: (context) => (isAudienceWindow(window.location.search) ? <AudienceWindow context={context} /> : <PresenterScreen context={context} tab={id} />),
+      })),
       actions: [
         { id: "Present", label: "Present", placement: "primary", icon: <MonitorPlay size={15} />, run: (context) => context.openOverlay("Display selector") },
         { id: "advance", label: "Advance a slide", placement: "secondary", run: (context) => advanceAction(context) },
