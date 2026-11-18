@@ -42,7 +42,7 @@ export function AttentionCentre({
   initialView?: AttentionView;
 }) {
   const navigate = useNavigate();
-  const { org, role, actor, relative } = useWorkspace();
+  const { org, actor, relative } = useWorkspace();
   const receipts = useUi((s) => s.attentionReceipts);
   const updateReceipt = useUi((s) => s.setAttentionReceipt);
   const updateReceipts = useUi((s) => s.setAttentionReceipts);
