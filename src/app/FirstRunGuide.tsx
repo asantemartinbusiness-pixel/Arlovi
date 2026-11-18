@@ -11,14 +11,14 @@ import "./first-run.css";
  * as an invitation delivered, an AI employee operating, or a mission executed.
  */
 export function FirstRunGuide() {
-  const { org } = useWorkspace();
+  const { org, role } = useWorkspace();
   const location = useLocation();
   const navigate = useNavigate();
   const mutations = useMutations();
   const records = useCollections(["organizations", "members", "sources", "agents", "missions", "preferences"]);
   const preference = records.preferences.find((item) => item.fields.kind === "getting_started");
   const force = new URLSearchParams(location.search).get("gettingStarted") === "1";
-  if (!org.ownerName || !records.organizations.some((record) => record.id === org.id) || (preference?.fields.dismissed === true && !force)) return null;
+  if (!org.ownerName || role !== "owner" || !records.organizations.some((record) => record.id === org.id) || (preference?.fields.dismissed === true && !force)) return null;
 
   const humanTeam = records.members.filter((member) => member.fields.kind === "human" && member.fields.role !== "owner");
   const reviewableKnowledge = records.sources.filter((source) => source.status === "indexed" || source.status === "verified");
@@ -29,7 +29,7 @@ export function FirstRunGuide() {
     {
       id: "identity", title: "Company headquarters", detail: "Company profile and region recorded",
       complete: records.organizations.some((record) => record.id === org.id),
-      to: appEntry("ADMIN", org.slug), action: "Review identity",
+      to: "/o/" + org.slug + "/workspace/setup", action: "Review setup",
     },
     {
       id: "knowledge", title: "Review Company Brain sources",
@@ -85,8 +85,8 @@ export function FirstRunGuide() {
     <section className="hq-intro" aria-label="Your company getting started">
       <div className="hq-intro-top">
         <div>
-          <div className="hq-intro-eyebrow">YOUR WORKSPACE IS READY</div>
-          <h2>Welcome to {org.name}.</h2>
+          <div className="hq-intro-eyebrow">YOUR OPERATING FOUNDATIONS</div>
+          <h2>Make {org.name} operational.</h2>
           <p>Bring the people, intelligence and applications in your headquarters together. Each step opens a real part of your company.</p>
         </div>
         <Button variant="ghost" size="sm" iconOnly aria-label="Dismiss getting-started guidance" onClick={() => { void dismiss(); }}>
