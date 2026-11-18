@@ -124,7 +124,9 @@ function ChangeEditor({ context, record }: { context: ScreenContext; record: Rec
   const submitIssues = submitBlockers(preview);
   const requester = String(record.fields.requestedBy ?? record.createdBy);
   const approverChoices = members.map((member) => member.title).filter((name) => name !== requester);
-  const decideIssue = approver ? approvalBlocker(record, approver) : "Choose who approved it.";
+  const decideIssue = approver
+    ? approvalBlocker(record, approver, context.actor)
+    : (requester === context.actor ? approvalBlocker(record, "", context.actor) : undefined) ?? "Choose who approved it.";
   const remote = changeFactors(record).target === "remote";
 
   async function save(extra: Partial<Rec> = {}, event = `Change request ${draft.title} saved`) {
@@ -194,7 +196,7 @@ function ChangeEditor({ context, record }: { context: ScreenContext; record: Rec
             )}
             <Row gap={2} wrap>
               <Button variant="secondary" disabled={!dirty} onClick={() => void save()}>Save draft</Button>
-              <Button variant="primary" disabled={submitIssues.length > 0} onClick={() => void save({ status: "submitted" }, `Change request ${draft.title} submitted for approval (${risk.level} risk)`)}>Submit for approval</Button>
+              <Button variant="primary" disabled={submitIssues.length > 0} onClick={() => void save({ status: "submitted", fields: { approvedBy: "", decisionRecordedBy: "", decidedAt: "", decisionNote: "" } }, `Change request ${draft.title} ${record.status === "rejected" ? "resubmitted" : "submitted"} for approval (${risk.level} risk)`)}>Submit for approval</Button>
             </Row>
           </Stack>
         )}
@@ -212,7 +214,7 @@ function ChangeEditor({ context, record }: { context: ScreenContext; record: Rec
                 <Field label="Decision note"><TextInput value={decisionNote} onChange={(event) => setDecisionNote(event.target.value)} /></Field>
               </div>
             </Row>
-            {decideIssue && approver && <Notice tone="warning" title="Cannot be approved yet">{decideIssue}</Notice>}
+            {decideIssue && (approver || requester === context.actor) && <Notice tone="warning" title="Cannot be approved yet">{decideIssue}</Notice>}
             <p className="ds-subtle">The requester cannot approve their own change. You record the decision; the approver is named on it.</p>
             <Row gap={2} wrap>
               <Button variant="primary" disabled={Boolean(decideIssue)} onClick={() => void context.mutate.patch(record.id, {

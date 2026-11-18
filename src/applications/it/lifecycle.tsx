@@ -23,7 +23,12 @@ export function makeEntry(by: string, kind: TimelineKind, text: string): Timelin
   return { id: `t${wallMs().toString(36)}${entryCounter}`, at: clockIso(), by, kind, text };
 }
 
-/** Diagnostics count as verification when they ran after the incident opened, in this session or recorded in the audit log. */
+/**
+ * A workspace diagnostics run recorded after the incident opened, in this
+ * session or in the audit log. Diagnostic events carry no incident reference:
+ * they check the whole workspace, so this is evidence that a check ran, not
+ * that this incident's fix was verified specifically.
+ */
 export function useVerified(record: Rec | undefined): boolean {
   const ranAt = useItUi((state) => state.ranAt);
   const events = useEvents();
@@ -57,11 +62,12 @@ export function IncidentLifecycle({ context, record }: { context: ScreenContext;
   async function setField(key: "severity" | "owner", value: string) {
     const kind: TimelineKind = key === "severity" ? "severity" : "assignee";
     const text = key === "severity" ? `Severity set to ${value}` : `Owner set to ${value}`;
-    await context.mutate.patch(record.id, {
+    const saved = await context.mutate.patch(record.id, {
       ...(key === "owner" ? { ownerName: value } : {}),
       fields: { ...record.fields, [key]: value },
       ...withEntry(record, makeEntry(context.actor, kind, text)),
     }, { expectRevision: record.revision, event: `${record.title}: ${text}` });
+    return saved;
   }
 
   async function advance() {
@@ -70,10 +76,10 @@ export function IncidentLifecycle({ context, record }: { context: ScreenContext;
     try {
       const entries: TimelineEntry[] = [];
       if (note.trim() && (target === "mitigate" || target === "resolve")) entries.push(makeEntry(context.actor, "mitigation", note.trim()));
-      if (target === "resolve") entries.push(makeEntry(context.actor, "verification", "Diagnostics had run since the incident opened"));
+      if (target === "resolve") entries.push(makeEntry(context.actor, "verification", "A workspace diagnostics run was recorded since the incident opened (it checks the whole workspace, not this incident alone)"));
       entries.push(makeEntry(context.actor, "stage", `Moved to ${STAGE_LABELS[target]}`));
       const timeline = [...readTimeline(record), ...entries];
-      await context.mutate.patch(record.id, {
+      const saved = await context.mutate.patch(record.id, {
         status: STAGE_STATUS[target],
         ...(target === "resolve" ? { endAt: clockIso() } : {}),
         fields: {
@@ -84,6 +90,7 @@ export function IncidentLifecycle({ context, record }: { context: ScreenContext;
         },
         body: { ...(record.body && typeof record.body === "object" ? record.body as Record<string, unknown> : {}), timeline },
       }, { expectRevision: record.revision, event: `${record.title} moved to ${STAGE_LABELS[target]}` });
+      if (!saved) return;
       setNote("");
       context.toast(`Moved to ${STAGE_LABELS[target]}`, "The change is on the incident timeline.");
     } finally {
@@ -163,9 +170,10 @@ export function TimelineComposer({ context, record }: { context: ScreenContext; 
       onSubmit={async (event) => {
         event.preventDefault();
         if (!text.trim()) return;
-        await context.mutate.patch(record.id, withEntry(record, makeEntry(context.actor, kind, text.trim())), {
+        const saved = await context.mutate.patch(record.id, withEntry(record, makeEntry(context.actor, kind, text.trim())), {
           expectRevision: record.revision, event: `${KIND_LABEL[kind]} added to ${record.title}`,
         });
+        if (!saved) return;
         setText("");
         context.toast("Entry added", "It is on the incident timeline with your name and the time.");
       }}
