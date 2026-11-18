@@ -70,7 +70,7 @@ export const portalApp = registerApp({
       overlays: [
         { id: "Portal wizard", kind: "drawer", title: "New portal", width: 640, render: ({ close, ...context }) => <PortalWizard context={context} close={close} />, footer: submitFooter("portal-wizard", "Create portal") },
         { id: "branding", kind: "modal", title: "Branding", width: 560, render: ({ close, ...context }) => <PortalBranding context={context} close={close} />, footer: submitFooter("portal-branding", "Save branding") },
-        { id: "access setup", kind: "modal", title: "Access", width: 580, render: ({ close, ...context }) => <AccessSetup context={context} close={close} />, footer: submitFooter("access-setup", "Save access") },
+        { id: "access setup", kind: "modal", title: "Access", width: 580, presentation: { guidance: "Choose exactly what the external user can see, how long access lasts and which records remain private." }, render: ({ close, ...context }) => <AccessSetup context={context} close={close} />, footer: submitFooter("access-setup", "Save access") },
         confirmOverlay,
       ],
     },
