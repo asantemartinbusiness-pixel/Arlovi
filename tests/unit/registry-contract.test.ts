@@ -102,11 +102,15 @@ describe("screen registry contract", () => {
       overlaysDeclared: acc.overlaysDeclared + Math.min(row.overlaysDeclared, row.overlaysRequired),
     }), { screens: 0, bespoke: 0, fallback: 0, legacy: 0, tabsRequired: 0, tabsDeclared: 0, actionsRequired: 0, actionsDeclared: 0, overlaysRequired: 0, overlaysDeclared: 0 });
 
+    // Evidence files are written only when explicitly requested
+    // (`npm run evidence`), so routine test runs leave the tree clean.
+    if (process.env.ARLOVI_WRITE_EVIDENCE === "1") {
     mkdirSync(new URL("../../docs/implementation/", import.meta.url), { recursive: true });
     writeFileSync(
       new URL("../../docs/implementation/registry-coverage.json", import.meta.url),
       `${JSON.stringify({ generatedFrom: "src/generated/catalog.json + registered application modules", applications: allApps().length, totals, rows }, null, 2)}\n`,
     );
+    }
     expect(totals.screens).toBe(catalog.counts.screens);
   });
 });

@@ -7,7 +7,8 @@ import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
 import { ROLE_LABELS, can as roleCan, type Capability } from "@/platform/policy";
 import { clockIso } from "@/platform/clock";
-import type { Rec, Role } from "@/domain/types";
+import { revisedRecord } from "@/platform/repo";
+import type { Role } from "@/domain/types";
 import { CAPABILITIES, ROLES, appsForRole, capabilityLabel, ofKind, useAdmin } from "./pieces";
 
 /* ====================================================================== *
@@ -156,22 +157,6 @@ export function AccessRequests({ context }: { context: ScreenContext }) {
   );
 }
 
-/** A record as `patchRecord` would write it, for atomic multi-record batches. */
-function reviseRecord(current: Rec, patch: Partial<Rec>, actor: string, now: string): Rec {
-  return {
-    ...current,
-    ...patch,
-    fields: patch.fields ? { ...current.fields, ...patch.fields } : current.fields,
-    history: [{
-      title: current.title, status: current.status, summary: current.summary,
-      fields: { ...current.fields }, body: current.body, amountMinor: current.amountMinor, at: now,
-    }, ...current.history].slice(0, 25),
-    revision: current.revision + 1,
-    updatedAt: now,
-    updatedBy: actor,
-  };
-}
-
 export function AccessReview({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
   const { role: viewerRole } = useWorkspace();
@@ -205,8 +190,8 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
         try {
           await context.mutate.putMany(
             [
-              reviseRecord(member, { fields: { ...member.fields, role: to } }, context.actor, now),
-              reviseRecord(request, { status: outcome, fields: requestFields }, context.actor, now),
+              revisedRecord(member, { fields: { ...member.fields, role: to } }, { actor: context.actor, now }),
+              revisedRecord(request, { status: outcome, fields: requestFields }, { actor: context.actor, now }),
             ],
             [`Role view changed from ${from} to ${to} for ${member.title} (access request approved)`, requestEvent],
             { [member.id]: member.revision, [request.id]: request.revision },

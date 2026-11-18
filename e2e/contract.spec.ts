@@ -62,7 +62,9 @@ test.describe("screen contract sweep", () => {
       });
     }
 
-    writeFileSync(new URL("../docs/implementation/screen-sweep.json", import.meta.url), `${JSON.stringify(results, null, 2)}\n`);
+    if (process.env.ARLOVI_WRITE_EVIDENCE === "1") {
+      writeFileSync(new URL("../docs/implementation/screen-sweep.json", import.meta.url), `${JSON.stringify(results, null, 2)}\n`);
+    }
 
     const broken = results.filter((row) => row.errors.length > 0);
     const headless = results.filter((row) => !row.heading);
