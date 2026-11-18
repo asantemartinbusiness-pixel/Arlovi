@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { findScreen, screens } from "@/app/catalog";
 import { APP_ENTRIES } from "@/app/nav";
 import { routeForRecord } from "@/platform/attention";
-import { canOpen } from "@/platform/policy";
+import { canOpenLegacyScreen } from "@/platform/accessInventory";
 import { useCollections, useOrgRecords, useWorkspace } from "@/platform/workspace";
 import { useNavigationContinuity } from "@/platform/navigationContinuity";
 import { destinationLabel } from "@/app/WorkspaceContinuity";
@@ -37,7 +37,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const hits = useMemo<Hit[]>(() => {
     const q = query.trim().toLowerCase();
     const pages: Hit[] = screens
-      .filter((screen) => canOpen(role, screen.applicationCode) && !screen.route.includes(":id") && !screen.route.includes(":slug"))
+      .filter((screen) => canOpenLegacyScreen(role, screen) && !screen.route.includes(":id") && !screen.route.includes(":slug"))
       .filter((screen) => !q || `${screen.title} ${screen.applicationName} ${screen.purpose}`.toLowerCase().includes(q))
       .slice(0, q ? 8 : 6)
       .map((screen) => ({
@@ -55,7 +55,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         .filter((item): item is { record: typeof records[number]; to: string } => {
           if (!item.to) return false;
           const destination = findScreen(item.to)?.screen;
-          return !destination || canOpen(role, destination.applicationCode);
+          return !destination || canOpenLegacyScreen(role, destination);
         })
         .slice(0, 10)
         .map(({ record, to }) => ({
@@ -70,7 +70,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     const locations: Hit[] = [...new Set([...navigation.pinned, ...navigation.recent.map(item => item.path)])]
       .filter(path => {
         const matched = findScreen(path)?.screen;
-        return (!matched || canOpen(role, matched.applicationCode)) && (!q || destinationLabel(path, org.slug, projects, departments).toLowerCase().includes(q));
+        return (!matched || canOpenLegacyScreen(role, matched)) && (!q || destinationLabel(path, org.slug, projects, departments).toLowerCase().includes(q));
       })
       .slice(0, q ? 8 : 6).map(path => ({
         key: `location-${path}`, group: "Recent & saved",
