@@ -119,7 +119,7 @@ export const autoApp = registerApp({
       ],
       overlays: [
         { id: "Workflow quick view", kind: "drawer", title: "Automation", width: 520, render: ({ ...context }) => <WorkflowQuickView context={context} /> },
-        { id: "activation review", kind: "modal", title: "Activation review", width: 620, capability: "run_automation", presentation: { selectedRecord: true, guidance: "Review the workflow graph, blocking errors, warnings and disconnected providers before activating it." }, render: ({ close, ...context }) => <ActivationReview context={context} close={close} /> },
+        { id: "activation review", kind: "modal", title: "Activation review", width: 620, capability: "run_automation", presentation: { selectedRecord: true, collection: "workflows", guidance: "Review the workflow graph, blocking errors, warnings and disconnected providers before activating it." }, render: ({ close, ...context }) => <ActivationReview context={context} close={close} /> },
         { id: "archive", kind: "modal", title: "Archive this automation", tone: "danger", width: 520, render: ({ close, ...context }) => <ArchiveWorkflow context={context} close={close} /> },
         { id: "Create workflow", kind: "modal", title: "New automation", width: 560, render: ({ close, ...context }) => <CreateWorkflow context={context} close={close} />, footer: submitFooter("auto-create", "Create automation") },
         { id: "duplicate copy", kind: "modal", title: "Duplicate without grants", width: 560, render: ({ close, ...context }) => <DuplicateWorkflow context={context} close={close} /> },
