@@ -32,7 +32,7 @@ const STEP_KEY = "arlovi-company-setup-step-v1";
 const STEPS = ["Company", "Identity", "Knowledge", "Departments", "People", "Intelligence", "Applications", "Collaboration", "Authority", "Launch"];
 const DEFAULT: Setup = {
   company: "", slug: "", owner: "", territory: "GB", currency: "GBP",
-  timezone: "Europe/London", accent: "#234FE8", description: "",
+  timezone: "Europe/London", accent: "#2D6B65", description: "",
   departments: ["Operations", "Finance", "Sales", "Marketing", "People", "Creative", "Customer Care", "Engineering"],
   agents: ["Chief of Staff", "Finance Analyst", "Creative Director"],
   knowledgeNotes: "", colleagues: "",
@@ -48,7 +48,7 @@ const TERRITORIES: Record<Territory, { currency: string; timezone: string; local
 };
 const DEPARTMENTS = ["Operations", "Finance", "Sales", "Marketing", "People", "Creative", "Customer Care", "Engineering", "Legal", "Procurement", "IT", "Research"];
 const AGENTS = ["Chief of Staff", "Finance Analyst", "Creative Director", "Sales Researcher", "Operations Coordinator", "Customer Care Specialist"];
-const COLORS = ["#234FE8", "#006E70", "#6236D1", "#C24B24", "#A51F63", "#20242B"];
+const COLORS = ["#2D6B65", "#3F624D", "#5D4B84", "#6E5C28", "#805137", "#1F2723"];
 const APPS = ["Headquarters", "Inbox", "Assets", "Administration", "Ask Arlovi", "Company Brain", "AI Workforce", "Missions", "Automation", "Analytics", "Finance", "CRM", "People", "Projects", "Communications", "Customer Care", "Legal", "Marketing", "Commerce", "Bookings", "Procurement", "Portals", "Docs", "Sheets", "Present", "Design", "Photo", "Layout", "Video", "Motion", "Websites", "App Builder", "Forms", "Integrations", "IT Operations"];
 const CHANNELS = ["Company Updates", "Leadership", "Operations", "Announcements", "Creative", "Sales", "Support", "Engineering"];
 
@@ -58,6 +58,8 @@ function restored(): Setup {
     if (!stored) return DEFAULT;
     const parsed = JSON.parse(stored) as Partial<Setup>;
     return { ...DEFAULT, ...parsed,
+      // Historical drafts defaulted to cobalt; new companies now start Seafoam.
+      accent: parsed.accent?.toLowerCase() === "#234fe8" ? DEFAULT.accent : parsed.accent || DEFAULT.accent,
       departments: Array.isArray(parsed.departments) ? parsed.departments : DEFAULT.departments,
       agents: Array.isArray(parsed.agents) ? parsed.agents : DEFAULT.agents,
       preferredApps: Array.isArray(parsed.preferredApps) ? parsed.preferredApps : DEFAULT.preferredApps,
@@ -269,7 +271,12 @@ export function CompanyOnboarding() {
               <fieldset className="onb-colors"><legend>Company accent</legend><div>
                 {COLORS.map(color=><button key={color} type="button" aria-label={"Select accent "+color} aria-pressed={setup.accent===color}
                   className={setup.accent===color?"onb-color onb-color-selected":"onb-color"} style={{background:color}} onClick={()=>change("accent",color)}/>)}
-              </div></fieldset>
+              </div>
+                <label className="onb-brand-custom">Custom company colour
+                  <input type="color" aria-label="Choose custom company colour" value={/^#[0-9a-fA-F]{6}$/.test(setup.accent) ? setup.accent : DEFAULT.accent} onChange={(event)=>change("accent",event.target.value)} />
+                </label>
+                <p className="onb-brand-hint">Your company identity colours are used for branded outputs and customer-facing experiences. The Arlovi workspace and safety statuses remain consistent.</p>
+              </fieldset>
               <div className="onb-note">Brand rules, typography, logos, assets and advanced customization remain editable inside Arlovi.</div>
             </>}
             {step === 2 && <>

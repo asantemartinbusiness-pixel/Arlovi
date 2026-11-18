@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { Minus, Plus, RotateCcw, X } from "lucide-react";
+import { Minus, Plus, RotateCcw, X, Check } from "lucide-react";
+import { palettes } from "@/brand";
 import { useUi } from "@/runtime/ui";
 import { SCALE_DEFAULT, SCALE_MAX, SCALE_MIN, SCALE_STEP } from "@/runtime/interfaceScale";
 import "./display-preferences.css";
@@ -9,8 +10,12 @@ type Density = "compact" | "balanced" | "comfortable";
 export function DisplayPreferences({ onClose }: { onClose: () => void }) {
   const scale = useUi(state => state.interfaceScale);
   const density = useUi(state => state.density);
+  const theme = useUi(state => state.theme);
+  const palette = useUi(state => state.palette);
   const setScale = useUi(state => state.setInterfaceScale);
   const setDensity = useUi(state => state.setDensity);
+  const setTheme = useUi(state => state.setTheme);
+  const setPalette = useUi(state => state.setPalette);
   const panel = useRef<HTMLElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
 
@@ -34,8 +39,8 @@ export function DisplayPreferences({ onClose }: { onClose: () => void }) {
       <section ref={panel} className="display-panel" role="dialog" aria-modal="true" aria-labelledby="display-title" aria-describedby="display-description">
         <header className="display-panel-heading">
           <div>
-            <h2 id="display-title">Display & scaling</h2>
-            <p id="display-description">Make Arlovi fit the way you work.</p>
+            <h2 id="display-title">Appearance & display</h2>
+            <p id="display-description">Personalise how Arlovi looks without changing your company’s branding.</p>
           </div>
           <button ref={closeButton} type="button" className="display-icon-button" aria-label="Close display settings" onClick={onClose}><X size={18} /></button>
         </header>
@@ -63,6 +68,30 @@ export function DisplayPreferences({ onClose }: { onClose: () => void }) {
               ))}
             </div>
           </fieldset>
+
+          <fieldset className="display-density">
+            <legend>Appearance</legend>
+            <p className="display-help">Light is the default. Your choice affects only your workspace appearance, not company branding or system alerts.</p>
+            <div className="display-theme-options" role="group" aria-label="Light or dark appearance">
+              <button type="button" aria-pressed={theme === "light"} onClick={() => setTheme("light")}>Light</button>
+              <button type="button" aria-pressed={theme === "dark"} onClick={() => setTheme("dark")}>Dark</button>
+            </div>
+          </fieldset>
+          <fieldset className="display-density">
+            <legend>Colour palette</legend>
+            <p className="display-help">Seafoam is the Arlovi default. Presets apply to selection and primary accents—not backgrounds, alerts or user-generated content.</p>
+            <div className="display-palette-grid">
+              {palettes.map((option) => (
+                <button key={option.id} type="button" className="display-palette-option" aria-pressed={palette === option.id} aria-label={option.label + (palette === option.id ? ", selected" : "")} onClick={() => setPalette(option.id)}>
+                  <span className="display-palette-swatch" style={{ backgroundColor: option.soft, borderColor: option.color }} aria-hidden="true">
+                    <span style={{ backgroundColor: option.color }} />
+                  </span>
+                  <span className="display-palette-label">{option.label}</span>
+                  {palette === option.id && <Check size={14} aria-hidden="true" />}
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <div className="display-preview" aria-label="Sample workspace card">
             <span className="display-preview-eyebrow">Preview</span>
             <div className="display-preview-card">
@@ -72,10 +101,10 @@ export function DisplayPreferences({ onClose }: { onClose: () => void }) {
               <span className="display-preview-pill">View projects</span>
             </div>
           </div>
-          <p className="display-help">Your choices are saved in this browser. Browser zoom and operating-system accessibility settings remain available.</p>
+          <p className="display-help">Your personal display preferences are saved in this browser. Company identity settings and customer-facing branding are separate. Browser zoom and operating-system accessibility options remain available.</p>
         </div>
         <footer className="display-panel-footer">
-          <button type="button" className="display-reset" onClick={() => { setScale(SCALE_DEFAULT); setDensity("balanced"); }}><RotateCcw size={15}/> Reset defaults</button>
+          <button type="button" className="display-reset" onClick={() => { setScale(SCALE_DEFAULT); setDensity("balanced"); setTheme("light"); setPalette("seafoam"); }}><RotateCcw size={15}/> Reset defaults</button>
           <button type="button" className="display-done" onClick={onClose}>Done</button>
         </footer>
       </section>

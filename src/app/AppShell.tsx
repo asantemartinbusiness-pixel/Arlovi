@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronDown, Menu as MenuIcon, Sparkles, Search, Bell, Inbox
 import { Button, Pill, Row } from "@/design-system";
 import { Menu } from "@/design-system/overlays";
 import { ArloviMark, brand } from "@/app/brand";
+import { foregroundOnBrand } from "@/design-system/brandColor";
 import { NAV_GROUPS, APP_ENTRIES } from "@/app/nav";
 import { appEntry, findScreen, nativeNavPath, screens } from "@/app/catalog";
 import { destinationForOrganization } from "@/app/organizationNavigation";
@@ -282,7 +283,7 @@ export function AppShell() {
           trigger={
             <button type="button" className="hq-orgswitch">
               <span className="ds-sr-only">Switch company, current </span>
-              <span className="hq-orgdot" style={{ background: org.accent }}>{org.shortName.slice(0, 1)}</span>
+              <span className="hq-orgdot" style={{ background: org.accent, color: foregroundOnBrand(org.accent) }}>{org.shortName.slice(0, 1)}</span>
               <span className="name ds-truncate" aria-hidden="true">{org.name}</span>
               <span className="ds-sr-only">{org.name}</span>
               <ChevronDown size={14} />
