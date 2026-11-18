@@ -2,6 +2,7 @@ import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ArrowRight, Building2, ChevronRight, FolderKanban, Grid2X2, Home, Layers, Megaphone, Plus, Users, LockKeyhole, Activity, CheckCircle2, CircleDot, FileText, MessageSquare, Sparkles, Clock3 } from "lucide-react";
 import { ContextualCreate } from "@/app/ContextualCreate";
+const WorkspaceActivity = lazy(() => import("@/app/WorkspaceActivity").then(module => ({ default: module.WorkspaceActivity })));
 const WorkspaceTaskDesk = lazy(() => import("@/app/WorkspaceTaskDesk").then(module => ({ default: module.WorkspaceTaskDesk })));
 const WorkspaceWork = lazy(() => import("@/app/WorkspaceWork").then(module => ({ default: module.WorkspaceWork })));
 const WorkspaceHome = lazy(() => import("@/app/WorkspaceHome").then(module => ({ default: module.WorkspaceHome })));
@@ -100,7 +101,7 @@ function SpaceDetail({ record, kind, all, slug }: { record: Rec; kind: "departme
     {tab === "people" && <div className="ws-stack"><DeferredPanel><CompanyPeople scope={{type:kind,id:record.id,title:record.title}}/></DeferredPanel><WorkList title="AI collaborators" records={agents} slug={slug} fallback="No AI collaborators linked." /></div>}
     {tab === "files" && <DeferredPanel><ResourceLibrary scope={{type:kind,id:record.id,title:record.title}}/></DeferredPanel>}
     {tab === "conversations" && <div className="ws-collaboration"><header className="ws-collaboration-head"><div><span className="ws-detail-kicker">COORDINATION / CONVERSATIONS</span><h2>Conversations that move work.</h2><p>Return to discussions linked to this space or open the Communications application.</p></div><Link to={appEntry("COMMS",slug)}>Open Communications <ArrowRight size={16}/></Link></header><section className="ws-detail-panel"><div className="ws-detail-panel-head"><div><span className="ws-detail-kicker">LINKED DISCUSSIONS</span><h2>Workspace channels</h2></div><span className="ws-collaboration-count">{channels.length} linked</span></div>{channels.length ? <div className="ws-entry-list">{channels.map(channel => <RowLink key={channel.id} title={channel.title} detail={channel.summary || channel.status.replace(/_/g," ")} to={routeForRecord(channel,slug) ?? appEntry("COMMS",slug)} icon={MessageSquare}/>)}</div> : <div className="ws-collaboration-empty"><MessageSquare size={23}/><strong>No linked conversations</strong><p>Discussions linked to this workspace will appear here. You can still start in Communications.</p><Link to={appEntry("COMMS",slug)}>Go to Communications <ArrowRight size={15}/></Link></div>}</section></div>}
-    {tab === "activity" && <div className="ws-stack"><p className="ws-note">Record last updated {new Date(record.updatedAt).toLocaleDateString()}. For the full audit history, open the source record.</p><RowLink title={"Open "+kind+" record"} to={routeForRecord(record,slug) ?? workAreaPath(slug,kind==="department"?"spaces":"work")} /></div>}
+    {tab === "activity" && <DeferredPanel><WorkspaceActivity record={record} linked={[...tasks,...docs,...projects,...channels,...agents]} slug={slug} fallback={workAreaPath(slug,kind==="department"?"spaces":"work")}/></DeferredPanel>}
   </div>;
 }
 
