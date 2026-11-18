@@ -470,7 +470,7 @@ export const hrApp = registerApp({
           render: ({ close, ...context }) => <PeopleFileReference context={context} close={close} />,
           footer: submitFooter("hr-document", "Save reference") },
         { id: "access request", kind: "modal", title: "Request access", width: 520, render: ({ close, ...context }) => <AccessRequest context={context} close={close} />, footer: submitFooter("hr-access", "Send the request") },
-        { id: "offboarding confirmation", kind: "modal", title: "Offboard this person", tone: "danger", width: 640, capability: "edit_people", presentation: { selectedRecord: true, guidance: "Record the departure, verify the handover and identify access that must be revoked outside Arlovi." }, render: ({ close, ...context }) => <OffboardingConfirmation context={context} close={close} /> },
+        { id: "offboarding confirmation", kind: "modal", title: "Offboard this person", tone: "danger", width: 640, capability: "edit_people", presentation: { selectedRecord: true, collection: "employees", guidance: "Record the departure, verify the handover and identify access that must be revoked outside Arlovi." }, render: ({ close, ...context }) => <OffboardingConfirmation context={context} close={close} /> },
       ],
     },
 
