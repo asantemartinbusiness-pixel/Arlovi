@@ -271,7 +271,7 @@ export const procApp = registerApp({
       overlays: [
         { id: "Movement inspector", kind: "drawer", title: "Movement", width: 600, render: ({ ...context }) => <MovementInspector context={context} /> },
         { id: "count reconciliation", kind: "drawer", title: "Count reconciliation", width: 720, render: ({ close, ...context }) => <StockCount context={context} close={close} />, footer: submitFooter("stock-count", "Record variances") },
-        { id: "authorization", kind: "modal", title: "Record a movement", width: 640, render: ({ close, ...context }) => <MovementAuthorization context={context} close={close} />, footer: submitFooter("movement-authorization", "Record movement") },
+        { id: "authorization", kind: "modal", title: "Authorise stock movement", width: 640, presentation: { noRecordContext: true, guidance: "Choose a product, warehouse, signed quantity and reason; confirm how the recorded stock estimate will change." }, render: ({ close, ...context }) => <MovementAuthorization context={context} close={close} /> },
         confirmOverlay,
       ],
     },
