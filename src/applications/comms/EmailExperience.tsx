@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   Archive, ArrowLeft, ArrowRight, AtSign, CheckCheck, ChevronRight, CircleAlert,
   FilePenLine, Inbox, Mail, MailOpen, Plus, Search, Send, Settings2, ShieldCheck,
-  ShieldAlert, Sparkles, Trash2, Users, X,
+  ShieldAlert, Users, X,
 } from "lucide-react";
 import { Avatar, Button, Notice, Pill, Row, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
