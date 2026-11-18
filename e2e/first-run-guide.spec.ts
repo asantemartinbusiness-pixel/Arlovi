@@ -5,15 +5,15 @@ test("new company headquarters has an actionable, truthful and dismissible setup
   await page.goto("/setup");
   await page.getByRole("textbox", { name: "Company name" }).fill(slug);
   await page.getByRole("textbox", { name: "Your name" }).fill("Morgan Smith");
-  for (let stage = 0; stage < 9; stage++) {
+  for (let stage = 0; stage < 3; stage++) {
     await page.getByRole("button", { name: "Continue" }).click();
   }
-  await page.getByRole("button", { name: "Enter headquarters" }).click();
+  await page.getByRole("button", { name: "Create my headquarters" }).click();
   await expect(page).toHaveURL(new RegExp("/o/" + slug + "/workspace/home"));
 
   const guide = page.getByRole("region", { name: "Your company getting started" });
   await expect(guide).toBeVisible();
-  await expect(guide.getByRole("heading", { name: "Welcome to " + slug + "." })).toBeVisible();
+  await expect(guide.getByRole("heading", { name: "Make " + slug + " operational." })).toBeVisible();
   await expect(guide.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "2");
   await expect(guide).toContainText("Specialists start as drafts without model execution");
 

@@ -1,0 +1,44 @@
+/* Company Setup Centre — information architecture borrowed from Executive Home.
+   A review ledger, not a grid of generic dashboard cards. */
+
+.setup-centre{width:min(1190px,100%);padding:clamp(20px,3vw,48px);margin:0 auto;display:flex;flex-direction:column;gap:23px;color:var(--fg-default)}
+.setup-centre-header{display:flex;justify-content:space-between;align-items:end;gap:22px;padding-bottom:22px;border-bottom:1px solid var(--border-default)}
+.setup-centre-header h1{font:500 clamp(31px,3vw,41px)/1.12 var(--font-display,Inter,sans-serif);letter-spacing:-.042em;margin:12px 0}
+.setup-centre-header p{font-size:var(--text-sm,14px);color:var(--fg-muted);line-height:1.65;max-width:65ch;margin:0}
+.setup-centre-eyebrow{font:500 var(--text-2xs,11px) var(--font-mono,monospace);color:var(--fg-subtle);letter-spacing:.08em}
+.setup-centre-back{display:inline-flex;align-items:center;gap:8px;color:var(--fg-default);text-decoration:none;font-size:var(--text-xs,12px);font-weight:600;white-space:nowrap;padding-bottom:5px}
+.setup-centre-back:hover{text-decoration:underline}
+.setup-centre-overview{display:flex;align-items:center;gap:17px;padding:16px 0 23px;border-bottom:1px solid var(--border-default)}
+.setup-centre-overview-icon{display:flex;align-items:center;justify-content:center;flex:none;width:42px;height:42px;border:2px solid var(--fg-default);border-radius:var(--radius-md,10px);color:var(--fg-default);background:var(--bg-surface);font-size:17px;font-weight:600}
+.setup-centre-overview-copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:5px}
+.setup-centre-overview-copy strong{font:500 var(--text-xl,20px) var(--font-display,Inter,sans-serif);letter-spacing:-.03em;overflow-wrap:anywhere}
+.setup-centre-overview-copy span,.setup-centre-overview-stat span{font-size:var(--text-xs,12px);color:var(--fg-muted)}
+.setup-centre-overview-stat{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.setup-centre-overview-stat strong{font:500 var(--text-xl,20px) var(--font-display,Inter,sans-serif);font-variant-numeric:tabular-nums}
+.setup-centre-guidance,.setup-centre-boundary{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-subtle);background:transparent}
+.setup-centre-guidance svg,.setup-centre-boundary svg{flex:none;color:var(--fg-subtle);margin-top:2px}
+.setup-centre-guidance strong{font-size:var(--text-sm,14px);font-weight:600}
+.setup-centre-guidance p,.setup-centre-boundary p{font-size:var(--text-xs,12px);line-height:1.6;color:var(--fg-muted);margin:5px 0 0}
+.setup-centre-grid{display:flex;flex-direction:column;border-top:1px solid var(--border-strong);margin-top:9px}
+.setup-centre-card{display:grid;grid-template-columns:27px 38px minmax(0,1.35fr) minmax(150px,.75fr) 18px;align-items:center;gap:18px;min-height:94px;padding:17px 8px;border-bottom:1px solid var(--border-default);color:var(--fg-default);text-decoration:none;background:transparent}
+.setup-centre-card:hover{background:var(--bg-hover)}
+.setup-centre-card:focus-visible{outline:2px solid var(--focus-ring,var(--fg-default));outline-offset:2px}
+.setup-centre-card-number{align-self:start;padding-top:4px;font:500 var(--text-2xs,11px) var(--font-mono,monospace);color:var(--fg-subtle)}
+.setup-centre-card-icon{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border:1px solid var(--border-default);border-radius:var(--radius-md,10px);background:var(--bg-surface);color:var(--fg-default)}
+.setup-centre-card-main{display:flex;flex-direction:column;gap:6px;min-width:0}
+.setup-centre-card-main h2{font:500 var(--text-lg,17px)/1.3 var(--font-display,Inter,sans-serif);letter-spacing:-.02em;margin:0}
+.setup-centre-card-main p{font-size:var(--text-xs,12px);color:var(--fg-muted);line-height:1.5;margin:0;max-width:55ch}
+.setup-centre-card-meta{display:flex;flex-direction:column;gap:8px;min-width:0;align-items:flex-start}
+.setup-centre-state{display:flex;align-items:center;gap:6px;font-size:var(--text-2xs,11px);font-weight:600;color:var(--fg-muted)}
+.setup-centre-state[data-state=ready]{color:var(--success)}
+.setup-centre-card-detail{font-size:var(--text-xs,12px);line-height:1.45;color:var(--fg-muted)}
+.setup-centre-card-arrow{color:var(--fg-subtle)}
+.setup-centre-footer{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:22px 0;border-top:1px solid var(--border-strong)}
+.setup-centre-footer strong{font-size:var(--text-sm,14px);font-weight:600}
+.setup-centre-footer p{font-size:var(--text-xs,12px);line-height:1.55;color:var(--fg-muted);margin:6px 0 0}
+.setup-centre-footer-links{display:flex;flex-wrap:wrap;gap:18px;font-size:var(--text-xs,12px);font-weight:600}
+.setup-centre-footer-links a{color:var(--fg-default);text-decoration:underline;text-underline-offset:3px}
+@media(max-width:930px){.setup-centre-card{grid-template-columns:24px 34px minmax(0,1fr) minmax(130px,.7fr) 16px;gap:11px}.setup-centre-header{align-items:flex-start}}
+@media(max-width:720px){.setup-centre{padding:20px 16px}.setup-centre-header,.setup-centre-footer{flex-direction:column;align-items:flex-start}.setup-centre-card{grid-template-columns:23px 35px minmax(0,1fr) 17px;min-height:100px;gap:12px}.setup-centre-card-number{grid-row:1}.setup-centre-card-icon{grid-row:1}.setup-centre-card-main{grid-column:3;grid-row:1}.setup-centre-card-meta{grid-column:3;grid-row:2;flex-direction:row;align-items:center;flex-wrap:wrap;gap:9px}.setup-centre-card-arrow{grid-column:4;grid-row:1 / 3}.setup-centre-overview{flex-wrap:wrap}.setup-centre-overview-stat{align-items:flex-start;margin-left:59px}}
+@media(max-width:420px){.setup-centre-card{grid-template-columns:18px 31px minmax(0,1fr) 16px;gap:9px;padding:16px 0}.setup-centre-card-icon{width:31px;height:31px}.setup-centre-overview-stat{margin-left:0;width:100%}}
+@media(prefers-reduced-motion:no-preference){.setup-centre-card{transition:background-color .14s ease}}
