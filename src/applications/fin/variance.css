@@ -1,0 +1,59 @@
+/* Finance: the variance explanation is a decision record, not a long form. */
+.fin-variance-flow { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.fin-variance-overview {
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-inset);
+}
+.fin-variance-overview-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  flex-wrap: wrap; gap: var(--space-3); padding-block-end: var(--space-4);
+}
+.fin-variance-eyebrow {
+  display: block; color: var(--fg-subtle); font-size: var(--text-2xs);
+  font-weight: 500; text-transform: uppercase; letter-spacing: var(--tracking-label);
+}
+.fin-variance-account {
+  display: block; margin-block-start: var(--space-1);
+  font-size: var(--text-lg); font-weight: 500; line-height: 1.3;
+  color: var(--fg-strong); overflow-wrap: anywhere;
+}
+.fin-variance-period {
+  font-size: var(--text-xs); color: var(--fg-muted);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-default); border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+}
+.fin-variance-metrics {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px; border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); overflow: hidden;
+  background: var(--border-subtle);
+}
+.fin-variance-metric {
+  display: flex; flex-direction: column; align-items: flex-start;
+  min-width: 0; gap: var(--space-2);
+  padding: var(--space-4); background: var(--bg-surface);
+}
+.fin-variance-metric-label {
+  font-size: var(--text-xs); color: var(--fg-subtle); font-weight: 500;
+}
+.fin-variance-metric-value {
+  font-size: var(--text-lg); font-weight: 500;
+  color: var(--fg-strong); font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.fin-variance-metric .ds-pill { max-width: 100%; }
+.fin-variance-change { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.fin-variance-note { padding-block-end: var(--space-3); }
+.fin-variance-note .ds-field { max-width: none; }
+.fin-variance-status { font-size: var(--text-xs); color: var(--fg-muted); margin-inline-start: auto; }
+@media (max-width: 599px) {
+  .fin-variance-overview { padding: var(--space-4); }
+  .fin-variance-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fin-variance-metric:last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 350px) {
+  .fin-variance-metrics { grid-template-columns: 1fr; }
+  .fin-variance-metric:last-child { grid-column: auto; }
+}
