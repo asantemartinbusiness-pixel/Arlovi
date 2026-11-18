@@ -18,3 +18,16 @@
 .ws-agent-note{display:flex;gap:8px;align-items:start;font-size:var(--text-sm);line-height:1.55;color:var(--fg-muted)}.ws-agent-note svg{flex:none;margin-top:2px}.ws-agent-note a{color:inherit;text-decoration:underline}
 .ws-agent-error{color:var(--danger);font-size:var(--text-sm)}
 @media(max-width:599px){.ws-agent-form{flex-direction:column;align-items:stretch}.ws-agent-form label{min-width:0;width:100%;flex:auto}.ws-agent-row{align-items:stretch}.ws-agent-actions{width:100%}.ws-agent-actions>*{flex:1}}
+
+.ws-agent-heading{padding:var(--space-5);border:1px solid var(--border-default);border-left:4px solid var(--accent);border-radius:var(--radius-lg);background:var(--bg-surface)}
+.ws-agent-heading h2{font:500 clamp(24px,2.7vw,34px)/1.15 var(--font-display);letter-spacing:-.035em;margin-top:var(--space-2)}
+.ws-agent-eyebrow{font:500 var(--text-xs) var(--font-mono);letter-spacing:.075em;color:var(--fg-muted)}
+.ws-agent-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-3)}
+.ws-agent-overview>div{display:flex;flex-direction:column;gap:var(--space-2);padding:var(--space-4);border:1px solid var(--border-default);border-radius:var(--radius-lg);background:var(--bg-surface)}
+.ws-agent-overview span,.ws-agent-overview small{font-size:var(--text-xs);color:var(--fg-muted)}
+.ws-agent-overview strong{font:500 clamp(24px,2.7vw,34px) var(--font-display);font-variant-numeric:tabular-nums}
+.ws-agent-empty{display:flex;gap:var(--space-3);align-items:center;padding:var(--space-4);background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-lg)}
+.ws-agent-empty>svg{color:var(--fg-muted);flex:none}.ws-agent-empty strong{font-size:var(--text-sm)}.ws-agent-empty p{font-size:var(--text-xs);color:var(--fg-muted);margin-top:5px}
+.ws-agent-previous-toggle{display:flex;gap:var(--space-2);align-items:center;justify-content:space-between;width:100%;min-height:48px;padding:var(--space-3) var(--space-4);background:transparent;color:var(--fg-default);border:0;font:500 var(--text-sm) var(--font-sans);cursor:pointer;text-align:left}
+.ws-agent-previous-toggle span{font-size:var(--text-xs);color:var(--fg-muted)}.ws-agent-previous-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+@media(max-width:680px){.ws-agent-overview{grid-template-columns:1fr}.ws-agent-heading{padding:var(--space-4)}}
