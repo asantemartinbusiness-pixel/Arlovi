@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { checkDraft, draftInput, draftRecord } from "@/applications/comms/mailbox";
 import { addComposeRecipient, contactQuery, documentSuggestions, findComposeContacts, insertComposeLink, safeComposeLink } from "@/applications/comms/composeTools";
 import type { Rec } from "@/domain/types";
 const make = (id: string, title: string, email: string, collection = "contacts"): Rec =>
@@ -22,6 +23,13 @@ describe("email composer workspace tools", () => {
     expect(safeComposeLink("https://example.com/path")).toBe("https://example.com/path");
     expect(insertComposeLink("Hello", "https://example.com")).toBe("Hello\n\nhttps://example.com/");
     expect(insertComposeLink("Hello", "file:///etc/passwd")).toBe("Hello");
+  });
+  it("preserves blind-carbon-copy addresses in local draft records", () => {
+    const input = { to: "one@example.com", cc: "", bcc: "private@example.com", subject: "Hello", body: "Body" };
+    const record = draftRecord(input, "sender@example.com", "2026-11-18T15:00:00Z");
+    expect(record.fields.bcc).toBe("private@example.com");
+    expect(checkDraft(input).recipients).toBe(2);
+    expect(draftInput({ ...record, id: "draft", collection: "emailThreads" } as unknown as Rec).bcc).toBe("private@example.com");
   });
   it("returns document metadata references without inventing downloadable attachments", () => {
     const docs = [make("d1", "Invoice 100", "", "documents"), make("d2", "Archived quote", "", "documents")];
