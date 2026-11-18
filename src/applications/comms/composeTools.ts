@@ -37,7 +37,7 @@ export type ComposeReference = { id: string; title: string; collection: string }
 
 export function documentSuggestions(records: Rec[], query: string, limit = 8): ComposeReference[] {
   const q = query.trim().toLowerCase();
-  return records.filter((row) => row.status !== "archived" && row.title.toLowerCase().includes(q))
+  return records.filter((row) => row.status !== "archived" && row.fields.confidential !== true && row.title.toLowerCase().includes(q))
     .slice(0, limit).map((row) => ({ id: row.id, title: row.title, collection: row.collection }));
 }
 
@@ -51,4 +51,17 @@ export function safeComposeLink(raw: string): string | null {
 export function insertComposeLink(body: string, url: string): string {
   const safe = safeComposeLink(url);
   return safe ? [body.trimEnd(), safe].filter(Boolean).join("\n\n") : body;
+}
+
+/** The current browser-local record schema supports only scalar fields. */
+export function parseComposeReferences(value: unknown): ComposeReference[] {
+  if (typeof value !== "string") return [];
+  try {
+    const data: unknown = JSON.parse(value);
+    if (!Array.isArray(data)) return [];
+    return data.filter((row): row is ComposeReference =>
+      typeof row === "object" && row !== null &&
+      typeof row.id === "string" && typeof row.title === "string" && typeof row.collection === "string"
+    ).slice(0, 20);
+  } catch { return []; }
 }
