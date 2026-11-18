@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button, Field, Notice, Pill, Row, Select, Stack, TextInput } from "@/design-system";
 import { wallMs } from "@/platform/clock";
 import {
@@ -12,6 +13,18 @@ import type { AppModel, Entity, ScreenComponent } from "./model";
  * the form does). Changes save through the inspector's onEdit, like every
  * other component setting.
  * ====================================================================== */
+
+/** A typed comparison value is saved when the field loses focus or Enter is pressed, not on every keystroke. */
+function FilterValueInput({ label, value, type, onCommit }: { label: string; value: string; type: string; onCommit: (value: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  const commit = () => { if (draft !== value) onCommit(draft); };
+  return (
+    <TextInput aria-label={label} value={draft} type={type}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commit(); } }} />
+  );
+}
 
 export function BindingEditor({ component, entity, model, screenId, onEdit }: {
   component: ScreenComponent; entity: Entity; model: AppModel; screenId: string;
@@ -52,7 +65,7 @@ export function BindingEditor({ component, entity, model, screenId, onEdit }: {
                     <option value="">Choose</option>
                     {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
                   </Select>
-                  : <TextInput aria-label={`Filter ${index + 1} value`} value={filter.value} type={field?.kind === "date" ? "date" : "text"} onChange={(event) => setFilter(filter.id, { value: event.target.value })} />;
+                  : <FilterValueInput key={`${filter.id}-${filter.value}`} label={`Filter ${index + 1} value`} value={filter.value} type={field?.kind === "date" ? "date" : "text"} onCommit={(value) => setFilter(filter.id, { value })} />;
               })()}
               <Button size="sm" variant="ghost" aria-label={`Remove filter ${index + 1}`} onClick={() => onEdit({ filters: component.filters.filter((item) => item.id !== filter.id) })}>Remove</Button>
             </div>

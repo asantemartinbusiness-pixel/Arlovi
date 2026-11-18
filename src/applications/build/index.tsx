@@ -17,7 +17,7 @@ import {
   IntegrationsScreen, MigrationPanel, MonitorScreen, ProjectLibrary,
   ProjectSetupForm, ReleaseApproval, TestsScreen,
 } from "./panels";
-import { saveApp, useBuildUi } from "./state";
+import { editComponent, saveApp, useBuildUi } from "./state";
 import {
   ConfigInspector, EditFileForm, importRepository, EventInspector, SafeCommandPanel, TraceInspector, addComponent, approveFix, askEngineer,
   attachIntegration, branchProject, commitChange, configureProvider, createIncident, deployFunctions, editStyles,
@@ -44,10 +44,7 @@ function ComponentInspectorOverlay({ context }: { context: ScreenContext }) {
     <ComponentInspector
       component={component}
       model={model}
-      onEdit={(patch) => void saveApp(context, record, {
-        ...model,
-        screens: model.screens.map((item) => (item.id === screen!.id ? { ...item, components: item.components.map((entry) => (entry.id === component.id ? { ...entry, ...patch } : entry)) } : item)),
-      }, `Edited ${component.title}`)}
+      onEdit={(patch) => void editComponent(context, record.id, component.id, patch, `Edited ${component.title}`)}
     />
   );
 }
