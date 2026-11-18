@@ -207,9 +207,9 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
       try {
         if (idRef.current) {
           const previous = existing && existing.id === idRef.current ? existing : undefined;
-          await context.mutate.patch(idRef.current, { ...draftRecord(value, from, at, previous), fields: { ...draftRecord(value, from, at, previous).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderVerified: false } }, { event: `Email draft updated by ${context.actor}` });
+          await context.mutate.patch(idRef.current, { ...draftRecord(value, from, at, previous), fields: { ...draftRecord(value, from, at, previous).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderSignature: identity?.signature ?? "", senderVerified: false } }, { event: `Email draft updated by ${context.actor}` });
         } else {
-          const created = await context.mutate.create({ collection: "emailThreads", tags: ["draft"], ...{ ...draftRecord(value, from, at), fields: { ...draftRecord(value, from, at).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderVerified: false } } }, `Email draft saved by ${context.actor}`);
+          const created = await context.mutate.create({ collection: "emailThreads", tags: ["draft"], ...{ ...draftRecord(value, from, at), fields: { ...draftRecord(value, from, at).fields, senderIdentityId: identity?.id ?? "", senderDisplayName: identity?.name ?? context.actor, senderSignature: identity?.signature ?? "", senderVerified: false } } }, `Email draft saved by ${context.actor}`);
           idRef.current = created.id;
         }
         setSavedAt(at);
