@@ -14,6 +14,7 @@ import { SAFETY_SCORE, activationBlockers, assertionsOf, latestRunFor, runScenar
 import type { Rec } from "@/domain/types";
 import { clockIso } from "@/platform/clock";
 import { AssignmentHistory, ContractEditor, ExecutionAvailabilityCard } from "./ContractPanels";
+import { AgentTeamForm, AgentTeamsOf, AgentTeamsOrgCard, AgentTeamsSection } from "./AgentTeamsPanels";
 
 /* ====================================================================== *
  * TEAM — AI Workforce & Agent Academy
@@ -233,6 +234,8 @@ function AgentDirectory({ context, view }: { context: ScreenContext; view: "All"
   }
 
   return (
+    <Stack gap={5}>
+    {view === "All" && <AgentTeamsSection context={context} agents={data.agents} />}
     <Grid>
       {rows.map((agent) => {
         const body = agentBody(agent);
@@ -269,7 +272,14 @@ function AgentDirectory({ context, view }: { context: ScreenContext; view: "All"
         );
       })}
     </Grid>
+    </Stack>
   );
+}
+
+function AgentTeamFormHost({ context, close }: { context: ScreenContext; close: () => void }) {
+  const data = useWorkforce();
+  const people = data.members.filter((member) => member.fields.kind !== "ai").map((member) => member.title).sort();
+  return <AgentTeamForm context={context} close={close} agents={data.agents} people={people} />;
 }
 
 /* ---------------------------- TEAM-003 ---------------------------- */
@@ -392,6 +402,7 @@ function AgentProfile({ context, view }: { context: ScreenContext; view: "Overvi
             { label: "Spend ceiling", value: context.money(Number(agent.fields.spendCapMinor ?? 0)) },
             { label: "Model", value: <Pill tone="warning">Not connected</Pill> },
             { label: "Permitted actions", value: String((body.authority ?? []).length) },
+            { label: "Agent teams", value: <AgentTeamsOf agentId={agent.id} /> },
           ]} />
         </Stack>
       </Card>
@@ -809,6 +820,7 @@ function TeamOrgChart({ context, view }: { context: ScreenContext; view: "Hierar
           })}
         </Grid>
       )}
+      <AgentTeamsOrgCard context={context} agents={data.agents} />
       <Notice tone="info" title="A reporting line does not grant data rights">
         An AI employee reporting into a department does not gain that department's confidential sources. Grants are recorded on the knowledge policy, and they do not cross between legal entities.
       </Notice>
@@ -2365,6 +2377,7 @@ export const teamApp = registerApp({
         { id: "Agent quick view", kind: "drawer", title: "AI employee", width: 480, render: ({ ...context }) => <QuickProfile context={context} /> },
         { id: "assignment", kind: "modal", title: "Assign work", width: 560, render: ({ close, ...context }) => <AgentAssignment context={context} close={close} /> },
         { id: "archive confirmation", kind: "modal", title: "Archive this contract", tone: "danger", width: 560, render: ({ close, ...context }) => <ArchiveConfirmation context={context} close={close} /> },
+        { id: "agent team", kind: "modal", title: (context) => ((context.overlayPayload as { id?: string } | undefined)?.id ? "Edit agent team" : "New agent team"), width: 600, render: ({ close, ...context }) => <AgentTeamFormHost context={context} close={close} /> },
       ],
     },
 
