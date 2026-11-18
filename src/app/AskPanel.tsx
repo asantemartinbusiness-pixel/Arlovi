@@ -48,7 +48,7 @@ export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string 
   const navigate = useNavigate();
   const location = useLocation();
   const context = workspaceDestination(location.pathname)?.title ?? findScreen(location.pathname)?.screen.applicationName ?? "Workspace";
-  const { org, now, relative } = useWorkspace();
+  const { org, relative } = useWorkspace();
   const records = useOrgRecords();
   const [prompt, setPrompt] = useState(seed);
   const historyKey = `arlovi-ask-history:${org.id}`;
@@ -73,7 +73,7 @@ export function AskPanel({ onClose, seed }: { onClose: () => void; seed: string 
     if (!question) return;
     const reply = localAssistantReply(records, org.id, question);
     const cited = records
-      .filter((record) => reply.text.includes(record.title))
+      .filter((record) => record.organizationId === org.id && reply.citations.some((source) => source.id === record.id))
       .slice(0, 4)
       .map((record) => ({ id: record.id, title: record.title, route: routeForRecord(record, org.slug) }));
     const updatedAt = new Date().toISOString();
