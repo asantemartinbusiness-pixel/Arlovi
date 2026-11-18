@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowUpRight, Bookmark, BookmarkCheck, Clock3, Search, X } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Bookmark, BookmarkCheck, Clock3, Grid2X2, LayoutList, Search, Sparkles, X } from "lucide-react";
 import { platformDestinations } from "@/app/platformDirectory";
 import { growthDestinations } from "@/app/growthDirectory";
 import { CATEGORY_OVERVIEWS, categoryDestinations } from "@/app/categoryDirectory";
@@ -80,15 +80,16 @@ function ApplicationCard({
   const Icon = app.icon;
   const shortcuts = !focused ? [] : platform ? platformDestinations(app.code, slug)
     : growth ? growthDestinations(app.code, slug) : categoryDestinations(app.code, slug);
-  return <article className="apps-directory-card" data-platform={platform ? "true" : undefined}
+  return <article className="apps-directory-card" data-category={app.group.toLowerCase()} data-platform={platform ? "true" : undefined}
     data-growth={growth ? "true" : undefined} data-workareas={shortcuts.length ? "true" : undefined}>
     <Link className="apps-directory-open" to={appEntry(app.code, slug)} aria-label={app.short}>
       <span className="apps-directory-icon"><Icon size={20} strokeWidth={1.8} aria-hidden="true" /></span>
       <span className="apps-directory-copy">
+        <span className="apps-directory-card-label">{app.group} / Native application</span>
         <strong>{app.short}</strong>
         <span className="apps-directory-description">{app.purpose}</span>
       </span>
-      <ArrowUpRight size={16} className="apps-directory-arrow" aria-hidden="true" />
+      <span className="apps-directory-card-action">Open application <ArrowUpRight size={14} aria-hidden="true" /></span>
     </Link>
     <button className="apps-directory-pin" type="button" aria-label={(pinned ? "Unpin " : "Pin ") + app.short}
       aria-pressed={pinned} title={pinned ? "Remove from favourites" : "Pin to favourites"}
@@ -131,12 +132,14 @@ export function AppsDirectory() {
   const query = params.get("q") ?? "";
   const requestedGroup = params.get("category") ?? "All";
   const group = NAV_GROUPS.some(item => item.label === requestedGroup) ? requestedGroup : "All";
+  const compactView = params.get("view") === "compact";
+  const pinnedOnly = params.get("saved") === "1";
 
   const available = useMemo(() => DIRECTORY_APPS.filter(app => canOpen(role, app.code)), [role]);
-  const visible = useMemo(() => findDirectoryApps(available, query, group), [available, query, group]);
   const favourites = useMemo(() => new Set(preferences
     .filter(pref => pref.fields.pinned === true)
     .map(pref => String(pref.fields.app))), [preferences]);
+  const visible = useMemo(() => findDirectoryApps(available, query, group).filter(app => !pinnedOnly || favourites.has(app.short)), [available, query, group, pinnedOnly, favourites]);
   const pinnedApps = available.filter(app => favourites.has(app.short));
   const recentApps = useMemo(() => {
     const used = new Set<string>();
@@ -153,7 +156,7 @@ export function AppsDirectory() {
     return result;
   }, [navigation.recent, org.slug, available]);
 
-  function setFilter(key: "category" | "q", value: string) {
+  function setFilter(key: "category" | "q" | "view" | "saved", value: string) {
     // Read the latest browser URL, not a render's captured searchParams.
     // Fast clear-search -> choose-category interactions can otherwise restore
     // the previous query and show a misleading empty directory.
@@ -187,7 +190,19 @@ export function AppsDirectory() {
     }
   }
 
-  return <div className="apps-directory" aria-label="Native applications">
+  return <div className="apps-directory" data-view={compactView ? "compact" : "cards"} aria-label="Native applications">
+    <section className="apps-directory-summary" aria-label="Applications overview">
+      <div className="apps-directory-summary-copy">
+        <span className="apps-directory-summary-kicker"><Sparkles size={13} aria-hidden="true" /> YOUR COMPANY TOOLKIT</span>
+        <strong>Everything you need, exactly where you work.</strong>
+        <p>Open an application, return to recent work, or save the tools you use most. All within {org.name}.</p>
+      </div>
+      <div className="apps-directory-summary-stats" aria-label="Your applications">
+        <span><strong>{available.length}</strong><small>Available</small></span>
+        <span><strong>{pinnedApps.length}</strong><small>Favourites</small></span>
+        <span><strong>{recentApps.length}</strong><small>Recently used</small></span>
+      </div>
+    </section>
     <div className="apps-directory-toolbar">
       <label className="ws-app-search">
         <Search size={18} aria-hidden="true" />
@@ -198,9 +213,13 @@ export function AppsDirectory() {
         {query && <button className="apps-directory-clear" type="button" onClick={() => setFilter("q", "")}
           aria-label="Clear application search"><X size={16} aria-hidden="true"/></button>}
       </label>
-      <span className="apps-directory-count" aria-live="polite">
-        {visible.length} of {available.length} applications in this role view
-      </span>
+      <div className="apps-directory-view-controls">
+        <span className="apps-directory-count" aria-live="polite">{visible.length} of {available.length} applications</span>
+        <div className="apps-directory-view-toggle" role="group" aria-label="Application display">
+          <button type="button" aria-label="Card view" aria-pressed={!compactView} onClick={() => setFilter("view", "")} title="Card view"><Grid2X2 size={16} /></button>
+          <button type="button" aria-label="Compact list view" aria-pressed={compactView} onClick={() => setFilter("view", "compact")} title="Compact list view"><LayoutList size={16} /></button>
+        </div>
+      </div>
     </div>
 
     <nav className="apps-directory-categories" aria-label="Application categories">
@@ -213,9 +232,13 @@ export function AppsDirectory() {
           {category}<span aria-hidden="true">{count}</span>
         </button>;
       })}
+      <button type="button" className="apps-directory-favourites-filter" aria-pressed={pinnedOnly}
+        onClick={() => setFilter("saved", pinnedOnly ? "" : "1")}>
+        <Bookmark size={14} aria-hidden="true" /> Favourites <span aria-hidden="true">{pinnedApps.length}</span>
+      </button>
     </nav>
 
-    {group !== "All" && !query && visible.length > 0 && CATEGORY_OVERVIEWS[group] && (
+    {group !== "All" && !query && !pinnedOnly && visible.length > 0 && CATEGORY_OVERVIEWS[group] && (
       <section className="apps-platform-intro" aria-label={`${group} application overview`}>
         <div>
           <span className="apps-platform-kicker">{CATEGORY_OVERVIEWS[group].kicker}</span>
@@ -228,16 +251,16 @@ export function AppsDirectory() {
       </section>
     )}
 
-    {!query && group === "All" && (pinnedApps.length > 0 || recentApps.length > 0) && (
+    {!query && !pinnedOnly && group === "All" && (pinnedApps.length > 0 || recentApps.length > 0) && (
       <div className="apps-directory-continuity">
         {pinnedApps.length > 0 && <section className="ws-section" aria-label="Pinned applications">
-          <h2><Bookmark size={17} aria-hidden="true"/> Pinned</h2>
+          <div className="apps-directory-section-header"><h2><Bookmark size={17} aria-hidden="true"/> Your favourites</h2><span>One-click access</span></div>
           <div className="apps-directory-shortcuts">
             {pinnedApps.map(app => <AppShortcut key={app.code} app={app} slug={org.slug}/>)}
           </div>
         </section>}
         {recentApps.length > 0 && <section className="ws-section" aria-label="Recently used applications">
-          <h2><Clock3 size={17} aria-hidden="true"/> Recently used</h2>
+          <div className="apps-directory-section-header"><h2><Clock3 size={17} aria-hidden="true"/> Pick up where you left off</h2><span>Recent applications</span></div>
           <div className="apps-directory-shortcuts">
             {recentApps.map(app => <AppShortcut key={app.code} app={app} slug={org.slug}/>)}
           </div>
@@ -249,10 +272,10 @@ export function AppsDirectory() {
     {visible.length === 0
       ? <section className="apps-directory-empty" aria-label="No applications found">
           <h2>No applications found</h2>
-          <p>Try an application name, a capability such as invoices or documents, or another category.</p>
+          <p>{pinnedOnly && pinnedApps.length === 0 ? "Save an application using its bookmark icon and it will appear here." : "Try an application name, a capability such as invoices or documents, or another category."}</p>
           <button type="button" onClick={() => {
             const next = new URLSearchParams(window.location.search);
-            next.delete("q"); next.delete("category"); setParams(next, { replace: true });
+            next.delete("q"); next.delete("category"); next.delete("saved"); setParams(next, { replace: true });
           }}>Show all available applications</button>
         </section>
       : NAV_GROUPS.map(category => {
@@ -261,7 +284,8 @@ export function AppsDirectory() {
           return <section className="ws-section apps-directory-group" key={category.label}
             aria-label={category.label + " applications"}>
             <div className="apps-directory-group-heading">
-              <h2>{category.label}</h2><span>{items.length} {items.length === 1 ? "application" : "applications"}</span>
+              <div><span className="apps-directory-group-overline">APPLICATION COLLECTION</span><h2>{category.label}</h2></div>
+              <span>{items.length} {items.length === 1 ? "application" : "applications"} <ArrowRight size={14} aria-hidden="true" /></span>
             </div>
             <div className="apps-directory-grid">
               {items.map(app => <ApplicationCard key={app.code} app={app} slug={org.slug}
