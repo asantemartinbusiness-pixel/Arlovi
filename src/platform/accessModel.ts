@@ -36,6 +36,7 @@ export interface AccessResource {
   screenId?: string;
   id?: string;
   ownerId?: string;
+  submittedById?: string;
   assigneeIds?: string[];
   teamId?: string;
   departmentId?: string;
@@ -121,6 +122,8 @@ export function evaluateAccess(query: AccessQuery, grants: readonly AccessGrant[
     return { outcome: "deny", reason: "No active authenticated identity.", matchedGrantIds: [] };
   if (principal.orgId !== resource.orgId)
     return { outcome: "deny", reason: "Access cannot cross organisation boundaries.", matchedGrantIds: [] };
+  if (query.action === "approve" && resource.submittedById && resource.submittedById === principal.id)
+    return { outcome: "deny", reason: "An actor cannot approve their own submitted transaction.", matchedGrantIds: [] };
   const now = query.now ?? clockNow();
   const matched = grants.filter(g => isTargetMatch(g, query, now));
   const denial = matched.filter(g => g.effect === "deny");
@@ -128,6 +131,8 @@ export function evaluateAccess(query: AccessQuery, grants: readonly AccessGrant[
   const allowed = matched.filter(g => g.effect === "allow"
     && LEVEL[resource.classification] <= LEVEL[g.maxClassification ?? "internal"]);
   if (!allowed.length) return { outcome: "deny", reason: "No matching grant for this resource and action.", matchedGrantIds: [] };
+  if (principal.kind === "ai_agent" && ["approve","publish","delete","manage_credentials"].includes(query.action))
+    return { outcome: "approval_required", reason: "An AI employee needs separate human authorisation for high-impact actions.", matchedGrantIds: allowed.map(g => g.id) };
   const direct = allowed.filter(g => {
     const withinAmount = query.amountMinor === undefined || g.maxAmountMinor === undefined
       || query.amountMinor <= g.maxAmountMinor;
