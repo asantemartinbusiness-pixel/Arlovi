@@ -97,6 +97,46 @@ registerSeed("it", (context) => {
         fields: { kind: "release", environment: "workspace", gates: "labels, options and branches clear" },
       }),
       context.rec({
+        org: "nl", collection: "it_changes", n: 20, title: "Move the showroom diary to the shared calendar",
+        status: "submitted", owner: "Maya Chen",
+        summary: "Export bookings as ICS and import them into the shared studio calendar.",
+        at: iso(2), createdAt: iso(2),
+        fields: {
+          requestedBy: "Maya Chen", scope: "team", reversible: true, tested: false, target: "remote",
+          plan: "Export bookings as ICS and import them into the shared studio calendar.",
+          rollbackPlan: "Delete the imported events; the bookings remain the source in this workspace.",
+          window: iso(-3).slice(0, 10), risk: "medium", riskScore: 2,
+        },
+      }),
+      context.rec({
+        org: "nl", collection: "it_changes", n: 21, title: "Turn on the retention policy for trade applications",
+        status: "draft", owner: "Maya Chen",
+        summary: "Apply the 540-day retention period to the trade application form.",
+        at: iso(1), createdAt: iso(1),
+        fields: {
+          requestedBy: "Maya Chen", scope: "workspace", reversible: true, tested: true, target: "local",
+          plan: "Apply the 540-day retention period to the trade application form.", rollbackPlan: "", window: "",
+        },
+      }),
+      context.rec({
+        org: "nl", collection: "it_assets", n: 20, title: "northline.co.uk domain", status: "active", owner: "Maya Chen",
+        summary: "Registered with an external registrar.", createdAt: iso(40),
+        fields: { kind: "domain", location: "remote", owner: "Maya Chen", verifiedAt: iso(20), verifiedBy: "Maya Chen", verifiedNote: "Registrar shows renewal due next spring." },
+        body: { config: [{ key: "registrar", value: "External, not connected" }, { key: "auto_renew", value: "on" }] },
+      }),
+      context.rec({
+        org: "nl", collection: "it_assets", n: 21, title: "Showroom laptop", status: "active", owner: "Ada Fernsby",
+        summary: "Used for the showroom diary and counter.", createdAt: iso(40),
+        fields: { kind: "device", location: "remote", owner: "Ada Fernsby" },
+        body: { config: [{ key: "disk_encryption", value: "unknown" }, { key: "os", value: "unknown" }] },
+      }),
+      context.rec({
+        org: "nl", collection: "it_assets", n: 22, title: "Workspace backup policy", status: "active", owner: "Maya Chen",
+        summary: "How often the workspace is exported from this browser.", createdAt: iso(40),
+        fields: { kind: "configuration", location: "local", owner: "Maya Chen" },
+        body: { config: [{ key: "frequency", value: "weekly" }, { key: "keep", value: "4 exports" }] },
+      }),
+      context.rec({
         org: "hb", collection: "incidents", n: 20, title: "INC-4 Counter orders cannot take a card",
         status: "open", owner: "Elena Ward",
         summary: "Orders are held as awaiting payment. No processor is connected, which is correct but leaves the counter reconciling by hand.",
