@@ -10,6 +10,7 @@ import { CAPABILITY_LABELS, CAPABILITY_TONE, PROVIDER_CAPABILITIES } from "@/pla
 import { can as roleCan, ROLE_LABELS, type Capability } from "@/platform/policy";
 import type { Rec, Role } from "@/domain/types";
 import { AccessRequests, EffectiveAccess } from "./access";
+import { AccessWorkspace } from "./AccessWorkspace";
 import {
   appsForRole, CAPABILITIES, capabilityLabel, csvCell, csvList, ofKind, ROLES, RoleReach, StepUp,
   useAdmin, useOrganisationRecord, useSeeded, useSeededList,
@@ -693,16 +694,7 @@ export function RolesScreen({ context, tab }: { context: ScreenContext; tab: "Ro
   if (tab === "Roles") {
     return (
       <Stack gap={4}>
-        <Grid>
-          {ROLES.map((role) => {
-            const holders = data.members.filter((member) => member.fields.role === role);
-            return (
-              <Card key={role} eyebrow="ROLE VIEW" prov="posted" span={4} title={ROLE_LABELS[role]} subtitle={`${holders.length} ${holders.length === 1 ? "holder" : "holders"} · built in`}>
-                <RoleReach role={role} />
-              </Card>
-            );
-          })}
-        </Grid>
+        <AccessWorkspace />
         <Card eyebrow="CUSTOM ROLES" prov="human" title={`Custom roles · ${custom.length}`} subtitle="Narrower views defined in this workspace" flush>
           <DataGrid
             rows={custom}
@@ -750,7 +742,7 @@ export function RolesScreen({ context, tab }: { context: ScreenContext; tab: "Ro
     );
   }
 
-  if (tab === "Effective access") return <EffectiveAccess context={context} />;
+  if (tab === "Effective access") return <Stack gap={4}><AccessWorkspace detailed /><EffectiveAccess context={context} /></Stack>;
 
   const exceptions = custom.filter((role) => csvList(role.fields.deny).length > 0 || role.status === "draft");
   return (
