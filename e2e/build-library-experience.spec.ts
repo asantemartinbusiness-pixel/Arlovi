@@ -102,10 +102,10 @@ test("Build API, access, integration and monitoring pages provide scoped status"
   });
   const main = page.locator("#main");
   await page.goto(`/o/northline/build/projects/${id}/api`);
-  await expect(main.getByLabel("API contract overview")).toBeVisible();
+  await expect(main.getByLabel("API contract overview", { exact: true })).toBeVisible();
   await expect(main.getByLabel("API contract overview metrics")).toContainText("Open contracts");
   await page.goto(`/o/northline/build/projects/${id}/auth?tab=Roles`);
-  await expect(main.getByLabel("Access policy overview")).toBeVisible();
+  await expect(main.getByLabel("Access policy overview", { exact: true })).toBeVisible();
   await expect(main.getByLabel("Access policy overview metrics")).toContainText("Write grants");
   await page.goto(`/o/northline/build/projects/${id}/integrations`);
   await expect(main.getByLabel("Build integration overview")).toBeVisible();

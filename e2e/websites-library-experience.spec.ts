@@ -14,7 +14,7 @@ test("Websites library exposes work, release context and recoverable search", as
   await expect(main.getByRole("searchbox", { name: "Find a website" })).toHaveValue("");
   await main.getByRole("button", { name: "Table view" }).click();
   await expect(main.getByRole("button", { name: "Table view" })).toHaveAttribute("aria-pressed", "true");
-  await expect(main.getByLabel("Sites")).toBeVisible();
+  await expect(main.getByRole("table", { name: "Sites" })).toBeVisible();
   await main.getByRole("button", { name: "Card view" }).click();
   await expect(main.locator(".web-library-card").first()).toBeVisible();
 });

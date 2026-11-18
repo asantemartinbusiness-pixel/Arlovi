@@ -891,6 +891,8 @@ test("WF-07 Design-to-publish: editable file, brand rules, review approval, publ
   await expect(dialog(page).getByText(/hosting|not connected/i).first()).toBeVisible();
   await page.keyboard.press("Escape");
   await open(page, "/web/sites", "Website Directory");
+  // The directory opens as cards since the site-library redesign; the table view is the row-per-site register.
+  await main(page).getByRole("button", { name: "Table view" }).click();
   await expect(main(page).getByRole("row", { name: /northline\.co\.uk/ })).toContainText("NOT PUBLISHED", { ignoreCase: true });
 });
 
