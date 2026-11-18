@@ -10,6 +10,9 @@ export interface Toast {
   title: string;
   body: string;
   tone: "ok" | "blocked" | "failed" | "info";
+  actionLabel?: string;
+  onAction?: () => void;
+  durationMs?: number;
 }
 
 interface UiState {
