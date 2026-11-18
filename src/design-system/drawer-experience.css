@@ -94,3 +94,26 @@
 @media (prefers-reduced-motion: reduce) {
   .ds-drawer, .ds-drawer-scrim { animation: none !important; }
 }
+
+/* Persistent, on-page inspectors use the same architectural rhythm as drawers. */
+.ds-inspector { min-width: 0; overflow: hidden; }
+.ds-inspector .ds-inspector-head {
+  flex: none;
+  min-height: calc(52px * var(--interface-scale, 1));
+  padding: var(--space-4);
+  background: var(--bg-surface);
+}
+.ds-inspector .ds-inspector-head h3 {
+  font-size: var(--text-md);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+.ds-inspector .ds-inspector-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
