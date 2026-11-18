@@ -134,7 +134,8 @@ export const analyticsApp = registerApp({
           run: async (context) => {
             const record = context.selectedId ? await db.records.get(context.selectedId) : undefined;
             if (!record) return;
-            await context.mutate.patch(record.id, { fields: { ...record.fields, pinned: record.fields.pinned !== true } }, { event: record.fields.pinned === true ? "Dashboard unpinned" : "Dashboard pinned" });
+            const saved = await context.mutate.patch(record.id, { fields: { ...record.fields, pinned: record.fields.pinned !== true } }, { event: record.fields.pinned === true ? "Dashboard unpinned" : "Dashboard pinned" });
+            if (!saved) return;
             context.toast(record.fields.pinned === true ? "Unpinned" : "Pinned", "The change is on the record.");
           },
         },
@@ -144,7 +145,8 @@ export const analyticsApp = registerApp({
           guard: (context) => (context.selectedId ? undefined : "Select a dashboard first"),
           run: async (context) => {
             if (!context.selectedId) return;
-            await context.mutate.patch(context.selectedId, { status: "archived" }, { event: "Dashboard archived" });
+            const saved = await context.mutate.patch(context.selectedId, { status: "archived" }, { event: "Dashboard archived" });
+            if (!saved) return;
             context.toast("Archived", "It no longer appears in the working directory. Its tiles are kept on the record.");
           },
         },
