@@ -12,6 +12,7 @@ import {
   notificationCategory, notificationPreferenceKey, safeNotificationPath,
 } from "@/platform/notificationExperience";
 import { useWorkspace } from "@/platform/workspace";
+import { clockNow } from "@/platform/clock";
 import { appEntry } from "@/app/catalog";
 import { useUi } from "@/runtime/ui";
 import { NotificationSettings } from "@/app/NotificationSettings";
@@ -93,7 +94,7 @@ export function AttentionCentre({
     updateReceipt(receiptKey(item), { read: true, acknowledged: true });
   }
   function snooze(item: AttentionItem, hours: number) {
-    updateReceipt(receiptKey(item), { snoozedUntil: new Date(Date.now() + hours * 3600000).toISOString() });
+    updateReceipt(receiptKey(item), { snoozedUntil: new Date(clockNow().getTime() + hours * 3600000).toISOString() });
   }
   function markVisibleRead() {
     const changes: Record<string, { read: boolean }> = {};
