@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { FileText, Plus, Printer, Send, Trash2 } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
@@ -1278,6 +1278,8 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
 
   return (
     <Stack gap={4}>
+      <ModalUnsavedChanges when={amountEdited || date !== now.toISOString().slice(0, 10) || method !== "Bank transfer"} />
+      <ModalInFlight when={busy} />
       <StatementRow
         context={context}
         rows={[
@@ -1306,7 +1308,7 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
       </Row>
       <CapabilityNotice id="payment.capture" />
       {blocked && <Notice tone="warning" title="This payment cannot be recorded yet">{blocked}</Notice>}
-      <Row gap={2}>
+      <ModalActions>
         <Button
           variant="primary"
           busy={busy}
@@ -1355,8 +1357,8 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
         >
           Post the receipt
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        <Button variant="ghost" onClick={close} disabled={busy}>Cancel</Button>
+      </ModalActions>
     </Stack>
   );
 }
