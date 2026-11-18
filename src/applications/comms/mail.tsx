@@ -4,12 +4,13 @@ import {
   Avatar, Button, DataGrid, Empty, Field, Notice, Pill, Row, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
-import { useRecord, useWorkspace } from "@/platform/workspace";
+import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { clockIso } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { requestMailboxConnection } from "./actions";
 import { useCommsData } from "./panels";
 import { configuredIdentities, signaturePreview, validateIdentity } from "./mailIdentities";
+import { filterMailView, relatedMailContext, type MailView } from "./mailViews";
 import {
   MAIL_FOLDERS, checkDraft, draftInput, draftRecord, folderCounts, folderOf, searchThreads, senderAddress,
   type DraftInput, type MailFolder,
@@ -48,15 +49,18 @@ export function MailWorkspace({ context, lens }: { context: ScreenContext; lens:
   const data = useCommsData();
   const { org } = useWorkspace();
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<MailView>("all");
   const [manageIdentities, setManageIdentities] = useState(false);
   const [manageConnections, setManageConnections] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const folder = lens.toLowerCase();
   const searching = query.trim().length > 0;
-  const rows = searchThreads(data.emailThreads, query, folder);
+  const rows = filterMailView(searchThreads(data.emailThreads, query, folder), view);
   const counts = folderCounts(data.emailThreads);
+  const relatedTasks = useCollections(["tasks"]).tasks;
   const preview = data.emailThreads.find((thread) => thread.id === previewId) ?? null;
   const previewMessages = (preview?.body as { messages?: { from?: string; body?: string; at?: string }[] } | undefined)?.messages ?? [];
+  const related = preview ? relatedMailContext(preview, data.contacts, relatedTasks) : null;
   const openRow = (id: string) => {
     const row = data.emailThreads.find((thread) => thread.id === id);
     if (row && folderOf(row) === "drafts") context.openOverlay("Compose window", { id });
@@ -90,6 +94,11 @@ export function MailWorkspace({ context, lens }: { context: ScreenContext; lens:
         </Button>
       </aside>
       <Stack gap={3}>
+        <div className="cm-mail-views" role="group" aria-label="Filter mail messages">
+          {([["all", "All messages"], ["unread", "Unread"], ["followup", "Follow-up"], ["flagged", "Flagged"]] as const).map(([id, label]) => (
+            <button key={id} type="button" className="cm-mail-view" aria-pressed={view === id} onClick={() => setView(id)}>{label}</button>
+          ))}
+        </div>
         {manageConnections && <MailConnectionSetup context={context} />}
         {manageIdentities && <MailIdentityManager context={context} />}
         {folder === "drafts" && !searching && <NotSentNotice context={context} />}
@@ -161,9 +170,22 @@ export function MailWorkspace({ context, lens }: { context: ScreenContext; lens:
               </article>
             ))}
             {previewMessages.length === 0 && <p>{preview.summary}</p>}
-            <Notice tone="info" title="Connected business context">
-              Linked customers, invoices, projects and assigned work will appear here only when matching records are authorised. This local email does not grant access to other applications.
-            </Notice>
+            <section className="cm-mail-preview-context" aria-label="Related records">
+              <Row gap={2}><Link2 size={15} /><strong>Business context</strong></Row>
+              {related?.contact ? (
+                <Row gap={2} wrap>
+                  <span className="ds-grow">Contact: {related.contact.title}</span>
+                  <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/crm/contacts/${related.contact!.id}`)}>Open in CRM</Button>
+                </Row>
+              ) : <p className="ds-subtle">No matching contact in the current workspace. A matching email address alone does not grant access to another application.</p>}
+              {related?.task ? (
+                <Row gap={2} wrap>
+                  <span className="ds-grow">Follow-up: {related.task.title}</span>
+                  <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/project/tasks/${related.task!.id}`)}>Open task</Button>
+                </Row>
+              ) : <p className="ds-subtle">No linked follow-up task.</p>}
+              <Notice tone="info">Context is based on this browser's local records, not synchronised provider data. Use the record's own permissions before opening it.</Notice>
+            </section>
           </section>
         )}
       </Stack>
