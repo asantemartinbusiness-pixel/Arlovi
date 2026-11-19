@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import {
   BookOpen, CalendarDays, ClipboardCheck, GraduationCap, Inbox, UserPlus, Users,
 } from "lucide-react";
@@ -3158,11 +3159,17 @@ export function PositionEditor({ context, close }: { context: ScreenContext; clo
   const payload = context.overlayPayload as { id?: string } | undefined;
   const existing = useRecord(payload?.id);
   const departments = useCollection("departments");
-  const [title, setTitle] = useState(existing?.title ?? "");
-  const [department, setDepartment] = useState(String(existing?.fields.departmentId ?? departments[0]?.id ?? ""));
-  const [low, setLow] = useState(String(Number(existing?.fields.salaryLowMinor ?? 300_000) / 100));
-  const [high, setHigh] = useState(String(Number(existing?.fields.salaryHighMinor ?? 350_000) / 100));
-  const [summary, setSummary] = useState(existing?.summary ?? "");
+  const draftScope = `people:position:${context.org.id}:${context.actor}:${payload?.id ?? "new"}`;
+  const [draftTitle, setTitle] = useWorkingField<string | undefined>(draftScope, "title", undefined);
+  const [draftDepartment, setDepartment] = useWorkingField<string | undefined>(draftScope, "department", undefined);
+  const [draftLow, setLow] = useWorkingField<string | undefined>(draftScope, "salaryLow", undefined);
+  const [draftHigh, setHigh] = useWorkingField<string | undefined>(draftScope, "salaryHigh", undefined);
+  const [draftSummary, setSummary] = useWorkingField<string | undefined>(draftScope, "summary", undefined);
+  const title = draftTitle ?? existing?.title ?? "";
+  const department = draftDepartment ?? String(existing?.fields.departmentId ?? departments[0]?.id ?? "");
+  const low = draftLow ?? String(Number(existing?.fields.salaryLowMinor ?? 300_000) / 100);
+  const high = draftHigh ?? String(Number(existing?.fields.salaryHighMinor ?? 350_000) / 100);
+  const summary = draftSummary ?? existing?.summary ?? "";
   const invalidRange = Number(high) < Number(low);
 
   return (
@@ -3182,6 +3189,7 @@ export function PositionEditor({ context, close }: { context: ScreenContext; clo
         } else {
           await context.mutate.create({ collection: "positions", title, status: "open", summary, fields }, `Position opened: ${title}`);
         }
+        clearWorkingDraft(draftScope);
         context.toast("Position saved", `${title} is on the recruitment board.`);
         close();
       }}
@@ -3199,6 +3207,10 @@ export function PositionEditor({ context, close }: { context: ScreenContext; clo
       {invalidRange && <Notice tone="danger" title="The top of the range is below the bottom">Publishing a range that cannot be met is worse than publishing none.</Notice>}
       <Field label="What the role is for"><TextArea value={summary} onChange={(event) => setSummary(event.target.value)} rows={3} /></Field>
       <Notice tone="info">Publishing a salary range in the advert is a choice this workspace supports; the range is stored on the position record.</Notice>
+      <Row gap={2}>
+        <span className="ds-subtle">Unfinished edits remain in this browser tab.</span>
+        <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
+      </Row>
     </form>
   );
 }

@@ -18,6 +18,7 @@ import type { CrmData } from "./data";
 import { ActivityPill, CapabilityNotice, ConsentPill, Money, StagePill } from "./parts";
 import { MergeGroups } from "./actions";
 import { clockIso } from "@/platform/clock";
+import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { accountHref } from "./account";
 
 /* ---------------------------- CRM-002 ---------------------------- */
@@ -183,15 +184,25 @@ export function ContactForm({ context, close }: { context: ScreenContext; close:
   const payload = context.overlayPayload as { id?: string } | undefined;
   const existing = useRecord(payload?.id ?? context.selectedId);
   const contact = existing?.collection === "contacts" ? existing : undefined;
-  const [title, setTitle] = useState(contact?.title ?? "");
-  const [email, setEmail] = useState(String(contact?.fields.email ?? ""));
-  const [phone, setPhone] = useState(String(contact?.fields.phone ?? ""));
-  const [role, setRole] = useState(String(contact?.fields.role ?? ""));
-  const [companyId, setCompanyId] = useState(String(contact?.fields.companyId ?? ""));
-  const [taxStatus, setTaxStatus] = useState<CustomerTaxStatus | "">((contact?.fields.taxStatus as CustomerTaxStatus) ?? "");
-  const [consent, setConsent] = useState(Boolean(contact?.fields.consent));
-  const [suppressed, setSuppressed] = useState(contact?.fields.suppressed === true);
-  const [summary, setSummary] = useState(contact?.summary ?? "");
+  const draftScope = `crm:contact:${context.org.id}:${context.actor}:${payload?.id ?? contact?.id ?? "new"}`;
+  const [titleDraft, setTitle] = useWorkingField<string | undefined>(draftScope, "title", undefined);
+  const [emailDraft, setEmail] = useWorkingField<string | undefined>(draftScope, "email", undefined);
+  const [phoneDraft, setPhone] = useWorkingField<string | undefined>(draftScope, "phone", undefined);
+  const [roleDraft, setRole] = useWorkingField<string | undefined>(draftScope, "role", undefined);
+  const [companyDraft, setCompanyId] = useWorkingField<string | undefined>(draftScope, "company", undefined);
+  const [taxDraft, setTaxStatus] = useWorkingField<CustomerTaxStatus | "" | undefined>(draftScope, "taxStatus", undefined);
+  const [consentDraft, setConsent] = useWorkingField<boolean | undefined>(draftScope, "consent", undefined);
+  const [suppressedDraft, setSuppressed] = useWorkingField<boolean | undefined>(draftScope, "suppressed", undefined);
+  const [summaryDraft, setSummary] = useWorkingField<string | undefined>(draftScope, "summary", undefined);
+  const title = titleDraft ?? contact?.title ?? "";
+  const email = emailDraft ?? String(contact?.fields.email ?? "");
+  const phone = phoneDraft ?? String(contact?.fields.phone ?? "");
+  const role = roleDraft ?? String(contact?.fields.role ?? "");
+  const companyId = companyDraft ?? String(contact?.fields.companyId ?? "");
+  const taxStatus = taxDraft ?? (contact?.fields.taxStatus as CustomerTaxStatus | undefined) ?? "";
+  const consent = consentDraft ?? Boolean(contact?.fields.consent);
+  const suppressed = suppressedDraft ?? (contact?.fields.suppressed === true);
+  const summary = summaryDraft ?? contact?.summary ?? "";
   const [busy, setBusy] = useState(false);
 
   const duplicateEmail = email.trim() && data.contacts.some((item) => String(item.fields.email ?? "").toLowerCase() === email.trim().toLowerCase() && item.id !== contact?.id);
@@ -223,6 +234,7 @@ export function ContactForm({ context, close }: { context: ScreenContext; close:
           context.select(created.id);
           context.toast("Contact created", taxStatus ? `${created.title} is on file with a ${taxStatus} tax status.` : `${created.title} is on file. Without a tax status an invoice to them cannot resolve a rate.`);
         }
+        clearWorkingDraft(draftScope);
         setBusy(false);
         close();
       }}
@@ -255,8 +267,10 @@ export function ContactForm({ context, close }: { context: ScreenContext; close:
       <Field label="Notes"><TextArea aria-label="Notes" value={summary} rows={3} onChange={(event) => setSummary(event.target.value)} /></Field>
       <Row gap={2}>
         <Button type="submit" variant="primary" busy={busy} disabled={!title.trim()}>{contact ? "Save the contact" : "Create the contact"}</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
+        <Button variant="ghost" onClick={close}>Close & keep draft</Button>
+        <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
+      <p className="ds-subtle">Unfinished edits stay in this browser tab until saved or discarded. No customer message is sent.</p>
     </form>
   );
 }

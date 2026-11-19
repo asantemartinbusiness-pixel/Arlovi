@@ -26,6 +26,7 @@ import {
 import { DocumentCanvas, type EditIntent } from "./canvas";
 import { SAVE_LABEL, SAVE_TONE, activeDocEditor, useDocEditor, type DocEditor } from "./state";
 import { useGuardRefresh } from "@/applications/design/sharedDoc";
+import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { createStore, useStore } from "@/applications/visual/kit";
 import "./docs.css";
 
@@ -1757,10 +1758,11 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
   const templates = useCollection("templates").filter((record) => record.fields.kind === "document" && record.status !== "retired");
   const payload = context.overlayPayload as { templateId?: string } | undefined;
   const { org } = useWorkspace();
-  const [title, setTitle] = useState("");
-  const [templateId, setTemplateId] = useState(payload?.templateId ?? "");
-  const [folder, setFolder] = useState("Unfiled");
-  const [confidential, setConfidential] = useState(false);
+  const draftScope = `docs:new-document:${org.id}:${context.actor}:${payload?.templateId ?? "blank"}`;
+  const [title, setTitle] = useWorkingField(draftScope, "title", "");
+  const [templateId, setTemplateId] = useWorkingField(draftScope, "templateId", payload?.templateId ?? "");
+  const [folder, setFolder] = useWorkingField(draftScope, "folder", "Unfiled");
+  const [confidential, setConfidential] = useWorkingField(draftScope, "confidential", false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const existing = useCollection("documents");
@@ -1797,6 +1799,7 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
               context.toast("Document created", "The document was saved. The template usage counter could not be updated.", "info");
             }
           }
+          clearWorkingDraft(draftScope);
           context.toast("Document created", `${created.title} is in ${folder}.`);
           close();
           context.navigate(`/o/${org.slug}/docs/documents/${created.id}`);
@@ -1826,6 +1829,10 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
       {selectedTemplate && <Notice tone="info" title="The master stays independent">This document will receive a copy of the template content and preserve its source revision. Unresolved company-field tokens remain visible for human completion.</Notice>}
       {error && <Notice tone="danger" title="Document not created">{error}</Notice>}
       {saving && <p className="ds-subtle">Creating the document…</p>}
+      <Row gap={2}>
+        <span className="ds-subtle">Unfinished document setup stays in this browser tab.</span>
+        <Button type="button" variant="ghost" disabled={saving} onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
+      </Row>
     </form>
   );
 }
