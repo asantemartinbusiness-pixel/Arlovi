@@ -87,7 +87,14 @@ function useOwnDocEditor(context: ScreenContext, record: Rec | undefined): DocEd
     }
   }, [record, context.actor, context.now]);
 
-  useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
+  // On a cross-app detour, do not silently abandon edits made within the
+  // 800ms autosave window. Keep the latest callback in a ref so cleanup does
+  // not run on ordinary rerenders, only when this editor actually unmounts.
+  const saveOnExit = useRef<() => Promise<void>>(() => Promise.resolve());
+  useEffect(() => () => {
+    if (timer.current) window.clearTimeout(timer.current);
+    if (pending.current) void saveOnExit.current();
+  }, []);
 
   const flush = useCallback(async () => {
     const next = pending.current;
@@ -109,6 +116,8 @@ function useOwnDocEditor(context: ScreenContext, record: Rec | undefined): DocEd
     setLastSavedAt(result.updatedAt);
     setSaveState("saved");
   }, [context, recordId, record?.summary, record?.status, record?.body, record?.updatedAt]);
+
+  saveOnExit.current = flush;
 
   const schedule = useCallback((next: DocModel) => {
     pending.current = next;
