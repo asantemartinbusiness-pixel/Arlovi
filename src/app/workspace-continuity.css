@@ -27,3 +27,20 @@
 .ws-continuity-search{display:flex;align-items:center;gap:var(--space-2);min-height:44px;border:1px solid var(--border-default);border-radius:var(--radius-pill);background:var(--bg-surface);padding:0 var(--space-3);color:var(--fg-muted);flex:1;max-width:300px}
 .ws-continuity-search input{min-width:0;flex:1;background:transparent;border:0;outline:0;font:var(--text-sm) var(--font-sans);color:var(--fg-default)}
 @media(max-width:599px){.ws-continuity-controls{align-items:stretch}.ws-continuity-filters{width:100%;justify-content:space-between}.ws-continuity-filters button{flex:1;padding-inline:var(--space-2)}.ws-continuity-search{max-width:none;flex-basis:100%}}
+
+/* Small, distinctly branded app-resume elements; no oversized colour panels. */
+.ws-resume{background:var(--bg-surface);border:1px solid var(--border-default);border-radius:var(--radius-lg);overflow:hidden}
+.ws-resume-title{display:block}
+.ws-resume-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--border-subtle)}
+.ws-resume-link{display:flex;align-items:center;gap:10px;padding:var(--space-3);min-width:0;min-height:64px;background:var(--bg-surface);color:var(--fg-default);text-decoration:none;transition:background-color var(--dur-hover) var(--ease-out)}
+.ws-resume-link:hover{background:var(--bg-hover)}.ws-resume-link:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ws-resume-icon{flex:none;width:34px;height:34px;border:1px solid var(--accent-border);background:var(--accent-soft);color:var(--accent-soft-fg);border-radius:10px;display:grid;place-items:center}
+.ws-resume-link:nth-child(4n+2) .ws-resume-icon{background:var(--studio-iris-soft);color:var(--studio-iris);border-color:transparent}
+.ws-resume-link:nth-child(4n+3) .ws-resume-icon{background:var(--studio-citrus-soft);color:var(--studio-citrus-ink);border-color:transparent}
+.ws-resume-link:nth-child(4n+4) .ws-resume-icon{background:var(--studio-coral-soft);color:var(--studio-coral-ink);border-color:transparent}
+.ws-resume-details{min-width:0;display:flex;flex-direction:column;gap:3px;flex:1}
+.ws-resume-details strong{font:600 var(--text-sm) var(--font-sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ws-resume-details small{font:var(--text-xs) var(--font-sans);color:var(--fg-muted)}
+.ws-resume-arrow{flex:none;color:var(--fg-subtle)}.ws-resume-link:hover .ws-resume-arrow{color:var(--accent)}
+@media(max-width:599px){.ws-resume-grid{grid-template-columns:1fr}.ws-resume-link{min-height:56px}}
+@media(prefers-reduced-motion:reduce){.ws-resume-link{transition:none}}

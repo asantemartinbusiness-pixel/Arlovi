@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Bookmark, BookmarkCheck, Clock3, Search, Trash2 } from "lucide-react";
+import { Bookmark, BookmarkCheck, Clock3, Search, Trash2, ArrowUpRight } from "lucide-react";
 import { findScreen } from "@/app/catalog";
+import { APP_ENTRIES } from "@/app/nav";
+import { readAppJourney } from "@/platform/appJourney";
+import { resumableApps } from "@/app/recentAppWork";
 import { useCollections, useWorkspace } from "@/platform/workspace";
 import {
   clearRecentNavigation, removeRecentNavigation, toggleSavedNavigation,
@@ -31,10 +34,12 @@ function LocationRow({ item, saved, label, onToggle, onRemove }: { item: Navigat
   </div>;
 }
 export function WorkspaceContinuity({ compact = false }: { compact?: boolean }) {
-  const { org } = useWorkspace();
+  const { org, role, actor } = useWorkspace();
   const [view, setView] = useState<"all" | "recent" | "saved">("all");
   const [query, setQuery] = useState("");
   const { recent, pinned } = useNavigationContinuity(org.id, org.slug);
+  const journey = readAppJourney(`${org.id}:${role}:${actor}`, org.slug);
+  const resume = resumableApps(journey, org.slug, role, compact ? 3 : 6);
   const related = useCollections(["projects","departments"]);
   const projects = related.projects ?? [];
   const departments = related.departments ?? [];
@@ -47,10 +52,26 @@ export function WorkspaceContinuity({ compact = false }: { compact?: boolean }) 
   const showSaved = compact || view !== "recent";
   const showRecent = compact || view !== "saved";
   const toggle = (path: string) => toggleSavedNavigation(org.id,org.slug,path);
+  const continued = resume.filter(item =>
+    !query.trim() || `${item.title} ${item.page}`.toLowerCase().includes(query.trim().toLowerCase()));
   return <section className="ws-section ws-continuity" aria-label="Recent and saved work">
     <div className="ws-continuity-heading"><h2><Clock3 size={18}/> {compact ? "Pick up where you left off" : "Recent and saved work"}</h2>
       {!compact && available.length > 0 && <button className="ws-continuity-clear" type="button" onClick={() => clearRecentNavigation(org.id,org.slug)}>Clear recent</button>}
     </div>
+    {continued.length > 0 && (compact || view !== "saved") && <nav className="ws-resume" aria-label="Resume native application work">
+      <span className="ws-continuity-group ws-resume-title">CONTINUE IN YOUR APPLICATIONS</span>
+      <div className="ws-resume-grid">
+        {continued.map(item => {
+          const Icon = APP_ENTRIES[item.code]?.icon;
+          return <Link to={item.to} className="ws-resume-link" key={item.code}
+            aria-label={`Continue ${item.title}: ${item.page}`}>
+            <span className="ws-resume-icon">{Icon && <Icon size={19} aria-hidden="true"/>}</span>
+            <span className="ws-resume-details"><strong>{item.title}</strong><small className="ds-truncate">{item.page}</small></span>
+            <ArrowUpRight size={16} aria-hidden="true" className="ws-resume-arrow"/>
+          </Link>;
+        })}
+      </div>
+    </nav>}
     {!compact && <div className="ws-continuity-controls"><div className="ws-continuity-filters" aria-label="Filter recent work">{(["all","recent","saved"] as const).map(value => <button type="button" key={value} aria-pressed={view === value} onClick={() => setView(value)}>{value === "all" ? "All places" : value === "recent" ? "Recently visited" : "Saved"}</button>)}</div><label className="ws-continuity-search"><Search size={16} aria-hidden="true"/><span className="sr-only">Search recent and saved places</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Find a place…"/></label></div>}
     {showSaved && visiblePinned.length > 0 && <section className="ws-continuity-list" aria-label="Saved places">
       <div className="ws-continuity-group">SAVED PLACES</div>

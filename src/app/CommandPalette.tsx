@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { findScreen, screens } from "@/app/catalog";
 import { APP_ENTRIES } from "@/app/nav";
 import { routeForRecord } from "@/platform/attention";
@@ -7,6 +7,8 @@ import { canOpenLegacyScreen } from "@/platform/accessInventory";
 import { useCollections, useOrgRecords, useWorkspace } from "@/platform/workspace";
 import { useNavigationContinuity } from "@/platform/navigationContinuity";
 import { destinationLabel } from "@/app/WorkspaceContinuity";
+import { readAppJourney, previousJourney } from "@/platform/appJourney";
+import { resumableApps } from "@/app/recentAppWork";
 
 interface Hit {
   key: string;
@@ -23,12 +25,18 @@ interface Hit {
  */
 export function CommandPalette({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
-  const { org, role } = useWorkspace();
+  const location = useLocation();
+  const { org, role, actor } = useWorkspace();
   const records = useOrgRecords();
   const spaces = useCollections(["projects", "departments"]);
   const projects = spaces.projects ?? [];
   const departments = spaces.departments ?? [];
   const navigation = useNavigationContinuity(org.id, org.slug);
+  const journey = useMemo(
+    () => readAppJourney(`${org.id}:${role}:${actor}`, org.slug),
+    [org.id, org.slug, role, actor],
+  );
+  const resumable = useMemo(() => resumableApps(journey, org.slug, role, 6), [journey, org.slug, role]);
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
@@ -36,6 +44,19 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
 
   const hits = useMemo<Hit[]>(() => {
     const q = query.trim().toLowerCase();
+    const currentUrl = location.pathname + location.search + location.hash;
+    const backEntry = journey.trail.at(-1)?.url === currentUrl ? previousJourney(journey) : null;
+    const returnCandidate = resumable.find(item => item.to === backEntry?.url);
+    const returnHit: Hit[] = returnCandidate && (!q || `back return ${returnCandidate.title} ${returnCandidate.page}`.toLowerCase().includes(q))
+      ? [{ key: "return-to-previous-app", group: "Your journey",
+          title: `Back to ${returnCandidate.title}`, detail: returnCandidate.page, to: returnCandidate.to }]
+      : [];
+    const continueHits: Hit[] = resumable
+      .filter(item => item.to !== currentUrl)
+      .filter(item => !q || `${item.title} ${item.page} continue resume working`.toLowerCase().includes(q))
+      .slice(0, q ? 6 : 4)
+      .map(item => ({ key: `resume-${item.code}`, group: "Continue working",
+        title: item.title, detail: item.page, to: item.to }));
     const pages: Hit[] = screens
       .filter((screen) => canOpenLegacyScreen(role, screen) && !screen.route.includes(":id") && !screen.route.includes(":slug"))
       .filter((screen) => !q || `${screen.title} ${screen.applicationName} ${screen.purpose}`.toLowerCase().includes(q))
@@ -90,12 +111,12 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       {key:"action-account",group:"Quick destinations",title:"Account and data settings",detail:"Preferences",to:`/o/${org.slug}/workspace/account`},
     ].filter(hit=>!q || (hit.title+" "+hit.detail).toLowerCase().includes(q)).slice(0,q?6:4);
     const used = new Set<string>();
-    return [...actions, ...locations, ...workspaces, ...pages, ...rows].filter(hit => {
+    return [...returnHit, ...continueHits, ...actions, ...locations, ...workspaces, ...pages, ...rows].filter(hit => {
       if (used.has(hit.to)) return false;
       used.add(hit.to);
       return true;
     });
-  }, [query, records, org.slug, role, navigation, departments, projects]);
+  }, [query, records, org.slug, role, navigation, departments, projects, location.pathname, location.search, location.hash, journey, resumable]);
 
   useEffect(() => { setIndex(0); }, [query]);
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -139,7 +160,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
           aria-controls="palette-list"
           aria-activedescendant={hits[index]?.key}
           aria-label={`Search screens, records and actions in ${org.name}`}
-          placeholder={`Search screens and records in ${org.name}`}
+          placeholder={`Search apps, work, records in ${org.name}`}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
