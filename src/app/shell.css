@@ -412,3 +412,48 @@
 @media(prefers-reduced-motion:reduce) {
   .hq-rail-btn, .hq-journey-return { transition: none; }
 }
+
+
+/* Selection treatment v3 — restore the original full, soft-pink pill.
+   Keep keyboard focus and navigation continuity; never draw clipped rails. */
+.hq-rail-btn[data-active="true"],
+.hq-rail-group.ws-primary-group .hq-rail-btn[data-active="true"] {
+  background: var(--selection-pop);
+  color: var(--selection-pop-fg);
+  box-shadow: none;
+}
+.hq-rail-btn[data-active="true"]::before { content: none; display: none; }
+.hq-appnav .hq-navlink,
+.ws-sidebar .hq-navlink {
+  min-height: 46px;
+  border-radius: 999px;
+  padding-inline: 13px;
+  box-shadow: none;
+}
+.hq-appnav .hq-navlink[aria-current="page"],
+.ws-sidebar .hq-navlink[aria-current="page"],
+.ws-sidebar .hq-navlink.ws-side-selected {
+  background: var(--selection-pop);
+  color: var(--selection-pop-fg);
+  border-radius: 999px;
+  box-shadow: none;
+  font-weight: 600;
+}
+.hq-appnav .hq-navlink[aria-current="page"]::before,
+.ws-sidebar .hq-navlink[aria-current="page"]::before,
+.ws-sidebar .hq-navlink.ws-side-selected::before { content: none; display: none; }
+.hq-appnav .hq-navlink[aria-current="page"]:hover,
+.ws-sidebar .hq-navlink[aria-current="page"]:hover,
+.ws-sidebar .hq-navlink.ws-side-selected:hover {
+  background: var(--selection-pop);
+  color: var(--selection-pop-fg);
+}
+.hq-appnav .hq-navlink:focus-visible,
+.ws-sidebar .hq-navlink:focus-visible,
+.hq-rail-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media(prefers-reduced-motion: reduce) {
+  .hq-appnav .hq-navlink, .ws-sidebar .hq-navlink { transition: none; }
+}

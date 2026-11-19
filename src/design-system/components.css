@@ -414,3 +414,23 @@ body:has([role="dialog"]) .ds-toasts { inset-block-start: var(--space-4); inset-
 @media(prefers-reduced-motion:reduce) {
   .ds-btn:not(:disabled):active { transform: none; }
 }
+
+
+/* Restore filled selection for short tabs such as "All": compact circle
+   for short labels, rounded capsules for longer ones, never underlines. */
+.ds-tab[aria-selected="true"] {
+  background: var(--selection-pop);
+  color: var(--selection-pop-fg);
+  border-radius: 999px;
+  box-shadow: none;
+}
+.ds-tab[aria-selected="true"]::after { content: none; display: none; }
+.ds-tab[aria-selected="true"]:hover { background: var(--selection-pop); color: var(--selection-pop-fg); }
+.ds-tabs .ds-tab { min-height: 44px; min-width: 44px; padding-inline: 15px; }
+.ds-segment button[aria-pressed="true"],
+.ds-btn-group > button[aria-pressed="true"] {
+  background: var(--selection-pop);
+  color: var(--selection-pop-fg);
+  border-color: var(--selection-pop);
+  box-shadow: none;
+}

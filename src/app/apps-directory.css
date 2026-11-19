@@ -181,3 +181,16 @@
 :root[data-theme="dark"] .apps-directory-icon { background:color-mix(in srgb,var(--directory-ink) 15%,var(--bg-surface)); color:var(--fg-strong); }
 :root[data-theme="dark"] .apps-platform-intro::after { opacity:.16; }
 @media(prefers-reduced-motion:reduce){.apps-directory-card:hover .apps-directory-icon{transform:none}}
+
+
+/* App-directory category filters also use the same selected pill. */
+.apps-directory-categories button[aria-pressed="true"] {
+  background: var(--selection-pop);
+  color: var(--selection-pop-fg);
+  border-color: var(--selection-pop);
+  box-shadow: none;
+}
+.apps-directory-categories button[aria-pressed="true"]:hover {
+  background: var(--selection-pop);
+  color: var(--selection-pop-fg);
+}

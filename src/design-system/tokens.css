@@ -437,3 +437,17 @@
 
 @media (max-width: 1199px) { :root { --page-pad: 24px; } }
 @media (max-width: 899px) { :root { --page-pad: 16px; } }
+
+
+/* Signature selected state: the soft lilac-pink filled pill from the
+   original sidebar and "All" tab. Separate from action/status colours. */
+:root {
+  --selection-pop: #ffc9ff;
+  --selection-pop-fg: #201923;
+  --selection-pop-hover: #ffe0fd;
+}
+:root[data-theme="dark"] {
+  --selection-pop: #eab8ef;
+  --selection-pop-fg: #211621;
+  --selection-pop-hover: #423145;
+}

@@ -136,3 +136,15 @@
 .ws-detail-tabs button[aria-current="page"], .ws-tabs button[aria-current="page"] {
   border-radius: 0; box-shadow: none;
 }
+
+
+/* The familiar long selected pill, across workspace and app navigation. */
+.ws-sidebar .hq-navlink.ws-side-selected,
+.ws-sidebar .hq-navlink[aria-current="page"] {
+  border-radius: 999px;
+  background: var(--selection-pop);
+  color: var(--selection-pop-fg);
+  box-shadow: none;
+}
+.ws-sidebar .hq-navlink.ws-side-selected::before,
+.ws-sidebar .hq-navlink[aria-current="page"]::before { content: none; display: none; }
