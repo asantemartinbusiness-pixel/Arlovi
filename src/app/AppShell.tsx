@@ -32,6 +32,7 @@ import { buildAttention, filterForRole, headerAttentionCounts } from "@/platform
 import { DEFAULT_NOTIFICATION_PREFERENCES, isUrgent, mayInterrupt } from "@/platform/notificationPolicy";
 import { applyAttentionReceipts } from "@/platform/attentionReceipts";
 import { useUi } from "@/runtime/ui";
+import { wallMs } from "@/platform/clock";
 import { DisplayPreferences } from "@/app/DisplayPreferences";
 import { NotificationToastStack } from "@/app/NotificationToastStack";
 import { NotificationBanner } from "@/app/NotificationBanner";
@@ -184,34 +185,60 @@ export function AppShell() {
   }), role), ui.attentionReceipts, org.id, role, actor, now), [data, org.slug, org.id, now, role, actor, ui.attentionReceipts]);
   const contextVisible = isWorkspaceArea && ["project","department"].includes(location.pathname.split("/")[5]);
   const {decisions, unreadUpdates: updates} = headerAttentionCounts(attention);
-  // Start from the current feed. Only events arriving after this view mounts may
-  // produce transient feedback; loading historical notifications never spams toasts.
-  const arrivalTracker = useRef<{ scope: string; seen: Set<string> } | null>(null);
+  // Transient feedback is only for items that genuinely arrive after the feed has settled:
+  //  1. hydration grace: for ~4s after the scope seeds (extended while the feed keeps growing,
+  //     capped at 8s) arrivals are absorbed silently, because lazily hydrated collections
+  //     appear as "fresh" otherwise;
+  //  2. an item id is never toasted twice per session (the seen set is only ever added to);
+  //  3. arrivals inside a 1.5s window are coalesced into a single toast;
+  //  4. the "private" preview keeps the content out of the toast.
+  const arrivalTracker = useRef<{
+    scope: string; seen: Set<string>; seededAt: number; graceUntil: number;
+    queue: typeof attention; timer: number | null;
+  } | null>(null);
   useEffect(() => {
     const scope = `${org.id}:${encodeURIComponent(actor)}:${role}`;
-    if (!arrivalTracker.current || arrivalTracker.current.scope !== scope) {
-      arrivalTracker.current = { scope, seen: new Set(attention.map(item => item.id)) };
+    const now = wallMs();
+    let tracker = arrivalTracker.current;
+    if (!tracker || tracker.scope !== scope) {
+      if (tracker?.timer != null) window.clearTimeout(tracker.timer);
+      tracker = arrivalTracker.current = { scope, seen: new Set(attention.map(item => item.id)), seededAt: now, graceUntil: now + 4000, queue: [], timer: null };
       return;
     }
-    const fresh = attention.filter(item => !arrivalTracker.current!.seen.has(item.id));
-    fresh.forEach(item => arrivalTracker.current!.seen.add(item.id));
+    const fresh = attention.filter(item => !tracker!.seen.has(item.id));
+    if (!fresh.length) return;
+    fresh.forEach(item => tracker!.seen.add(item.id));
+    if (now < tracker.graceUntil) {
+      tracker.graceUntil = Math.min(tracker.seededAt + 8000, Math.max(tracker.graceUntil, now + 1500));
+      return;
+    }
     const personal = ui.notificationSettings[`${org.id}:${encodeURIComponent(actor)}`] ?? DEFAULT_NOTIFICATION_PREFERENCES;
     const eligible = fresh.filter(item => mayInterrupt(item, personal,
       Boolean(item.route) && item.route!.split("?")[0] === location.pathname));
     if (!eligible.length) return;
-    const mostImportant = [...eligible].sort((a,b)=>a.priority.localeCompare(b.priority))[0];
-    const privateSummary = personal.preview === "private";
-    ui.pushToast({
-      title: privateSummary ? (isUrgent(mostImportant.priority) ? "Urgent notification" : "New notification") : mostImportant.title,
-      body: privateSummary ? `${eligible.length} new item(s) need your attention. Open notifications to review.`
-        : eligible.length > 1 ? `${eligible.length} new updates · ${mostImportant.body}` : mostImportant.body,
-      tone: isUrgent(mostImportant.priority) ? "blocked" : "info",
-      durationMs: isUrgent(mostImportant.priority) ? 0 : 6000,
-      actionLabel: "Review",
-      onAction: () => { setAttentionView(mostImportant.kind === "approval" || mostImportant.kind === "assignment" ? "approvals" : "updates");
-        ui.setCommand(false); ui.setAsk(false); ui.setNotes(true); },
-    });
+    tracker.queue.push(...eligible);
+    if (tracker.timer != null) return;
+    const { pushToast, setNotes, setAsk, setCommand } = ui;
+    const active = tracker;
+    active.timer = window.setTimeout(() => {
+      const batch = active.queue.splice(0);
+      active.timer = null;
+      if (!batch.length) return;
+      const mostImportant = [...batch].sort((a,b)=>a.priority.localeCompare(b.priority))[0];
+      const privateSummary = personal.preview === "private";
+      pushToast({
+        title: privateSummary ? (isUrgent(mostImportant.priority) ? "Urgent notification" : "New notification") : mostImportant.title,
+        body: privateSummary ? `${batch.length} new item(s) need your attention. Open notifications to review.`
+          : batch.length > 1 ? `${batch.length} new updates · ${mostImportant.body}` : mostImportant.body,
+        tone: isUrgent(mostImportant.priority) ? "blocked" : "info",
+        durationMs: isUrgent(mostImportant.priority) ? 0 : 6000,
+        actionLabel: "Review",
+        onAction: () => { setAttentionView(mostImportant.kind === "approval" || mostImportant.kind === "assignment" ? "approvals" : "updates");
+          setCommand(false); setAsk(false); setNotes(true); },
+      });
+    }, 1500);
   }, [attention, org.id, actor, role, location.pathname, ui.notificationSettings, ui.pushToast, ui.setNotes, ui.setAsk, ui.setCommand]);
+  useEffect(() => () => { const timer = arrivalTracker.current?.timer; if (timer != null) window.clearTimeout(timer); }, []);
   function openCommand() { ui.setAsk(false); ui.setNotes(false); ui.setCommand(true); }
   function openAsk() { ui.setCommand(false); ui.setNotes(false); ui.setAsk(true); }
   function openAttention(view: "for-you" | "approvals" | "updates" | "settings") {

@@ -26,6 +26,9 @@
   --text-2xl: calc(30px * var(--interface-scale));
   --text-3xl: calc(40px * var(--interface-scale));
   --text-display: calc(54px * var(--interface-scale));
+  /* Hierarchy steps that sit between the base ramp: page title and stat figure. */
+  --text-title: calc(32px * var(--interface-scale));
+  --text-stat: calc(34px * var(--interface-scale));
   --header-h: calc(68px * var(--interface-scale));
   --rail-w: calc(64px * var(--interface-scale));
   --appnav-w: calc(232px * var(--interface-scale));

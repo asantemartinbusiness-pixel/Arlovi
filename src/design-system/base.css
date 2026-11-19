@@ -28,8 +28,16 @@ a { color: var(--fg-link); text-decoration-thickness: 1px; text-underline-offset
 :focus { outline: none; }
 :focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
-/* Hierarchy comes from the gap between light statements and medium labels,
-   never from bold display type. */
+/* ---- Typography hierarchy: six steps, rendered px at the 100 scale ----
+   Applications inherit these; they never pick a size by hand.
+   1 page title     --text-title  25.6  light 300  h1, .pg-title h1
+   2 section title  --text-lg     16    regular    h2, .pk-section h2, record name
+   3 card title     --text-md     12.8  medium     h3, .ds-card-head h2/h3
+   4 body           --text-base   12    regular    p, form copy (grid cells use --text-sm)
+   5 label          --text-xs     9.6   medium caps .ds-eyebrow, .ds-stat-label, th
+   6 metadata       --text-sm     10.8  regular     .ds-subtle, .ds-card-sub, captions
+   Stat figures use --text-stat (27) light. Hierarchy comes from the gap between
+   light statements and medium labels, never from bold display type. */
 h1, h2, h3, h4, h5, h6 {
   margin: 0;
   font-family: var(--font-display);
@@ -38,10 +46,13 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.2;
   color: var(--fg-strong);
 }
-h1 { font-size: var(--text-3xl); font-weight: 300; line-height: 1.05; letter-spacing: var(--tracking-tighter); }
-h2 { font-size: var(--text-xl); font-weight: 300; line-height: 1.1; letter-spacing: var(--tracking-tighter); }
-h3 { font-size: var(--text-lg); font-weight: 400; letter-spacing: -0.01em; }
-h4 { font-size: var(--text-md); font-weight: 500; }
+h1 { font-size: var(--text-title); font-weight: 300; line-height: 1.1; letter-spacing: var(--tracking-tighter); }
+h2 { font-size: var(--text-lg); font-weight: 400; line-height: 1.15; letter-spacing: -0.01em; }
+h3 { font-size: var(--text-md); font-weight: 500; letter-spacing: 0; }
+h4 { font-size: var(--text-base); font-weight: 500; }
+/* The page heading receives programmatic focus after a route change for
+   assistive technology; it is not an interactive control, so no ring. */
+h1[tabindex="-1"]:focus, h1[tabindex="-1"]:focus-visible { outline: none; box-shadow: none; }
 p { margin: 0; }
 ul, ol { margin: 0; padding: 0; list-style: none; }
 figure { margin: 0; }
@@ -83,7 +94,7 @@ tr[data-prov]::before { inset-block: 0; }
 
 /* A label that names what a thing is. */
 .ds-eyebrow {
-  font-size: var(--text-xs); font-weight: 500;
+  font-size: var(--text-xs); font-weight: 500; line-height: 1.3;
   letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--fg-subtle);
 }
 

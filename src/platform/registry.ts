@@ -4,6 +4,7 @@ import type { Rec, Role } from "@/domain/types";
 import type { Capability } from "./policy";
 import type { OrgProfile } from "./org";
 import type { Mutations } from "./workspace";
+import type { RecordHeaderProps } from "@/design-system/page-kit";
 
 /* ------------------------------------------------------------------ *
  * Typed screen registry.
@@ -113,6 +114,13 @@ export interface ScreenDef {
   /** Override the page title/description from the registry contract. */
   title?: (context: ScreenContext) => string;
   subtitle?: (context: ScreenContext) => ReactNode;
+  /**
+   * Record/detail pages: replaces the generic page head. The returned title
+   * becomes the page h1 (and the route-change focus target), the screen title
+   * becomes the eyebrow, the lede is dropped and the screen actions render in
+   * the header. Breadcrumbs and the ScreenDef tab strip stay as they are.
+   */
+  record?: (context: ScreenContext) => RecordHeaderProps | null;
 }
 
 export interface AppNavSection {

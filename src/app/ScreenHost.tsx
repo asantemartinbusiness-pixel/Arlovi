@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { MoreHorizontal } from "lucide-react";
 import { OverlayOrigin, OverlayRecordContext, nativeOverlayDomain } from "@/app/OverlayExperience";
 import "@/app/native-overlay-experience.css";
-import { Breadcrumbs, Button, Drawer, Menu, Modal, Notice, Tabs, TabPanel } from "@/design-system";
+import { Breadcrumbs, Button, Drawer, Menu, Modal, Notice, Tabs, TabPanel, RecordHeader, OVERLAY_WIDTH } from "@/design-system";
 import { appEntry, findScreen, type ScreenInfo } from "@/app/catalog";
 import { runNativeScreenAction } from "@/app/screenActions";
 import { APP_ENTRIES } from "@/app/nav";
@@ -238,6 +238,7 @@ export function ScreenHost() {
   const activeDefTab = def?.tabs?.find((item) => item.id === activeTab);
   const title = def?.title?.(context) ?? screen.title;
   const AppIcon = APP_ENTRIES[screen.applicationCode]?.icon;
+  const recordHeader = def?.record?.(context) ?? null;
 
   const content = def?.surface
     ? def.surface(context)
@@ -303,7 +304,7 @@ export function ScreenHost() {
 
   const page = (
     <div className="pg">
-      <header className="pg-head">
+      <header className="pg-head" data-record={recordHeader ? "true" : undefined}>
         <Breadcrumbs
           items={[
             { label: workspace.org.shortName, to: `/o/${workspace.org.slug}/hq/home` },
@@ -311,20 +312,24 @@ export function ScreenHost() {
             { label: title },
           ]}
         />
-        <div className="pg-titlerow">
-          <div className="pg-title">
-            <h1>
-              {AppIcon && <AppIcon size={0} />}
-              {title}
-            </h1>
-            {def?.subtitle
-              ? <div className="pg-lede">{def.subtitle(context)}</div>
-              : def
-                ? null
-                : <p className="pg-lede">{screen.purpose}</p>}
-          </div>
-          {actionBar}
-        </div>
+        {recordHeader
+          ? <RecordHeader level={1} flat {...recordHeader} eyebrow={title} actions={actions.length > 0 ? actionBar : undefined} />
+          : (
+            <div className="pg-titlerow">
+              <div className="pg-title">
+                <h1>
+                  {AppIcon && <AppIcon size={0} />}
+                  {title}
+                </h1>
+                {def?.subtitle
+                  ? <div className="pg-lede">{def.subtitle(context)}</div>
+                  : def
+                    ? null
+                    : <p className="pg-lede">{screen.purpose}</p>}
+              </div>
+              {actionBar}
+            </div>
+          )}
       </header>
 
       {def?.header?.(context)}
@@ -438,7 +443,7 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
   }
   if (found.kind === "drawer") {
     return (
-      <Drawer open onOpenChange={(next) => { if (!next) onClose(); }} title={overlayTitle} subtitle={description} origin={origin} head={recordContext} application={appCode} width={found.width ?? 440} footer={found.footer?.(overlayContext)}>
+      <Drawer open onOpenChange={(next) => { if (!next) onClose(); }} title={overlayTitle} subtitle={description} origin={origin} head={recordContext} application={appCode} width={found.width ?? OVERLAY_WIDTH.compact} footer={found.footer?.(overlayContext)}>
         {body}
       </Drawer>
     );
@@ -452,7 +457,7 @@ function ScreenOverlays({ context: ctx, def: screenDef, overlayId, onClose }: { 
       origin={origin}
       head={recordContext}
       application={appCode}
-      width={found.width ?? 560}
+      width={found.width ?? OVERLAY_WIDTH.modal}
       tone={found.tone}
       blocking={found.blocking}
       footer={found.footer?.(overlayContext)}

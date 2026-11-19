@@ -217,7 +217,7 @@ export function RoutingLine({ nodes }: { nodes: { icon: ReactNode; label: string
 export function Empty({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="ds-empty">
-      {icon && <div className="ds-empty-icon" aria-hidden="true"><Sculpture seed={title} size={80} /></div>}
+      {icon && <div className="ds-empty-icon" aria-hidden="true"><Sculpture seed={title} size={56} /></div>}
       <h3>{title}</h3>
       {children && <p className="ds-prose">{children}</p>}
       {action}
