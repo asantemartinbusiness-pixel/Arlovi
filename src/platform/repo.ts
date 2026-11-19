@@ -446,6 +446,14 @@ export async function executeReviewedErasure(
       throw new Error("The selected subject request is no longer available.");
     }
     if (request.fields.legalHold === true) throw new Error("The subject request is under a legal hold.");
+    if (request.fields.erasureExecutionStatus !== "not_executed" || !request.fields.erasureReviewedBy) {
+      throw new Error("This request has no approved local erasure impact review.");
+    }
+    const reviewedCandidates = String(request.fields.erasureCandidateIds ?? "").split(",").filter(Boolean);
+    if (reviewedCandidates.length !== candidateIds.length ||
+      reviewedCandidates.some((id) => !candidateIds.includes(id))) {
+      throw new Error("Erasure selection differs from the recorded impact review.");
+    }
     const scope = String(request.fields.collections ?? "").split(",").map((entry) => entry.trim()).filter(Boolean);
     const held = latest.filter((record) => record.collection === "policies" &&
       record.fields.kind === "retention" && record.fields.legalHold === true);
@@ -476,6 +484,7 @@ export async function executeReviewedErasure(
         completedBy: context.actor,
         completedAt: context.now,
         erasureExecutedLocally: true,
+        erasureExecutionStatus: "executed_locally",
       },
     }, context);
     await db.records.put(updated);
