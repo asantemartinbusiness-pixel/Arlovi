@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
-import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord } from "@/platform/workspace";
