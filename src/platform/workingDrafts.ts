@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 
 /**
  * Explicitly opt-in, in-memory working drafts. Sensitive draft fields never
@@ -6,6 +6,30 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
  * Drafts survive an in-app detour and unmount, but not a browser reload.
  */
 const workingDrafts = new Map<string, Map<string, unknown>>();
+const draftListeners = new Set<() => void>();
+let draftRevision = 0;
+function notifyDraftChange(): void { draftRevision++; draftListeners.forEach(listener => listener()); }
+export function subscribeWorkingDrafts(listener: () => void): () => void {
+  draftListeners.add(listener);
+  return () => { draftListeners.delete(listener); };
+}
+export function workingDraftRevision(): number { return draftRevision; }
+export function hasWorkingDraft(scope: string): boolean {
+  return (workingDrafts.get(scope)?.size ?? 0) > 0;
+}
+export function countWorkingDrafts(orgId: string, actor: string): number {
+  const marker = `:${orgId}:${actor}`;
+  return [...workingDrafts.entries()].filter(([scope, fields]) =>
+    fields.size > 0 && (scope.endsWith(marker) || scope.includes(marker + ":"))).length;
+}
+export function useWorkingDraftPresence(scope: string): boolean {
+  useSyncExternalStore(subscribeWorkingDrafts, workingDraftRevision, () => 0);
+  return hasWorkingDraft(scope);
+}
+export function useWorkingDraftCount(orgId: string, actor: string): number {
+  useSyncExternalStore(subscribeWorkingDrafts, workingDraftRevision, () => 0);
+  return countWorkingDrafts(orgId, actor);
+}
 
 export function readWorkingField<T>(scope: string, field: string, fallback: T): T {
   const fields = workingDrafts.get(scope);
@@ -18,9 +42,10 @@ export function rememberWorkingField<T>(scope: string, field: string, value: T):
     workingDrafts.set(scope, fields);
   }
   fields.set(field, value);
+  notifyDraftChange();
 }
 export function clearWorkingDraft(scope: string): void {
-  workingDrafts.delete(scope);
+  if (workingDrafts.delete(scope)) notifyDraftChange();
 }
 export function useWorkingField<T>(scope: string, field: string, fallback: T): [T, (next: T) => void] {
   // A mounted editor must never display another organisation's earlier

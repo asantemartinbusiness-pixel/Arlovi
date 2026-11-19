@@ -36,6 +36,7 @@ import { DisplayPreferences } from "@/app/DisplayPreferences";
 import { NotificationToastStack } from "@/app/NotificationToastStack";
 import { NotificationBanner } from "@/app/NotificationBanner";
 import { ProfileMenu } from "@/app/ProfileMenu";
+import { TemporaryDraftCounter } from "@/app/WorkingDraftStatus";
 import type { Role } from "@/domain/types";
 import "@/app/shell.css";
 
@@ -368,6 +369,7 @@ export function AppShell() {
         </div>
         <span className="ds-grow" />
 
+        <TemporaryDraftCounter orgId={org.id} actor={actor} />
         <button ref={searchTrigger} type="button" className="hq-search" onClick={openCommand} aria-keyshortcuts="Control+K Meta+K">
           <Search size={15} aria-hidden="true" />
           <span className="ds-sr-only">Search anything in {org.shortName}</span>
