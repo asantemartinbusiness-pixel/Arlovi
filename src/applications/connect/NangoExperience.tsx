@@ -6,7 +6,20 @@ import { BUSINESS_GOALS, SUGGESTED_INTEGRATIONS, type IntegrationGoal, type Sugg
 import "./nango-experience.css";
 
 type Status = { available: boolean; integrations: string[]; note?: string };
-type ConnectedAccount = { id: string; integrationId: string; provider: string; created: string; needsAttention: boolean };
+type ConnectedAccount = { id: string; integrationId: string; provider: string; created: string; needsAttention: boolean; ownedByMe: boolean };
+type ConnectionPage = { connections: ConnectedAccount[]; page: number; nextPage: number | null };
+
+async function getOwnedConnections(organizationId: string, integrationId: string): Promise<ConnectedAccount[]> {
+  const result: ConnectedAccount[] = [];
+  for (let page = 1; page <= 15; page++) {
+    const params = new URLSearchParams({ organizationId, integrationId, owner: "mine", page: String(page) });
+    const batch = await readJson<ConnectionPage>("/api/integrations/connections?" + params);
+    result.push(...batch.connections.filter(item => item.integrationId === integrationId && item.ownedByMe));
+    if (!batch.nextPage) return result;
+  }
+  // A partial account list cannot safely confirm a new authorisation.
+  throw new Error("This company has too many accounts to verify here. Ask an administrator to review them.");
+}
 
 async function readJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { credentials: "same-origin", cache: "no-store", ...init });
@@ -36,16 +49,19 @@ export function GuidedMarketplace({ context }: { context: ScreenContext }) {
   const [all, setAll] = useState(false);
   const [nangoProviders, setNangoProviders] = useState<SuggestedIntegration[]>([]);
   const [nangoTotal, setNangoTotal] = useState(0);
+  const [nangoPage, setNangoPage] = useState(1);
+  const [nextNangoPage, setNextNangoPage] = useState<number | null>(null);
   const status = useNangoReadiness();
   useEffect(() => {
     if (!all || !status?.available) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      readJson<{ providers: { id: string; name: string; categories: string[] }[]; total: number }>(
-        "/api/integrations/providers?q=" + encodeURIComponent(query), { signal: controller.signal })
+      readJson<{ providers: { id: string; name: string; categories: string[] }[]; total: number; nextPage: number | null }>(
+        "/api/integrations/providers?q=" + encodeURIComponent(query) + "&page=" + nangoPage, { signal: controller.signal })
         .then(result => {
           setNangoTotal(result.total);
-          setNangoProviders(result.providers.map(item => {
+          setNextNangoPage(result.nextPage);
+          const fresh = result.providers.map(item => {
             const cats = item.categories.map(value => value.toLowerCase());
             const category = cats.some(value => /financ|account|payment/.test(value)) ? "Finance" :
               cats.some(value => /commerce|retail/.test(value)) ? "Commerce" :
@@ -55,13 +71,16 @@ export function GuidedMarketplace({ context }: { context: ScreenContext }) {
               id: item.id, name: item.name, category, goal: "organise",
               summary: "Explore account access. Available actions and syncs must be verified separately.",
               applications: ["Integrations"],
-            };
-          }));
+            } as SuggestedIntegration;
+          });
+          setNangoProviders(previous => nangoPage === 1
+            ? fresh
+            : [...previous, ...fresh.filter(item => !previous.some(existing => existing.id === item.id))]);
         })
         .catch(() => { if (!controller.signal.aborted) setNangoProviders([]); });
     }, 250);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [all, query, status?.available]);
+  }, [all, query, nangoPage, status?.available]);
   const cards = useMemo(() => {
     const q = query.toLocaleLowerCase().trim();
     const merged = all
@@ -70,7 +89,7 @@ export function GuidedMarketplace({ context }: { context: ScreenContext }) {
     return merged.filter(item =>
       (all || item.goal === goal) &&
       (!q || [item.name, item.category, item.summary, item.keywords || "", ...item.applications].join(" ").toLocaleLowerCase().includes(q)))
-      .slice(0, all ? 48 : 6);
+      .slice(0, all ? 1200 : 6);
   }, [goal, all, query, nangoProviders]);
 
   return <section className="connect-guide" aria-label="Guided integration setup">
@@ -85,7 +104,7 @@ export function GuidedMarketplace({ context }: { context: ScreenContext }) {
     <div className="connect-guide-goals" role="group" aria-label="Business goals">
       {BUSINESS_GOALS.map(item =>
         <button type="button" key={item.id} aria-pressed={goal === item.id && !all}
-          onClick={() => { setGoal(item.id); setAll(false); setQuery(""); }}>
+          onClick={() => { setGoal(item.id); setAll(false); setQuery(""); setNangoPage(1); }}>
           <span>{item.title}</span><small>{item.detail}</small>
         </button>)}
     </div>
@@ -94,9 +113,9 @@ export function GuidedMarketplace({ context }: { context: ScreenContext }) {
         <Search size={16} aria-hidden="true"/>
         <span className="ds-sr-only">Search suggested software</span>
         <input type="search" aria-label="Search suggested software" placeholder="Find a tool, or search what it helps with…" value={query}
-          onChange={event => { setQuery(event.target.value); if (event.target.value.trim()) setAll(true); }} />
+          onChange={event => { setQuery(event.target.value); setNangoPage(1); setNangoProviders([]); if (event.target.value.trim()) setAll(true); }} />
       </label>
-      <Button size="sm" variant="secondary" onClick={() => { setAll(value => !value); setQuery(""); }}>
+      <Button size="sm" variant="secondary" onClick={() => { setAll(value => !value); setQuery(""); setNangoPage(1); setNangoProviders([]); }}>
         {all ? "Show my suggestions" : "Browse more tools"}
       </Button>
     </div>
@@ -120,7 +139,7 @@ export function GuidedMarketplace({ context }: { context: ScreenContext }) {
           <div className="connect-guide-apps">{item.applications.join(" · ")}</div>
           <div className="connect-guide-card-footer">
             <span className="connect-guide-state">{enabled ? "Available to connect" : "Explore connection"}</span>
-            <button type="button" onClick={() => context.openOverlay("Nango guided setup", { providerId: item.id })}>
+            <button type="button" onClick={() => context.openOverlay("Nango guided setup", { providerId: item.id, provider: item })}>
               Set up <ArrowRight size={15} aria-hidden="true"/>
             </button>
           </div>
@@ -128,19 +147,24 @@ export function GuidedMarketplace({ context }: { context: ScreenContext }) {
       })}
     </div>
     {cards.length === 0 && <p className="ds-subtle">No suggested tools match. Try a different name or business goal.</p>}
+    {all && nextNangoPage && <Button size="sm" variant="secondary"
+      onClick={() => setNangoPage(nextNangoPage)}>Show more tools</Button>}
     <p className="connect-guide-disclaimer">Suggested integrations are not automatically active. Availability, permission requirements and supported operations are verified during setup.</p>
   </section>;
 }
 
 export function NangoGuidedSetup({ context }: { context: ScreenContext }) {
-  const payload = context.overlayPayload as { providerId?: string } | undefined;
-  const provider = SUGGESTED_INTEGRATIONS.find(item => item.id === payload?.providerId);
+  const payload = context.overlayPayload as { providerId?: string; provider?: SuggestedIntegration } | undefined;
+  const selected = payload?.provider;
+  const provider = SUGGESTED_INTEGRATIONS.find(item => item.id === payload?.providerId) ??
+    (selected && selected.id === payload?.providerId && /^[a-z0-9][a-z0-9_-]{1,95}$/i.test(selected.id) ? selected : undefined);
   const status = useNangoReadiness();
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [launched, setLaunched] = useState(false);
   const [verified, setVerified] = useState(false);
+  const [previousIds, setPreviousIds] = useState<string[] | null>(null);
   const available = Boolean(provider && status?.available && status.integrations.includes(provider.id));
   if (!provider) return <Notice tone="warning" title="Unknown integration">Select a supported integration in the directory.</Notice>;
 
@@ -151,6 +175,10 @@ export function NangoGuidedSetup({ context }: { context: ScreenContext }) {
     if (popup) { popup.document.title = "Authorising account"; popup.opener = null; }
     setBusy(true); setError("");
     try {
+      // A preflight snapshot prevents an older account from being mistaken for
+      // a successful NEW connection. The backend checks current user ownership.
+      const previouslyConnected = await getOwnedConnections(context.org.id, provider.id);
+      setPreviousIds(previouslyConnected.map(item => item.id));
       const result = await readJson<{ connectLink: string }>("/api/integrations/connect-session", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ organizationId: context.org.id, integrationId: provider.id }),
@@ -169,10 +197,11 @@ export function NangoGuidedSetup({ context }: { context: ScreenContext }) {
   const verify = async () => {
     setBusy(true); setError("");
     try {
-      const result = await readJson<{ connections: ConnectedAccount[] }>(
-        "/api/integrations/connections?organizationId=" + encodeURIComponent(context.org.id));
-      const match = result.connections.some(item => item.integrationId === provider.id && !item.needsAttention);
-      if (!match) throw new Error("We haven't confirmed the account yet. Finish signing in, then try again.");
+      if (!previousIds) throw new Error("Start a new secure connection before verifying the result.");
+      const accounts = await getOwnedConnections(context.org.id, provider.id);
+      const before = new Set(previousIds);
+      const match = accounts.some(item => !before.has(item.id) && !item.needsAttention);
+      if (!match) throw new Error("We haven't confirmed a newly linked account yet. Finish signing in, then try again.");
       setVerified(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not verify your account.");
@@ -230,33 +259,70 @@ export function NangoGuidedSetup({ context }: { context: ScreenContext }) {
 }
 
 export function NangoLiveConnections({ context }: { context: ScreenContext }) {
+  const status = useNangoReadiness();
   const [connections, setConnections] = useState<ConnectedAccount[] | null>(null);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
-  const load = async () => {
-    setBusy(true); setError("");
+  const [nextPage, setNextPage] = useState<number | null>(null);
+  const load = async (page = 1) => {
+    if (!status?.available) return;
+    setBusy(true); setError(""); setInfo("");
     try {
-      const response = await readJson<{ connections: ConnectedAccount[] }>(
-        "/api/integrations/connections?organizationId=" + encodeURIComponent(context.org.id));
-      setConnections(response.connections);
+      const params = new URLSearchParams({ organizationId: context.org.id, page: String(page) });
+      const result = await readJson<ConnectionPage>("/api/integrations/connections?" + params);
+      setConnections(previous => page === 1 ? result.connections : [...(previous || []), ...result.connections]);
+      setNextPage(result.nextPage);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Connections are unavailable."); }
     finally { setBusy(false); }
   };
-  // No background polling or fake connection counts.
+  useEffect(() => {
+    if (status?.available) void load(1);
+    // Only when readiness/org changes; no polling.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status?.available, context.org.id]);
+
+  const reconnect = async (account: ConnectedAccount) => {
+    if (busy) return;
+    const popup = window.open("about:blank", "_blank", "width=580,height=730");
+    if (popup) { popup.document.title = "Reconnect account"; popup.opener = null; }
+    setBusy(true); setError(""); setInfo("");
+    try {
+      const result = await readJson<{ connectLink: string }>("/api/integrations/reconnect-session", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: context.org.id, connectionId: account.id, integrationId: account.integrationId }),
+      });
+      const destination = new URL(result.connectLink);
+      if (destination.protocol !== "https:") throw new Error("Invalid sign-in destination.");
+      if (popup && !popup.closed) popup.location.replace(destination.toString());
+      else window.open(destination.toString(), "_blank", "noopener,noreferrer");
+      setInfo("Complete the account sign-in, then refresh to check its status.");
+    } catch (cause) {
+      if (popup && !popup.closed) popup.close();
+      setError(cause instanceof Error ? cause.message : "Could not open account reconnection.");
+    } finally { setBusy(false); }
+  };
+
   return <section className="connect-guide connect-live" aria-label="Nango connections">
     <div className="connect-guide-heading">
       <div><span className="connect-eyebrow">SECURE PROVIDER ACCOUNTS</span><h3>Connected accounts</h3>
-        <p>Check accounts authorised through Nango for this company. This is separate from local demo records.</p></div>
+        <p>Review accounts authorised through Nango for this company, separately from local workspace records.</p></div>
       <span className="connect-guide-mark" aria-hidden="true"><PlugZap size={22}/></span>
     </div>
-    <Button size="sm" variant="secondary" busy={busy} onClick={load}>Refresh authorised accounts</Button>
-    {error && <p className="ds-subtle" role="status">{error}</p>}
+    {!status?.available && <Notice tone="info" title="Secure connections are not enabled here">
+      Company authentication and Nango environment setup are required before real accounts can be viewed.
+    </Notice>}
+    {status?.available && <Button size="sm" variant="secondary" busy={busy} onClick={() => void load(1)}>Refresh authorised accounts</Button>}
+    {error && <p className="ds-subtle" role="alert">{error}</p>}
+    {info && <p className="ds-subtle" role="status">{info}</p>}
     {connections && <div className="connect-live-list">
       {connections.length === 0 ? <p className="ds-subtle">No provider accounts have been authorised for this company.</p> :
-        connections.map(item => <div key={String(item.id)} className="connect-live-account">
-          <div><strong>{String(item.provider || item.integrationId)}</strong><small>Account {String(item.id)}</small></div>
-          <span>{item.needsAttention ? "Needs attention" : "Authorised"}</span>
+        connections.map(item => <div key={item.integrationId + ":" + item.id} className="connect-live-account">
+          <div><strong>{item.provider || item.integrationId}</strong><small>Account {item.id}</small>
+            <small>{item.needsAttention ? "Needs attention" : "Authorised · data sync not automatically enabled"}</small></div>
+          <Button size="sm" variant="secondary" busy={busy} onClick={() => void reconnect(item)}>Reconnect</Button>
         </div>)}
+      {nextPage && <Button size="sm" variant="secondary" busy={busy} onClick={() => void load(nextPage)}>Show more accounts</Button>}
     </div>}
   </section>;
 }
