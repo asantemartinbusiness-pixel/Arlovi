@@ -284,34 +284,35 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
 
 export function AccessRequestForm({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
-  const people = useMemo(() => data.members.filter((row) => row.fields.kind !== "ai"), [data.members]);
-  const mine = people.find((row) => row.title === context.actor);
+  const people = useMemo(() => data.members.filter((row) => row.fields.kind !== "ai" && row.status === "active" && row.organizationId === context.org.id), [data.members, context.org.id]);
   const [memberId, setMemberId] = useState("");
-  const chosen = people.find((row) => row.id === (memberId || mine?.id)) ?? people[0];
+  const chosen = people.find((row) => row.id === memberId);
   const [requested, setRequested] = useState<Role | "">("");
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const from = (String(chosen?.fields.role ?? "member")) as Role;
-  const target = (requested || ROLES.find((entry) => entry !== from && entry !== "client") || "member") as Role;
-  const change = accessChange(from, target);
+  const target = requested || "";
+  const change = chosen && target && target !== from ? accessChange(from, target) : null;
 
   return (
     <Stack gap={4}>
-      <Field label="Who needs access">
+      <Field label="Who needs access" required>
         <Select value={chosen?.id ?? ""} onChange={(event) => setMemberId(event.target.value)}>
+          <option value="">Choose a team member</option>
           {people.map((row) => <option key={row.id} value={row.id}>{row.title} · {ROLE_LABELS[String(row.fields.role) as Role] ?? String(row.fields.role)}</option>)}
         </Select>
       </Field>
-      <Field label="Role view requested">
+      <Field label="Role view requested" required>
         <Select value={target} onChange={(event) => setRequested(event.target.value as Role)}>
+          <option value="">Choose a requested role</option>
           {ROLES.filter((entry) => entry !== from).map((entry) => <option key={entry} value={entry}>{ROLE_LABELS[entry]}</option>)}
         </Select>
       </Field>
-      <p className="ds-subtle">
+      {change && <p className="ds-subtle">
         {change.gained.length ? `Would add ${change.gained.map(capabilityLabel).join(", ")}.` : "Adds no capabilities."}
         {change.lost.length ? ` Would remove ${change.lost.map(capabilityLabel).join(", ")}.` : ""}
-      </p>
+      </p>}
       <Field label="Why" required error={error || undefined}>
         <TextArea rows={3} value={reason} onChange={(event) => { setReason(event.target.value); setError(""); }} placeholder="Covering month-end while Jonah is away" />
       </Field>
@@ -321,10 +322,10 @@ export function AccessRequestForm({ context, close }: { context: ScreenContext; 
         <Button
           variant="primary"
           busy={busy}
-          disabled={!chosen}
+          disabled={!chosen || !target || target === from || reason.trim().length < 10 || busy}
           onClick={async () => {
-            if (!chosen) return;
-            if (!reason.trim()) { setError("Give the reviewer a reason."); return; }
+            if (!chosen || !target || target === from || busy) return;
+            if (reason.trim().length < 10) { setError("Provide a specific reason of at least 10 characters."); return; }
             if (ofKind(data.policies, "accessRequest").some((row) => row.status === "open" && row.fields.memberId === chosen.id && row.fields.requestedRole === target)) {
               setError("That request is already waiting for review."); return;
             }
@@ -341,7 +342,7 @@ export function AccessRequestForm({ context, close }: { context: ScreenContext; 
               }, `Access requested for ${chosen.title}: ${from} → ${target}`);
               context.toast("Request recorded", "An owner reviews it under Exceptions with the exact change shown.");
               close();
-            } finally { setBusy(false); }
+            } catch (cause) { setError(cause instanceof Error ? cause.message : "Request could not be saved."); } finally { setBusy(false); }
           }}
         >
           Send for review
