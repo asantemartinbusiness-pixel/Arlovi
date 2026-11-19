@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Database, FileClock, KeyRound, Lock, Scale, Server } from "lucide-react";
 import {
-  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, ModalActions, ModalInFlight, Notice, OverlayCancel, Pill,
+  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayCancel, Pill,
   Properties, Row, Select, Stack, Stat, StatRow, Switch, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
@@ -839,75 +839,128 @@ export function DataRequestOverlay({ context, close }: { context: ScreenContext;
   const counting = settledRecords === null;
   const records = settledRecords ?? [];
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const request = data.dataRequests.find((row) => row.id === (payload?.id ?? context.selectedId));
+  const request = data.dataRequests.find(row =>
+    row.id === (payload?.id ?? context.selectedId) && row.organizationId === context.org.id);
+  const [identityReviewed, setIdentityReviewed] = useState(false);
   const [busy, setBusy] = useState(false);
-  if (!request) return <Empty title="Select a request" icon={<Scale size={20} />}>Choose a request to review it.</Empty>;
+  const [error, setError] = useState("");
+  if (!request) return <Empty title="Choose a subject request" icon={<Scale size={20} />}>
+    Select the actual privacy request. Arlovi will not substitute a different person's request.
+  </Empty>;
 
-  const subject = String(request.fields.subject ?? "");
+  const subject = String(request.fields.subject ?? "").trim();
   const collections = csvList(request.fields.collections);
   const matching = subjectRecords(request, records);
   const hold = request.fields.legalHold === true;
+  const ready = !counting && !seedsFailed && subject.length > 0 && collections.length > 0;
+  const canExport = ready && identityReviewed && !busy && context.can("export_data");
+  const canRestrict = !busy && context.can("manage_policy") && request.status !== "restricted";
+  const canDelete = ready && !busy && !hold && context.can("delete_records");
 
   return (
     <Stack gap={4}>
+      <ModalUnsavedChanges when={identityReviewed} />
+      <ModalInFlight when={busy} />
       <Properties rows={[
-        { label: "Subject", value: subject },
-        { label: "Kind", value: String(request.fields.type) },
+        { label: "Subject", value: subject || "Missing subject identity" },
+        { label: "Request", value: request.title },
+        { label: "Kind", value: String(request.fields.type ?? "Not recorded") },
         { label: "Received", value: context.dateTime(request.at) },
-        { label: "Due", value: request.dueAt ? `${context.date(request.dueAt)} (${context.relative(request.dueAt)})` : "No deadline recorded" },
-        { label: "Basis", value: String(request.fields.lawfulBasis ?? "") },
+        { label: "Due", value: request.dueAt
+          ? `${context.date(request.dueAt)} (${context.relative(request.dueAt)})`
+          : "No deadline recorded" },
+        { label: "Basis", value: String(request.fields.lawfulBasis ?? "Not recorded") },
         { label: "Handler", value: String(request.fields.handler ?? "Unassigned") },
-        { label: "Records matched now", value: seedsFailed ? "Not every application's records could be loaded" : counting ? "Counting records from every application…" : `${matching.length} across ${collections.length} collections` },
-        ...(counting ? [] : [{ label: "Where they are", value: collections.map((collection) => `${collection} ${matching.filter((row) => row.collection === collection).length}`).join(" · ") }]),
+        { label: "Records counted", value: seedsFailed
+          ? "Some application records could not be loaded"
+          : counting ? "Still counting organisation records"
+          : `${matching.length} matches in ${collections.length} requested collection(s)` },
+        ...(!counting ? [{
+          label: "Collection scope",
+          value: collections.map(collection =>
+            `${collection}: ${matching.filter(row => row.collection === collection).length}`).join(" · "),
+        }] : []),
       ]} />
       {seedsFailed && <SeedsFailedNotice retry={seeds.retry} />}
-      {hold && (
-        <Notice tone="danger" title="A legal hold applies">
-          {String(request.fields.holdReason ?? "A hold is recorded against these records.")} Erasure is refused while the hold stands.
-          The person must be told that their request is lawfully restricted, not quietly ignored.
-        </Notice>
-      )}
-      <Row gap={2} wrap>
-        <Button
-          variant="primary"
-          busy={busy}
-          disabled={counting}
-          title={seedsFailed ? "Unavailable: not every application's records could be loaded" : counting ? "Wait until every record has been counted" : undefined}
+      {hold && <Notice tone="danger" title="Legal hold recorded">
+        {String(request.fields.holdReason ?? "This request is under a recorded hold.")}
+        Erasure is blocked while the hold remains. Review actual legal obligations outside this local workspace.
+      </Notice>}
+      {!subject && <Notice tone="danger" title="Subject identification missing">
+        An export cannot be prepared without an identified request subject. Correct the request first.
+      </Notice>}
+      {collections.length === 0 && <Notice tone="warning" title="No requested collections recorded">
+        The export and deletion preview remain unavailable until the record scope is defined.
+      </Notice>}
+      <Notice tone="info" title="Privacy actions are local records, not complete compliance workflows">
+        The browser can prepare a scoped CSV and record a local processing restriction.
+        It cannot authenticate a data subject, enforce restrictions in external systems
+        or establish whether an erasure meets every applicable legal obligation.
+      </Notice>
+      <Checkbox checked={identityReviewed} disabled={busy || !ready}
+        onChange={event => setIdentityReviewed(event.target.checked)}
+        label="I independently verified the requester's identity and confirmed the collection scope before preparing a copy." />
+      {error && <Notice tone="danger" title="Privacy action could not be completed">{error}</Notice>}
+      <ModalActions>
+        <OverlayCancel disabled={busy}>Close review</OverlayCancel>
+        <span className="ds-grow" />
+        <Button variant="secondary" busy={busy} disabled={!canRestrict}
+          title={!context.can("manage_policy") ? "Policy-management permission required" : undefined}
           onClick={async () => {
+            if (!canRestrict) return;
             setBusy(true);
+            setError("");
+            try {
+              const saved = await context.mutate.patch(request.id, {
+                status: "restricted",
+                fields: { ...request.fields, restrictedBy: context.actor,
+                  restrictedAt: context.now.toISOString() },
+              }, { event: `Local processing restriction flag recorded for ${subject}`,
+                expectRevision: request.revision });
+              if (!saved) { setError("The request changed. Reopen the latest version before trying again."); return; }
+              context.toast("Local restriction recorded",
+                "The request was marked restricted here. External processors and other systems were not automatically restricted.");
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : "Review the request before retrying.");
+            } finally { setBusy(false); }
+          }}>
+          Mark locally restricted
+        </Button>
+        <Button variant="primary" busy={busy} disabled={!canExport}
+          title={!context.can("export_data") ? "Export permission required" : !ready ? "Identify the subject and finish counting records first" : undefined}
+          onClick={async () => {
+            if (!canExport) return;
+            setBusy(true);
+            setError("");
             try {
               const header = "collection,id,title,status,summary,updated\n";
-              const body = matching.map((record) => [record.collection, record.id, record.title, record.status, record.summary, record.updatedAt].map(quote).join(",")).join("\n");
-              // Persist the audit receipt before initiating a browser download,
-              // so a navigation cannot lose the evidence of preparation.
-              await context.mutate.patch(request.id, { fields: { exportPreparedAt: context.now.toISOString(), exportPreparedBy: context.actor } }, { event: `Subject data export prepared for ${subject} (${matching.length} records)` });
+              const body = matching.map(record =>
+                [record.collection, record.id, record.title, record.status, record.summary, record.updatedAt]
+                  .map(quote).join(",")).join("\n");
+              const saved = await context.mutate.patch(request.id, {
+                fields: { ...request.fields, exportPreparedAt: context.now.toISOString(),
+                  exportPreparedBy: context.actor, exportedCount: matching.length },
+              }, { expectRevision: request.revision,
+                event: `Scoped subject data copy prepared for ${subject} (${matching.length} records)` });
+              if (!saved) { setError("The request changed. No CSV was downloaded. Reopen the latest request."); return; }
               download(`${context.org.slug}-${subject.replace(/\W+/g, "-").toLowerCase()}-data.csv`, header + body);
-              context.toast("Copy prepared", `${matching.length} records downloaded as CSV, and the request records that it happened.`);
+              context.toast("CSV prepared",
+                `${matching.length} current record(s) downloaded locally. No external delivery occurred.`);
+              setIdentityReviewed(false);
+            } catch (cause) {
+              const message = cause instanceof Error ? cause.message : "The data copy could not be prepared.";
+              setError(message);
+              context.toast("Export not prepared", message, "failed");
             } finally { setBusy(false); }
-          }}
-        >
-          Export their data
+          }}>
+          Export scoped CSV
         </Button>
-        <Button
-          variant="secondary"
-          onClick={async () => {
-            await context.mutate.patch(request.id, { status: "restricted", fields: { ...request.fields, restrictedBy: context.actor, restrictedAt: context.now.toISOString() } }, { event: `Processing restricted for ${subject}`, expectRevision: request.revision });
-            context.toast("Processing restricted", "The request is marked restricted: the records stay but are not used further.");
-          }}
-        >
-          Restrict processing
+        <Button variant="outline-danger" disabled={!canDelete}
+          title={hold ? "Legal hold recorded" : !context.can("delete_records") ? "Deletion permission required" : !ready ? "Finish counting the records and verify the subject" : undefined}
+          onClick={() => context.openOverlay("deletion impact", { id: request.id })}>
+          Review deletion impact…
         </Button>
-        <Button
-          variant="outline-danger"
-          disabled={hold || seedsFailed}
-          title={hold ? "A legal hold prevents deletion" : seedsFailed ? "Unavailable: not every application's records could be loaded" : undefined}
-          onClick={() => context.openOverlay("deletion impact", { id: request.id })}
-        >
-          Delete where lawful…
-        </Button>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+      </ModalActions>
     </Stack>
   );
 }
