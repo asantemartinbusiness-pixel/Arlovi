@@ -101,16 +101,18 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
 
   const candidates = useMemo<SearchHit[]>(() => {
     const currentUrl = location.pathname + location.search + location.hash;
-    const previous = journey.trail.at(-1)?.url === currentUrl ? previousJourney(journey) : null;
-    const previousScreen = previous && findScreen(previous.url.split(/[?#]/)[0])?.screen;
-    const canReturn = previous && previousScreen
-      && previousScreen.applicationCode === previous.app
-      && canOpenLegacyScreen(role, previousScreen)
-      && safeLocation(previous.url, org.slug);
-    const back: SearchHit[] = canReturn ? [{
+    // A full-page route transition can paint its new heading before the
+    // app-journey effect persists the destination. Use the prior app whenever
+    // the current route is not yet the end of the stored trail.
+    const previous = journey.trail.at(-1)?.url === currentUrl
+      ? previousJourney(journey)
+      : [...journey.trail].reverse().find(item => item.app !== currentApp) ?? null;
+    const returnCandidate = resumable.find(item => item.to === previous?.url)
+      ?? resumable.find(item => item.code !== currentApp && item.to !== currentUrl);
+    const back: SearchHit[] = returnCandidate ? [{
       key: "return-to-previous-app", kind: "return", group: "Your journey",
-      title: `Back to ${APP_ENTRIES[previous.app]?.short ?? previousScreen.applicationName}`,
-      detail: previousScreen.title, to: previous.url, appCode: previous.app,
+      title: `Back to ${returnCandidate.title}`,
+      detail: returnCandidate.page, to: returnCandidate.to, appCode: returnCandidate.code,
       keywords: "back return previous continue",
     }] : [];
 
@@ -222,12 +224,12 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
 
   const hits = useMemo(() => {
     // Keep the opening state short; do not dump every screen in a tall menu.
-    const opening = query.trim() ? candidates : [
+    const opening = query.trim() || scope !== "all" ? candidates : [
       ...candidates.filter(hit => ["return", "resume", "saved", "action"].includes(hit.kind)).slice(0, 8),
       ...candidates.filter(hit => hit.kind === "screen").slice(0, 4),
       ...candidates.filter(hit => hit.kind === "app").slice(0, 6),
     ];
-    const limit = query.trim() ? MAX_RECORD_RESULTS : 15;
+    const limit = query.trim() || scope !== "all" ? MAX_RECORD_RESULTS : 15;
     return searchHits(opening, { query, scope, activeApp: currentApp }, limit);
   }, [candidates, query, scope, currentApp]);
 
