@@ -123,3 +123,29 @@ test("signature handover never substitutes an approved contract without selectio
   await expect(dialog).toContainText("Choose a contract ready for signature");
   await expect(dialog.getByRole("button", { name: "Mark awaiting signature" })).toHaveCount(0);
 });
+
+test("People payroll run review requires explicit selection", async ({ page }) => {
+  await page.goto("/o/northline/hr/payroll?overlay=Payroll%20review");
+  const drawer = page.getByRole("dialog", { name: "Payroll evidence" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toContainText("Choose a payroll run to review");
+  await expect(drawer.getByRole("combobox", { name: "Company payroll run" })).toHaveValue("");
+  await expect(drawer.getByRole("grid", { name: "Illustrative current employee salary breakdown" })).toHaveCount(0);
+});
+
+test("payroll human approval cannot select the first draft automatically", async ({ page }) => {
+  await page.goto("/o/northline/hr/payroll?overlay=submission%20signoff");
+  const dialog = page.getByRole("dialog", { name: "Payroll human approval" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("Choose the draft payroll run");
+  await expect(dialog.getByRole("button", { name: "Approve local draft" })).toHaveCount(0);
+});
+
+test("Customer Care bulk routing requires a named owner and review", async ({ page }) => {
+  await page.goto("/o/northline/care/tickets?overlay=bulk%20assignment");
+  const dialog = page.getByRole("dialog", { name: "Route unassigned cases" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("combobox", { name: "Assign every listed case to" })).toHaveValue("");
+  await expect(dialog.getByRole("button", { name: /Assign \d+ cases/ })).toBeDisabled();
+  await expect(dialog).toContainText("Their conversation history, queue, priority and existing SLA remain unchanged");
+});
