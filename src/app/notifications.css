@@ -92,3 +92,11 @@ body:has([role=dialog]) .nt-toast-stack.ds-toasts{inset-block-start:var(--space-
 .nt-banner[data-tone=warning]{border-left-color:var(--warning)}
 .nt-banner[data-tone=success]{border-left-color:var(--success)}
 @media(max-width:599px){.nt-banner{flex-wrap:wrap}.nt-banner-action{margin-left:30px}}
+
+
+/* Notifications must not trap underlying workspace controls, particularly on
+   small screens. The toast text is informational; only its explicit action and
+   dismiss controls intercept input. Persistent blocked/error toasts remain
+   readable and dismissible without making other applications unusable. */
+.nt-toast-stack.ds-toasts .nt-toast { pointer-events: none; }
+.nt-toast-stack.ds-toasts .nt-toast button { pointer-events: auto; }
