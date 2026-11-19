@@ -109,7 +109,7 @@ function ApplicationCard({
   </article>;
 }
 
-function AppShortcut({ app, slug, resumeApp }: { app: DirectoryApp; slug: string; resumeApp: (code: string) => string }) {
+function AppShortcut({ app, resumeApp }: { app: DirectoryApp; resumeApp: (code: string) => string }) {
   const Icon = app.icon;
   return <Link className="apps-directory-shortcut" to={resumeApp(app.code)}
     aria-label={app.short}>
@@ -260,13 +260,13 @@ export function AppsDirectory() {
         {pinnedApps.length > 0 && <section className="ws-section" aria-label="Pinned applications">
           <div className="apps-directory-section-header"><h2><Bookmark size={17} aria-hidden="true"/> Your favourites</h2><span>One-click access</span></div>
           <div className="apps-directory-shortcuts">
-            {pinnedApps.map(app => <AppShortcut key={app.code} app={app} slug={org.slug} resumeApp={resumeApp}/>)}
+            {pinnedApps.map(app => <AppShortcut key={app.code} app={app} resumeApp={resumeApp}/>)}
           </div>
         </section>}
         {recentApps.length > 0 && <section className="ws-section" aria-label="Recently used applications">
           <div className="apps-directory-section-header"><h2><Clock3 size={17} aria-hidden="true"/> Pick up where you left off</h2><span>Recent applications</span></div>
           <div className="apps-directory-shortcuts">
-            {recentApps.map(app => <AppShortcut key={app.code} app={app} slug={org.slug} resumeApp={resumeApp}/>)}
+            {recentApps.map(app => <AppShortcut key={app.code} app={app} resumeApp={resumeApp}/>)}
           </div>
         </section>}
       </div>
