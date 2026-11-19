@@ -80,3 +80,71 @@ export function bodyObject(req: Request): Record<string, unknown> | null {
   }
   return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
 }
+
+
+/** Minimal safe projection. Nango's list endpoint includes tags and errors,
+ * but no token should ever reach a browser. Missing/ambiguous ownership fails closed. */
+export type SafeConnection = {
+  id: string;
+  integrationId: string;
+  provider: string;
+  created: string;
+  needsAttention: boolean;
+  ownedByMe: boolean;
+};
+export function projectCompanyConnections(payload: unknown, organizationId: string, userId: string, owner: "all" | "mine" = "all"): SafeConnection[] {
+  if (!payload || typeof payload !== "object") return [];
+  const input = (payload as { connections?: unknown }).connections;
+  if (!Array.isArray(input)) return [];
+  const valid = (value: unknown): value is Record<string, unknown> =>
+    !!value && typeof value === "object" && !Array.isArray(value);
+  return input.filter(valid).flatMap(item => {
+    const tags = item.tags;
+    if (!valid(tags) || tags.organization_id !== organizationId) return [];
+    if (owner === "mine" && tags.end_user_id !== userId) return [];
+    if (typeof item.connection_id !== "string" || !item.connection_id ||
+        typeof item.provider_config_key !== "string" || !item.provider_config_key) return [];
+    return [{
+      id: item.connection_id,
+      integrationId: item.provider_config_key,
+      provider: typeof item.provider === "string" ? item.provider : item.provider_config_key,
+      created: typeof item.created === "string" ? item.created : "",
+      needsAttention: Array.isArray(item.errors) && item.errors.length > 0,
+      ownedByMe: tags.end_user_id === userId,
+    }];
+  });
+}
+export function isSafeConnectLink(link: unknown): link is string {
+  if (typeof link !== "string" || link.length > 4096) return false;
+  try {
+    const url = new URL(link);
+    // No redirects to untrusted phishing sites; hosted custom domains may be
+    // explicitly allowlisted as origins in server environment settings.
+    const extra = (process.env.NANGO_CONNECT_ALLOWED_ORIGINS || "")
+      .split(",").map(origin => origin.trim()).filter(Boolean);
+    return url.protocol === "https:" && !url.username && !url.password &&
+      (url.hostname === "nango.dev" || url.hostname.endsWith(".nango.dev") || extra.includes(url.origin));
+  } catch { return false; }
+}
+export function validOrgId(value: unknown): value is string {
+  return typeof value === "string" && /^[a-z0-9_-]{2,96}$/i.test(value);
+}
+export async function fetchCompanyConnectionPage(
+  organizationId: string, userId: string, page: number, limit: number, owner: "all" | "mine" = "all",
+  integrationId?: string,
+): Promise<{ connections: SafeConnection[]; hasMore: boolean } | null> {
+  const params = new URLSearchParams({
+    "tags[organization_id]": organizationId, page: String(page), limit: String(limit),
+  });
+  if (owner === "mine") params.set("tags[end_user_id]", userId);
+  const response = await nango("/connections?" + params.toString());
+  if (!response.ok) return null;
+  const payload: unknown = await response.json();
+  const raw = payload && typeof payload === "object" ? (payload as { connections?: unknown }).connections : undefined;
+  if (!Array.isArray(raw)) return null;
+  const scoped = projectCompanyConnections(payload, organizationId, userId, owner);
+  return {
+    connections: integrationId ? scoped.filter(item => item.integrationId === integrationId) : scoped,
+    hasMore: raw.length === limit,
+  };
+}
