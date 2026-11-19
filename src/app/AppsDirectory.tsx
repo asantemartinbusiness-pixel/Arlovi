@@ -9,6 +9,7 @@ import { NAV_GROUPS, type AppNavEntry } from "@/app/nav";
 import { canOpen } from "@/platform/policy";
 import { useCollection, useMutations, useWorkspace } from "@/platform/workspace";
 import { useNavigationContinuity } from "@/platform/navigationContinuity";
+import { resumeNativeAppPath } from "@/app/resumeNativeApp";
 import "./apps-directory.css";
 
 export interface DirectoryApp extends AppNavEntry {
@@ -66,10 +67,11 @@ export function findDirectoryApps(apps: DirectoryApp[], query: string, group = "
 }
 
 function ApplicationCard({
-  app, slug, pinned, busy, onPin, platform, growth, focused,
+  app, slug, pinned, busy, onPin, platform, growth, focused, resumeApp,
 }: {
   app: DirectoryApp;
   slug: string;
+  resumeApp: (code: string) => string;
   pinned: boolean;
   busy: boolean;
   onPin: (app: DirectoryApp) => void;
@@ -80,16 +82,17 @@ function ApplicationCard({
   const Icon = app.icon;
   const shortcuts = !focused ? [] : platform ? platformDestinations(app.code, slug)
     : growth ? growthDestinations(app.code, slug) : categoryDestinations(app.code, slug);
+  const resumable = resumeApp(app.code) !== appEntry(app.code, slug);
   return <article className="apps-directory-card" data-category={app.group.toLowerCase()} data-platform={platform ? "true" : undefined}
     data-growth={growth ? "true" : undefined} data-workareas={shortcuts.length ? "true" : undefined}>
-    <Link className="apps-directory-open" to={appEntry(app.code, slug)} aria-label={app.short}>
+    <Link className="apps-directory-open" to={resumeApp(app.code)} aria-label={resumable ? `Continue ${app.short} where you left off` : app.short}>
       <span className="apps-directory-icon"><Icon size={20} strokeWidth={1.8} aria-hidden="true" /></span>
       <span className="apps-directory-copy">
         <span className="apps-directory-card-label">{app.group} / Native application</span>
         <strong>{app.short}</strong>
         <span className="apps-directory-description">{app.purpose}</span>
       </span>
-      <span className="apps-directory-card-action">Open application <ArrowUpRight size={14} aria-hidden="true" /></span>
+      <span className="apps-directory-card-action">{resumable ? "Continue where you left off" : "Open application"} <ArrowUpRight size={14} aria-hidden="true" /></span>
     </Link>
     <button className="apps-directory-pin" type="button" aria-label={(pinned ? "Unpin " : "Pin ") + app.short}
       aria-pressed={pinned} title={pinned ? "Remove from favourites" : "Pin to favourites"}
@@ -106,9 +109,9 @@ function ApplicationCard({
   </article>;
 }
 
-function AppShortcut({ app, slug }: { app: DirectoryApp; slug: string }) {
+function AppShortcut({ app, slug, resumeApp }: { app: DirectoryApp; slug: string; resumeApp: (code: string) => string }) {
   const Icon = app.icon;
-  return <Link className="apps-directory-shortcut" to={appEntry(app.code, slug)}
+  return <Link className="apps-directory-shortcut" to={resumeApp(app.code)}
     aria-label={app.short}>
     <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
     <span>{app.short}</span>
@@ -122,7 +125,8 @@ function AppShortcut({ app, slug }: { app: DirectoryApp; slug: string }) {
  * No application code is loaded merely because its card is visible.
  */
 export function AppsDirectory() {
-  const { org, role } = useWorkspace();
+  const { org, role, actor } = useWorkspace();
+  const resumeApp = (code: string) => resumeNativeAppPath(org.id, org.slug, actor, role, code);
   const [params, setParams] = useSearchParams();
   const preferences = useCollection("preferences");
   const mutate = useMutations("workspace-apps");
@@ -256,7 +260,7 @@ export function AppsDirectory() {
         {pinnedApps.length > 0 && <section className="ws-section" aria-label="Pinned applications">
           <div className="apps-directory-section-header"><h2><Bookmark size={17} aria-hidden="true"/> Your favourites</h2><span>One-click access</span></div>
           <div className="apps-directory-shortcuts">
-            {pinnedApps.map(app => <AppShortcut key={app.code} app={app} slug={org.slug}/>)}
+            {pinnedApps.map(app => <AppShortcut key={app.code} app={app} slug={org.slug} resumeApp={resumeApp}/>)}
           </div>
         </section>}
         {recentApps.length > 0 && <section className="ws-section" aria-label="Recently used applications">
@@ -288,7 +292,7 @@ export function AppsDirectory() {
               <span>{items.length} {items.length === 1 ? "application" : "applications"} <ArrowRight size={14} aria-hidden="true" /></span>
             </div>
             <div className="apps-directory-grid">
-              {items.map(app => <ApplicationCard key={app.code} app={app} slug={org.slug}
+              {items.map(app => <ApplicationCard key={app.code} app={app} slug={org.slug} resumeApp={resumeApp}
                 pinned={favourites.has(app.short)} busy={busyCode === app.code} platform={group === "Platform"} growth={group === "Growth"} focused={group !== "All"}
                 onPin={item => void togglePin(item)}/>)}
             </div>

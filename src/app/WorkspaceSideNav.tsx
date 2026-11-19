@@ -5,6 +5,7 @@ import {
   Rocket, Settings2, Users, Workflow,
 } from "lucide-react";
 import { appEntry } from "@/app/catalog";
+import { resumeNativeAppPath } from "@/app/resumeNativeApp";
 import { NAV_GROUPS } from "@/app/nav";
 import { useCollections, useWorkspace } from "@/platform/workspace";
 import { canOpen } from "@/platform/policy";
@@ -32,7 +33,7 @@ function sidebarLinks(slug:string) {
 }
 /** A contextual secondary navigation: the primary rail owns the five top areas. */
 export function WorkspaceSideNav() {
-  const {org,role} = useWorkspace();
+  const {org,role,actor} = useWorkspace();
   const location = useLocation();
   const destination = workspaceDestination(location.pathname);
   const area = destination?.area ?? "home";
@@ -62,7 +63,7 @@ export function WorkspaceSideNav() {
   const apps = [link("apps","Browse all applications",Grid2X2)];
   const main = area==="home"?workspace:area==="company"?company:area==="spaces"?spaces:area==="work"?work:apps;
   const appShortcut=(code:string,label:string,icon:NavItem["icon"]):NavItem|null=>
-    canOpen(role,code)?{label,to:appEntry(code,org.slug),icon}:null;
+    canOpen(role,code)?{label,to:resumeNativeAppPath(org.id,org.slug,actor,role,code),icon}:null;
   const shortcuts:NavItem[] = (area==="home"
     ? [appShortcut("INBOX","Inbox",Inbox),appShortcut("BOOK","Calendar & bookings",CalendarDays)]
     : area==="company"
