@@ -639,9 +639,9 @@ export const hrApp = registerApp({
       ],
       overlays: [
         { id: "reconcile run", kind: "modal", title: "Reconcile the run to the ledger", width: 560, render: ({ close, ...context }) => <ReconcileRun context={context} close={close} /> },
-        { id: "Payroll review", kind: "drawer", title: "Payroll run", width: 620, render: ({ ...context }) => <PayrollReview context={context} /> },
+        { id: "Payroll review", kind: "drawer", title: "Payroll evidence", width: 700, presentation: { noRecordContext: true, guidance: "Select an actual payroll run and distinguish saved run evidence from today’s illustrative salary calculations." }, render: ({ ...context }) => <PayrollReview context={context} /> },
         { id: "exception report", kind: "modal", title: "Payroll exceptions", width: 600, render: ({ ...context }) => <PayrollExceptions context={context} /> },
-        { id: "submission signoff", kind: "modal", title: "Approve this run", tone: "danger", width: 560, render: ({ close, ...context }) => <PayrollSignoff context={context} close={close} /> },
+        { id: "submission signoff", kind: "modal", title: "Payroll human approval", width: 620, capability: "view_payroll", presentation: { noRecordContext: true, guidance: "Review the saved draft, recorded exceptions and filing limitations before signing off locally." }, render: ({ close, ...context }) => <PayrollSignoff context={context} close={close} /> },
       ],
     },
 
@@ -1156,19 +1156,35 @@ function PayrollExceptions({ context }: { context: ScreenContext }) {
 function PayrollSignoff({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCollections(["payrollRuns", "employees"]);
   const payload = context.overlayPayload as { id?: string } | undefined;
+  const [selectedRunId, setSelectedRunId] = useState(payload?.id ?? context.selectedId ?? "");
   const [checkedSources, setCheckedSources] = useState(false);
   const [checkedBoundary, setCheckedBoundary] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const wantedId = payload?.id ?? context.selectedId;
-  const run = wantedId
-    ? data.payrollRuns.find((row) => row.id === wantedId && row.organizationId === context.org.id && row.status === "draft")
-    : data.payrollRuns.find((row) => row.status === "draft");
+  const drafts = data.payrollRuns.filter(row =>
+    row.organizationId === context.org.id && row.status === "draft");
+  const run = selectedRunId ? drafts.find(row => row.id === selectedRunId) : undefined;
   const gaps = payrollSalaryGaps(data.employees);
   if (!context.can("view_payroll")) return <RoleViewNote what="Payroll approval" />;
   if (!run) return (
-    <Empty title={wantedId ? "Selected draft run unavailable" : "No draft run to approve"}>
-      Open an actual company payroll draft; a missing or approved run cannot silently be substituted.
-    </Empty>
+    <Stack gap={3}>
+      <Notice tone={selectedRunId ? "warning" : "info"}
+        title={selectedRunId ? "Selected draft payroll run unavailable" : "Choose the draft payroll run"}>
+        {selectedRunId
+          ? "This run is not an available draft in the current company. It may already be approved or changed elsewhere."
+          : "Select a draft from this company. No payroll run is substituted or approved automatically."}
+      </Notice>
+      {drafts.length > 0 ? <Field label="Draft payroll run">
+        <Select aria-label="Draft payroll run" value={selectedRunId}
+          onChange={event => { setSelectedRunId(event.target.value); setCheckedSources(false); setCheckedBoundary(false); setError(""); }}>
+          <option value="">Select a draft</option>
+          {drafts.map(row => <option key={row.id} value={row.id}>
+            {row.title} · {String(row.fields.period ?? "Period not recorded")}
+          </option>)}
+        </Select>
+      </Field> : <Empty title="No draft payroll runs">Create and validate a run before opening human approval.</Empty>}
+      <ModalActions><OverlayCancel>Cancel</OverlayCancel></ModalActions>
+    </Stack>
   );
   const grossMinor = Number(run.fields.grossMinor);
   const hasGross = run.fields.grossMinor !== undefined && Number.isFinite(grossMinor) && grossMinor >= 0;
@@ -1178,6 +1194,8 @@ function PayrollSignoff({ context, close }: { context: ScreenContext; close: () 
   const ready = !blocked && checkedSources && checkedBoundary;
   return (
     <Stack gap={4}>
+      <ModalUnsavedChanges when={checkedSources || checkedBoundary} />
+      <ModalInFlight when={busy} />
       <PeopleDialogLead eyebrow="PEOPLE / PAYROLL / HUMAN SIGN-OFF" title="Approve this recorded draft"
         description="Review the saved run and its source evidence. Approval records a human decision in this workspace; it never files, pays or issues payslips."
         status={<Pill tone="warning">Draft review</Pill>} />
@@ -1225,12 +1243,13 @@ function PayrollSignoff({ context, close }: { context: ScreenContext; close: () 
         </Notice>
         {error && <Notice tone="danger" title="Run not approved">{error}</Notice>}
       </PeopleDialogSection>
-      <Row gap={2} wrap>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
+      <ModalActions>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
         <span className="ds-grow" />
-        <Button variant="primary" disabled={!ready} onClick={async () => {
+        <Button variant="primary" busy={busy} disabled={!ready || busy} onClick={async () => {
+          if (!ready || busy || !context.can("view_payroll")) return;
+          setBusy(true);
           setError("");
-          if (!ready || !context.can("view_payroll")) return;
           try {
             const saved = await context.mutate.patch(run.id, {
               status: "approved", fields: {
@@ -1244,9 +1263,11 @@ function PayrollSignoff({ context, close }: { context: ScreenContext; close: () 
             close();
           } catch (reason) {
             setError(reason instanceof Error ? reason.message : "The selected draft could not be signed off.");
+          } finally {
+            setBusy(false);
           }
         }}>Approve local draft</Button>
-      </Row>
+      </ModalActions>
     </Stack>
   );
 }
