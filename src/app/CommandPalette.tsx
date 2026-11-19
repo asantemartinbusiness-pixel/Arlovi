@@ -8,6 +8,7 @@ import { appEntry, findScreen, screens } from "@/app/catalog";
 import { APP_ENTRIES, NAV_GROUPS } from "@/app/nav";
 import { buildLocalSearchHits } from "@/platform/searchRecordProviders";
 import { integrationSearchHits, LOCAL_SEARCH_SOURCE } from "@/platform/searchSources";
+import { readConnectedSearchHits, connectedStatusConfigured } from "@/platform/connectedSearch";
 import { canOpenLegacyScreen } from "@/platform/accessInventory";
 import { canOpen } from "@/platform/policy";
 import { useCollections, useOrgRecords, useWorkspace } from "@/platform/workspace";
@@ -91,6 +92,11 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const [scope, setScope] = useState<SearchScope>("all");
   const [index, setIndex] = useState(0);
   const [showPreview, setShowPreview] = useState(true);
+  const [remoteConfigured, setRemoteConfigured] = useState(false);
+  const [remoteSearch, setRemoteSearch] = useState<{
+    orgSlug: string; query: string; hits: SearchHit[];
+    status: "idle" | "loading" | "complete" | "partial" | "unavailable";
+  }>({ orgSlug: "", query: "", hits: [], status: "idle" });
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -100,6 +106,48 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       else sessionStorage.removeItem(searchMemoryKey(org.id, actor));
     } catch { /* Private browsing must not break search. */ }
   }, [query, org.id, actor]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    // Browser-local sessions remain fully functional if the server search
+    // endpoint is unavailable or the account lacks trusted authentication.
+    fetch("/api/search/status", { credentials: "same-origin", cache: "no-store", signal: controller.signal })
+      .then(response => response.ok ? response.json() as Promise<unknown> : null)
+      .then(value => { if (!controller.signal.aborted) setRemoteConfigured(connectedStatusConfigured(value)); })
+      .catch(() => { if (!controller.signal.aborted) setRemoteConfigured(false); });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const term = query.trim();
+    if (!remoteConfigured || term.length < 2 || !["all", "files", "connected"].includes(scope)) return;
+    const controller = new AbortController();
+    setRemoteSearch({ orgSlug: org.slug, query: term, hits: [], status: "loading" });
+    const timer = window.setTimeout(() => {
+      fetch("/api/search/records", {
+        method: "POST", credentials: "same-origin", cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationSlug: org.slug, query: term }),
+        signal: controller.signal,
+      }).then(async response => {
+        if (!response.ok) throw new Error("CONNECTED_SEARCH_UNAVAILABLE");
+        return await response.json() as unknown;
+      }).then(value => {
+        if (controller.signal.aborted) return;
+        const body = value && typeof value === "object" ? value as Record<string, unknown> : {};
+        const state = body.state === "complete" || body.state === "partial" ? body.state : "unavailable";
+        setRemoteSearch({
+          orgSlug: org.slug, query: term,
+          hits: readConnectedSearchHits(value, org.slug), status: state,
+        });
+      }).catch(() => {
+        if (!controller.signal.aborted) {
+          setRemoteSearch({ orgSlug: org.slug, query: term, hits: [], status: "unavailable" });
+        }
+      });
+    }, 240);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [query, scope, org.slug, remoteConfigured]);
 
   const candidates = useMemo<SearchHit[]>(() => {
     const currentUrl = location.pathname + location.search + location.hash;
@@ -210,15 +258,19 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   ]);
 
   const hits = useMemo(() => {
+    const term = query.trim();
+    const remoteHits = remoteConfigured && remoteSearch.orgSlug === org.slug
+      && remoteSearch.query === term ? remoteSearch.hits : [];
+    const allCandidates = remoteHits.length ? [...candidates, ...remoteHits] : candidates;
     // Keep the opening state short; do not dump every screen in a tall menu.
-    const opening = query.trim() || scope !== "all" ? candidates : [
-      ...candidates.filter(hit => ["return", "resume", "saved", "action"].includes(hit.kind)).slice(0, 8),
-      ...candidates.filter(hit => hit.kind === "screen").slice(0, 4),
-      ...candidates.filter(hit => hit.kind === "app").slice(0, 6),
+    const opening = term || scope !== "all" ? allCandidates : [
+      ...allCandidates.filter(hit => ["return", "resume", "saved", "action"].includes(hit.kind)).slice(0, 8),
+      ...allCandidates.filter(hit => hit.kind === "screen").slice(0, 4),
+      ...allCandidates.filter(hit => hit.kind === "app").slice(0, 6),
     ];
     const limit = query.trim() || scope !== "all" ? MAX_RECORD_RESULTS : 15;
     return searchHits(opening, { query, scope, activeApp: currentApp }, limit);
-  }, [candidates, query, scope, currentApp]);
+  }, [candidates, query, scope, currentApp, org.slug, remoteConfigured, remoteSearch]);
 
   useEffect(() => { setIndex(0); }, [query, scope]);
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -242,7 +294,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const preview = showPreview && Boolean(query.trim()) && selected;
   const previewSnippet = preview ? matchingContentSnippet(preview, query) : undefined;
   const canSave = selected && !selected.to.includes("?") && !selected.to.includes("#")
-    && selected.kind !== "return" && selected.kind !== "connector";
+    && selected.kind !== "return" && selected.kind !== "connector" && selected.sourceType !== "remote";
   const isSaved = Boolean(selected && navigation.pinned.includes(selected.to));
 
   function go(hit?: SearchHit) {
@@ -303,7 +355,8 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
           </div>
           <div className="search-v2-scopes" role="group" aria-label="Search within">
             {SEARCH_SCOPES.filter(item => (item.id !== "mail" || canOpen(role, "COMMS"))
-              && (item.id !== "integrations" || canOpen(role, "CONNECT"))).map(item =>
+              && (item.id !== "integrations" || canOpen(role, "CONNECT"))
+              && (item.id !== "connected" || remoteConfigured)).map(item =>
               <button type="button" key={item.id} aria-pressed={scope === item.id}
                 onClick={() => { setScope(item.id); inputRef.current?.focus(); }}
                 title={item.id === "this-app" ? "Search the current application" : undefined}>
@@ -318,19 +371,27 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
             Browse <ArrowRight size={13}/>
           </button>
         </div>}
+        {scope === "connected" && <div className="search-v2-source-disclosure" role="note">
+          <Plug size={16} aria-hidden="true"/>
+          <span><strong>Authorised connected records only.</strong> External results require verified company permissions and supported synced data.</span>
+        </div>}
         <div className="search-v2-body">
           <div className="hq-palette-list search-v2-results" id="palette-list" role="listbox"
             aria-label="Search results" ref={listRef}>
             <div className="search-v2-results-heading">
               <span>{query ? "SEARCH RESULTS" : "PICK UP WHERE YOU LEFT OFF"}</span>
-              <span>{hits.length} {hits.length === 1 ? "result" : "results"}</span>
+              <span>{scope === "connected" && remoteSearch.orgSlug === org.slug
+                && remoteSearch.query === query.trim() && remoteSearch.status === "loading"
+                ? "Searching…" : `${hits.length} ${hits.length === 1 ? "result" : "results"}`}</span>
             </div>
             {hits.length === 0 && <div className="search-v2-empty" role="status">
               <Search size={24} aria-hidden="true"/>
               <strong>No matching results</strong>
-              <p>Nothing in {org.name} matches “{query}” in this search. {scope !== "all"
+              <p>{scope === "connected" && remoteSearch.status === "unavailable"
+                ? "Connected search is unavailable or your account is not authorised for these sources."
+                : <>Nothing in {org.name} matches “{query}” in this search. {scope !== "all"
                 ? "Try Everything or a different search term."
-                : "Try another word, a record reference or an application name."}</p>
+                : "Try another word, a record reference or an application name."}</>}</p>
               <button type="button" onClick={() => { setScope("all"); setQuery(""); inputRef.current?.focus(); }}>
                 Reset search <ArrowRight size={15}/>
               </button>
