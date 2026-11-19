@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, BookOpen, Bot, Building2, CheckCircle2, CircleDot, Compass, Grid2X2, LockKeyhole, Network, ShieldCheck, Users } from "lucide-react";
+import { ArrowRight, BookOpen, Bot, Building2, CheckCircle2, CircleDot, Compass, Grid2X2, LockKeyhole, Network, PlugZap, ShieldCheck, Users } from "lucide-react";
 import { appEntry } from "@/app/catalog";
 import { useCollections, useWorkspace } from "@/platform/workspace";
 import "./company-setup-centre.css";
@@ -52,10 +52,16 @@ export function CompanySetupCentre() {
       state: "draft", Icon: Bot,
     },
     {
-      title: "Applications & connections", description: "Choose favorites, organize apps and review provider connections.",
+      title: "Applications & favourites", description: "Choose your favourite Arlovi apps and organise your workspace.",
       href: "/o/" + org.slug + "/workspace/apps",
-      detail: pinnedApps.length + " pinned apps · providers connect separately",
-      state: "connection", Icon: Grid2X2,
+      detail: pinnedApps.length + " pinned apps",
+      state: "review", Icon: Grid2X2,
+    },
+    {
+      title: "Integrations & connected accounts", description: "Find business software, authorise accounts, review access and connection health.",
+      href: "/o/" + org.slug + "/connect/marketplace",
+      detail: "Secure provider setup · approvals and activity",
+      state: "connection", Icon: PlugZap,
     },
     {
       title: "Collaboration", description: "Communication spaces, notifications and shared work.",

@@ -8,6 +8,7 @@ import {
   RetryReview, RevokeGrant, RiskSummary, ScopeReview, SyncCentre, openConnector, useConnector,
 } from "./panels";
 import { CONNECTOR_ENTRIES } from "./catalog";
+import { NangoGuidedSetup } from "./NangoExperience";
 import { Button, Notice, Properties, Stack } from "@/design-system";
 import { openAct } from "@/applications/t6kit/act";
 import {
@@ -99,7 +100,7 @@ export const connectApp = registerApp({
   code: "CONNECT",
   short: "Integrations",
   name: "Integrations & Connectors",
-  purpose: "What each provider would do, what it would need, and what runs here instead",
+  purpose: "Discover business tools, connect authorised accounts and manage provider capabilities",
   icon: Plug,
   nav: [
     {
@@ -122,7 +123,7 @@ export const connectApp = registerApp({
     "ARL-CONNECT-001": {
       id: "ARL-CONNECT-001",
       title: () => "Integration directory",
-      subtitle: () => "Every provider in the capability register, with the state it actually holds.",
+      subtitle: () => "Find the right tools for your business, with clear availability and permission requirements.",
       tabs: (["Featured", "Categories", "Installed", "Custom"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <Marketplace context={context} lens={lens} />,
@@ -136,6 +137,7 @@ export const connectApp = registerApp({
       ],
       overlays: [
         { id: "Connector preview", kind: "drawer", title: "Connector", width: 520, render: ({ ...context }) => <ConnectorPreview context={context} /> },
+        { id: "Nango guided setup", kind: "drawer", title: "Connect your software", width: 560, render: ({ ...context }) => <NangoGuidedSetup context={context} /> },
         installConnector,
         { id: "compare connectors", kind: "modal", title: "Compare connectors", width: 820, render: ({ ...context }) => <CompareConnectors context={context} />, footer: closeFooter() },
         { id: "risk summary", kind: "modal", title: "Risk", width: 560, render: ({ ...context }) => <RiskSummary context={context} />, footer: closeFooter() },
