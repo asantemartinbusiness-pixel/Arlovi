@@ -322,6 +322,36 @@ export async function putMany(records: Rec[], context: WriteContext, events: Omi
           throw new Error("The access request has expired or has an invalid expiry.");
         }
       }
+      // Restoring an access approval requires the member to still hold exactly
+      // the granted role and the paired request to be approved. A newer role
+      // decision must not be overwritten by a stale restoration.
+      for (const [index, next] of records.entries()) {
+        if (next.collection !== "policies" || next.fields.kind !== "accessRequest" ||
+            next.status !== "restored") continue;
+        const prior = existing[index];
+        if (!prior || prior.status !== "approved" || prior.fields.kind !== "accessRequest") {
+          throw new Error("Only a currently approved access request can be restored.");
+        }
+        const memberId = String(prior.fields.memberId ?? "");
+        const memberIndex = records.findIndex((row) => row.id === memberId);
+        const member = memberIndex < 0 ? undefined : existing[memberIndex];
+        const updatedMember = memberIndex < 0 ? undefined : records[memberIndex];
+        if (!member || !updatedMember || member.collection !== "members" ||
+            member.organizationId !== scopeId || member.status !== "active" ||
+            String(member.fields.role) !== String(prior.fields.requestedRole) ||
+            String(updatedMember.fields.role) !== String(prior.fields.fromRole) ||
+            String(next.fields.restorationReason ?? "").trim().length < 10) {
+          throw new Error("The member's active role no longer matches the approved grant.");
+        }
+        const requests = await db.records.where("[organizationId+collection]")
+          .equals([scopeId, "policies"]).toArray();
+        if (requests.some((other) => other.id !== prior.id &&
+            other.fields.kind === "accessRequest" && other.fields.memberId === memberId &&
+            other.status === "approved" &&
+            String(other.fields.decidedAt ?? "") > String(prior.fields.decidedAt ?? ""))) {
+          throw new Error("A later approved access change exists. Reopen the latest decision.");
+        }
+      }
       // Creating a parent and children in one batch must be create-only.
       // A colliding id cannot replace an existing record even when this batch
       // does not need compare-and-swap revisions for another source.
