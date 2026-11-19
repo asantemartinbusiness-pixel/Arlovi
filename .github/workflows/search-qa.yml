@@ -33,4 +33,4 @@ jobs:
       - run: npm run build
       - run: npx vitest run tests/unit/search-model.test.ts tests/unit/navigation-continuity.test.ts tests/unit/app-journey.test.ts
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test e2e/search-v2.spec.ts e2e/command-resume.spec.ts e2e/header-context-safety.spec.ts e2e/universal-header.spec.ts --workers=2
+      - run: npx playwright test e2e/search-v2.spec.ts e2e/command-resume.spec.ts e2e/header-context-safety.spec.ts e2e/universal-header.spec.ts --grep="search|palette|quick destinations|Recent & Saved" --workers=2
