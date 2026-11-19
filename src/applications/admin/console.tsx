@@ -1030,7 +1030,7 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
 
   return (
     <Stack gap={4}>
-      <ModalInFlight busy={busy} />
+      <ModalInFlight when={busy} />
       <Notice tone="warning" title="Erasure execution is unavailable in this browser">
         The previous per-record deletion could partially succeed if a later removal failed.
         Until a single atomic, revision-checked deletion operation can enforce legal holds
@@ -1048,7 +1048,7 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
       <Field label="Review rationale" required hint="At least 10 characters; explain the lawful basis, scope and any held records.">
         <TextArea value={reason} onChange={(event) => setReason(event.target.value)} />
       </Field>
-      <Checkbox checked={reviewed} onChange={setReviewed} label="I checked the subject, scope and retention holds. This saves an impact review only." />
+      <Checkbox checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} label="I checked the subject, scope and retention holds. This saves an impact review only." />
       {!context.can("delete_records") && <Notice tone="warning" title="Permission required">Only a role with record-deletion capability may record this erasure review.</Notice>}
       {error && <Notice tone="danger" title="Review not saved">{error}</Notice>}
       <ModalActions>
