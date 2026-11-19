@@ -295,6 +295,33 @@ export async function putMany(records: Rec[], context: WriteContext, events: Omi
           throw new ConflictError(record.id, 0, original.revision);
         }
       }
+      // Access approval is a coupled domain transition, not merely two
+      // independent valid revisions. Verify the member and request still
+      // describe the same role change inside the write transaction.
+      for (const [index, next] of records.entries()) {
+        const previous = existing[index];
+        if (next.collection !== "policies" || next.fields.kind !== "accessRequest" ||
+            next.status !== "approved" || previous?.status === "approved") continue;
+        if (!previous || previous.status !== "open" || previous.fields.kind !== "accessRequest") {
+          throw new Error("Only an open access request can be approved.");
+        }
+        const memberId = String(previous.fields.memberId ?? "");
+        const memberIndex = records.findIndex((row) => row.id === memberId);
+        const member = memberIndex >= 0 ? existing[memberIndex] : undefined;
+        const changedMember = memberIndex >= 0 ? records[memberIndex] : undefined;
+        if (!member || !changedMember || member.collection !== "members" ||
+            member.organizationId !== scopeId || member.status !== "active" ||
+            member.fields.kind === "ai" ||
+            String(member.fields.role) !== String(previous.fields.fromRole) ||
+            String(changedMember.fields.role) !== String(previous.fields.requestedRole) ||
+            !String(next.fields.decisionNote ?? "").trim()) {
+          throw new Error("Access approval no longer matches the member's current role and reviewed request.");
+        }
+        const expiry = String(previous.fields.expiresAt ?? "");
+        if (expiry && (!Number.isFinite(Date.parse(expiry)) || Date.parse(expiry) <= Date.parse(context.now))) {
+          throw new Error("The access request has expired or has an invalid expiry.");
+        }
+      }
       // Creating a parent and children in one batch must be create-only.
       // A colliding id cannot replace an existing record even when this batch
       // does not need compare-and-swap revisions for another source.
