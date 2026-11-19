@@ -972,61 +972,90 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
   const payload = context.overlayPayload as { id?: string } | undefined;
   const request = data.dataRequests.find((row) => row.id === (payload?.id ?? context.selectedId));
   const [busy, setBusy] = useState(false);
-  if (!request) return <Empty title="Select a request" />;
+  const [reviewed, setReviewed] = useState(false);
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  if (!request) return <Empty title="Select a subject request before reviewing erasure" />;
   if (seeds.status === "failed") return <SeedsFailedNotice retry={seeds.retry} />;
   if (settledRecords === null) {
-    return (
-      <Notice tone="info" title="Counting the records this request covers">
-        Records from every application are still arriving in this browser. Deletion is offered once the full set is known, so no record
-        is missed.
-      </Notice>
-    );
+    return <Notice tone="info" title="Counting matching records">Erasure review is unavailable until all application records are loaded.</Notice>;
   }
-  const records = settledRecords;
 
-  const subject = String(request.fields.subject ?? "");
+  const subject = String(request.fields.subject ?? "").trim();
   const collections = csvList(request.fields.collections);
-  const retention = ofKind(data.policies, "retention").filter((policy) => csvList(policy.fields.collections).some((entry) => collections.includes(entry)));
+  const retention = ofKind(data.policies, "retention").filter((policy) =>
+    csvList(policy.fields.collections).some((entry) => collections.includes(entry)));
   const held = retention.filter((policy) => policy.fields.legalHold === true);
-  const covered = subjectRecords(request, records);
+  const covered = subject ? subjectRecords(request, settledRecords) : [];
   const deletable = covered.filter((record) => !held.some((policy) => csvList(policy.fields.collections).includes(record.collection)));
   const blocked = covered.filter((record) => held.some((policy) => csvList(policy.fields.collections).includes(record.collection)));
+  const eligible = context.can("delete_records") && subject.length > 0 && reviewed && reason.trim().length >= 10 && !busy;
+
+  async function recordReview() {
+    if (!eligible) return;
+    setBusy(true);
+    setError("");
+    try {
+      const saved = await context.mutate.patch(request!.id, {
+        fields: {
+          ...request!.fields,
+          erasureReview: {
+            reviewedBy: context.actor,
+            reviewedAt: context.now.toISOString(),
+            reason: reason.trim(),
+            candidateIds: deletable.map((record) => record.id),
+            retainedIds: blocked.map((record) => record.id),
+            sourceRevision: request!.revision,
+            executionStatus: "not_executed",
+          },
+        },
+      }, {
+        event: `Erasure impact reviewed for ${subject}; no records removed`,
+        expectRevision: request!.revision,
+      });
+      if (!saved) {
+        setError("The subject request changed. Reopen it and repeat the review.");
+        return;
+      }
+      context.toast("Erasure review recorded", "No records were deleted. Execution requires a revision-checked atomic deletion service.");
+      close();
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Could not save this erasure review.";
+      setError(message);
+      context.toast("Review not saved", message, "failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
-    <StepUp
-      word="DELETE"
-      label={deletable.length ? `Delete ${deletable.length} ${deletable.length === 1 ? "record" : "records"}` : "Nothing may be deleted"}
-      busy={busy}
-      onConfirm={async () => {
-        if (deletable.length === 0) {
-          context.toast("Nothing deleted", "Every matching record is under a retention rule or a legal hold.", "blocked");
-          return;
-        }
-        setBusy(true);
-        try {
-          for (const record of deletable) {
-            await context.mutate.remove(record.id, `Erasure request ${request.id}: deleted ${record.collection} ${record.id}`);
-          }
-          await context.mutate.patch(request.id, {
-            status: blocked.length ? "partially_completed" : "completed",
-            fields: { ...request.fields, deletedCount: deletable.length, blockedCount: blocked.length, completedBy: context.actor },
-          }, { event: `Erasure completed for ${subject}: ${deletable.length} deleted, ${blocked.length} retained under a hold` });
-          context.toast("Deleted where lawful", `${deletable.length} removed, ${blocked.length} kept under a legal hold.`);
-          close();
-        } finally { setBusy(false); }
-      }}
-    >
-      <Properties rows={[
-        { label: "Subject", value: subject },
-        { label: "Records that may be deleted", value: deletable.length ? deletable.map((record) => `${record.collection}/${record.id}`).join(", ") : "None" },
-        { label: "Records that must be kept", value: blocked.length ? blocked.map((record) => `${record.collection}/${record.id}`).join(", ") : "None" },
-        { label: "Rules preventing deletion", value: held.map((policy) => policy.title).join("; ") || "None" },
-      ]} />
-      <Notice tone="warning" title="Deleting is permanent and audited">
-        Each deletion is written to the audit trail with the request that justified it. Links from other records to a deleted record
-        will show as unavailable rather than silently disappearing.
+    <Stack gap={4}>
+      <ModalInFlight busy={busy} />
+      <Notice tone="warning" title="Erasure execution is unavailable in this browser">
+        The previous per-record deletion could partially succeed if a later removal failed.
+        Until a single atomic, revision-checked deletion operation can enforce legal holds
+        and update the request together, this panel records a review only. It does not delete records or contact external systems.
       </Notice>
-    </StepUp>
+      <Properties rows={[
+        { label: "Verified request", value: request.title },
+        { label: "Subject", value: subject || "Subject identity missing" },
+        { label: "Matching records", value: String(covered.length) },
+        { label: "Potentially erasable", value: deletable.length ? deletable.map((record) => `${record.collection}/${record.id}`).join(", ") : "None" },
+        { label: "Excluded by legal hold", value: blocked.length ? blocked.map((record) => `${record.collection}/${record.id}`).join(", ") : "None" },
+        { label: "Hold policies", value: held.map((policy) => policy.title).join("; ") || "None recorded" },
+        { label: "Execution status", value: "Not executed — no records removed" },
+      ]} />
+      <Field label="Review rationale" required hint="At least 10 characters; explain the lawful basis, scope and any held records.">
+        <TextArea value={reason} onChange={(event) => setReason(event.target.value)} />
+      </Field>
+      <Checkbox checked={reviewed} onChange={setReviewed} label="I checked the subject, scope and retention holds. This saves an impact review only." />
+      {!context.can("delete_records") && <Notice tone="warning" title="Permission required">Only a role with record-deletion capability may record this erasure review.</Notice>}
+      {error && <Notice tone="danger" title="Review not saved">{error}</Notice>}
+      <ModalActions>
+        <Button variant="ghost" disabled={busy} onClick={close}>Keep request unchanged</Button>
+        <Button variant="primary" busy={busy} disabled={!eligible} onClick={() => void recordReview()}>Record erasure review</Button>
+      </ModalActions>
+    </Stack>
   );
 }
 
