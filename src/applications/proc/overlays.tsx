@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
-  Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, MoneyInput, Notice, OverlayCancel, Pill, Properties, Row,
-  Select, Stack, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, FactGrid, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, MoneyInput, Notice, OverlayActions, OverlayCancel,
+  OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
@@ -10,6 +10,7 @@ import type { Rec } from "@/domain/types";
 import type { TaxCategory } from "@/platform/money";
 import { applyScenario, approvalLimitFor } from "./actions";
 import { ReceiptStockLinks } from "./supplierInsights";
+import { chainForOrder, chainForRequisition, ProcChain } from "./kit";
 import {
   approverFor, APPROVAL_LIMITS, billTotals, bodyOf, findSupplier, isPurchaseOrder, MATCH_LABEL, matchTone, resolveSupplierId,
   outstandingFor, poTotals, statusTone, threeWayMatch, useProcData,

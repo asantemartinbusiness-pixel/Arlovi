@@ -1,0 +1,20 @@
+/* CRM — the relationship and the evidence behind each stage.
+   Shared by the deal drawer, contact record and closure dialog. */
+.crm-deal-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+@media (max-width: 480px) { .crm-deal-pair { grid-template-columns: minmax(0, 1fr); } }
+
+.crm-deal-activity { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.crm-deal-activity li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); }
+.crm-deal-activity-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Evidence ledger: each line is a stage requirement or a handoff condition and states whether it holds. */
+.crm-evidence { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.crm-evidence li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-3); align-items: baseline; padding: var(--space-2) var(--space-3); }
+.crm-evidence li + li { border-block-start: 1px solid var(--border-default); }
+.crm-evidence-label { min-width: 0; }
+.crm-evidence-value { text-align: end; }
+.crm-evidence[data-flush] { border: 0; }
+
+.crm-consent { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.crm-next { display: grid; gap: var(--space-2); }
+.crm-next-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; }

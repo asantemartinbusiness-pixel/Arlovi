@@ -1,0 +1,5 @@
+/* Finance: shared layout pieces. Signature: ledger figures in mono tabular type, provenance always stated. */
+.fin-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-4); min-width: 0; }
+.fin-form-grid > [data-span="full"] { grid-column: 1 / -1; }
+@media (max-width: 599px) { .fin-form-grid { grid-template-columns: minmax(0, 1fr); } }
+.fin-figure { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }

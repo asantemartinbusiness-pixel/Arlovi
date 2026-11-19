@@ -1,5 +1,5 @@
 import { useCallback, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { Button, Notice, Pill, Properties, Row, Stack, type Tone } from "@/design-system";
+import { Button, Notice, OverlayActions, Pill, Properties, Row, Stack, type Tone } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, capabilityById } from "@/platform/capability";
 import { addDays, sameDay, startOfMonth, startOfWeek } from "@/platform/clock";
 import type { InvoiceTotals, TaxCategory } from "@/platform/money";
@@ -16,11 +16,10 @@ import type { Rec } from "@/domain/types";
 
 /** Standard modal footer for a form rendered inside an overlay. */
 export const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+  <OverlayActions
+    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+  />
 );
 
 /**

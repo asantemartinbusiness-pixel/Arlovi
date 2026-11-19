@@ -4,8 +4,9 @@ import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { Link } from "react-router-dom";
 import { FileText, Plus, Printer, Send, Trash2 } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, OverlayCancel, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, Empty, Field, FactGrid, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, OverlayActions, OverlayCancel, OverlaySection, OverlaySummary, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
+import type { RecordHeaderProps } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import { downloadFile } from "@/runtime/db";
@@ -367,37 +368,47 @@ export function useInvoice(context: ScreenContext): { invoice?: Rec; data: FinDa
   return { invoice, data, totals, customer };
 }
 
-export function InvoiceHeader({ context }: { context: ScreenContext }) {
+type InvoicePart = "number" | "status" | "summary" | "customer" | "issued" | "due" | "gross" | "split";
+
+/** One piece of the invoice record header. Each reads the invoice itself so the header props can stay plain nodes. */
+function InvoiceHeaderPart({ context, part }: { context: ScreenContext; part: InvoicePart }) {
   const { invoice, totals, customer } = useInvoice(context);
-  if (!invoice) return null;
+  const { org } = useWorkspace();
+  if (!invoice) return part === "number" ? <>Invoice</> : null;
   const late = daysOverdue(invoice, context.now);
-  return (
-    <Card prov="posted" flush>
-      <div className="ds-card-body">
-        <Row gap={4} wrap>
-          <div className="ds-grow">
-            <Row gap={2}>
-              <h2 style={{ fontSize: "var(--text-xl)" }}>{invoice.title}</h2>
-              <StatusPill status={invoice.status} />
-              {late && <Pill tone="danger" dot>{late} days late</Pill>}
-              {totals.hasUnknownRate && <Pill tone="danger" dot>Tax unresolved</Pill>}
-            </Row>
-            <p className="ds-subtle">{invoice.summary}</p>
-          </div>
-          <Properties rows={[
-            { label: "Customer", value: customer?.title ?? "Not linked" },
-            { label: "Issued", value: <span className="ds-num">{context.date(invoice.at)}</span> },
-            { label: "Due", value: <span className="ds-num">{context.date(invoice.dueAt)}</span> },
-          ]} />
-          <div style={{ textAlign: "end" }}>
-            <span className="ds-stat-label">Gross</span>
-            <div className="ds-stat-value">{context.money(totals.grossMinor)}</div>
-            <span className="ds-subtle">{context.money(totals.netMinor)} net + {context.money(totals.taxMinor)} tax</span>
-          </div>
-        </Row>
-      </div>
-    </Card>
-  );
+  const posted = Boolean(invoice.fields.journalId);
+  switch (part) {
+    case "number": return <span className="ds-num">{invoice.title}</span>;
+    case "status": return (
+      <>
+        <StatusPill status={invoice.status} />
+        {posted
+          ? <Pill tone="success">On the ledger</Pill>
+          : invoice.status === "void" ? null : <Pill tone="warning">Draft, not on the ledger</Pill>}
+        {late && invoice.status !== "paid" && <Pill tone="danger" dot>{late} days late</Pill>}
+        {totals.hasUnknownRate && <Pill tone="danger" dot>Tax unresolved</Pill>}
+      </>
+    );
+    case "summary": return invoice.summary ? <>{invoice.summary}</> : null;
+    case "customer": return customer
+      ? <Link to={`/o/${org.slug}/crm/contacts/${customer.id}`}>{customer.title}</Link>
+      : <>No customer linked</>;
+    case "issued": return <span className="ds-num">Issued {context.date(invoice.at)}</span>;
+    case "due": return <span className="ds-num">Due {context.date(invoice.dueAt)}</span>;
+    case "gross": return <span className="ds-num"><strong>{context.money(totals.grossMinor)}</strong> gross</span>;
+    case "split": return <span className="ds-num">{context.money(totals.netMinor)} net + {context.money(totals.taxMinor)} tax</span>;
+  }
+}
+
+/** `ScreenDef.record` for the invoice page: the one identity block, with the money beside it. */
+export function invoiceRecord(context: ScreenContext): RecordHeaderProps {
+  const part = (name: InvoicePart) => <InvoiceHeaderPart context={context} part={name} />;
+  return {
+    title: part("number"),
+    status: part("status"),
+    subtitle: part("summary"),
+    meta: [part("customer"), part("gross"), part("split"), part("issued"), part("due")],
+  };
 }
 
 export function InvoiceOverview({ context }: { context: ScreenContext }) {
@@ -1248,8 +1259,9 @@ export function DocumentPreview({ context }: { context: ScreenContext }) {
 export function PaymentForm({ context, close }: { context: ScreenContext; close: () => void }) {
   const { invoice, data, totals } = useInvoice(context);
   const { now } = useWorkspace();
-  const paid = Number(invoice?.fields.paidMinor ?? 0);
-  const outstanding = Math.max(0, totals.grossMinor - paid);
+  const settled = invoice?.status === "paid" || invoice?.status === "void";
+  const paid = invoice?.status === "paid" ? totals.grossMinor : Number(invoice?.fields.paidMinor ?? 0);
+  const outstanding = settled ? 0 : Math.max(0, totals.grossMinor - paid);
   const [amount, setAmount] = useState(outstanding);
   const [date, setDate] = useState(now.toISOString().slice(0, 10));
   const [accountId, setAccountId] = useState("");
@@ -1269,54 +1281,85 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
   if (!invoice) return <Empty title="No invoice selected" />;
   const ar = data.accounts.find((account) => accountCode(account) === "1100");
   const tooMuch = amount > outstanding;
-  const blocked = !["awaiting_payment", "part_paid"].includes(invoice.status)
-    ? "Only an issued invoice with an outstanding balance can receive a payment."
-    : !ar
-      ? "The chart of accounts has no 1100 receivables account."
-    : !accountId
-      ? "Choose the account the money arrived in."
-      : amount <= 0
-        ? "Enter an amount above zero."
-        : tooMuch
-          ? `That is more than the ${context.money(outstanding)} outstanding. Record an overpayment as a separate journal.`
-          : data.locked.includes(date.slice(0, 7))
-            ? `${date.slice(0, 7)} is a closed period.`
-            : undefined;
+  // Whether the invoice can take a payment at all is decided before any field is shown.
+  const invoiceBlock = invoice.status === "void"
+    ? "This invoice is void. A void invoice cannot receive a payment."
+    : invoice.status === "paid"
+      ? "This invoice is already paid in full. Nothing is outstanding."
+      : !["awaiting_payment", "part_paid"].includes(invoice.status)
+        ? "Only an issued invoice with an outstanding balance can receive a payment. Approve and post this invoice first."
+        : !ar
+          ? "The chart of accounts has no 1100 receivables account, so the receipt has nowhere to post."
+          : undefined;
+  const amountIssue = amount <= 0
+    ? "Enter an amount above zero."
+    : tooMuch
+      ? `That is more than the ${context.money(outstanding)} outstanding. Record an overpayment as a separate journal.`
+      : undefined;
+  const dateIssue = data.locked.includes(date.slice(0, 7)) ? `${date.slice(0, 7)} is a closed period.` : undefined;
+  const blocked = invoiceBlock
+    ?? (!accountId ? "Choose the account the money arrived in." : undefined)
+    ?? amountIssue ?? dateIssue;
+
+  const summary = (
+    <OverlaySummary
+      eyebrow="Receipt against"
+      title={<span className="ds-num">{invoice.title}</span>}
+      status={<StatusPill status={invoice.status} />}
+      meta={[context.date(invoice.dueAt) ? `Due ${context.date(invoice.dueAt)}` : undefined]}
+    />
+  );
+  const figures = (
+    <FactGrid columns={3} items={[
+      { label: "Gross invoiced", value: context.money(totals.grossMinor), mono: true },
+      { label: "Already paid", value: paid ? context.money(paid) : "\u2014", mono: true },
+      { label: "Outstanding", value: context.money(outstanding), mono: true, tone: outstanding > 0 ? "accent" : undefined },
+    ]} />
+  );
+
+  if (invoiceBlock) {
+    return (
+      <Stack gap={4}>
+        {summary}
+        <Notice tone="warning" title="This payment cannot be recorded">{invoiceBlock}</Notice>
+        {figures}
+        <ModalActions>
+          <OverlayActions primary={<OverlayCancel>Close</OverlayCancel>} />
+        </ModalActions>
+      </Stack>
+    );
+  }
 
   return (
     <Stack gap={4}>
       <ModalUnsavedChanges when={amountEdited || date !== now.toISOString().slice(0, 10) || method !== "Bank transfer"} />
       <ModalInFlight when={busy} />
-      <StatementRow
-        context={context}
-        rows={[
-          { label: "Gross invoiced", minor: totals.grossMinor },
-          { label: "Already paid", minor: paid },
-          { label: "Outstanding", minor: outstanding, bold: true },
-        ]}
-      />
-      <Row gap={3} wrap>
-        <Field label="Amount received" required>
-          <MoneyInput label="Amount received" currency={context.org.currency} valueMinor={amount} onChangeMinor={(minor) => { setAmountEdited(true); setAmount(minor); }} />
-        </Field>
-        <Field label="Date received" required>
-          <TextInput aria-label="Date received" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
-        </Field>
-        <Field label="Into" required>
-          <Select aria-label="Into" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
-            {cashAccounts.map((account) => <option key={account.id} value={account.id}>{accountCode(account)} {account.title}</option>)}
-          </Select>
-        </Field>
-        <Field label="Method">
-          <Select aria-label="Method" value={method} onChange={(event) => setMethod(event.target.value)}>
-            {["Bank transfer", "Card, taken elsewhere", "Cash", "Cheque", "Offset"].map((item) => <option key={item}>{item}</option>)}
-          </Select>
-        </Field>
-      </Row>
+      {summary}
+      {figures}
+      <OverlaySection title="Receipt">
+        <div className="fin-form-grid">
+          <Field label="Amount received" required error={amountIssue}>
+            <MoneyInput label="Amount received" currency={context.org.currency} valueMinor={amount} onChangeMinor={(minor) => { setAmountEdited(true); setAmount(minor); }} />
+          </Field>
+          <Field label="Date received" required error={dateIssue}>
+            <TextInput aria-label="Date received" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
+          </Field>
+          <Field label="Into" required>
+            <Select aria-label="Into" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+              {cashAccounts.map((account) => <option key={account.id} value={account.id}>{accountCode(account)} {account.title}</option>)}
+            </Select>
+          </Field>
+          <Field label="Method">
+            <Select aria-label="Method" value={method} onChange={(event) => setMethod(event.target.value)}>
+              {["Bank transfer", "Card, taken elsewhere", "Cash", "Cheque", "Offset"].map((item) => <option key={item}>{item}</option>)}
+            </Select>
+          </Field>
+        </div>
+      </OverlaySection>
       <CapabilityNotice id="payment.capture" />
-      {blocked && <Notice tone="warning" title="This payment cannot be recorded yet">{blocked}</Notice>}
       <ModalActions>
-        <Button
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || !context.can("post_journal")}
@@ -1363,8 +1406,9 @@ export function PaymentForm({ context, close }: { context: ScreenContext; close:
           }}
         >
           Post the receipt
-        </Button>
-        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
+        </Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
       </ModalActions>
     </Stack>
   );

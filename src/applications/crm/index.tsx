@@ -1,7 +1,8 @@
 import {
   Building2, CalendarClock, FileSignature, Inbox, Kanban, LineChart, Target, UserRound, Workflow,
 } from "lucide-react";
-import { Button, Empty } from "@/design-system";
+import { Button, Empty, OVERLAY_WIDTH } from "@/design-system";
+import "./crm.css";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import {
   CampaignsPanel, CrmMetricDrilldown, CrmOverview, CrmOverviewStrip, InsightCard, MyPipeline, NewLead, TeamOverview,
@@ -233,7 +234,7 @@ export const crmApp = registerApp({
         { id: "close lost", label: "Close lost", placement: "overflow", tone: "danger", guard: (context) => (context.selectedId ? undefined : "Select a deal first"), run: (context) => context.openOverlay("lost reason", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "Deal drawer", kind: "drawer", title: "Deal", width: 640, render: ({ close, ...context }) => <DealDrawer context={context} close={close} /> },
+        { id: "Deal drawer", kind: "drawer", title: "Deal", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <DealDrawer context={context} close={close} /> },
         { id: "stage change validation", kind: "modal", title: "Stage change", width: 620, render: ({ close, ...context }) => <StageChangeValidation context={context} close={close} /> },
         { id: "lost reason", kind: "modal", title: "Close the deal as lost", width: 560, tone: "danger", render: ({ close, ...context }) => <LostReason context={context} close={close} /> },
         { id: "assign owner", kind: "modal", title: "Assign an owner", width: 560, render: ({ close, ...context }) => <AssignOwner context={context} close={close} /> },

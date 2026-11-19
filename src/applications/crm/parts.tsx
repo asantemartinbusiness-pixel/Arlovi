@@ -4,7 +4,7 @@ import { Avatar, Notice, Pill, Row } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, capabilityById } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
 import type { Rec } from "@/domain/types";
-import { ACTIVITY_LABEL, activityKind, probabilityOf, stageOf } from "@/domain/crm-pipeline";
+import { ACTIVITY_LABEL, STAGES, activityKind, probabilityOf, stageById, stageOf } from "@/domain/crm-pipeline";
 
 /* ------------------------------------------------------------------ *
  * CRM presentation pieces. Money stays right-aligned and tabular; a
@@ -16,8 +16,8 @@ export function Money({ minor, context, bold }: { minor: number | undefined; con
   return <span className="ds-num" style={{ fontWeight: bold ? 650 : undefined }}>{context.money(minor)}</span>;
 }
 
-export function StagePill({ deal }: { deal: Rec }) {
-  const stage = stageOf(deal);
+export function StagePill({ deal, stageId }: { deal?: Rec; stageId?: string }) {
+  const stage = deal ? stageOf(deal) : stageById(stageId ?? "") ?? STAGES[0];
   const tone = stage.kind === "won" ? "success" : stage.kind === "lost" ? "danger" : stage.id === "negotiation" ? "accent" : stage.id === "proposal" ? "info" : "neutral";
   return <Pill tone={tone} dot>{stage.label}</Pill>;
 }

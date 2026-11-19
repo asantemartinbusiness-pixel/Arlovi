@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AtSign, CalendarDays, Hash, Mail, Megaphone, MessageSquare, Phone, Settings2, Video } from "lucide-react";
 import {
-  Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Checkbox, Empty, FactGrid, Field, Notice, OverlayActions, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
@@ -25,11 +25,10 @@ import {
 import { clockIso } from "@/platform/clock";
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+  <OverlayActions
+    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+  />
 );
 
 function ChannelArchive({ context, close }: { context: ScreenContext; close: () => void }) {
@@ -539,7 +538,7 @@ export const commsApp = registerApp({
 
     "ARL-COMMS-005": {
       id: "ARL-COMMS-005",
-      subtitle: () => "One place for conversations, sender identities, and provider setup. External delivery requires a connection.",
+      subtitle: () => "Mail is kept in this browser. No mail service is connected, so nothing is delivered.",
       tabs: (["Inbox", "Sent", "Drafts", "Archive", "Spam", "Shared inboxes", "Accounts & domains", "Sender identities"] as EmailArea[]).map((lens) => ({
         id: lens, render: (context: ScreenContext) => <EmailExperience context={context} lens={lens} />,
       })),

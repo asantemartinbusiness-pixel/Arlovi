@@ -288,13 +288,13 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
         if (check.blocking.length) return;
         const ok = await save(draft);
         if (!ok) return;
-        context.toast("Draft saved", "The draft is in this workspace with its recipients and body. No mail provider is connected, so nothing was sent.");
+        context.toast("Saved as a local draft", "No mail service is connected, so nothing was sent.");
         close();
       }}
     >
       <div className="cm-compose-heading">
         <span className="cm-compose-mark"><FilePenLine size={17} /></span>
-        <div><strong>New message</strong><small>Compose within Arlovi · Draft only</small></div>
+        <div><strong>New message</strong></div>
         <span className="cm-compose-state" role="status" aria-live="polite"><Save size={13}/>{status}</span>
       </div>
       <div className="cm-compose-fields">
@@ -306,7 +306,6 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
               <option value="">{context.actor} · {senderAddress(context.actor, context.org.slug)} (placeholder)</option>
               {identities.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.address} (unverified)</option>)}
             </select>
-            <small className="cm-compose-help">Provider authorisation required before sending.</small>
           </div>
         </div>
         <div className="cm-compose-row">
@@ -356,9 +355,9 @@ export function DraftComposer({ context, close }: { context: ScreenContext; clos
       {check.invalid.length > 0 && <Notice tone="danger" title="One of those is not an address">{check.blocking[0]}. The draft is not saved until every recipient is an email address.</Notice>}
       {failure && <Notice tone="danger" title="Draft not saved">{failure}</Notice>}
       {check.invalid.length === 0 && check.warnings.length > 0 && (draft.to || draft.subject || draft.body) && (
-        <p className="ds-subtle">Before it could be sent: {check.warnings.join(" ")}</p>
+        <p className="ds-subtle">Still missing: {check.warnings.join(" ")}</p>
       )}
-      <div className="cm-compose-connect"><ShieldAlert size={16}/><div><strong>Draft only — provider not connected</strong><small>Saved in this browser. Nothing is delivered to recipients.</small></div><Button type="button" size="sm" variant="secondary" onClick={() => void requestMailboxConnection(context)}>Request connection</Button></div>
+      <div className="cm-compose-connect"><ShieldAlert size={16}/><div><strong>Kept as a local draft</strong><small>No mail service is connected, so nothing is sent.</small></div><Button type="button" size="sm" variant="secondary" onClick={() => void requestMailboxConnection(context)}>Request a mailbox connection</Button></div>
       {idRef.current && (
         <Row gap={2}>
           <Button type="button" size="sm" variant="outline-danger" onClick={async () => {
@@ -450,10 +449,8 @@ export function MailConnectionSetup({ context }: { context: ScreenContext }) {
   const canManage = context.can("manage_connectors");
   return (
     <section className="cm-mail-identities" aria-label="Mail accounts and domain setup">
-      <Row gap={2} wrap><PlugZap size={16} /><strong className="ds-grow">Accounts & domain setup</strong><Pill tone="warning">Provider not connected</Pill></Row>
-      <Notice tone="info" title="Use the company's existing email provider">
-        Google and Microsoft accounts require OAuth with an approved backend callback. Other providers need secure server-side credentials. Domain DNS verification cannot be performed in this browser-only workspace.
-      </Notice>
+      <Row gap={2} wrap><PlugZap size={16} /><strong className="ds-grow">Accounts & domain setup</strong></Row>
+      <p className="ds-subtle">Use the company's existing provider. Google and Microsoft need an approved OAuth callback and other providers need server-side credentials; DNS cannot be verified from this browser.</p>
       {requests.length > 0 && (
         <div className="ds-stack ds-gap-2">
           <strong>Configuration requests</strong>

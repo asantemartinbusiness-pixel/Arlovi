@@ -91,12 +91,13 @@ export function ArrangeCards({ context, close }: { context: ScreenContext; close
         close();
       }}
     >
-      <p className="ds-subtle">Choose which cards show, and move them with the arrows. The order is used top to bottom.</p>
+      <div className="hq-arrange-count"><span className="ds-eyebrow">Page order</span><span className="ds-num ds-subtle">{order.length - hidden.length} of {order.length} shown</span></div>
       {order.map((key, index) => {
         const card = HOME_CARDS.find((item) => item.key === key);
         if (!card) return null;
         return (
-          <Row key={key} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
+          <Row key={key} gap={2} className="ds-panel hq-arrange-row" data-hidden={hidden.includes(key) || undefined}>
+            <span className="hq-arrange-n ds-num" aria-hidden="true">{index + 1}</span>
             <Checkbox
               label={card.label}
               checked={!hidden.includes(key)}

@@ -2,7 +2,8 @@ import {
   Banknote, BookOpen, Building2, CircleDollarSign, FileText, Landmark, Percent, PieChart, Receipt,
   ReceiptText, Scale, ScrollText, Wallet,
 } from "lucide-react";
-import { Button, Empty } from "@/design-system";
+import { Button, Empty, OVERLAY_WIDTH } from "@/design-system";
+import "./finance.css";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import type { AccountType } from "@/domain/fin-ledger";
 import {
@@ -15,7 +16,7 @@ import {
   ReverseConfirmation,
 } from "./ledger";
 import {
-  ApproveInvoice, BulkActionPreview, DocumentPreview, EmailPreview, exportInvoices, InvoiceActivity, InvoiceHeader,
+  ApproveInvoice, BulkActionPreview, DocumentPreview, EmailPreview, exportInvoices, InvoiceActivity, invoiceRecord,
   InvoiceInspector, InvoiceLineItems, InvoiceList, InvoiceOverview, InvoicePayments, LineEditor, NewInvoice,
   FinanceTimeInputs, FinanceTimeReview,
   PaymentForm, ReminderApproval, VoidReason,
@@ -213,7 +214,7 @@ export const finApp = registerApp({
     "ARL-FIN-005": {
       id: "ARL-FIN-005",
       title: () => "Invoice",
-      header: (context) => <InvoiceHeader context={context} />,
+      record: invoiceRecord,
       inspectorTitle: "Invoice",
       inspector: (context) => <InvoiceInspector context={context} />,
       tabs: [
@@ -235,7 +236,7 @@ export const finApp = registerApp({
       overlays: [
         { id: "Line item editor", kind: "drawer", title: "Line items", width: 1080, render: ({ close, ...context }) => <><LineEditor context={context} close={close} /><ApproveInvoice context={context} close={close} /></> },
         { id: "email preview", kind: "drawer", title: "Document and message", width: 900, render: ({ close, ...context }) => <><DocumentPreview context={context} /><EmailPreview context={context} close={close} /></> },
-        { id: "payment form", kind: "modal", title: "Record a payment", width: 620, capability: "post_journal", presentation: { selectedRecord: true, collection: "invoices", guidance: "Check the outstanding balance, receipt date and destination account before posting a balanced journal." }, render: ({ close, ...context }) => <PaymentForm context={context} close={close} /> },
+        { id: "payment form", kind: "modal", title: "Record a payment", width: OVERLAY_WIDTH.form, capability: "post_journal", presentation: { selectedRecord: true, collection: "invoices", noRecordContext: true, guidance: "Check the outstanding balance, receipt date and destination account before posting a balanced journal." }, render: ({ close, ...context }) => <PaymentForm context={context} close={close} /> },
         { id: "void reason", kind: "modal", title: "Void or credit this invoice", width: 580, tone: "danger", render: ({ close, ...context }) => <VoidReason context={context} close={close} /> },
         { id: "approve invoice", kind: "modal", title: "Approve and post this invoice", width: 680, render: ({ close, ...context }) => <ApproveInvoice context={context} close={close} /> },
         { id: "send invoice", kind: "modal", title: "Send this invoice", width: 620, render: ({ close, ...context }) => <SendInvoice context={context} close={close} /> },

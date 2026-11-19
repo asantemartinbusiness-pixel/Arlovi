@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { ArrowLeft, ArrowRight, GripVertical, Kanban } from "lucide-react";
 import {
-  BarChart, Button, Card, DataGrid, Empty, Field, Grid, Kbd, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  BarChart, Button, Card, DataGrid, DrawerActions, Empty, Field, FactGrid, Grid, Kbd, MoneyInput, Notice, OverlayActions, OverlaySection,
+  OverlaySummary, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -12,8 +13,8 @@ import {
   LOST_REASONS, OPEN_STAGES, STAGES, activitiesFor, probabilityOf, stageGuard, stageIndex, stageOf,
 } from "@/domain/crm-pipeline";
 import type { Stage } from "@/domain/crm-pipeline";
-import { companyOfDeal, contactOfDeal, quotesOfDeal, stagesWithDeals, useCrmData } from "./data";
-import { ForecastNote, Money, ProbabilityPill, StagePill } from "./parts";
+import { companyById, companyOfDeal, contactById, contactOfDeal, dealsOfCompany, quotesOfDeal, stagesWithDeals, useCrmData } from "./data";
+import { ActivityPill, ConsentPill, ForecastNote, Money, ProbabilityPill, StagePill } from "./parts";
 import { clockIso } from "@/platform/clock";
 
 /* ---------------------------- CRM-006 ---------------------------- *
@@ -388,97 +389,163 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
 
   const stage = STAGES.find((item) => item.id === stageId)!;
   const guard = existing && stageId !== stageOf(existing).id ? stageGuard(existing, stage) : undefined;
+  const company = companyById(data, companyId);
+  const contact = contactById(data, contactId);
+  const weighted = Math.round((amount * stage.probability) / 100);
+  const weightedBefore = existing ? Math.round((Number(existing.amountMinor ?? 0) * probabilityOf(existing)) / 100) : undefined;
+  const accountDeals = dealsOfCompany(data, companyId).filter((deal) => deal.id !== existing?.id && stageOf(deal).kind === "open");
+  const accountOpenMinor = accountDeals.reduce((sum, deal) => sum + Number(deal.amountMinor ?? 0), 0);
+  // The account's own history, then the chosen contact's, newest first and without repeats.
+  const recent = [...new Map([...activitiesFor(data.activities, companyId), ...activitiesFor(data.activities, contactId)]
+    .map((activity) => [activity.id, activity])).values()]
+    .sort((a, b) => (b.startAt ?? b.at ?? b.updatedAt).localeCompare(a.startAt ?? a.at ?? a.updatedAt))
+    .slice(0, 4);
+  const closeAt = closeDate ? `${closeDate}T12:00:00.000Z` : undefined;
+  const overdue = Boolean(closeAt && new Date(closeAt) < now && stage.kind === "open");
+  const editable = context.can("edit_pipeline");
+
+  const save = async () => {
+    setBusy(true);
+    const fields: Record<string, string | number | boolean> = {
+      stage: stageId,
+      probability: stage.probability,
+      owner: existing ? String(existing.fields.owner ?? context.actor) : context.actor,
+    };
+    if (contactId) fields.contactId = contactId;
+    if (companyId) fields.companyId = companyId;
+    if (closeDate) fields.closeDate = closeDate;
+    if (existing) {
+      const saved = await context.mutate.patch(existing.id, {
+        title: title.trim(), summary, amountMinor: amount, status: stageId,
+        dueAt: closeDate ? `${closeDate}T00:00:00.000Z` : existing.dueAt,
+        fields: { ...existing.fields, ...fields },
+      }, { expectRevision: existing.revision, event: `Deal ${title.trim()} updated` });
+      if (!saved) { setBusy(false); return; }
+      context.toast("Deal saved", `${title.trim()} is in ${stage.label} at ${stage.probability}%.`);
+    } else {
+      const created = await context.mutate.create({
+        collection: "deals", title: title.trim(), status: stageId, summary,
+        amountMinor: amount,
+        at: now.toISOString(),
+        dueAt: closeDate ? `${closeDate}T00:00:00.000Z` : undefined,
+        parentId: companyId || undefined,
+        fields,
+      }, `Deal ${title.trim()} created`);
+      context.select(created.id);
+      context.toast("Deal created", `${created.title} is in ${stage.label}. Its weighted value is ${context.money(weighted)}.`);
+    }
+    clearWorkingDraft(draftScope);
+    setBusy(false);
+    close();
+  };
 
   return (
     <Stack gap={4}>
-      {existing && (
-        <Properties rows={[
-          { label: "Current stage", value: <StagePill deal={existing} /> },
-          { label: "Weighting", value: <ProbabilityPill deal={existing} /> },
-          { label: "Quotes", value: String(quotesOfDeal(data, existing.id).length) },
-          { label: "Activities", value: String(activitiesFor(data.activities, existing.id).length) },
-          { label: "Owner", value: String(existing.fields.owner ?? existing.ownerName) },
-        ]} />
-      )}
-      <Field label="Deal" required><TextInput aria-label="Deal" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
-      <Row gap={3} wrap>
-        <Field label="Amount" hint="A deal with no amount is excluded from every forecast figure.">
-          <MoneyInput label="Deal amount" currency={org.currency} valueMinor={amount} onChangeMinor={setAmount} />
+      <OverlaySummary
+        eyebrow={existing ? "Deal" : "New deal"}
+        title={existing ? existing.title : title.trim() || "Untitled deal"}
+        status={<StagePill stageId={stageId} />}
+        meta={[
+          company?.title ?? "No account yet",
+          existing ? `Owner ${String(existing.fields.owner ?? existing.ownerName)}` : `Owner ${context.actor}`,
+          existing ? `${quotesOfDeal(data, existing.id).length} quote(s)` : undefined,
+        ]}
+      />
+
+      <Stack gap={3}>
+        <Field label="Deal" required><TextInput aria-label="Deal" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
+        <div className="crm-deal-pair">
+          <Field label="Amount" hint="No amount, no forecast figure.">
+            <MoneyInput label="Deal amount" currency={org.currency} valueMinor={amount} onChangeMinor={setAmount} />
+          </Field>
+          <Field label="Stage">
+            <Select aria-label="Stage" value={stageId} onChange={(event) => setStageId(event.target.value)}>
+              {STAGES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </Select>
+          </Field>
+        </div>
+        <Field label="Expected close" hint={closeAt ? (overdue ? `${context.relative(closeAt)}: past due while still open` : context.relative(closeAt)) : "Negotiation needs a close date."}>
+          <TextInput aria-label="Expected close" type="date" value={closeDate} onChange={(event) => setCloseDate(event.target.value)} />
         </Field>
-        <Field label="Stage">
-          <Select aria-label="Stage" value={stageId} onChange={(event) => setStageId(event.target.value)}>
-            {STAGES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-          </Select>
-        </Field>
-        <Field label="Expected close"><TextInput aria-label="Expected close" type="date" value={closeDate} onChange={(event) => setCloseDate(event.target.value)} /></Field>
-      </Row>
-      <Row gap={3} wrap>
-        <Field label="Account">
-          <Select aria-label="Account" value={companyId} onChange={(event) => setCompanyId(event.target.value)}>
-            <option value="">None</option>
-            {data.companies.map((company) => <option key={company.id} value={company.id}>{company.title}</option>)}
-          </Select>
-        </Field>
-        <Field label="Contact">
-          <Select aria-label="Contact" value={contactId} onChange={(event) => setContactId(event.target.value)}>
-            <option value="">None</option>
-            {data.contacts.filter((contact) => !companyId || String(contact.fields.companyId ?? "") === companyId).map((contact) => <option key={contact.id} value={contact.id}>{contact.title}</option>)}
-          </Select>
-        </Field>
-      </Row>
-      <Field label="Notes"><TextArea aria-label="Notes" value={summary} rows={3} onChange={(event) => setSummary(event.target.value)} /></Field>
+        <div className="crm-deal-pair">
+          <Field label="Account">
+            <Select aria-label="Account" value={companyId} onChange={(event) => setCompanyId(event.target.value)}>
+              <option value="">None</option>
+              {data.companies.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+            </Select>
+          </Field>
+          <Field label="Contact">
+            <Select aria-label="Contact" value={contactId} onChange={(event) => setContactId(event.target.value)}>
+              <option value="">None</option>
+              {data.contacts.filter((item) => !companyId || String(item.fields.companyId ?? "") === companyId).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+            </Select>
+          </Field>
+        </div>
+        <Field label="Notes"><TextArea aria-label="Notes" value={summary} rows={3} onChange={(event) => setSummary(event.target.value)} /></Field>
+      </Stack>
+
       {guard && <Notice tone="warning" title="That stage change will be refused">{guard}</Notice>}
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          busy={busy}
-          disabled={!title.trim() || Boolean(guard) || !context.can("edit_pipeline")}
-          title={!context.can("edit_pipeline") ? "Editing the pipeline needs the Sales or Owner role view" : guard}
-          onClick={async () => {
-            setBusy(true);
-            const fields: Record<string, string | number | boolean> = {
-              stage: stageId,
-              probability: STAGES.find((item) => item.id === stageId)?.probability ?? 0,
-              owner: existing ? String(existing.fields.owner ?? context.actor) : context.actor,
-            };
-            if (contactId) fields.contactId = contactId;
-            if (companyId) fields.companyId = companyId;
-            if (closeDate) fields.closeDate = closeDate;
-            if (existing) {
-              const saved = await context.mutate.patch(existing.id, {
-                title: title.trim(), summary, amountMinor: amount, status: stageId,
-                dueAt: closeDate ? `${closeDate}T00:00:00.000Z` : existing.dueAt,
-                fields: { ...existing.fields, ...fields },
-              }, { expectRevision: existing.revision, event: `Deal ${title.trim()} updated` });
-              if (!saved) { setBusy(false); return; }
-              context.toast("Deal saved", `${title.trim()} is in ${stage.label} at ${stage.probability}%.`);
-            } else {
-              const created = await context.mutate.create({
-                collection: "deals", title: title.trim(), status: stageId, summary,
-                amountMinor: amount,
-                at: now.toISOString(),
-                dueAt: closeDate ? `${closeDate}T00:00:00.000Z` : undefined,
-                parentId: companyId || undefined,
-                fields,
-              }, `Deal ${title.trim()} created`);
-              context.select(created.id);
-              context.toast("Deal created", `${created.title} is in ${stage.label}. Its weighted value is ${context.money(Math.round((amount * stage.probability) / 100))}.`);
-            }
-            clearWorkingDraft(draftScope);
-            setBusy(false);
-            close();
-          }}
-        >
-          {existing ? "Save the deal" : "Create the deal"}
-        </Button>
-        {existing && (
-          <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${org.slug}/crm/deals/${existing.id}`); }}>Open the full record</Button>
+
+      <OverlaySection title="What it is worth" hint="Amount x stage probability. A prediction, not revenue.">
+        <FactGrid columns={3} items={[
+          { label: "Probability", value: `${stage.probability}%`, mono: true, hint: stage.label },
+          { label: "Weighted value", value: context.money(weighted), mono: true, tone: stage.kind === "lost" ? "danger" : undefined,
+            hint: weightedBefore !== undefined && weightedBefore !== weighted ? `was ${context.money(weightedBefore)}` : undefined },
+          { label: "Expected close", value: closeAt ? context.relative(closeAt) : "Not set", tone: overdue ? "warning" : undefined },
+        ]} />
+      </OverlaySection>
+
+      <OverlaySection title="Account and contact" hint={company ? undefined : "Pick an account to see what else is open there."}>
+        {company ? (
+          <FactGrid columns={2} dense items={[
+            { label: "Account owner", value: String(company.fields.owner ?? company.ownerName) },
+            { label: "Other open deals", value: accountDeals.length ? `${accountDeals.length} worth ${context.money(accountOpenMinor)}` : "None", mono: accountDeals.length > 0 },
+            { label: "Contact", value: contact?.title ?? "Not named", hint: contact ? String(contact.fields.role ?? "") : "Discovery needs a named contact." },
+            { label: "Email consent", value: contact ? <ConsentPill contact={contact} /> : "Unknown" },
+          ]} />
+        ) : null}
+      </OverlaySection>
+
+      <OverlaySection title="Recent activity" hint={recent.length ? "Calls, meetings and notes on this account and contact." : undefined}>
+        {recent.length === 0 ? (
+          <p className="ds-subtle">Nothing logged yet. A first call or note starts the history.</p>
+        ) : (
+          <ul className="crm-deal-activity">
+            {recent.map((activity) => (
+              <li key={activity.id}>
+                <ActivityPill activity={activity} />
+                <span className="crm-deal-activity-title">{activity.title}</span>
+                <span className="ds-subtle ds-num">{context.relative(activity.startAt ?? activity.at ?? activity.updatedAt)}</span>
+              </li>
+            ))}
+          </ul>
         )}
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close & keep draft</Button>
-        <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard changes</Button>
-      </Row>
+      </OverlaySection>
+
       <WorkingDraftStatus scope={draftScope} />
+      <DrawerActions>
+        <OverlayActions
+          busy={busy}
+          primary={
+            <Button
+              variant="primary"
+              busy={busy}
+              disabled={!title.trim() || Boolean(guard) || !editable}
+              title={!editable ? "Editing the pipeline needs the Sales or Owner role view" : guard}
+              onClick={() => { void save(); }}
+            >
+              {existing ? "Save the deal" : "Create the deal"}
+            </Button>
+          }
+          secondary={existing
+            ? <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${org.slug}/crm/deals/${existing.id}`); }}>Open the full record</Button>
+            : undefined}
+          end={<>
+            <Button variant="ghost" onClick={close}>Close & keep draft</Button>
+            <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard changes</Button>
+          </>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }

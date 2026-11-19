@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Avatar, Button, Checkbox, Empty, Field, ModalActions, ModalInFlight, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Avatar, Button, Checkbox, Empty, FactGrid, Field, ModalActions, OverlayActions, ModalInFlight, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
@@ -488,6 +488,8 @@ export function ForwardMail({ context }: { context: ScreenContext }) {
   );
 }
 
+const LOCAL_DRAFT_STATEMENT = "No mail service is connected. The message is kept as a local draft and nothing leaves this browser.";
+
 export function SendConfirmation({ context, close }: { context: ScreenContext; close: () => void }) {
   const request = context.overlayPayload as SendRequest | undefined;
   const source = useRecord(request?.sourceId);
@@ -496,11 +498,9 @@ export function SendConfirmation({ context, close }: { context: ScreenContext; c
   if (!request) {
     return (
       <Stack gap={4}>
-        <Boundary id="email.send" />
-        <Properties rows={[
-          { label: "What happens when you send", value: "A queued draft record with its recipients, subject and body" },
-          { label: "What does not happen", value: "No message is transmitted and no recipient is contacted" },
-        ]} />
+        <Notice tone="warning" title="Nothing is sent from here">{LOCAL_DRAFT_STATEMENT}</Notice>
+        <p className="ds-subtle">Start a forward or a reply from an email thread; the recipients are confirmed here first.</p>
+        <OverlayActions variant="confirm" end={<OverlayCancel>Close</OverlayCancel>} />
       </Stack>
     );
   }
@@ -512,44 +512,46 @@ export function SendConfirmation({ context, close }: { context: ScreenContext; c
   return (
     <Stack gap={4}>
       <ModalInFlight when={busy} />
-      <Properties rows={[
-        { label: "To", value: request.to.join(", ") },
+      <Notice tone="warning" title="Kept as a local draft, not sent">{LOCAL_DRAFT_STATEMENT}</Notice>
+      <FactGrid columns={2} items={[
+        { label: "To", value: request.to.join(", "), mono: true },
         { label: "Subject", value: request.subject },
-        { label: "Outside the company", value: external.length ? external.join(", ") : "None" },
-        { label: "Sensitive", value: sensitive ? <Pill tone="warning">Labelled sensitive</Pill> : "No" },
+        { label: "Outside the company", value: external.length ? external.join(", ") : "None", mono: external.length > 0, tone: external.length ? "warning" : undefined },
+        { label: "Sensitive", value: sensitive ? "Labelled sensitive" : "No", tone: sensitive ? "warning" : undefined },
       ]} />
       {needsCheck && <Checkbox label={`I have checked these ${request.to.length} recipients and they should receive this`} checked={checked} onChange={(event) => setChecked(event.target.checked)} />}
-      <Boundary id="email.send" />
-      <ModalActions>
-        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
-        <span className="ds-grow" />
-        <Button
-          variant="primary"
-          disabled={busy || (needsCheck && !checked)}
-          busy={busy}
-          onClick={async () => {
-            if (busy || (needsCheck && !checked)) return;
-            setBusy(true);
-            try {
-              const from = `${context.actor.split(" ")[0].toLowerCase()}@${domain}`;
-            const draft = await context.mutate.create({
-              collection: "emailThreads", title: request.subject, status: "draft", summary: request.body.slice(0, 160), at: clockIso(), tags: ["draft"],
-              fields: { folder: "drafts", from, to: request.to.join(", "), unread: false, risk: "none", labels: "draft", delivery: "queued_local", messageCount: 1, forwardedFrom: request.sourceId ?? "", recipientsConfirmedBy: needsCheck ? context.actor : "" },
-              body: { messages: [{ from, at: clockIso(), body: request.body, external: false }] },
-            }, `Forward of ${source?.title ?? "a thread"} queued by ${context.actor}`);
-            await logBoundary(context, "email.send", `Forward to ${request.to.join(", ")} queued locally`, draft.id);
-            context.toast("Forward queued locally", boundaryText("email.send"));
-            close();
-            } catch (error) {
-              context.toast("Forward not queued", error instanceof Error ? error.message : "Review the recipients and retry.", "failed");
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Queue the forward
-        </Button>
-      </ModalActions>
+      <OverlayActions
+        busy={busy}
+        primary={(
+          <Button
+            variant="primary"
+            disabled={busy || (needsCheck && !checked)}
+            busy={busy}
+            onClick={async () => {
+              if (busy || (needsCheck && !checked)) return;
+              setBusy(true);
+              try {
+                const from = `${context.actor.split(" ")[0].toLowerCase()}@${domain}`;
+                const draft = await context.mutate.create({
+                  collection: "emailThreads", title: request.subject, status: "draft", summary: request.body.slice(0, 160), at: clockIso(), tags: ["draft"],
+                  fields: { folder: "drafts", from, to: request.to.join(", "), unread: false, risk: "none", labels: "draft", delivery: "queued_local", messageCount: 1, forwardedFrom: request.sourceId ?? "", recipientsConfirmedBy: needsCheck ? context.actor : "" },
+                  body: { messages: [{ from, at: clockIso(), body: request.body, external: false }] },
+                }, `Forward of ${source?.title ?? "a thread"} kept as a local draft by ${context.actor}`);
+                await logBoundary(context, "email.send", `Forward to ${request.to.join(", ")} kept as a local draft`, draft.id);
+                context.toast("Forward kept as a local draft", "It is in Drafts. No mail service is connected, so nothing was sent.");
+                close();
+              } catch (error) {
+                context.toast("Forward not saved", error instanceof Error ? error.message : "Review the recipients and retry.", "failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Keep as a local draft
+          </Button>
+        )}
+        end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+      />
     </Stack>
   );
 }
@@ -609,7 +611,6 @@ export function AttachToThread({ context, close }: { context: ScreenContext; clo
           {documents.map((row) => <option key={row.id} value={row.id}>{row.title}{row.fields.confidential === true ? " (confidential)" : ""}</option>)}
         </Select>
       </Field>
-      <Boundary id="email.send" />
     </form>
   );
 }

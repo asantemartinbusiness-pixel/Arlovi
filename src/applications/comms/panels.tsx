@@ -19,13 +19,8 @@ export function useCommsData() {
   return useCollections(["channels", "messages", "emailThreads", "meetings", "calls", "announcements", "preferences", "members", "employees", "contacts", "documents"]);
 }
 
-export function MailBoundary({ what = "Sending" }: { what?: string }) {
-  const capability = capabilityById("email.send");
-  return (
-    <Notice tone="warning" title={`${what} stops at the mail provider`}>
-      {capability?.note} {capability?.localEquivalent}
-    </Notice>
-  );
+export function MailBoundary(_props: { what?: string }) {
+  return <Notice tone="warning" title="Kept as a local draft">No mail service is connected, so nothing is sent.</Notice>;
 }
 
 function channelMessages(messages: Rec[], channelId: string): Rec[] {

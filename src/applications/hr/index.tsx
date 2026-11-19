@@ -24,6 +24,7 @@ import { csvCell, planOnboardingLaunch } from "./decisions";
 import { planShiftMove, planTimesheetApprovals } from "./workforce";
 import { scopedDetailRecord } from "@/platform/recordScope";
 import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
+import { employeeRecordHeader, applicantRecordHeader } from "./recordHeads";
 import { LEAVER_KIND, leaverSteps } from "./offboarding";
 
 function payrollRecords(context: ScreenContext, collection: string) {
@@ -453,7 +454,7 @@ export const hrApp = registerApp({
     "ARL-HR-003": {
       id: "ARL-HR-003",
       title: () => "Employee profile",
-      subtitle: () => "One person's record: job, documents, leave, performance and access.",
+      record: employeeRecordHeader,
       tabs: ["Overview", "Job", "Documents", "Leave", "Performance", "Access"].map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <EmployeeProfile context={context} lens={lens} />,
@@ -499,7 +500,7 @@ export const hrApp = registerApp({
     "ARL-HR-005": {
       id: "ARL-HR-005",
       title: () => "Applicant profile",
-      subtitle: () => "One application, with its consent date and the person accountable for the decision.",
+      record: applicantRecordHeader,
       tabs: ["Overview", "Documents", "Interviews", "Decisions"].map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <ApplicantProfile context={context} lens={lens} />,

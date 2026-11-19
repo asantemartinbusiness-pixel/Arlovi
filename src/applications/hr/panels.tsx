@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import {
   Avatar, BarChart, Button, Card, Checkbox, DataGrid, DonutChart, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, Notice, OverlayCancel,
-  Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput, KeyValueList,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
@@ -655,63 +655,27 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
   const pendingLeave = leave.filter((request) => request.status === "requested");
   const outstandingReviews = reviews.filter((review) => review.status !== "acknowledged");
   const canEdit = context.can("edit_people");
-  const profileDescriptions: Record<string, string> = {
-    Overview: "An employee-centered workspace: identity, role, contact preferences and the next tasks that need attention.",
-    Job: "The recorded employment relationship, management line, skills and pay information available to your current role view.",
-    Documents: "Only real document records associated with this employee. References never claim a file was uploaded.",
-    Leave: "Recorded leave requests and balances, with unknown allowances clearly distinguished from zero.",
-    Performance: "Recorded performance cycles and named human review decisions; no automated personnel judgement.",
-    Access: "Local access requests and offboarding evidence. External accounts and permissions are not independently verified.",
-  };
-  const profileHeader = (
-    <section className="hr-profile-identity" aria-label={`Employee profile for ${employee.title}`}>
-      <div className="hr-profile-identity-main">
-        <Avatar name={employee.title} size="lg" />
-        <div className="hr-profile-identity-copy">
-          <span className="ops-eyebrow">People / Employee profile / {lens}</span>
-          <h2>{employee.title}</h2>
-          <p>{String(employee.fields.title || "No job title recorded")} · {departmentName(data.departments, employee.fields.departmentId)}</p>
-          <div className="hr-profile-identifiers">
-            <EmploymentPill record={employee} />
-            <span>{String(employee.fields.office || "Location not recorded")}</span>
-            <span>{employee.startAt ? `Started ${context.date(employee.startAt)}` : "Start date not recorded"}</span>
-          </div>
-        </div>
-      </div>
-      <div className="hr-profile-identity-actions">
-        <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/hr/employees`)}>Employee directory</Button>
-        {context.can("edit_people") && !terminated && (
-          <>
-            <Button variant="primary" onClick={() => context.openOverlay("profile editor")}>Edit profile</Button>
-            <Button variant="outline-danger" onClick={() => context.openOverlay("offboarding confirmation")}>Offboard</Button>
-          </>
-        )}
-      </div>
-    </section>
-  );
-  const profileMetrics = (
-    <OpsMetrics label={`${employee.title} employee record overview`}>
-      <OpsMetric label="Leave balance" value={balance.known ? `${balance.left} days` : "Not recorded"}
-        detail={balance.known ? `${balance.allowance} annual allowance` : "Verify the allowance"} />
-      <OpsMetric label="Documents on record" value={linkedDocs.length} detail="Linked document records and references" />
-      <OpsMetric label="Onboarding actions" value={openChecklist.length} detail="Incomplete recorded checklist steps" />
-      <OpsMetric label="Pending access requests" value={pendingAccess.length}
-        detail="Local requests, not actual grants" emphasis={pendingAccess.length ? "attention" : "neutral"} />
-    </OpsMetrics>
-  );
+  const doneSteps = onboarding.filter((task) => task.status === "done").length;
+  /* Tiles appear only when they carry something: an empty count is not news. */
+  const profileMetrics = lens === "Overview" && (balance.known || linkedDocs.length > 0 || onboarding.length > 0 || pendingAccess.length > 0) ? (
+    <StatRow>
+      {balance.known && <Stat label="Leave left" value={`${balance.left} days`} meta={`of ${balance.allowance} this year`} onClick={() => context.setTab("Leave")} prov="human" />}
+      {onboarding.length > 0 && <Stat label="Onboarding" value={`${doneSteps} of ${onboarding.length}`} meta={openChecklist.length ? `${openChecklist.length} step${openChecklist.length === 1 ? "" : "s"} open` : "Checklist complete"} onClick={() => context.navigate(`/o/${org.slug}/hr/onboarding`)} />}
+      {linkedDocs.length > 0 && <Stat label="Documents" value={linkedDocs.length} meta="Linked records and references" onClick={() => context.setTab("Documents")} />}
+      {pendingAccess.length > 0 && <Stat label="Access requests" value={pendingAccess.length} meta="Local requests, not grants" onClick={() => context.setTab("Access")} />}
+    </StatRow>
+  ) : null;
   const withProfileFrame = (body: ReactNode) => (
     <Stack gap={4}>
-      {profileHeader}
-      <p className="hr-profile-section-description">{profileDescriptions[lens] ?? profileDescriptions.Overview}</p>
-      {profileMetrics}
-      {(terminated || pendingLeave.length > 0 || pendingAccess.length > 0 || outstandingReviews.length > 0) && (
+      {(terminated || pendingLeave.length > 0 || outstandingReviews.length > 0 || (lens !== "Overview" && lens !== "Access" && pendingAccess.length > 0)) && (
         <div className="hr-profile-workflow-strip" aria-label="Employee workflow status">
           {terminated && <Pill tone="warning">Former employee · departure recorded locally</Pill>}
-          {pendingLeave.length > 0 && <Button size="sm" variant="secondary" onClick={() => context.setTab("Leave")}>{pendingLeave.length} pending leave request{pendingLeave.length === 1 ? "" : "s"}</Button>}
-          {outstandingReviews.length > 0 && <Button size="sm" variant="secondary" onClick={() => context.setTab("Performance")}>{outstandingReviews.length} review{outstandingReviews.length === 1 ? "" : "s"} awaiting acknowledgement</Button>}
-          {pendingAccess.length > 0 && <Button size="sm" variant="secondary" onClick={() => context.setTab("Access")}>{pendingAccess.length} open local access request{pendingAccess.length === 1 ? "" : "s"}</Button>}
+          {pendingLeave.length > 0 && lens !== "Leave" && <Button size="sm" variant="secondary" onClick={() => context.setTab("Leave")}>{pendingLeave.length} pending leave request{pendingLeave.length === 1 ? "" : "s"}</Button>}
+          {outstandingReviews.length > 0 && lens !== "Performance" && <Button size="sm" variant="secondary" onClick={() => context.setTab("Performance")}>{outstandingReviews.length} review{outstandingReviews.length === 1 ? "" : "s"} awaiting acknowledgement</Button>}
+          {pendingAccess.length > 0 && lens !== "Access" && lens !== "Overview" && <Button size="sm" variant="secondary" onClick={() => context.setTab("Access")}>{pendingAccess.length} open local access request{pendingAccess.length === 1 ? "" : "s"}</Button>}
         </div>
       )}
+      {profileMetrics}
       {body}
     </Stack>
   );
@@ -918,21 +882,22 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
 
   return withProfileFrame(
     <Grid>
-      <Card span={5} title={<Row gap={3}><Avatar name={employee.title} size="lg" /><span>{employee.title}</span></Row>} subtitle={String(employee.fields.title ?? "")} actions={<EmploymentPill record={employee} />}>
+      <Card span={5} eyebrow="WORK" title="Role and line" prov="human"
+        actions={canEdit && !terminated ? <Button size="sm" variant="secondary" onClick={() => context.openOverlay("profile editor")}>Update</Button> : undefined}>
         <Stack gap={3}>
-          <p className="ds-subtle">{employee.summary}</p>
-          <Properties rows={[
+          {employee.summary && <p className="ds-subtle">{employee.summary}</p>}
+          <KeyValueList items={[
             { label: "Department", value: departmentName(data.departments, employee.fields.departmentId) },
             { label: "Manager", value: String(employee.fields.manager ?? "Unassigned") },
             { label: "Office", value: String(employee.fields.office ?? "—") },
             { label: "Pronouns", value: String(employee.fields.pronouns ?? "—") },
-            { label: "Started", value: context.date(employee.startAt) },
+            { label: "Started", value: context.date(employee.startAt), mono: true },
           ]} />
         </Stack>
       </Card>
       <Card span={7} title="Contact" subtitle="Shown according to this person's privacy setting">
         <Stack gap={3}>
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Work email", value: String(employee.fields.email ?? "Not recorded") },
             { label: "Phone", value: <span className="ds-subtle">{String(employee.fields.phone ?? "Not shared")}</span> },
             { label: "Date of birth", value: context.can("view_payroll") ? String(employee.fields.dateOfBirth ?? "Not recorded") : "Hidden in this role view" },
@@ -940,22 +905,6 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
           ]} />
           {!context.can("view_payroll") && <RoleViewNote what="Date of birth and emergency contact" />}
         </Stack>
-      </Card>
-      <Card span={4} eyebrow="LEAVE" prov={balance.known ? "human" : "unknown"} title="Leave" subtitle={balance.known ? `${balance.left} of ${balance.allowance} days left` : "No allowance recorded"}>
-        {balance.known ? <Meter value={balance.taken} max={Math.max(1, balance.allowance)} label="Leave used" tone={balance.left <= 2 ? "warning" : "success"} /> : <Notice tone="warning" title="Allowance unverified">A missing balance is not zero days available.</Notice>}
-        <Button size="sm" variant="ghost" style={{ marginBlockStart: "var(--space-3)" }} onClick={() => context.setTab("Leave")}>See requests</Button>
-      </Card>
-      <Card span={4} title="Pay" subtitle="Payroll role view">
-        <strong style={{ fontSize: "var(--text-lg)" }}>{salaryText(context, employee)}</strong>
-        <p className="ds-subtle">{context.can("view_payroll") ? "From the employee record, used by the local payroll calculation." : "Switch to the People or Owner role view to see pay."}</p>
-      </Card>
-      <Card span={4} title="Onboarding" subtitle={onboarding.length ? `${onboarding.filter((task) => task.status === "done").length} of ${onboarding.length} steps done` : "No checklist"}>
-        {onboarding.length === 0 ? <span className="ds-subtle">No onboarding checklist was launched for this person.</span> : (
-          <>
-            <Meter value={onboarding.filter((task) => task.status === "done").length} max={onboarding.length} label="Onboarding progress" />
-            <Button size="sm" variant="ghost" style={{ marginBlockStart: "var(--space-3)" }} onClick={() => context.navigate(`/o/${org.slug}/hr/onboarding`)}>Open the checklist</Button>
-          </>
-        )}
       </Card>
     </Grid>
   );
@@ -1285,15 +1234,21 @@ export function ApplicantProfile({ context, lens }: { context: ScreenContext; le
     );
   }
 
+  const rating = Number(applicant.fields.rating ?? 0);
   return (
     <Grid>
-      <Card span={5} title={<Row gap={3}><Avatar name={applicant.title} size="lg" />{applicant.title}</Row>} subtitle={String(applicant.fields.role ?? "")} actions={<Pill tone="info">{String(applicant.fields.stage ?? applicant.status)}</Pill>}>
-        <Properties rows={[
-          { label: "Applied", value: context.date(applicant.at) },
-          { label: "Source", value: String(applicant.fields.source ?? "") },
-          { label: "Email", value: String(applicant.fields.email ?? "") },
-          { label: "Rating", value: Number(applicant.fields.rating ?? 0) > 0 ? `${String(applicant.fields.rating)} of 5` : "Not scored" },
-        ]} />
+      <Card span={5} eyebrow="APPLICATION" title="Application record">
+        <Stack gap={3}>
+          <KeyValueList items={[
+            { label: "Applied for", value: position?.title ?? String(applicant.fields.role ?? "—") },
+            { label: "Applied", value: context.date(applicant.at ?? applicant.createdAt), mono: true },
+            { label: "Source", value: String(applicant.fields.source ?? "—") },
+            { label: "Email", value: String(applicant.fields.email ?? "—") },
+            { label: "Rating", value: rating > 0 ? `${rating} of 5` : "Not scored" },
+            { label: "Data held until", value: consentUntil ? context.date(consentUntil) : "No date recorded", mono: Boolean(consentUntil), tone: consentExpired ? "danger" : undefined },
+          ]} />
+          {consentExpired && <Notice tone="danger" title="Consent has expired">This record is past its consent date and is listed for the next retention sweep.</Notice>}
+        </Stack>
       </Card>
       <Card span={7} title="Job-relevant summary" subtitle="Assembled from the application only">
         <Stack gap={3}>
@@ -1303,13 +1258,6 @@ export function ApplicantProfile({ context, lens }: { context: ScreenContext; le
             candidate beyond what they wrote, and protected characteristics are not recorded on this screen at all.
           </Notice>
         </Stack>
-      </Card>
-      <Card span={12} title="Consent" subtitle={consentExpired ? "Expired" : `Held until ${consentUntil || "an unrecorded date"}`}>
-        <Notice tone={consentExpired ? "danger" : "success"}>
-          {consentExpired
-            ? "This record is past its consent date and is listed for the next retention sweep."
-            : "The candidate agreed to this record being held for the length of the hiring process."}
-        </Notice>
       </Card>
     </Grid>
   );

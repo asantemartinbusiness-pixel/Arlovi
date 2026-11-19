@@ -3,6 +3,7 @@ import { useState } from "react";
 import { CalendarRange, FolderKanban, Gauge, LayoutDashboard, ListChecks, Target, Timer, Users } from "lucide-react";
 import {
   Button, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  FactGrid, OverlayActions, OverlaySection, OverlaySummary, OVERLAY_WIDTH,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
@@ -34,11 +35,10 @@ async function withTask(context: ScreenContext, what: string, then: (task: Rec) 
 }
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+  <OverlayActions
+    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+  />
 );
 
 type Phase = ProjectPhase;
