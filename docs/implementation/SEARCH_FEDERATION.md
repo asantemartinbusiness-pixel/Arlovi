@@ -100,7 +100,7 @@ Every gateway response has `Cache-Control: no-store` and no tokens, raw Nango ro
 
 ### Deployment gates
 
-1. Complete the separate Nango integration PR #84 review and reconcile its branch with main.
+1. **Nango gateway PR #84 merged into main on 19 November 2026.** Verify the newly merged integration workflows against production authentication, durable connection permissions and actual provider credentials before enabling any Search 2.4 read path.
 2. Create and verify Arlovi's *own* authentication/membership backend and durable `search.read` grant service (with rate limiting), independently audited. Nango authenticates provider access, not Arlovi users.
 3. Implement the authority's `verify` and `resolve` endpoints with proper RLS and connection-mapping storage. Ensure disconnect, revocation, role change, ownership transfer and deletion take effect on the next search request.
 4. Configure a real Nango document metadata Sync model and scoped consent in a test company; test account isolation, matching and resources before enabling in production.
@@ -108,3 +108,7 @@ Every gateway response has `Cache-Control: no-store` and no tokens, raw Nango ro
 6. Enable `ARLOVI_SEARCH_REMOTE_ENABLED` only after full live-credential browser and security tests, then expand to additional provider adapters and a dedicated indexed search service for complete, scalable results.
 
 Until then, Search 2.4 is a **securely gated implementation**, not a claim of working live connected search.
+
+### Integration coordination update
+
+Nango PR #84 merged into `main` while Search 2.4 was in review. Its setup and connection metadata gateway is a separate capability from an active search grant, a deployed document Sync model and resource-level permission records. Search 2.4 remains off until all of those independent activation checks are successful. Do not interpret the merged PR as approval to switch the remote-search feature flag on.
