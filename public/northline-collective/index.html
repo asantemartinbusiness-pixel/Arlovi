@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#192421">
+<meta name="description" content="Northline Collective — an editorial showcase of spaces, objects and experiences. Fictional flagship business simulation built for Arlovi.">
+<meta name="robots" content="noindex,nofollow">
+<title>Northline Collective — Material. Space. Experience.</title>
+<style>
+:root{--ink:#192421;--paper:#eeeae1;--soft:#e0d8ca;--rust:#ba6b4c;--sage:#839184;--line:#c9c5b9;--white:#fffdf7;--ease:cubic-bezier(.22,1,.36,1);font-synthesis:none}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:76px}body{margin:0;background:var(--paper);color:var(--ink);font-family:Arial,Helvetica,sans-serif;font-weight:400}button,a{font:inherit}a{color:inherit;text-decoration:none}button{cursor:pointer}::selection{background:var(--rust);color:white}
+.skip{position:absolute;top:-80px;left:20px;padding:15px;background:#fff;z-index:30}.skip:focus{top:20px}
+.flag{background:#c0ae94;color:#18221f;padding:9px 5vw;text-transform:uppercase;font-size:10px;letter-spacing:.15em;text-align:center;font-weight:700}
+header{height:78px;padding:0 5vw;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(25,36,33,.12);position:sticky;top:0;z-index:10;background:rgba(238,234,225,.96);backdrop-filter:blur(18px)}
+.brand{display:flex;align-items:center;gap:12px;font-size:17px;letter-spacing:-.055em;font-weight:800}.brand-mark{width:35px;height:35px;border:1.5px solid var(--ink);display:grid;place-items:center;font-family:Georgia,serif;font-size:26px;font-weight:400;line-height:1}
+nav{display:flex;gap:30px;align-items:center}nav a{font-size:11px;letter-spacing:.14em;text-transform:uppercase;transition:opacity .2s}nav a:hover{opacity:.55}.nav-cta{border-bottom:1px solid;padding-bottom:6px}.menu{display:none;border:0;background:none;font-size:12px;letter-spacing:.15em;text-transform:uppercase}
+.container{width:90%;margin:auto;max-width:1750px}.label{font-size:11px;line-height:1.6;text-transform:uppercase;letter-spacing:.22em;font-weight:700}.eyebrow{display:flex;align-items:center;gap:17px}.eyebrow:before{content:"";display:block;width:27px;height:1px;background:currentColor}
+h1,h2,h3,p{margin:0}h1,h2,.display{font-family:Georgia,'Times New Roman',serif;font-weight:400;letter-spacing:-.064em}h1{font-size:clamp(74px,11vw,190px);line-height:.88}h2{font-size:clamp(60px,8vw,128px);line-height:.94}h3{font-size:clamp(32px,4vw,58px);line-height:1.05;font-family:Georgia,serif;font-weight:400;letter-spacing:-.045em}
+p{line-height:1.55}button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--rust);outline-offset:4px}
+.hero{min-height:calc(100svh - 108px);display:grid;grid-template-rows:1fr auto;overflow:hidden;position:relative}.hero-content{padding:9vh 0 6vh;position:relative;z-index:1}.hero h1{max-width:1250px;margin:clamp(34px,7vh,90px) 0 30px}.hero h1 em{font-style:italic;color:var(--rust)}.hero-bottom{display:flex;align-items:end;justify-content:space-between;padding:35px 0;border-top:1px solid var(--line);gap:30px}.hero-bottom p{max-width:440px;font-size:clamp(16px,1.5vw,22px)}.micro{font-size:10px;line-height:1.5;letter-spacing:.15em;text-transform:uppercase}.hero-counter{font-family:Georgia,serif;font-size:clamp(64px,8vw,120px);line-height:1;color:#b2aca2;letter-spacing:-.1em}
+.orb{position:absolute;width:34vw;height:34vw;min-width:340px;min-height:340px;right:-11%;top:12%;opacity:.36;border-radius:50%;background:radial-gradient(circle at 39% 34%,#e6ad83 0,#ae7757 22%,#2b433d 62%,#192421 68%,transparent 71%);filter:blur(1px);pointer-events:none;animation:float 14s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-22px) rotate(8deg)}}
+.ticker{background:var(--ink);color:var(--paper);padding:15px 5vw;display:flex;justify-content:space-between;gap:20px;white-space:nowrap;overflow:hidden}
+.ticker span{font-size:11px;text-transform:uppercase;letter-spacing:.2em}
+.statement{padding:clamp(110px,17vw,260px) 0}.statement .copy{margin-top:43px;max-width:1150px;font-size:clamp(38px,5.3vw,89px);font-family:Georgia,serif;line-height:1.1;letter-spacing:-.045em}.statement .copy em{color:var(--rust);font-weight:400}
+.section-top{display:flex;justify-content:space-between;align-items:end;padding-bottom:25px;border-bottom:1px solid var(--line);gap:24px}.section-top p{font-size:13px;max-width:270px;color:#56625d}
+.work{padding-bottom:160px}.projects{display:grid;gap:120px;margin-top:70px}.project{display:grid;grid-template-columns:1.2fr .8fr;gap:4vw;align-items:end}.project:nth-child(even){grid-template-columns:.8fr 1.2fr}.project:nth-child(even) .project-art{order:2}.project-art{position:relative;aspect-ratio:1.23;overflow:hidden;background:#49534a;display:grid;place-items:center;isolation:isolate}.project-art>svg{width:100%;height:100%;display:block}.project-info{padding-bottom:4vw}.project-num{font-family:Georgia,serif;font-size:15px;color:var(--rust)}.project-info h3{margin:28px 0 20px}.project-info p{max-width:350px;font-size:16px;color:#48544e}.tagline{margin-top:36px;display:flex;gap:14px;align-items:center;font-size:11px;text-transform:uppercase;letter-spacing:.16em}.tagline:after{content:"↗";font-size:19px}
+.tile-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);margin-top:65px;border:1px solid var(--line)}.tile{padding:34px;min-height:480px;background:var(--paper);display:flex;flex-direction:column;justify-content:space-between;transition:background .35s}.tile:hover{background:#e7dfd0}.tile-index{font-size:12px;letter-spacing:.2em}.tile-visual{width:100%;aspect-ratio:1.3;display:grid;place-items:center}.tile-visual svg{width:85%;height:90%;transition:transform .7s var(--ease)}.tile:hover svg{transform:translateY(-7px) rotate(-2deg)}.tile h3{font-size:41px;margin-bottom:13px}.tile p{font-size:14px;color:#5a665f;max-width:280px}
+.banded{background:var(--ink);color:var(--paper);padding:140px 0}.banded .split{display:grid;grid-template-columns:1fr 1fr;gap:10vw;margin-top:115px;align-items:end}.large-quote{font-family:Georgia,serif;font-size:clamp(38px,5vw,80px);line-height:1.08;letter-spacing:-.05em}.banded .detail{font-size:17px;max-width:460px;color:#c1c5bc}.linework{margin-top:80px;width:100%;height:auto;opacity:.75}
+.studio{padding:140px 0}.studio .split{display:grid;grid-template-columns:1fr 1fr;gap:10vw}.studio .right{padding-top:160px}.studio .right p{max-width:420px;font-size:21px}.studio .right .small{margin-top:35px;font-size:13px;color:#59635e;max-width:370px}
+.numbers{display:grid;grid-template-columns:repeat(4,1fr);margin-top:110px;border-top:1px solid var(--line)}.numbers>div{padding:27px 20px 0 0;border-right:1px solid var(--line)}.numbers>div:not(:first-child){padding-left:25px}.numbers strong{display:block;font-family:Georgia,serif;font-size:clamp(40px,5vw,72px);font-weight:400;letter-spacing:-.065em}.numbers p{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:#67716b}
+.contact{background:var(--rust);color:var(--white);padding:120px 0 60px}.contact h2{margin:70px 0;font-size:clamp(70px,11vw,180px)}.contact-form{display:grid;grid-template-columns:1fr 1fr;gap:28px;max-width:970px}.contact-form label{display:flex;flex-direction:column;gap:9px;font-size:11px;letter-spacing:.15em;text-transform:uppercase}.contact-form input,.contact-form select,.contact-form textarea{background:transparent;color:inherit;border:0;border-bottom:1px solid rgba(255,255,255,.55);padding:13px 0;border-radius:0;font-size:17px;letter-spacing:normal;outline-offset:3px}.contact-form select option{color:#18221f}.contact-form textarea{min-height:85px;resize:vertical}.contact-form .wide{grid-column:1/-1}.send{border:1px solid var(--white);padding:17px 26px;background:transparent;color:inherit;letter-spacing:.16em;font-size:11px;text-transform:uppercase;transition:background .2s,color .2s}.send:hover{background:var(--white);color:var(--rust)}.notice{font-size:12px;opacity:.85;max-width:650px}
+footer{background:var(--ink);color:var(--paper);padding:55px 0 35px}.footer-top{display:flex;justify-content:space-between;gap:30px}.footer-logo{font-family:Georgia,serif;font-size:clamp(50px,8vw,140px);line-height:.9;letter-spacing:-.07em}.footer-links{display:flex;gap:45px;align-items:end}.footer-links a{font-size:11px;text-transform:uppercase;letter-spacing:.16em}.footer-bottom{display:flex;justify-content:space-between;border-top:1px solid #53605b;margin-top:100px;padding-top:20px;gap:20px;font-size:11px;color:#b9c0b7}
+.reveal{opacity:0;transform:translateY(30px);transition:opacity 1s var(--ease),transform 1s var(--ease)}.reveal.visible{opacity:1;transform:none}
+@media(max-width:900px){header{height:68px}nav{display:none;position:absolute;top:68px;left:0;right:0;background:var(--paper);padding:35px 5vw;flex-direction:column;align-items:start;border-bottom:1px solid var(--line)}nav.open{display:flex}.menu{display:block}.hero{min-height:75svh}.project,.project:nth-child(even){grid-template-columns:1fr;gap:22px}.project:nth-child(even) .project-art{order:0}.project-info{padding:0}.tile-grid{grid-template-columns:1fr 1fr}.banded .split,.studio .split{grid-template-columns:1fr;gap:40px}.studio .right{padding:0}.footer-links{gap:20px}}
+@media(max-width:620px){.container{width:88%}.flag{font-size:9px}.hero-content{padding-top:9vh}.hero h1{font-size:clamp(62px,18vw,110px);margin-top:85px}.hero-bottom{align-items:start}.hero-counter{display:none}.orb{right:-45%;top:35%}.statement{padding:130px 0}.statement .copy{font-size:40px}.projects{gap:90px}.work{padding-bottom:110px}.tile-grid{grid-template-columns:1fr}.tile{min-height:410px}.banded{padding:100px 0}.studio{padding:95px 0}.numbers{grid-template-columns:1fr 1fr;row-gap:35px}.numbers>div:nth-child(3){padding-left:0}.contact{padding-top:90px}.contact-form{grid-template-columns:1fr}.footer-top{flex-direction:column}.footer-links{justify-content:start}.footer-bottom{flex-direction:column}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}.reveal{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="flag">Fictional flagship experience · Built to demonstrate Arlovi · Not a live business</div>
+<header>
+  <a href="#top" class="brand" aria-label="Northline Collective home"><span class="brand-mark" aria-hidden="true">N</span> NORTHLINE <span style="font-weight:400">COLLECTIVE</span></a>
+  <button class="menu" aria-expanded="false" aria-controls="nav" id="menu">Menu +</button>
+  <nav id="nav" aria-label="Main navigation">
+    <a href="#work">Work</a><a href="#disciplines">Disciplines</a><a href="#approach">Approach</a><a href="#studio">Studio</a><a href="#contact" class="nav-cta">Start a conversation</a>
+  </nav>
+</header>
+<main id="main">
+<section class="hero container" id="top" aria-labelledby="hero-heading">
+  <div class="orb" aria-hidden="true"></div>
+  <div class="hero-content">
+    <span class="label eyebrow">An independent house of ideas · Est. in imagination</span>
+    <h1 id="hero-heading">Material.<br>Space.<br><em>Experience.</em></h1>
+  </div>
+  <div class="hero-bottom"><p>We make considered places, useful objects and moments that stay with you.</p><span class="micro">01 — 07<br>Scroll to explore</span><span class="hero-counter" aria-hidden="true">N° 01</span></div>
+</section>
+<div class="ticker" aria-hidden="true"><span>OBSERVE</span><span>MAKE</span><span>LIVE</span><span>FEEL</span><span>REMEMBER</span></div>
+<section class="statement container reveal" aria-labelledby="manifesto"><span class="label eyebrow">A point of view</span><p class="copy" id="manifesto">We believe the things we surround ourselves with should do more than look beautiful. They should make room for <em>life.</em></p></section>
+<section class="work container" id="work" aria-labelledby="work-heading">
+  <div class="section-top"><div><span class="label eyebrow">01 / Selected work</span><h2 id="work-heading" style="margin-top:40px">Work with<br><i>intention.</i></h2></div><p>Across hospitality, interiors and product design. The projects below are original fictional portfolio concepts for the simulation.</p></div>
+  <div class="projects">
+    <article class="project reveal">
+      <div class="project-art" role="img" aria-label="Original architectural illustration of warm illuminated hotel arches">
+        <svg viewBox="0 0 800 640" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="arch" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#cead8b"/><stop offset="1" stop-color="#534d41"/></linearGradient><radialGradient id="glow"><stop stop-color="#fff1c8"/><stop offset="1" stop-color="#be7f4f" stop-opacity="0"/></radialGradient></defs><rect width="800" height="640" fill="#7b8072"/><path d="M0 0H800V640H0Z" fill="#7e8779"/><path d="M120 640V180Q120 55 245 55H555Q680 55 680 180V640" fill="url(#arch)"/><path d="M194 640V200Q194 114 280 114H520Q606 114 606 200V640" fill="#2e3933"/><circle cx="400" cy="315" r="200" fill="url(#glow)"/><path d="M246 640V295Q246 222 320 222H480Q554 222 554 295V640" fill="#bdac91"/><path d="M287 640V340Q287 285 342 285H458Q513 285 513 340V640" fill="#e2c4a2"/><ellipse cx="400" cy="523" rx="160" ry="28" fill="#9b836b" opacity=".45"/><rect x="330" y="340" width="140" height="210" rx="70" fill="#e8d6b7"/><path d="M399 360V548" stroke="#74674f" stroke-width="3"/><circle cx="400" cy="358" r="30" fill="#bd8e59"/></svg>
+      </div>
+      <div class="project-info"><span class="project-num">01 / SPATIAL DESIGN</span><h3>Lighthouse<br>Hotels</h3><p>Forty-five rooms, one shared language of light. An exploration of hospitality through atmosphere, texture and restraint.</p><div class="tagline">Concept case study</div></div>
+    </article>
+    <article class="project reveal">
+      <div class="project-art" style="background:#c7b59c" role="img" aria-label="Original product illustration of an arched brass floor lamp">
+        <svg viewBox="0 0 800 640" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="brass" x1="0" y1="0" x2="1" y2=".4"><stop stop-color="#e6cb90"/><stop offset=".48" stop-color="#966637"/><stop offset="1" stop-color="#e9bd7c"/></linearGradient><radialGradient id="bg"><stop stop-color="#e7d5bb"/><stop offset="1" stop-color="#bba78c"/></radialGradient></defs><rect width="800" height="640" fill="url(#bg)"/><ellipse cx="520" cy="583" rx="180" ry="25" fill="#66513b" opacity=".23"/><path d="M520 550V185C520 100 470 76 390 76H295" fill="none" stroke="url(#brass)" stroke-width="16"/><path d="M520 550H520" stroke="#2a2922" stroke-width="11"/><ellipse cx="520" cy="555" rx="75" ry="16" fill="#554734"/><path d="M260 135L315 135L348 224H225Z" fill="#e8dcc3"/><path d="M259 135H314" stroke="#594938" stroke-width="5"/><path d="M225 224H348" stroke="#866d4e" stroke-width="4"/><circle cx="287" cy="202" r="42" fill="#f6d29c" opacity=".32"/><path d="M0 589H800" stroke="#a78d70" stroke-width="2"/></svg>
+      </div>
+      <div class="project-info"><span class="project-num">02 / OBJECTS</span><h3>The Arc<br>Collection</h3><p>In a single bend of metal, a study in balance. Brushed brass, thoughtful proportions and parts made to be repaired.</p><div class="tagline">Collection exploration</div></div>
+    </article>
+    <article class="project reveal">
+      <div class="project-art" role="img" aria-label="Original abstract illustration of a studio table and material samples">
+        <svg viewBox="0 0 800 640" xmlns="http://www.w3.org/2000/svg"><rect width="800" height="640" fill="#857869"/><path d="M0 0H800V390H0Z" fill="#a99b85"/><path d="M0 390L800 275V640H0Z" fill="#554e42"/><path d="M75 250L590 165L740 460L204 555Z" fill="#d7c6a9"/><path d="M205 330L450 289L515 412L265 455Z" fill="#b36e50"/><path d="M430 230L615 200L675 320L479 356Z" fill="#e5dcc8"/><path d="M480 240L610 218" stroke="#8a8d76" stroke-width="4"/><circle cx="380" cy="342" r="82" fill="#7f9184"/><circle cx="380" cy="342" r="54" fill="#a7b5a5"/><rect x="125" y="310" width="35" height="180" transform="rotate(-12 125 310)" fill="#3b453f"/><path d="M520 480Q610 380 720 510" fill="none" stroke="#e9dfc7" stroke-width="12"/></svg>
+      </div>
+      <div class="project-info"><span class="project-num">03 / EXPERIENCE</span><h3>Sunday<br>Sessions</h3><p>A series of intimate gatherings around making, material knowledge and the simple pleasure of being together.</p><div class="tagline">Experience concept</div></div>
+    </article>
+  </div>
+</section>
+<section class="container" id="disciplines" style="padding-bottom:160px">
+  <div class="section-top"><div><span class="label eyebrow">02 / Our disciplines</span><h2 style="margin-top:40px">Distinct minds.<br><i>Shared purpose.</i></h2></div><p>One collective, three ways to make a difference in the everyday.</p></div>
+  <div class="tile-grid">
+    <article class="tile"><span class="tile-index">N° 01 / SPACES</span><div class="tile-visual" aria-hidden="true"><svg viewBox="0 0 300 260"><rect x="45" y="25" width="210" height="220" rx="104" fill="#b7bba9"/><path d="M87 245V114Q87 68 134 68H167Q213 68 213 114V245" fill="#eeeae1"/><circle cx="150" cy="151" r="31" fill="#c18a67"/></svg></div><div><h3>Atelier</h3><p>Spaces with soul. Architecture, interiors, light and material.</p></div></article>
+    <article class="tile"><span class="tile-index">N° 02 / OBJECTS</span><div class="tile-visual" aria-hidden="true"><svg viewBox="0 0 300 260"><ellipse cx="153" cy="225" rx="85" ry="17" fill="#c9b79e"/><path d="M138 221V60" stroke="#7a5f43" stroke-width="9"/><path d="M76 95L207 95L225 165H58Z" fill="#b8754e"/><ellipse cx="141" cy="96" rx="66" ry="17" fill="#d99d71"/><ellipse cx="141" cy="165" rx="84" ry="18" fill="#946044"/></svg></div><div><h3>Supply</h3><p>Objects that earn their place. Designed with purpose and permanence.</p></div></article>
+    <article class="tile"><span class="tile-index">N° 03 / GATHERINGS</span><div class="tile-visual" aria-hidden="true"><svg viewBox="0 0 300 260"><circle cx="110" cy="109" r="62" fill="#d4c1a9"/><circle cx="182" cy="130" r="60" fill="#aa978c" opacity=".9"/><circle cx="146" cy="190" r="60" fill="#809185" opacity=".88"/><circle cx="150" cy="134" r="18" fill="#eeeae1"/></svg></div><div><h3>Experiences</h3><p>Time made meaningful. Workshops, consultations and conversations.</p></div></article>
+  </div>
+</section>
+<section class="banded" id="approach">
+  <div class="container">
+    <span class="label eyebrow">03 / How we think</span><h2 style="margin-top:70px">The beauty<br>is in the <i>doing.</i></h2>
+    <div class="split"><p class="large-quote">What if the most extraordinary thing was simply getting the ordinary right?</p><div class="detail"><span class="label">Our process</span><p style="margin-top:22px">Listen carefully. Ask better questions. Work with materials honestly. Prototype in the real world. Build with people, not just for them. And remain curious after the work has been delivered.</p></div></div>
+    <svg class="linework" viewBox="0 0 1200 220" aria-hidden="true"><path d="M0 160Q160 -20 300 130T600 130T900 130T1200 80" fill="none" stroke="#d4bca1" stroke-width="1.2"/><circle cx="300" cy="130" r="6" fill="#c48e6c"/><circle cx="600" cy="130" r="6" fill="#c48e6c"/><circle cx="900" cy="130" r="6" fill="#c48e6c"/></svg>
+  </div>
+</section>
+<section class="studio container" id="studio">
+  <div class="split"><div><span class="label eyebrow">04 / The people behind the work</span><h2 style="margin-top:70px">Always<br>in <i>good</i><br>company.</h2></div><div class="right"><p>A contemporary business lives between instinct and systems. Our teams bring humanity to the first, and clarity to the second.</p><p class="small">For this Arlovi simulation, every business activity is fictional: customer projects, finances, team profiles, workflows and creative files are locally seeded demonstration materials.</p></div></div>
+  <div class="numbers"><div><strong>03</strong><p>Creative disciplines</p></div><div><strong>35</strong><p>Arlovi native apps</p></div><div><strong>20</strong><p>Cross-app journeys</p></div><div><strong>01</strong><p>Connected idea</p></div></div>
+</section>
+<section class="contact" id="contact">
+  <div class="container"><span class="label eyebrow">05 / Begin something</span><h2>Let's make<br><i>something matter.</i></h2>
+    <form id="brief" class="contact-form">
+      <label>Your name<input name="name" autocomplete="name" placeholder="Your name" required maxlength="100"></label>
+      <label>Your email<input name="email" type="email" autocomplete="email" placeholder="you@example.com" required maxlength="180"></label>
+      <label>What are we imagining?<select name="kind" required><option value="">Choose a discipline</option><option>Spaces and interiors</option><option>Objects and collections</option><option>Experiences and events</option><option>Something else entirely</option></select></label>
+      <label>Indicative budget<select name="budget"><option value="">Prefer not to say</option><option>£5k–£25k</option><option>£25k–£100k</option><option>£100k–£250k</option><option>£250k+</option></select></label>
+      <label class="wide">Tell us the idea<textarea name="story" required maxlength="2000" placeholder="What would you love to make possible?"></textarea></label>
+      <div class="wide" style="display:flex;justify-content:space-between;align-items:center;gap:25px;flex-wrap:wrap"><button class="send" type="submit">Download demo enquiry ↗</button><p class="notice" id="status" role="status">Nothing is sent. Submitting exports your fictional project brief as a local text file. No account or external service is connected.</p></div>
+    </form>
+  </div>
+</section>
+</main>
+<footer><div class="container"><div class="footer-top"><div class="footer-logo">Northline<br><i>Collective.</i></div><div class="footer-links"><a href="#work">Work</a><a href="#disciplines">Disciplines</a><a href="#contact">Contact</a></div></div><div class="footer-bottom"><span>© 2026 Northline Collective. Fictional flagship demonstration.</span><span>Art-directed and built as a standalone design showcase for Arlovi.</span><a href="#top">Back to top ↑</a></div></div></footer>
+<script>
+const menu=document.getElementById('menu'),nav=document.getElementById('nav');menu.addEventListener('click',()=>{const open=nav.classList.toggle('open');menu.setAttribute('aria-expanded',String(open));menu.textContent=open?'Close −':'Menu +'});nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{nav.classList.remove('open');menu.setAttribute('aria-expanded','false');menu.textContent='Menu +'}));
+const observer='IntersectionObserver' in window?new IntersectionObserver(items=>items.forEach(item=>{if(item.isIntersecting){item.target.classList.add('visible');observer.unobserve(item.target)}}),{threshold:.1}):null;document.querySelectorAll('.reveal').forEach(el=>{if(observer)observer.observe(el);else el.classList.add('visible')});
+document.getElementById('brief').addEventListener('submit',e=>{e.preventDefault();const f=e.currentTarget;if(!f.reportValidity())return;const d=new FormData(f);const lines=['NORTHLINE COLLECTIVE — FICTIONAL PROJECT ENQUIRY','Local demonstration only. Not submitted or transmitted.','',...Array.from(d.entries()).map(([k,v])=>k.toUpperCase()+': '+String(v))];const blob=new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download='northline-collective-demo-brief.txt';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);document.getElementById('status').textContent='Your demo brief has been exported to your device. Nothing was sent.'});
+</script>
+</body>
+</html>
