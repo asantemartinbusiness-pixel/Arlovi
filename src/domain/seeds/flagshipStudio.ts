@@ -143,7 +143,7 @@ const publication = ():PublicationDoc => {
     ["Gather around.","Our experiences create room for learning: workshops in material thinking, personal consultations, demonstrations and gatherings that make the craft accessible."],
     ["Begin a conversation.","A project starts with a good question. What should the space, object or experience make someone feel?\n\nNorthline Collective is a fictional Arlovi flagship demonstration. The brand, business results and projects shown here are not real claims."],
   ];
-  const pages:Page[]=chapters.map((chapter,i)=>{
+  const pages:Page[]=chapters.map((_,i)=>{
     const id="pub-p"+(i+1);
     const isCover=i===0;
     const frames:Frame[]=[
