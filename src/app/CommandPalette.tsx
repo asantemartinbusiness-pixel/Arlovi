@@ -144,7 +144,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
       const screen = findScreen(item.path)?.screen;
       return safeLocation(item.path, org.slug) && (!screen || canOpenLegacyScreen(role, screen));
     }).map(item => ({
-      key: `location-${item.path}`, kind: "saved", group: item.saved ? "Saved places" : "Recently visited",
+      key: `location-${item.path}`, kind: "saved" as const, group: item.saved ? "Saved places" : "Recently visited",
       title: destinationLabel(item.path, org.slug, projects, departments),
       detail: item.saved ? "Saved destination" : "Recently visited",
       appCode: findScreen(item.path)?.screen.applicationCode ?? "HQ",
@@ -159,7 +159,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         const destination = findScreen(item.to)?.screen;
         return destination && canOpenLegacyScreen(role, destination);
       }).map(({ app, to }) => ({
-        key: `app-${app.code}`, kind: "app", group: "Applications",
+        key: `app-${app.code}`, kind: "app" as const, group: "Applications",
         title: app.short, detail: "Application", to, appCode: app.code,
         keywords: `open go launch ${app.short}`,
       }));
@@ -167,7 +167,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     const pages: SearchHit[] = screens
       .filter(screen => canOpenLegacyScreen(role, screen) && !/:id\b|:slug\b/.test(screen.route))
       .map(screen => ({
-        key: `screen-${screen.id}`, kind: "screen", group: "Screens",
+        key: `screen-${screen.id}`, kind: "screen" as const, group: "Screens",
         title: screen.title, detail: APP_ENTRIES[screen.applicationCode]?.short ?? screen.applicationName,
         to: screen.route.replace(":org", org.slug),
         appCode: screen.applicationCode, keywords: screen.purpose,
@@ -345,16 +345,16 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
               <button type="button" aria-label="Hide preview" onClick={() => setShowPreview(false)}><X size={16}/></button>
             </div>
             <div className="search-v2-preview-icon">
-              {(() => { const Icon = APP_ENTRIES[selected.appCode ?? ""]?.icon ?? iconFor(selected.kind); return <Icon size={24}/>; })()}
+              {(() => { const Icon = APP_ENTRIES[preview.appCode ?? ""]?.icon ?? iconFor(preview.kind); return <Icon size={24}/>; })()}
             </div>
-            <h2>{selected.title}</h2>
-            <p className="search-v2-preview-meta">{selected.detail}</p>
-            {selected.summary && <p className="search-v2-preview-summary">{selected.summary.slice(0, 270)}</p>}
-            {selected.status && <div className="search-v2-preview-field"><span>Status</span><strong>{selected.status.replace(/_/g, " ")}</strong></div>}
-            {selected.ownerName && <div className="search-v2-preview-field"><span>Owner</span><strong>{selected.ownerName}</strong></div>}
-            {selected.updatedAt && <div className="search-v2-preview-field"><span>Updated</span><strong>{new Date(selected.updatedAt).toLocaleDateString()}</strong></div>}
+            <h2>{preview.title}</h2>
+            <p className="search-v2-preview-meta">{preview.detail}</p>
+            {preview.summary && <p className="search-v2-preview-summary">{preview.summary.slice(0, 270)}</p>}
+            {preview.status && <div className="search-v2-preview-field"><span>Status</span><strong>{preview.status.replace(/_/g, " ")}</strong></div>}
+            {preview.ownerName && <div className="search-v2-preview-field"><span>Owner</span><strong>{preview.ownerName}</strong></div>}
+            {preview.updatedAt && <div className="search-v2-preview-field"><span>Updated</span><strong>{new Date(preview.updatedAt).toLocaleDateString()}</strong></div>}
             <div className="search-v2-preview-actions">
-              <button type="button" className="search-v2-primary" onClick={() => go(selected)}>Open result <ArrowUpRight size={15}/></button>
+              <button type="button" className="search-v2-primary" onClick={() => go(preview)}>Open result <ArrowUpRight size={15}/></button>
               {canSave && <button type="button" className="search-v2-secondary"
                 onClick={() => toggleSavedNavigation(org.id, org.slug, selected.to)}>
                 {isSaved ? <BookmarkCheck size={15}/> : <Bookmark size={15}/>}
