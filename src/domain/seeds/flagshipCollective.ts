@@ -107,7 +107,7 @@ const WEB_BODY = {
   domains: [],
   deployments: [{ id: "showcase-preview", at: "2026-11-14T09:30:00.000Z", environment: "preview", state: "draft", note: "Concept and local draft only. No hosting or domain is connected.", pages: 7, bytes: 0, actor: "Maya Chen" }],
 };
-const form = (name: string, fields: unknown[], confirmation: string) => ({
+const form = (fields: unknown[], confirmation: string) => ({
   fields, logic: [],
   theme: { accent: PALETTE.bronze, ink: PALETTE.ink, paper: PALETTE.canvas, radius: 9, width: "narrow", font: "Inter" },
   settings: { notifyEnabled: false, notifyTo: "", confirmation, retentionDays: 180, access: "link", closed: false, closeMessage: "", version: 1 },
@@ -168,7 +168,7 @@ registerSeed("flagship-collective", (ctx) => {
   push("tickets",0,"Lighthouse — finish sample enquiry",{status:"open",summary:"Client would like to compare the blackened and brushed brass finishes.",fields:{companyId:id("companies",10),projectId:id("projects",0),priority:"normal"}});
   push("portals",0,"Lighthouse Hotels — client review portal",{status:"draft",summary:"Fictional scoped customer collaboration: approved brief, milestones, change requests and document review.",fields:{companyId:id("companies",10),projectId:id("projects",0),externalAccess:"not_connected"},body:{sections:["Overview","Approvals","Milestones","Documents","Messages"],sharedRecordIds:[id("documents",0),id("projects",0),id("quotes",0)]}});
   push("sites",0,"Northline Collective — flagship editorial site",{status:"draft",summary:"Seven-page art-directed branded website in the native builder. No live publication or provider connection.",fields:{delivery:"not_connected",pageCount:7,showcase:true},body:WEB_BODY});
-  push("forms",0,"Northline Collective — immersive project brief",{status:"draft",summary:"Branded multi-step client intake, consent and project classification; local only.",fields:{category:"client_intake",websiteId:id("sites",0)},body:form("Project brief",[
+  push("forms",0,"Northline Collective — immersive project brief",{status:"draft",summary:"Branded multi-step client intake, consent and project classification; local only.",fields:{category:"client_intake",websiteId:id("sites",0)},body:form([
     {id:"type",type:"select",label:"What are we creating together?",required:true,options:["A considered space","A collection of objects","A memorable experience","Something unexpected"]},
     {id:"name",type:"text",label:"Your name",required:true},
     {id:"email",type:"email",label:"Email address",required:true,pattern:"email"},
@@ -177,7 +177,7 @@ registerSeed("flagship-collective", (ctx) => {
     {id:"budget",type:"select",label:"Indicative investment",required:true,options:["£5k–£25k","£25k–£100k","£100k–£250k","£250k+"]},
     {id:"consent",type:"checkbox",label:"I consent to being contacted about my enquiry",required:true}
   ],"Your project brief has been saved locally for this demonstration.")});
-  push("forms",1,"Northline Experiences — private session",{status:"draft",summary:"Consultation and workshop enquiry form.",fields:{category:"booking_intake"},body:form("Private session",[
+  push("forms",1,"Northline Experiences — private session",{status:"draft",summary:"Consultation and workshop enquiry form.",fields:{category:"booking_intake"},body:form([
     {id:"name",type:"text",label:"Your name",required:true},{id:"email",type:"email",label:"Email",required:true},
     {id:"experience",type:"select",label:"Choose an experience",required:true,options:["Design consultation","Material workshop","Private event"]},
     {id:"date",type:"date",label:"Preferred date",required:true},{id:"requirements",type:"longtext",label:"Anything that would make your visit easier?"}
@@ -215,7 +215,7 @@ registerSeed("flagship-collective", (ctx) => {
   push("incidents",0,"Showcase hosting connection unavailable",{status:"open",summary:"Live publishing is intentionally blocked until a hosting connector is configured.",fields:{severity:"low",provider:"hosting",capability:"not_connected"}});
   // Fill broader workflows with linked, non-financial records without presenting sample business volumes as verified facts.
   const linkedCollections=["emailThreads","meetings","notifications","templates","workbooks","publications","designs","photos","returns","warehouse","stockMoves","budgets","articles","sources","reviews","skills","agents","evaluations","channels","messages","shifts","leaveRequests","applicants","employees","receipts","obligations","datasets","workflowRuns","connectors","expenses","promotions","socialPosts","timelineEvents","resources"];
-  linkedCollections.forEach((collection,i)=>{
+  linkedCollections.forEach((collection)=>{
     if(collection==="datasets")return;
     push(collection,0,"Collective / "+collection.replace(/([A-Z])/g," $1").toLowerCase()+" showcase",{status:"draft",summary:"Illustrative flagship record; additional specialist-specific records belong in the native editor.",fields:{sourceProjectId:id("projects",0),demoOnly:true}});
   });
