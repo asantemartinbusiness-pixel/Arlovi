@@ -184,7 +184,7 @@ export function ContactForm({ context, close }: { context: ScreenContext; close:
   const payload = context.overlayPayload as { id?: string } | undefined;
   const existing = useRecord(payload?.id ?? context.selectedId);
   const contact = existing?.collection === "contacts" ? existing : undefined;
-  const draftScope = `crm:contact:${context.org.id}:${context.actor}:${payload?.id ?? contact?.id ?? "new"}`;
+  const draftScope = `crm:contact:${context.org.id}:${context.actor}:${payload?.id || contact?.id || "new"}`;
   const [titleDraft, setTitle] = useWorkingField<string | undefined>(draftScope, "title", undefined);
   const [emailDraft, setEmail] = useWorkingField<string | undefined>(draftScope, "email", undefined);
   const [phoneDraft, setPhone] = useWorkingField<string | undefined>(draftScope, "phone", undefined);
