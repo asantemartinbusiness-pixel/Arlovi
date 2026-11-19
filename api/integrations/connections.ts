@@ -1,5 +1,5 @@
-import type { Request, Response } from "./_shared";
-import { identify, json, nango, ready } from "./_shared";
+import type { Request, Response } from "../../server/integrations/shared";
+import { identify, json, nango, ready } from "../../server/integrations/shared";
 
 export default async function handler(req: Request, res: Response) {
   if (req.method !== "GET") return json(res, 405, { error: "METHOD_NOT_ALLOWED" });
