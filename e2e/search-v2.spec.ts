@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("global search offers a compact app finder and keyboard navigation", async ({ page }) => {
   await page.goto("/o/northline/workspace/home");
+  await expect(page.locator(".hq-header")).toBeVisible();
   await page.keyboard.press("Control+k");
   const dialog = page.getByRole("dialog", { name: /Search Northline/ });
   await expect(dialog).toBeVisible();
@@ -18,6 +19,7 @@ test("global search offers a compact app finder and keyboard navigation", async 
 
 test("the global search offers a context preview and a recoverable empty state", async ({ page }) => {
   await page.goto("/o/northline/workspace/home");
+  await expect(page.locator(".hq-header")).toBeVisible();
   await page.keyboard.press("Control+k");
   const dialog = page.getByRole("dialog", { name: /Search Northline/ });
   await dialog.getByRole("combobox").fill("Finance");
@@ -33,6 +35,7 @@ test("global search continues to restore the exact previous native app location"
   await page.goto("/o/northline/fin/invoices?tab=Draft");
   await expect(page.locator("h1").first()).toBeVisible();
   await page.goto("/o/northline/project/home");
+  await expect(page.locator(".hq-header")).toBeVisible();
   await expect(page.locator("h1").first()).toBeVisible();
   await page.keyboard.press("Control+k");
   const dialog = page.getByRole("dialog", { name: /Search Northline/ });
