@@ -5,7 +5,8 @@ import {
   MousePointer2, Hand, Grid3x3, Magnet, Link2, Play, FileCode2, Download, Plus, Component,
 } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, ModalActions, ModalInFlight, Notice, OverlayCancel, Pill, Properties, Row,
+  Button, Card, Checkbox, DataGrid, Empty, Field, FactGrid, Grid, ModalActions, ModalInFlight, Notice, OVERLAY_WIDTH, OverlayActions, OverlayCancel,
+  OverlaySection, OverlaySummary, Pill, Popover, Properties, Row,
   Select, Stack, Stat, StatRow, TextArea, TextInput, Tool, Toolbar, ToolbarSeparator,
 } from "@/design-system";
 import { registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
@@ -344,6 +345,7 @@ function CanvasScreen({ context, actions }: { context: ScreenContext; actions: A
       context={context}
       actions={actions}
       tabs={[{ id: "Design" }, { id: "Prototype" }, { id: "Inspect" }, { id: "Comments" }]}
+      lean
       title={record.title}
       subtitle={<Row gap={2} wrap><SaveState handle={handle} /><span>{page ? `${page.name} · ${Object.keys(page.nodes).length} layers` : ""}</span></Row>}
       backTo={{ label: "Design", to: `/o/${context.org.slug}/design/files` }}
@@ -366,6 +368,10 @@ function CanvasScreen({ context, actions }: { context: ScreenContext; actions: A
             <Button size="sm" variant="ghost" disabled={!handle.canRedo} onClick={handle.redo}>Redo</Button>
             <Button size="sm" variant="ghost" onClick={requestFit}>Fit</Button>
           </Toolbar>
+          <ToolbarSeparator />
+          <Popover align="end" trigger={<Button size="sm" variant="ghost" aria-label="Keyboard shortcuts">Keys</Button>}>
+            <div className="vx-keys"><ShortcutTable rows={SHORTCUT_ROWS} /></div>
+          </Popover>
         </>
       }
       left={
@@ -707,6 +713,7 @@ function PathScreen({ context, actions }: { context: ScreenContext; actions: Act
       context={context}
       actions={actions}
       tabs={[{ id: "Pen" }, { id: "Curves" }, { id: "Boolean" }, { id: "Offset" }]}
+      lean
       title={`${record.title} — paths`}
       subtitle={<Row gap={2}><SaveState handle={handle} /><span>{paths.length} path layer{paths.length === 1 ? "" : "s"}</span></Row>}
       backTo={{ label: record.title, to: context.path("/o/:org/design/files/:id", context.params.id) }}
@@ -3080,6 +3087,19 @@ function SharingPanel({ context, id }: { context: ScreenContext; id?: string }) 
   );
 }
 
+const SHORTCUT_ROWS = [
+          { keys: "Drag", does: "Draw the shape; hold Shift for a square or circle" },
+          { keys: "V", does: "Back to the select tool" },
+          { keys: "Arrows", does: "Nudge the selection 1px, with Shift 10px" },
+          { keys: "Alt + arrows", does: "Resize the selection without the pointer" },
+          { keys: "⌘[ / ⌘]", does: "Send backwards / bring forwards" },
+          { keys: "⌘G", does: "Group the selection" },
+          { keys: "⌘D", does: "Duplicate" },
+          { keys: "Tab", does: "Walk the layers" },
+          { keys: "0", does: "Zoom to fit" },
+          { keys: "Space + drag", does: "Pan the canvas" },
+        ];
+
 function InsertTools({ close }: { close: () => void }) {
   return (
     <Stack gap={3}>
@@ -3091,20 +3111,7 @@ function InsertTools({ close }: { close: () => void }) {
           </Card>
         ))}
       </Grid>
-      <ShortcutTable
-        rows={[
-          { keys: "Drag", does: "Draw the shape; hold Shift for a square or circle" },
-          { keys: "V", does: "Back to the select tool" },
-          { keys: "Arrows", does: "Nudge the selection 1px, with Shift 10px" },
-          { keys: "Alt + arrows", does: "Resize the selection without the pointer" },
-          { keys: "⌘[ / ⌘]", does: "Send backwards / bring forwards" },
-          { keys: "⌘G", does: "Group the selection" },
-          { keys: "⌘D", does: "Duplicate" },
-          { keys: "Tab", does: "Walk the layers" },
-          { keys: "0", does: "Zoom to fit" },
-          { keys: "Space + drag", does: "Pan the canvas" },
-        ]}
-      />
+      <ShortcutTable rows={SHORTCUT_ROWS} />
     </Stack>
   );
 }

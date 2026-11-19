@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   BarChart, Button, Card, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice, Pill,
-  Properties, Row, Segmented, Select, Stack, Stat, StatRow,
+  KeyValueList, Row, Segmented, Select, Stack, Stat, StatRow,
 } from "@/design-system";
 import { Boxes, Package, PackageCheck, RotateCcw, ShoppingBag, Tags, Truck } from "lucide-react";
 import type { ScreenContext } from "@/platform/registry";
@@ -13,10 +13,10 @@ import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import {
   bodyOf, marginOf, onHandFor, orderTaxStatus, orderTotals, withDelivery, reservedFor, statusTone,
-  stockRows, taxCategoryOfProduct, useCommerceData, PAYMENT_LABEL, paymentTone,
+  stockRows, taxCategoryOfProduct, useCommerceData, PAYMENT_LABEL, paymentLabel, paymentTone,
   type OrderBody, type ProductBody,
 } from "./data";
-import { lineProgress, refundableMinor, refundedMinor, shipmentsOf } from "./fulfilment";
+import { lineProgress, refundableMinor, refundedMinor, refundStateLabel, shipmentsOf } from "./fulfilment";
 import { RefundHistory, ShipmentsPanel } from "./operations";
 import { StorefrontPreview } from "./storefront";
 import { applyOrderFilter, LocationScopeNote, orderFilter, useLocationScope, useOrderFilter } from "./actions";
@@ -196,7 +196,7 @@ function CommerceOverviewBody({ context, lens }: { context: ScreenContext; lens:
             columns={[
               { key: "title", header: "Order", primary: true, cell: (row) => row.title },
               { key: "buyer", header: "Buyer", cell: (row) => data.contacts.find((contact) => contact.id === String(row.fields.contactId))?.title ?? String(row.fields.buyerName || "Guest") },
-              { key: "payment", header: "Payment", cell: (row) => <Pill tone={paymentTone(String(row.fields.payment))} dot>{PAYMENT_LABEL[String(row.fields.payment)] ?? String(row.fields.payment)}</Pill> },
+              { key: "payment", header: "Payment", cell: (row) => <Pill tone={paymentTone(String(row.fields.payment))} dot>{paymentLabel(row.fields.payment)}</Pill> },
               { key: "total", header: "Total", align: "end", cell: (row) => context.money(row.amountMinor) },
             ]}
           />
@@ -389,7 +389,7 @@ export function ProductDetail({ context, lens }: { context: ScreenContext; lens:
     return (
       <Grid>
         <Card span={7} title="Storefront metadata" subtitle="Used by the storefront page and nothing else">
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Meta title", value: String(product.fields.seoTitle || "Not set") },
             { label: "Meta description", value: String(product.fields.seoDescription || "Not set") },
             { label: "Handle", value: <code>/{product.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}</code> },
@@ -423,13 +423,11 @@ export function ProductDetail({ context, lens }: { context: ScreenContext; lens:
   const reserved = reservedFor(data.orders, product.id);
   return (
     <Grid>
-      <Card span={5} title="Overview" subtitle={String(product.fields.sku)}>
+      <Card span={5} title="Overview">
         <Stack gap={3}>
           <div className="t4-tile-media" style={{ height: 140 }}>{body.media?.[0]?.label ?? "No photograph"}</div>
           <p className="ds-prose">{body.description ?? product.summary}</p>
-          <Properties rows={[
-            { label: "Status", value: <Pill tone={statusTone(product.status)}>{product.status}</Pill> },
-            { label: "Collection", value: String(product.fields.productCollection ?? "—") },
+          <KeyValueList items={[
             { label: "Variants", value: String(variants.length) },
             { label: "Lead time", value: `${product.fields.leadTimeDays ?? "—"} days` },
           ]} />
@@ -437,7 +435,7 @@ export function ProductDetail({ context, lens }: { context: ScreenContext; lens:
       </Card>
       <Card span={7} title="Price and tax" subtitle={`${taxCode.label} (${taxCode.code})`}>
         <Stack gap={3}>
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "List price", value: <strong className="ds-num">{context.money(product.amountMinor)}</strong> },
             { label: "Tax category", value: taxCategoryOfProduct(product).replace("_", " ") },
             { label: "Resolved code", value: `${taxCode.code} at ${(taxCode.rateBp / 100).toFixed(2)}%` },
@@ -501,7 +499,7 @@ export function Inventory({ context, lens }: { context: ScreenContext; lens: str
             <Card key={warehouse.id} span={4} title={warehouse.title} subtitle={warehouse.summary}
               actions={<Pill tone={units > Number(warehouse.fields.capacityUnits ?? 0) ? "danger" : "neutral"}>{units} units</Pill>}>
               <Stack gap={3}>
-                <Properties rows={[
+                <KeyValueList items={[
                   { label: "Code", value: String(warehouse.fields.code ?? "—") },
                   { label: "Manager", value: String(warehouse.fields.managerName ?? "Unassigned") },
                   { label: "Capacity", value: `${warehouse.fields.capacityUnits ?? "—"} units` },
@@ -607,7 +605,7 @@ export function Orders({ context, state }: { context: ScreenContext; state: stri
         { key: "title", header: "Order", primary: true, cell: (row) => row.title, sortValue: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
         { key: "buyer", header: "Buyer", cell: (row) => data.contacts.find((contact) => contact.id === String(row.fields.contactId))?.title ?? String(row.fields.buyerName || "Guest checkout") },
         { key: "placed", header: "Placed", cell: (row) => context.date(row.at), sortValue: (row) => row.at ?? "", hideBelow: 900 },
-        { key: "payment", header: "Payment", cell: (row) => <Pill tone={paymentTone(String(row.fields.payment))} dot>{PAYMENT_LABEL[String(row.fields.payment)] ?? String(row.fields.payment)}</Pill> },
+        { key: "payment", header: "Payment", cell: (row) => <Pill tone={paymentTone(String(row.fields.payment))} dot>{paymentLabel(row.fields.payment)}</Pill> },
         { key: "fulfilment", header: "Fulfilment", cell: (row) => <Pill tone={statusTone(String(row.fields.fulfilment ?? row.status))}>{String(row.fields.fulfilment ?? row.status).replace("_", " ")}</Pill> },
         { key: "returns", header: "Return", cell: (row) => { const found = data.returns.find((item) => String(item.fields.orderId) === row.id); return found ? <Pill tone={statusTone(found.status)}>{found.title}</Pill> : <span className="ds-subtle">—</span>; }, hideBelow: 1200 },
         { key: "total", header: "Total", align: "end", cell: (row) => context.money(row.amountMinor), sortValue: (row) => row.amountMinor ?? 0 },
@@ -640,7 +638,7 @@ export function OrderDetail({ context, lens }: { context: ScreenContext; lens: s
       <Stack gap={4}>
         <Card title="Physical state" subtitle={`${String(order.fields.fulfilment ?? order.status).replace("_", " ")} · ${String(order.fields.carrier) || "no carrier chosen"}`}>
           <Stack gap={3}>
-            <Properties rows={[
+            <KeyValueList items={[
               { label: "Warehouse", value: warehouseName(data.warehouses, String(order.fields.warehouseId)) },
               { label: "Carrier", value: String(order.fields.carrier) || "Not chosen" },
               { label: "Tracking", value: String(order.fields.tracking) || "No tracking recorded" },
@@ -692,11 +690,11 @@ export function OrderDetail({ context, lens }: { context: ScreenContext; lens: s
           {returns.map((item) => (
             <Card key={item.id} title={item.title} subtitle={item.summary}
               actions={<Pill tone={statusTone(item.status)}>{item.status.replace("_", " ")}</Pill>}>
-              <Properties rows={[
+              <KeyValueList items={[
                 { label: "Reason", value: String(item.fields.reason ?? "").replace("_", " ") },
                 { label: "Quantity", value: String(item.fields.quantity ?? 1) },
                 { label: "Restock", value: item.fields.restock === true ? "Back into stock" : "Not resaleable" },
-                { label: "Refund state", value: <Pill tone="warning">{String(item.fields.refundState ?? "").replace(/_/g, " ")}</Pill> },
+                { label: "Refund state", value: <Pill tone={refundStateLabel(item.fields.refundState).tone}>{refundStateLabel(item.fields.refundState).label}</Pill> },
                 { label: "Value", value: context.money(item.amountMinor) },
                 { label: "Refunded", value: <span className="ds-num">{context.money(refundedMinor(item))}</span> },
               ]} />
@@ -725,7 +723,7 @@ export function OrderDetail({ context, lens }: { context: ScreenContext; lens: s
           ))}
         </ol>
         {(body.timeline ?? []).length === 0 && <Empty title="No events recorded on this order" />}
-        <Properties rows={[
+        <KeyValueList items={[
           { label: "Created", value: `${context.dateTime(order.createdAt)} by ${order.createdBy}` },
           { label: "Updated", value: `${context.dateTime(order.updatedAt)} by ${order.updatedBy}` },
           { label: "Revision", value: String(order.revision) },
@@ -736,13 +734,12 @@ export function OrderDetail({ context, lens }: { context: ScreenContext; lens: s
 
   return (
     <Grid>
-      <Card span={5} title="Customer" subtitle={contact ? String(contact.fields.segment ?? "") : "Guest checkout"}>
-        <Properties rows={[
+      <Card span={5} title="Customer" subtitle={contact ? undefined : "Guest checkout"}>
+        <KeyValueList items={[
           { label: "Name", value: contact?.title ?? String(order.fields.buyerName || "Guest") },
           { label: "Email", value: String(contact?.fields.email ?? order.fields.buyerEmail ?? "Not recorded") },
           { label: "Tax status", value: orderTaxStatus(order, contact).replace("_", " ") },
           { label: "Ship to", value: [body.shipTo?.line1, body.shipTo?.city, body.shipTo?.postcode].filter(Boolean).join(", ") || "Not recorded" },
-          { label: "Channel", value: String(order.fields.channel ?? "—") },
         ]} />
       </Card>
       <Card span={7} title="Totals" subtitle={`Tax resolved for ${org.jurisdiction} as ${orderTaxStatus(order, contact).replace("_", " ")}`}>
@@ -789,7 +786,7 @@ export function StorefrontBuilder({ context, lens }: { context: ScreenContext; l
       <Grid>
         <Card span={6} title="Theme" subtitle="Tokens the storefront reads">
           <Stack gap={3}>
-            <Properties rows={[
+            <KeyValueList items={[
               { label: "Palette", value: String(site?.fields.theme ?? "Studio brass on paper") },
               { label: "Headings", value: String(site?.fields.headingFace ?? "Display") },
               { label: "Corners", value: String(site?.fields.radius ?? "Rounded") },
@@ -806,7 +803,7 @@ export function StorefrontBuilder({ context, lens }: { context: ScreenContext; l
         </Card>
         <Card span={6} title="Responsive behaviour">
           <Stack gap={3}>
-            <Properties rows={[
+            <KeyValueList items={[
               { label: "Below 900px", value: "The basket moves beneath the shelf and stops sticking" },
               { label: "Below 600px", value: "One product per row, controls reach 44px" },
               { label: "Checkout", value: "Single column at every width" },
@@ -848,7 +845,7 @@ export function StorefrontBuilder({ context, lens }: { context: ScreenContext; l
     return (
       <Grid>
         <Card span={6} title="Storefront settings">
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Domain", value: "northline.example (not registered from here)" },
             { label: "Currency", value: context.org.currency },
             { label: "Tax jurisdiction", value: context.org.jurisdiction },
@@ -858,7 +855,7 @@ export function StorefrontBuilder({ context, lens }: { context: ScreenContext; l
         </Card>
         <Card span={6} title="Publication">
           <Stack gap={3}>
-            <Properties rows={[
+            <KeyValueList items={[
               { label: "Last export", value: site?.fields.exportedAt ? context.dateTime(String(site.fields.exportedAt)) : "Never exported" },
               { label: "Live site", value: <Pill tone="warning">Not hosted</Pill> },
             ]} />
@@ -1006,7 +1003,7 @@ export function CheckoutAdmin({ context, lens }: { context: ScreenContext; lens:
       </Card>
       <Card span={5} title="What happens at the end" subtitle="The payment boundary, stated plainly">
         <Stack gap={3}>
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "On submit", value: "An order record is created" },
             { label: "Status", value: <Pill tone="warning" dot>awaiting_payment</Pill> },
             { label: "Lines kept", value: "Every line with quantity, unit price and tax code" },
@@ -1049,7 +1046,7 @@ export function Fulfilment({ context, lens }: { context: ScreenContext; lens: st
                 <Button size="sm" variant="secondary" onClick={() => context.openOverlay("delivery exception", { id: order.id })}>Record a decision</Button>
                 <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${org.slug}/commerce/orders/${order.id}`)}>Open order</Button>
               </>}>
-              <Properties rows={[
+              <KeyValueList items={[
                 { label: "Carrier", value: String(order.fields.carrier) || "Not recorded" },
                 { label: "Tracking", value: String(order.fields.tracking) || "None — nothing was scanned" },
                 { label: "Value", value: context.money(order.amountMinor) },
@@ -1136,7 +1133,7 @@ export function Returns({ context, state }: { context: ScreenContext; state: str
           { key: "title", header: "Return", primary: true, cell: (row) => row.title, filterValue: (row) => `${row.title} ${row.summary}` },
           { key: "order", header: "Order", cell: (row) => data.orders.find((order) => order.id === String(row.fields.orderId))?.title ?? "—" },
           { key: "product", header: "Product", cell: (row) => data.products.find((product) => product.id === String(row.fields.productId))?.title ?? "—" },
-          { key: "reason", header: "Reason", cell: (row) => String(row.fields.reason ?? "").replace("_", " ") },
+          { key: "reason", header: "Reason", cell: (row) => String(row.fields.reason ?? "").replace("_", " ") || <span className="ds-subtle">Not given</span> },
           { key: "photos", header: "Photos", align: "end", cell: (row) => (Number(row.fields.photos ?? 0) ? String(row.fields.photos) : <span className="ds-subtle">None</span>) },
           { key: "eligible", header: "Eligibility", cell: (row) => {
             const order = data.orders.find((item) => item.id === String(row.fields.orderId));
@@ -1144,7 +1141,7 @@ export function Returns({ context, state }: { context: ScreenContext; state: str
             if (days === undefined) return <Pill tone="warning">No order date</Pill>;
             return days <= 14 ? <Pill tone="success">Within 14 days</Pill> : <Pill tone="warning">{days} days after the order</Pill>;
           } },
-          { key: "refund", header: "Refund", cell: (row) => <Pill tone={["credit_note_local", "refund_recorded"].includes(String(row.fields.refundState)) ? "success" : "warning"}>{String(row.fields.refundState ?? "").replace(/_/g, " ")}</Pill> },
+          { key: "refund", header: "Refund", cell: (row) => { const state = refundStateLabel(row.fields.refundState); return <Pill tone={state.tone}>{state.label}</Pill>; } },
           { key: "refunded", header: "Refunded", align: "end", hideBelow: 1000, cell: (row) => <span className="ds-num">{context.money(refundedMinor(row))}</span>, sortValue: (row) => refundedMinor(row) },
           { key: "value", header: "Value", align: "end", cell: (row) => context.money(row.amountMinor), sortValue: (row) => row.amountMinor ?? 0 },
         ]}
@@ -1231,7 +1228,7 @@ export function Promotions({ context, lens }: { context: ScreenContext; lens: st
                 context.toast("Paused", `${promotion.title} no longer applies at checkout in this workspace.`);
               }}>Pause</Button>}
             </>}>
-            <Properties rows={[
+            <KeyValueList items={[
               { label: "Kind", value: `${String(promotion.fields.kind)} · ${String(promotion.fields.kind) === "amount" ? context.money(Number(promotion.fields.value ?? 0)) : `${promotion.fields.value}%`}` },
               { label: "Code", value: String(promotion.fields.code) || "No code — applied by rule" },
               { label: "Window", value: `${context.date(promotion.startAt)} – ${context.date(promotion.endAt)}` },

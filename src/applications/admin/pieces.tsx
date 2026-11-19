@@ -76,8 +76,7 @@ export function StepUp({
   return (
     <Stack gap={4}>
       <Notice tone="warning" title="A local confirmation, not a second factor">
-        Nothing here checks a device, a provider or an identity service. Typing the word records a deliberate confirmation in the audit
-        log so a consequential change is never one stray click.
+        Typing the word records a deliberate confirmation in the audit trail. No device or identity service is checked.
       </Notice>
       {children}
       <Field label={`Type ${word} to confirm`} required>

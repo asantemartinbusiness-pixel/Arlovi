@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowRight, ArrowUpRight, Bookmark, BookmarkCheck, Clock3, Grid2X2, LayoutList, Search, Sparkles, X } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Bookmark, BookmarkCheck, Clock3, Grid2X2, LayoutList, Search, X } from "lucide-react";
 import { platformDestinations } from "@/app/platformDirectory";
 import { growthDestinations } from "@/app/growthDirectory";
 import { CATEGORY_OVERVIEWS, categoryDestinations } from "@/app/categoryDirectory";
@@ -88,11 +88,10 @@ function ApplicationCard({
     <Link className="apps-directory-open" to={resumeApp(app.code)} aria-label={resumable ? `Continue ${app.short} where you left off` : app.short}>
       <span className="apps-directory-icon"><Icon size={20} strokeWidth={1.8} aria-hidden="true" /></span>
       <span className="apps-directory-copy">
-        <span className="apps-directory-card-label">{app.group} / Native application</span>
         <strong>{app.short}</strong>
         <span className="apps-directory-description">{app.purpose}</span>
       </span>
-      <span className="apps-directory-card-action">{resumable ? "Continue where you left off" : "Open application"} <ArrowUpRight size={14} aria-hidden="true" /></span>
+      <span className="apps-directory-card-action">{resumable ? "Continue" : "Open"} <ArrowUpRight size={14} aria-hidden="true" /></span>
     </Link>
     <button className="apps-directory-pin" type="button" aria-label={(pinned ? "Unpin " : "Pin ") + app.short}
       aria-pressed={pinned} title={pinned ? "Remove from favourites" : "Pin to favourites"}
@@ -195,18 +194,23 @@ export function AppsDirectory() {
   }
 
   return <div className="apps-directory" data-view={compactView ? "compact" : "cards"} aria-label="Native applications">
-    <section className="apps-directory-summary" aria-label="Applications overview">
-      <div className="apps-directory-summary-copy">
-        <span className="apps-directory-summary-kicker"><Sparkles size={13} aria-hidden="true" /> YOUR COMPANY TOOLKIT</span>
-        <strong>Everything you need, exactly where you work.</strong>
-        <p>Open an application, return to recent work, or save the tools you use most. All within {org.name}.</p>
+    {!query && !pinnedOnly && group === "All" && (pinnedApps.length > 0 || recentApps.length > 0) && (
+      <div className="apps-directory-continuity">
+        {pinnedApps.length > 0 && <section className="ws-section" aria-label="Pinned applications">
+          <div className="apps-directory-section-header"><h2><Bookmark size={15} aria-hidden="true"/> Favourites</h2></div>
+          <div className="apps-directory-shortcuts">
+            {pinnedApps.map(app => <AppShortcut key={app.code} app={app} resumeApp={resumeApp}/>)}
+          </div>
+        </section>}
+        {recentApps.length > 0 && <section className="ws-section" aria-label="Recently used applications">
+          <div className="apps-directory-section-header"><h2><Clock3 size={15} aria-hidden="true"/> Pick up where you left off</h2></div>
+          <div className="apps-directory-shortcuts">
+            {recentApps.map(app => <AppShortcut key={app.code} app={app} resumeApp={resumeApp}/>)}
+          </div>
+        </section>}
       </div>
-      <div className="apps-directory-summary-stats" aria-label="Your applications">
-        <span><strong>{available.length}</strong><small>Available</small></span>
-        <span><strong>{pinnedApps.length}</strong><small>Favourites</small></span>
-        <span><strong>{recentApps.length}</strong><small>Recently used</small></span>
-      </div>
-    </section>
+    )}
+
     <div className="apps-directory-toolbar">
       <label className="ws-app-search">
         <Search size={18} aria-hidden="true" />
@@ -255,23 +259,6 @@ export function AppsDirectory() {
       </section>
     )}
 
-    {!query && !pinnedOnly && group === "All" && (pinnedApps.length > 0 || recentApps.length > 0) && (
-      <div className="apps-directory-continuity">
-        {pinnedApps.length > 0 && <section className="ws-section" aria-label="Pinned applications">
-          <div className="apps-directory-section-header"><h2><Bookmark size={17} aria-hidden="true"/> Your favourites</h2><span>One-click access</span></div>
-          <div className="apps-directory-shortcuts">
-            {pinnedApps.map(app => <AppShortcut key={app.code} app={app} resumeApp={resumeApp}/>)}
-          </div>
-        </section>}
-        {recentApps.length > 0 && <section className="ws-section" aria-label="Recently used applications">
-          <div className="apps-directory-section-header"><h2><Clock3 size={17} aria-hidden="true"/> Pick up where you left off</h2><span>Recent applications</span></div>
-          <div className="apps-directory-shortcuts">
-            {recentApps.map(app => <AppShortcut key={app.code} app={app} resumeApp={resumeApp}/>)}
-          </div>
-        </section>}
-      </div>
-    )}
-
     {error && <p role="alert" className="apps-directory-error">{error}</p>}
     {visible.length === 0
       ? <section className="apps-directory-empty" aria-label="No applications found">
@@ -288,7 +275,7 @@ export function AppsDirectory() {
           return <section className="ws-section apps-directory-group" key={category.label} data-group={category.label.toLowerCase()}
             aria-label={category.label + " applications"}>
             <div className="apps-directory-group-heading">
-              <div><span className="apps-directory-group-overline">APPLICATION COLLECTION</span><h2>{category.label}</h2></div>
+              <h2>{category.label}</h2>
               <span>{items.length} {items.length === 1 ? "application" : "applications"} <ArrowRight size={14} aria-hidden="true" /></span>
             </div>
             <div className="apps-directory-grid">
@@ -298,9 +285,6 @@ export function AppsDirectory() {
             </div>
           </section>;
         })}
-    <p className="apps-directory-footnote">
-      Applications use {org.name}'s current browser-local workspace data.
-      Role views organise the interface; they do not grant cloud account access.
-    </p>
+    <p className="apps-directory-footnote">Role views organise the interface; they do not grant cloud account access.</p>
   </div>;
 }

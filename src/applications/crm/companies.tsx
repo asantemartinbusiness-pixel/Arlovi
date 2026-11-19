@@ -218,6 +218,7 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
       <Field label="What they do"><TextArea aria-label="What they do" value={summary} rows={3} onChange={(event) => setSummary(event.target.value)} /></Field>
       <Row gap={2}>
         <Button type="submit" variant="primary" busy={busy} disabled={!title.trim() || duplicate}>{company ? "Save the account" : "Create the account"}</Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </form>
@@ -837,6 +838,7 @@ export function ConvertDialog({ context, close }: { context: ScreenContext; clos
         >
           <Target size={15} aria-hidden="true" /> Convert to a deal
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>

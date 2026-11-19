@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Lock } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel, OverlaySummary, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
@@ -241,6 +241,7 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
         event.preventDefault();
         if (!codeValid || duplicate || !title.trim() || (typeChanged && hasPostings)) return;
         setBusy(true);
+        try {
         const tags = cash ? [type, "cash"] : [type];
         if (existing) {
           await context.mutate.patch(existing.id, {
@@ -256,11 +257,17 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
           context.select(created.id);
           context.toast("Account created", `${code.trim()} ${title.trim()} can now be used on a journal line.`);
         }
-        setBusy(false);
         close();
+        } catch (error) {
+          context.toast("Account not saved", error instanceof Error ? error.message : "The account changed. Reopen it and retry.", "failed");
+        } finally {
+          setBusy(false);
+        }
       }}
     >
-      <Row gap={3} wrap>
+      <ModalUnsavedChanges when={code !== (existing ? accountCode(existing) : "") || title !== (existing?.title ?? "") || summary !== (existing?.summary ?? "")} />
+      <ModalInFlight when={busy} />
+      <div className="fin-form-grid">
         <Field label="Code" required hint="Four digits. The first two group the account in the tree.">
           <TextInput aria-label="Code" value={code} inputMode="numeric" align="end" invalid={Boolean(code) && (!codeValid || duplicate)} onChange={(event) => setCode(event.target.value)} required />
         </Field>
@@ -269,10 +276,12 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
             {ACCOUNT_TYPES.map((item) => <option key={item} value={item}>{ACCOUNT_TYPE_LABEL[item]}</option>)}
           </Select>
         </Field>
-      </Row>
-      <Field label="Account name" required>
-        <TextInput aria-label="Account name" value={title} onChange={(event) => setTitle(event.target.value)} required />
-      </Field>
+        <div data-span="full">
+          <Field label="Account name" required>
+            <TextInput aria-label="Account name" value={title} onChange={(event) => setTitle(event.target.value)} required />
+          </Field>
+        </div>
+      </div>
       <Field label="What it is for">
         <TextArea aria-label="What it is for" value={summary} onChange={(event) => setSummary(event.target.value)} rows={2} />
       </Field>
@@ -284,10 +293,10 @@ export function AccountEditor({ context, close }: { context: ScreenContext; clos
           The type is fixed once something is posted, because changing it would move a balance between the profit and loss and the balance sheet. Create a new account and reverse instead.
         </Notice>
       )}
-      <Row gap={2}>
-        <Button type="submit" variant="primary" busy={busy} disabled={!codeValid || duplicate || !title.trim()}>{existing ? "Save account" : "Create account"}</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <OverlayActions
+        primary={<Button type="submit" variant="primary" busy={busy} disabled={!codeValid || duplicate || !title.trim()}>{existing ? "Save account" : "Create account"}</Button>}
+        end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+      />
     </form>
   );
 }
@@ -324,12 +333,15 @@ export function AccountHistory({ context, close }: { context: ScreenContext; clo
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Account", value: `${accountCode(account)} ${account.title}` },
-        { label: "Type", value: <AccountTypePill type={accountType(account)} /> },
-        { label: "Normal side", value: isDebitNormal(accountType(account)) ? "Debit" : "Credit" },
-        { label: "Posted entries", value: String(rows.length) },
-        { label: "Balance", value: <Amount minor={row?.balanceMinor} context={context} bold /> },
+      <OverlaySummary
+        eyebrow={`Account ${accountCode(account)}`}
+        title={account.title}
+        status={<AccountTypePill type={accountType(account)} />}
+        meta={[`${isDebitNormal(accountType(account)) ? "Debit" : "Credit"} normal`, account.status === "inactive" ? "Deactivated" : undefined]}
+      />
+      <FactGrid columns={2} items={[
+        { label: "Posted entries", value: String(rows.length), mono: true },
+        { label: "Balance", value: <Amount minor={row?.balanceMinor} context={context} bold />, mono: true, tone: "accent" },
       ]} />
       {rows.length === 0 ? (
         <Empty title="Nothing posted to this account" />
@@ -376,13 +388,18 @@ export function DeactivationImpact({ context, close }: { context: ScreenContext;
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Account", value: `${accountCode(account)} ${account.title}` },
-        { label: "Posted entries", value: String(posted.length) },
-        { label: "Draft entries", value: String(postings.length - posted.length) },
-        { label: "Balance", value: <Amount minor={row?.balanceMinor} context={context} bold /> },
-        { label: "Budgets referencing it", value: String(budgets.length) },
-        { label: "Expense claims coded to it", value: String(expenses.length) },
+      <ModalInFlight when={busy} />
+      <OverlaySummary
+        eyebrow="Deactivating"
+        title={`${accountCode(account)} ${account.title}`}
+        status={account.status === "inactive" ? <Pill tone="warning">Deactivated</Pill> : <Pill tone="success" dot>Active</Pill>}
+      />
+      <FactGrid columns={3} items={[
+        { label: "Posted entries", value: String(posted.length), mono: true },
+        { label: "Draft entries", value: String(postings.length - posted.length), mono: true },
+        { label: "Balance", value: <Amount minor={row?.balanceMinor} context={context} bold zero="0" />, mono: true, tone: balanceBlocked ? "warning" : undefined },
+        { label: "Budgets referencing it", value: String(budgets.length), mono: true },
+        { label: "Expense claims coded to it", value: String(expenses.length), mono: true },
       ]} />
 
       {deleteBlocked ? (
@@ -399,8 +416,9 @@ export function DeactivationImpact({ context, close }: { context: ScreenContext;
         </Notice>
       )}
 
-      <Row gap={2} wrap>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="secondary"
           busy={busy}
           disabled={account.status === "inactive"}
@@ -413,8 +431,8 @@ export function DeactivationImpact({ context, close }: { context: ScreenContext;
           }}
         >
           {account.status === "inactive" ? "Already deactivated" : "Deactivate"}
-        </Button>
-        {account.status === "inactive" && (
+        </Button>}
+          secondary={account.status === "inactive" ? (
           <Button
             variant="secondary"
             busy={busy}
@@ -427,8 +445,8 @@ export function DeactivationImpact({ context, close }: { context: ScreenContext;
             }}
           >
             Reactivate
-          </Button>
-        )}
+          </Button>) : undefined}
+          end={<>
         <Button
           variant="outline-danger"
           busy={busy}
@@ -444,9 +462,10 @@ export function DeactivationImpact({ context, close }: { context: ScreenContext;
         >
           Delete account
         </Button>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+        <OverlayCancel disabled={busy}>Close</OverlayCancel>
+          </>}
+        />
+      </ModalActions>
     </Stack>
   );
 }

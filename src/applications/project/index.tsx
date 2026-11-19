@@ -2,7 +2,7 @@ import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useState } from "react";
 import { CalendarRange, FolderKanban, Gauge, LayoutDashboard, ListChecks, Target, Timer, Users } from "lucide-react";
 import {
-  Button, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Avatar, Button, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
   FactGrid, OverlayActions, OverlaySection, OverlaySummary, OVERLAY_WIDTH,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
@@ -15,6 +15,8 @@ import {
   useProjectData,
 } from "./panels";
 import "./project.css";
+import { taskRecord, StagePill } from "./taskInspector";
+import { criticalPath, dependenciesOf } from "./timeline";
 import { kitOverlays, needsSelection } from "@/applications/hr/opsKit";
 import { approveHours } from "@/applications/hr/actions";
 import {
@@ -141,12 +143,11 @@ function PortfolioFilter({ context, close }: { context: ScreenContext; close: ()
           </Row>
         ))}
       </Stack>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={() => { portfolioFilter.set({ programme: "", health: "" }); close(); }}>Clear</Button>
-        <Button variant="ghost" onClick={() => { context.navigate(`/o/${context.org.slug}/project/projects`); close(); }}>Open the directory</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" onClick={() => { portfolioFilter.set({ programme, health }); close(); }}>Filter the portfolio ({matched.length})</Button>
-      </Row>
+      <OverlayActions
+        primary={<Button variant="primary" onClick={() => { portfolioFilter.set({ programme, health }); close(); }}>Filter the portfolio ({matched.length})</Button>}
+        secondary={<Button variant="ghost" onClick={() => { context.navigate(`/o/${context.org.slug}/project/projects`); close(); }}>Open the directory</Button>}
+        end={<Button variant="ghost" onClick={() => { portfolioFilter.set({ programme: "", health: "" }); close(); }}>Clear</Button>}
+      />
     </Stack>
   );
 }
@@ -169,7 +170,7 @@ function PriorityChange({ context, close }: { context: ScreenContext; close: () 
         close();
       }}
     >
-      <h3>{project.title}</h3>
+      <OverlaySummary eyebrow="Project" title={project.title} />
       <Field label="Priority"><Select name="priority" defaultValue={String(project.fields.priority ?? "normal")}>{["low", "normal", "high"].map((value) => <option key={value}>{value}</option>)}</Select></Field>
       <Field label="Health, as its owner sees it">
         <Select name="health" defaultValue={String(project.fields.health ?? "on_track")}>
@@ -339,10 +340,8 @@ function BatchReview({ context, close }: { context: ScreenContext; close: () => 
           ]}
         />
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <OverlayActions
+        primary={<Button
           variant="primary"
           disabled={candidates.length === 0}
           onClick={async () => {
@@ -354,8 +353,9 @@ function BatchReview({ context, close }: { context: ScreenContext; close: () => 
           }}
         >
           Move {candidates.length} tasks
-        </Button>
-      </Row>
+        </Button>}
+        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }
@@ -367,24 +367,33 @@ function WorkloadDetail({ context }: { context: ScreenContext }) {
   const person = payload?.person ?? String(selected?.fields.assignee ?? "");
   const assigned = data.tasks.filter((task) => String(task.fields.assignee ?? task.ownerName) === person && stageOf(task) !== "done" && task.fields.kind !== "onboarding");
   if (!person) return <Empty title="Choose a person" icon={<Users size={20} />} />;
+  const hours = assigned.reduce((sum, task) => sum + Number(task.fields.estimateHours ?? 0), 0);
+  const blocked = assigned.filter((task) => stageOf(task) === "blocked").length;
   return (
-    <Stack gap={4}>
-      <h3>{person}</h3>
-      <Properties rows={[
-        { label: "Open tasks", value: String(assigned.length) },
-        { label: "Estimated hours", value: `${assigned.reduce((sum, task) => sum + Number(task.fields.estimateHours ?? 0), 0)}h` },
-        { label: "Projects involved", value: String(new Set(assigned.map((task) => task.parentId)).size) },
+    <Stack gap={3}>
+      <OverlaySummary
+        avatar={<Avatar name={person} size="lg" />}
+        eyebrow="Holds"
+        title={person}
+        status={hours > 35 ? <Pill tone="danger" dot>Over capacity</Pill> : undefined}
+        meta={[`${assigned.length} open ${assigned.length === 1 ? "task" : "tasks"}`]}
+      />
+      <FactGrid columns={3} items={[
+        { label: "Estimated", value: `${hours}h of 35h`, mono: true, tone: hours > 35 ? "danger" : undefined },
+        { label: "Projects", value: String(new Set(assigned.map((task) => task.parentId)).size), mono: true },
+        { label: "Blocked", value: String(blocked), mono: true, tone: blocked ? "warning" : undefined },
       ]} />
-      <Stack gap={2}>
-        {assigned.map((task) => (
-          <Row key={task.id} gap={2}>
-            <span className="ds-grow ds-truncate">{task.title}</span>
-            <Pill tone={stageOf(task) === "blocked" ? "danger" : "neutral"}>{stageOf(task)}</Pill>
-            <span className="ds-subtle ds-num">{String(task.fields.estimateHours ?? 0)}h</span>
-          </Row>
-        ))}
-      </Stack>
-      <Notice tone="info">Reassigning here changes the owner on the task and keeps who did the earlier work.</Notice>
+      <OverlaySection title="Open work" hint="Reassigning changes the owner and keeps who did the earlier work.">
+        <ul className="pj-depworks">
+          {assigned.map((task) => (
+            <li key={task.id} className="pj-depwork">
+              <StagePill task={task} />
+              <button type="button" className="pj-link" onClick={() => context.navigate(`/o/${context.org.slug}/project/tasks/${task.id}`)}>{task.title}</button>
+              <span className="ds-subtle ds-num">{String(task.fields.estimateHours ?? 0)}h</span>
+            </li>
+          ))}
+        </ul>
+      </OverlaySection>
     </Stack>
   );
 }
@@ -415,7 +424,7 @@ function AllocationEditor({ context, close }: { context: ScreenContext; close: (
         close();
       }}
     >
-      <h3>{task.title}</h3>
+      <OverlaySummary eyebrow="Task" title={task.title} meta={[String(task.fields.assignee ?? task.ownerName)]} />
       <Field label="Owner">
         <Select name="assignee" defaultValue={String(task.fields.assignee ?? "")}>
           {[...new Set(data.tasks.map((row) => String(row.fields.assignee ?? row.ownerName)))].filter(Boolean).map((person) => <option key={person}>{person}</option>)}
@@ -433,17 +442,21 @@ function OverCapacity({ context }: { context: ScreenContext }) {
   const people = [...new Set(open.map((task) => String(task.fields.assignee ?? task.ownerName)))].filter(Boolean);
   const over = people
     .map((person) => ({ person, hours: open.filter((task) => String(task.fields.assignee ?? task.ownerName) === person).reduce((sum, task) => sum + Number(task.fields.estimateHours ?? 0), 0) }))
-    .filter((row) => row.hours > 35);
+    .filter((row) => row.hours > 35)
+    .sort((a, b) => b.hours - a.hours);
   return over.length === 0 ? <Empty title="Nobody is over capacity" icon={<Gauge size={20} />} /> : (
-    <Stack gap={3}>
-      {over.map((row) => (
-        <div key={row.person} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-          <Row gap={2}><strong className="ds-grow">{row.person}</strong><Pill tone="danger" dot>{row.hours}h of 35</Pill></Row>
-          <p className="ds-subtle">Open task estimates exceed a normal week. Move work or change an estimate; neither happens on its own.</p>
-          <Button size="sm" variant="secondary" style={{ marginBlockStart: "var(--space-2)" }} onClick={() => context.openOverlay("Workload detail", { person: row.person })}>See what they hold</Button>
-        </div>
-      ))}
-    </Stack>
+    <OverlaySection title={`${over.length} over a 35 hour week`} hint="Open task estimates exceed a normal week. Move work or change an estimate; neither happens on its own.">
+      <ul className="pj-depworks">
+        {over.map((row) => (
+          <li key={row.person} className="pj-depwork">
+            <Avatar name={row.person} size="sm" />
+            <strong className="ds-grow ds-truncate">{row.person}</strong>
+            <Pill tone="danger" dot>{row.hours}h of 35</Pill>
+            <Button size="sm" variant="secondary" aria-label={`See what ${row.person} holds`} onClick={() => context.openOverlay("Workload detail", { person: row.person })}>See what they hold</Button>
+          </li>
+        ))}
+      </ul>
+    </OverlaySection>
   );
 }
 
@@ -503,10 +516,8 @@ function TemplatePreview({ context, close }: { context: ScreenContext; close: ()
         {count} tasks across {phases.length} phases are created. Attachments, comments and approvals from any earlier project
         built on this template are not copied.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <OverlayActions
+        primary={<Button
           variant="primary"
           disabled={!name.trim() || template.status !== "published"}
           onClick={async () => {
@@ -526,8 +537,9 @@ function TemplatePreview({ context, close }: { context: ScreenContext; close: ()
           }}
         >
           Create the project
-        </Button>
-      </Row>
+        </Button>}
+        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }
@@ -542,15 +554,14 @@ function RevisionConfirm({ context, close }: { context: ScreenContext; close: ()
         Publishing a revision of {template.title} changes it for every project created from now on. Projects already created keep
         the structure they were given.
       </p>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" onClick={async () => {
+      <OverlayActions
+        primary={<Button variant="primary" onClick={async () => {
           await context.mutate.patch(template.id, { status: "published", fields: { ...template.fields, revisedBy: context.actor } }, { expectRevision: template.revision, event: `${template.title} revision published by ${context.actor}` });
           context.toast("Revision published", "Existing projects are untouched.");
           close();
-        }}>Publish the revision</Button>
-      </Row>
+        }}>Publish the revision</Button>}
+        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }
@@ -770,18 +781,23 @@ function QuickDetail({ context }: { context: ScreenContext }) {
   const project = useRecord(context.selectedId) ?? data.projects[0];
   if (!project) return <Empty title="Select a project" icon={<FolderKanban size={20} />} />;
   const tasks = data.tasks.filter((task) => task.parentId === project.id && task.fields.kind !== "onboarding");
+  const done = tasks.filter((task) => stageOf(task) === "done").length;
+  const health = String(project.fields.health ?? "");
   return (
-    <Stack gap={4}>
-      <h3>{project.title}</h3>
-      <p className="ds-subtle">{project.summary}</p>
-      <Properties rows={[
-        { label: "Owner", value: project.ownerName },
-        { label: "Health", value: String(project.fields.health ?? "").replace("_", " ") },
-        { label: "Tasks", value: `${tasks.filter((task) => stageOf(task) === "done").length} of ${tasks.length} done` },
-        { label: "Dates", value: `${context.date(project.startAt)} – ${context.date(project.endAt)}` },
-        { label: "Budget", value: `${context.money(Number(project.fields.spentMinor ?? 0))} of ${context.money(Number(project.fields.budgetMinor ?? 0))}` },
+    <Stack gap={3}>
+      <OverlaySummary
+        eyebrow="Project"
+        title={project.title}
+        status={health ? <Pill tone={health === "off_track" ? "danger" : health === "at_risk" ? "warning" : "success"} dot>{health.replace("_", " ")}</Pill> : undefined}
+        meta={[project.ownerName, `${context.date(project.startAt)} – ${context.date(project.endAt)}`]}
+        actions={<Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/project/projects/${project.id}`)}>Open the project</Button>}
+      />
+      {project.summary && <p className="ds-subtle">{project.summary}</p>}
+      <FactGrid columns={3} items={[
+        { label: "Tasks done", value: `${done} of ${tasks.length}`, mono: true },
+        { label: "Spent", value: context.money(Number(project.fields.spentMinor ?? 0)), mono: true },
+        { label: "Budget", value: context.money(Number(project.fields.budgetMinor ?? 0)), mono: true },
       ]} />
-      <Button variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/project/projects/${project.id}`)}>Open the project</Button>
     </Stack>
   );
 }
@@ -814,48 +830,92 @@ function InitiativeDetail({ context }: { context: ScreenContext }) {
 function ConflictReview({ context }: { context: ScreenContext }) {
   const data = useProjectData();
   const { now } = useWorkspace();
-  const problems = data.tasks.filter((task) => {
+  const problems = data.tasks.flatMap((task) => {
     const deps = String(task.fields.dependsOn ?? "").split(",").filter(Boolean);
-    return deps.some((id) => {
+    return deps.flatMap((id) => {
       const dependency = data.tasks.find((row) => row.id === id);
-      return dependency?.endAt && task.startAt && new Date(dependency.endAt) > new Date(task.startAt);
+      if (!dependency?.endAt || !task.startAt || new Date(dependency.endAt) <= new Date(task.startAt)) return [];
+      const days = Math.max(1, Math.ceil((new Date(dependency.endAt).getTime() - new Date(task.startAt).getTime()) / 86_400_000));
+      return [{ task, dependency, days }];
     });
   });
   const late = data.tasks.filter((task) => task.endAt && new Date(task.endAt) < now && stageOf(task) !== "done" && task.fields.kind !== "onboarding");
   return (
-    <Stack gap={4}>
-      <Properties rows={[
-        { label: "Impossible orders", value: String(problems.length) },
-        { label: "Past their end date", value: String(late.length) },
+    <Stack gap={3}>
+      <FactGrid columns={2} items={[
+        { label: "Impossible orders", value: String(problems.length), mono: true, tone: problems.length ? "danger" : "success" },
+        { label: "Past their end date", value: String(late.length), mono: true, tone: late.length ? "warning" : undefined },
       ]} />
-      {problems.map((task) => (
-        <Notice key={task.id} tone="danger" title={task.title}>
-          Starts {context.date(task.startAt)}, before the work it depends on finishes. The schedule cannot be published while this is true.
-        </Notice>
-      ))}
-      {problems.length === 0 && <Notice tone="success" title="No impossible dates">Every task starts after the work it waits for.</Notice>}
+      <OverlaySection title="Starts before its prerequisite ends" tone={problems.length ? "danger" : "success"} hint={problems.length ? "The schedule cannot be published while this is true." : undefined}>
+        {problems.length === 0
+          ? <p>Every task starts after the work it waits for.</p>
+          : (
+            <ul className="pj-depworks">
+              {problems.map(({ task, dependency, days }) => (
+                <li key={`${task.id}-${dependency.id}`} className="pj-depwork">
+                  <span className="ds-grow"><strong>{task.title}</strong><span className="ds-subtle"> starts <span className="ds-num">{context.date(task.startAt)}</span> but needs {dependency.title}, which ends <span className="ds-num">{context.date(dependency.endAt)}</span></span></span>
+                  <Pill tone="danger">{days}d early</Pill>
+                </li>
+              ))}
+            </ul>
+          )}
+      </OverlaySection>
+      {late.length > 0 && (
+        <OverlaySection title="Past their end date">
+          <ul className="pj-depworks">
+            {late.map((task) => <li key={task.id} className="pj-depwork"><span className="ds-grow ds-truncate">{task.title}</span><span className="ds-num ds-subtle">{context.date(task.endAt)}</span><Pill tone="warning">{stageOf(task)}</Pill></li>)}
+          </ul>
+        </OverlaySection>
+      )}
     </Stack>
   );
 }
 
+/** What waits for what: tasks in the order they can start, each step released by the one before it. */
 function DependencyGraph({ context }: { context: ScreenContext }) {
   const data = useProjectData();
   const project = useRecord(context.params.id) ?? data.projects[0];
   const tasks = data.tasks.filter((task) => task.parentId === project?.id);
+  if (tasks.length === 0) return <Empty title="No tasks" />;
+  const critical = new Set(criticalPath(tasks));
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const level = new Map<string, number>();
+  const depthOf = (id: string, seen: Set<string> = new Set()): number => {
+    const cached = level.get(id);
+    if (cached !== undefined) return cached;
+    if (seen.has(id)) return 0;
+    seen.add(id);
+    const task = byId.get(id);
+    const deps = task ? dependenciesOf(task).filter((dep) => byId.has(dep)) : [];
+    const value = deps.length === 0 ? 0 : 1 + Math.max(...deps.map((dep) => depthOf(dep, seen)));
+    level.set(id, value);
+    return value;
+  };
+  tasks.forEach((task) => depthOf(task.id));
+  const steps = [...new Set(tasks.map((task) => level.get(task.id) ?? 0))].sort((a, b) => a - b);
   return (
     <Stack gap={3}>
-      {tasks.map((task) => {
-        const deps = String(task.fields.dependsOn ?? "").split(",").filter(Boolean);
-        return (
-          <div key={task.id} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-            <strong>{task.title}</strong>
-            <p className="ds-subtle">
-              {deps.length === 0 ? "Waits for nothing." : `Waits for ${deps.map((id) => tasks.find((row) => row.id === id)?.title ?? id).join(", ")}.`}
-            </p>
-          </div>
-        );
-      })}
-      {tasks.length === 0 && <Empty title="No tasks" />}
+      <OverlaySummary eyebrow="What waits for what" title={project?.title ?? "Project"} meta={[`${tasks.length} tasks`, `${critical.size} on the critical path`]} />
+      {steps.map((step) => (
+        <OverlaySection key={step} title={step === 0 ? "Can start now" : `Step ${step + 1} · released by step ${step}`}>
+          <ul className="pj-depworks">
+            {tasks.filter((task) => (level.get(task.id) ?? 0) === step).map((task) => {
+              const deps = dependenciesOf(task).map((id) => byId.get(id)).filter((row): row is Rec => Boolean(row));
+              return (
+                <li key={task.id} className="pj-depwork pj-graph-row">
+                  <StagePill task={task} />
+                  <span className="ds-grow">
+                    <strong>{task.title}</strong>
+                    {deps.length > 0 && <span className="ds-subtle"> waits for {deps.map((row) => row.title).join(", ")}</span>}
+                  </span>
+                  {critical.has(task.id) && <Pill tone="accent">critical</Pill>}
+                  {task.endAt && <span className="ds-num ds-subtle">{context.date(task.endAt)}</span>}
+                </li>
+              );
+            })}
+          </ul>
+        </OverlaySection>
+      ))}
     </Stack>
   );
 }
@@ -885,7 +945,6 @@ export const projectApp = registerApp({
   screens: {
     "ARL-PROJECT-001": {
       id: "ARL-PROJECT-001",
-      subtitle: (context) => `Every programme in ${context.org.shortName}, counted from the project records.`,
       tabs: (["Overview", "Departments", "Timeline", "Risks"] as const).map((lens) => ({
         id: lens, render: (context: ScreenContext) => <Portfolio context={context} lens={lens} />,
       })),
@@ -899,15 +958,14 @@ export const projectApp = registerApp({
       overlays: [
         { id: "create project", kind: "modal", title: "Create a project", width: 600, render: ({ close, ...context }) => <ProjectFromTemplate context={context} close={close} />, footer: submitFooter("pj-create", "Create project") },
         { id: "portfolio report", kind: "drawer", title: "Portfolio report", width: 680, render: ({ close, ...context }) => <PortfolioReport context={context} close={close} /> },
-        { id: "Portfolio filter", kind: "drawer", title: "Filter the portfolio", width: 480, render: ({ close, ...context }) => <PortfolioFilter context={context} close={close} /> },
-        { id: "initiative detail", kind: "drawer", title: "Project health and its evidence", width: 620, render: ({ ...context }) => <InitiativeDetail context={context} /> },
+        { id: "Portfolio filter", kind: "drawer", title: "Filter the portfolio", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <PortfolioFilter context={context} close={close} /> },
+        { id: "initiative detail", kind: "drawer", title: "Project health and its evidence", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <InitiativeDetail context={context} /> },
         { id: "priority change", kind: "modal", title: "Priority and health", width: 520, render: ({ close, ...context }) => <PriorityChange context={context} close={close} />, footer: submitFooter("pj-priority", "Save") },
       ],
     },
 
     "ARL-PROJECT-002": {
       id: "ARL-PROJECT-002",
-      subtitle: () => "Every project, its owner, its counted progress and when it last moved.",
       tabs: (["All", "Mine", "Following", "Archived"] as const).map((lens) => ({
         id: lens, render: (context: ScreenContext) => <ProjectDirectory context={context} lens={lens} />,
       })),
@@ -923,14 +981,13 @@ export const projectApp = registerApp({
         ...kitOverlays,
         { id: "Project template", kind: "modal", title: "Create a project", width: 600, render: ({ close, ...context }) => <ProjectFromTemplate context={context} close={close} />, footer: submitFooter("pj-create", "Create project") },
         { id: "archive impact", kind: "modal", title: "Archive this project", tone: "danger", width: 540, render: ({ close, ...context }) => <ArchiveImpact context={context} close={close} /> },
-        { id: "quick detail", kind: "drawer", title: "Project", width: 460, render: ({ ...context }) => <QuickDetail context={context} /> },
+        { id: "quick detail", kind: "drawer", title: "Project", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <QuickDetail context={context} /> },
       ],
     },
 
     "ARL-PROJECT-003": {
       id: "ARL-PROJECT-003",
       title: () => "Project overview",
-      subtitle: () => "Plan, people, budget and what is actually blocked.",
       tabs: ["Overview", "Tasks", "Timeline", "Files", "Activity", "Metrics"].map((lens) => ({
         id: lens, render: (context: ScreenContext) => <ProjectOverview context={context} lens={lens} />,
       })),
@@ -974,7 +1031,8 @@ export const projectApp = registerApp({
         { id: "new task", kind: "modal", title: "New task", width: 560, render: ({ close, ...context }) => <NewTask context={context} close={close} />, footer: submitFooter("pj-new-task", "Create the task") },
         { id: "move task", kind: "modal", title: "Move a task", width: 480, render: ({ close, ...context }) => <MoveTask context={context} close={close} /> },
         { id: "board filter", kind: "modal", title: "Filter the board", width: 440, render: ({ close, ...context }) => <BoardFilter context={context} close={close} /> },
-        { id: "Task drawer", kind: "drawer", title: "Task", width: 520, render: ({ ...context }) => <TaskDrawer context={context} /> },
+        { id: "Task drawer", kind: "drawer", title: "Task", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ ...context }) => <TaskDrawer context={context} close={context.close} /> },
+        { id: "dependency selector", kind: "modal", title: "Link work", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <DependencySelector context={context} close={close} />, footer: submitFooter("pj-dependency", "Save link") },
         { id: "stage rule", kind: "modal", title: "This move skips a review", tone: "danger", width: 540, render: ({ close, ...context }) => <StageRule context={context} close={close} /> },
         { id: "batch action review", kind: "modal", title: "Review this batch first", width: 620, render: ({ close, ...context }) => <BatchReview context={context} close={close} /> },
         { id: "Assignee picker", kind: "modal", title: "Assign this task", width: 520, render: ({ close, ...context }) => <AssigneePicker context={context} close={close} />, footer: submitFooter("pj-assignee", "Assign") },
@@ -984,7 +1042,7 @@ export const projectApp = registerApp({
     "ARL-PROJECT-005": {
       id: "ARL-PROJECT-005",
       title: () => "Task",
-      subtitle: () => "Description, checklist, dependencies, time and who did what.",
+      record: taskRecord,
       tabs: ["Details", "Discussion", "Subtasks", "History"].map((lens) => ({
         id: lens, render: (context: ScreenContext) => <TaskDetail context={context} lens={lens} />,
       })),
@@ -1009,7 +1067,6 @@ export const projectApp = registerApp({
     "ARL-PROJECT-006": {
       id: "ARL-PROJECT-006",
       title: () => "Timeline",
-      subtitle: () => "Bars, milestones and the dependencies between them, drawn from the records.",
       tabs: (["Timeline", "Critical path", "Baseline", "Risks"] as const).map((lens) => ({
         id: lens, render: (context: ScreenContext) => <TimelineScreen context={context} lens={lens} />,
       })),
@@ -1025,14 +1082,13 @@ export const projectApp = registerApp({
         { id: "link task", kind: "modal", title: "Link a task", width: 560, render: ({ close, ...context }) => <DependencySelector context={context} close={close} />, footer: submitFooter("pj-dependency", "Save link") },
         { id: "duration edit", kind: "modal", title: "Change a duration", width: 480, render: ({ close, ...context }) => <DurationEdit context={context} close={close} /> },
         { id: "Date edit", kind: "modal", title: "Reschedule", width: 520, render: ({ close, ...context }) => <DateEdit context={context} close={close} />, footer: submitFooter("pj-dates", "Save dates") },
-        { id: "conflict review", kind: "drawer", title: "Scheduling conflicts", width: 520, render: ({ ...context }) => <ConflictReview context={context} /> },
-        { id: "dependency graph", kind: "drawer", title: "What waits for what", width: 520, render: ({ ...context }) => <DependencyGraph context={context} /> },
+        { id: "conflict review", kind: "drawer", title: "Scheduling conflicts", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ConflictReview context={context} /> },
+        { id: "dependency graph", kind: "drawer", title: "What waits for what", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ ...context }) => <DependencyGraph context={context} /> },
       ],
     },
 
     "ARL-PROJECT-007": {
       id: "ARL-PROJECT-007",
-      subtitle: () => "People and AI employees modelled separately, because they are not the same.",
       tabs: (["People", "AI", "Departments", "Calendar"] as const).map((lens) => ({
         id: lens, render: (context: ScreenContext) => <Workload context={context} lens={lens} />,
       })),
@@ -1042,9 +1098,9 @@ export const projectApp = registerApp({
         { id: "adjust estimates", label: "Adjust an estimate", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a task first"), run: (context) => context.openOverlay("allocation editor") },
       ],
       overlays: [
-        { id: "Workload detail", kind: "drawer", title: "What this person holds", width: 520, render: ({ ...context }) => <WorkloadDetail context={context} /> },
+        { id: "Workload detail", kind: "drawer", title: "What this person holds", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <WorkloadDetail context={context} /> },
         { id: "allocation editor", kind: "modal", title: "Owner and estimate", width: 520, render: ({ close, ...context }) => <AllocationEditor context={context} close={close} />, footer: submitFooter("pj-allocation", "Save") },
-        { id: "over-capacity alert", kind: "drawer", title: "Over capacity", width: 480, render: ({ ...context }) => <OverCapacity context={context} /> },
+        { id: "over-capacity alert", kind: "drawer", title: "Over capacity", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <OverCapacity context={context} /> },
       ],
     },
 
@@ -1071,7 +1127,6 @@ export const projectApp = registerApp({
 
     "ARL-PROJECT-009": {
       id: "ARL-PROJECT-009",
-      subtitle: () => "Objectives with a measure, a target and a check-in somebody wrote.",
       tabs: (["Company", "Team", "Personal", "Check-ins"] as const).map((lens) => ({
         id: lens, render: (context: ScreenContext) => <Goals context={context} lens={lens} />,
       })),
@@ -1106,7 +1161,7 @@ export const projectApp = registerApp({
         ...kitOverlays,
         { id: "Timer", kind: "modal", title: "Log time", width: 520, render: ({ close, ...context }) => <TimerOverlay context={context} close={close} />, footer: submitFooter("pj-timer", "Save entry") },
         { id: "timesheet correction", kind: "modal", title: "Correct a time entry", width: 520, render: ({ close, ...context }) => <TimesheetCorrection context={context} close={close} />, footer: submitFooter("pj-correction", "Save correction") },
-        { id: "billing link", kind: "drawer", title: "Billable time", width: 480, render: ({ ...context }) => <BillingLink context={context} /> },
+        { id: "billing link", kind: "drawer", title: "Billable time", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <BillingLink context={context} /> },
       ],
     },
   },
@@ -1121,31 +1176,34 @@ function CompletionCheck({ context, close }: { context: ScreenContext; close: ()
   const blockers = String(task.fields.dependsOn ?? "").split(",").filter(Boolean)
     .map((id) => data.tasks.find((row) => row.id === id))
     .filter((row): row is Rec => Boolean(row) && stageOf(row!) !== "done");
+  const hours = data.shifts.filter((entry) => entry.fields.taskId === task.id).reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0);
   return (
-    <Stack gap={4}>
-      <h3>{task.title}</h3>
-      <Properties rows={[
-        { label: "Checklist", value: `${checklist.length - unticked.length} of ${checklist.length} ticked` },
-        { label: "Waiting on", value: blockers.length ? blockers.map((row) => row.title).join(", ") : "Nothing" },
-        { label: "Time logged", value: `${data.shifts.filter((entry) => entry.fields.taskId === task.id).reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0)} hours` },
+    <Stack gap={3}>
+      <OverlaySummary eyebrow="Completing" title={task.title} />
+      <FactGrid columns={3} items={[
+        { label: "Checklist", value: `${checklist.length - unticked.length} of ${checklist.length} ticked`, mono: true, tone: unticked.length ? "warning" : "success" },
+        { label: "Waiting on", value: blockers.length ? blockers.map((row) => row.title).join(", ") : "Nothing", tone: blockers.length ? "danger" : undefined },
+        { label: "Time logged", value: `${hours} hours`, mono: true },
       ]} />
       {blockers.length > 0 && <Notice tone="danger" title="This task depends on unfinished work">Completing it now would say something finished that has not.</Notice>}
       {unticked.length > 0 && blockers.length === 0 && <Notice tone="warning" title={`${unticked.length} checklist items are not ticked`}>{unticked.map((item) => item.label).join("; ")}.</Notice>}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
-          variant="primary"
-          disabled={blockers.length > 0}
-          onClick={async () => {
-            await context.mutate.patch(task.id, { status: "done", fields: { ...task.fields, stage: "done", completedBy: context.actor } }, { expectRevision: task.revision, event: `${task.title} completed by ${context.actor}` });
-            context.toast("Task complete", "The stage changed on the record, with your name against it.");
-            close();
-          }}
-        >
-          Mark complete
-        </Button>
-      </Row>
+      <OverlayActions
+        variant="form"
+        primary={
+          <Button
+            variant="primary"
+            disabled={blockers.length > 0}
+            onClick={async () => {
+              await context.mutate.patch(task.id, { status: "done", fields: { ...task.fields, stage: "done", completedBy: context.actor } }, { expectRevision: task.revision, event: `${task.title} completed by ${context.actor}` });
+              context.toast("Task complete", "The stage changed on the record, with your name against it.");
+              close();
+            }}
+          >
+            Mark complete
+          </Button>
+        }
+        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }

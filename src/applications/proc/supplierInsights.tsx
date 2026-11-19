@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Card, DataGrid, Empty, Field, Notice, Pill, Properties, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Card, DataGrid, Empty, Field, Notice, OverlaySummary, Pill, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
@@ -226,11 +226,8 @@ function QualityReturnForm({ context, close, receipt }: { context: ScreenContext
       context.toast("Return recorded", `${count} × ${line.description} recorded as returned${productId ? " and taken out of stock" : ""}. Nothing has been sent to the supplier from here.`);
       close();
     }}>
-      <Properties rows={[
-        { label: "Receipt", value: <span className="ds-num">{receipt.title}</span> },
-        { label: "Against", value: order?.title ?? "—" },
-        { label: "Supplier", value: data.suppliers.find((item) => item.id === String(receipt.fields.supplierId))?.title ?? "—" },
-      ]} />
+      <OverlaySummary eyebrow="Return to supplier" title={<span className="ds-num">{receipt.title}</span>}
+        meta={[order ? `Against ${order.title}` : undefined, data.suppliers.find((item) => item.id === String(receipt.fields.supplierId))?.title]} />
       <Field label="Line" required>
         <Select value={lineId} onChange={(event) => { setLineId(event.target.value); setError(""); }}>
           {lines.map((item) => <option key={item.lineId} value={item.lineId}>{item.description}</option>)}

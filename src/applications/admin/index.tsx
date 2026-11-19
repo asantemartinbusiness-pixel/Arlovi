@@ -107,7 +107,7 @@ export const adminApp = registerApp({
       ],
       overlays: [
         { id: "Invite wizard", kind: "modal", title: "Invite someone", width: 600, render: ({ close, ...context }) => <InviteWizard context={context} close={close} /> },
-        { id: "role impact", kind: "drawer", title: "What a role change does", width: 600, capability: "manage_policy", presentation: { selectedRecord: true, collection: "members", guidance: "Compare current and proposed capabilities, confirm the person and record the change without implying external account access." }, render: ({ close, ...context }) => <RoleImpact context={context} close={close} /> },
+        { id: "role impact", kind: "drawer", title: "What a role change does", width: 600, capability: "manage_policy", presentation: { selectedRecord: true, collection: "members", guidance: "Compare current and proposed access, give a reason, then apply." }, render: ({ close, ...context }) => <RoleImpact context={context} close={close} /> },
         { id: "revoke confirmation", kind: "modal", title: "Offboard", tone: "danger", width: 560, blocking: true, render: ({ close, ...context }) => <RevokeConfirmation context={context} close={close} /> },
         { id: "suspend member", kind: "modal", title: "Suspend a member", tone: "danger", width: 540, render: ({ close, ...context }) => <SuspendMember context={context} close={close} /> },
         { id: "export members", kind: "modal", title: "Export the member list", width: 500, render: ({ close, ...context }) => <MembersExport context={context} close={close} /> },

@@ -157,7 +157,7 @@ test("CARE triage: SLA view, saved draft, unsent reply, triage moves and resolut
 });
 
 test("PROJECT subtasks and dependency links persist; health check is shown", async ({ page }) => {
-  await open(page, "/project/tasks/nl-tasks-024", "Task");
+  await open(page, "/project/tasks/nl-tasks-024", "Repaint and make good");
   await expect(card(page, "Dependencies").getByText(/Waiting on 2 unfinished tasks/)).toBeVisible();
   await card(page, "Dependencies").getByRole("button", { name: "Remove the link to Trade counter joinery" }).click();
   await expect(card(page, "Dependencies").getByText(/Waiting on 1 unfinished task/)).toBeVisible();

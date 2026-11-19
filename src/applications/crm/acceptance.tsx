@@ -88,6 +88,7 @@ export function RecordCustomerAcceptance({ context, close }: { context: ScreenCo
         }}>
         Record customer acceptance
       </Button>
+      <span className="ds-grow" />
       <Button variant="ghost" onClick={close}>Cancel</Button>
     </Row>
   </Stack>;

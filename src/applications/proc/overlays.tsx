@@ -1,16 +1,16 @@
 import { useState } from "react";
 import {
-  Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, FactGrid, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, MoneyInput, Notice, OverlayActions, OverlayCancel,
-  OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, FactGrid, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel,
+  KeyValueList, OverlaySection, OverlaySummary, Pill, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
-import { ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
+import { ProviderBoundary } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import type { TaxCategory } from "@/platform/money";
 import { applyScenario, approvalLimitFor } from "./actions";
 import { ReceiptStockLinks } from "./supplierInsights";
-import { chainForOrder, chainForRequisition, ProcChain } from "./kit";
+import { blankLine, chainForOrder, chainForRequisition, LineEditor, ProcChain, Totals } from "./kit";
 import {
   approverFor, APPROVAL_LIMITS, billTotals, bodyOf, findSupplier, isPurchaseOrder, MATCH_LABEL, matchTone, resolveSupplierId,
   outstandingFor, poTotals, statusTone, threeWayMatch, useProcData,
@@ -54,7 +54,7 @@ function RequisitionFormBody({ context, close, existing, loaded }: { context: Sc
   const [budget, setBudget] = useState(String(existing?.fields.budgetLine ?? "Workshop materials"));
   const [priority, setPriority] = useState(String(existing?.fields.priority ?? "normal"));
   const [note, setNote] = useState(existing?.summary ?? "");
-  const [lines, setLines] = useState<PoLine[]>(existingBody.lines ?? (seeded.length ? seeded : [{ id: "l1", description: "", quantity: 1, unitPriceMinor: 0, taxCategory: "standard", receivedQuantity: 0 }]));
+  const [lines, setLines] = useState<PoLine[]>(existingBody.lines ?? (seeded.length ? seeded : [blankLine(0)]));
 
   const supplier = findSupplier(data, supplierId);
   const draft = { ...(existing ?? ({} as Rec)), at: now.toISOString(), body: { lines } } as Rec;
@@ -102,46 +102,36 @@ function RequisitionFormBody({ context, close, existing, loaded }: { context: Sc
         close();
       }}
     >
-      <Field label="Supplier">
-        <Select value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
-          {data.suppliers.filter((item) => item.status !== "archived").map((item) => (
-            <option key={item.id} value={item.id}>{item.title}{item.status === "review" ? " (under review)" : ""}</option>
-          ))}
-        </Select>
-      </Field>
-      {supplier?.status === "review" && <Notice tone="warning" title="This supplier is under review">A requisition can name them, but the approver will see the review state before committing.</Notice>}
-      <Row gap={3} wrap>
-        <Field label="Budget line"><Select value={budget} onChange={(event) => setBudget(event.target.value)}>{["Workshop materials", "Packaging", "Workshop equipment", "Logistics", "Finishing"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
-        <Field label="Priority"><Select value={priority} onChange={(event) => setPriority(event.target.value)}>{["low", "normal", "high"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
-      </Row>
-      <Field label="Why it is needed" required hint="The approver reads this before committing money.">
-        <TextArea value={note} rows={2} onChange={(event) => setNote(event.target.value)} required />
-      </Field>
-      <fieldset className="ds-fieldset">
-        <legend>Lines</legend>
+      <OverlaySection title="Request" hint="Who supplies it, which budget pays and why. The approver reads this before committing money.">
         <Stack gap={3}>
-          {lines.map((line, index) => (
-            <Row key={line.id} gap={2} wrap>
-              <Field label={`Item ${index + 1}`}>
-                <TextInput value={line.description} onChange={(event) => setLines((current) => current.map((item, position) => (position === index ? { ...item, description: event.target.value } : item)))} />
-              </Field>
-              <Field label="Quantity">
-                <TextInput inputMode="numeric" align="end" value={String(line.quantity)} onChange={(event) => setLines((current) => current.map((item, position) => (position === index ? { ...item, quantity: Number(event.target.value) || 0 } : item)))} />
-              </Field>
-              <Field label="Unit price">
-                <MoneyInput valueMinor={line.unitPriceMinor} currency={org.currency} label={`Unit price for line ${index + 1}`}
-                  onChangeMinor={(minor) => setLines((current) => current.map((item, position) => (position === index ? { ...item, unitPriceMinor: minor } : item)))} />
-              </Field>
-              <Button size="sm" variant="ghost" onClick={() => setLines((current) => current.filter((_, position) => position !== index))}>Remove</Button>
-            </Row>
-          ))}
-          <Button size="sm" variant="secondary" onClick={() => setLines((current) => [...current, { id: `l${current.length + 1}`, description: "", quantity: 1, unitPriceMinor: 0, taxCategory: "standard", receivedQuantity: 0 }])}>Add line</Button>
+          <Field label="Supplier">
+            <Select value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
+              {data.suppliers.filter((item) => item.status !== "archived").map((item) => (
+                <option key={item.id} value={item.id}>{item.title}{item.status === "review" ? " (under review)" : ""}</option>
+              ))}
+            </Select>
+          </Field>
+          {supplier?.status === "review" && <Notice tone="warning" title="This supplier is under review">A requisition can name them, but the approver will see the review state before committing.</Notice>}
+          <Row gap={3} wrap>
+            <Field label="Budget line"><Select value={budget} onChange={(event) => setBudget(event.target.value)}>{["Workshop materials", "Packaging", "Workshop equipment", "Logistics", "Finishing"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
+            <Field label="Priority"><Select value={priority} onChange={(event) => setPriority(event.target.value)}>{["low", "normal", "high"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
+          </Row>
+          <Field label="Why it is needed" required>
+            <TextArea value={note} rows={2} onChange={(event) => setNote(event.target.value)} required />
+          </Field>
         </Stack>
-      </fieldset>
-      <TotalsBlock totals={totals} money={context.money} label="Requisition" />
-      <Notice tone="info" title={`${approverFor(totals.grossMinor)} has to approve this`}>
-        The approval level follows the value, not the requester. Converting a requisition into a purchase order keeps the same approval, so the chain cannot be stepped around by converting early.
-      </Notice>
+      </OverlaySection>
+      <OverlaySection title="Lines">
+        <LineEditor lines={lines} setLines={setLines} currency={org.currency} money={context.money} />
+      </OverlaySection>
+      <OverlaySection title="Value and approval">
+        <Stack gap={3}>
+          <Totals totals={totals} money={context.money} label="Requisition" />
+          <Notice tone="info" title={`${approverFor(totals.grossMinor)} has to approve this`}>
+            The approval level follows the value, not the requester, and converting a requisition into an order keeps it.
+          </Notice>
+        </Stack>
+      </OverlaySection>
     </form>
   );
 }
@@ -202,16 +192,20 @@ export function RequisitionReview({ context, close }: { context: ScreenContext; 
     <Stack gap={4}>
       <DrawerUnsavedChanges when={Boolean(reason.trim())} />
       <DrawerInFlight when={busy} />
-      <Properties rows={[
-        { label: "Requisition", value: <span className="ds-num">{requisition.title}</span> },
-        { label: "Requester", value: String(requisition.fields.requester ?? requisition.ownerName) },
-        { label: "Supplier", value: supplier?.title ?? "Not chosen" },
-        { label: "Budget line", value: String(requisition.fields.budgetLine ?? "—") },
-        { label: "Reason", value: requisition.summary },
-        { label: "Approval needed", value: <Pill tone="warning">{needed}</Pill> },
-        { label: "Your view", value: canApprove ? <Pill tone={withinLimit ? "success" : "danger"}>{limit.role} · up to {context.money(limit.limitMinor)}</Pill> : <Pill tone="danger">May not approve</Pill> },
-        { label: "State", value: <Pill tone={statusTone(requisition.status)}>{requisition.status.replace("_", " ")}</Pill> },
+      <OverlaySummary
+        eyebrow="Requisition"
+        title={<span className="ds-num">{requisition.title}</span>}
+        status={<Pill tone={statusTone(requisition.status)} dot>{requisition.status.replace("_", " ")}</Pill>}
+        meta={[`Requested by ${String(requisition.fields.requester ?? requisition.ownerName)}`, supplier?.title, String(requisition.fields.budgetLine ?? "")]}
+      />
+      <ProcChain stages={chainForRequisition(requisition, data.purchaseOrders)} />
+      <FactGrid columns={3} items={[
+        { label: "Value", value: <strong>{context.money(totals.grossMinor)}</strong>, mono: true },
+        { label: "Approval needed", value: needed, tone: "warning" },
+        { label: "Your limit", value: canApprove ? `${limit.role} · up to ${context.money(limit.limitMinor)}` : "May not approve", tone: canApprove ? (withinLimit ? "success" : "danger") : "danger" },
       ]} />
+      <OverlaySection title="Why it is needed" flush><p style={{ margin: 0 }}>{requisition.summary || "No reason was given."}</p></OverlaySection>
+      <OverlaySection title="Lines" flush>
       <DataGrid rows={bodyOf<PoBody>(requisition, {}).lines ?? []} rowId={(row) => row.id} label="Requisition lines" filterable={false}
         columns={[
           { key: "description", header: "Item", primary: true, cell: (row) => row.description },
@@ -219,7 +213,8 @@ export function RequisitionReview({ context, close }: { context: ScreenContext; 
           { key: "unit", header: "Unit", align: "end", cell: (row) => <span className="ds-num">{context.money(row.unitPriceMinor)}</span> },
           { key: "line", header: "Line total", align: "end", cell: (row) => <span className="ds-num">{context.money(row.quantity * row.unitPriceMinor)}</span> },
         ]} />
-      <TotalsBlock totals={totals} money={context.money} label="Requisition" />
+      </OverlaySection>
+      {totals.hasUnknownRate && <Notice tone="danger" title="A line has no approved tax rate">Resolve the unknown tax rate before approving; the figure above is shown without tax.</Notice>}
       {!canApprove ? (
         <Notice tone="danger" title="This role view does not approve commitments">
           Approving a requisition commits money, so it is limited to the views that hold the approval capability. Role views shape what this interface offers; they are not an account security boundary.
@@ -245,7 +240,8 @@ export function RequisitionReview({ context, close }: { context: ScreenContext; 
           <Field label="Note for the record" hint="Required when declining; optional when approving."><TextInput value={reason} disabled={busy} onChange={(event) => setReason(event.target.value)} /></Field>
           {error && <Notice tone="danger" title="Decision could not be recorded">{error}</Notice>}
           <DrawerActions>
-            <Button
+            <OverlayActions
+              primary={<Button
               variant="primary"
               busy={busy}
               disabled={busy || !canApprove || !pending || !withinLimit || Boolean(separation.refused) || totals.hasUnknownRate}
@@ -269,8 +265,8 @@ export function RequisitionReview({ context, close }: { context: ScreenContext; 
                   setError(cause instanceof Error ? cause.message : "Review and retry the approval.");
                 } finally { setBusy(false); }
               }}
-            >Approve requisition</Button>
-            <Button
+            >Approve requisition</Button>}
+              secondary={<Button
               variant="outline-danger"
               busy={busy}
               disabled={busy || !canApprove || !pending || !reason.trim()}
@@ -292,8 +288,9 @@ export function RequisitionReview({ context, close }: { context: ScreenContext; 
                   setError(cause instanceof Error ? cause.message : "Review and retry the rejection.");
                 } finally { setBusy(false); }
               }}
-            >Reject with reason</Button>
-            <OverlayCancel disabled={busy}>Close review</OverlayCancel>
+            >Reject with reason</Button>}
+              end={<OverlayCancel disabled={busy}>Close review</OverlayCancel>}
+            />
           </DrawerActions>
         </>
       )}
@@ -307,6 +304,7 @@ export function BudgetCheck({ context }: { context: ScreenContext }) {
   const lines = [...new Set(data.purchaseOrders.map((order) => String(order.fields.budgetLine ?? "Unassigned")))];
   return (
     <Stack gap={4}>
+      <OverlaySection title="Commitment by budget line" flush>
       <DataGrid rows={lines} rowId={(row) => row} label="Budget lines" filterable={false}
         columns={[
           { key: "line", header: "Budget line", primary: true, cell: (row) => row },
@@ -318,11 +316,13 @@ export function BudgetCheck({ context }: { context: ScreenContext }) {
           ) },
           { key: "budget", header: "Budget set", cell: () => <Pill tone="warning">Not recorded</Pill> },
         ]} />
+      </OverlaySection>
       <Notice tone="warning" title="No budget figure is held for these lines">
-        Commitment totals are counted from the orders themselves. A budget to compare them against would come from Finance, which is not connected to this screen, so no percentage of budget is shown rather than one being invented.
+        Commitments are counted from the orders themselves. A budget to compare them with would come from Finance, so no percentage of budget is shown rather than an invented one.
       </Notice>
-      <Properties rows={APPROVAL_LIMITS.map((limit) => ({ label: limit.role, value: limit.limitMinor === 0 ? "Raises, cannot approve" : `Up to ${context.money(limit.limitMinor)}` }))} />
-      <span className="ds-subtle">Limits are expressed in {org.currency}.</span>
+      <OverlaySection title="Approval limits" hint={`Expressed in ${org.currency}. The limit follows the value, not the requester.`}>
+        <FactGrid columns={3} items={APPROVAL_LIMITS.map((limit) => ({ label: limit.role, value: limit.limitMinor === 0 ? "Raises, cannot approve" : `Up to ${context.money(limit.limitMinor)}`, mono: limit.limitMinor !== 0 }))} />
+      </OverlaySection>
     </Stack>
   );
 }
@@ -338,15 +338,15 @@ export function CostInspector({ context }: { context: ScreenContext }) {
   const match = threeWayMatch(bill, data.purchaseOrders, data.receipts);
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Invoice", value: <span className="ds-num">{bill.title}</span> },
-        { label: "Supplier", value: supplier?.title ?? "—" },
-        { label: "Due", value: <span className="ds-num">{context.date(bill.dueAt)}</span> },
-        { label: "Match", value: <Pill tone={matchTone(match.state)} dot>{MATCH_LABEL[match.state]}</Pill> },
-      ]} />
-      <TotalsBlock totals={totals} money={context.money} label="Invoice" />
+      <OverlaySummary
+        eyebrow="Supplier invoice"
+        title={<span className="ds-num">{bill.title}</span>}
+        status={<Pill tone={matchTone(match.state)} dot>{MATCH_LABEL[match.state]}</Pill>}
+        meta={[supplier?.title, bill.dueAt ? `Due ${context.date(bill.dueAt)}` : undefined]}
+        actions={<Button variant="secondary" size="sm" onClick={() => context.openOverlay("three-way match", { id: bill.id })}>Open the three-way match</Button>}
+      />
+      <Totals totals={totals} money={context.money} label="Invoice" />
       {match.blockedReason && <Notice tone="danger" title="Payment is blocked">{match.blockedReason}</Notice>}
-      <Button variant="secondary" onClick={() => context.openOverlay("three-way match", { id: bill.id })}>Open the three-way match</Button>
     </Stack>
   );
 }
@@ -358,6 +358,8 @@ export function StockAlert({ context }: { context: ScreenContext }) {
     return { product, onHand, point: Number(product.fields.reorderPoint ?? 0) };
   }).filter((row) => row.onHand <= row.point);
   return rows.length === 0 ? <Empty title="Nothing is below its reorder point" /> : (
+    <Stack gap={3}>
+    <OverlaySection title={`${rows.length} product${rows.length === 1 ? "" : "s"} at or below the reorder point`} hint="On hand is the sum of recorded stock movements across every site." flush>
     <DataGrid rows={rows} rowId={(row) => row.product.id} label="Stock alerts" filterable={false}
       onOpen={() => { context.navigate(`/o/${context.org.slug}/proc/replenishment`); context.closeOverlay(); }}
       columns={[
@@ -366,6 +368,9 @@ export function StockAlert({ context }: { context: ScreenContext }) {
         { key: "point", header: "Reorder point", align: "end", cell: (row) => <span className="ds-num">{String(row.point)}</span> },
         { key: "lead", header: "Lead time", align: "end", cell: (row) => <span className="ds-num">{String(row.product.fields.leadTimeDays ?? "—")} days</span> },
       ]} />
+    </OverlaySection>
+    <OverlayActions primary={<Button variant="primary" onClick={() => { context.navigate(`/o/${context.org.slug}/proc/replenishment`); context.closeOverlay(); }}>Plan replenishment</Button>} />
+    </Stack>
   );
 }
 
@@ -408,6 +413,8 @@ export function SupplierForm({ context, close }: { context: ScreenContext; close
         close();
       }}
     >
+      <OverlaySection title="Identity">
+      <Stack gap={3}>
       <Field label="Supplier name" required error={duplicate ? "A supplier with that name already exists" : undefined}>
         <TextInput value={title} invalid={duplicate} onChange={(event) => setTitle(event.target.value)} required />
       </Field>
@@ -415,6 +422,9 @@ export function SupplierForm({ context, close }: { context: ScreenContext; close
         <Field label="Email"><TextInput type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
         <Field label="Category"><Select value={category} onChange={(event) => setCategory(event.target.value)}>{["Metal", "Packaging", "Textile", "Electrical", "Glass", "Logistics", "Finishing"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
       </Row>
+      </Stack>
+      </OverlaySection>
+      <OverlaySection title="Terms">
       <Row gap={3} wrap>
         <Field label="Payment terms"><Select value={terms} onChange={(event) => setTerms(event.target.value)}>{["On receipt", "14 days", "30 days", "60 days", "50% deposit"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
         <Field label="Lead time in days"><TextInput value={lead} inputMode="numeric" align="end" onChange={(event) => setLead(event.target.value)} /></Field>
@@ -422,8 +432,9 @@ export function SupplierForm({ context, close }: { context: ScreenContext; close
           <Select value={taxStatus} onChange={(event) => setTaxStatus(event.target.value)}>{["domestic", "eu_business", "export", "domestic_exempt"].map((item) => <option key={item}>{item}</option>)}</Select>
         </Field>
       </Row>
+      </OverlaySection>
       <Notice tone="danger" title="Bank details are not set here">
-        Payment details are changed only through a separate verification against a known contact, because an emailed change of bank account is the most common fraud in purchasing.
+        Bank changes go through a separate verification with a known contact: an emailed change of account is the most common purchasing fraud.
       </Notice>
     </form>
   );
@@ -454,16 +465,20 @@ export function SupplierVerification({ context, close }: { context: ScreenContex
         close();
       }}
     >
-      <Properties rows={[
-        { label: "Supplier", value: supplier.title },
-        { label: "Current account", value: String(supplier.fields.bankLast4) ? <span className="ds-num">···{String(supplier.fields.bankLast4)}</span> : "None recorded" },
-        { label: "Last verified", value: String(supplier.fields.bankVerifiedAt) ? <span className="ds-num">{context.date(String(supplier.fields.bankVerifiedAt))}</span> : "Never" },
+      <OverlaySummary eyebrow="Bank detail" title={supplier.title} status={<Pill tone={statusTone(supplier.status)} dot>{supplier.status}</Pill>} />
+      <FactGrid columns={2} items={[
+        { label: "Current account", value: String(supplier.fields.bankLast4) ? `···${String(supplier.fields.bankLast4)}` : "None recorded", mono: true },
+        { label: "Last verified", value: String(supplier.fields.bankVerifiedAt) ? context.date(String(supplier.fields.bankVerifiedAt)) : "Never", mono: true, tone: String(supplier.fields.bankVerifiedAt) ? undefined : "warning" },
       ]} />
+      <OverlaySection title="Call-back verification" flush>
+      <Stack gap={3}>
       <Checkbox label="I called the supplier back on a number we already held, not one from the request" checked={calledBack} onChange={(event) => setCalledBack(event.target.checked)} />
       <Field label="Who confirmed it" required><TextInput value={contact} onChange={(event) => setContact(event.target.value)} required /></Field>
       <Field label="Last four digits" required><TextInput value={last4} inputMode="numeric" align="end" maxLength={4} onChange={(event) => setLast4(event.target.value.replace(/\D/g, ""))} required /></Field>
+      </Stack>
+      </OverlaySection>
       <Notice tone="warning" title="Only the last four digits are kept">
-        The full account number is never stored in this workspace. What is recorded is that someone verified the change, with whom, and when.
+        The full account number is never stored here. What is recorded is that someone verified the change, with whom, and when.
       </Notice>
     </form>
   );
@@ -476,12 +491,7 @@ export function SanctionsReview({ context }: { context: ScreenContext }) {
   if (!supplier) return <Empty title="No supplier" />;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Supplier", value: supplier.title },
-        { label: "Country", value: String(supplier.fields.city ?? "—") },
-        { label: "Screening result", value: <Pill tone="warning">Unavailable</Pill> },
-        { label: "Internal state", value: <Pill tone={statusTone(supplier.status)}>{supplier.status}</Pill> },
-      ]} />
+      <OverlaySummary eyebrow="Compliance screening" title={supplier.title} status={<Pill tone="warning" dot>Not screened</Pill>} meta={[String(supplier.fields.city ?? ""), `Internal state: ${supplier.status}`]} />
       <Notice tone="warning" title="No screening service is connected">
         Sanctions and compliance screening needs an authoritative list from a provider. Nothing here has been screened, and showing a clear result would be worse than showing none.
       </Notice>
@@ -500,17 +510,17 @@ export function ContractViewer({ context }: { context: ScreenContext }) {
   const clauses = bodyOf<ContractBody>(contract, {}).clauses ?? [];
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Contract", value: contract.title },
-        { label: "Value", value: <span className="ds-num">{context.money(contract.amountMinor)}</span> },
-        { label: "Review by", value: <span className="ds-num">{context.date(contract.dueAt)}</span> },
-        { label: "Signed", value: contract.fields.signed === true ? "Yes" : "No e-signature provider is connected" },
-      ]} />
+      <OverlaySummary eyebrow="Contract" title={contract.title}
+        status={contract.fields.signed === true ? <Pill tone="success" dot>Signed</Pill> : <Pill tone="warning" dot>Not signed</Pill>}
+        meta={[`Value ${context.money(contract.amountMinor)}`, contract.dueAt ? `Review by ${context.date(contract.dueAt)}` : undefined]} />
+      {contract.fields.signed !== true && <span className="ds-subtle">No e-signature provider is connected, so signing is not recorded here.</span>}
+      <OverlaySection title={`${clauses.length} clause${clauses.length === 1 ? "" : "s"}, grouped by assigned risk`} flush>
       <Stack gap={3}>
         {clauses.map((clause) => (
           <Card key={clause.id} prov={clause.risk === "high" ? "unknown" : "human"} eyebrow={clause.risk.toUpperCase()} title={clause.title} subtitle={clause.detail} />
         ))}
       </Stack>
+      </OverlaySection>
       <Notice tone="danger" title="These are summaries, not advice">
         Clauses are recorded as written and grouped by the risk someone assigned them. Interpreting a liability, governing law or price variation clause needs a qualified reviewer.
       </Notice>
@@ -540,10 +550,10 @@ export function RiskEscalation({ context, close }: { context: ScreenContext; clo
         close();
       }}
     >
-      <Properties rows={[
-        { label: "Supplier", value: supplier.title },
-        { label: "Open orders", value: <span className="ds-num">{String(data.purchaseOrders.filter((order) => String(order.fields.supplierId) === supplier.id && ["approved", "sent"].includes(order.status)).length)}</span> },
-        { label: "On time", value: <span className="ds-num">{String(supplier.fields.onTimeRatePct ?? "—")}%</span> },
+      <OverlaySummary eyebrow="Supplier" title={supplier.title} status={<Pill tone={statusTone(supplier.status)} dot>{supplier.status}</Pill>} />
+      <FactGrid columns={2} items={[
+        { label: "Open orders", value: String(data.purchaseOrders.filter((order) => String(order.fields.supplierId) === supplier.id && ["approved", "sent"].includes(order.status)).length), mono: true },
+        { label: "On time", value: `${String(supplier.fields.onTimeRatePct ?? "—")}%`, mono: true },
       ]} />
       <Field label="Why" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
       <Notice tone="warning" title="Flagging does not cancel anything">
@@ -574,13 +584,15 @@ function PoEditorForm({ context, close, existing, preset, loaded }: { context: S
   const [supplierId, setSupplierId] = useState(resolveSupplierId(data.supplierAliases, String((existing ?? preset)?.fields.supplierId ?? data.suppliers[0]?.id ?? "")));
   const [dueAt, setDueAt] = useState((existing?.dueAt ?? new Date(now.getTime() + 14 * 86_400_000).toISOString()).slice(0, 10));
   const [note, setNote] = useState(existing?.summary ?? preset?.summary ?? "");
-  const [lines, setLines] = useState<PoLine[]>(existingBody.lines ?? [{ id: "l1", description: "", quantity: 1, unitPriceMinor: 0, taxCategory: "standard", receivedQuantity: 0 }]);
+  const [lines, setLines] = useState<PoLine[]>(existingBody.lines ?? [blankLine(0)]);
 
   const supplier = findSupplier(data, supplierId);
   const draft = { ...(existing ?? ({} as Rec)), at: now.toISOString(), body: { lines } } as Rec;
   const totals = poTotals(draft, supplier, org.jurisdiction);
   const source = approvedRequisitions.find((item) => item.id === fromRequisition);
   const alreadySent = existing?.status === "sent";
+  const receivedUnits = lines.reduce((sum, line) => sum + line.receivedQuantity, 0);
+  const valueChange = existing ? totals.grossMinor - (existing.amountMinor ?? 0) : 0;
   const invalid = lines.length === 0 || lines.some((line) => !line.description.trim() || line.quantity <= 0) || !supplierId;
 
   return (
@@ -634,69 +646,72 @@ function PoEditorForm({ context, close, existing, preset, loaded }: { context: S
         close();
       }}
     >
-      {!existing && (
-        <Field label="From an approved requisition" hint="Converting carries the approval across; raising from scratch does not.">
-          <Select value={fromRequisition} onChange={(event) => {
-            setFromRequisition(event.target.value);
-            const chosen = data.purchaseOrders.find((item) => item.id === event.target.value);
-            if (chosen) {
-              setSupplierId(String(chosen.fields.supplierId));
-              setLines(bodyOf<PoBody>(chosen, {}).lines ?? []);
-              setNote(chosen.summary);
-            }
-          }}>
-            <option value="">Raise from scratch — needs its own approval</option>
-            {approvedRequisitions.map((item) => <option key={item.id} value={item.id}>{item.title} · {context.money(item.amountMinor)} · approved by {String(item.fields.approver)}</option>)}
-          </Select>
-        </Field>
+      {existing && (
+        <>
+          <OverlaySummary
+            eyebrow={alreadySent ? "Issued order, revision" : "Purchase order"}
+            title={<span className="ds-num">{existing.title}</span>}
+            status={<Pill tone={statusTone(existing.status)} dot>{existing.status.replace("_", " ")}</Pill>}
+            meta={[alreadySent ? `Version ${String(existing.fields.version ?? 1)}, saving makes v${Number(existing.fields.version ?? 1) + 1}` : `Version ${String(existing.fields.version ?? 1)}`, existing.fields.approver ? `Approved by ${String(existing.fields.approver)}` : "Not approved"]}
+          />
+          <ProcChain stages={chainForOrder(existing, data.purchaseOrders, data.receipts, data.bills)} />
+        </>
       )}
-      <Field label="Supplier" required>
-        <Select value={supplierId} onChange={(event) => setSupplierId(event.target.value)} required>
-          {data.suppliers.filter((item) => item.status !== "archived").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
-        </Select>
-      </Field>
-      <Row gap={3} wrap>
-        <Field label="Delivery expected"><TextInput type="date" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></Field>
-        <Field label="Reference note"><TextInput value={note} onChange={(event) => setNote(event.target.value)} /></Field>
-      </Row>
-      <fieldset className="ds-fieldset">
-        <legend>Lines</legend>
+      <OverlaySection title="Source and supplier">
         <Stack gap={3}>
-          {lines.map((line, index) => (
-            <Row key={line.id} gap={2} wrap>
-              <Field label={`Item ${index + 1}`}>
-                <TextInput value={line.description} onChange={(event) => setLines((current) => current.map((item, position) => (position === index ? { ...item, description: event.target.value } : item)))} />
-              </Field>
-              <Field label="Quantity">
-                <TextInput inputMode="numeric" align="end" value={String(line.quantity)} onChange={(event) => setLines((current) => current.map((item, position) => (position === index ? { ...item, quantity: Number(event.target.value) || 0 } : item)))} />
-              </Field>
-              <Field label="Unit price">
-                <MoneyInput valueMinor={line.unitPriceMinor} currency={org.currency} label={`Unit price for line ${index + 1}`}
-                  onChangeMinor={(minor) => setLines((current) => current.map((item, position) => (position === index ? { ...item, unitPriceMinor: minor } : item)))} />
-              </Field>
-              <Field label="Tax">
-                <Select value={line.taxCategory} onChange={(event) => setLines((current) => current.map((item, position) => (position === index ? { ...item, taxCategory: event.target.value as TaxCategory } : item)))}>
-                  {["standard", "reduced", "zero_rated", "exempt", "reverse_charge", "outside_scope"].map((item) => <option key={item} value={item}>{item.replace("_", " ")}</option>)}
-                </Select>
-              </Field>
-              <Button size="sm" variant="ghost" onClick={() => setLines((current) => current.filter((_, position) => position !== index))}>Remove</Button>
-            </Row>
-          ))}
-          <Button size="sm" variant="secondary" onClick={() => setLines((current) => [...current, { id: `l${current.length + 1}`, description: "", quantity: 1, unitPriceMinor: 0, taxCategory: "standard", receivedQuantity: 0 }])}>Add line</Button>
+          {!existing && (
+            <Field label="From an approved requisition" hint="Converting carries the approval across; raising from scratch does not.">
+              <Select value={fromRequisition} onChange={(event) => {
+                setFromRequisition(event.target.value);
+                const chosen = data.purchaseOrders.find((item) => item.id === event.target.value);
+                if (chosen) {
+                  setSupplierId(String(chosen.fields.supplierId));
+                  setLines(bodyOf<PoBody>(chosen, {}).lines ?? []);
+                  setNote(chosen.summary);
+                }
+              }}>
+                <option value="">Raise from scratch — needs its own approval</option>
+                {approvedRequisitions.map((item) => <option key={item.id} value={item.id}>{item.title} · {context.money(item.amountMinor)} · approved by {String(item.fields.approver)}</option>)}
+              </Select>
+            </Field>
+          )}
+          <Field label="Supplier" required>
+            <Select value={supplierId} onChange={(event) => setSupplierId(event.target.value)} required>
+              {data.suppliers.filter((item) => item.status !== "archived").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+            </Select>
+          </Field>
+          <Row gap={3} wrap>
+            <Field label="Delivery expected"><TextInput type="date" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></Field>
+            <Field label="Reference note"><TextInput value={note} onChange={(event) => setNote(event.target.value)} /></Field>
+          </Row>
+          {supplier && supplierStatusNote(supplier)}
         </Stack>
-      </fieldset>
-      <TotalsBlock totals={totals} money={context.money} label="Order" />
-      {supplier && supplierStatusNote(supplier)}
-      {alreadySent && (
-        <Notice tone="warning" title="This order has already been issued">
-          Saving creates version {Number(existing?.fields.version ?? 1) + 1} of the same order rather than a new one. A second order would risk the supplier delivering twice.
-        </Notice>
-      )}
-      {!existing && !fromRequisition && (
-        <Notice tone="warning" title="Raised from scratch, so it starts as a draft">
-          A purchase order without an approved requisition behind it carries no approval. It cannot be issued until someone with the right limit approves it.
-        </Notice>
-      )}
+      </OverlaySection>
+      <OverlaySection title="Lines" hint={existing && receivedUnits > 0 ? `${receivedUnits} units are already received; a revision does not change what arrived.` : undefined}>
+        <LineEditor lines={lines} setLines={setLines} currency={org.currency} money={context.money} withTax />
+      </OverlaySection>
+      <OverlaySection title={existing ? "Change impact" : "Value"} tone={alreadySent && valueChange !== 0 ? "warning" : "neutral"}>
+        <Stack gap={3}>
+          <Totals totals={totals} money={context.money} label="Order" />
+          {existing && (
+            <FactGrid columns={3} dense items={[
+              { label: "Saved value", value: context.money(existing.amountMinor), mono: true },
+              { label: "After this save", value: context.money(totals.grossMinor), mono: true },
+              { label: "Change", value: `${valueChange > 0 ? "+" : ""}${context.money(valueChange)}`, mono: true, tone: valueChange === 0 ? undefined : valueChange > 0 ? "warning" : "success" },
+            ]} />
+          )}
+          {alreadySent && (
+            <Notice tone="warning" title={`Saving records version ${Number(existing?.fields.version ?? 1) + 1} of the same order`}>
+              The supplier needs the revision, never a second order: a second order risks a double delivery.
+            </Notice>
+          )}
+          {!existing && !fromRequisition && (
+            <Notice tone="warning" title="Raised from scratch, so it starts as a draft">
+              With no approved requisition behind it, this order carries no approval and cannot be issued until someone with the right limit approves it.
+            </Notice>
+          )}
+        </Stack>
+      </OverlaySection>
     </form>
   );
 }
@@ -713,32 +728,69 @@ function supplierStatusNote(supplier: Rec) {
 
 export function ChangeImpact({ context }: { context: ScreenContext }) {
   const data = useProcData();
+  const { org } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const order = useRecord(payload?.id ?? context.selectedId) ?? data.purchaseOrders[0];
   if (!order) return <Empty title="No order" />;
-  const revisions = bodyOf<PoBody>(order, {}).revisions ?? [];
-  const receipts = data.receipts.filter((receipt) => String(receipt.fields.purchaseOrderId) === order.id);
+  const body = bodyOf<PoBody>(order, {});
+  const revisions = body.revisions ?? [];
+  const lines = body.lines ?? [];
+  const supplier = findSupplier(data, String(order.fields.supplierId ?? ""));
+  const totals = poTotals(order, supplier, org.jurisdiction);
+  const receipts = data.receipts.filter((receipt) => String(receipt.fields.purchaseOrderId) === order.id && receipt.status !== "expected");
+  const bills = data.bills.filter((bill) => String(bill.fields.purchaseOrderId) === order.id);
+  const requisition = data.purchaseOrders.find((item) => item.id === String(order.fields.requisitionId ?? ""));
+  const receivedValue = lines.reduce((sum, line) => sum + Math.min(line.receivedQuantity, line.quantity) * line.unitPriceMinor, 0);
+  const orderedValue = lines.reduce((sum, line) => sum + line.quantity * line.unitPriceMinor, 0);
+  const approved = Boolean(order.fields.approver);
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Order", value: <span className="ds-num">{order.title}</span> },
-        { label: "Current version", value: <span className="ds-num">v{String(order.fields.version ?? 1)}</span> },
-        { label: "Issued", value: String(order.fields.sentAt) ? <span className="ds-num">{context.date(String(order.fields.sentAt))}</span> : "Not issued" },
-        { label: "Receipts raised", value: <span className="ds-num">{String(receipts.length)}</span> },
+      <OverlaySummary
+        eyebrow="Purchase order"
+        title={<span className="ds-num">{order.title}</span>}
+        status={<Pill tone={statusTone(order.status)} dot>{order.status.replace("_", " ")}</Pill>}
+        meta={[supplier?.title, `Version ${String(order.fields.version ?? 1)}`, String(order.fields.sentAt ?? "") ? `Issued ${context.date(String(order.fields.sentAt))}` : "Not issued"]}
+      />
+      <ProcChain stages={chainForOrder(order, data.purchaseOrders, data.receipts, data.bills)} />
+      <FactGrid columns={4} items={[
+        { label: "Order value", value: <strong>{context.money(totals.grossMinor)}</strong>, mono: true },
+        { label: "Tax", value: context.money(totals.taxMinor), mono: true },
+        { label: "Received so far", value: context.money(receivedValue), mono: true, hint: orderedValue ? `${Math.round((receivedValue / orderedValue) * 100)}% of lines` : undefined },
+        { label: "Approval", value: approved ? `${String(order.fields.approver)}` : "Not approved", tone: approved ? "success" : "warning", hint: approved && order.fields.approvedAt ? context.date(String(order.fields.approvedAt)) : undefined },
       ]} />
-      {revisions.length === 0 ? (
-        <Notice tone="info" title="No revision has been recorded">This order is on its original version.</Notice>
-      ) : (
-        <DataGrid rows={revisions} rowId={(row) => String(row.version)} label="Revisions" filterable={false}
+      <OverlaySection title="Lines" hint="Ordered against received. Receiving is a separate record from the order." flush>
+        <DataGrid rows={lines} rowId={(row) => row.id} label="Order lines" filterable={false}
           columns={[
-            { key: "version", header: "Version", primary: true, cell: (row) => <span className="ds-num">v{String(row.version)}</span> },
-            { key: "at", header: "Changed", cell: (row) => <span className="ds-num">{context.dateTime(row.at)}</span> },
-            { key: "change", header: "What changed", cell: (row) => row.change },
-          ]} />
-      )}
-      <Notice tone="warning" title="A revision replaces the order, it never adds one">
-        Each change bumps the version on the same record. If a supplier connection existed, they would receive the revision against the same number, which is what prevents a double delivery.
-      </Notice>
+            { key: "description", header: "Item", primary: true, cell: (row) => row.description },
+            { key: "ordered", header: "Ordered", align: "end", cell: (row) => <span className="ds-num">{String(row.quantity)}</span> },
+            { key: "received", header: "Received", align: "end", cell: (row) => <span className="ds-num">{String(row.receivedQuantity)}</span> },
+            { key: "unit", header: "Unit", align: "end", cell: (row) => <span className="ds-num">{context.money(row.unitPriceMinor)}</span> },
+          ]}
+          empty={<Empty title="This order has no lines" />} />
+      </OverlaySection>
+      <OverlaySection title="Related records" flush>
+        <KeyValueList items={[
+          { label: "Requisition", value: requisition ? <Button size="sm" variant="ghost" onClick={() => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/proc/requisitions`); }}>{requisition.title}</Button> : <span className="ds-subtle">Raised directly</span> },
+          { label: "Goods receipts", value: receipts.length ? receipts.map((receipt) => (
+            <Button key={receipt.id} size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/proc/receiving`)}>{receipt.title}</Button>
+          )) : <span className="ds-subtle">None yet</span> },
+          { label: "Supplier invoices", value: bills.length ? bills.map((bill) => (
+            <Button key={bill.id} size="sm" variant="ghost" onClick={() => context.openOverlay("three-way match", { id: bill.id })}>{bill.title}</Button>
+          )) : <span className="ds-subtle">None recorded</span> },
+        ]} />
+      </OverlaySection>
+      <OverlaySection title="Revision history" hint="A revision bumps the version on this record; it never adds an order." flush>
+        {revisions.length === 0 ? (
+          <span className="ds-subtle">No revision has been recorded; this order is on its original version.</span>
+        ) : (
+          <DataGrid rows={revisions} rowId={(row) => String(row.version)} label="Revisions" filterable={false}
+            columns={[
+              { key: "version", header: "Version", primary: true, cell: (row) => <span className="ds-num">v{String(row.version)}</span> },
+              { key: "at", header: "Changed", cell: (row) => <span className="ds-num">{context.dateTime(row.at)}</span> },
+              { key: "change", header: "What changed", cell: (row) => row.change },
+            ]} />
+        )}
+      </OverlaySection>
     </Stack>
   );
 }
@@ -755,34 +807,47 @@ export function SendPreview({ context, close }: { context: ScreenContext; close:
   const alreadySent = Boolean(order.fields.sentAt);
   return (
     <Stack gap={4}>
-      <div className="ds-panel" style={{ padding: "var(--space-4)" }}>
-        <Row gap={2}><strong className="ds-grow">{org.name}</strong><span className="ds-num">{order.title} v{String(order.fields.version ?? 1)}</span></Row>
-        <p className="ds-subtle">To {supplier?.title ?? "—"} · {String(supplier?.fields.email ?? "no email on file")}</p>
+      <OverlaySummary
+        eyebrow="Issue the order"
+        title={<span className="ds-num">{order.title} v{String(order.fields.version ?? 1)}</span>}
+        status={<Pill tone={approved ? "success" : "danger"} dot>{approved ? `Approved by ${String(order.fields.approver)}` : "Not approved"}</Pill>}
+        meta={[`To ${supplier?.title ?? "—"} · ${String(supplier?.fields.email ?? "no email on file")}`]}
+      />
+      <ProcChain stages={chainForOrder(order, data.purchaseOrders, data.receipts, data.bills)} />
+      <OverlaySection title="What the supplier would receive" hint={`From ${org.name}`} flush>
         <DataGrid rows={bodyOf<PoBody>(order, {}).lines ?? []} rowId={(row) => row.id} label="Order lines" filterable={false}
           columns={[
             { key: "description", header: "Item", primary: true, cell: (row) => row.description },
             { key: "qty", header: "Quantity", align: "end", cell: (row) => <span className="ds-num">{String(row.quantity)}</span> },
             { key: "unit", header: "Unit", align: "end", cell: (row) => <span className="ds-num">{context.money(row.unitPriceMinor)}</span> },
+            { key: "line", header: "Line total", align: "end", cell: (row) => <span className="ds-num">{context.money(row.quantity * row.unitPriceMinor)}</span> },
           ]} />
-      </div>
-      <TotalsBlock totals={totals} money={context.money} label="Order" />
+      </OverlaySection>
+      <Totals totals={totals} money={context.money} label="Order" />
       {!approved && <Notice tone="danger" title="This order is not approved">An unapproved order cannot be issued. Approve the requisition behind it, or have it approved on its own.</Notice>}
       {alreadySent && <Notice tone="warning" title="Already issued">It was issued on {context.date(String(order.fields.sentAt))}. Issuing again would re-send the same number; record a revision instead.</Notice>}
       <ProviderBoundary id="email.send" title="The order cannot be transmitted" />
-      <Button
-        variant="primary"
-        disabled={!approved}
-        onClick={async () => {
-          await context.mutate.patch(order.id, {
-            status: "sent",
-            fields: { ...order.fields, sentAt: now.toISOString(), sentBy: actor },
-          }, { expectRevision: order.revision, event: `${order.title} marked as issued by ${actor}` });
-          context.toast("Marked as issued", `${order.title} is recorded as issued. Nothing was sent: no supplier connection exists.`);
-          close();
-        }}
-      >
-        {alreadySent ? "Re-record the issue date" : "Mark as issued"}
-      </Button>
+      <DrawerActions>
+        <OverlayActions
+          primary={
+            <Button
+              variant="primary"
+              disabled={!approved}
+              onClick={async () => {
+                await context.mutate.patch(order.id, {
+                  status: "sent",
+                  fields: { ...order.fields, sentAt: now.toISOString(), sentBy: actor },
+                }, { expectRevision: order.revision, event: `${order.title} marked as issued by ${actor}` });
+                context.toast("Marked as issued", `${order.title} is recorded as issued. Nothing was sent: no supplier connection exists.`);
+                close();
+              }}
+            >
+              {alreadySent ? "Re-record the issue date" : "Mark as issued"}
+            </Button>
+          }
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -817,6 +882,8 @@ export function LocationEditor({ context, close }: { context: ScreenContext; clo
         close();
       }}
     >
+      <OverlaySection title="Site">
+      <Stack gap={3}>
       <Field label="Location name" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
       <Row gap={3} wrap>
         <Field label="Code" error={duplicate ? "That code is already used" : undefined}><TextInput value={code} invalid={duplicate} onChange={(event) => setCode(event.target.value.toUpperCase())} /></Field>
@@ -824,7 +891,9 @@ export function LocationEditor({ context, close }: { context: ScreenContext; clo
         <Field label="Bins"><TextInput value={bins} inputMode="numeric" align="end" onChange={(event) => setBins(event.target.value)} /></Field>
       </Row>
       <Field label="Manager"><TextInput value={manager} onChange={(event) => setManager(event.target.value)} /></Field>
-      <Notice tone="info">Capacity is used to warn when a site is nearly full. It never blocks a receipt, because the goods have already arrived by then.</Notice>
+      </Stack>
+      </OverlaySection>
+      <Notice tone="info">Capacity warns when a site is nearly full. It never blocks a receipt: the goods have already arrived.</Notice>
     </form>
   );
 }
@@ -862,7 +931,10 @@ export function StockCount({ context, close }: { context: ScreenContext; close: 
         close();
       }}
     >
-      <Properties rows={[{ label: "Location", value: warehouse.title }, { label: "Lines counted", value: <span className="ds-num">{String(rows.filter((row) => row.counted !== undefined).length)}</span> }]} />
+      <DrawerUnsavedChanges when={Object.values(counts).some((value) => value !== "")} />
+      <OverlaySummary eyebrow="Stock count" title={warehouse.title}
+        meta={[`${rows.filter((row) => row.counted !== undefined).length} of ${rows.length} lines counted`, `${variances.length} variance${variances.length === 1 ? "" : "s"} to record`]} />
+      <OverlaySection title="Count sheet" hint="Leave a line blank if it was not counted." flush>
       <DataGrid rows={rows} rowId={(row) => row.product.id} label="Count sheet" filterable={false}
         columns={[
           { key: "product", header: "Product", primary: true, cell: (row) => row.product.title },
@@ -873,8 +945,9 @@ export function StockCount({ context, close }: { context: ScreenContext; close: 
           ) },
           { key: "variance", header: "Variance", align: "end", cell: (row) => (row.variance === undefined ? <span className="ds-subtle">Not counted</span> : <strong className={row.variance === 0 ? "ds-num" : "ds-field-error"}>{row.variance > 0 ? "+" : ""}{row.variance}</strong>) },
         ]} />
+      </OverlaySection>
       <Notice tone="warning" title="A variance becomes its own movement">
-        The level is never overwritten. Each difference is written as a movement carrying the counted and expected figures, so the stock ledger explains itself.
+        The level is never overwritten. Each difference is written as a movement carrying the counted and expected figures.
       </Notice>
     </form>
   );
@@ -905,6 +978,8 @@ export function TransferForm({ context, close }: { context: ScreenContext; close
         close();
       }}
     >
+      <OverlaySection title="What moves and where">
+      <Stack gap={3}>
       <Field label="Product"><Select value={productId} onChange={(event) => setProductId(event.target.value)}>{data.products.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</Select></Field>
       <Row gap={3} wrap>
         <Field label="From"><Select value={from} onChange={(event) => setFrom(event.target.value)}>{data.warehouses.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</Select></Field>
@@ -913,6 +988,13 @@ export function TransferForm({ context, close }: { context: ScreenContext; close
           <TextInput value={quantity} inputMode="numeric" align="end" invalid={invalid} onChange={(event) => setQuantity(event.target.value)} />
         </Field>
       </Row>
+      </Stack>
+      </OverlaySection>
+      <FactGrid columns={3} dense items={[
+        { label: "At the source", value: String(available), mono: true },
+        { label: "After, at the source", value: String(available - amount), mono: true, tone: available - amount < 0 ? "danger" : undefined },
+        { label: "Company total", value: "Unchanged", hint: "Two movements under one reference" },
+      ]} />
     </form>
   );
 }
@@ -939,7 +1021,7 @@ function ScanOverlayForm({ context, close, receipt, presetOrder, loaded }: { con
   const data = live.purchaseOrders.length ? live : loaded;
   const { org, now, actor } = useWorkspace();
   const openOrders = data.purchaseOrders.filter((order) => isPurchaseOrder(order) && ["approved", "sent"].includes(order.status));
-  const [orderId, setOrderId] = useState(presetOrder || String(openOrders[0]?.id ?? ""));
+  const [orderId, setOrderId] = useState(presetOrder || String((openOrders.find((item) => outstandingFor(item).length > 0) ?? openOrders[0])?.id ?? ""));
   const order = data.purchaseOrders.find((item) => item.id === orderId);
   const supplier = findSupplier(data, String(order?.fields.supplierId ?? ""));
   const outstanding = outstandingFor(order);
@@ -949,6 +1031,14 @@ function ScanOverlayForm({ context, close, receipt, presetOrder, loaded }: { con
   const [damaged, setDamaged] = useState(false);
 
   const countFor = (lineId: string) => Number(received[lineId] ?? 0);
+  const outstandingTotal = outstanding.reduce((sum, row) => sum + row.outstanding, 0);
+  const addScan = () => {
+    const code = scan.trim().toUpperCase();
+    if (!code) return;
+    if (scans.includes(code)) { context.toast("Already scanned", `${code} is already on this receipt, so it was not counted twice.`, "blocked"); setScan(""); return; }
+    setScans((current) => [...current, code]);
+    setScan("");
+  };
   const totalReceived = outstanding.reduce((sum, row) => sum + countFor(row.line.id), 0);
   const over = outstanding.some((row) => countFor(row.line.id) > row.outstanding);
   const invalid = !order || totalReceived <= 0 || over;
@@ -1030,19 +1120,27 @@ function ScanOverlayForm({ context, close, receipt, presetOrder, loaded }: { con
         close();
       }}
     >
-      <Field label="Receive against" required>
-        <Select value={orderId} onChange={(event) => setOrderId(event.target.value)} required>
-          {openOrders.map((item) => <option key={item.id} value={item.id}>{item.title} · {findSupplier(data, String(item.fields.supplierId))?.title}</option>)}
-        </Select>
-      </Field>
+      <DrawerUnsavedChanges when={totalReceived > 0 || scans.length > 0 || damaged} />
+      <OverlaySection title="Order being received">
+        <Stack gap={3}>
+          <Field label="Receive against" required>
+            <Select value={orderId} onChange={(event) => { setOrderId(event.target.value); setReceived({}); }} required>
+              {openOrders.map((item) => <option key={item.id} value={item.id}>{item.title} · {findSupplier(data, String(item.fields.supplierId))?.title}</option>)}
+            </Select>
+          </Field>
+          {order && (
+            <FactGrid columns={4} dense items={[
+              { label: "Supplier", value: supplier?.title ?? "—" },
+              { label: "Expected", value: order.dueAt ? context.date(order.dueAt) : "No date", mono: true },
+              { label: "Order value", value: context.money(poTotals(order, supplier, org.jurisdiction).grossMinor), mono: true },
+              { label: "Approved by", value: String(order.fields.approver ?? "") || "Not recorded", tone: order.fields.approver ? undefined : "warning" },
+            ]} />
+          )}
+        </Stack>
+      </OverlaySection>
       {!order ? <Notice tone="warning" title="No order is open for receipt">Goods are only ever received against an approved or issued purchase order.</Notice> : (
         <>
-          <Properties rows={[
-            { label: "Supplier", value: supplier?.title ?? "—" },
-            { label: "Expected", value: <span className="ds-num">{context.date(order.dueAt)}</span> },
-            { label: "Order value", value: <span className="ds-num">{context.money(poTotals(order, supplier, org.jurisdiction).grossMinor)}</span> },
-            { label: "Outstanding lines", value: <span className="ds-num">{String(outstanding.length)}</span> },
-          ]} />
+          <OverlaySection title="Count what arrived" hint="Enter what is physically here. The receipt is its own record, separate from the order and the invoice." flush>
           {outstanding.length === 0 ? <Notice tone="success" title="Everything on this order has been received">There is nothing outstanding to receipt.</Notice> : (
             <DataGrid rows={outstanding} rowId={(row) => row.line.id} label="Outstanding lines" filterable={false}
               columns={[
@@ -1057,23 +1155,30 @@ function ScanOverlayForm({ context, close, receipt, presetOrder, loaded }: { con
                 ) },
               ]} />
           )}
-          <Row gap={2} wrap>
-            <Field label="Scan a barcode" hint="Each code is recorded once; a repeated scan is ignored.">
-              <TextInput value={scan} onChange={(event) => setScan(event.target.value)} placeholder="TB-COL-60" />
-            </Field>
-            <Button size="sm" variant="secondary" onClick={() => {
-              const code = scan.trim().toUpperCase();
-              if (!code) return;
-              if (scans.includes(code)) { context.toast("Already scanned", `${code} is already on this receipt, so it was not counted twice.`, "blocked"); setScan(""); return; }
-              setScans((current) => [...current, code]);
-              setScan("");
-            }}>Add scan</Button>
-          </Row>
-          {scans.length > 0 && <Row gap={1} wrap>{scans.map((code) => <Pill key={code}>{code}</Pill>)}</Row>}
-          <Checkbox label="Something arrived damaged" checked={damaged} onChange={(event) => setDamaged(event.target.checked)} />
+          </OverlaySection>
+          {outstanding.length > 0 && (
+            <FactGrid columns={3} dense items={[
+              { label: "Counted now", value: String(totalReceived), mono: true },
+              { label: "Still outstanding after", value: String(Math.max(0, outstandingTotal - totalReceived)), mono: true, tone: totalReceived > 0 && outstandingTotal - totalReceived > 0 ? "warning" : undefined },
+              { label: "Receipt will be", value: totalReceived <= 0 ? "Not started" : damaged ? "An exception (damage)" : outstandingTotal - totalReceived > 0 ? "An exception (short)" : "Complete", tone: totalReceived <= 0 ? undefined : damaged || outstandingTotal - totalReceived > 0 ? "warning" : "success" },
+            ]} />
+          )}
+          <OverlaySection title="Scans and condition">
+            <Stack gap={3}>
+              <Row gap={2} wrap>
+                <Field label="Scan a barcode" hint="Each code is recorded once; a repeated scan is ignored. Enter adds the scan.">
+                  <TextInput value={scan} onChange={(event) => setScan(event.target.value)} placeholder="TB-COL-60"
+                    onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addScan(); } }} />
+                </Field>
+                <Button size="sm" variant="secondary" onClick={addScan}>Add scan</Button>
+              </Row>
+              {scans.length > 0 && <Row gap={1} wrap>{scans.map((code) => <Pill key={code}>{code}</Pill>)}</Row>}
+              <Checkbox label="Something arrived damaged" checked={damaged} onChange={(event) => setDamaged(event.target.checked)} />
+            </Stack>
+          </OverlaySection>
           {over && <Notice tone="danger" title="More than the order allows">A receipt cannot exceed what was ordered. Raise a revision if the supplier genuinely sent more.</Notice>}
-          <Notice tone="info" title="What this writes">
-            A goods receipt, the received quantities on the order, and a stock movement for each catalogue line. The movement is what the inventory ledger reads, so stock never changes without a receipt behind it.
+          <Notice tone="info" title="What recording writes">
+            A goods receipt, the received quantities on the order and one stock movement per catalogue line. Stock never changes without a receipt behind it. It does not approve or pay the supplier invoice.
           </Notice>
         </>
       )}
@@ -1086,6 +1191,7 @@ export function Discrepancy({ context, close }: { context: ScreenContext; close:
   const { actor } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const receipt = useRecord(payload?.id ?? context.selectedId) ?? data.receipts.find((item) => item.status === "exception");
+  const order = data.purchaseOrders.find((item) => item.id === String(receipt?.fields.purchaseOrderId ?? ""));
   const [kind, setKind] = useState("short");
   const [note, setNote] = useState("");
   if (!receipt) return <Empty title="No receipt selected" />;
@@ -1106,20 +1212,27 @@ export function Discrepancy({ context, close }: { context: ScreenContext; close:
         close();
       }}
     >
-      <Properties rows={[
-        { label: "Receipt", value: <span className="ds-num">{receipt.title}</span> },
-        { label: "Expected", value: <span className="ds-num">{String(expected)}</span> },
-        { label: "Received", value: <span className="ds-num">{String(received)}</span> },
-        { label: "Difference", value: <strong className="ds-field-error">{received - expected}</strong> },
+      <ModalUnsavedChanges when={Boolean(note.trim()) || kind !== "short"} />
+      <OverlaySummary eyebrow="Receipt" title={<span className="ds-num">{receipt.title}</span>}
+        status={<Pill tone={statusTone(receipt.status)} dot>{receipt.status.replace("_", " ")}</Pill>}
+        meta={[order ? `Against ${order.title}` : undefined, order ? findSupplier(data, String(order.fields.supplierId))?.title : undefined]} />
+      <FactGrid columns={3} items={[
+        { label: "Expected", value: String(expected), mono: true },
+        { label: "Received", value: String(received), mono: true },
+        { label: "Difference", value: `${received - expected > 0 ? "+" : ""}${received - expected}`, mono: true, tone: received - expected === 0 ? undefined : "danger" },
       ]} />
-      <Field label="Classification">
-        <Select value={kind} onChange={(event) => setKind(event.target.value)}>
-          {["short", "over", "damaged", "wrong_item", "late"].map((item) => <option key={item} value={item}>{item.replace("_", " ")}</option>)}
-        </Select>
-      </Field>
-      <Field label="What happened" required><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} required /></Field>
+      <OverlaySection title="What went wrong">
+        <Stack gap={3}>
+          <Field label="Classification">
+            <Select value={kind} onChange={(event) => setKind(event.target.value)}>
+              {["short", "over", "damaged", "wrong_item", "late"].map((item) => <option key={item} value={item}>{item.replace("_", " ")}</option>)}
+            </Select>
+          </Field>
+          <Field label="What happened" required><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} required /></Field>
+        </Stack>
+      </OverlaySection>
       <Notice tone="warning" title="A discrepancy blocks payment, it does not adjust stock">
-        Stock reflects what physically arrived. The difference is carried into the three-way match so the supplier invoice cannot be paid in full until it is settled.
+        Stock reflects what physically arrived. The difference is carried into the three-way match, so the invoice cannot be paid in full until it is settled.
       </Notice>
     </form>
   );
@@ -1131,30 +1244,46 @@ export function ReceiptConfirmation({ context }: { context: ScreenContext }) {
   const receipt = useRecord(payload?.id ?? context.selectedId) ?? data.receipts[0];
   if (!receipt) return <Empty title="No receipt" />;
   const order = data.purchaseOrders.find((item) => item.id === String(receipt.fields.purchaseOrderId));
+  const supplier = findSupplier(data, String(receipt.fields.supplierId ?? order?.fields.supplierId ?? ""));
   const lines = bodyOf<ReceiptBody>(receipt, {}).lines ?? [];
   const scans = bodyOf<ReceiptBody>(receipt, {}).scans ?? [];
+  const bills = order ? data.bills.filter((bill) => String(bill.fields.purchaseOrderId) === order.id) : [];
+  const discrepancy = String(receipt.fields.discrepancy ?? "none");
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Receipt", value: <span className="ds-num">{receipt.title}</span> },
-        { label: "Against", value: order?.title ?? "—" },
+      <OverlaySummary
+        eyebrow="Goods receipt"
+        title={<span className="ds-num">{receipt.title}</span>}
+        status={<Pill tone={statusTone(receipt.status)} dot>{receipt.status.replace("_", " ")}</Pill>}
+        meta={[order ? `Against ${order.title}` : undefined, supplier?.title, receipt.at ? context.dateTime(receipt.at) : undefined]}
+      />
+      {order && <ProcChain stages={chainForOrder(order, data.purchaseOrders, data.receipts, data.bills)} />}
+      <FactGrid columns={4} items={[
         { label: "Received by", value: String(receipt.fields.receivedBy || "Nobody yet") },
-        { label: "Scanned", value: receipt.fields.scanned === true ? <Pill tone="success">{scans.length} codes</Pill> : <Pill tone="warning">Not scanned</Pill> },
-        { label: "Discrepancy", value: <Pill tone={String(receipt.fields.discrepancy) === "none" ? "success" : "danger"}>{String(receipt.fields.discrepancy ?? "none")}</Pill> },
+        { label: "Units received", value: String(receipt.fields.quantityReceived ?? "—"), mono: true, hint: receipt.fields.quantityExpected !== undefined ? `of ${String(receipt.fields.quantityExpected)} expected` : undefined },
+        { label: "Scans", value: receipt.fields.scanned === true ? `${scans.length} codes` : "Not scanned", mono: true, tone: receipt.fields.scanned === true ? "success" : "warning" },
+        { label: "Discrepancy", value: discrepancy.replace("_", " "), tone: discrepancy === "none" ? "success" : "danger" },
       ]} />
+      {discrepancy !== "none" && String(receipt.fields.discrepancyNote ?? "") && (
+        <Notice tone="danger" title={`Discrepancy: ${discrepancy.replace("_", " ")}`}>{String(receipt.fields.discrepancyNote)}</Notice>
+      )}
       {lines.length > 0 && (
-        <DataGrid rows={lines} rowId={(row) => row.lineId} label="Receipt lines" filterable={false}
-          columns={[
-            { key: "description", header: "Item", primary: true, cell: (row) => row.description },
-            { key: "expected", header: "Expected", align: "end", cell: (row) => <span className="ds-num">{String(row.expected)}</span> },
-            { key: "received", header: "Received", align: "end", cell: (row) => <span className="ds-num">{String(row.received)}</span> },
-            { key: "condition", header: "Condition", cell: (row) => <Pill tone={row.condition === "good" ? "success" : "danger"}>{row.condition || "not recorded"}</Pill> },
-          ]} />
+        <OverlaySection title="Lines received" flush>
+          <DataGrid rows={lines} rowId={(row) => row.lineId} label="Receipt lines" filterable={false}
+            columns={[
+              { key: "description", header: "Item", primary: true, cell: (row) => row.description },
+              { key: "expected", header: "Expected", align: "end", cell: (row) => <span className="ds-num">{String(row.expected)}</span> },
+              { key: "received", header: "Received", align: "end", cell: (row) => <span className="ds-num">{String(row.received)}</span> },
+              { key: "condition", header: "Condition", cell: (row) => <Pill tone={row.condition === "good" ? "success" : "danger"}>{row.condition || "not recorded"}</Pill> },
+            ]} />
+        </OverlaySection>
       )}
       {receipt.status !== "expected" && <ReceiptStockLinks context={context} receipt={receipt} />}
-      <Notice tone="info" title="De-duplication">
-        Each scanned code is recorded once on a receipt. Scanning the same code again is refused with a message rather than counted, which is what protects a count taken offline and re-entered later.
-      </Notice>
+      <OverlaySection title="Supplier invoices against this order" hint="The invoice is matched separately; this receipt does not approve payment." flush>
+        {bills.length === 0 ? <span className="ds-subtle">No invoice has been recorded against this order.</span> : (
+          <Row gap={2} wrap>{bills.map((bill) => <Button key={bill.id} size="sm" variant="secondary" onClick={() => context.openOverlay("three-way match", { id: bill.id })}>Match {bill.title}</Button>)}</Row>
+        )}
+      </OverlaySection>
     </Stack>
   );
 }
@@ -1171,15 +1300,14 @@ export function MovementInspector({ context }: { context: ScreenContext }) {
   const order = data.purchaseOrders.find((item) => item.title === reference);
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Movement", value: move.title },
+      <OverlaySummary eyebrow={String(move.fields.kind ?? "move").replace("_", " ")} title={move.title}
+        status={<Pill tone={Number(move.fields.quantity) >= 0 ? "success" : "warning"} dot>{Number(move.fields.quantity) > 0 ? "+" : ""}{String(move.fields.quantity)} units</Pill>}
+        meta={[context.dateTime(move.at), `by ${move.createdBy}`]} />
+      <FactGrid columns={2} items={[
         { label: "Product", value: product?.title ?? String(move.fields.productId) },
-        { label: "Quantity", value: <strong className="ds-num">{Number(move.fields.quantity) > 0 ? "+" : ""}{String(move.fields.quantity)}</strong> },
-        { label: "Kind", value: String(move.fields.kind ?? "move").replace("_", " ") },
         { label: "Site", value: data.warehouses.find((item) => item.id === String(move.fields.warehouseId))?.title ?? "—" },
-        { label: "Reference", value: reference ? <span className="ds-num">{reference}</span> : <Pill tone="danger">None</Pill> },
-        { label: "Recorded", value: <span className="ds-num">{context.dateTime(move.at)}</span> },
-        { label: "By", value: move.createdBy },
+        { label: "Reference", value: reference || "None", mono: true, tone: reference ? undefined : "danger" },
+        { label: "Quantity", value: `${Number(move.fields.quantity) > 0 ? "+" : ""}${String(move.fields.quantity)}`, mono: true },
       ]} />
       {order ? (
         <Notice tone="success" title="Traceable to a purchase order">{order.title} from {findSupplier(data, String(order.fields.supplierId))?.title ?? "an unknown supplier"}.</Notice>
@@ -1251,10 +1379,8 @@ export function MovementAuthorization({ context, close }: { context: ScreenConte
       }}>
       <ModalUnsavedChanges when={Boolean(productId || warehouseId || quantity || reason.trim() || reviewed)} />
       <ModalInFlight when={busy} />
-      <Notice tone="info" title="Record a specific site movement">
-        Select a product and warehouse. Counts are calculated from recorded movements, not independently
-        verified warehouse stock. No inventory provider is connected.
-      </Notice>
+      <OverlaySection title="What moves" hint="Counts come from recorded movements, not independently verified warehouse stock. No inventory provider is connected.">
+      <Stack gap={3}>
       <Field label="Product" required>
         <Select aria-label="Product" value={productId} disabled={busy}
           onChange={event => { setProductId(event.target.value); setReviewed(false); setError(""); }}>
@@ -1285,11 +1411,13 @@ export function MovementAuthorization({ context, close }: { context: ScreenConte
             onChange={event => { setQuantity(event.target.value); setReviewed(false); setError(""); }} />
         </Field>
       </Row>
-      <Properties rows={[
-        { label: "Current recorded on hand", value: product && warehouse ? String(onHand) : "Select a product and warehouse" },
-        { label: "Proposed movement", value: validQuantity ? `${delta > 0 ? "+" : ""}${delta}` : "Enter a whole number" },
-        { label: "Projected recorded on hand", value: product && warehouse && validQuantity ? String(onHand + delta) : "—" },
-        { label: "Authorising user", value: actor },
+      </Stack>
+      </OverlaySection>
+      <FactGrid columns={4} dense items={[
+        { label: "Recorded on hand", value: product && warehouse ? String(onHand) : "—", mono: true },
+        { label: "Movement", value: validQuantity ? `${delta > 0 ? "+" : ""}${delta}` : "—", mono: true, tone: validQuantity ? (delta < 0 ? "warning" : "success") : undefined },
+        { label: "After", value: product && warehouse && validQuantity ? String(onHand + delta) : "—", mono: true },
+        { label: "Authorised by", value: actor },
       ]} />
       <Field label="Reason for adjustment" required
         hint="Minimum 10 characters. Include the source count, damage record or authorisation reference.">
@@ -1304,10 +1432,10 @@ export function MovementAuthorization({ context, close }: { context: ScreenConte
         label="I checked the selected product, site, direction, quantity and supporting reason." />
       {error && <Notice tone="danger" title="Movement could not be recorded">{error}</Notice>}
       <ModalActions>
-        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
-        <span className="ds-grow" />
-        <Button variant="primary" type="submit" form="movement-authorization"
-          disabled={!canRecord} busy={busy}>Record stock movement</Button>
+        <OverlayActions
+          primary={<Button variant="primary" type="submit" form="movement-authorization" disabled={!canRecord} busy={busy}>Record stock movement</Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
       </ModalActions>
     </form>
   );
@@ -1319,12 +1447,14 @@ export function ReorderPolicy() {
   const data = useProcData();
   return (
     <Stack gap={4}>
-      <Properties rows={[
+      <OverlaySection title="How a suggestion is made" flush>
+      <KeyValueList items={[
         { label: "Suggested when", value: "On hand plus units already on order falls to or below the reorder point" },
         { label: "Suggested quantity", value: "The reorder quantity recorded on the product, unchanged" },
         { label: "Lead time", value: "Shown so the buyer can judge whether it will arrive in time" },
         { label: "Not used", value: "Seasonality, promotions, or any projection of future demand" },
       ]} />
+      </OverlaySection>
       <DataGrid rows={data.products.filter((product) => product.status === "active")} rowId={(row) => row.id} label="Reorder policy" filterable={false}
         columns={[
           { key: "product", header: "Product", primary: true, cell: (row) => row.title },
@@ -1333,7 +1463,7 @@ export function ReorderPolicy() {
           { key: "lead", header: "Lead time", align: "end", cell: (row) => <span className="ds-num">{String(row.fields.leadTimeDays ?? 0)}d</span> },
         ]} />
       <Notice tone="warning" title="These figures were set by a person, not learned">
-        Nothing in this workspace adjusts a reorder point automatically. If demand has changed, the point is wrong until someone changes it.
+        Nothing adjusts a reorder point automatically. If demand has changed, the point is wrong until someone changes it.
       </Notice>
     </Stack>
   );
@@ -1361,11 +1491,16 @@ export function Scenario({ context }: { context: ScreenContext }) {
           { key: "point", header: "Point in this scenario", align: "end", cell: (row) => <span className="ds-num">{String(row.point)}</span> },
           { key: "short", header: "Would suggest an order", cell: (row) => (row.short ? <Pill tone="warning">Yes</Pill> : <Pill tone="success">No</Pill>) },
         ]} />
-      <Notice tone="warning" title="A scenario changes nothing">
-        Nothing is saved until you apply it, and applying changes reorder points only: no order is created. It is arithmetic on the points someone already set, so a buyer can see the consequence before changing them.
+      <FactGrid columns={2} dense items={[
+        { label: "Would suggest an order", value: `${rows.filter((row) => row.short).length} of ${rows.length} products`, mono: true, tone: rows.some((row) => row.short) ? "warning" : undefined },
+        { label: "Money committed", value: context.money(0), mono: true, hint: "Applying changes reorder points only" },
+      ]} />
+      <Notice tone="warning" title="A scenario changes nothing until you apply it">
+        Applying changes reorder points only; no order is created.
       </Notice>
-      <span className="ds-subtle">{rows.filter((row) => row.short).length} of {rows.length} products would be suggested at this level. Values in {context.org.currency} are unaffected.</span>
-      <Button variant="primary" disabled={!(Number(uplift) || 0)} onClick={() => applyScenario(context, Number(uplift) || 0)}>Apply to reorder points…</Button>
+      <DrawerActions>
+        <OverlayActions primary={<Button variant="primary" disabled={!(Number(uplift) || 0)} onClick={() => applyScenario(context, Number(uplift) || 0)}>Apply to reorder points…</Button>} end={<OverlayCancel>Close</OverlayCancel>} />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -1389,12 +1524,16 @@ export function ThreeWayMatch({ context, close }: { context: ScreenContext; clos
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Invoice", value: <span className="ds-num">{bill.title}</span> },
-        { label: "Supplier", value: supplier?.title ?? "—" },
-        { label: "Purchase order", value: match.order?.title ?? <Pill tone="danger">None referenced</Pill> },
-        { label: "Receipts", value: match.receipts.length ? match.receipts.map((receipt) => receipt.title).join(", ") : <Pill tone="warning">None</Pill> },
-        { label: "Result", value: <Pill tone={matchTone(match.state)} dot>{MATCH_LABEL[match.state]}</Pill> },
+      <OverlaySummary
+        eyebrow="Three-way match"
+        title={<span className="ds-num">{bill.title}</span>}
+        status={<Pill tone={matchTone(match.state)} dot>{MATCH_LABEL[match.state]}</Pill>}
+        meta={[supplier?.title]}
+      />
+      <FactGrid columns={3} items={[
+        { label: "Purchase order", value: match.order?.title ?? "None referenced", mono: true, tone: match.order ? undefined : "danger" },
+        { label: "Goods receipts", value: match.receipts.length ? match.receipts.map((receipt) => receipt.title).join(", ") : "None", mono: true, tone: match.receipts.length ? undefined : "warning" },
+        { label: "Invoice", value: <strong>{context.money(totals.grossMinor)}</strong>, mono: true },
       ]} />
 
       {match.lines.length > 0 && (
@@ -1411,7 +1550,7 @@ export function ThreeWayMatch({ context, close }: { context: ScreenContext; clos
           ]} />
       )}
 
-      <TotalsBlock totals={totals} money={context.money} label="Invoice" />
+      <Totals totals={totals} money={context.money} label="Invoice" />
 
       {match.blockedReason ? (
         <Notice tone="danger" title="This invoice cannot be approved for payment">{match.blockedReason}</Notice>
@@ -1421,20 +1560,27 @@ export function ThreeWayMatch({ context, close }: { context: ScreenContext; clos
 
       <ProviderBoundary id="payment.capture" title="Payment itself happens outside this workspace" />
 
-      <Button
-        variant="primary"
-        disabled={!payable || String(bill.fields.payment) === "paid_local"}
-        onClick={async () => {
-          await context.mutate.patch(bill.id, {
-            status: "approved",
-            fields: { ...bill.fields, matchState: "matched", approvedBy: actor, payment: "approved_local" },
-          }, { expectRevision: bill.revision, event: `${bill.title} approved for payment by ${actor} after a three-way match` });
-          context.toast("Approved for payment", `${bill.title} is cleared by the match. Paying it is a separate step in the ledger, outside this screen.`);
-          close();
-        }}
-      >
-        {String(bill.fields.payment) === "paid_local" ? "Already paid in the ledger" : payable ? "Approve for payment" : "Blocked by the match"}
-      </Button>
+      <DrawerActions>
+        <OverlayActions
+          primary={
+            <Button
+              variant="primary"
+              disabled={!payable || String(bill.fields.payment) === "paid_local"}
+              onClick={async () => {
+                await context.mutate.patch(bill.id, {
+                  status: "approved",
+                  fields: { ...bill.fields, matchState: "matched", approvedBy: actor, payment: "approved_local" },
+                }, { expectRevision: bill.revision, event: `${bill.title} approved for payment by ${actor} after a three-way match` });
+                context.toast("Approved for payment", `${bill.title} is cleared by the match. Paying it is a separate step in the ledger, outside this screen.`);
+                close();
+              }}
+            >
+              {String(bill.fields.payment) === "paid_local" ? "Already paid in the ledger" : payable ? "Approve for payment" : "Blocked by the match"}
+            </Button>
+          }
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -1444,7 +1590,7 @@ export function MetricSource({ context }: { context: ScreenContext }) {
   const orders = data.purchaseOrders.filter(isPurchaseOrder);
   return (
     <Stack gap={4}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Counted", value: "Approved, sent, received and closed purchase orders" },
         { label: "Excluded", value: `${orders.filter((order) => order.status === "cancelled").length} cancelled and ${orders.filter((order) => order.status === "draft").length} draft orders` },
         { label: "Requisitions", value: "Never counted as spend — they commit nothing" },
@@ -1513,12 +1659,12 @@ export function SupplierReview({ context, close }: { context: ScreenContext; clo
         close();
       }}
     >
-      <Properties rows={[
-        { label: "Supplier", value: supplier.title },
-        { label: "On time", value: <span className="ds-num">{String(supplier.fields.onTimeRatePct ?? "—")}%</span> },
-        { label: "Late deliveries recorded", value: <span className="ds-num">{String(deliveries.filter((delivery) => delivery.lateDays > 0).length)}</span> },
-        { label: "Spend to date", value: <span className="ds-num">{context.money(Number(supplier.fields.spendToDateMinor ?? 0))}</span> },
-        { label: "Open orders", value: <span className="ds-num">{String(data.purchaseOrders.filter((order) => String(order.fields.supplierId) === supplier.id && ["approved", "sent"].includes(order.status)).length)}</span> },
+      <OverlaySummary eyebrow="Supplier review" title={supplier.title} status={<Pill tone={statusTone(supplier.status)} dot>{supplier.status}</Pill>} />
+      <FactGrid columns={4} items={[
+        { label: "On time", value: `${String(supplier.fields.onTimeRatePct ?? "—")}%`, mono: true },
+        { label: "Late deliveries", value: String(deliveries.filter((delivery) => delivery.lateDays > 0).length), mono: true },
+        { label: "Spend to date", value: context.money(Number(supplier.fields.spendToDateMinor ?? 0)), mono: true },
+        { label: "Open orders", value: String(data.purchaseOrders.filter((order) => String(order.fields.supplierId) === supplier.id && ["approved", "sent"].includes(order.status)).length), mono: true },
       ]} />
       <Field label="Outcome">
         <Select value={outcome} onChange={(event) => setOutcome(event.target.value)}>

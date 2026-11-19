@@ -18,3 +18,9 @@
 .crm-consent { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .crm-next { display: grid; gap: var(--space-2); }
 .crm-next-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; }
+
+/* Inline fact row used inside RecordHeader meta. */
+.crm-facts { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) 0; }
+.crm-facts > * + *::before { content: "\00b7"; margin-inline: var(--space-2); color: var(--fg-subtle); }
+.crm-facts a { color: inherit; text-decoration: underline; text-decoration-color: var(--border-default); text-underline-offset: 2px; }
+.crm-facts a:hover { text-decoration-color: currentColor; }

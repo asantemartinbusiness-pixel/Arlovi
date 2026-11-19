@@ -1,7 +1,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { ShoppingBag } from "lucide-react";
 import {
-  Button, Card, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextInput,
+  Button, Card, Empty, Field, KeyValueList, Notice, Pill, Row, Select, Stack, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -105,7 +105,7 @@ export function StorefrontPreview({ context, products, moves, orders, promotions
                   Thank you. Your order is recorded with every line, the tax resolved for {org.jurisdiction} and the address you gave.
                   Nothing has been charged: this storefront has no payment processor, so the order waits as <strong>awaiting payment</strong> until the studio contacts you.
                 </p>
-                <Properties rows={[
+                <KeyValueList items={[
                   { label: "Order", value: held.number },
                   { label: "State", value: <Pill tone="warning" dot>Awaiting payment</Pill> },
                   { label: "Total held", value: context.money(due.grossMinor) },

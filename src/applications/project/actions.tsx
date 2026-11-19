@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
-import { Button, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Button, Checkbox, DataGrid, Empty, Field, Notice, OverlayActions, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useEvents, useRecord } from "@/platform/workspace";
 import { listByCollection } from "@/platform/repo";
@@ -363,7 +363,7 @@ export function NewTask({ context, close }: { context: ScreenContext; close: () 
 }
 
 export function MoveTask({ context, close }: { context: ScreenContext; close: () => void }) {
-  const task = useRecord(context.selectedId);
+  const task = useRecord((context.overlayPayload as { id?: string } | undefined)?.id ?? context.selectedId);
   const data = useCollections(["tasks"]);
   const [lane, setLane] = useState<LaneId | "">("");
   if (!task || task.collection !== "tasks") return <Empty title="Select a card on the board first" />;
@@ -382,10 +382,8 @@ export function MoveTask({ context, close }: { context: ScreenContext; close: ()
       {blockedByDeps && <Notice tone="danger" title="Task move blocked">{decision?.blocked}</Notice>}
       {skipsReview && <Notice tone="warning" title="This skips Review">High priority work goes through Review. Continuing opens the stage rule so the skip is a recorded decision.</Notice>}
       <Notice tone="info">Moving a card changes its stage only. No automation or external side effect runs from a stage change.</Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <OverlayActions
+        primary={<Button
           variant="primary"
           disabled={!lane || blockedByDeps}
           onClick={async () => {
@@ -400,8 +398,9 @@ export function MoveTask({ context, close }: { context: ScreenContext; close: ()
           }}
         >
           Move the task
-        </Button>
-      </Row>
+        </Button>}
+        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }
@@ -423,11 +422,10 @@ export function BoardFilter({ context: _context, close }: { context: ScreenConte
     <Stack gap={4}>
       <Field label="Owner"><Select value={value.assignee} onChange={(event) => setValue({ ...value, assignee: event.target.value })}><option value="">Anyone</option>{owners.map((owner) => <option key={owner}>{owner}</option>)}</Select></Field>
       <Field label="Priority"><Select value={value.priority} onChange={(event) => setValue({ ...value, priority: event.target.value })}><option value="">Any</option>{["low", "normal", "high"].map((option) => <option key={option}>{option}</option>)}</Select></Field>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={() => { boardFilter.set({ assignee: "", priority: "" }); close(); }}>Clear</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" onClick={() => { boardFilter.set(value); close(); }}>Apply the filter</Button>
-      </Row>
+      <OverlayActions
+        primary={<Button variant="primary" onClick={() => { boardFilter.set(value); close(); }}>Apply the filter</Button>}
+        secondary={<Button variant="ghost" onClick={() => { boardFilter.set({ assignee: "", priority: "" }); close(); }}>Clear</Button>}
+      />
     </Stack>
   );
 }
@@ -579,10 +577,8 @@ export function DurationEdit({ context, close }: { context: ScreenContext; close
         { label: "Would end", value: invalid ? "—" : context.date(end) },
       ]} />
       {pushed.length > 0 && <Notice tone="danger" title="Dependent work would start before this ends">{pushed.map((row) => `${row.title} starts ${context.date(row.startAt)}`).join("; ")}. Move those first; an impossible order is refused.</Notice>}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <OverlayActions
+        primary={<Button
           variant="primary"
           disabled={invalid || pushed.length > 0 || value === current}
           onClick={async () => {
@@ -592,8 +588,9 @@ export function DurationEdit({ context, close }: { context: ScreenContext; close
           }}
         >
           Change the duration
-        </Button>
-      </Row>
+        </Button>}
+        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }
@@ -632,15 +629,14 @@ export function LinkProject({ context, close }: { context: ScreenContext; close:
         ))}
       </fieldset>
       <Notice tone="info">Linking says which work contributes. Progress still comes from a person's check-in, never from the linked projects' task counts.</Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" onClick={async () => {
+      <OverlayActions
+        primary={<Button variant="primary" onClick={async () => {
           await context.mutate.patch(objective.id, { fields: { ...objective.fields, projectIds: ids.join(",") } }, { expectRevision: objective.revision, event: `${objective.title} linked to ${ids.length} project${ids.length === 1 ? "" : "s"} by ${context.actor}` });
           context.toast("Projects linked", `${objective.title} lists ${ids.length} contributing project${ids.length === 1 ? "" : "s"}.`);
           close();
-        }}>Save the links</Button>
-      </Row>
+        }}>Save the links</Button>}
+        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }

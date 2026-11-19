@@ -146,3 +146,26 @@
 .pj-subtask-add { display: flex; gap: var(--space-2); }
 .pj-subtask-add > :first-child { flex: 1 1 auto; min-width: 0; }
 .pj-signals { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+
+/* Task inspector and detail: dependency and time are the signature of this app. */
+.pj-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: var(--space-4); align-items: start; }
+.pj-detail-main, .pj-detail-facts { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+@media (max-width: 900px) { .pj-detail { grid-template-columns: minmax(0, 1fr); } }
+.pj-person { display: inline-flex; align-items: center; gap: var(--space-2); }
+.pj-meta { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
+.pj-meta [data-tone="danger"] { color: var(--danger); }
+.pj-link { all: unset; cursor: pointer; font-weight: 600; color: var(--accent-soft-fg, inherit); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pj-link:hover { text-decoration: underline; }
+.pj-link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 2px; }
+.pj-summary { margin: 0; color: var(--fg-muted); }
+.pj-depworks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.pj-depwork { display: flex; align-items: center; gap: var(--space-2); padding-block: 6px; border-block-end: 1px solid var(--border-subtle); }
+.pj-depwork:last-child { border-block-end: 0; }
+.pj-progress { display: flex; align-items: center; gap: var(--space-3); }
+.pj-progress .ds-meter { flex: 1 1 auto; }
+.pj-activity { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pj-activity li { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: var(--space-2); font-size: var(--text-sm); }
+.pj-activity-text { overflow-wrap: anywhere; }
+.pj-comment-entry { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
+.pj-comment-entry textarea { width: 100%; }
+.pj-depwork .pj-link { flex: 1 1 auto; }

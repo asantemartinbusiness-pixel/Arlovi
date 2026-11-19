@@ -158,6 +158,7 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
     ? doc.pages.slice(Math.max(0, activeIndex - (activeIndex % 2 === 0 ? 0 : 1)), Math.max(0, activeIndex - (activeIndex % 2 === 0 ? 0 : 1)) + 2)
     : [doc.pages[activeIndex]].filter(Boolean)) : [];
   const overset = [...compositions.values()].filter((composition) => composition.oversetChars > 0);
+  const oversetChars = overset.reduce((sum, item) => sum + item.oversetChars, 0);
 
   const fitZoom = () => {
     const host = stageRef.current;
@@ -244,8 +245,19 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
       context={context}
       actions={actions}
       tabs={[{ id: "Pages" }, { id: "Layout" }, { id: "Type" }, { id: "Review" }]}
+      lean
       title={record.title}
-      subtitle={<Row gap={2} wrap><SaveState handle={handle} />{doc && <span><span className="ds-num">{doc.pages.length}</span> pages · {doc.size.name}</span>}</Row>}
+      subtitle={(
+        <Row gap={2} wrap>
+          <SaveState handle={handle} />
+          {doc && <span><span className="ds-num">{doc.pages.length}</span> pages · {doc.size.name}</span>}
+          {oversetChars > 0 && (
+            <button type="button" className="ds-pill lx-overset-chip" data-tone="danger" onClick={() => context.openOverlay("overset warning")}>
+              <span className="ds-num">{oversetChars.toLocaleString("en")}</span> characters overset
+            </button>
+          )}
+        </Row>
+      )}
       backTo={{ label: "Layout", to: `/o/${context.org.slug}/layout/publications` }}
       tools={
         <div className="lx-tools">

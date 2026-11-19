@@ -65,6 +65,7 @@ export function ProfileMenu({
           align="end"
           sideOffset={8}
           collisionPadding={12}
+          aria-labelledby={undefined}
           aria-label="Account and preferences"
         >
           <div className="profile-menu__identity">

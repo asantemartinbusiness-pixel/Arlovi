@@ -75,6 +75,11 @@ export function companyOfDeal(data: CrmData, deal: Rec | undefined): Rec | undef
   return companyById(data, String(deal?.fields.companyId ?? deal?.parentId ?? ""));
 }
 
+/** The deal's own account, else the account its named contact belongs to. */
+export function accountOfDeal(data: CrmData, deal: Rec | undefined): Rec | undefined {
+  return companyOfDeal(data, deal) ?? companyById(data, String(contactOfDeal(data, deal)?.fields.companyId ?? ""));
+}
+
 export function contactsOfCompany(data: CrmData, companyId: string | undefined): Rec[] {
   return companyId ? data.contacts.filter((contact) => String(contact.fields.companyId ?? "") === companyId) : [];
 }

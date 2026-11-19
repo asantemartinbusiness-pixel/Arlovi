@@ -1145,7 +1145,7 @@ function MemberInspector({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const member = useRecord(payload?.id ?? context.selectedId);
   const departments = useCollection("departments");
-  if (!member) return <Empty title="Select a member" />;
+  if (!member) return <Empty title="Select a member">Choose a person on the chart or in the directory to see them here.</Empty>;
   const ai = member.fields.kind === "ai";
   const department = departments.find((dept) => dept.id === member.fields.departmentId);
   return (
@@ -1225,7 +1225,7 @@ function SaveViewDialog({ context, close }: { context: ScreenContext; close: () 
       }}
     >
       <Field label="View name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} required placeholder={`${context.screen.title} · ${context.tab}`} /></Field>
-      <FactGrid columns={2} dense items={[
+      <FactGrid columns={3} dense items={[
         { label: "Screen", value: context.screen.title },
         { label: "Period", value: context.tab },
         { label: "Stored", value: "In this browser", hint: shared ? "Listed for the workspace" : "Only you see it" },
@@ -1360,7 +1360,7 @@ export const hqApp = registerApp({
             </form>
           ),
           footer: submitFooter("quick-task", "Add task") },
-        { id: "work item inspector", kind: "drawer", title: "Work item", render: ({ ...context }) => <WorkItemInspector context={context} /> },
+        { id: "work item inspector", kind: "drawer", title: "Work item", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <WorkItemInspector context={context} /> },
         { id: "request help", kind: "modal", title: "Request help", width: 520, render: ({ close, ...context }) => <RequestHelp context={context} close={close} />, footer: submitFooter("hq-help", "Ask for help") },
         { id: "personal preferences", kind: "modal", title: "Personal preferences", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <WorkspacePreferences context={context} close={close} />, footer: submitFooter("hq-prefs", "Save preferences") },
       ],
@@ -1414,7 +1414,7 @@ export const hqApp = registerApp({
         { id: "assign leader", kind: "modal", title: "Assign a leader", width: 480, render: ({ close, ...context }) => <AssignLeader context={context} close={close} />, footer: submitFooter("hq-leader", "Assign") },
         { id: "open department", kind: "modal", title: "Open a department", width: 460, render: ({ close, ...context }) => <OpenDepartment context={context} close={close} /> },
         { id: "reorder directory", kind: "modal", title: "Reorder the directory", width: 480, render: ({ close, ...context }) => <ReorderDepartments context={context} close={close} />, footer: submitFooter("hq-reorder", "Save order") },
-        { id: "organizational impact preview", kind: "drawer", title: "Organisational impact", width: 460, render: ({ ...context }) => {
+        { id: "organizational impact preview", kind: "drawer", title: "Organisational impact", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => {
           const payload = context.overlayPayload as { departmentId?: string } | undefined;
           return <Building departmentId={payload?.departmentId} context={context} />;
         } },
@@ -1457,8 +1457,8 @@ export const hqApp = registerApp({
         { id: "permission inspector", kind: "drawer", title: "Permissions", width: OVERLAY_WIDTH.compact, presentation: { noRecordContext: true }, render: ({ ...context }) => (
           <Stack gap={3}>
             <OverlaySection title="This role view can">
-              <FactGrid columns={2} items={([["edit_people", "Edit people"], ["export_data", "Export data"], ["approve_spend", "Approve spend"], ["manage_access", "Manage access"]] as const).map(([capability, label]) => {
-                const allowed = (context.can as (value: string) => boolean)(capability);
+              <FactGrid columns={2} items={([["edit_people", "Edit people"], ["export_data", "Export data"], ["approve_payment", "Approve payments"], ["manage_policy", "Change policy"]] as const).map(([capability, label]) => {
+                const allowed = context.can(capability);
                 return { label, value: allowed ? "Yes" : "No", tone: allowed ? "success" : undefined } as const;
               })} />
             </OverlaySection>
@@ -1482,7 +1482,7 @@ export const hqApp = registerApp({
         { id: "zoom out", label: "Zoom out", placement: "overflow", run: (context) => stepZoom(context, Number(new URLSearchParams(window.location.search).get("zoom") ?? 1) || 1, -1) },
       ],
       overlays: [
-        { id: "Member inspector", kind: "drawer", title: "Member", render: ({ ...context }) => <MemberInspector context={context} /> },
+        { id: "Member inspector", kind: "drawer", title: "Member", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <MemberInspector context={context} /> },
         { id: "change manager", kind: "modal", title: "Change reporting line", width: 480, render: ({ close, ...context }) => <ChangeManager context={context} close={close} />, footer: submitFooter("change-manager", "Apply change") },
         { id: "impact confirmation", kind: "modal", title: "Confirm the change", tone: "danger", width: OVERLAY_WIDTH.compact, presentation: { noRecordContext: true }, render: ({ close }) => (
           <Stack gap={3}>
@@ -1562,7 +1562,7 @@ export const hqApp = registerApp({
       ],
       overlays: [
         { id: "log decision", kind: "modal", title: "Log a decision", width: 580, render: ({ close, ...context }) => <DecisionEditor context={context} close={close} /> },
-        { id: "Event inspector", kind: "drawer", title: "Event", render: ({ ...context }) => {
+        { id: "Event inspector", kind: "drawer", title: "Event", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => {
           const payload = context.overlayPayload as { id?: string } | undefined;
           return <EventInspector id={payload?.id} context={context} />;
         } },
@@ -1608,7 +1608,7 @@ export const hqApp = registerApp({
         { id: "presence", label: "Presence settings", placement: "overflow", run: (context) => context.openOverlay("presence settings") },
       ],
       overlays: [
-        { id: "Profile quick view", kind: "drawer", title: "Profile", render: ({ ...context }) => <MemberInspector context={context} /> },
+        { id: "Profile quick view", kind: "drawer", title: "Profile", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <MemberInspector context={context} /> },
         { id: "start conversation", kind: "modal", title: "Start a conversation", width: 520, render: ({ close, ...context }) => <StartConversation context={context} close={close} />, footer: submitFooter("hq-conversation", "Send") },
         { id: "assign task", kind: "modal", title: "Assign a task", width: 520, render: ({ close, ...context }) => <AssignTaskTo context={context} close={close} />, footer: submitFooter("hq-assign-task", "Assign") },
         { id: "find colleague", kind: "modal", title: "Find a colleague", width: 520, render: ({ close, ...context }) => <FindColleague context={context} close={close} /> },
@@ -1758,7 +1758,7 @@ function RelatedWork({ context }: { context: ScreenContext }) {
 
 function EventInspector({ id, context }: { id?: string; context: ScreenContext }) {
   const event = useRecord(id);
-  if (!event) return <Empty title="Select an event" />;
+  if (!event) return <Empty title="Select an event">Choose an event on the timeline to see its source.</Empty>;
   return (
     <Stack gap={3}>
       <OverlaySummary

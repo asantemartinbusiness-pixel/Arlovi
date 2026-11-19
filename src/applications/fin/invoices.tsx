@@ -363,7 +363,7 @@ export function useInvoice(context: ScreenContext): { invoice?: Rec; data: FinDa
   return { invoice, data, totals, customer };
 }
 
-type InvoicePart = "number" | "status" | "summary" | "customer" | "issued" | "due" | "gross" | "split";
+type InvoicePart = "numberMono" | "number" | "status" | "summary" | "customer" | "issued" | "due" | "gross" | "split";
 
 /** One piece of the invoice record header. Each reads the invoice itself so the header props can stay plain nodes. */
 function InvoiceHeaderPart({ context, part }: { context: ScreenContext; part: InvoicePart }) {
@@ -373,7 +373,7 @@ function InvoiceHeaderPart({ context, part }: { context: ScreenContext; part: In
   const late = daysOverdue(invoice, context.now);
   const posted = Boolean(invoice.fields.journalId);
   switch (part) {
-    case "number": return <span className="ds-num">{invoice.title}</span>;
+    case "number": return <>{invoice.title}</>;
     case "status": return (
       <>
         <StatusPill status={invoice.status} />
@@ -384,6 +384,7 @@ function InvoiceHeaderPart({ context, part }: { context: ScreenContext; part: In
         {totals.hasUnknownRate && <Pill tone="danger" dot>Tax unresolved</Pill>}
       </>
     );
+    case "numberMono": return <span className="ds-num">{invoice.title}</span>;
     case "summary": return invoice.summary ? <>{invoice.summary}</> : null;
     case "customer": return customer
       ? <Link to={`/o/${org.slug}/crm/contacts/${customer.id}`}>{customer.title}</Link>
@@ -624,12 +625,14 @@ export function LineEditor({ context, close, withApproval }: { context: ScreenCo
   return (
     <Stack gap={4}>
       <DrawerUnsavedChanges when={dirty} />
-      <OverlaySummary
-        eyebrow="Draft invoice"
-        title={<span className="ds-num">{invoice.title}</span>}
-        status={<Pill tone="warning">Draft, not on the ledger</Pill>}
-        meta={[customer?.title ?? "No customer linked", `Due ${context.date(invoice.dueAt)}`]}
-      />
+      {close && (
+        <OverlaySummary
+          eyebrow="Draft invoice"
+          title={<span className="ds-num">{invoice.title}</span>}
+          status={<Pill tone="warning">Draft, not on the ledger</Pill>}
+          meta={[customer?.title ?? "No customer linked", `Due ${context.date(invoice.dueAt)}`]}
+        />
+      )}
       <FactGrid columns={3} items={[
         { label: "Net", value: context.money(totals.netMinor), mono: true },
         { label: "Tax", value: context.money(totals.taxMinor), mono: true, tone: totals.hasUnknownRate ? "danger" : undefined },
@@ -858,31 +861,27 @@ export function InvoicePayments({ context }: { context: ScreenContext }) {
       </Card>
       <Card prov="posted" span={5} title="Settlement">
         <Stack gap={3}>
-          <StatementRow
-            context={context}
-            rows={[
-              { label: "Gross invoiced", minor: totals.grossMinor },
-              { label: "Paid", minor: paid },
-              { label: "Outstanding", minor: outstanding, bold: true },
-            ]}
-          />
+          <FactGrid columns={3} items={[
+            { label: "Gross invoiced", value: context.money(totals.grossMinor), mono: true },
+            { label: "Paid", value: paid ? context.money(paid) : "\u2014", mono: true },
+            { label: "Outstanding", value: outstanding ? context.money(outstanding) : "\u2014", mono: true, tone: outstanding > 0 ? "accent" : "success" },
+          ]} />
+          {paid > 0 && outstanding > 0 && <Pill tone="info" dot>Part paid</Pill>}
           {unlinkedHistoricPayment && (
             <Notice tone="warning" title="Paid status has no linked posted receipt">
               This historical invoice is marked paid, but no receipt journal is linked to it.
               Its zero outstanding amount follows the recorded status; verify the ledger before reconciliation.
             </Notice>
           )}
-          <CapabilityNotice id="payment.capture" />
           <Button
             variant="primary"
             disabled={outstanding <= 0 || invoice.status === "draft" || invoice.status === "void"}
-            title={invoice.status === "draft" ? "Approve the invoice first so receivables exist" : undefined}
+            title={invoice.status === "draft" ? "Approve the invoice first so receivables exist" : outstanding <= 0 ? "Nothing is outstanding" : undefined}
             onClick={() => context.openOverlay("payment form")}
           >
             Record a payment
           </Button>
-          {paid > 0 && outstanding > 0 && <Pill tone="info" dot>Part paid</Pill>}
-          <SourceNote>Current receipts update the invoice allocation and post a journal together. Historical paid records without a linked journal are flagged for ledger review; no bank feed is connected.</SourceNote>
+          <CapabilityNotice id="payment.capture" />
         </Stack>
       </Card>
       <Card prov="human" span={12} title="Receivables ageing for this customer" subtitle="Every open invoice on the same contact">

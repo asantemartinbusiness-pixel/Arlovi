@@ -352,6 +352,7 @@ export function ActivityEntry({ context, close }: { context: ScreenContext; clos
         >
           {existing ? "Save" : "Log it"}
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -435,6 +436,7 @@ export function MeetingComposer({ context, close }: { context: ScreenContext; cl
         >
           Record the meeting
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -783,6 +785,7 @@ export function OverrideReason({ context, close }: { context: ScreenContext; clo
         >
           Apply the override
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -1048,6 +1051,7 @@ export function WorkflowDesigner({ context, close }: { context: ScreenContext; c
         >
           {existing ? "Save the rule" : "Create as a draft"}
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -1146,6 +1150,7 @@ export function ActivationApproval({ context, close }: { context: ScreenContext;
         >
           Activate the rule
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Building2, Scale } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel, OverlaySummary, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -311,6 +311,7 @@ export function EntityConfig({ context, close }: { context: ScreenContext; close
         event.preventDefault();
         if (!title.trim() || duplicate || cycle) return;
         setBusy(true);
+        try {
         const fields: Record<string, string | number | boolean> = { number, country, currency };
         if (parentId) fields.parentId = parentId;
         if (existing) {
@@ -319,13 +320,19 @@ export function EntityConfig({ context, close }: { context: ScreenContext; close
           await context.mutate.create({ collection: "legalEntities", title: title.trim(), status: "active", summary, fields }, `Entity ${title.trim()} recorded`);
         }
         context.toast("Entity saved", `${title.trim()} is recorded. Tagging journals to it is what puts figures in its column.`);
-        setBusy(false);
         close();
+        } catch (error) {
+          context.toast("Entity not saved", error instanceof Error ? error.message : "The entity changed. Reopen it and retry.", "failed");
+        } finally {
+          setBusy(false);
+        }
       }}
     >
+      <ModalUnsavedChanges when={title !== (existing?.title ?? "") || number !== String(existing?.fields.number ?? "") || summary !== (existing?.summary ?? "")} />
+      <ModalInFlight when={busy} />
       <Field label="Legal name" required><TextInput aria-label="Legal name" value={title} invalid={duplicate} onChange={(event) => setTitle(event.target.value)} required /></Field>
       {duplicate && <Notice tone="danger" title="That name is already recorded">Two entities with the same name make a consolidation column ambiguous.</Notice>}
-      <Row gap={3} wrap>
+      <div className="fin-form-grid">
         <Field label="Registration number"><TextInput aria-label="Registration number" value={number} onChange={(event) => setNumber(event.target.value)} /></Field>
         <Field label="Country"><TextInput aria-label="Country" value={country} onChange={(event) => setCountry(event.target.value)} /></Field>
         <Field label="Functional currency" hint="A currency other than the organisation's is never converted here.">
@@ -333,7 +340,7 @@ export function EntityConfig({ context, close }: { context: ScreenContext; close
             {["GBP", "USD", "EUR"].map((item) => <option key={item}>{item}</option>)}
           </Select>
         </Field>
-      </Row>
+      </div>
       <Field label="Parent">
         <Select aria-label="Parent" value={parentId} onChange={(event) => setParentId(event.target.value)}>
           <option value="">None, it is the top company</option>
@@ -342,10 +349,10 @@ export function EntityConfig({ context, close }: { context: ScreenContext; close
       </Field>
       {cycle && <Notice tone="danger" title="An entity cannot be its own parent" />}
       <Field label="What it does"><TextArea aria-label="What it does" value={summary} rows={2} onChange={(event) => setSummary(event.target.value)} /></Field>
-      <Row gap={2}>
-        <Button type="submit" variant="primary" busy={busy} disabled={!title.trim() || duplicate || cycle}>{existing ? "Save entity" : "Record entity"}</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <OverlayActions
+        primary={<Button type="submit" variant="primary" busy={busy} disabled={!title.trim() || duplicate || cycle}>{existing ? "Save entity" : "Record entity"}</Button>}
+        end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+      />
     </form>
   );
 }
@@ -358,6 +365,10 @@ export function ConsolidationPreview({ context, close }: { context: ScreenContex
 
   return (
     <Stack gap={4}>
+      <OverlaySummary eyebrow="Consolidation preview" title={`${consolidation.columns.length} entities`}
+        status={balanced ? <Pill tone="success" dot>Group balances</Pill> : <Pill tone="danger" dot>Group does not balance</Pill>}
+        meta={["Posted journals only; entity ledgers are never changed"]} />
+      {!balanced && <Notice tone="danger" title="The group column does not balance">A journal has been counted twice or an elimination has removed one side only.</Notice>}
       <StatementRow
         context={context}
         rows={[
@@ -367,21 +378,21 @@ export function ConsolidationPreview({ context, close }: { context: ScreenContex
           { label: "Group credits", minor: consolidation.groupCreditMinor, bold: true },
         ]}
       />
-      {balanced
-        ? <Notice tone="success" title="The group column balances">Every posted journal was counted once and each intercompany journal was removed once.</Notice>
-        : <Notice tone="danger" title="The group column does not balance">A journal has been counted twice or an elimination has removed one side only.</Notice>}
+      {balanced && <SourceNote>Every posted journal was counted once and each intercompany journal was removed once.</SourceNote>}
       {consolidation.unassignedJournalIds.length > 0 && (
         <Notice tone="warning" title={`${consolidation.unassignedJournalIds.length} posted journals have no entity`}>
           They are counted in {consolidation.columns[0]?.label ?? "the first column"}. Tag them on the journal to put them in the right entity.
         </Notice>
       )}
-      <Row gap={2}>
-        <Button
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={!balanced || !context.can("export_data")}
           onClick={async () => {
             setBusy(true);
+            try {
             await context.mutate.create({
               collection: "legalEntities",
               title: `Consolidation ${context.date(context.now)}`,
@@ -397,14 +408,19 @@ export function ConsolidationPreview({ context, close }: { context: ScreenContex
               },
             }, `Consolidation prepared for ${consolidation.columns.length} entities`);
             context.toast("Consolidation recorded", "The group figures and the eliminations behind them are kept as a record in this browser.");
-            setBusy(false);
             close();
+            } catch (error) {
+              context.toast("Consolidation not recorded", error instanceof Error ? error.message : "Try again.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Record this consolidation
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -418,12 +434,12 @@ export function FxSources() {
       <Notice tone="warning" title="No rate source is attached">
         A translated figure without a sourced rate would be invented. This screen shows the untranslated figure and says which currency it is in.
       </Notice>
-      <Properties rows={[
-        { label: "Reporting currency", value: org.currency },
-        { label: "Entities needing a rate", value: foreign.length ? foreign.map((entity) => `${entity.title} (${String(entity.fields.currency)})`).join(", ") : "None" },
-        { label: "What a rate record would need", value: "The currency pair, the rate, the date it applies to and the source it came from." },
-        { label: "Rates held", value: "None" },
+      <FactGrid columns={3} items={[
+        { label: "Reporting currency", value: org.currency, mono: true },
+        { label: "Rates held", value: "None", mono: true, tone: "warning" },
+        { label: "Entities needing a rate", value: String(foreign.length), mono: true, hint: foreign.length ? foreign.map((entity) => `${entity.title} (${String(entity.fields.currency)})`).join(", ") : "None" },
       ]} />
+      <SourceNote>A rate record needs the currency pair, the rate, the date it applies to and its source.</SourceNote>
       <SourceNote>Where a rate matters for a statement, the statement says the figure is unavailable rather than converting at a guess.</SourceNote>
     </Stack>
   );

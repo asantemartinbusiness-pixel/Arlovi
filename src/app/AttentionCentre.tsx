@@ -108,13 +108,13 @@ export function AttentionCentre({ items, onClose, initialView = "for-you" }: {
           </button>}
         </div>
         {grouped.length === 0 && <Empty title={view === "snoozed" ? "Nothing snoozed" : view === "resolved" ? "No resolved items" : "You're all caught up"}>
-          {view === "approvals" ? "There are no pending decisions for this role view." :
-            "Updates will appear here when relevant work changes. Quiet items remain accessible in the full Inbox."}
+          {view === "approvals" ? "No decisions are waiting on this role view." : view === "snoozed" ? "Snoozed items return here when their hour is up." : view === "resolved" ? "Items you finish appear here." :
+            "New activity shows up here. Quieter items stay in the full Inbox."}
         </Empty>}
         <div className="nt-groups">
           {grouped.slice(0, 40).map(group => (
             <section className="nt-group" key={group.id}>
-              <div className="nt-group-heading"><span>{group.label}</span><span>{group.items.length > 1 ? "Related activity" : ""}</span></div>
+              {group.items.length > 1 && <div className="nt-group-heading"><span>{group.label}</span><span>Related activity</span></div>}
               {group.items.map(item => {
                 const actionable = isDecisionItem(item);
                 const sensitive = preferences.preview === "private" &&

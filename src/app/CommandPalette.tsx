@@ -200,7 +200,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     }).map(item => ({
       key: `location-${item.path}`, kind: "saved" as const, group: item.saved ? "Saved places" : "Recently visited",
       title: destinationLabel(item.path, org.slug, projects, departments),
-      detail: item.saved ? "Saved destination" : "Recently visited",
+      detail: `${APP_ENTRIES[findScreen(item.path)?.screen.applicationCode ?? "HQ"]?.short ?? "Workspace"} · ${item.saved ? "Saved" : "Recent"}`,
       appCode: findScreen(item.path)?.screen.applicationCode ?? "HQ",
       to: item.path,
       keywords: item.saved ? "pinned favourite saved" : "recent history",
@@ -378,12 +378,12 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         <div className="search-v2-body">
           <div className="hq-palette-list search-v2-results" id="palette-list" role="listbox"
             aria-label="Search results" ref={listRef}>
-            <div className="search-v2-results-heading">
-              <span>{query ? "SEARCH RESULTS" : "PICK UP WHERE YOU LEFT OFF"}</span>
-              <span>{scope === "connected" && remoteSearch.orgSlug === org.slug
+            {query.trim() && <div className="search-v2-results-heading">
+              <span>Search results</span>
+              <span aria-live="polite">{scope === "connected" && remoteSearch.orgSlug === org.slug
                 && remoteSearch.query === query.trim() && remoteSearch.status === "loading"
-                ? "Searching…" : `${hits.length} ${hits.length === 1 ? "result" : "results"}`}</span>
-            </div>
+                ? "Searching…" : query.trim() ? `${hits.length} ${hits.length === 1 ? "result" : "results"}` : ""}</span>
+            </div>}
             {hits.length === 0 && <div className="search-v2-empty" role="status">
               <Search size={24} aria-hidden="true"/>
               <strong>No matching results</strong>

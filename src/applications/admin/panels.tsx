@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Building2, KeyRound, ShieldCheck, Users } from "lucide-react";
 import {
-  BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, Notice, OverlayCancel, Pill,
-  Properties, Row, Select, Stack, Stat, StatRow, Switch, TextInput,
+  Avatar, BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, Notice, OverlayCancel, Pill,
+  FactGrid, OverlayActions, OverlaySection, OverlaySummary, Properties, Row, Select, Stack, Stat, StatRow, Switch, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
@@ -430,7 +430,7 @@ export function MembersScreen({ context, tab }: { context: ScreenContext; tab: "
           ]}
           bulkActions={[
             {
-              label: "Suspend",
+              label: "Offboard",
               tone: "danger",
               onRun: (selected) => { context.select(selected[0]?.id); context.openOverlay("revoke confirmation", { ids: selected.map((row) => row.id) }); },
               disabled: (selected) => selected.every((row) => row.status === "suspended"),
@@ -554,67 +554,113 @@ export function RoleImpact({ context, close }: { context: ScreenContext; close: 
   const member = data.members.find((row) => row.id === context.selectedId);
   const [roleValue, setRole] = useSeeded(String(member?.fields.role ?? "member"));
   const role = roleValue as Role;
+  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   if (!member) return <Empty title="Select a member" icon={<Users size={20} />}>Choose a person to see what a role change would do.</Empty>;
 
   const current = (member.fields.role as Role) ?? "member";
+  const changed = role !== current;
   const gained = CAPABILITIES.filter((capability) => roleCan(role, capability) && !roleCan(current, capability));
   const lost = CAPABILITIES.filter((capability) => roleCan(current, capability) && !roleCan(role, capability));
+  const appsBefore = appsForRole(current);
+  const appsAfter = appsForRole(role);
+  const appsGained = appsAfter.filter((code) => !appsBefore.includes(code));
+  const appsLost = appsBefore.filter((code) => !appsAfter.includes(code));
+  const widens = gained.length > 0 || appsGained.length > 0;
+  const own = member.title === context.actor;
+  const needsReason = changed && widens;
+  const trimmed = reason.trim();
+  const canApply = changed && context.can("manage_policy") && (!needsReason || trimmed.length >= 8) && !busy;
+  const isAgent = member.fields.kind === "ai";
 
   return (
     <Stack gap={4}>
-      <DrawerUnsavedChanges when={role !== current} />
+      <DrawerUnsavedChanges when={changed || trimmed.length > 0} />
       <DrawerInFlight when={busy} />
-      <Properties rows={[{ label: "Member", value: member.title }, { label: "Current role view", value: ROLE_LABELS[current] }, { label: "Proposed role view", value: ROLE_LABELS[role] }]} />
-      <Field label="Role view">
-        <Select value={role} onChange={(event) => setRole(event.target.value as Role)}>
-          {ROLES.map((entry) => <option key={entry} value={entry}>{ROLE_LABELS[entry]}</option>)}
-        </Select>
-      </Field>
-      <Grid>
-        <Card eyebrow="GAINS" prov="human" span={6} title="Gains" subtitle={`${gained.length} capabilities`}>
-          {gained.length === 0 ? <span className="ds-subtle">Nothing new.</span> : <Row gap={1} wrap>{gained.map((capability) => <Pill key={capability} tone="success">{capabilityLabel(capability)}</Pill>)}</Row>}
-        </Card>
-        <Card eyebrow="LOSES" prov="human" span={6} title="Loses" subtitle={`${lost.length} capabilities`}>
-          {lost.length === 0 ? <span className="ds-subtle">Nothing is removed.</span> : <Row gap={1} wrap>{lost.map((capability) => <Pill key={capability} tone="warning">{capabilityLabel(capability)}</Pill>)}</Row>}
-        </Card>
-      </Grid>
-      <RoleReach role={role} />
-      <Notice tone="warning" title="Role views are not an account boundary">
-        Changing a view changes what this interface offers. It does not enforce anything on a server, and nobody should treat it as a
-        security control.
-      </Notice>
+      <OverlaySummary
+        eyebrow="Role view change"
+        avatar={<Avatar name={member.title} kind={isAgent ? "ai" : "human"} />}
+        title={member.title}
+        status={<Pill tone={member.status === "active" ? "success" : "warning"}>{member.status}</Pill>}
+        meta={[String(member.fields.title ?? member.summary ?? ""), data.departments.find((department) => department.id === member.fields.departmentId)?.title]}
+      />
+      <OverlaySection title="Proposed change"><Stack gap={3}>
+        <Field label="Role view">
+          <Select value={role} onChange={(event) => setRole(event.target.value as Role)}>
+            {ROLES.map((entry) => <option key={entry} value={entry}>{ROLE_LABELS[entry]}{entry === current ? " (current)" : ""}</option>)}
+          </Select>
+        </Field>
+        <FactGrid columns={3} dense items={[
+          { label: "Current", value: ROLE_LABELS[current] },
+          { label: "Proposed", value: ROLE_LABELS[role], tone: changed ? (widens ? "warning" : "info") : undefined },
+          { label: "Applications offered", value: `${appsBefore.length} → ${appsAfter.length}`, mono: true },
+        ]} />
+      </Stack></OverlaySection>
+      <OverlaySection title="Access change" hint={changed ? `${gained.length} gained, ${lost.length} lost` : "Choose a different view to compare"} tone={widens && changed ? "warning" : "neutral"}>
+        <div className="adm-delta">
+          <div>
+            <h4 className="adm-delta-head">Gains</h4>
+            {gained.length + appsGained.length === 0 ? <span className="ds-subtle">Nothing new.</span> : <Row gap={1} wrap>
+              {gained.map((capability) => <Pill key={capability} tone="success">{capabilityLabel(capability)}</Pill>)}
+              {appsGained.map((code) => <Pill key={code} tone="success">{code} app</Pill>)}
+            </Row>}
+          </div>
+          <div>
+            <h4 className="adm-delta-head">Loses</h4>
+            {lost.length + appsLost.length === 0 ? <span className="ds-subtle">Nothing is removed.</span> : <Row gap={1} wrap>
+              {lost.map((capability) => <Pill key={capability} tone="warning">{capabilityLabel(capability)}</Pill>)}
+              {appsLost.map((code) => <Pill key={code} tone="warning">{code} app</Pill>)}
+            </Row>}
+          </div>
+        </div>
+      </OverlaySection>
+      <OverlaySection title="Request and record" hint={needsReason ? "A reason is required when a view gains access." : "Recorded with the change."}><Stack gap={3}>
+        <FactGrid columns={2} dense items={[
+          { label: "Requested by", value: context.actor },
+          { label: "Reviewer", value: own ? "Your own record: no independent reviewer" : "None. An administrator applies it directly", tone: own ? "warning" : undefined },
+        ]} />
+        <Field label="Reason" required={needsReason} hint="Saved in the audit trail beside the change.">
+          <TextArea value={reason} rows={2} maxLength={300} disabled={busy} onChange={(event) => setReason(event.target.value)} />
+        </Field>
+        {changed && <p className="adm-audit-line" role="status">Audit entry: <strong>{member.title}</strong> {ROLE_LABELS[current]} → {ROLE_LABELS[role]}, by {context.actor}{trimmed ? `, “${trimmed}”` : ""}.</p>}
+      </Stack></OverlaySection>
       {error && <Notice tone="danger" title="Role view could not be saved">{error}</Notice>}
       <DrawerActions>
-        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
-        <span className="ds-grow" />
-        <Button
-          variant="primary"
+        <OverlayActions
           busy={busy}
-          disabled={busy || role === current || !context.can("manage_policy")}
-          title={!context.can("manage_policy") ? "Administration permission required" : undefined}
-          onClick={async () => {
-            if (busy || role === current || !context.can("manage_policy")) return;
-            setBusy(true);
-            setError("");
-            try {
-              const saved = await context.mutate.patch(member.id, { fields: { ...member.fields, role } }, { event: `Role view changed from ${current} to ${role} for ${member.title}`, expectRevision: member.revision });
-              if (!saved) {
-                setError("The member record changed elsewhere. Reload it before applying another change.");
-                return;
-              }
-              context.toast("Role view updated", `${member.title} now holds the ${ROLE_LABELS[role]} view in this workspace. This does not change provider-side access.`);
-              close();
-            } catch (cause) {
-              setError(cause instanceof Error ? cause.message : "Review the role and try again.");
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Change role view
-        </Button>
+          primary={
+            <Button
+              variant="primary"
+              busy={busy}
+              disabled={!canApply}
+              title={!context.can("manage_policy") ? "Administration permission required" : needsReason && trimmed.length < 8 ? "Add a reason of at least 8 characters" : undefined}
+              onClick={async () => {
+                if (!canApply) return;
+                setBusy(true);
+                setError("");
+                try {
+                  const saved = await context.mutate.patch(member.id, {
+                    fields: { ...member.fields, role, roleChangedBy: context.actor, roleChangedAt: clockIso(), ...(trimmed ? { roleChangeReason: trimmed } : {}) },
+                  }, { event: `Role view changed from ${current} to ${role} for ${member.title} by ${context.actor}${trimmed ? `: ${trimmed}` : ""}`, expectRevision: member.revision });
+                  if (!saved) {
+                    setError("The member record changed elsewhere. Reload it before applying another change.");
+                    return;
+                  }
+                  context.toast("Role view updated", `${member.title} now holds the ${ROLE_LABELS[role]} view. The change is in the audit trail.`);
+                  close();
+                } catch (cause) {
+                  setError(cause instanceof Error ? cause.message : "Review the role and try again.");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Change role view
+            </Button>
+          }
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
       </DrawerActions>
     </Stack>
   );

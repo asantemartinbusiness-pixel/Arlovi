@@ -1,5 +1,5 @@
 import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { FileSignature, Plus, Trash2 } from "lucide-react";
 import {
@@ -169,10 +169,18 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useWorkingState(draftScope, "dirty", false);
 
+  // Hydrate once per record revision. While collections are still loading the
+  // `data` object changes identity every render, and every setter here writes a
+  // fresh state entry, so an unguarded effect looped when this editor was opened
+  // from a deep link (`?overlay=`) before the records had arrived.
+  const hydrated = useRef("");
   useEffect(() => {
     // A local in-progress revision takes precedence over record refreshes.
     if (readWorkingField(draftScope, "dirty", false)) return;
     if (quote) {
+      const stamp = `${draftScope}:${quote.id}:${quote.revision}`;
+      if (hydrated.current === stamp) return;
+      hydrated.current = stamp;
       setLines(readLines(quote));
       setStatus(statusFor(quote, contactById(data, String(quote.fields.contactId ?? ""))));
       setNumber(String(quote.fields.number ?? quote.title));
@@ -180,9 +188,11 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
       setDealId(String(quote.fields.dealId ?? quote.parentId ?? ""));
       setDirty(false);
     } else {
-      const numbers = data.quotes.map((item) => Number(/(\d+)/.exec(String(item.fields.number ?? item.title))?.[1] ?? 0));
-      setNumber((current) => current || `Q-${Math.max(100, ...numbers) + 1}`);
-      setLines((current) => (current.length ? current : [blankLine(0)]));
+      if (!readWorkingField(draftScope, "number", "")) {
+        const numbers = data.quotes.map((item) => Number(/(\d+)/.exec(String(item.fields.number ?? item.title))?.[1] ?? 0));
+        setNumber(`Q-${Math.max(100, ...numbers) + 1}`);
+      }
+      if (readWorkingField<InvoiceLine[]>(draftScope, "lines", []).length === 0) setLines([blankLine(0)]);
     }
   }, [quote, data, draftScope, setLines, setStatus, setNumber, setContactId, setDealId, setDirty]);
 
@@ -533,6 +543,7 @@ export function SendPreview({ context, close }: { context: ScreenContext; close:
         >
           Issue and queue the message
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>

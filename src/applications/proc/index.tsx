@@ -1,9 +1,10 @@
 import { BarChart3, Boxes, FileText, PackageCheck, Truck, Warehouse } from "lucide-react";
-import { Empty, Notice, Pill, Properties, Row, Stack } from "@/design-system";
+import { Empty, KeyValueList, Notice, OVERLAY_WIDTH, Pill, Row, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { GrowthOverviewNav } from "@/app/GrowthOverviewNav";
 import { useRecord, useWorkspace } from "@/platform/workspace";
-import { confirmOverlay, submitFooter } from "@/applications/market/kit";
+import { confirmOverlay } from "@/applications/market/kit";
+import { procFooter, SupplierHeading } from "./kit";
 import {
   approveAdjustment, approvePurchase, approveSuggestions, auditLocation, closeOrder, convertToPo, countReceipt,
   exportMovements, exportSpend, LinkContract, LocationInspector, PutAway, QuoteRequest, RejectRequisition, SpendCompare,
@@ -12,7 +13,7 @@ import {
 import "@/applications/market/growth.css";
 import { PurchaseTrail, QuoteComparison } from "./quotes";
 import { QualityReturn } from "./supplierInsights";
-import { approverFor, statusTone } from "./data";
+import { approverFor } from "./data";
 import {
   ProcurementAnalytics, ProcurementOverview, PurchaseOrders, Receiving, Replenishment,
   Requisitions, StockMovements, SupplierDetail, Suppliers, Warehouses,
@@ -79,11 +80,11 @@ export const procApp = registerApp({
         { id: "costs", label: "Inspect an invoice", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("cost inspector", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "Requisition form", kind: "drawer", title: "Raise a requisition", width: 720, render: ({ close, ...context }) => <RequisitionForm context={context} close={close} />, footer: submitFooter("requisition-form", "Submit for approval") },
-        { id: "Requisition", kind: "drawer", title: "Requisition review", width: 740, presentation: { noRecordContext: true, guidance: "Choose an actual submitted requisition, inspect the budget and approval limit, and decide with a named reviewer and a recorded reason." }, render: ({ close, ...context }) => <RequisitionReview context={context} close={close} /> },
-        { id: "stock alert", kind: "drawer", title: "Stock risk", width: 620, render: ({ ...context }) => <StockAlert context={context} /> },
-        { id: "cost inspector", kind: "drawer", title: "Invoice", width: 620, render: ({ ...context }) => <CostInspector context={context} /> },
-        { id: "three-way match", kind: "drawer", title: "Three-way match", width: 780, render: ({ close, ...context }) => <ThreeWayMatch context={context} close={close} /> },
+        { id: "Requisition form", kind: "drawer", title: "Raise a requisition", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <RequisitionForm context={context} close={close} />, footer: procFooter("requisition-form", "Submit for approval") },
+        { id: "Requisition", kind: "drawer", title: "Requisition review", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true, guidance: "Choose an actual submitted requisition, inspect the budget and approval limit, and decide with a named reviewer and a recorded reason." }, render: ({ close, ...context }) => <RequisitionReview context={context} close={close} /> },
+        { id: "stock alert", kind: "drawer", title: "Stock risk", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <StockAlert context={context} /> },
+        { id: "cost inspector", kind: "drawer", title: "Invoice", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <CostInspector context={context} /> },
+        { id: "three-way match", kind: "drawer", title: "Three-way match", width: OVERLAY_WIDTH.wide, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <ThreeWayMatch context={context} close={close} /> },
       ],
     },
 
@@ -104,11 +105,11 @@ export const procApp = registerApp({
         { id: "compliance", label: "Compliance screening", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("sanctions/compliance review", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "Supplier form", kind: "drawer", title: "Supplier", width: 640, render: ({ close, ...context }) => <SupplierForm context={context} close={close} />, footer: submitFooter("supplier-form", "Save supplier") },
-        { id: "verification", kind: "modal", title: "Verify bank detail", width: 600, render: ({ close, ...context }) => <SupplierVerification context={context} close={close} />, footer: submitFooter("supplier-verification", "Record verification") },
-        { id: "sanctions/compliance review", kind: "drawer", title: "Compliance", width: 560, render: ({ ...context }) => <SanctionsReview context={context} /> },
-        { id: "supplier review", kind: "modal", title: "Evaluate supplier", width: 620, render: ({ close, ...context }) => <SupplierReview context={context} close={close} />, footer: submitFooter("supplier-review", "Record evaluation") },
-        { id: "link contract", kind: "modal", title: "Link a contract", width: 560, render: ({ close, ...context }) => <LinkContract context={context} close={close} />, footer: submitFooter("link-contract", "Link contract") },
+        { id: "Supplier form", kind: "drawer", title: "Supplier", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <SupplierForm context={context} close={close} />, footer: procFooter("supplier-form", "Save supplier") },
+        { id: "verification", kind: "modal", title: "Verify bank detail", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <SupplierVerification context={context} close={close} />, footer: procFooter("supplier-verification", "Record verification") },
+        { id: "sanctions/compliance review", kind: "drawer", title: "Compliance", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <SanctionsReview context={context} /> },
+        { id: "supplier review", kind: "modal", title: "Evaluate supplier", width: OVERLAY_WIDTH.modal, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <SupplierReview context={context} close={close} />, footer: procFooter("supplier-review", "Record evaluation") },
+        { id: "link contract", kind: "modal", title: "Link a contract", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <LinkContract context={context} close={close} />, footer: procFooter("link-contract", "Link contract") },
       ],
     },
 
@@ -116,7 +117,12 @@ export const procApp = registerApp({
     "ARL-PROC-003": {
       id: "ARL-PROC-003",
       title: () => "Supplier",
-      subtitle: () => "Performance from recorded deliveries, contracts as written, and every order and invoice.",
+      record: (context) => ({
+        title: <SupplierHeading context={context} part="title" />,
+        status: <SupplierHeading context={context} part="status" />,
+        subtitle: <SupplierHeading context={context} part="subtitle" />,
+        meta: [<SupplierHeading key="facts" context={context} part="meta" />],
+      }),
       tabs: ["Overview", "Contracts", "Orders", "Communications"].map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <SupplierDetail context={context} lens={lens} />,
@@ -130,14 +136,14 @@ export const procApp = registerApp({
         { id: "flag", label: "Flag a risk", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("risk escalation") },
       ],
       overlays: [
-        { id: "Supplier editor", kind: "drawer", title: "Supplier", width: 640, render: ({ close, ...context }) => <SupplierForm context={context} close={close} />, footer: submitFooter("supplier-form", "Save supplier") },
-        { id: "contract viewer", kind: "drawer", title: "Contract", width: 640, render: ({ ...context }) => <ContractViewer context={context} /> },
-        { id: "risk escalation", kind: "modal", title: "Flag a risk", width: 580, render: ({ close, ...context }) => <RiskEscalation context={context} close={close} />, footer: submitFooter("risk-escalation", "Flag for review") },
-        { id: "supplier review", kind: "modal", title: "Supplier review", width: 620, render: ({ close, ...context }) => <SupplierReview context={context} close={close} />, footer: submitFooter("supplier-review", "Record review") },
-        { id: "three-way match", kind: "drawer", title: "Three-way match", width: 780, render: ({ close, ...context }) => <ThreeWayMatch context={context} close={close} /> },
-        { id: "Requisition form", kind: "drawer", title: "Raise a requisition", width: 720, render: ({ close, ...context }) => <RequisitionForm context={context} close={close} />, footer: submitFooter("requisition-form", "Submit for approval") },
-        { id: "quote request", kind: "modal", title: "Request a quote", width: 600, render: ({ close, ...context }) => <QuoteRequest context={context} close={close} />, footer: submitFooter("quote-request", "Keep as a draft") },
-        { id: "supplier compare", kind: "drawer", title: "Compare suppliers", width: 820, render: ({ ...context }) => <SupplierCompare context={context} /> },
+        { id: "Supplier editor", kind: "drawer", title: "Supplier", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <SupplierForm context={context} close={close} />, footer: procFooter("supplier-form", "Save supplier") },
+        { id: "contract viewer", kind: "drawer", title: "Contract", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ ...context }) => <ContractViewer context={context} /> },
+        { id: "risk escalation", kind: "modal", title: "Flag a risk", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <RiskEscalation context={context} close={close} />, footer: procFooter("risk-escalation", "Flag for review") },
+        { id: "supplier review", kind: "modal", title: "Supplier review", width: OVERLAY_WIDTH.modal, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <SupplierReview context={context} close={close} />, footer: procFooter("supplier-review", "Record review") },
+        { id: "three-way match", kind: "drawer", title: "Three-way match", width: OVERLAY_WIDTH.wide, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <ThreeWayMatch context={context} close={close} /> },
+        { id: "Requisition form", kind: "drawer", title: "Raise a requisition", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <RequisitionForm context={context} close={close} />, footer: procFooter("requisition-form", "Submit for approval") },
+        { id: "quote request", kind: "modal", title: "Request a quote", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <QuoteRequest context={context} close={close} />, footer: procFooter("quote-request", "Keep as a draft") },
+        { id: "supplier compare", kind: "drawer", title: "Compare suppliers", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <SupplierCompare context={context} /> },
       ],
       inspector: (context) => <SupplierFacts context={context} />,
       inspectorTitle: "Supplier facts",
@@ -160,12 +166,12 @@ export const procApp = registerApp({
         { id: "budget", label: "Budget check", placement: "overflow", run: (context) => context.openOverlay("budget check") },
       ],
       overlays: [
-        { id: "Requisition form", kind: "drawer", title: "Requisition", width: 720, render: ({ close, ...context }) => <RequisitionForm context={context} close={close} />, footer: submitFooter("requisition-form", "Submit for approval") },
-        { id: "Requisition", kind: "drawer", title: "Requisition review", width: 700, render: ({ close, ...context }) => <RequisitionReview context={context} close={close} /> },
-        { id: "budget check", kind: "drawer", title: "Budget and limits", width: 660, render: ({ ...context }) => <BudgetCheck context={context} /> },
-        { id: "quote comparison", kind: "drawer", title: "Supplier quotes", width: 900, render: ({ ...context }) => <QuoteComparison context={context} /> },
-        { id: "rejection reason", kind: "modal", title: "Reject with a reason", width: 600, render: ({ close, ...context }) => <RejectRequisition context={context} close={close} />, footer: submitFooter("reject-requisition", "Reject requisition") },
-        { id: "PO editor", kind: "drawer", title: "Purchase order", width: 760, render: ({ close, ...context }) => <PoEditor context={context} close={close} />, footer: submitFooter("po-editor", "Save order") },
+        { id: "Requisition form", kind: "drawer", title: "Requisition", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <RequisitionForm context={context} close={close} />, footer: procFooter("requisition-form", "Submit for approval") },
+        { id: "Requisition", kind: "drawer", title: "Requisition review", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <RequisitionReview context={context} close={close} /> },
+        { id: "budget check", kind: "drawer", title: "Budget and limits", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <BudgetCheck context={context} /> },
+        { id: "quote comparison", kind: "drawer", title: "Supplier quotes", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <QuoteComparison context={context} /> },
+        { id: "rejection reason", kind: "modal", title: "Reject with a reason", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <RejectRequisition context={context} close={close} />, footer: procFooter("reject-requisition", "Reject requisition") },
+        { id: "PO editor", kind: "drawer", title: "Purchase order", width: OVERLAY_WIDTH.wide, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <PoEditor context={context} close={close} />, footer: procFooter("po-editor", "Save order") },
       ],
     },
 
@@ -187,12 +193,12 @@ export const procApp = registerApp({
         { id: "purchase trail", label: "Purchase trail", placement: "secondary", guard: needsSelection, run: (context) => context.openOverlay("purchase trail", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "PO editor", kind: "drawer", title: "Purchase order", width: 760, render: ({ close, ...context }) => <PoEditor context={context} close={close} />, footer: submitFooter("po-editor", "Save order") },
-        { id: "change impact", kind: "drawer", title: "Revisions", width: 620, render: ({ ...context }) => <ChangeImpact context={context} /> },
-        { id: "purchase trail", kind: "drawer", title: "Purchase trail", width: 640, render: ({ ...context }) => <PurchaseTrail context={context} /> },
-        { id: "three-way match", kind: "drawer", title: "Three-way match", width: 780, render: ({ close, ...context }) => <ThreeWayMatch context={context} close={close} /> },
-        { id: "send preview", kind: "drawer", title: "Issue the order", width: 680, render: ({ close, ...context }) => <SendPreview context={context} close={close} /> },
-        { id: "receive", kind: "drawer", title: "Receive goods", width: 780, render: ({ close, ...context }) => <ScanOverlay context={context} close={close} />, footer: submitFooter("scan-overlay", "Record receipt") },
+        { id: "PO editor", kind: "drawer", title: "Purchase order", width: OVERLAY_WIDTH.wide, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <PoEditor context={context} close={close} />, footer: procFooter("po-editor", "Save order") },
+        { id: "change impact", kind: "drawer", title: "Purchase order", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ ...context }) => <ChangeImpact context={context} /> },
+        { id: "purchase trail", kind: "drawer", title: "Purchase trail", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <PurchaseTrail context={context} /> },
+        { id: "three-way match", kind: "drawer", title: "Three-way match", width: OVERLAY_WIDTH.wide, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <ThreeWayMatch context={context} close={close} /> },
+        { id: "send preview", kind: "drawer", title: "Issue the order", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <SendPreview context={context} close={close} /> },
+        { id: "receive", kind: "drawer", title: "Receive goods", width: OVERLAY_WIDTH.wide, render: ({ close, ...context }) => <ScanOverlay context={context} close={close} />, footer: procFooter("scan-overlay", "Record receipt") },
         confirmOverlay,
       ],
     },
@@ -213,10 +219,10 @@ export const procApp = registerApp({
         { id: "count", label: "Count a site", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("stock count", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "Location editor", kind: "modal", title: "Location", width: 620, render: ({ close, ...context }) => <LocationEditor context={context} close={close} />, footer: submitFooter("location-editor", "Save location") },
-        { id: "stock count", kind: "drawer", title: "Stock count", width: 720, render: ({ close, ...context }) => <StockCount context={context} close={close} />, footer: submitFooter("stock-count", "Record variances") },
-        { id: "transfer", kind: "modal", title: "Transfer stock", width: 640, render: ({ close, ...context }) => <TransferForm context={context} close={close} />, footer: submitFooter("transfer-form", "Record transfer") },
-        { id: "location inspector", kind: "drawer", title: "Location", width: 600, render: ({ ...context }) => <LocationInspector context={context} /> },
+        { id: "Location editor", kind: "modal", title: "Location", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <LocationEditor context={context} close={close} />, footer: procFooter("location-editor", "Save location") },
+        { id: "stock count", kind: "drawer", title: "Stock count", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <StockCount context={context} close={close} />, footer: procFooter("stock-count", "Record variances") },
+        { id: "transfer", kind: "modal", title: "Transfer stock", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <TransferForm context={context} close={close} />, footer: procFooter("transfer-form", "Record transfer") },
+        { id: "location inspector", kind: "drawer", title: "Location", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ ...context }) => <LocationInspector context={context} /> },
         confirmOverlay,
       ],
     },
@@ -245,11 +251,12 @@ export const procApp = registerApp({
         { id: "movements", label: "Stock movements", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/proc/movements`) },
       ],
       overlays: [
-        { id: "Scan overlay", kind: "drawer", title: "Receive goods", width: 780, render: ({ close, ...context }) => <ScanOverlay context={context} close={close} />, footer: submitFooter("scan-overlay", "Record receipt") },
-        { id: "discrepancy", kind: "modal", title: "Discrepancy", width: 620, render: ({ close, ...context }) => <Discrepancy context={context} close={close} />, footer: submitFooter("discrepancy", "Record discrepancy") },
-        { id: "receipt confirmation", kind: "drawer", title: "Receipt", width: 700, render: ({ ...context }) => <ReceiptConfirmation context={context} /> },
-        { id: "put away", kind: "modal", title: "Put away", width: 600, render: ({ close, ...context }) => <PutAway context={context} close={close} />, footer: submitFooter("put-away", "Put away") },
-        { id: "quality return", kind: "modal", title: "Return to supplier", width: 620, render: ({ close, ...context }) => <QualityReturn context={context} close={close} />, footer: submitFooter("quality-return", "Record return") },
+        { id: "Scan overlay", kind: "drawer", title: "Receive goods", width: OVERLAY_WIDTH.wide, render: ({ close, ...context }) => <ScanOverlay context={context} close={close} />, footer: procFooter("scan-overlay", "Record receipt") },
+        { id: "discrepancy", kind: "modal", title: "Discrepancy", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <Discrepancy context={context} close={close} />, footer: procFooter("discrepancy", "Record discrepancy") },
+        { id: "receipt confirmation", kind: "drawer", title: "Receipt", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ ...context }) => <ReceiptConfirmation context={context} /> },
+        { id: "three-way match", kind: "drawer", title: "Three-way match", width: OVERLAY_WIDTH.wide, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <ThreeWayMatch context={context} close={close} /> },
+        { id: "put away", kind: "modal", title: "Put away", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <PutAway context={context} close={close} />, footer: procFooter("put-away", "Put away") },
+        { id: "quality return", kind: "modal", title: "Return to supplier", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <QualityReturn context={context} close={close} />, footer: procFooter("quality-return", "Record return") },
       ],
     },
 
@@ -269,9 +276,9 @@ export const procApp = registerApp({
         { id: "inspect", label: "Inspect selected", placement: "overflow", guard: needsSelection, run: (context) => context.openOverlay("Movement inspector", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "Movement inspector", kind: "drawer", title: "Movement", width: 600, render: ({ ...context }) => <MovementInspector context={context} /> },
-        { id: "count reconciliation", kind: "drawer", title: "Count reconciliation", width: 720, render: ({ close, ...context }) => <StockCount context={context} close={close} />, footer: submitFooter("stock-count", "Record variances") },
-        { id: "authorization", kind: "modal", title: "Authorise stock movement", width: 640, presentation: { noRecordContext: true, guidance: "Choose a product, warehouse, signed quantity and reason; confirm how the recorded stock estimate will change." }, render: ({ close, ...context }) => <MovementAuthorization context={context} close={close} /> },
+        { id: "Movement inspector", kind: "drawer", title: "Movement", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <MovementInspector context={context} /> },
+        { id: "count reconciliation", kind: "drawer", title: "Count reconciliation", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <StockCount context={context} close={close} />, footer: procFooter("stock-count", "Record variances") },
+        { id: "authorization", kind: "modal", title: "Authorise stock movement", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true, guidance: "Choose a product, warehouse, signed quantity and reason; confirm how the recorded stock estimate will change." }, render: ({ close, ...context }) => <MovementAuthorization context={context} close={close} /> },
         confirmOverlay,
       ],
     },
@@ -291,9 +298,9 @@ export const procApp = registerApp({
         { id: "policy", label: "How a suggestion is made", placement: "overflow", run: (context) => context.openOverlay("Reorder policy") },
       ],
       overlays: [
-        { id: "Reorder policy", kind: "drawer", title: "Reorder policy", width: 660, render: () => <ReorderPolicy /> },
-        { id: "scenario", kind: "drawer", title: "Scenario", width: 660, render: ({ ...context }) => <Scenario context={context} /> },
-        { id: "purchase preview", kind: "drawer", title: "Raise a requisition", width: 720, render: ({ close, ...context }) => <PurchasePreview context={context} close={close} />, footer: submitFooter("requisition-form", "Submit for approval") },
+        { id: "Reorder policy", kind: "drawer", title: "Reorder policy", width: OVERLAY_WIDTH.record, render: () => <ReorderPolicy /> },
+        { id: "scenario", kind: "drawer", title: "Scenario", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <Scenario context={context} /> },
+        { id: "purchase preview", kind: "drawer", title: "Raise a requisition", width: OVERLAY_WIDTH.record, render: ({ close, ...context }) => <PurchasePreview context={context} close={close} />, footer: procFooter("requisition-form", "Submit for approval") },
         confirmOverlay,
       ],
     },
@@ -316,12 +323,12 @@ export const procApp = registerApp({
         { id: "match", label: "Three-way match", placement: "overflow", run: (context) => context.openOverlay("three-way match") },
       ],
       overlays: [
-        { id: "Metric source", kind: "drawer", title: "What spend counts", width: 700, render: ({ ...context }) => <MetricSource context={context} /> },
-        { id: "report designer", kind: "modal", title: "Save a report", width: 560, render: ({ close, ...context }) => <ReportDesigner context={context} close={close} />, footer: submitFooter("proc-report", "Save report") },
-        { id: "supplier review", kind: "modal", title: "Supplier review", width: 620, render: ({ close, ...context }) => <SupplierReview context={context} close={close} />, footer: submitFooter("supplier-review", "Record review") },
-        { id: "three-way match", kind: "drawer", title: "Three-way match", width: 780, render: ({ close, ...context }) => <ThreeWayMatch context={context} close={close} /> },
-        { id: "spend compare", kind: "drawer", title: "Compare periods", width: 700, render: ({ ...context }) => <SpendCompare context={context} /> },
-        { id: "supplier inspector", kind: "drawer", title: "Supplier", width: 600, render: ({ ...context }) => <SupplierInspect context={context} /> },
+        { id: "Metric source", kind: "drawer", title: "What spend counts", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <MetricSource context={context} /> },
+        { id: "report designer", kind: "modal", title: "Save a report", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ReportDesigner context={context} close={close} />, footer: procFooter("proc-report", "Save report") },
+        { id: "supplier review", kind: "modal", title: "Supplier review", width: OVERLAY_WIDTH.modal, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <SupplierReview context={context} close={close} />, footer: procFooter("supplier-review", "Record review") },
+        { id: "three-way match", kind: "drawer", title: "Three-way match", width: OVERLAY_WIDTH.wide, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <ThreeWayMatch context={context} close={close} /> },
+        { id: "spend compare", kind: "drawer", title: "Compare periods", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <SpendCompare context={context} /> },
+        { id: "supplier inspector", kind: "drawer", title: "Supplier", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <SupplierInspect context={context} /> },
       ],
     },
   },
@@ -333,10 +340,7 @@ function SupplierFacts({ context }: { context: ScreenContext }) {
   if (!supplier) return <Empty title="No supplier" >Open a supplier to see their facts here.</Empty>;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Record", value: <code>{supplier.id}</code> },
-        { label: "State", value: <Pill tone={statusTone(supplier.status)} dot>{supplier.status}</Pill> },
-        { label: "Terms", value: String(supplier.fields.terms ?? "—") },
+      <KeyValueList items={[
         { label: "Tax status", value: String(supplier.fields.taxStatus ?? "unknown").replace("_", " ") },
         { label: "Jurisdiction", value: org.jurisdiction },
         { label: "Approval limit for their orders", value: approverFor(Number(supplier.fields.spendToDateMinor ?? 0)) },

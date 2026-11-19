@@ -5,6 +5,7 @@ import {
 import { Button, Empty, OVERLAY_WIDTH } from "@/design-system";
 import "./finance.css";
 import { registerApp, type ScreenContext } from "@/platform/registry";
+import { knownRecord } from "@/platform/repo";
 import type { AccountType } from "@/domain/fin-ledger";
 import {
   CashflowTab, CorrectionProposal, FinanceInsights, FinanceOverview, FinanceOverviewHeader, FinanceTasks,
@@ -60,6 +61,12 @@ import {
  * the engine in `src/platform/money.ts` from jurisdiction, line category,
  * customer status and date — never from the currency.
  * ====================================================================== */
+
+/** Reads the invoice the screen already primed, so a header action can say why it is unavailable. */
+function invoiceGuard(context: ScreenContext, reason: (status: string) => string | undefined): string | undefined {
+  const record = knownRecord(context.params.id);
+  return record?.collection === "invoices" ? reason(record.status) : undefined;
+}
 
 function Unavailable({ context, what }: { context: ScreenContext; what: string }) {
   return (
@@ -224,10 +231,10 @@ export const finApp = registerApp({
         { id: "Activity", render: (context) => <InvoiceActivity context={context} /> },
       ],
       actions: [
-        { id: "approve", label: "Approve and post", placement: "primary", capability: "post_journal", run: (context) => context.openOverlay("approve invoice") },
+        { id: "approve", label: "Approve and post", placement: "primary", capability: "post_journal", guard: (context) => invoiceGuard(context, (status) => status !== "draft" ? "Only a draft can be approved. This invoice is already issued." : undefined), run: (context) => context.openOverlay("approve invoice") },
         { id: "Edit draft", label: "Edit the lines", placement: "secondary", run: (context) => context.openOverlay("Line item editor") },
         { id: "preview", label: "Preview the document", placement: "secondary", run: (context) => context.openOverlay("email preview") },
-        { id: "record payment", label: "Record a payment", placement: "overflow", capability: "post_journal", run: (context) => context.openOverlay("payment form") },
+        { id: "record payment", label: "Record a payment", placement: "overflow", capability: "post_journal", guard: (context) => invoiceGuard(context, (status) => status === "paid" ? "Already paid in full." : status === "void" ? "A void invoice cannot take a payment." : status === "draft" ? "Approve and post the invoice first." : undefined), run: (context) => context.openOverlay("payment form") },
         { id: "send", label: "Send (queued locally)", placement: "overflow", run: (context) => context.openOverlay("send invoice") },
         { id: "draft email", label: "Draft an email", placement: "overflow", run: (context) => context.openOverlay("email preview") },
         { id: "promise", label: "Record a promise to pay", placement: "overflow", run: (context) => context.openOverlay("promise to pay") },

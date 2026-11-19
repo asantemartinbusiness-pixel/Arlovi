@@ -3,7 +3,7 @@ import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { Activity, CalendarRange, FolderKanban, LayoutDashboard, ListChecks, Timer, Users } from "lucide-react";
 import {
   Avatar, BarChart, Button, Card, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice,
-  Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, PageSection, KeyValueList,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
@@ -16,8 +16,9 @@ import { BoardFilterNotice, PortfolioFilterNotice, TaskComments, boardFilter, ma
 import { Gantt, createsCycle, criticalPath, dependenciesOf } from "./timeline";
 import { OpsHeader, OpsMetric, OpsMetrics } from "@/applications/shared/operational-surfaces";
 import { planTimesheetApprovals } from "@/applications/hr/workforce";
-import { healthCheck, unfinishedDependencies, withoutDependency } from "./taskWork";
+import { healthCheck, withoutDependency } from "./taskWork";
 import { HealthCheckCard, SubtaskEditor } from "./subtasks";
+import { ActivityList, ChecklistProgress, CommentEntry, DependencyList, TaskInspector, taskFactItems, useTaskFacts } from "./taskInspector";
 
 export function useProjectData() {
   return useCollections(["projects", "tasks", "templates", "objectives", "shifts", "members", "departments", "documents"]);
@@ -561,17 +562,17 @@ function checklistOf(task: Rec): ChecklistItem[] {
 export function TaskDetail({ context, lens }: { context: ScreenContext; lens: string }) {
   const data = useProjectData();
   const record = useRecord(context.params.id);
-  const { org, now } = useWorkspace();
+  const { org } = useWorkspace();
   const task = context.params.id
     ? (record?.collection === "tasks" && record.organizationId === org.id ? record : undefined)
     : data.tasks[0];
+  const facts = useTaskFacts(task);
   const commentScope = `project:task-comment:${org.id}:${context.actor}:${task?.id ?? "none"}`;
   const [comment, setComment] = useWorkingField(commentScope, "comment", "");
   if (!task) return <Empty title="No task" icon={<ListChecks size={20} />} />;
   const project = data.projects.find((row) => row.id === task.parentId);
   const dependencies = dependenciesOf(task).map((id) => data.tasks.find((row) => row.id === id)).filter((row): row is Rec => Boolean(row));
   const dependents = data.tasks.filter((row) => dependenciesOf(row).includes(task.id));
-  const waitingOn = unfinishedDependencies(task, data.tasks);
   const time = data.shifts.filter((entry) => entry.fields.kind === "time" && entry.fields.taskId === task.id);
   const checklist = checklistOf(task);
 
@@ -651,63 +652,60 @@ export function TaskDetail({ context, lens }: { context: ScreenContext; lens: st
     );
   }
 
+  if (!facts) return null;
+  const stage = stageOf(task);
+  const done = checklist.filter((item) => item.done).length;
+  const items = taskFactItems(context, task, facts);
   return (
-    <Grid>
-      <Card span={7} title={task.title} subtitle={project ? `In ${project.title}` : undefined} actions={<Pill tone={stageOf(task) === "done" ? "success" : stageOf(task) === "blocked" ? "danger" : "neutral"} dot>{stageOf(task)}</Pill>}>
-        <Stack gap={3}>
-          <p>{task.summary}</p>
-          <Properties rows={[
-            { label: "Owner", value: <Row gap={2}><Avatar name={String(task.fields.assignee ?? task.ownerName)} size="sm" />{String(task.fields.assignee ?? task.ownerName)}</Row> },
-            { label: "Priority", value: String(task.fields.priority ?? "normal") },
-            { label: "Sprint", value: String(task.fields.sprint ?? "—") },
-            { label: "Dates", value: <span className="ds-num">{context.date(task.startAt)} – {context.date(task.endAt)}</span> },
-            { label: "Due", value: task.dueAt ? <Row gap={2}><span className="ds-num">{context.date(task.dueAt)}</span>{stageOf(task) !== "done" && new Date(task.dueAt) < now && <Pill tone="danger" dot>overdue</Pill>}</Row> : <span className="ds-subtle">No due date — set one in Edit the task</span> },
-            { label: "Estimate", value: <span className="ds-num">{String(task.fields.estimateHours ?? 0)} hours</span> },
-            { label: "Logged", value: <span className="ds-num">{time.reduce((sum, entry) => sum + Number(entry.fields.hours ?? 0), 0)} hours</span> },
-          ]} />
-        </Stack>
-      </Card>
-      <Card span={5} title="Dependencies" subtitle={`${dependencies.length} before · ${dependents.length} after`}>
-        <Stack gap={3}>
-          <Stack gap={2}>
-            {dependencies.map((dependency) => (
-              <Row key={dependency.id} gap={2}>
-                <Pill tone={stageOf(dependency) === "done" ? "success" : "warning"}>{stageOf(dependency)}</Pill>
-                <button type="button" className="ds-grow ds-truncate" style={{ textAlign: "start", background: "none", border: 0, font: "inherit", color: "inherit", cursor: "pointer" }} onClick={() => context.navigate(`/o/${org.slug}/project/tasks/${dependency.id}`)}>{dependency.title}</button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={`Remove the link to ${dependency.title}`}
-                  onClick={async () => {
-                    await context.mutate.patch(task.id, { fields: { ...task.fields, dependsOn: withoutDependency(task, dependency.id) } }, { expectRevision: task.revision, event: `${task.title} no longer waits on ${dependency.title} (${context.actor})` });
-                    context.toast("Link removed", `${task.title} no longer waits on ${dependency.title}.`);
-                  }}
-                >
-                  Remove
-                </Button>
-              </Row>
-            ))}
-            {waitingOn.length > 0 && stageOf(task) !== "done" && (
-              <Notice tone="warning" title={`Waiting on ${waitingOn.length} unfinished ${waitingOn.length === 1 ? "task" : "tasks"}`}>
-                Starting before {waitingOn.map((row) => row.title).join(", ")} {waitingOn.length === 1 ? "is" : "are"} done means working on assumptions.
-              </Notice>
-            )}
-            {dependents.length > 0 && (
-              <span className="ds-subtle">Waiting on this: {dependents.map((row) => row.title).join(", ")}</span>
-            )}
-            {dependencies.length === 0 && <span className="ds-subtle">Nothing has to happen first.</span>}
+    <div className="pj-detail">
+      <div className="pj-detail-main">
+        <PageSection title="Description">
+          {task.summary ? <p>{task.summary}</p> : <span className="ds-subtle">No description. Add one from Edit the task.</span>}
+        </PageSection>
+        <PageSection title="Checklist" hint={checklist.length ? `${done} of ${checklist.length} done` : undefined} actions={<Button size="sm" variant="secondary" onClick={() => context.setTab("Subtasks")}>Edit subtasks</Button>}>
+          <ChecklistProgress context={context} task={task} />
+        </PageSection>
+        <PageSection title="Dependencies" hint={`${dependencies.length} before · ${dependents.length} after`} actions={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("dependency selector")}>Link work</Button>}>
+          <DependencyList
+            context={context}
+            task={task}
+            facts={facts}
+            onRemove={async (dependency) => {
+              await context.mutate.patch(task.id, { fields: { ...task.fields, dependsOn: withoutDependency(task, dependency.id) } }, { expectRevision: task.revision, event: `${task.title} no longer waits on ${dependency.title} (${context.actor})` });
+              context.toast("Link removed", `${task.title} no longer waits on ${dependency.title}.`);
+            }}
+          />
+        </PageSection>
+        <PageSection title="Recent activity" actions={<Button size="sm" variant="ghost" onClick={() => context.setTab("Discussion")}>All discussion</Button>}>
+          <Stack gap={3}>
+            <ActivityList context={context} facts={facts} />
+            <CommentEntry context={context} task={task} />
           </Stack>
-          <Button size="sm" variant="secondary" onClick={() => context.openOverlay("dependency selector")}>Link work</Button>
-        </Stack>
-      </Card>
-      <Card span={12} title="Checklist" subtitle={`${checklist.filter((item) => item.done).length} of ${checklist.length} done`} actions={<Button size="sm" variant="secondary" onClick={() => context.setTab("Subtasks")}>Edit subtasks</Button>}>
-        <Stack gap={2}>
-          {checklist.length > 0 && <Meter value={checklist.filter((item) => item.done).length} max={checklist.length} label="Subtasks done" />}
-          {checklist.map((item) => <Row key={item.label} gap={2}><Pill tone={item.done ? "success" : "neutral"}>{item.done ? "done" : "to do"}</Pill><span>{item.label}</span></Row>)}
-          {checklist.length === 0 && <span className="ds-subtle">No checklist.</span>}
-        </Stack>
-      </Card>
-    </Grid>
+        </PageSection>
+      </div>
+      <aside className="pj-detail-facts" aria-label="Task facts">
+        <PageSection title="Facts" hint={stage === "done" && task.fields.completedBy ? `Completed by ${String(task.fields.completedBy)}` : undefined}>
+          <KeyValueList items={items} />
+        </PageSection>
+        <PageSection title="Time">
+          <Stack gap={2}>
+            {Number(task.fields.estimateHours ?? 0) > 0 && <Meter value={facts.loggedHours} max={Number(task.fields.estimateHours)} label="Hours against estimate" tone={facts.loggedHours > Number(task.fields.estimateHours) ? "warning" : undefined} />}
+            <KeyValueList items={[
+              { label: "Logged", value: `${facts.loggedHours} hours`, mono: true },
+              { label: "Entries", value: String(facts.time.length), mono: true },
+            ]} />
+            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/project/time`)}>Log time</Button>
+          </Stack>
+        </PageSection>
+        <PageSection title="Record">
+          <KeyValueList items={[
+            { label: "Project", value: project ? <button type="button" className="pj-link" onClick={() => context.navigate(`/o/${org.slug}/project/projects/${project.id}`)}>{project.title}</button> : "None" },
+            { label: "Created", value: `${context.date(task.createdAt)} · ${task.createdBy}` },
+            { label: "Updated", value: `${context.date(task.updatedAt)} · ${task.updatedBy}` },
+          ]} />
+        </PageSection>
+      </aside>
+    </div>
   );
 }
 
@@ -1238,34 +1236,8 @@ export function TimeAndCost({ context, lens }: { context: ScreenContext; lens: "
  * Overlay bodies
  * ------------------------------------------------------------------ */
 
-export function TaskDrawer({ context }: { context: ScreenContext }) {
-  const payload = context.overlayPayload as { id?: string } | undefined;
-  const task = useRecord(payload?.id ?? context.selectedId);
-  const { org } = useWorkspace();
-  if (!task) return <Empty title="Select a task" icon={<ListChecks size={20} />} />;
-  const checklist = checklistOf(task);
-  return (
-    <Stack gap={4}>
-      <div>
-        <h3>{task.title}</h3>
-        <p className="ds-subtle">{task.summary}</p>
-      </div>
-      <Properties rows={[
-        { label: "Stage", value: <Pill tone={stageOf(task) === "done" ? "success" : "neutral"}>{stageOf(task)}</Pill> },
-        { label: "Owner", value: String(task.fields.assignee ?? task.ownerName) },
-        { label: "Priority", value: String(task.fields.priority ?? "normal") },
-        { label: "Dates", value: <span className="ds-num">{context.date(task.startAt)} – {context.date(task.endAt)}</span> },
-        { label: "Estimate", value: `${String(task.fields.estimateHours ?? 0)}h, ${String(task.fields.loggedHours ?? 0)}h logged` },
-      ]} />
-      <Stack gap={2}>
-        {checklist.map((item) => <Row key={item.label} gap={2}><Pill tone={item.done ? "success" : "neutral"}>{item.done ? "done" : "to do"}</Pill><span>{item.label}</span></Row>)}
-      </Stack>
-      <Row gap={2}>
-        <Button variant="primary" onClick={() => context.navigate(`/o/${org.slug}/project/tasks/${task.id}`)}>Open the task</Button>
-        <Button variant="secondary" onClick={() => context.openOverlay("Assignee picker", { id: task.id })}>Reassign</Button>
-      </Row>
-    </Stack>
-  );
+export function TaskDrawer({ context, close }: { context: ScreenContext; close?: () => void }) {
+  return <TaskInspector context={context} close={close} />;
 }
 
 export function AssigneePicker({ context, close }: { context: ScreenContext; close: () => void }) {

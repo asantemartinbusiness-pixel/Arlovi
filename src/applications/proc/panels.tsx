@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   BarChart, Button, Card, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice, Pill,
-  Properties, Row, Stack, Stat, StatRow, TextInput,
+  KeyValueList, Row, Stack, Stat, StatRow, TextInput,
 } from "@/design-system";
 import { Boxes, FileText, PackageCheck, Truck, Warehouse } from "lucide-react";
 import type { ScreenContext } from "@/platform/registry";
@@ -89,7 +89,7 @@ export function ProcurementOverview({ context, lens }: { context: ScreenContext;
               title={<Link to={`/o/${org.slug}/proc/suppliers/${supplier.id}`} style={{ color: "inherit", textDecoration: "none" }}>{supplier.title}</Link>}
               subtitle={supplier.summary}
               actions={<Pill tone={supplier.status === "approved" ? "success" : "warning"}>{supplier.status}</Pill>}>
-              <Properties rows={[
+              <KeyValueList items={[
                 { label: "Open exposure", value: <span className="ds-num">{context.money(exposure)}</span> },
                 { label: "On time", value: <span className="ds-num">{String(supplier.fields.onTimeRatePct ?? "—")}%</span> },
                 { label: "Lead time", value: <span className="ds-num">{String(supplier.fields.leadTimeDays ?? "—")} days</span> },
@@ -238,7 +238,7 @@ export function SupplierDetail({ context, lens }: { context: ScreenContext; lens
                 actions={<Pill tone={statusTone(contract.status)} dot>{contract.status.replace("_", " ")}</Pill>}
                 footer={<Button size="sm" variant="secondary" onClick={() => { context.select(contract.id); context.openOverlay("contract viewer", { id: contract.id }); }}>Open clauses</Button>}>
                 <Stack gap={3}>
-                  <Properties rows={[
+                  <KeyValueList items={[
                     { label: "Value", value: <span className="ds-num">{context.money(contract.amountMinor)}</span> },
                     { label: "Review by", value: <span className="ds-num">{context.date(contract.dueAt)}</span> },
                     { label: "Renewal", value: String(contract.fields.renewal ?? "—") },
@@ -302,7 +302,7 @@ export function SupplierDetail({ context, lens }: { context: ScreenContext; lens
       <Stack gap={4}>
         <ProviderBoundary id="email.send" title="Nothing has been sent to this supplier" />
         <Card eyebrow="ON FILE" prov="human" title="What is recorded" subtitle="Contact details held in this workspace">
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Contact", value: String(supplier.fields.contactName ?? "—") },
             { label: "Email", value: String(supplier.fields.email ?? "—") },
             { label: "City", value: String(supplier.fields.city ?? "—") },
@@ -319,7 +319,7 @@ export function SupplierDetail({ context, lens }: { context: ScreenContext; lens
     <Grid>
       <Card span={5} eyebrow="SUPPLIER" prov="human" title={supplier.title} subtitle={supplier.summary}
         actions={<Pill tone={statusTone(supplier.status)} dot>{supplier.status}</Pill>}>
-        <Properties rows={[
+        <KeyValueList items={[
           { label: "Category", value: String(supplier.fields.category ?? "—") },
           { label: "Contact", value: String(supplier.fields.contactName ?? "—") },
           { label: "Email", value: String(supplier.fields.email ?? "—") },
@@ -331,7 +331,7 @@ export function SupplierDetail({ context, lens }: { context: ScreenContext; lens
       </Card>
       <Card span={7} eyebrow="BANK DETAIL" prov={String(supplier.fields.bankLast4) ? "posted" : "unknown"} title="Payment details" subtitle="Changed only through a separate verification">
         <Stack gap={3}>
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Account on file", value: String(supplier.fields.bankLast4) ? <span className="ds-num">ends ···{String(supplier.fields.bankLast4)}</span> : "None recorded" },
             { label: "Verified", value: String(supplier.fields.bankVerifiedAt) ? <span className="ds-num">{context.date(String(supplier.fields.bankVerifiedAt))}</span> : <Pill tone="warning">Never</Pill> },
             { label: "Age", value: String(supplier.fields.bankVerifiedAt) ? `${freshness(String(supplier.fields.bankVerifiedAt), now, 365).days} days` : "Unknown" },
@@ -481,7 +481,7 @@ export function Warehouses({ context, lens }: { context: ScreenContext; lens: st
               actions={<Pill tone={capacity && units / capacity > 0.9 ? "danger" : "neutral"}>{capacity ? `${Math.round((units / capacity) * 100)}%` : "No capacity recorded"}</Pill>}>
               <Stack gap={3}>
                 <Meter value={units} max={capacity || 1} label={`${warehouse.title} capacity`} tone={capacity && units / capacity > 0.9 ? "danger" : undefined} />
-                <Properties rows={[
+                <KeyValueList items={[
                   { label: "Units held", value: <span className="ds-num">{String(units)}</span> },
                   { label: "Capacity", value: capacity ? <span className="ds-num">{String(capacity)}</span> : "Not recorded" },
                   { label: "Bins", value: <span className="ds-num">{String(warehouse.fields.bins ?? 0)}</span> },
@@ -522,7 +522,7 @@ export function Warehouses({ context, lens }: { context: ScreenContext; lens: st
             <Button size="sm" variant="ghost" onClick={() => { context.select(warehouse.id); context.openOverlay("Location editor", { id: warehouse.id }); }}>Edit</Button>
             <Button size="sm" variant="ghost" onClick={() => { context.select(warehouse.id); context.openOverlay("stock count", { id: warehouse.id }); }}>Count</Button>
           </>}>
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Code", value: <span className="ds-num">{String(warehouse.fields.code ?? "—")}</span> },
             { label: "Units held", value: <span className="ds-num">{String(onHandAt(warehouse.id))}</span> },
             { label: "Bins", value: <span className="ds-num">{String(warehouse.fields.bins ?? 0)}</span> },
@@ -681,7 +681,7 @@ export function Replenishment({ context, lens }: { context: ScreenContext; lens:
               subtitle={row.lead === 0 ? "No lead time is recorded, so no reorder date can be worked out."
                 : row.quantity === 0 ? "No reorder quantity is recorded, so there is nothing to suggest."
                   : `Below its reorder point with nothing on order. Lead time is ${row.lead} days.`}>
-              <Properties rows={[
+              <KeyValueList items={[
                 { label: "On hand", value: <span className="ds-num">{String(row.onHand)}</span> },
                 { label: "On order", value: <span className="ds-num">{String(row.onOrder)}</span> },
                 { label: "Reorder point", value: <span className="ds-num">{String(row.point)}</span> },

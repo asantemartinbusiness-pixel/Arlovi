@@ -1,17 +1,18 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Users } from "lucide-react";
 import {
-  Avatar, Button, Card, DataGrid, Empty, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Meter,
+  Avatar, Button, Card, DataGrid, Empty, Field, Grid, FactGrid, KeyValueList, ModalActions, ModalInFlight, ModalUnsavedChanges, OverlayActions, OverlayCancel, OverlaySection, OverlaySummary, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Meter,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
+import type { RecordHeaderProps } from "@/design-system";
 import { useEvents, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { ACTIVITY_LABEL, STAGES, activitiesFor, activityKind, probabilityOf, stageGuard, stageIndex, stageOf } from "@/domain/crm-pipeline";
 import { documentTotals, readLines, statusFor } from "@/domain/fin-invoice";
 import { dealAfterWin, dealWonBlocker, draftInvoiceFromDeal, nextDraftInvoiceNumber } from "./handoff";
 import {
-  companyOfDeal, contactOfDeal, contactsOfCompany, invoicesOfDeal, quotesOfDeal, ticketsOfContact, useCrmData,
+  accountOfDeal, contactOfDeal, contactsOfCompany, invoicesOfDeal, quotesOfDeal, ticketsOfContact, useCrmData,
 } from "./data";
 import type { CrmData } from "./data";
 import { ActivityPill, CapabilityNotice, ConsentPill, Money, ProbabilityPill, QuoteStatusPill, StagePill } from "./parts";
@@ -33,42 +34,50 @@ export function useDeal(context: ScreenContext): { deal?: Rec; data: CrmData } {
   return { deal, data };
 }
 
-export function DealHeader({ context }: { context: ScreenContext }) {
+/* The record header's slots are rendered as components so each can read the
+   live deal; ScreenDef.record itself is called as a plain function. */
+function DealTitle({ context }: { context: ScreenContext }) {
+  const { deal } = useDeal(context);
+  return <>{deal?.title ?? "Deal"}</>;
+}
+
+function DealStatus({ context }: { context: ScreenContext }) {
+  const { deal } = useDeal(context);
+  if (!deal) return null;
+  return <><StagePill deal={deal} /> <ProbabilityPill deal={deal} /></>;
+}
+
+function DealSubtitle({ context }: { context: ScreenContext }) {
+  const { deal } = useDeal(context);
+  return deal?.summary ? <>{deal.summary}</> : null;
+}
+
+function DealFacts({ context }: { context: ScreenContext }) {
   const { deal, data } = useDeal(context);
   if (!deal) return null;
-  const company = companyOfDeal(data, deal);
+  const account = accountOfDeal(data, deal);
   const contact = contactOfDeal(data, deal);
+  const amount = Number(deal.amountMinor ?? 0);
+  const closeAt = deal.fields.closeDate ? `${String(deal.fields.closeDate)}T12:00:00.000Z` : undefined;
   return (
-    <Card prov="human" flush>
-      <div className="ds-card-body">
-        <Row gap={4} wrap>
-          <div className="ds-grow">
-            <Row gap={2}>
-              <h2 style={{ fontSize: "var(--text-xl)" }}>{deal.title}</h2>
-              <StagePill deal={deal} />
-              <ProbabilityPill deal={deal} />
-            </Row>
-            <p className="ds-subtle">{deal.summary}</p>
-            <Row gap={3} wrap style={{ marginBlockStart: "var(--space-2)" }}>
-              {company && <Link to={accountHref(context.org.slug, company.id)} style={{ color: "inherit" }}>{company.title}</Link>}
-              {contact && <Link to={`/o/${context.org.slug}/crm/contacts/${contact.id}`} style={{ color: "inherit" }}>{contact.title}</Link>}
-              <span className="ds-subtle">Owner {String(deal.fields.owner ?? deal.ownerName)}</span>
-            </Row>
-          </div>
-          <Properties rows={[
-            { label: "Expected close", value: deal.fields.closeDate ? context.date(String(deal.fields.closeDate)) : "Not set" },
-            { label: "Created", value: <span className="ds-num">{context.date(deal.createdAt)}</span> },
-            { label: "Last change", value: context.relative(deal.updatedAt) },
-          ]} />
-          <div style={{ textAlign: "end" }}>
-            <span className="ds-stat-label">Amount</span>
-            <div className="ds-stat-value">{context.money(Number(deal.amountMinor ?? 0))}</div>
-            <span className="ds-subtle">Weighted {context.money(Math.round((Number(deal.amountMinor ?? 0) * probabilityOf(deal)) / 100))}</span>
-          </div>
-        </Row>
-      </div>
-    </Card>
+    <span className="crm-facts">
+      <strong className="ds-num">{context.money(amount)}</strong>
+      <span className="ds-subtle">weighted <span className="ds-num">{context.money(Math.round((amount * probabilityOf(deal)) / 100))}</span></span>
+      {account && <Link to={accountHref(context.org.slug, account.id)}>{account.title}</Link>}
+      {contact && <Link to={`/o/${context.org.slug}/crm/contacts/${contact.id}`}>{contact.title}</Link>}
+      {stageOf(deal).kind === "open" && <span className="ds-subtle">{closeAt ? `close ${context.relative(closeAt)}` : "no close date"}</span>}
+      <span className="ds-subtle">owner {String(deal.fields.owner ?? deal.ownerName)}</span>
+    </span>
   );
+}
+
+export function dealRecord(context: ScreenContext): RecordHeaderProps {
+  return {
+    title: <DealTitle context={context} />,
+    status: <DealStatus context={context} />,
+    subtitle: <DealSubtitle context={context} />,
+    meta: [<DealFacts key="facts" context={context} />],
+  };
 }
 
 /**
@@ -137,14 +146,14 @@ export function DealOverview({ context }: { context: ScreenContext }) {
   if (!deal) return <Empty title="No deal selected" />;
 
   const contact = contactOfDeal(data, deal);
-  const company = companyOfDeal(data, deal);
+  const company = accountOfDeal(data, deal);
   const quotes = quotesOfDeal(data, deal.id);
   const invoices = invoicesOfDeal(data, deal);
   const activities = activitiesFor(data.activities, deal.id);
   const tickets = ticketsOfContact(data, contact?.id);
   const stage = stageOf(deal);
   const next = STAGES[Math.min(STAGES.length - 1, stageIndex(stage.id) + 1)];
-  const guard = stageGuard(deal, next);
+  const guard = stage.kind === "open" ? stageGuard(deal, next) : undefined;
   const open = activities.filter((activity) => activity.status === "open");
   const lastTouch = activities[0];
 
@@ -155,7 +164,7 @@ export function DealOverview({ context }: { context: ScreenContext }) {
           <Meter value={stageIndex(stage.id) + 1} max={STAGES.length} label={`${deal.title} stage`} tone={stage.kind === "lost" ? "danger" : stage.kind === "won" ? "success" : undefined} />
           <Properties rows={[
             { label: "Next stage", value: stage.kind === "open" ? next.label : "Closed" },
-            { label: "Blocked by", value: guard ?? "Nothing" },
+            ...(stage.kind === "open" ? [{ label: "Blocked by", value: guard ?? "Nothing" }] : []),
             { label: "Last activity", value: lastTouch ? `${context.relative(lastTouch.startAt ?? lastTouch.at)} · ${lastTouch.title}` : "None logged" },
             { label: "Open follow-ups", value: String(open.length) },
           ]} />
@@ -516,37 +525,46 @@ export function CollaboratorPicker({ context, close }: { context: ScreenContext;
   const collaborators = ((deal.body as { collaborators?: { name: string; role: string }[] })?.collaborators) ?? [];
 
   return (
-    <Stack gap={4}>
-      <Field label="Person" required>
-        <Select aria-label="Person" value={name} onChange={(event) => setName(event.target.value)}>
-          <option value="">Choose someone</option>
-          {data.members.filter((member) => member.fields.kind !== "ai").map((member) => <option key={member.id} value={member.title}>{member.title} · {String(member.fields.title ?? "")}</option>)}
-        </Select>
-      </Field>
-      <Field label="Their part"><TextInput aria-label="Their part" value={role} onChange={(event) => setRole(event.target.value)} /></Field>
+    <OverlaySection
+      title="People on this deal"
+      hint={collaborators.length ? `${collaborators.length} named. Nobody is notified: no mail provider is connected.` : "Nobody added yet. Nobody is notified: no mail provider is connected."}
+    >
+      <Stack gap={3}>
       {collaborators.length > 0 && (
-        <Properties rows={collaborators.map((person) => ({ label: person.name, value: person.role }))} />
+        <KeyValueList items={collaborators.map((person) => ({ label: person.name, value: person.role }))} />
       )}
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          busy={busy}
-          disabled={!name || collaborators.some((person) => person.name === name)}
-          onClick={async () => {
-            setBusy(true);
-            await context.mutate.patch(deal.id, {
-              body: { ...(deal.body as object ?? {}), collaborators: [...collaborators, { name, role }] },
-            }, { expectRevision: deal.revision, event: `${name} added to ${deal.title} as ${role}` });
-            context.toast("Collaborator added", `${name} is on ${deal.title}. They are not notified: no mail provider is connected.`);
-            setBusy(false);
-            close();
-          }}
-        >
-          Add to the deal
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
-    </Stack>
+      <div className="crm-deal-pair">
+        <Field label="Person" required>
+          <Select aria-label="Person" value={name} onChange={(event) => setName(event.target.value)}>
+            <option value="">Choose someone</option>
+            {data.members.filter((member) => member.fields.kind !== "ai").map((member) => <option key={member.id} value={member.title}>{member.title} · {String(member.fields.title ?? "")}</option>)}
+          </Select>
+        </Field>
+        <Field label="Their part"><TextInput aria-label="Their part" value={role} onChange={(event) => setRole(event.target.value)} /></Field>
+      </div>
+      <OverlayActions
+        primary={
+          <Button
+            variant="primary"
+            busy={busy}
+            disabled={!name || collaborators.some((person) => person.name === name)}
+            onClick={async () => {
+              setBusy(true);
+              await context.mutate.patch(deal.id, {
+                body: { ...(deal.body as object ?? {}), collaborators: [...collaborators, { name, role }] },
+              }, { expectRevision: deal.revision, event: `${name} added to ${deal.title} as ${role}` });
+              context.toast("Collaborator added", `${name} is on ${deal.title}. They are not notified: no mail provider is connected.`);
+              setBusy(false);
+              close();
+            }}
+          >
+            Add to the deal
+          </Button>
+        }
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
+      </Stack>
+    </OverlaySection>
   );
 }
 
@@ -564,8 +582,8 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
   const quotes = quotesOfDeal(data, deal.id);
   const latest = quotes.find((quote) => quote.status === "accepted") ?? quotes[0];
   const contact = contactOfDeal(data, deal);
+  const account = accountOfDeal(data, deal);
   const existingInvoices = invoicesOfDeal(data, deal);
-  const wonStage = STAGES.find((stage) => stage.kind === "won")!;
   const guard = dealWonBlocker({ deal, quote: latest, contact, invoices: existingInvoices, createInvoice: createInvoice === "yes", now });
 
   const lines = latest ? readLines(latest) : [];
@@ -576,116 +594,155 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
     date: now.toISOString().slice(0, 10),
   });
 
+  const summary = (
+    <OverlaySummary
+      eyebrow="Deal"
+      title={deal.title}
+      status={<StagePill deal={deal} />}
+      meta={[contact?.title, account?.title, <span className="ds-num" key="amt">{context.money(Number(deal.amountMinor ?? 0))}</span>]}
+    />
+  );
+
   if (stageOf(deal).kind === "won") {
     return (
       <Stack gap={4}>
+        {summary}
         <Notice tone="success" title="This deal is already closed won">
           {existingInvoices.length ? `${existingInvoices[0].title} is linked to it.` : "No invoice is linked yet."}
         </Notice>
         {existingInvoices.length > 0 && (
-          <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${org.slug}/fin/invoices/${existingInvoices[0].id}`); }}>Open the invoice</Button>
+          <ModalActions>
+            <OverlayActions
+              primary={<Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${org.slug}/fin/invoices/${existingInvoices[0].id}`); }}>Open the invoice</Button>}
+              end={<OverlayCancel>Close</OverlayCancel>}
+            />
+          </ModalActions>
         )}
       </Stack>
     );
   }
 
+  const activityCount = activitiesFor(data.activities, deal.id).length;
+  const evidence: { ok: boolean; label: string; value: ReactNode }[] = [
+    { ok: Boolean(contact), label: "A customer is linked", value: contact ? contact.title : "No contact" },
+    {
+      ok: latest ? latest.status === "accepted" : false,
+      label: "The customer accepted a quote",
+      value: latest
+        ? latest.status === "accepted"
+          ? `${String(latest.fields.number ?? latest.title)} (accepted)${latest.fields.acceptedAt ? `, ${context.date(String(latest.fields.acceptedAt))}` : ""}`
+          : `${String(latest.fields.number ?? latest.title)} (${latest.status})`
+        : "No quote on this deal",
+    },
+    { ok: activityCount > 0, label: "A call, meeting or note backs the stage", value: activityCount ? `${activityCount} logged` : "Nothing logged" },
+    { ok: !totals.hasUnknownRate, label: "Every line has an approved tax rate", value: totals.hasUnknownRate ? "A line is UNKNOWN" : totals.byCode.map((group) => group.code.code).join(", ") || "None" },
+  ];
+
   return (
     <Stack gap={4}>
       <ModalUnsavedChanges when={createInvoice !== "yes"} />
       <ModalInFlight when={busy} />
-      <Notice tone={guard ? "danger" : "info"} title={guard ? "This deal cannot be closed won yet" : "Closing won creates real records"}>
-        {guard ?? "A won deal gets a draft invoice in Finance, linked both ways, priced line by line through the tax engine. A status alone would leave nothing to collect."}
-      </Notice>
-      <Properties rows={[
-        { label: "Deal", value: deal.title },
-        { label: "Amount", value: <Money minor={deal.amountMinor} context={context} bold /> },
-        { label: "Customer", value: contact?.title ?? "No contact linked" },
-        { label: "Quote used for pricing", value: latest ? `${String(latest.fields.number ?? latest.title)} (${latest.status})` : "None, the deal amount is used as a single line" },
-        { label: "Invoice net", value: <Money minor={totals.netMinor} context={context} /> },
-        { label: "Invoice tax", value: <Money minor={totals.taxMinor} context={context} /> },
-        { label: "Invoice gross", value: <Money minor={totals.grossMinor} context={context} bold /> },
-        { label: "Resolved codes", value: totals.byCode.map((group) => group.code.code).join(", ") || "None" },
-      ]} />
-      {totals.hasUnknownRate && (
-        <Notice tone="warning" title="A line has no approved tax rate">
-          The invoice will be created as a draft with the line held as UNKNOWN. Finance cannot approve it until the combination is approved, which is deliberate.
-        </Notice>
-      )}
-      <Field label="Create the invoice">
-        <Select aria-label="Create the invoice" value={createInvoice} onChange={(event) => setCreateInvoice(event.target.value)}>
-          <option value="yes">Yes, create a draft invoice in Finance</option>
-          <option value="no">No, I will raise it myself</option>
-        </Select>
-      </Field>
+      {summary}
+      {guard && <Notice tone="danger" title="This deal cannot be closed won yet">{guard}</Notice>}
+      <OverlaySection title="Evidence" hint="What the close rests on. The same stage validation runs here as on the board.">
+        <ul className="crm-evidence" data-flush>
+          {evidence.map((item) => (
+            <li key={item.label}>
+              <Pill tone={item.ok ? "success" : "warning"} dot>{item.ok ? "Holds" : "Open"}</Pill>
+              <span className="crm-evidence-label">{item.label}</span>
+              <span className="crm-evidence-value ds-subtle">{item.value}</span>
+            </li>
+          ))}
+        </ul>
+      </OverlaySection>
+      <OverlaySection title="Finance handoff" hint={createInvoice === "yes" ? "A draft invoice is created and linked both ways. Nothing is posted to the ledger." : "No invoice is created. Raise it yourself in Finance."}>
+        <Stack gap={3}>
+        <FactGrid columns={3} items={[
+          { label: "Net", value: context.money(totals.netMinor), mono: true },
+          { label: "Tax", value: context.money(totals.taxMinor), mono: true },
+          { label: "Gross", value: context.money(totals.grossMinor), mono: true },
+        ]} />
+        <Field label="Create the invoice">
+          <Select aria-label="Create the invoice" value={createInvoice} onChange={(event) => setCreateInvoice(event.target.value)}>
+            <option value="yes">Yes, create a draft invoice in Finance</option>
+            <option value="no">No, I will raise it myself</option>
+          </Select>
+        </Field>
+        {totals.hasUnknownRate && (
+          <Notice tone="warning" title="A line has no approved tax rate">
+            The invoice will be created as a draft with the line held as UNKNOWN. Finance cannot approve it until the combination is approved, which is deliberate.
+          </Notice>
+        )}
+        </Stack>
+      </OverlaySection>
       <ModalActions>
-        <Button
-          variant="primary"
+        <OverlayActions
           busy={busy}
-          disabled={Boolean(guard) || !context.can("edit_pipeline")}
-          title={guard}
-          onClick={async () => {
-            if (guard || !contact || busy) return;
-            setBusy(true);
-            try {
-              const invoice = createInvoice === "yes"
-                ? draftInvoiceFromDeal({
-                    deal, quote: latest, contact, totals, now, actor: context.actor,
-                    currency: org.currency, number: nextDraftInvoiceNumber(data.invoices),
-                  })
-                : undefined;
-              const invoiceId = invoice?.id ?? existingInvoices[0]?.id;
-              const won = dealAfterWin(deal, context.actor, now, invoiceId, latest?.id);
+          primary={
+            <Button
+              variant="primary"
+              busy={busy}
+              disabled={Boolean(guard) || !context.can("edit_pipeline")}
+              title={guard}
+              onClick={async () => {
+                if (guard || !contact || busy) return;
+                setBusy(true);
+                try {
+                  const invoice = createInvoice === "yes"
+                    ? draftInvoiceFromDeal({
+                        deal, quote: latest, contact, totals, now, actor: context.actor,
+                        currency: org.currency, number: nextDraftInvoiceNumber(data.invoices),
+                      })
+                    : undefined;
+                  const invoiceId = invoice?.id ?? existingInvoices[0]?.id;
+                  const won = dealAfterWin(deal, context.actor, now, invoiceId, latest?.id);
 
-              // One scoped IndexedDB transaction commits the deal + invoice +
-              // their audit events. Expected revisions also protect the quote
-              // that supplied prices, even though quote status is unchanged.
-              // Failure leaves neither an orphan invoice nor a false deal win.
-              await context.mutate.putMany(
-                [won, ...(invoice ? [invoice] : [])],
-                [
-                  `${deal.title} closed won${invoiceId ? " with a linked Finance invoice" : ""}`,
-                  ...(invoice ? [`Invoice ${invoice.title} drafted from accepted deal ${deal.title}`] : []),
-                ],
-                {
-                  [deal.id]: deal.revision,
-                  ...(latest ? { [latest.id]: latest.revision } : {}),
-                },
-                invoice ? ["update", "create"] : ["update"],
-              );
-              context.toast(
-                "Deal closed won",
-                invoice
-                  ? `A draft invoice for ${context.money(totals.grossMinor)} is in Finance and linked to this deal. Nothing has been posted to the ledger.`
-                  : `${deal.title} is closed won with ${latest ? "its customer-accepted quote" : "an existing invoice"}. No additional invoice was created.`,
-              );
-              close();
-              if (invoice) context.navigate(`/o/${org.slug}/fin/invoices/${invoice.id}`);
-            } catch (error) {
-              context.toast(
-                "The handoff was not completed",
-                error instanceof Error ? error.message : "The deal or its pricing changed. Reopen the deal and retry.",
-                "failed",
-              );
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          <CheckCircle2 size={15} aria-hidden="true" /> Close won
-        </Button>
-        <Button
-          variant="outline-danger"
-          busy={busy}
-          onClick={() => { close(); context.openOverlay("lost reason", { id: deal.id }); }}
-        >
-          Close lost instead
-        </Button>
-        <span className="ds-grow" />
-        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
+                  // One scoped IndexedDB transaction commits the deal + invoice +
+                  // their audit events. Expected revisions also protect the quote
+                  // that supplied prices, even though quote status is unchanged.
+                  // Failure leaves neither an orphan invoice nor a false deal win.
+                  await context.mutate.putMany(
+                    [won, ...(invoice ? [invoice] : [])],
+                    [
+                      `${deal.title} closed won${invoiceId ? " with a linked Finance invoice" : ""}`,
+                      ...(invoice ? [`Invoice ${invoice.title} drafted from accepted deal ${deal.title}`] : []),
+                    ],
+                    {
+                      [deal.id]: deal.revision,
+                      ...(latest ? { [latest.id]: latest.revision } : {}),
+                    },
+                    invoice ? ["update", "create"] : ["update"],
+                  );
+                  context.toast(
+                    "Deal closed won",
+                    invoice
+                      ? `A draft invoice for ${context.money(totals.grossMinor)} is in Finance and linked to this deal. Nothing has been posted to the ledger.`
+                      : `${deal.title} is closed won with ${latest ? "its customer-accepted quote" : "an existing invoice"}. No additional invoice was created.`,
+                  );
+                  close();
+                  if (invoice) context.navigate(`/o/${org.slug}/fin/invoices/${invoice.id}`);
+                } catch (error) {
+                  context.toast(
+                    "The handoff was not completed",
+                    error instanceof Error ? error.message : "The deal or its pricing changed. Reopen the deal and retry.",
+                    "failed",
+                  );
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <CheckCircle2 size={15} aria-hidden="true" /> Close won
+            </Button>
+          }
+          secondary={
+            <Button variant="outline-danger" busy={busy} onClick={() => { close(); context.openOverlay("lost reason", { id: deal.id }); }}>
+              Close lost instead
+            </Button>
+          }
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
       </ModalActions>
-      <span className="ds-subtle" style={{ fontSize: "var(--text-xs)" }}>
-        {stageOf(deal).label} → {wonStage.label}. The same stage validation runs here as on the board.
-      </span>
     </Stack>
   );
 }
@@ -699,41 +756,42 @@ export function RequestApproval({ context, close }: { context: ScreenContext; cl
   const needsApproval = quotes.filter((quote) => quote.fields.discountApproval);
 
   return (
-    <Stack gap={4}>
-      <Notice tone="info" title="An approval request is a record">
-        It appears on the approvals list for whoever holds the Owner view. Nobody is notified, because no mail provider is connected.
-      </Notice>
-      <Properties rows={[
-        { label: "Deal", value: deal.title },
-        { label: "Amount", value: <Money minor={deal.amountMinor} context={context} bold /> },
-        { label: "Quotes needing a discount approval", value: String(needsApproval.length) },
+    <OverlaySection title="Ask for an approval" hint="A record on the approvals list for the Owner view. Nobody is notified.">
+      <Stack gap={3}>
+      <FactGrid columns={3} dense items={[
+        { label: "Deal amount", value: context.money(Number(deal.amountMinor ?? 0)), mono: true },
+        { label: "Stage", value: stageOf(deal).label },
+        { label: "Quotes needing discount approval", value: String(needsApproval.length), mono: true, tone: needsApproval.length ? "warning" : undefined },
       ]} />
       <Field label="What you are asking for" required><TextArea aria-label="What you are asking for" value={note} rows={3} onChange={(event) => setNote(event.target.value)} required /></Field>
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          busy={busy}
-          disabled={!note.trim()}
-          onClick={async () => {
-            setBusy(true);
-            await context.mutate.create({
-              collection: "approvals",
-              title: `Approval for ${deal.title}`,
-              status: "pending",
-              summary: note,
-              amountMinor: deal.amountMinor,
-              fields: { kind: "deal", recordId: deal.id, raisedBy: context.actor },
-            }, `Approval requested on ${deal.title}`);
-            context.toast("Approval requested", "It is on the approvals list. Nothing has been sent.");
-            setBusy(false);
-            close();
-          }}
-        >
-          Request the approval
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
-    </Stack>
+      <OverlayActions
+        primary={
+          <Button
+            variant="primary"
+            busy={busy}
+            disabled={!note.trim()}
+            onClick={async () => {
+              setBusy(true);
+              await context.mutate.create({
+                collection: "approvals",
+                title: `Approval for ${deal.title}`,
+                status: "pending",
+                summary: note,
+                amountMinor: deal.amountMinor,
+                fields: { kind: "deal", recordId: deal.id, raisedBy: context.actor },
+              }, `Approval requested on ${deal.title}`);
+              context.toast("Approval requested", "It is on the approvals list. Nothing has been sent.");
+              setBusy(false);
+              close();
+            }}
+          >
+            Request the approval
+          </Button>
+        }
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
+      </Stack>
+    </OverlaySection>
   );
 }
 
@@ -743,16 +801,13 @@ export function DealInspector({ context }: { context: ScreenContext }) {
   if (!deal) return <Empty title="No deal" />;
   const stage = stageOf(deal);
   const next = STAGES[Math.min(STAGES.length - 1, stageIndex(stage.id) + 1)];
-  const guard = stageGuard(deal, next);
+  const guard = stage.kind === "open" ? stageGuard(deal, next) : undefined;
   const invoices = invoicesOfDeal(data, deal);
 
   return (
     <Stack gap={4}>
       <Properties rows={[
-        { label: "Stage", value: <StagePill deal={deal} /> },
-        { label: "Weighting", value: <ProbabilityPill deal={deal} /> },
         { label: "Weighted value", value: <Money minor={Math.round((Number(deal.amountMinor ?? 0) * probabilityOf(deal)) / 100)} context={context} bold /> },
-        { label: "Owner", value: String(deal.fields.owner ?? deal.ownerName) },
         { label: "Revision", value: String(deal.revision) },
       ]} />
       {guard

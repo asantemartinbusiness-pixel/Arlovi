@@ -389,14 +389,14 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
 
   const stage = STAGES.find((item) => item.id === stageId)!;
   const guard = existing && stageId !== stageOf(existing).id ? stageGuard(existing, stage) : undefined;
-  const company = companyById(data, companyId);
   const contact = contactById(data, contactId);
+  const company = companyById(data, companyId) ?? companyById(data, String(contact?.fields.companyId ?? ""));
   const weighted = Math.round((amount * stage.probability) / 100);
   const weightedBefore = existing ? Math.round((Number(existing.amountMinor ?? 0) * probabilityOf(existing)) / 100) : undefined;
-  const accountDeals = dealsOfCompany(data, companyId).filter((deal) => deal.id !== existing?.id && stageOf(deal).kind === "open");
+  const accountDeals = dealsOfCompany(data, company?.id).filter((deal) => deal.id !== existing?.id && stageOf(deal).kind === "open");
   const accountOpenMinor = accountDeals.reduce((sum, deal) => sum + Number(deal.amountMinor ?? 0), 0);
   // The account's own history, then the chosen contact's, newest first and without repeats.
-  const recent = [...new Map([...activitiesFor(data.activities, companyId), ...activitiesFor(data.activities, contactId)]
+  const recent = [...new Map([...activitiesFor(data.activities, company?.id), ...activitiesFor(data.activities, contactId)]
     .map((activity) => [activity.id, activity])).values()]
     .sort((a, b) => (b.startAt ?? b.at ?? b.updatedAt).localeCompare(a.startAt ?? a.at ?? a.updatedAt))
     .slice(0, 4);
@@ -450,6 +450,7 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
           existing ? `Owner ${String(existing.fields.owner ?? existing.ownerName)}` : `Owner ${context.actor}`,
           existing ? `${quotesOfDeal(data, existing.id).length} quote(s)` : undefined,
         ]}
+        actions={existing ? <Button size="sm" variant="ghost" onClick={() => { close(); context.navigate(`/o/${org.slug}/crm/deals/${existing.id}`); }}>Open the full record</Button> : undefined}
       />
 
       <Stack gap={3}>
@@ -481,17 +482,19 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
             </Select>
           </Field>
         </div>
-        <Field label="Notes"><TextArea aria-label="Notes" value={summary} rows={3} onChange={(event) => setSummary(event.target.value)} /></Field>
+        <Field label="Notes"><TextArea aria-label="Notes" value={summary} rows={2} onChange={(event) => setSummary(event.target.value)} /></Field>
       </Stack>
 
       {guard && <Notice tone="warning" title="That stage change will be refused">{guard}</Notice>}
 
       <OverlaySection title="What it is worth" hint="Amount x stage probability. A prediction, not revenue.">
-        <FactGrid columns={3} items={[
+        <FactGrid columns={2} items={[
           { label: "Probability", value: `${stage.probability}%`, mono: true, hint: stage.label },
           { label: "Weighted value", value: context.money(weighted), mono: true, tone: stage.kind === "lost" ? "danger" : undefined,
             hint: weightedBefore !== undefined && weightedBefore !== weighted ? `was ${context.money(weightedBefore)}` : undefined },
           { label: "Expected close", value: closeAt ? context.relative(closeAt) : "Not set", tone: overdue ? "warning" : undefined },
+          { label: "To leave this stage", value: stage.requires?.length ? stage.requires.map((item) => item.label).join(", ") : stage.kind === "open" ? "Nothing more" : "Closed",
+            tone: stage.requires?.some((item) => !(existing && String(existing.fields[item.field] ?? "") !== "" && existing.fields[item.field] !== false)) ? "warning" : undefined },
         ]} />
       </OverlaySection>
 
@@ -537,9 +540,6 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
               {existing ? "Save the deal" : "Create the deal"}
             </Button>
           }
-          secondary={existing
-            ? <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${org.slug}/crm/deals/${existing.id}`); }}>Open the full record</Button>
-            : undefined}
           end={<>
             <Button variant="ghost" onClick={close}>Close & keep draft</Button>
             <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard changes</Button>
@@ -604,6 +604,7 @@ export function StageChangeValidation({ context, close }: { context: ScreenConte
         >
           Move to {stage.label}
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -653,6 +654,7 @@ export function LostReason({ context, close }: { context: ScreenContext; close: 
         >
           Close as lost
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>

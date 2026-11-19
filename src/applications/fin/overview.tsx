@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Banknote, FileWarning, Landmark, ReceiptText, ScrollText } from "lucide-react";
+import { Banknote, FileWarning, ReceiptText, ScrollText } from "lucide-react";
 import {
-  BarChart, Button, Card, DataGrid, Empty, Grid, LineChart, Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Field, TextArea,
+  BarChart, Button, Card, DataGrid, Empty, FactGrid, Grid, LineChart, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayActions, OverlayCancel, OverlaySummary, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Field, TextArea,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -338,18 +338,19 @@ export function MetricDrilldown({ context }: { context: ScreenContext }) {
     const recon = reconcile({ accounts: data.accounts, journals: data.journals, lines: data.bankLines, bankAccountCode: "1000" });
     return (
       <Stack gap={4}>
+        <OverlaySummary eyebrow="Figure" title="Bank statement balance"
+          status={<Pill tone="warning" dot>Not verified by a provider</Pill>}
+          meta={[recon.statement ? `${recon.statement.filename}, imported by hand` : "No statement imported"]} />
         <CapabilityNotice id="bank.feed" />
         {recon.statement ? (
-          <Properties rows={[
-            { label: "Source", value: `${recon.statement.filename}, uploaded by hand` },
+          <FactGrid columns={3} items={[
             { label: "Period", value: `${context.date(recon.statement.from)} to ${context.date(recon.statement.to)}` },
-            { label: "Opening", value: context.money(recon.statement.openingMinor) },
-            { label: "Closing", value: context.money(recon.statement.closingMinor) },
-            { label: "Ledger balance", value: context.money(recon.ledgerMinor) },
-            { label: "Difference", value: context.money(recon.differenceMinor ?? 0) },
-            { label: "Verified by a provider", value: <Pill tone="warning">No</Pill> },
+            { label: "Opening", value: context.money(recon.statement.openingMinor), mono: true },
+            { label: "Closing", value: context.money(recon.statement.closingMinor), mono: true, tone: "accent" },
+            { label: "Ledger balance", value: context.money(recon.ledgerMinor), mono: true },
+            { label: "Difference", value: context.money(recon.differenceMinor ?? 0), mono: true, tone: recon.differenceMinor ? "danger" : "success" },
           ]} />
-        ) : <Empty title="No statement" />}
+        ) : <Empty title="No statement">Import a CSV statement from Banking and Feeds to compare it with the ledger.</Empty>}
       </Stack>
     );
   }
@@ -358,7 +359,8 @@ export function MetricDrilldown({ context }: { context: ScreenContext }) {
     const cashAccounts = data.accounts.filter((account) => cashFlow(data.accounts, data.journals).cashAccountIds.includes(account.id));
     return (
       <Stack gap={4}>
-        <p className="ds-subtle">The balance is the sum of posted debits less posted credits on every cash account. Nothing is taken from a feed.</p>
+        <OverlaySummary eyebrow="Figure" title="Cash on the ledger" status={<Pill tone="success">Posted</Pill>}
+          meta={["Posted debits less credits on every cash account; nothing is taken from a feed", data.cash.lastPosted ? `Last posting ${context.date(data.cash.lastPosted)} (${freshness(data.cash.lastPosted, now).days} days)` : "No posting recorded"]} />
         <StatementRow
           context={context}
           rows={[
@@ -369,10 +371,6 @@ export function MetricDrilldown({ context }: { context: ScreenContext }) {
             { label: "Total cash", minor: data.cash.amountMinor, bold: true },
           ]}
         />
-        <Properties rows={[
-          { label: "Last posting", value: data.cash.lastPosted ? context.date(data.cash.lastPosted) : "None" },
-          { label: "Age", value: data.cash.lastPosted ? `${freshness(data.cash.lastPosted, now).days} days` : "Unknown" },
-        ]} />
       </Stack>
     );
   }
@@ -381,7 +379,8 @@ export function MetricDrilldown({ context }: { context: ScreenContext }) {
     const month = trialForRange(data.accounts, data.journals, org.id, { period: data.currentPeriod });
     return (
       <Stack gap={4}>
-        <p className="ds-subtle">{month.journalCount} journals are posted with a ledger date inside {periodLabel(data.currentPeriod, org.locale)}. Drafts are excluded.</p>
+        <OverlaySummary eyebrow="Figure" title={`Result · ${periodLabel(data.currentPeriod, org.locale)}`} status={<Pill tone="success">Posted</Pill>}
+          meta={[`${month.journalCount} posted journals; drafts are excluded`]} />
         <StatementRow
           context={context}
           rows={month.rows.filter((row) => ["revenue", "expense"].includes(row.type) && row.balanceMinor !== 0)
@@ -396,7 +395,8 @@ export function MetricDrilldown({ context }: { context: ScreenContext }) {
     : openInvoices(data.invoices);
   return (
     <Stack gap={3}>
-      <p className="ds-subtle">Each row below is the record the figure was summed from.</p>
+      <OverlaySummary eyebrow="Figure" title={metric === "payable" ? "Payable" : "Receivable"} status={<Pill tone="success">Posted</Pill>}
+        meta={[`${rows.length} records summed: each row is the record the figure came from`]} />
       <DataGrid
         rows={rows}
         rowId={(row) => row.id}
@@ -428,20 +428,19 @@ export function PeriodSelector({ context, close }: { context: ScreenContext; clo
           {data.periods.map((item) => <option key={item} value={item}>{periodLabel(item, org.locale)}</option>)}
         </Select>
       </Field>
-      <StatementRow
-        context={context}
-        rows={[
-          { label: "Posted journals", minor: undefined, note: `${scoped.journalCount} in ${periodLabel(period, org.locale)}` },
-          { label: "Revenue", minor: revenue },
-          { label: "Expense", minor: expense },
-          { label: "Result", minor: revenue - expense, bold: true },
-        ]}
-      />
+      <FactGrid columns={4} items={[
+        { label: "Posted journals", value: String(scoped.journalCount), mono: true },
+        { label: "Revenue", value: context.money(revenue), mono: true },
+        { label: "Expense", value: context.money(expense), mono: true },
+        { label: "Result", value: context.money(revenue - expense), mono: true, tone: "accent" },
+      ]} />
       {data.locked.includes(period) && <Notice tone="warning" title="This period is closed">No journal can be posted into it until it is reopened from the General Ledger.</Notice>}
-      <Row gap={2}>
-        <Button variant="primary" onClick={() => { context.navigate(`/o/${org.slug}/fin/reports?tab=Statements`); close(); }}>Open the statements</Button>
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={() => { context.navigate(`/o/${org.slug}/fin/reports?tab=Statements`); close(); }}>Open the statements</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -457,6 +456,7 @@ export function CorrectionProposal({ context, close }: { context: ScreenContext;
       onSubmit={async (event) => {
         event.preventDefault();
         setBusy(true);
+        try {
         await context.mutate.create({
           collection: "approvals",
           title: `Correction: ${payload?.note ?? "finance figure"}`,
@@ -465,8 +465,12 @@ export function CorrectionProposal({ context, close }: { context: ScreenContext;
           fields: { kind: "correction", raisedBy: context.actor, screenId: context.screen.id },
         }, "Correction proposed on a finance figure");
         context.toast("Correction recorded", "It is on the approvals list for Finance to action. Nothing in the ledger has changed.");
-        setBusy(false);
         close();
+        } catch (error) {
+          context.toast("Correction not recorded", error instanceof Error ? error.message : "Try again.", "failed");
+        } finally {
+          setBusy(false);
+        }
       }}
     >
       <Notice tone="info" title="A proposal does not change the ledger">
@@ -475,10 +479,14 @@ export function CorrectionProposal({ context, close }: { context: ScreenContext;
       <Field label="What looks wrong" required hint={payload?.note ? `About: ${payload.note}` : undefined}>
         <TextArea aria-label="What looks wrong" value={note} onChange={(event) => setNote(event.target.value)} rows={4} required />
       </Field>
-      <Row gap={2}>
-        <Button type="submit" variant="primary" busy={busy} disabled={!note.trim()}>Record the proposal</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <ModalUnsavedChanges when={note.trim() !== ""} />
+      <ModalInFlight when={busy} />
+      <ModalActions>
+        <OverlayActions
+          primary={<Button type="submit" form="correction-proposal" variant="primary" busy={busy} disabled={!note.trim()}>Record the proposal</Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </form>
   );
 }
@@ -492,8 +500,6 @@ export function FinanceOverviewHeader() {
       <Pill tone="neutral">{data.accounts.length} accounts</Pill>
       <Pill tone="neutral">{data.postedCount} posted journals</Pill>
       {data.locked.length > 0 && <Pill tone="warning">{data.locked.length} closed period{data.locked.length === 1 ? "" : "s"}</Pill>}
-      <span className="ds-grow" />
-      <span className="ds-subtle"><Landmark size={14} aria-hidden="true" /> Everything on this screen is computed in this browser.</span>
     </Row>
   );
 }

@@ -231,3 +231,39 @@ export function adjustmentProblems(input: { productId: string; delta: number; on
   else if (reason.needsNote && input.note.trim().length < 3) problems.push("Say what happened; this reason needs a note.");
   return problems;
 }
+
+/**
+ * Where an order's money stands, kept as three separate facts: what was
+ * proposed on the order, what the studio recorded as refunded against its
+ * returns (with the processor-side reference they typed), and what is left.
+ * Arlovi never moves money, so "recorded" is the strongest state there is.
+ */
+export interface OrderRefundSummary {
+  returns: Rec[];
+  proposedMinor: number;
+  proposedBy: string;
+  recorded: (RefundRecord & { returnTitle: string })[];
+  recordedMinor: number;
+}
+
+export function orderRefundSummary(order: Rec, returns: Rec[]): OrderRefundSummary {
+  const mine = returns.filter((item) => String(item.fields.orderId) === order.id && item.status !== "rejected");
+  const recorded = mine.flatMap((item) => refundsOf(item).map((refund) => ({ ...refund, returnTitle: item.title })));
+  return {
+    returns: mine,
+    proposedMinor: Number(order.fields.refundProposedMinor ?? 0),
+    proposedBy: String(order.fields.refundProposedBy ?? ""),
+    recorded,
+    recordedMinor: recorded.reduce((sum, refund) => sum + refund.amountMinor, 0),
+  };
+}
+
+/** Plain label and tone for a return's refund state; legacy or blank values read as not refunded. */
+export function refundStateLabel(state: unknown): { label: string; tone: "success" | "warning" | "neutral" } {
+  switch (String(state ?? "")) {
+    case "refund_recorded": return { label: "Refund recorded", tone: "success" };
+    case "credit_note_local": return { label: "Credit note recorded", tone: "success" };
+    case "partly_refunded": return { label: "Partly refunded", tone: "warning" };
+    default: return { label: "Not refunded", tone: "neutral" };
+  }
+}

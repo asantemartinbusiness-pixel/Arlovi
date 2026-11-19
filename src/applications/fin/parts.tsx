@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
-import { Notice, Pill, Properties, Row, Skeleton, Stack } from "@/design-system";
+import { DrawerActions, ModalActions, Notice, Pill, Properties, Row, Skeleton, Stack } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, capabilityById } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
 import type { Rec } from "@/domain/types";
@@ -224,4 +224,15 @@ export function groupByType(accounts: Rec[]): { type: AccountType; accounts: Rec
     type,
     accounts: accountOptions(accounts, true).filter((account) => accountType(account) === type),
   }));
+}
+
+/** Overlay footer: actions flow from the left, the dismiss action sits at the end. Portals into the overlay footer. */
+export function FormFooter({ children, end, drawer }: { children?: ReactNode; end?: ReactNode; drawer?: boolean }) {
+  const row = (
+    <div className="ds-ov-actions" data-variant="form">
+      {children}
+      {end && <><span className="ds-grow" aria-hidden="true" />{end}</>}
+    </div>
+  );
+  return drawer ? <DrawerActions>{row}</DrawerActions> : <ModalActions>{row}</ModalActions>;
 }

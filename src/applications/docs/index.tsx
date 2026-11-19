@@ -3,12 +3,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlignLeft, Bold, Braces, CheckCheck, ChevronDown, ChevronUp, CornerDownRight, FileDown, FileText,
   Highlighter, Image as ImageIcon, Italic, Link2, List, ListOrdered, MessageSquare, Minus, Quote,
-  Redo2, Search, Strikethrough, Table as TableIcon, Underline, Undo2, Upload,
+  MoreHorizontal, Redo2, Search, Strikethrough, Type as TypeIcon, Table as TableIcon, Underline, Undo2, Upload,
 } from "lucide-react";
 import {
   BarChart, Button, ButtonGroup, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, InspectorSection,
-  Meter, Notice, OverlayCancel, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Switch, Tabs,
-  TextArea, TextInput, Tool, Toolbar, ToolbarSeparator,
+  Menu, Meter, Notice, OverlayCancel, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Switch, Tabs,
+  TextArea, TextInput, Tool, Toolbar, ToolbarSeparator, type RecordHeaderProps,
 } from "@/design-system";
 import { getScreenDef, registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
@@ -29,6 +29,7 @@ import { SAVE_LABEL, SAVE_TONE, activeDocEditor, useDocEditor, type DocEditor } 
 import { useGuardRefresh } from "@/applications/design/sharedDoc";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { createStore, useStore } from "@/applications/visual/kit";
+import { CommentPopoverBody, FormatPopoverBody, ImagePopoverBody, LinkPopoverBody, PopoverTool, StylesPopoverBody, TablePopoverBody, openDocPopover } from "./popovers";
 import "./docs.css";
 
 /* ====================================================================== *
@@ -52,16 +53,15 @@ function useDocument(context: ScreenContext): Rec | undefined {
   return all.find((record) => !record.tags.includes("recovered")) ?? all[0];
 }
 
-/** The editor's contract actions, on its own bar (the full-chrome surface has no page header). */
+/** The editor's contract actions, kept reachable in one overflow menu (every one also has a tool on the ribbon). */
 function DocActions({ context }: { context: ScreenContext }) {
   const def = getScreenDef(context.screen.applicationCode, context.screen.id);
+  const items = (def?.actions ?? []).filter((action: ActionDef) => action.id !== "export").map((action: ActionDef) => {
+    const blocked = action.guard?.(context);
+    return { label: action.label ?? action.id, disabled: Boolean(blocked), onSelect: () => void action.run(context) };
+  });
   return (
-    <Toolbar label="Document actions">
-      {(def?.actions ?? []).filter((action: ActionDef) => action.id !== "export").map((action: ActionDef) => {
-        const blocked = action.guard?.(context);
-        return <Button key={action.id} size="sm" variant="ghost" disabled={Boolean(blocked)} title={blocked ?? action.shortcut} onClick={() => void action.run(context)}>{action.label ?? action.id}</Button>;
-      })}
-    </Toolbar>
+    <Menu label="Document actions" items={items} trigger={<Button size="sm" variant="ghost" icon={<MoreHorizontal size={15} />}>Actions</Button>} />
   );
 }
 
@@ -401,7 +401,7 @@ function LibraryInspector({ context }: { context: ScreenContext }) {
  * ARL-DOCS-002 — Document Editor
  * ====================================================================== */
 
-function WriteRibbon({ editor, context }: { editor: DocEditor; context: ScreenContext }) {
+function WriteRibbon({ editor, context, onFind }: { editor: DocEditor; context: ScreenContext; onFind: () => void }) {
   const block = currentBlock(editor);
   const selection = editor.selection;
   const expanded = Boolean(selection && !(selection.anchor.blockId === selection.head.blockId && selection.anchor.offset === selection.head.offset));
@@ -411,14 +411,20 @@ function WriteRibbon({ editor, context }: { editor: DocEditor; context: ScreenCo
       <Tool label="Undo (Cmd+Z)" icon={<Undo2 size={16} />} disabled={!editor.canUndo} onClick={editor.undo} />
       <Tool label="Redo (Cmd+Shift+Z)" icon={<Redo2 size={16} />} disabled={!editor.canRedo} onClick={editor.redo} />
       <ToolbarSeparator />
-      <Select
-        aria-label="Block type"
-        value={block?.type ?? "paragraph"}
-        onChange={(event) => selection && editor.handleEdit({ kind: "setHeading", level: 0, range: selection }) === undefined
-          && editor.commit(setBlockType(editor.model, selection!, event.target.value as BlockType).model, "Block type", selection)}
+      <PopoverTool
+        kind="format" label="Format" title="Format" editor={editor} width={320}
+        trigger={() => (
+          <Select
+            aria-label="Block type"
+            value={block?.type ?? "paragraph"}
+            onChange={(event) => selection && editor.commit(setBlockType(editor.model, selection, event.target.value as BlockType).model, "Block type", selection)}
+          >
+            {BLOCK_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </Select>
+        )}
       >
-        {BLOCK_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </Select>
+        {(_done, range) => <FormatPopoverBody editor={editor} range={range} />}
+      </PopoverTool>
       <Select
         aria-label="Named style"
         value={block?.styleId ?? ""}
@@ -427,27 +433,38 @@ function WriteRibbon({ editor, context }: { editor: DocEditor; context: ScreenCo
         <option value="">No named style</option>
         {editor.model.styles.map((style) => <option key={style.id} value={style.id}>{style.name}</option>)}
       </Select>
+      <PopoverTool kind="styles" label="Edit named styles" icon={<TypeIcon size={16} />} title="Edit a named style" editor={editor} width={340}>
+        {(done) => <StylesPopoverBody editor={editor} done={done} toast={context.toast} />}
+      </PopoverTool>
       <ToolbarSeparator />
       <Tool label="Bold (Cmd+B)" icon={<Bold size={16} />} pressed={editor.marks.includes("bold")} disabled={!expanded} onClick={mark("bold")} />
       <Tool label="Italic (Cmd+I)" icon={<Italic size={16} />} pressed={editor.marks.includes("italic")} disabled={!expanded} onClick={mark("italic")} />
       <Tool label="Underline (Cmd+U)" icon={<Underline size={16} />} pressed={editor.marks.includes("underline")} disabled={!expanded} onClick={mark("underline")} />
       <Tool label="Strikethrough (Cmd+Shift+X)" icon={<Strikethrough size={16} />} pressed={editor.marks.includes("strike")} disabled={!expanded} onClick={mark("strike")} />
       <Tool label="Inline code (Cmd+E)" icon={<Braces size={16} />} pressed={editor.marks.includes("code")} disabled={!expanded} onClick={mark("code")} />
-      <Tool label="Link (Cmd+Shift+L)" icon={<Link2 size={16} />} disabled={!expanded} onClick={() => context.openOverlay("link", { range: selection })} />
+      <PopoverTool kind="link" label="Link (Cmd+Shift+L)" icon={<Link2 size={16} />} title="Link the selection" editor={editor} disabled={!expanded}>
+        {(done, range) => <LinkPopoverBody editor={editor} range={range} done={done} toast={context.toast} />}
+      </PopoverTool>
       <ToolbarSeparator />
       <Tool label="Bulleted list" icon={<List size={16} />} pressed={block?.type === "bulletItem"} onClick={() => selection && editor.commit(setBlockType(editor.model, selection, "bulletItem").model, "Bulleted list", selection)} />
       <Tool label="Numbered list" icon={<ListOrdered size={16} />} pressed={block?.type === "numberItem"} onClick={() => selection && editor.commit(setBlockType(editor.model, selection, "numberItem").model, "Numbered list", selection)} />
       <Tool label="Quote" icon={<Quote size={16} />} pressed={block?.type === "quote"} onClick={() => selection && editor.commit(setBlockType(editor.model, selection, "quote").model, "Quote", selection)} />
       <ToolbarSeparator />
-      <Tool label="Insert table" icon={<TableIcon size={16} />} onClick={() => context.openOverlay("insert table")} />
-      <Tool label="Insert image reference" icon={<ImageIcon size={16} />} onClick={() => context.openOverlay("insert table", { mode: "image" })} />
+      <PopoverTool kind="table" label="Insert table" icon={<TableIcon size={16} />} title="Insert a table" editor={editor} width={280}>
+        {(done) => <TablePopoverBody editor={editor} done={done} toast={context.toast} />}
+      </PopoverTool>
+      <PopoverTool kind="image" label="Insert image reference" icon={<ImageIcon size={16} />} title="Image reference" editor={editor} width={340}>
+        {(done, _range, blockId) => <ImagePopoverBody editor={editor} blockId={blockId} done={done} toast={context.toast} />}
+      </PopoverTool>
       <Tool label="Insert page break" icon={<Minus size={16} />} onClick={() => {
         const result = insertBlockAfter(editor.model, editor.selection?.head.blockId, emptyBlock("pageBreak"));
         editor.commit(result.model, "Page break", result.selection);
       }} />
       <ToolbarSeparator />
-      <Tool label="Comment on the selection" icon={<MessageSquare size={16} />} disabled={!expanded} onClick={() => context.openOverlay("citations", { mode: "comment", range: selection })} />
-      <Tool label="Find and replace (Cmd+F)" icon={<Search size={16} />} onClick={() => context.openOverlay("Styles", { mode: "find" })} />
+      <PopoverTool kind="comment" label="Comment on the selection" icon={<MessageSquare size={16} />} title="Comment on the selection" editor={editor} width={320} disabled={!expanded}>
+        {(done, range) => <CommentPopoverBody editor={editor} range={range} done={done} toast={context.toast} />}
+      </PopoverTool>
+      <Tool label="Find and replace (Cmd+F)" icon={<Search size={16} />} onClick={onFind} />
     </Toolbar>
   );
 }
@@ -473,7 +490,9 @@ function ReviewRibbon({ editor, context }: { editor: DocEditor; context: ScreenC
         }}
       />
       <ToolbarSeparator />
-      <Tool label="Comment on the selection" icon={<MessageSquare size={16} />} onClick={() => context.openOverlay("citations", { mode: "comment", range: editor.selection })} />
+      <PopoverTool kind="comment" label="Comment on the selection" icon={<MessageSquare size={16} />} title="Comment on the selection" editor={editor} width={320}>
+        {(done, range) => <CommentPopoverBody editor={editor} range={range} done={done} toast={context.toast} />}
+      </PopoverTool>
       <Tool label="Open the full review desk" icon={<Highlighter size={16} />} onClick={() => context.navigate(context.path("/o/:org/docs/documents/:id/review", context.params.id))} />
     </Toolbar>
   );
@@ -607,7 +626,7 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
 
   function onEdit(intent: EditIntent) {
     editor.handleEdit(intent, {
-      onRequestLink: (range) => context.openOverlay("link", { range }),
+      onRequestLink: (range) => { if (tab !== "Write") context.setTab("Write"); openDocPopover("link", { range }); },
       onRequestFind: () => setFind((current) => ({ ...current, open: true })),
     });
   }
@@ -626,19 +645,33 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
   return (
     <div className="dx-shell">
       <div className="dx-bar">
-        <div className="dx-bar-title">
-          <input
-            aria-label="Document title"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            onBlur={() => {
-              if (title.trim() && title !== record.title) {
-                void context.mutate.patch(record.id, { title: title.trim() }, { event: `Document renamed to ${title.trim()}` });
-              } else setTitle(record.title);
-            }}
-          />
-          <span>{String(record.fields.folder ?? "Unfiled")} · {record.ownerName}</span>
-        </div>
+        <section className="dx-bar-main" aria-label="Document working status">
+          <div className="dx-bar-title">
+            <input
+              aria-label="Document title"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              onBlur={() => {
+                if (title.trim() && title !== record.title) {
+                  void context.mutate.patch(record.id, { title: title.trim() }, { event: `Document renamed to ${title.trim()}` });
+                } else setTitle(record.title);
+              }}
+            />
+            <span className="dx-bar-sub">
+              <Pill tone={record.status === "published" ? "success" : record.status === "in_review" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>
+              {editor.model.suggestMode && <Pill tone="info">Suggesting</Pill>}
+              <span>{stats.words} words · {stats.readingMinutes} min</span>
+              <span data-attention={mandatoryComments.length + pendingChanges.length > 0 || undefined}>
+                {mandatoryComments.length} mandatory review{mandatoryComments.length === 1 ? "" : "s"} open · {pendingChanges.length} pending change{pendingChanges.length === 1 ? "" : "s"}
+              </span>
+            </span>
+          </div>
+          <ButtonGroup label="Document areas">
+            <Button size="sm" variant="ghost" onClick={() => navigateDocumentArea("outline")}>Full outline</Button>
+            <Button size="sm" variant="ghost" onClick={() => navigateDocumentArea("review")}>Review history</Button>
+            <Button size="sm" variant="ghost" onClick={() => navigateDocumentArea("publish")}>Publishing</Button>
+          </ButtonGroup>
+        </section>
         <span className="ds-grow" />
         <DocActions context={context} />
         <SaveBadge editor={editor} context={context} />
@@ -646,22 +679,6 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
         <Button size="sm" variant="primary" onClick={() => context.openOverlay("export")} icon={<FileDown size={15} />}>Export</Button>
       </div>
 
-      <section className="dx-workflow-strip" aria-label="Document working status">
-        <div className="dx-workflow-context">
-          <span className="dx-workflow-eyebrow">CURRENT DOCUMENT</span>
-          <Row gap={2} wrap>
-            <Pill tone={record.status === "published" ? "success" : record.status === "in_review" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>
-            <span className="ds-subtle">{stats.words} words · {stats.readingMinutes} min read</span>
-            {editor.model.suggestMode && <Pill tone="info">Suggesting mode</Pill>}
-          </Row>
-          <span className="ds-subtle">{mandatoryComments.length} mandatory review{mandatoryComments.length === 1 ? "" : "s"} unresolved · {pendingChanges.length} pending change{pendingChanges.length === 1 ? "" : "s"}</span>
-        </div>
-        <div className="dx-workflow-actions">
-          <Button size="sm" variant="secondary" onClick={() => navigateDocumentArea("outline")}>Full outline</Button>
-          <Button size="sm" variant="secondary" onClick={() => navigateDocumentArea("review")}>Review history</Button>
-          <Button size="sm" variant="secondary" onClick={() => navigateDocumentArea("publish")}>Publishing</Button>
-        </div>
-      </section>
       <div className="dx-tabstrip">
         <Tabs
           label="Editor modes"
@@ -685,7 +702,7 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
       </div>
 
       <div className="dx-ribbon">
-        {tab === "Write" && <WriteRibbon editor={editor} context={context} />}
+        {tab === "Write" && <WriteRibbon editor={editor} context={context} onFind={() => setFind((current) => ({ ...current, open: true }))} />}
         {tab === "Review" && <ReviewRibbon editor={editor} context={context} />}
         {tab === "Layout" && <LayoutRibbon editor={editor} />}
         {tab === "References" && <ReferenceRibbon editor={editor} context={context} />}
@@ -777,7 +794,7 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
                 onCommentClick={setActiveCommentId}
                 onTableCell={setTableCell}
                 onTableEdit={(blockId, edit) => editor.commit(editTable(editor.model, blockId, edit), edit.kind === "addRow" ? "Add table row" : edit.kind === "addColumn" ? "Add table column" : edit.kind === "removeRow" ? "Remove table row" : "Remove table column")}
-                onBlockClick={(blockId) => context.openOverlay("insert table", { mode: "image", blockId })}
+                onBlockClick={(blockId) => { if (tab !== "Write") context.setTab("Write"); openDocPopover("image", { blockId }); }}
                 pageWidth={editor.model.page.size === "A4" ? 820 : 860}
               />
             )}
@@ -817,7 +834,7 @@ function DocumentEditorScreen({ context }: { context: ScreenContext }) {
                   { label: "Last action", value: editor.undoLabel ?? "None" },
                 ]} />
                 <Row gap={2} style={{ marginBlockStart: "var(--space-2)" }}>
-                  <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Styles")}>Styles</Button>
+                  <Button size="sm" variant="secondary" onClick={() => { context.setTab("Write"); openDocPopover("styles"); }}>Styles</Button>
                   <Button size="sm" variant="ghost" onClick={() => {
                     const block = currentBlock(editor);
                     if (!block) return;
@@ -1366,7 +1383,79 @@ function TemplatesScreen({ context, tab }: { context: ScreenContext; tab: "All" 
  * ARL-DOCS-006 — Publishing & Export
  * ====================================================================== */
 
+/** Identity block for the document pages that sit beside the editor: one title, the real state of the page. */
+function documentRecord(context: ScreenContext): RecordHeaderProps | null {
+  const record = useDocument(context);
+  if (!record) return null;
+  const model = readDoc(record.body, context.actor, context.now.toISOString());
+  const stats = documentStats(model);
+  const mandatory = model.comments.filter((comment) => comment.mandatory && !comment.resolved).length;
+  const changes = openSuggestions(model).length;
+  return {
+    title: record.title,
+    status: <Pill tone={record.status === "published" ? "success" : record.status === "in_review" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>,
+    meta: [
+      String(record.fields.folder ?? "Unfiled"),
+      record.ownerName,
+      `${stats.words} words`,
+      mandatory + changes > 0 ? `${mandatory} mandatory · ${changes} change${changes === 1 ? "" : "s"} open` : "No open review items",
+    ],
+  };
+}
+
+/** Save, review and publish are three separate facts about a document; this strip never lets one stand in for another. */
+function ReleasePath({ context, record, model, saveState }: { context: ScreenContext; record: Rec; model: DocModel; saveState: string }) {
+  const mandatory = model.comments.filter((comment) => comment.mandatory && !comment.resolved).length;
+  const open = model.comments.filter((comment) => !comment.resolved).length;
+  const changes = openSuggestions(model).length;
+  const approvals = record.fields.approvals ? String(record.fields.approvals).split("|").filter(Boolean) : [];
+  const lastApproval = approvals[approvals.length - 1];
+  const published = record.status === "published";
+  const steps = [
+    {
+      key: "save", label: "Saved", tone: saveState === "conflict" || saveState === "error" ? "danger" : saveState === "dirty" || saveState === "saving" ? "warning" : "success",
+      state: saveState === "conflict" ? "Conflict" : saveState === "error" ? "Not saved" : saveState === "dirty" || saveState === "saving" ? "Saving" : "Up to date",
+      detail: `Revision ${record.revision} · ${context.relative(record.updatedAt)}`,
+    },
+    {
+      key: "review", label: "Reviewed", tone: mandatory + changes > 0 ? "warning" : open > 0 ? "info" : "success",
+      state: mandatory + changes > 0 ? "Blocked" : open > 0 ? "Comments open" : "Clear",
+      detail: `${mandatory} mandatory · ${open} open comment${open === 1 ? "" : "s"} · ${changes} tracked change${changes === 1 ? "" : "s"}`,
+    },
+    {
+      key: "publish", label: "Published", tone: published ? "success" : "neutral",
+      state: published ? "Published here" : "Not published",
+      detail: published ? (lastApproval ? `Approved: ${lastApproval.split(" ")[0]} ${lastApproval.split(" ")[1] ?? ""}`.trim() : "Approved in this workspace") : "Workspace record only; no public URL",
+    },
+  ] as const;
+  return (
+    <ol className="dx-release" aria-label="Save, review and publish are separate">
+      {steps.map((step, index) => (
+        <li key={step.key} className="dx-release-step" data-tone={step.tone}>
+          <span className="dx-release-index" aria-hidden="true">{index + 1}</span>
+          <div>
+            <div className="dx-release-head"><strong>{step.label}</strong><Pill tone={step.tone as "success" | "warning" | "danger" | "info" | "neutral"}>{step.state}</Pill></div>
+            <span className="dx-release-detail">{step.detail}</span>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function PublishScreen({ context, tab }: { context: ScreenContext; tab: "Export" | "Share" | "Publish" | "History" }) {
+  const record = useDocument(context);
+  const editor = useDocEditor(context, record);
+  if (!record) return <Empty title="No document is open" icon={<FileText size={20} />} />;
+  return (
+    <Stack gap={4}>
+      <ReleasePath context={context} record={record} model={editor.model} saveState={editor.saveState} />
+      <PublishTab context={context} tab={tab} />
+    </Stack>
+  );
+}
+
+function PublishTab({ context, tab }: { context: ScreenContext; tab: "Export" | "Share" | "Publish" | "History" }) {
   const record = useDocument(context);
   const editor = useDocEditor(context, record);
   const events = useCollection("documents");
@@ -3385,9 +3474,9 @@ registerApp({
       tabs: ["Write", "Review", "Layout", "References"].map((id) => ({ id, render: () => null })),
       actions: [
         { id: "Type", label: "Type on the page", placement: "toolbar", run: (context) => focusPage(context) },
-        { id: "format", label: "Format…", placement: "toolbar", run: (context) => context.openOverlay("format") },
-        { id: "insert", label: "Insert", placement: "toolbar", run: (context) => context.openOverlay("insert table") },
-        { id: "comment", label: "Comment", placement: "toolbar", run: (context) => context.openOverlay("citations", { mode: "comment" }) },
+        { id: "format", label: "Format…", placement: "toolbar", run: (context) => { context.setTab("Write"); openDocPopover("format", { range: docEditorFor(context)?.selection }); } },
+        { id: "insert", label: "Insert", placement: "toolbar", run: (context) => { context.setTab("Write"); openDocPopover("table"); } },
+        { id: "comment", label: "Comment", placement: "toolbar", run: (context) => openDocPopover("comment", { range: docEditorFor(context)?.selection }) },
         { id: "accept changes", label: "Accept changes…", placement: "toolbar", run: (context) => context.openOverlay("accept changes") },
         { id: "export", label: "Export", placement: "toolbar", run: (context) => context.openOverlay("export") },
       ],
@@ -3404,6 +3493,7 @@ registerApp({
 
     "ARL-DOCS-003": {
       id: "ARL-DOCS-003",
+      record: documentRecord,
       title: () => "Outline & navigation",
       tabs: (["Headings", "Bookmarks", "Comments"] as const).map((id) => ({ id, render: (context) => <OutlineScreen context={context} tab={id} /> })),
       actions: [
@@ -3424,6 +3514,7 @@ registerApp({
 
     "ARL-DOCS-004": {
       id: "ARL-DOCS-004",
+      record: documentRecord,
       title: () => "Review & comments",
       tabs: (["Comments", "Changes", "Approvals", "Versions"] as const).map((id) => ({ id, render: (context) => <ReviewScreen context={context} tab={id} /> })),
       actions: [
@@ -3470,6 +3561,7 @@ registerApp({
 
     "ARL-DOCS-006": {
       id: "ARL-DOCS-006",
+      record: documentRecord,
       title: () => "Publishing & export",
       tabs: (["Export", "Share", "Publish", "History"] as const).map((id) => ({ id, render: (context) => <PublishScreen context={context} tab={id} /> })),
       actions: [
@@ -3490,6 +3582,7 @@ registerApp({
 
     "ARL-DOCS-007": {
       id: "ARL-DOCS-007",
+      record: documentRecord,
       title: () => "Document insights",
       tabs: (["Writing", "Accuracy", "Brand", "Sources"] as const).map((id) => ({ id, render: (context) => <InsightsScreen context={context} tab={id} /> })),
       actions: [

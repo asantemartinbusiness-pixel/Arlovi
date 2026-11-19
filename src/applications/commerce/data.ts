@@ -161,7 +161,15 @@ export const PAYMENT_LABEL: Record<string, string> = {
   void: "Voided",
   disputed: "Disputed",
   refunded_local: "Refunded in the ledger",
+  refund_proposed: "Refund proposed",
 };
+
+/** Label for an order's payment field; an absent or unknown value reads as not recorded, never "undefined". */
+export function paymentLabel(payment: unknown): string {
+  const key = typeof payment === "string" ? payment : "";
+  if (!key || key === "undefined") return "Payment not recorded";
+  return PAYMENT_LABEL[key] ?? key.replace(/_/g, " ");
+}
 
 export function paymentTone(payment: string): "success" | "warning" | "danger" | "neutral" {
   if (payment === "paid_local") return "success";

@@ -56,7 +56,7 @@ test("Document editor displays lifecycle context and routes to review and publis
   await page.goto(`/o/northline/docs/documents/${id}`);
   const status = page.getByLabel("Document working status");
   await expect(status).toBeVisible();
-  await expect(status).toContainText("CURRENT DOCUMENT");
+  await expect(status).toContainText("mandatory review");
   await expect(status).toContainText("draft");
   await status.getByRole("button", { name: "Review history" }).click();
   await expect(page).toHaveURL(/\/review/);

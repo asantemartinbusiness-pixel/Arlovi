@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { FileCheck2, Paperclip, Receipt, Upload } from "lucide-react";
+import { Paperclip, Receipt, Upload } from "lucide-react";
 import {
-  Button, Card, DataGrid, DrawerActions, DrawerUnsavedChanges, Empty, FactGrid, Field, ModalActions, ModalInFlight, MoneyInput, Notice, OverlayActions, OverlayCancel, OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, DataGrid, DrawerActions, DrawerUnsavedChanges, Empty, FactGrid, Field, ModalActions, ModalInFlight, MoneyInput, Notice, OverlayActions, OverlayCancel, OverlaySection, OverlaySummary, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -603,11 +603,9 @@ export function ReceiptCapture({ context, close }: { context: ScreenContext; clo
         close();
       }}
     >
-      <Row gap={3} wrap>
+      <div className="fin-form-grid">
         <Field label="What it was for" required><TextInput aria-label="What it was for" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
         <Field label="Amount" required><MoneyInput label="Amount" currency={org.currency} valueMinor={amount} onChangeMinor={setAmount} /></Field>
-      </Row>
-      <Row gap={3} wrap>
         <Field label="Category">
           <Select aria-label="Category" value={category} onChange={(event) => setCategory(event.target.value)}>
             {["travel", "materials", "marketing", "entertaining", "delivery", "software", "other"].map((item) => <option key={item}>{item}</option>)}
@@ -623,7 +621,7 @@ export function ReceiptCapture({ context, close }: { context: ScreenContext; clo
             {TAX_CATEGORIES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
           </Select>
         </Field>
-      </Row>
+      </div>
       <Field label="Receipt file name" hint="The image stays on your device. Only the name and the date are recorded.">
         <TextInput aria-label="Receipt file name" value={filename} onChange={(event) => setFilename(event.target.value)} placeholder="rail-16-nov.jpg" />
       </Field>
@@ -633,10 +631,10 @@ export function ReceiptCapture({ context, close }: { context: ScreenContext; clo
           The claim can still be submitted, and it will be flagged so an approver can see why it is blocked.
         </Notice>
       )}
-      <Row gap={2}>
-        <Button type="submit" variant="primary" busy={busy} disabled={!title.trim() || amount <= 0}>Submit the claim</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <OverlayActions
+        primary={<Button type="submit" variant="primary" busy={busy} disabled={!title.trim() || amount <= 0}>Submit the claim</Button>}
+        end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+      />
     </form>
   );
 }
@@ -655,26 +653,29 @@ export function ExpenseDetail({ context, close }: { context: ScreenContext; clos
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Claim", value: expense.title },
-        { label: "Claimant", value: String(expense.fields.claimant ?? expense.ownerName) },
-        { label: "Date", value: <span className="ds-num">{context.date(expense.at)}</span> },
-        { label: "Amount", value: <Amount minor={expense.amountMinor} context={context} bold /> },
-        { label: "Category", value: String(expense.fields.category ?? "uncategorised") },
-        { label: "Posts to", value: String(expense.fields.accountCode ?? "Not set") },
-        { label: "Recoverable tax", value: <Amount minor={tax} context={context} /> },
-        { label: "Receipt", value: receipt?.filename ? `${receipt.filename}, captured ${context.date(receipt.capturedAt)}` : "None" },
-        { label: "Status", value: <Pill tone={expense.status === "reimbursed" ? "success" : "neutral"} dot>{expense.status}</Pill> },
-        { label: "Posted journal", value: journal ? journal.title : "Nothing posted" },
+      <DrawerUnsavedChanges when={busy} />
+      <OverlaySummary
+        eyebrow="Expense claim"
+        title={expense.title}
+        status={<Pill tone={expense.status === "reimbursed" ? "success" : expense.status === "rejected" ? "danger" : "neutral"} dot>{expense.status}</Pill>}
+        meta={[String(expense.fields.claimant ?? expense.ownerName), <span className="ds-num" key="d">{context.date(expense.at)}</span>, journal ? `Posted: ${journal.title}` : "Nothing posted to the ledger"]}
+      />
+      {blocked && <Notice tone="danger" title="Cannot be approved">{blocked} Ask the claimant to add the receipt name.</Notice>}
+      <FactGrid columns={3} items={[
+        { label: "Amount", value: <Amount minor={expense.amountMinor} context={context} bold />, mono: true, tone: "accent" },
+        { label: "Recoverable tax", value: <Amount minor={tax} context={context} zero="0" />, mono: true },
+        { label: "Posts to", value: String(expense.fields.accountCode ?? "Not set"), mono: true, hint: String(expense.fields.category ?? "uncategorised") },
       ]} />
+      <SourceNote>Receipt: {receipt?.filename ? `${receipt.filename}, captured ${context.date(receipt.capturedAt)}` : "none"}</SourceNote>
       {expense.fields.policyNote && <Notice tone="warning" title="Policy">{String(expense.fields.policyNote)}</Notice>}
       {receipt?.filename && (
         <Notice tone="info" title="The receipt image is not stored here">
           Only the file name and capture date are kept, so nothing personal is held in this browser database beyond what you typed.
         </Notice>
       )}
-      <Row gap={2} wrap>
-        <Button
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || !context.can("approve_payment") || ["approved", "reimbursed"].includes(expense.status)}
@@ -688,8 +689,8 @@ export function ExpenseDetail({ context, close }: { context: ScreenContext; clos
           }}
         >
           Approve
-        </Button>
-        <Button
+        </Button>}
+          secondary={<Button
           variant="secondary"
           busy={busy}
           disabled={expense.status !== "approved" || !context.can("post_journal")}
@@ -729,7 +730,8 @@ export function ExpenseDetail({ context, close }: { context: ScreenContext; clos
           }}
         >
           Reimburse and post
-        </Button>
+        </Button>}
+          end={<>
         <Button
           variant="outline-danger"
           busy={busy}
@@ -744,9 +746,10 @@ export function ExpenseDetail({ context, close }: { context: ScreenContext; clos
         >
           Reject
         </Button>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+        <OverlayCancel disabled={busy}>Close</OverlayCancel>
+          </>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -754,10 +757,10 @@ export function ExpenseDetail({ context, close }: { context: ScreenContext; clos
 export function ApprovalChain({ context }: { context: ScreenContext }) {
   const data = useFinData();
   const steps = [
-    { label: "Claimant submits with a receipt", who: "Anyone", done: true },
-    { label: "Finance checks the category and the account", who: "Finance", done: true },
-    { label: "Owner approves anything over 200.00 or any entertaining", who: "Owner", done: false },
-    { label: "Reimbursement posts a balanced journal", who: "Finance", done: false },
+    { label: "Claimant submits with a receipt", who: "Anyone" },
+    { label: "Finance checks the category and the account", who: "Finance" },
+    { label: "Owner approves anything over 200.00 or any entertaining", who: "Owner" },
+    { label: "Reimbursement posts a balanced journal", who: "Finance" },
   ];
   const waiting = data.expenses.filter((expense) => expense.status === "review");
 
@@ -769,10 +772,9 @@ export function ApprovalChain({ context }: { context: ScreenContext }) {
       <Stack gap={3}>
         {steps.map((step, index) => (
           <Row key={step.label} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-            <Pill tone={step.done ? "success" : "neutral"} dot>{index + 1}</Pill>
+            <Pill tone="neutral">{index + 1}</Pill>
             <span className="ds-grow">{step.label}</span>
             <span className="ds-subtle">{step.who}</span>
-            {step.done ? <FileCheck2 size={16} aria-label="Already applied" /> : <span className="ds-subtle">Pending</span>}
           </Row>
         ))}
       </Stack>

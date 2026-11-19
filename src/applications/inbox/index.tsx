@@ -7,6 +7,7 @@ import {
 import {
   Avatar, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill,
   Properties, Row, Segmented, Select, Stack, Stat, StatRow, Switch, TextArea, TextInput,
+  FactGrid, OverlayActions, OverlaySection, OverlaySummary, OVERLAY_WIDTH,
 } from "@/design-system";
 import { findScreen } from "@/app/catalog";
 import { registerApp, type ScreenContext } from "@/platform/registry";
@@ -566,29 +567,44 @@ function NotificationDetail({ context }: { context: ScreenContext }) {
   if (!item) return <Empty title="Select an item" icon={<Inbox size={20} />}>Choose a row in the queue to see where it came from.</Empty>;
 
   return (
-    <Stack gap={4}>
-      <Row gap={2} wrap><PriorityTag priority={item.priority} /><StateTags item={item} /></Row>
-      <div>
-        <h3 style={{ marginBlockEnd: 4 }}>{item.title}</h3>
-        <p>{item.body}</p>
-      </div>
-      <Properties rows={[
-        { label: "Kind", value: item.kind },
+    <Stack gap={3}>
+      <OverlaySummary
+        eyebrow={`${item.sourceLabel} · ${item.kind}`}
+        title={item.title}
+        status={<PriorityTag priority={item.priority} />}
+        meta={[`${context.relative(item.at)}`, item.assignee ? `With ${item.assignee}` : "Unassigned"]}
+      />
+      <StateTags item={item} />
+      {item.body && <p>{item.body}</p>}
+      <OverlaySection title="Why this reached you"><p>{routeReason(item, rules, role)}</p></OverlaySection>
+      <FactGrid columns={2} items={[
         { label: "Group", value: item.group },
-        { label: "Raised by", value: item.sourceLabel },
-        { label: "When", value: `${context.dateTime(item.at)} (${context.relative(item.at)})` },
-        { label: "Stored as", value: item.sourceKind === "notification" ? `Record ${item.record?.id}` : "Derived from the record it points at" },
+        { label: "When", value: context.dateTime(item.at), mono: true },
         { label: "Audience", value: item.audience.length ? item.audience.map((entry) => ROLE_LABELS[entry]).join(", ") : "Everyone in the workspace" },
-        { label: "Snoozed until", value: item.snoozedUntil ? context.dateTime(item.snoozedUntil) : "Not snoozed" },
-        { label: "Assigned to", value: item.assignee ?? "Nobody" },
+        { label: "Snoozed until", value: item.snoozedUntil ? context.dateTime(item.snoozedUntil) : "Not snoozed", mono: Boolean(item.snoozedUntil) },
+        { label: "Stored as", value: item.sourceKind === "notification" ? `Record ${item.record?.id}` : "Derived from its record", mono: item.sourceKind === "notification" },
       ]} />
-      <Notice tone="info" title="Why this reached you">{routeReason(item, rules, role)}</Notice>
       <DeepLink item={item} context={context} />
-      <Notice tone="neutral" title="What each action means">
-        Read: you have seen it. Acknowledge: you accept it is yours to deal with. Snooze: out of the queue until a time.
-        Resolve: nothing more is needed. {item.kind === "approval" ? "Approving or declining happens on the request itself." : ""}
-      </Notice>
-      <Row gap={2} wrap>
+      <OverlaySection title="What each action means">
+        <p className="ds-subtle">
+          Read: you have seen it. Acknowledge: you accept it is yours to deal with. Snooze: out of the queue until a time.
+          Resolve: nothing more is needed. {item.kind === "approval" ? "Approving or declining happens on the request itself." : ""}
+        </p>
+      </OverlaySection>
+      <OverlayActions
+        primary={item.kind === "approval" ? (
+          <Button variant="primary" onClick={() => context.navigate(approvalReviewPath(context.org.slug, item))}>Decide on the record</Button>
+        ) : item.resolved ? (
+          <Button variant="secondary" onClick={() => void writeTriage(context.mutate, item, { resolved: false, snoozedUntil: null }, `Reopened: ${item.title}`).then(() => context.toast("Reopened", "The item is back in the queue."))}>Reopen</Button>
+        ) : (
+          <Button
+            variant="primary"
+            onClick={() => void writeTriage(context.mutate, item, { read: true, resolved: true }, `Resolved from the inbox: ${item.title}`).then(() => context.toast("Resolved", "The item left the queue and the change is on the record."))}
+          >
+            Resolve
+          </Button>
+        )}
+        secondary={<>
         {item.read ? (
           <Button
             variant="ghost"
@@ -616,19 +632,8 @@ function NotificationDetail({ context }: { context: ScreenContext }) {
         ) : (
           <Button variant="secondary" disabled={item.resolved} onClick={() => context.openOverlay("snooze picker", { itemIds: [item.id] })}>Snooze</Button>
         )}
-        {item.kind === "approval" ? (
-          <Button variant="primary" onClick={() => context.navigate(approvalReviewPath(context.org.slug, item))}>Decide on the record</Button>
-        ) : item.resolved ? (
-          <Button variant="secondary" onClick={() => void writeTriage(context.mutate, item, { resolved: false, snoozedUntil: null }, `Reopened: ${item.title}`).then(() => context.toast("Reopened", "The item is back in the queue."))}>Reopen</Button>
-        ) : (
-          <Button
-            variant="primary"
-            onClick={() => void writeTriage(context.mutate, item, { read: true, resolved: true }, `Resolved from the inbox: ${item.title}`).then(() => context.toast("Resolved", "The item left the queue and the change is on the record."))}
-          >
-            Resolve
-          </Button>
-        )}
-      </Row>
+        </>}
+      />
     </Stack>
   );
 }
@@ -683,15 +688,18 @@ function SnoozePicker({ context, close }: { context: ScreenContext; close: () =>
       <Field label="Or pick a time" hint="Kept in this browser against the item.">
         <TextInput type="datetime-local" value={custom} onChange={(event) => setCustom(event.target.value)} />
       </Field>
-      <Button
-        variant="primary"
-        busy={busy}
-        disabled={!custom || new Date(custom) <= now}
-        title={custom && new Date(custom) <= now ? "Choose a time in the future" : undefined}
-        onClick={() => void apply(new Date(custom))}
-      >
-        Snooze until the chosen time
-      </Button>
+      <OverlayActions
+        primary={<Button
+          variant="primary"
+          busy={busy}
+          disabled={!custom || new Date(custom) <= now}
+          title={custom && new Date(custom) <= now ? "Choose a time in the future" : undefined}
+          onClick={() => void apply(new Date(custom))}
+        >
+          Snooze until the chosen time
+        </Button>}
+        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }
@@ -758,11 +766,10 @@ function ActionPreview({ context, close }: { context: ScreenContext; close: () =
       <Field label="Note for the log" hint="Optional. Stored with each change so the log says why.">
         <TextInput value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Cleared during the Monday review" />
       </Field>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" busy={busy} disabled={willChange.length === 0} onClick={() => void apply()}>{label} {willChange.length}</Button>
-      </Row>
+      <OverlayActions
+        primary={<Button variant="primary" busy={busy} disabled={willChange.length === 0} onClick={() => void apply()}>{label} {willChange.length}</Button>}
+        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }
@@ -801,7 +808,6 @@ function ApprovalsScreen({ context, tab }: { context: ScreenContext; tab: Approv
         </Notice>
       )}
       <Card
-        eyebrow="APPROVALS"
         prov="human"
         title={tab === "History" ? "Decided" : `${rows.length} waiting`}
         subtitle={tab === "Mine" ? `Assigned to ${actor}` : tab === "Delegated" ? "Covered by a backup approver" : tab === "Pending" ? "Every open request in this workspace" : "Decisions already taken"}
@@ -872,40 +878,52 @@ function ApprovalsScreen({ context, tab }: { context: ScreenContext; tab: Approv
   );
 }
 
+const RISK_TONE = (risk: unknown) => (risk === "high" ? "danger" : risk === "medium" ? "warning" : "neutral") as "danger" | "warning" | "neutral";
+
+/** Evidence first: exactly what is being approved, bound to which version, and whether it still holds. */
 function ApprovalEvidence({ record, context }: { record: Rec; context: ScreenContext }) {
   const target = useRecord(String(record.fields.targetId ?? ""));
   const planVersion = String(record.fields.planVersion ?? "1");
   const currentVersion = target ? String(target.revision) : undefined;
   const { checked, drifted, boundRevision } = targetDrift(record, target);
+  const agent = record.fields.requesterKind === "ai";
 
   return (
-    <Stack gap={4}>
-      <Properties rows={[
-        { label: "Exact action", value: <span className="ds-num">{String(record.fields.action ?? "")}</span> },
-        { label: "Scope", value: String(record.fields.scope ?? "Not stated") },
-        { label: "Requested by", value: `${String(record.fields.requester ?? record.ownerName)}${record.fields.requesterKind === "ai" ? " (agent)" : ""}` },
-        { label: "Risk", value: <Pill tone={record.fields.risk === "high" ? "danger" : record.fields.risk === "medium" ? "warning" : "neutral"}>{String(record.fields.risk ?? "low")}</Pill> },
-        { label: "Amount", value: record.amountMinor === undefined ? "No money moves" : context.money(record.amountMinor) },
-        { label: "Affected accounts", value: String(record.fields.accounts ?? "—") },
-        { label: "Target record", value: target ? `${target.title} (revision ${target.revision})` : `${String(record.fields.targetTitle ?? "Unknown")} — not in this browser` },
-        { label: "Plan version approved", value: planVersion },
-        { label: "Target revision when requested", value: boundRevision ?? "Not recorded" },
-        { label: "Expires", value: record.dueAt ? context.date(record.dueAt) : "No expiry" },
-      ]} />
-      <Notice tone="info" title="Evidence as recorded">
-        {String(record.fields.evidence ?? "No evidence was attached to this request.")}
-      </Notice>
-      {drifted && (
-        <Notice tone="warning" title="The target changed after this request was made">
-          The request was raised against revision {boundRevision} of the target; the record is now at revision {currentVersion}. Approving would apply a
-          decision to something the requester did not describe, so it is blocked until the request is re-submitted.
-        </Notice>
-      )}
-      {target && !checked && (
-        <Notice tone="neutral" title="The target's revision was not recorded">
-          This request did not record which revision of {target.title} it describes, so a change since it was raised cannot be detected here.
-        </Notice>
-      )}
+    <Stack gap={3}>
+      <OverlaySection title="Evidence" hint="Recorded on the request. Nothing here is inferred.">
+        <Stack gap={3}>
+          <FactGrid columns={2} items={[
+            { label: "Exact action", value: String(record.fields.action ?? "Not stated"), mono: true },
+            { label: "Scope", value: String(record.fields.scope ?? "Not stated") },
+            { label: "Requested by", value: `${String(record.fields.requester ?? record.ownerName)}${agent ? " (agent)" : ""}` },
+            { label: "Affected accounts", value: String(record.fields.accounts ?? "—") },
+            { label: "Amount", value: record.amountMinor === undefined ? "No money moves" : context.money(record.amountMinor), mono: record.amountMinor !== undefined },
+            { label: "Expires", value: record.dueAt ? context.date(record.dueAt) : "No expiry", mono: Boolean(record.dueAt) },
+          ]} />
+          <blockquote className="ib-evidence">{String(record.fields.evidence ?? "No evidence was attached to this request.")}</blockquote>
+        </Stack>
+      </OverlaySection>
+      <OverlaySection title="Bound to" hint="The decision applies to this plan version and this revision of the target, and nothing else." tone={drifted ? "danger" : "neutral"}>
+        <FactGrid columns={3} items={[
+          { label: "Plan version", value: planVersion, mono: true },
+          { label: "Target", value: target ? target.title : `${String(record.fields.targetTitle ?? "Unknown")} (not in this browser)` },
+          {
+            label: "Revision",
+            value: boundRevision ? `${boundRevision} at request${currentVersion ? ` · now ${currentVersion}` : ""}` : "Not recorded",
+            mono: true,
+            tone: drifted ? "danger" : undefined,
+          },
+        ]} />
+        {drifted && (
+          <p className="ib-drift">
+            The request was raised against revision {boundRevision}; the record is now at revision {currentVersion}. Approving would apply a
+            decision to something the requester did not describe, so approval is blocked until the request is re-submitted.
+          </p>
+        )}
+        {target && !checked && (
+          <p className="ds-subtle">This request did not record which revision of {target.title} it describes, so a later change cannot be detected here.</p>
+        )}
+      </OverlaySection>
       {record.fields.decisionNote ? <Notice tone="neutral" title="Decision note">{String(record.fields.decisionNote)}</Notice> : null}
     </Stack>
   );
@@ -915,6 +933,7 @@ function ApprovalReview({ context, close }: { context: ScreenContext; close: () 
   const approvals = useCollection("approvals");
   const payload = context.overlayPayload as { id?: string; intent?: string } | undefined;
   const record = approvals.find((row) => row.id === (payload?.id ?? context.selectedId));
+  const target = useRecord(record ? String(record.fields.targetId ?? "") : undefined);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const { actor } = useWorkspace();
@@ -923,6 +942,8 @@ function ApprovalReview({ context, close }: { context: ScreenContext; close: () 
 
   const capability = String(record.fields.capability ?? "") as Capability;
   const allowed = capability ? context.can(capability) : true;
+  const decided = DECIDED.has(record.status);
+  const { drifted } = targetDrift(record, target);
 
   async function decide(decision: "denied" | "changes_requested") {
     setBusy(true);
@@ -939,28 +960,44 @@ function ApprovalReview({ context, close }: { context: ScreenContext; close: () 
   }
 
   return (
-    <Stack gap={4}>
-      <div>
-        <h3 style={{ marginBlockEnd: 4 }}>{record.title}</h3>
-        <p>{record.summary}</p>
-      </div>
+    <Stack gap={3}>
+      <OverlaySummary
+        eyebrow="Approval request"
+        title={record.title}
+        status={<Pill tone={RISK_TONE(record.fields.risk)} dot>{String(record.fields.risk ?? "low")} risk</Pill>}
+        meta={[
+          record.amountMinor !== undefined ? <span key="a" className="ds-num">{context.money(record.amountMinor)}</span> : null,
+          `Plan version ${String(record.fields.planVersion ?? "1")}`,
+          decided ? record.status.replace("_", " ") : record.dueAt ? `Expires ${context.date(record.dueAt)}` : null,
+        ]}
+      />
+      {record.summary && <p className="ib-summary">{record.summary}</p>}
       <ApprovalEvidence record={record} context={context} />
-      {!allowed && (
-        <Notice tone="warning" title={`The ${ROLE_LABELS[context.role]} view cannot take this decision`}>
-          This request needs the {capability.replace(/_/g, " ")} capability. Deciding is offered to the views that hold it; this shapes
-          the interface and is not an account security boundary.
-        </Notice>
-      )}
-      <Field label="Note" hint="Required to deny or to ask for changes. Stored on the request.">
-        <TextArea rows={3} value={note} onChange={(event) => setNote(event.target.value)} />
-      </Field>
-      <Row gap={2} wrap>
-        <Button variant="outline-danger" busy={busy} disabled={!note.trim()} title={!note.trim() ? "Add a note first" : undefined} onClick={() => void decide("denied")}>Deny</Button>
-        <Button variant="secondary" busy={busy} disabled={!note.trim()} title={!note.trim() ? "Add a note first" : undefined} onClick={() => void decide("changes_requested")}>Ask for changes</Button>
-        <span className="ds-grow" />
-        <Button variant="secondary" onClick={() => context.openOverlay("scope diff", { id: record.id })}>Scope</Button>
-        <Button variant="primary" disabled={!allowed} onClick={() => context.openOverlay("step-up auth", { id: record.id })}>Approve…</Button>
-      </Row>
+      <OverlaySection title={decided ? "Decision" : "Your decision"}>
+        {decided ? (
+          <p className="ds-subtle">Decided by {String(record.fields.decidedBy ?? "someone")} as {record.status.replace("_", " ")}.</p>
+        ) : (
+          <Stack gap={3}>
+            {!allowed && (
+              <Notice tone="warning" title={`The ${ROLE_LABELS[context.role]} view cannot take this decision`}>
+                This request needs the {capability.replace(/_/g, " ")} capability. This shapes the interface and is not an account security boundary.
+              </Notice>
+            )}
+            <Field label="Note" hint="Required to deny or to ask for changes. Stored on the request.">
+              <TextArea rows={3} value={note} onChange={(event) => setNote(event.target.value)} />
+            </Field>
+            <OverlayActions
+              primary={<Button variant="primary" disabled={!allowed || drifted} title={drifted ? "The target changed since the request" : undefined} onClick={() => context.openOverlay("step-up auth", { id: record.id })}>Approve…</Button>}
+              secondary={<>
+                <Button variant="secondary" busy={busy} disabled={!note.trim()} title={!note.trim() ? "Add a note first" : undefined} onClick={() => void decide("changes_requested")}>Ask for changes</Button>
+                <Button variant="ghost" onClick={() => context.openOverlay("scope diff", { id: record.id })}>Compare scope</Button>
+              </>}
+              end={<Button variant="outline-danger" busy={busy} disabled={!note.trim()} title={!note.trim() ? "Add a note first" : undefined} onClick={() => void decide("denied")}>Deny</Button>}
+              busy={busy}
+            />
+          </Stack>
+        )}
+      </OverlaySection>
     </Stack>
   );
 }
@@ -1000,16 +1037,16 @@ function StepUpAuth({ context, close }: { context: ScreenContext; close: () => v
   }
 
   return (
-    <Stack gap={4}>
-      <Notice tone="warning" title="This is a local confirmation, not a second factor">
-        Nothing here checks a device or a provider. Typing the word below records a deliberate confirmation in the audit log so a
-        consequential approval is never one stray click.
-      </Notice>
-      <Properties rows={[
-        { label: "Request", value: record.title },
-        { label: "Action", value: <span className="ds-num">{String(record.fields.action ?? "")}</span> },
-        { label: "Amount", value: record.amountMinor === undefined ? "No money moves" : context.money(record.amountMinor) },
-        { label: "Bound to", value: `Plan version ${planVersion}` },
+    <form className="ds-stack ds-gap-3" onSubmit={(event) => { event.preventDefault(); if (!drifted && phrase === expected) void approve(); }}>
+      <OverlaySummary
+        eyebrow="You are approving"
+        title={record.title}
+        status={<Pill tone={RISK_TONE(record.fields.risk)} dot>{String(record.fields.risk ?? "low")} risk</Pill>}
+      />
+      <FactGrid columns={2} items={[
+        { label: "Action", value: String(record.fields.action ?? "Not stated"), mono: true },
+        { label: "Amount", value: record.amountMinor === undefined ? "No money moves" : context.money(record.amountMinor), mono: record.amountMinor !== undefined },
+        { label: "Bound to", value: `Plan version ${planVersion}`, mono: true },
         { label: "Approving as", value: `${actor} · ${ROLE_LABELS[context.role]} view` },
       ]} />
       {drifted ? (
@@ -1018,16 +1055,18 @@ function StepUpAuth({ context, close }: { context: ScreenContext; close: () => v
           re-submit so the decision matches what will actually happen.
         </Notice>
       ) : (
-        <Field label={`Type ${expected} to confirm`} required>
-          <TextInput value={phrase} onChange={(event) => setPhrase(event.target.value.toUpperCase())} autoComplete="off" />
-        </Field>
+        <>
+          <Field label={`Type ${expected} to confirm`} required hint="A local confirmation recorded in the audit log, not a second factor. No device or provider is checked.">
+            <TextInput value={phrase} onChange={(event) => setPhrase(event.target.value.toUpperCase())} autoComplete="off" />
+          </Field>
+        </>
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" busy={busy} disabled={drifted || phrase !== expected} onClick={() => void approve()}>Approve this action</Button>
-      </Row>
-    </Stack>
+      <OverlayActions
+        primary={<Button variant="primary" type="submit" busy={busy} disabled={drifted || phrase !== expected}>Approve this action</Button>}
+        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        busy={busy}
+      />
+    </form>
   );
 }
 
@@ -1039,29 +1078,29 @@ function ScopeDiff({ context }: { context: ScreenContext }) {
   const capability = String(record.fields.capability ?? "");
   const requester = String(record.fields.requester ?? record.ownerName);
   const isAgent = record.fields.requesterKind === "ai";
-
+  const rows: { aspect: string; requested: string; held: string; differs: boolean }[] = [
+    { aspect: "Action", requested: String(record.fields.action ?? "Not stated"), held: isAgent ? "Drafts and requests only" : "Depends on their role view", differs: true },
+    { aspect: "Scope", requested: String(record.fields.scope ?? "Not stated"), held: isAgent ? "Draft mode" : "Their own role view", differs: isAgent },
+    { aspect: "Accounts", requested: String(record.fields.accounts ?? "—"), held: isAgent ? "None" : "Per role view", differs: isAgent },
+    { aspect: "Ceiling", requested: record.amountMinor === undefined ? "No money" : context.money(record.amountMinor), held: isAgent ? "No spend grant" : "Per role view", differs: isAgent && record.amountMinor !== undefined },
+    { aspect: "Capability", requested: capability || "None recorded", held: isAgent ? "Not held" : "Role view decides", differs: isAgent },
+  ];
   return (
-    <Stack gap={4}>
-      <Card eyebrow="REQUESTED" prov={isAgent ? "agent" : "human"} title="Requested" subtitle="What the request would allow">
-        <Properties rows={[
-          { label: "Action", value: <span className="ds-num">{String(record.fields.action ?? "")}</span> },
-          { label: "Scope", value: String(record.fields.scope ?? "Not stated") },
-          { label: "Accounts", value: String(record.fields.accounts ?? "—") },
-          { label: "Ceiling", value: record.amountMinor === undefined ? "No money" : context.money(record.amountMinor) },
-        ]} />
-      </Card>
-      <Card eyebrow="HELD TODAY" prov="posted" title="Held today" subtitle={`What ${requester} can already do`}>
-        <Properties rows={[
-          { label: "Requester", value: isAgent ? "Agent, draft mode" : "Person" },
-          { label: "Capability needed", value: capability || "None recorded" },
-          { label: "Already held", value: isAgent ? "No — agents draft and request" : "Depends on their role view" },
-          { label: "Difference", value: isAgent ? "The whole action: an agent never holds this grant." : "One action, once, on the record named above." },
-        ]} />
-      </Card>
-      <Notice tone="info" title="One action, not a standing grant">
-        Approving decides this request only. Standing authority lives in Administration under Autonomy, where a grant is recorded with
-        its cap and its expiry.
-      </Notice>
+    <Stack gap={3}>
+      <OverlaySummary eyebrow="Requested against held" title={record.title} meta={[`${requester}${isAgent ? " (agent)" : ""}`]} />
+      <table className="ib-diff" aria-label="Requested against held">
+        <thead><tr><th scope="col">Aspect</th><th scope="col">Requested</th><th scope="col">Held today</th></tr></thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.aspect} data-differs={row.differs || undefined}>
+              <th scope="row">{row.aspect}</th>
+              <td className="ds-num">{row.requested}</td>
+              <td>{row.held}{row.differs && <Pill tone="warning">new</Pill>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="ds-subtle">Approving decides this request only. Standing authority lives in Administration under Autonomy, with its own cap and expiry.</p>
     </Stack>
   );
 }
@@ -1219,21 +1258,20 @@ function MessageInspector({ context, close }: { context: ScreenContext; close: (
   }
 
   return (
-    <Stack gap={4}>
-      <Row gap={3}>
-        <Avatar name={String(message.fields.author ?? message.ownerName)} kind={message.fields.authorKind === "ai" ? "ai" : "human"} size="lg" />
-        <div className="ds-grow">
-          <h3 style={{ marginBlockEnd: 2 }}>{message.title}</h3>
-          <span className="ds-subtle">{String(message.fields.author ?? message.ownerName)} · {String(message.fields.channel ?? "Direct")} · {context.relative(message.at)}</span>
-        </div>
-      </Row>
+    <Stack gap={3}>
+      <OverlaySummary
+        avatar={<Avatar name={String(message.fields.author ?? message.ownerName)} kind={message.fields.authorKind === "ai" ? "ai" : "human"} size="lg" />}
+        eyebrow={`${String(message.fields.author ?? message.ownerName)} · ${String(message.fields.channel ?? "Direct")}`}
+        title={message.title}
+        meta={[context.relative(message.at), message.fields.assignee ? `Waiting on ${String(message.fields.assignee)}` : "Nobody owns this yet"]}
+      />
       <p className="ds-prose">{message.summary}</p>
-      <Properties rows={[
-        { label: "Thread", value: String(message.fields.threadId ?? message.id) },
-        { label: "Replies", value: String(message.fields.replies ?? 0) },
-        { label: "Owner", value: String(message.fields.assignee ?? "Unassigned") },
+      <FactGrid columns={3} items={[
+        { label: "Owner", value: String(message.fields.assignee ?? "Unassigned"), tone: message.fields.assignee ? undefined : "warning" },
+        { label: "Replies", value: String(message.fields.replies ?? 0), mono: true },
+        { label: "Linked task", value: message.fields.taskId ? String(message.fields.taskId) : "None", mono: Boolean(message.fields.taskId) },
         { label: "Visibility", value: restricted.length ? `Restricted to ${restricted.map((entry) => ROLE_LABELS[entry as keyof typeof ROLE_LABELS] ?? entry).join(", ")}` : "Everyone in the workspace" },
-        { label: "Linked task", value: message.fields.taskId ? String(message.fields.taskId) : "None" },
+        { label: "Thread", value: String(message.fields.threadId ?? message.id), mono: true },
       ]} />
       <Field label="Reply" hint="Saved as a message record in this thread.">
         <TextArea rows={4} value={reply} onChange={(event) => setReply(event.target.value)} />
@@ -1243,12 +1281,15 @@ function MessageInspector({ context, close }: { context: ScreenContext; close: (
           {mail.localEquivalent} {mail.note}
         </Notice>
       )}
-      <Row gap={2} wrap>
-        <Button variant="primary" busy={busy} disabled={!reply.trim()} onClick={() => void send()}>Save reply to the thread</Button>
-        <Button variant="secondary" onClick={() => context.openOverlay("reassignment", { id: message.id })}>Reassign</Button>
-        <Button variant="secondary" onClick={() => void convertToTask(context, message)}>Convert to task</Button>
-        <Button variant="ghost" onClick={() => context.openOverlay("mute", { id: message.id })}>Mute</Button>
-      </Row>
+      <OverlayActions
+        primary={<Button variant="primary" busy={busy} disabled={!reply.trim()} onClick={() => void send()}>Save reply to the thread</Button>}
+        secondary={<>
+          <Button variant="secondary" onClick={() => context.openOverlay("reassignment", { id: message.id })}>Reassign</Button>
+          <Button variant="secondary" onClick={() => void convertToTask(context, message)}>Convert to task</Button>
+        </>}
+        end={<Button variant="ghost" onClick={() => context.openOverlay("mute", { id: message.id })}>Mute</Button>}
+        busy={busy}
+      />
     </Stack>
   );
 }
@@ -1265,7 +1306,7 @@ function Reassignment({ context, close }: { context: ScreenContext; close: () =>
 
   return (
     <Stack gap={4}>
-      <p>{message.title} is owned by {String(message.fields.assignee ?? "nobody")}.</p>
+      <OverlaySummary eyebrow="Thread" title={message.title} meta={[`Owned by ${String(message.fields.assignee ?? "nobody")}`]} />
       <Field label="New owner" required>
         <Select value={to} onChange={(event) => setTo(event.target.value)}>
           <option value="">Choose a person or an agent</option>
@@ -1282,10 +1323,9 @@ function Reassignment({ context, close }: { context: ScreenContext; close: () =>
           An agent may draft a reply and summarise the thread. Anything consequential still comes back for a human decision.
         </Notice>
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <OverlayActions
+        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        primary={<Button
           variant="primary"
           busy={busy}
           disabled={!to}
@@ -1303,8 +1343,8 @@ function Reassignment({ context, close }: { context: ScreenContext; close: () =>
           }}
         >
           Reassign thread
-        </Button>
-      </Row>
+        </Button>}
+      />
     </Stack>
   );
 }
@@ -1433,20 +1473,17 @@ function EventDetail({ context }: { context: ScreenContext }) {
   const item = items.find((row) => row.id === (payload?.itemId ?? context.selectedId));
   if (!item) return <Empty title="Select an event" icon={<Bell size={20} />}>Choose a row to see its source and its deep link.</Empty>;
   return (
-    <Stack gap={4}>
-      <Row gap={2} wrap><PriorityTag priority={item.priority} /><Pill>{item.category}</Pill><StateTags item={item} /></Row>
-      <div>
-        <h3 style={{ marginBlockEnd: 4 }}>{item.title}</h3>
-        <p>{item.body}</p>
-      </div>
-      <Properties rows={[
-        { label: "Source", value: item.sourceLabel },
-        { label: "Recorded", value: context.dateTime(item.at) },
-        { label: "Deep link", value: item.route ? <span className="ds-num">{item.route.replace(":org", context.org.slug)}</span> : "None" },
-        { label: "Target record", value: item.entityId ?? "None" },
+    <Stack gap={3}>
+      <OverlaySummary eyebrow={`${item.sourceLabel} · ${item.category}`} title={item.title} status={<PriorityTag priority={item.priority} />} meta={[context.relative(item.at)]} />
+      <StateTags item={item} />
+      {item.body && <p>{item.body}</p>}
+      <FactGrid columns={2} items={[
+        { label: "Recorded", value: context.dateTime(item.at), mono: true },
+        { label: "Target record", value: item.entityId ?? "None", mono: Boolean(item.entityId) },
+        { label: "Deep link", value: item.route ? item.route.replace(":org", context.org.slug) : "None", mono: Boolean(item.route) },
       ]} />
       <DeepLink item={item} context={context} />
-      <Notice tone="info" title="Routing">{routeReason(item, rules, role)}</Notice>
+      <OverlaySection title="Routing"><p>{routeReason(item, rules, role)}</p></OverlaySection>
     </Stack>
   );
 }
@@ -1576,26 +1613,24 @@ function IncidentSummary({ context }: { context: ScreenContext }) {
   const record = incidents.find((row) => row.id === (payload?.id ?? context.selectedId));
   if (!record) return <Empty title="Select an incident" icon={<ShieldAlert size={20} />}>Choose an incident from the board.</Empty>;
   return (
-    <Stack gap={4}>
-      <Row gap={2} wrap>
-        <Pill tone={record.fields.severity === "sev1" ? "danger" : "warning"} dot>{String(record.fields.severity).toUpperCase()}</Pill>
-        <Pill>{String(record.fields.service ?? "")}</Pill>
-        <Pill tone={record.status === "resolved" ? "success" : "neutral"}>{record.status}</Pill>
-      </Row>
-      <div><h3 style={{ marginBlockEnd: 4 }}>{record.title}</h3><p>{record.summary}</p></div>
-      <Properties rows={[
-        { label: "Impact", value: String(record.fields.impact ?? "Not recorded") },
-        { label: "What the records show", value: String(record.fields.diagnosis ?? "No diagnosis recorded") },
-        { label: "Safe recovery", value: String(record.fields.recovery ?? "No recovery step recorded") },
-        { label: "Owner", value: String(record.fields.owner ?? "Unassigned") },
+    <Stack gap={3}>
+      <OverlaySummary
+        eyebrow={`${String(record.fields.service ?? "Incident")}`}
+        title={record.title}
+        status={<Pill tone={record.fields.severity === "sev1" ? "danger" : "warning"} dot>{String(record.fields.severity).toUpperCase()}</Pill>}
+        meta={[<Pill key="s" tone={record.status === "resolved" ? "success" : "neutral"}>{record.status}</Pill>, `Waiting on ${String(record.fields.owner ?? "no owner")}`]}
+      />
+      {record.summary && <p>{record.summary}</p>}
+      <FactGrid columns={2} items={[
+        { label: "Owner", value: String(record.fields.owner ?? "Unassigned"), tone: record.fields.owner ? undefined : "warning" },
+        { label: "Acknowledged", value: record.fields.acknowledgedBy ? `${String(record.fields.acknowledgedBy)} · ${context.relative(String(record.fields.acknowledgedAt ?? record.updatedAt))}` : "Not yet", tone: record.fields.acknowledgedBy ? undefined : "warning" },
         { label: "Escalation route", value: String(record.fields.escalation ?? "None") },
-        { label: "Acknowledged", value: record.fields.acknowledgedBy ? `${String(record.fields.acknowledgedBy)} · ${context.relative(String(record.fields.acknowledgedAt ?? record.updatedAt))}` : "Not yet" },
+        { label: "Impact", value: String(record.fields.impact ?? "Not recorded") },
       ]} />
-      <Notice tone="info" title="Diagnosis comes from records, not a guess">
-        Every line above is stored on this incident record. Where a cause is unknown the field says so rather than offering a likely
-        story.
-      </Notice>
-      <Row gap={2} wrap>
+      <OverlaySection title="What the records show" hint="Stored on the incident. Where a cause is unknown the field says so."><p>{String(record.fields.diagnosis ?? "No diagnosis recorded")}</p></OverlaySection>
+      <OverlaySection title="Safe recovery"><p>{String(record.fields.recovery ?? "No recovery step recorded")}</p></OverlaySection>
+      <OverlayActions
+        primary={
         <Button
           variant="primary"
           disabled={record.status === "resolved"}
@@ -1605,10 +1640,10 @@ function IncidentSummary({ context }: { context: ScreenContext }) {
           }}
         >
           Mark resolved
-        </Button>
-        <Button variant="secondary" onClick={() => context.openOverlay("owner handoff", { id: record.id })}>Hand over</Button>
-        {record.fields.severity === "sev1" && <Button variant="outline-danger" onClick={() => context.openOverlay("emergency pause", { id: record.id })}>Emergency pause…</Button>}
-      </Row>
+        </Button>}
+        secondary={<Button variant="secondary" onClick={() => context.openOverlay("owner handoff", { id: record.id })}>Hand over</Button>}
+        end={record.fields.severity === "sev1" ? <Button variant="outline-danger" onClick={() => context.openOverlay("emergency pause", { id: record.id })}>Emergency pause…</Button> : undefined}
+      />
     </Stack>
   );
 }
@@ -1622,8 +1657,8 @@ function OwnerHandoff({ context, close }: { context: ScreenContext; close: () =>
   const [brief, setBrief] = useState("");
   if (!record) return <Empty title="Select an incident" />;
   return (
-    <Stack gap={4}>
-      <p>{record.title} is owned by {String(record.fields.owner ?? "nobody")}.</p>
+    <Stack gap={3}>
+      <OverlaySummary eyebrow="Incident" title={record.title} meta={[`Owned by ${String(record.fields.owner ?? "nobody")}`]} />
       <Field label="Hand over to" required>
         <Select value={to} onChange={(event) => setTo(event.target.value)}>
           <option value="">Choose a person</option>
@@ -1635,10 +1670,9 @@ function OwnerHandoff({ context, close }: { context: ScreenContext; close: () =>
       <Field label="What they need to know" required hint="Written onto the incident so the next owner starts from the facts.">
         <TextArea rows={4} value={brief} onChange={(event) => setBrief(event.target.value)} placeholder="Rig is isolated; second circuit is free; client viewing at 14:00." />
       </Field>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <OverlayActions
+        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        primary={<Button
           variant="primary"
           disabled={!to || !brief.trim()}
           onClick={async () => {
@@ -1650,8 +1684,8 @@ function OwnerHandoff({ context, close }: { context: ScreenContext; close: () =>
           }}
         >
           Hand over
-        </Button>
-      </Row>
+        </Button>}
+      />
     </Stack>
   );
 }
@@ -2212,10 +2246,8 @@ function DigestAudience({ context, close }: { context: ScreenContext; close: () 
         A digest is built per person from the items routed to their role view, so a recipient never reads something their view does not
         hold.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <OverlayActions
+        primary={<Button
           variant="primary"
           onClick={async () => {
             await context.mutate.patch(digest.id, { fields: { ...digest.fields, recipients: chosen.join(",") } }, { event: `Digest audience set to ${chosen.join(", ") || "nobody"}`, expectRevision: digest.revision });
@@ -2224,8 +2256,9 @@ function DigestAudience({ context, close }: { context: ScreenContext; close: () 
           }}
         >
           Save audience
-        </Button>
-      </Row>
+        </Button>}
+        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }
@@ -2251,10 +2284,8 @@ function DigestSchedule({ context, close }: { context: ScreenContext; close: () 
         A scheduled digest is composed the next time this workspace is open. Nothing runs while the tab is closed, so the schedule is a
         statement of intent, not a server job.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button
+      <OverlayActions
+        primary={<Button
           variant="primary"
           onClick={async () => {
             await context.mutate.patch(digest.id, { fields: { ...digest.fields, sendAt } }, { event: `Digest schedule set to ${sendAt}`, expectRevision: digest.revision });
@@ -2263,8 +2294,9 @@ function DigestSchedule({ context, close }: { context: ScreenContext; close: () 
           }}
         >
           Save schedule
-        </Button>
-      </Row>
+        </Button>}
+        secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }
@@ -2622,11 +2654,10 @@ function EscalationConflictOverlay({ context }: { context: ScreenContext }) {
 /* ---------------------------- registration ---------------------------- */
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+  <OverlayActions
+    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    secondary={<Button variant="ghost" onClick={close}>Cancel</Button>}
+  />
 );
 
 function DigestPreviewRunner({ context }: { context: ScreenContext }) {
@@ -2696,7 +2727,6 @@ export const inboxApp = registerApp({
   screens: {
     "ARL-INBOX-001": {
       id: "ARL-INBOX-001",
-      subtitle: (context) => `Priority, routing and triage for ${context.org.name}, derived from records in this browser.`,
       statusStrip: (context) => <InboxStripLine context={context} />,
       tabs: [
         { id: "For You", render: (context) => <ForYou context={context} /> },
@@ -2731,15 +2761,14 @@ export const inboxApp = registerApp({
         { id: "bulk triage", label: "Bulk triage", placement: "overflow", run: (context) => context.openOverlay("action preview", { intent: "read" }) },
       ],
       overlays: [
-        { id: "Notification detail", kind: "drawer", title: "Where this came from", width: 520, render: ({ close: _close, ...context }) => <NotificationDetail context={context} /> },
-        { id: "snooze picker", kind: "modal", title: "Snooze", width: 480, render: ({ close, ...context }) => <SnoozePicker context={context} close={close} /> },
+        { id: "Notification detail", kind: "drawer", title: "Where this came from", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close: _close, ...context }) => <NotificationDetail context={context} /> },
+        { id: "snooze picker", kind: "modal", title: "Snooze", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <SnoozePicker context={context} close={close} /> },
         { id: "action preview", kind: "modal", title: "Preview this triage", width: 720, render: ({ close, ...context }) => <ActionPreview context={context} close={close} /> },
       ],
     },
 
     "ARL-INBOX-002": {
       id: "ARL-INBOX-002",
-      subtitle: () => "Each request names the exact action, its risk, the accounts it touches and the plan version it is bound to.",
       tabs: (["Mine", "Delegated", "Pending", "History"] as const).map((tab) => ({
         id: tab,
         render: (context: ScreenContext) => <ApprovalsScreen context={context} tab={tab} />,
@@ -2753,16 +2782,15 @@ export const inboxApp = registerApp({
         { id: "escalation rules", label: "Escalation rules", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/inbox/escalations`) },
       ],
       overlays: [
-        { id: "Approval review", kind: "drawer", title: "Review the request", width: 560, presentation: { guidance: "Read the source request, authority, evidence and consequences before making an approval decision." }, render: ({ close, ...context }) => <ApprovalReview context={context} close={close} /> },
-        { id: "step-up auth", kind: "modal", title: "Confirm this approval", width: 540, blocking: true, render: ({ close, ...context }) => <StepUpAuth context={context} close={close} /> },
-        { id: "scope diff", kind: "modal", title: "Requested against held", width: 640, render: ({ close: _close, ...context }) => <ScopeDiff context={context} /> },
+        { id: "Approval review", kind: "drawer", title: "Review the request", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <ApprovalReview context={context} close={close} /> },
+        { id: "step-up auth", kind: "modal", title: "Confirm this approval", width: OVERLAY_WIDTH.form, blocking: true, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <StepUpAuth context={context} close={close} /> },
+        { id: "scope diff", kind: "modal", title: "Requested against held", width: OVERLAY_WIDTH.wide, presentation: { noRecordContext: true }, render: ({ close: _close, ...context }) => <ScopeDiff context={context} /> },
         { id: "delegate approval", kind: "modal", title: "Delegate this request", width: 580, render: ({ close, ...context }) => <DelegateApproval context={context} close={close} /> },
       ],
     },
 
     "ARL-INBOX-003": {
       id: "ARL-INBOX-003",
-      subtitle: (context) => `Mentions, escalations and agent messages routed to the ${ROLE_LABELS[context.role]} view.`,
       tabs: (["Unread", "Assigned", "Mentions", "Escalated"] as const).map((tab) => ({
         id: tab,
         render: (context: ScreenContext) => <MessagesScreen context={context} tab={tab} />,
@@ -2782,15 +2810,14 @@ export const inboxApp = registerApp({
         },
       ],
       overlays: [
-        { id: "Message inspector", kind: "drawer", title: "Thread", width: 560, render: ({ close, ...context }) => <MessageInspector context={context} close={close} /> },
-        { id: "reassignment", kind: "modal", title: "Reassign the thread", width: 520, render: ({ close, ...context }) => <Reassignment context={context} close={close} /> },
-        { id: "mute", kind: "modal", title: "Mute", width: 480, render: ({ close, ...context }) => <MuteThread context={context} close={close} /> },
+        { id: "Message inspector", kind: "drawer", title: "Thread", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <MessageInspector context={context} close={close} /> },
+        { id: "reassignment", kind: "modal", title: "Reassign the thread", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <Reassignment context={context} close={close} /> },
+        { id: "mute", kind: "modal", title: "Mute", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <MuteThread context={context} close={close} /> },
       ],
     },
 
     "ARL-INBOX-004": {
       id: "ARL-INBOX-004",
-      subtitle: () => "Everything the applications in this workspace have recorded, with its source and a deep link that is checked before it is offered.",
       tabs: (["All", "Milestones", "Routine", "Archived"] as const).map((tab) => ({
         id: tab,
         render: (context: ScreenContext) => <NotificationsFeed context={context} tab={tab} />,
@@ -2807,9 +2834,9 @@ export const inboxApp = registerApp({
         { id: "open deep-link", label: "Open deep link", placement: "primary", guard: (context) => (context.selectedId ? undefined : "Select an event"), run: (context) => openItem(context, busItem(context.selectedId)) },
       ],
       overlays: [
-        { id: "Event detail", kind: "drawer", title: "Event", width: 520, render: ({ close: _close, ...context }) => <EventDetail context={context} /> },
+        { id: "Event detail", kind: "drawer", title: "Event", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close: _close, ...context }) => <EventDetail context={context} /> },
         { id: "grouped items", kind: "modal", title: "Grouped items", width: 640, render: ({ close: _close, ...context }) => <GroupedItems context={context} /> },
-        { id: "preference quick view", kind: "drawer", title: "Delivery at a glance", width: 460, render: ({ close: _close, ...context }) => <PreferenceQuickView context={context} /> },
+        { id: "preference quick view", kind: "drawer", title: "Delivery at a glance", width: OVERLAY_WIDTH.compact, render: ({ close: _close, ...context }) => <PreferenceQuickView context={context} /> },
         { id: "action preview", kind: "modal", title: "Preview this triage", width: 720, render: ({ close, ...context }) => <ActionPreview context={context} close={close} /> },
         { id: "follow source", kind: "modal", title: "Follow a source", width: 520, render: ({ close, ...context }) => <FollowSource context={context} close={close} /> },
       ],
@@ -2817,7 +2844,6 @@ export const inboxApp = registerApp({
 
     "ARL-INBOX-005": {
       id: "ARL-INBOX-005",
-      subtitle: () => "Critical issues with the service they affect, who owns them and where they escalate.",
       tabs: (["Urgent", "Waiting", "Resolved", "Security"] as const).map((tab) => ({
         id: tab,
         render: (context: ScreenContext) => <IncidentBoard context={context} tab={tab} />,
@@ -2834,8 +2860,8 @@ export const inboxApp = registerApp({
         { id: "emergency pause", label: "Emergency pause", placement: "overflow", tone: "danger", capability: "manage_policy", run: (context) => context.openOverlay("emergency pause") },
       ],
       overlays: [
-        { id: "Incident summary", kind: "drawer", title: "Incident", width: 560, render: ({ close: _close, ...context }) => <IncidentSummary context={context} /> },
-        { id: "owner handoff", kind: "modal", title: "Hand over the incident", width: 520, render: ({ close, ...context }) => <OwnerHandoff context={context} close={close} /> },
+        { id: "Incident summary", kind: "drawer", title: "Incident", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ close: _close, ...context }) => <IncidentSummary context={context} /> },
+        { id: "owner handoff", kind: "modal", title: "Hand over the incident", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <OwnerHandoff context={context} close={close} /> },
         { id: "emergency pause", kind: "modal", title: "Emergency pause", tone: "danger", width: 520, blocking: true, render: ({ close, ...context }) => <EmergencyPause context={context} close={close} /> },
         { id: "acknowledge incident", kind: "modal", title: "Acknowledge an incident", width: 540, render: ({ close, ...context }) => <AcknowledgeIncident context={context} close={close} /> },
         { id: "escalate incident", kind: "modal", title: "Escalate an incident", width: 580, tone: "danger", render: ({ close, ...context }) => <EscalateIncident context={context} close={close} /> },
@@ -2844,7 +2870,6 @@ export const inboxApp = registerApp({
 
     "ARL-INBOX-006": {
       id: "ARL-INBOX-006",
-      subtitle: () => "Which channel carries what, when it goes quiet, and what is never allowed to go quiet.",
       tabs: (["Channels", "Categories", "Schedule", "Delegation"] as const).map((tab) => ({
         id: tab,
         render: (context: ScreenContext) => (
@@ -2876,9 +2901,9 @@ export const inboxApp = registerApp({
         { id: "exceptions", label: "Why some items still arrive", placement: "overflow", run: (context) => context.openOverlay("exception explanation") },
       ],
       overlays: [
-        { id: "Delivery test", kind: "modal", title: "Delivery test", width: 520, render: ({ close, ...context }) => <DeliveryTest context={context} close={close} /> },
+        { id: "Delivery test", kind: "modal", title: "Delivery test", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <DeliveryTest context={context} close={close} /> },
         { id: "quiet-hour rules", kind: "modal", title: "Quiet hours", width: 520, render: ({ close, ...context }) => <QuietHourRules context={context} close={close} />, footer: submitFooter("quiet-hours", "Add window") },
-        { id: "exception explanation", kind: "drawer", title: "Exceptions", width: 460, render: ({ close: _close, ...context }) => <ExceptionExplanation context={context} /> },
+        { id: "exception explanation", kind: "drawer", title: "Exceptions", width: OVERLAY_WIDTH.compact, render: ({ close: _close, ...context }) => <ExceptionExplanation context={context} /> },
         { id: "toggle channel", kind: "modal", title: "Toggle a delivery channel", width: 520, render: ({ close, ...context }) => <ToggleChannel context={context} close={close} /> },
         { id: "set digest", kind: "modal", title: "Set the digest", width: 520, render: ({ close, ...context }) => <SetDigest context={context} close={close} /> },
       ],
@@ -2915,7 +2940,6 @@ export const inboxApp = registerApp({
 
     "ARL-INBOX-008": {
       id: "ARL-INBOX-008",
-      subtitle: () => "Backup approvers, timers and the authority each one actually holds.",
       tabs: (["Rules", "Coverage", "History", "Conflicts"] as const).map((tab) => ({
         id: tab,
         render: (context: ScreenContext) => <EscalationsScreen context={context} tab={tab} />,
@@ -2933,7 +2957,7 @@ export const inboxApp = registerApp({
       ],
       overlays: [
         { id: "Delegation grant", kind: "modal", title: "Delegation", width: 560, render: ({ close, ...context }) => <DelegationGrant context={context} close={close} />, footer: submitFooter("delegation-grant", "Save delegation") },
-        { id: "simulation", kind: "drawer", title: "If someone is away", width: 540, render: ({ close: _close, ...context }) => <EscalationSimulation context={context} /> },
+        { id: "simulation", kind: "drawer", title: "If someone is away", width: OVERLAY_WIDTH.form, render: ({ close: _close, ...context }) => <EscalationSimulation context={context} /> },
         { id: "escalation conflict", kind: "modal", title: "Authority conflicts", width: 620, render: ({ close: _close, ...context }) => <EscalationConflictOverlay context={context} /> },
         { id: "revoke rule", kind: "modal", title: "Revoke a delegation", width: 560, tone: "danger", render: ({ close, ...context }) => <RevokeRule context={context} close={close} /> },
       ],

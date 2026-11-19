@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Database, FileClock, KeyRound, Lock, Scale, Server } from "lucide-react";
 import {
   BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, ModalActions, ModalInFlight, Notice, OverlayCancel, Pill,
-  Properties, Row, Select, Stack, Stat, StatRow, Switch, TextArea, TextInput,
+  FactGrid, OverlayActions, OverlaySection, Properties, Row, Select, Stack, Stat, StatRow, Switch, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useEvents, useOrgRecords, useWorkspace } from "@/platform/workspace";
@@ -43,9 +43,8 @@ export function SecurityScreen({ context, tab }: { context: ScreenContext; tab: 
       <Grid>
         <Card eyebrow="SIGN-IN" prov="human" span={7} title="Sign-in" subtitle={policy?.summary ?? "No sign-in policy recorded"}>
           <Stack gap={3}>
-            <Notice tone="warning" title="There is no identity provider">
-              Role views are chosen in this browser from the account menu. Nothing here authenticates anybody, so every setting below
-              is a statement of intent that a future service would enforce.
+            <Notice tone="warning" title="No identity provider is connected">
+              Every setting below records intent for a future sign-in service. None of it is enforced today.
             </Notice>
             <Properties rows={[
               { label: "Single sign-on", value: <Pill tone={CAPABILITY_TONE.not_connected}>{CAPABILITY_LABELS.not_connected}</Pill> },
@@ -275,6 +274,7 @@ export function EmergencyRevoke({ context, close }: { context: ScreenContext; cl
   const [scope, setScope] = useState<"single" | "all" | "none">(initialId ? "single" : "none");
   const [selectedId, setSelectedId] = useState(initialId);
   const [confirmation, setConfirmation] = useState("");
+  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const target = scope === "all" ? active : scope === "single"
@@ -305,15 +305,24 @@ export function EmergencyRevoke({ context, close }: { context: ScreenContext; cl
           </Select>
         </Field>
       )}
-      {scope === "all" && <Notice tone="danger" title="Bulk revocation affects every other active session">
-        {active.length} active session record(s) will be marked revoked. The current local session remains unchanged.
-      </Notice>}
-      <Properties rows={[
-        { label: "Affected session records", value: String(target.length) },
-        { label: "Sessions", value: target.map(row => row.title).join("; ") || "None selected" },
-        { label: "Current session", value: "Not included in the revocation" },
-        { label: "Real provider sign-out", value: "Not connected; no remote session termination" },
-      ]} />
+      <OverlaySection title="Who loses a session" hint="Your current session is never included." tone={scope === "all" ? "danger" : "neutral"}><Stack gap={3}>
+        <FactGrid columns={3} dense items={[
+          { label: "Session records", value: String(target.length), mono: true },
+          { label: "People", value: String(new Set(target.map(row => String(row.fields.member))).size), mono: true },
+          { label: "Provider sign-out", value: "Not connected", tone: "warning" },
+        ]} />
+        {target.length === 0
+          ? <p className="ds-subtle">Choose a scope above to see exactly which sessions are marked revoked.</p>
+          : <ul className="adm-affected">{target.map(row => <li key={row.id}>
+              <span><strong>{String(row.fields.member)}</strong> <span className="ds-subtle">{String(row.fields.device ?? row.title)}{row.fields.location ? ` · ${String(row.fields.location)}` : ""}</span></span>
+              {row.fields.anomaly ? <Pill tone="warning">{String(row.fields.anomaly)}</Pill> : row.fields.trusted === true ? <Pill tone="success">Trusted</Pill> : <Pill>Untrusted</Pill>}
+            </li>)}</ul>}
+      </Stack></OverlaySection>
+      {target.length > 0 && (
+        <Field label="Reason" hint="Saved in the audit trail with who revoked and when.">
+          <TextArea value={reason} rows={1} maxLength={300} disabled={busy} onChange={event => setReason(event.target.value)} />
+        </Field>
+      )}
       {target.length > 0 && (
         <Field label="Type REVOKE to confirm" required>
           <TextInput aria-label="Type REVOKE to confirm" value={confirmation}
@@ -323,36 +332,37 @@ export function EmergencyRevoke({ context, close }: { context: ScreenContext; cl
       )}
       {error && <Notice tone="danger" title="Revocation could not be recorded">{error}</Notice>}
       <ModalActions>
-        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
-        <span className="ds-grow" />
-        <Button variant="danger" busy={busy} disabled={!canSubmit}
-          onClick={async () => {
-            if (!canSubmit) return;
-            setBusy(true);
-            setError("");
-            try {
-              const editor = { actor: context.actor, now: clockIso() };
-              const records = target.map(row => revisedRecord(row, {
-                status: "revoked", fields: { ...row.fields,
-                  revokedBy: context.actor, revokedAt: editor.now },
-              }, editor));
-              await context.mutate.putMany(
-                records,
-                target.map(row => `Session revocation recorded for ${row.title} by ${context.actor}`),
-                Object.fromEntries(target.map(row => [row.id, row.revision])),
-                target.map(() => "update"),
-              );
-              context.toast("Session records marked revoked",
-                `${target.length} session record(s) updated locally. No remote identity provider was contacted.`);
-              close();
-            } catch (cause) {
-              const message = cause instanceof Error ? cause.message : "The sessions may have changed. Reload before retrying.";
-              setError(message);
-              context.toast("Revocation not recorded", message, "failed");
-            } finally { setBusy(false); }
-          }}>
-          Record revocation{target.length > 0 ? ` (${target.length})` : ""}
-        </Button>
+        <OverlayActions
+          primary={<Button variant="danger" busy={busy} disabled={!canSubmit}
+            onClick={async () => {
+              if (!canSubmit) return;
+              setBusy(true);
+              setError("");
+              try {
+                const editor = { actor: context.actor, now: clockIso() };
+                const records = target.map(row => revisedRecord(row, {
+                  status: "revoked", fields: { ...row.fields,
+                    revokedBy: context.actor, revokedAt: editor.now, ...(reason.trim() ? { revokedReason: reason.trim() } : {}) },
+                }, editor));
+                await context.mutate.putMany(
+                  records,
+                  target.map(row => `Session revocation recorded for ${row.title} by ${context.actor}${reason.trim() ? `: ${reason.trim()}` : ""}`),
+                  Object.fromEntries(target.map(row => [row.id, row.revision])),
+                  target.map(() => "update"),
+                );
+                context.toast("Session records marked revoked",
+                  `${target.length} session record(s) updated locally. No remote identity provider was contacted.`);
+                close();
+              } catch (cause) {
+                const message = cause instanceof Error ? cause.message : "The sessions may have changed. Reload before retrying.";
+                setError(message);
+                context.toast("Revocation not recorded", message, "failed");
+              } finally { setBusy(false); }
+            }}>
+            Record revocation{target.length > 0 ? ` (${target.length})` : ""}
+          </Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
       </ModalActions>
     </Stack>
   );

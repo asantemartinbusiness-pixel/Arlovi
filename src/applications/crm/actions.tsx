@@ -138,6 +138,7 @@ export function AssignFollowUp({ context, close }: { context: ScreenContext; clo
         >
           Assign the follow-up
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -181,6 +182,7 @@ export function AskSales({ context, close }: { context: ScreenContext; close: ()
         >
           Ask Sales
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Close</Button>
       </Row>
       {asked && (
@@ -256,6 +258,7 @@ export function AttachRecord({ context, close }: { context: ScreenContext; close
         >
           Attach to {contact.title}
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -278,6 +281,7 @@ export function CompanyExport({ close, run }: { context: ScreenContext; close: (
       </Field>
       <Row gap={2}>
         <Button variant="primary" disabled={rows.length === 0} onClick={() => { run(rows, data); close(); }}>Download {rows.length} accounts as CSV</Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -331,6 +335,7 @@ export function AssignLead({ context, close }: { context: ScreenContext; close: 
         >
           Assign to {owner || "…"}
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -393,6 +398,7 @@ export function BulkRoute({ context, close }: { context: ScreenContext; close: (
         >
           Route {routable.length} lead{routable.length === 1 ? "" : "s"}
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -438,6 +444,7 @@ export function AssignOwner({ context, close }: { context: ScreenContext; close:
         >
           Assign to {owner || "…"}
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -490,6 +497,7 @@ export function ApproveQuote({ context, close }: { context: ScreenContext; close
         >
           Approve the quote
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -547,6 +555,7 @@ export function DuplicateQuote({ context, close }: { context: ScreenContext; clo
         >
           Duplicate and open
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -604,6 +613,7 @@ export function AddReminder({ context, close }: { context: ScreenContext; close:
         >
           Add the reminder
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -647,6 +657,7 @@ export function CompleteTask({ context, close }: { context: ScreenContext; close
         >
           Mark complete
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -715,6 +726,7 @@ export function AdjustAssumptions({ context, close }: { context: ScreenContext; 
         >
           Save the assumption
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -800,6 +812,7 @@ export function ReviewForecast({ context, close }: { context: ScreenContext; clo
         >
           Record the review
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -826,6 +839,7 @@ export function ForecastExport({ context, close }: { context: ScreenContext; clo
       <p>Every open deal with its stage, weight and weighted value. A deal excluded as double counted is marked in the file.</p>
       <Row gap={2}>
         <Button variant="primary" onClick={() => { exportForecast(context, data); close(); }}>Download the CSV</Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>
@@ -869,6 +883,7 @@ export function StopRule({ context, close }: { context: ScreenContext; close: ()
         >
           Stop the rule
         </Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
     </Stack>

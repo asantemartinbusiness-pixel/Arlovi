@@ -1,7 +1,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, Empty, Field, MoneyInput, FactGrid, ModalUnsavedChanges, Notice, OverlaySection, OverlaySummary, Pill, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { getRecord, listByCollection } from "@/platform/repo";
@@ -60,7 +60,7 @@ export function ProductInspect({ context }: { context: ScreenContext }) {
           {data.products.map((item) => <option key={item.id} value={item.id}>{item.title} · {String(item.fields.sku ?? "")}</option>)}
         </Select>
       </Field>
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "Status", value: <Pill>{product.status}</Pill> },
         { label: "In the storefront", value: product.fields.published === true ? "Yes" : "No" },
         { label: "On hand", value: <span className="ds-num">{onHand}</span> },
@@ -109,7 +109,7 @@ export function StorePicker({ close }: { close: () => void }) {
           {data.warehouses.map((site) => <option key={site.id} value={site.id}>{site.title} · {String(site.fields.code ?? "")}</option>)}
         </Select>
       </Field>
-      <Properties rows={data.warehouses.map((site) => ({ label: site.title, value: `${data.orders.filter((order) => String(order.fields.warehouseId ?? "") === site.id).length} orders · manager ${String(site.fields.managerName ?? "unassigned")}` }))} />
+      <FactGrid columns={2} items={data.warehouses.map((site) => ({ label: site.title, value: `${data.orders.filter((order) => String(order.fields.warehouseId ?? "") === site.id).length} orders · manager ${String(site.fields.managerName ?? "unassigned")}` }))} />
     </form>
   );
 }
@@ -138,7 +138,7 @@ export function Categorise({ context, close }: { context: ScreenContext; close: 
         close();
       }}
     >
-      <Properties rows={[{ label: "Product", value: product.title }, { label: "Collection now", value: current }]} />
+      <FactGrid columns={2} items={[{ label: "Product", value: product.title }, { label: "Collection now", value: current }]} />
       <Field label="Collection">
         <Select value={choice || current} onChange={(event) => setChoice(event.target.value)}>
           {existing.map((name) => <option key={name}>{name}</option>)}
@@ -234,13 +234,19 @@ function ChangePriceForm({ context, close, product }: { context: ScreenContext; 
         close();
       }}
     >
-      <Field label="New net price"><MoneyInput valueMinor={price} onChangeMinor={setPrice} currency={org.currency} label="New net price" /></Field>
-      <Field label="Reason" required hint="Recorded with the change."><TextInput value={reason} onChange={(event) => setReason(event.target.value)} /></Field>
-      <Properties rows={[
-        { label: "Price now", value: context.money(product.amountMinor) },
-        { label: "Unit cost", value: margin.costMinor ? context.money(margin.costMinor) : "Unavailable — no cost recorded" },
-        { label: "Margin at the new price", value: margin.costMinor ? `${(margin.marginBp / 100).toFixed(1)}%` : "Unavailable" },
-        { label: "Live offers checked", value: String(live.length) },
+      <ModalUnsavedChanges when={price !== (product.amountMinor ?? 0) || Boolean(reason.trim())} />
+      <OverlaySummary eyebrow="Change price" title={product.title} status={breaches.length ? <Pill tone="danger" dot>Breaks a margin floor</Pill> : undefined}
+        meta={[String(product.fields.sku ?? ""), `${live.length} live offer${live.length === 1 ? "" : "s"} checked`]} />
+      <OverlaySection title="New price">
+        <Stack gap={3}>
+          <div style={{ maxWidth: 240 }}><Field label="New net price"><MoneyInput valueMinor={price} onChangeMinor={setPrice} currency={org.currency} label="New net price" /></Field></div>
+          <Field label="Reason" required hint="Recorded with the change."><TextInput value={reason} onChange={(event) => setReason(event.target.value)} /></Field>
+        </Stack>
+      </OverlaySection>
+      <FactGrid columns={3} items={[
+        { label: "Price now", value: context.money(product.amountMinor), mono: true },
+        { label: "Unit cost", value: margin.costMinor ? context.money(margin.costMinor) : "Not recorded", mono: true, tone: margin.costMinor ? undefined : "warning" },
+        { label: "Margin now → new", value: margin.costMinor ? `${(marginOf(product).marginBp / 100).toFixed(1)}% → ${(margin.marginBp / 100).toFixed(1)}%` : "Unavailable", mono: true },
       ]} />
       <TotalsBlock totals={totals} money={context.money} label="One unit" />
       {breaches.length > 0 && (
@@ -341,7 +347,7 @@ function AssignOrderForm({ context, close, order }: { context: ScreenContext; cl
         close();
       }}
     >
-      <Properties rows={[{ label: "Order", value: order.title }, { label: "Owner now", value: order.ownerName }, { label: "Payment", value: PAYMENT_LABEL[String(order.fields.payment)] ?? String(order.fields.payment) }]} />
+      <FactGrid columns={2} items={[{ label: "Order", value: order.title }, { label: "Owner now", value: order.ownerName }, { label: "Payment", value: PAYMENT_LABEL[String(order.fields.payment)] ?? String(order.fields.payment) }]} />
       <Field label="Owner"><Select value={owner} onChange={(event) => setOwner(event.target.value)}>{TEAM.map((name) => <option key={name}>{name}</option>)}</Select></Field>
       {owner === order.ownerName && <Notice tone="info">Choose someone else to reassign it.</Notice>}
     </form>
@@ -385,7 +391,7 @@ function BuyerMessageForm({ context, close, subject, to, name }: { context: Scre
         close();
       }}
     >
-      <Properties rows={[{ label: "To", value: to || <Pill tone="danger">No email recorded</Pill> }, { label: "About", value: subject.title }]} />
+      <FactGrid columns={2} items={[{ label: "To", value: to || <Pill tone="danger">No email recorded</Pill> }, { label: "About", value: subject.title }]} />
       <Field label="Subject" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field label="Message" required><TextArea rows={5} value={text} onChange={(event) => setText(event.target.value)} /></Field>
       {!to && <Notice tone="danger" title="There is no address to write to">Record the buyer's email on their contact first.</Notice>}
@@ -579,7 +585,7 @@ export function StorefrontVersions({ context }: { context: ScreenContext }) {
   const listed = data.products.filter((product) => product.status === "active" && product.fields.published === true).length;
   return (
     <Stack gap={4}>
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "Products in the storefront", value: String(listed) },
         { label: "Active discount codes", value: String(data.promotions.filter((promotion) => promotion.status === "active" && promotion.fields.code).length) },
         { label: "Published version", value: store?.fields.publishedVersion ? `version ${String(store.fields.publishedVersion)}` : "None" },
@@ -765,7 +771,7 @@ function ScheduleOfferForm({ context, close, promotion }: { context: ScreenConte
         <Field label="Starts"><TextInput type="date" value={start} onChange={(event) => setStart(event.target.value)} /></Field>
         <Field label="Ends" error={problem}><TextInput type="date" value={end} invalid={Boolean(problem)} onChange={(event) => setEnd(event.target.value)} /></Field>
       </Row>
-      <Properties rows={[{ label: "Offer", value: promotion.title }, { label: "State now", value: promotion.status }, { label: "Margin floor", value: `${(Number(promotion.fields.floorMarginBp ?? 0) / 100).toFixed(0)}%` }]} />
+      <FactGrid columns={2} items={[{ label: "Offer", value: promotion.title }, { label: "State now", value: promotion.status }, { label: "Margin floor", value: `${(Number(promotion.fields.floorMarginBp ?? 0) / 100).toFixed(0)}%` }]} />
       <Notice tone="info">The basket applies an offer only inside its window, and the margin floor still holds for every line.</Notice>
     </form>
   );

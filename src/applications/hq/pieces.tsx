@@ -1,4 +1,4 @@
-import { Empty, Notice, Properties, Stack } from "@/design-system";
+import { Empty, FactGrid, Notice, OverlaySummary, Pill, Stack } from "@/design-system";
 import { useCollections } from "@/platform/workspace";
 import type { ScreenContext } from "@/platform/registry";
 
@@ -12,10 +12,15 @@ export function Building({ departmentId, context }: { departmentId?: string; con
   const blocked = members.length > 0 || work.length > 0;
   return (
     <Stack gap={4}>
-      <h3>{dept.title}</h3>
-      <Properties rows={[
-        { label: "Members", value: String(members.length) },
-        { label: "Open work", value: String(work.length) },
+      <OverlaySummary
+        eyebrow="Department"
+        title={dept.title}
+        status={blocked ? <Pill tone="warning" dot>Cannot be removed</Pill> : <Pill tone="success" dot>Safe to change</Pill>}
+        meta={[`Lead ${String(dept.fields.lead ?? "unassigned")}`]}
+      />
+      <FactGrid columns={3} items={[
+        { label: "Members", value: String(members.length), mono: true },
+        { label: "Open work", value: String(work.length), mono: true, tone: work.length ? "warning" : undefined },
         { label: "Lead", value: String(dept.fields.lead ?? "Unassigned") },
       ]} />
       {blocked ? (

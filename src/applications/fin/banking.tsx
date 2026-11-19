@@ -262,23 +262,24 @@ function MismatchTable({ context }: { context: ScreenContext }) {
   );
 }
 
-export function BankConnection({ context, close }: { context: ScreenContext; close: () => void }) {
+export function BankConnection({ context }: { context: ScreenContext; close?: () => void }) {
   const [bank, setBank] = useState("");
   return (
     <Stack gap={4}>
       <CapabilityNotice id="bank.feed" title="A bank connection cannot be made from this workspace" />
-      <Field label="Bank" hint="Recorded so you know which institution the statements come from.">
+      <ModalUnsavedChanges when={bank.trim() !== ""} />
+      <Field label="Bank" hint="Only a label to remember which institution the statements come from; no connection is made.">
         <TextInput aria-label="Bank" value={bank} onChange={(event) => setBank(event.target.value)} placeholder="Clerkenwell Mutual" />
       </Field>
-      <Properties rows={[
-        { label: "What a connection would need", value: "An authorised open-banking grant, held by a server this app does not have." },
-        { label: "What happens instead", value: "You export a CSV from your bank and import it here. The mapper below keeps your column choices." },
-        { label: "Credentials", value: "None are collected. This screen never asks for a bank login." },
-      ]} />
-      <Row gap={2}>
-        <Button variant="primary" icon={<PlugZap size={15} />} onClick={() => { context.openOverlay("CSV mapper"); }}>Import a statement instead</Button>
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+      <OverlaySection title="What happens instead" hint="You export a CSV from your bank and import it here. No bank login is ever asked for.">
+        <SourceNote>A real connection needs an authorised open-banking grant held by a server this app does not have.</SourceNote>
+      </OverlaySection>
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" icon={<PlugZap size={15} />} onClick={() => { context.openOverlay("CSV mapper"); }}>Import a statement instead</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -330,6 +331,7 @@ export function CsvMapper({ context, close }: { context: ScreenContext; close: (
 
   return (
     <Stack gap={4}>
+      <DrawerUnsavedChanges when={openingBalance !== "" || closingBalance !== "" || busy} />
       <Notice tone="info" title="This import runs entirely in the browser">
         Paste the CSV and enter the opening and closing balances from the actual statement. Nothing
         is uploaded or verified by a bank. The statement header and its unmatched lines are saved together; without
@@ -338,7 +340,8 @@ export function CsvMapper({ context, close }: { context: ScreenContext; close: (
       <Field label="CSV rows" hint="Comma separated. Amounts in minor units, negative for money out.">
         <TextArea aria-label="CSV rows" value={text} rows={6} onChange={(event) => setText(event.target.value)} style={{ fontFamily: "var(--font-mono, monospace)" }} />
       </Field>
-      <Row gap={3} wrap>
+      <OverlaySection title="Column mapping">
+      <div className="fin-form-grid">
         <Field label="Bank account">
           <Select aria-label="Bank account" value={code} onChange={(event) => setCode(event.target.value)}>
             {cashAccounts(data).map((account) => <option key={account.id} value={accountCode(account)}>{accountCode(account)} {account.title}</option>)}
@@ -351,9 +354,11 @@ export function CsvMapper({ context, close }: { context: ScreenContext; close: (
         <Field label="Date column"><TextInput aria-label="Date column" align="end" inputMode="numeric" value={String(dateColumn)} onChange={(event) => setDateColumn(Number(event.target.value.replace(/\D/g, "")) || 0)} /></Field>
         <Field label="Description column"><TextInput aria-label="Description column" align="end" inputMode="numeric" value={String(descriptionColumn)} onChange={(event) => setDescriptionColumn(Number(event.target.value.replace(/\D/g, "")) || 0)} /></Field>
         <Field label="Amount column"><TextInput aria-label="Amount column" align="end" inputMode="numeric" value={String(amountColumn)} onChange={(event) => setAmountColumn(Number(event.target.value.replace(/\D/g, "")) || 0)} /></Field>
-      </Row>
+      </div>
+      </OverlaySection>
 
-      <Row gap={3} wrap>
+      <OverlaySection title="Statement balances" hint="Taken from the actual statement. Nothing is inferred from the rows or the ledger.">
+      <div className="fin-form-grid">
         <Field label="Statement reference" required>
           <TextInput aria-label="Statement reference" value={filename} onChange={(event) => setFilename(event.target.value)} placeholder="e.g. bank-account-Nov-2026.csv" required />
         </Field>
@@ -363,8 +368,9 @@ export function CsvMapper({ context, close }: { context: ScreenContext; close: (
         <Field label="Closing balance (minor units)" required>
           <TextInput aria-label="Closing balance (minor units)" value={closingBalance} onChange={(event) => setClosingBalance(event.target.value)} placeholder="e.g. 321500" required />
         </Field>
-      </Row>
-      {!balancesValid && <Notice tone="warning" title="Statement balances are required">Enter both balances as whole minor units. Arlovi will not infer them from imported rows or the ledger.</Notice>}
+      </div>
+      {!balancesValid && <SourceNote>Both balances are required, as whole minor units, before the statement can be imported.</SourceNote>}
+      </OverlaySection>
       {parsed.length > 0 && (
         <DataGrid
           rows={parsed}
@@ -384,8 +390,9 @@ export function CsvMapper({ context, close }: { context: ScreenContext; close: (
       {bad.length > 0 && <Notice tone="warning" title={`${bad.length} row${bad.length === 1 ? "" : "s"} will be skipped`}>A row is skipped rather than guessed at.</Notice>}
       {duplicates.length > 0 && <Notice tone="warning" title={`${duplicates.length} row${duplicates.length === 1 ? " looks" : "s look"} like a line already imported`}>Same date and same amount. They will be imported and flagged so you can delete the copy.</Notice>}
 
-      <Row gap={2}>
-        <Button
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={good.length === 0 || !balancesValid || !filename.trim() || !accountValid || busy}
@@ -444,9 +451,10 @@ export function CsvMapper({ context, close }: { context: ScreenContext; close: (
           }}
         >
           Import {good.length} line{good.length === 1 ? "" : "s"}
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -457,11 +465,11 @@ export function FeedIncident({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <CapabilityNotice id="bank.feed" title="There is no feed, so there is no feed incident" />
-      <Properties rows={[
-        { label: "Open incidents", value: "None, because nothing is connected" },
-        { label: "Lines flagged as possible duplicates", value: String(flagged.length) },
-        { label: "What would be recorded", value: "A dropped feed would be recorded as an incident with the window it covered, and the lines in that window would stay unmatched." },
+      <FactGrid columns={2} items={[
+        { label: "Open incidents", value: "0", mono: true, hint: "Nothing is connected" },
+        { label: "Possible duplicate lines", value: String(flagged.length), mono: true, tone: flagged.length ? "warning" : undefined },
       ]} />
+      <SourceNote>A dropped feed would be recorded with the window it covered, and the lines in that window would stay unmatched.</SourceNote>
       {flagged.length > 0 && (
         <DataGrid
           rows={flagged}
@@ -499,13 +507,7 @@ export function ReconciliationStrip({ context }: { context: ScreenContext }) {
   const recon = useReconciliation("1000");
   return (
     <div className="fin-strip">
-      <span>Statement <Amount minor={recon.statementClosingMinor} context={context} bold /></span>
-      <span>Ledger at statement end <Amount minor={recon.ledgerMinor} context={context} bold /></span>
-      <span>Difference <Amount minor={recon.differenceMinor} context={context} bold /></span>
-      <span>
-        Unexplained{" "}
-        <Amount minor={recon.unexplainedMinor} context={context} bold tone={recon.unexplainedMinor ? "danger" : "success"} />
-      </span>
+      <span>Unexplained <Amount minor={recon.unexplainedMinor} context={context} bold tone={recon.unexplainedMinor ? "danger" : "success"} zero="0" /></span>
       <span className="ds-grow" />
       {recon.complete
         ? <Pill tone="success" dot>Ready to confirm</Pill>
