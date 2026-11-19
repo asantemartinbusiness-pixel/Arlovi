@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { appEntry, findScreen, screens } from "@/app/catalog";
 import { APP_ENTRIES, NAV_GROUPS } from "@/app/nav";
-import { routeForRecord } from "@/platform/attention";
+import { buildLocalSearchHits } from "@/platform/searchRecordProviders";
 import { canOpenLegacyScreen } from "@/platform/accessInventory";
 import { canOpen } from "@/platform/policy";
 import { useCollections, useOrgRecords, useWorkspace } from "@/platform/workspace";
@@ -15,7 +15,7 @@ import { destinationLabel } from "@/app/WorkspaceContinuity";
 import { readAppJourney, previousJourney, scopedJourneyUrl } from "@/platform/appJourney";
 import { resumableApps } from "@/app/recentAppWork";
 import {
-  SEARCH_SCOPES, searchHits, type SearchHit, type SearchKind, type SearchScope,
+  SEARCH_SCOPES, searchHits, matchingContentSnippet, type SearchHit, type SearchKind, type SearchScope,
 } from "@/platform/searchModel";
 import "./command-search.css";
 
@@ -177,25 +177,9 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         appCode: screen.applicationCode, keywords: screen.purpose,
       }));
 
-    const rows: SearchHit[] = records
-      .filter(record => record.organizationId === org.id && !["deleted", "trashed"].includes(record.status))
-      .map(record => {
-        const to = routeForRecord(record, org.slug);
-        const destination = to ? findScreen(to.split(/[?#]/)[0])?.screen : undefined;
-        // Unknown routes are not searchable: no ambiguous or inaccessible result.
-        if (!to || !destination || !canOpenLegacyScreen(role, destination)) return null;
-        const assignee = typeof record.fields.assignee === "string" ? record.fields.assignee : "";
-        return {
-          key: `record-${record.id}`, kind: "record" as const, group: "Records",
-          title: record.title, detail: `${record.collection} · ${record.status.replace(/_/g, " ")}`,
-          summary: record.summary, status: record.status,
-          ownerName: record.ownerName, updatedAt: record.updatedAt,
-          recordId: record.id, collection: record.collection,
-          appCode: destination.applicationCode, to,
-          mine: record.ownerName === actor || assignee === actor,
-          keywords: [record.id, record.collection, ...record.tags].join(" "),
-        };
-      }).filter((item): item is NonNullable<typeof item> => item !== null);
+    const rows = buildLocalSearchHits(records, {
+      organizationId: org.id, organizationSlug: org.slug, actor, role,
+    });
 
     const workspaces: SearchHit[] = [
       ...departments.map(record => ({
@@ -253,6 +237,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
 
   const selected = hits[Math.min(index, hits.length - 1)];
   const preview = showPreview && Boolean(query.trim()) && selected;
+  const previewSnippet = preview ? matchingContentSnippet(preview, query) : undefined;
   const canSave = selected && !selected.to.includes("?") && !selected.to.includes("#")
     && selected.kind !== "return";
   const isSaved = Boolean(selected && navigation.pinned.includes(selected.to));
@@ -314,7 +299,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
             <button type="button" className="search-v2-close" onClick={onClose} aria-label="Close search"><X size={18}/></button>
           </div>
           <div className="search-v2-scopes" role="group" aria-label="Search within">
-            {SEARCH_SCOPES.map(item =>
+            {SEARCH_SCOPES.filter(item => item.id !== "mail" || canOpen(role, "COMMS")).map(item =>
               <button type="button" key={item.id} aria-pressed={scope === item.id}
                 onClick={() => { setScope(item.id); inputRef.current?.focus(); }}
                 title={item.id === "this-app" ? "Search the current application" : undefined}>
@@ -352,6 +337,9 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
                   <span className="search-v2-hit-copy">
                     <strong><Highlight text={hit.title} query={query}/></strong>
                     <small>{hit.detail}</small>
+                    {query.trim() && matchingContentSnippet(hit, query) && <span className="search-v2-hit-snippet">
+                      <Highlight text={matchingContentSnippet(hit, query) ?? ""} query={query}/>
+                    </span>}
                   </span>
                   {query && <span className="search-v2-kind">{hit.kind === "record" ? recordCategory(hit.collection ?? "") : hit.kind === "screen" ? "Screen" : hit.kind === "app" ? "App" : hit.kind === "action" ? "Action" : hit.group}</span>}
                   <ArrowUpRight className="search-v2-hit-arrow" size={15} aria-hidden="true"/>
@@ -369,8 +357,13 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
             </div>
             <h2>{preview.title}</h2>
             <p className="search-v2-preview-meta">{preview.detail}</p>
-            {preview.summary && <p className="search-v2-preview-summary">{preview.summary.slice(0, 270)}</p>}
+            {previewSnippet
+              ? <p className="search-v2-preview-summary search-v2-content-excerpt"><Highlight text={previewSnippet} query={query}/></p>
+              : preview.summary && <p className="search-v2-preview-summary">{preview.summary.slice(0, 270)}</p>}
             {preview.status && <div className="search-v2-preview-field"><span>Status</span><strong>{preview.status.replace(/_/g, " ")}</strong></div>}
+            {preview.previewFields?.map(field =>
+              <div className="search-v2-preview-field" key={field.label}><span>{field.label}</span><strong>{field.value}</strong></div>
+            )}
             {preview.ownerName && <div className="search-v2-preview-field"><span>Owner</span><strong>{preview.ownerName}</strong></div>}
             {preview.updatedAt && <div className="search-v2-preview-field"><span>Updated</span><strong>{new Date(preview.updatedAt).toLocaleDateString()}</strong></div>}
             <div className="search-v2-preview-actions">
