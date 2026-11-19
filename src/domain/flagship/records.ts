@@ -237,6 +237,16 @@ export function createFlagshipRecords(now: string = SEED_NOW): { records: Rec[];
     status:i%4===0?"approved":"draft",fields:{campaignId:flagshipId("campaigns",i),publishState:"not_connected"}});
 
   for(let i=1;i<=10;i++)add("channels",i,`${DEPARTMENTS[i]} · team updates`,{fields:{visibility:"internal"}});
+  for(let i=1;i<=36;i++)add("conversations",i,
+    `Conversation · ${["Lighthouse delivery review","Brand launch planning","Margin investigation","Service team briefing"][i%4]}`,{
+      status:i%6===0?"archived":"active",fields:{purpose:"internal_business_context",provider:"not_connected",
+        contactId:flagshipId("contacts",i%600+1),agentId:flagshipId("agents",i%18+1)},
+      body:{messages:[{id:`demo-msg-${i}-1`,role:"user",
+        text:"Review the permitted records and prepare an evidence-based draft.",
+        at:daysFrom(now,-(i%20))}],generatedByLiveModel:false}});
+  for(let i=1;i<=70;i++)add("messages",i,`Internal note ${i} · ${DEPARTMENTS[i%DEPARTMENTS.length]}`,{
+    summary:"Illustrative internal communication; no provider message was sent.",
+    fields:{channelId:flagshipId("channels",i%10+1),sentExternally:false,source:"fictional_internal"}});
   for(let i=1;i<=90;i++)add("emailThreads",i,`Correspondence · ${CLIENTS[i%CLIENTS.length]}`,{
     status:i%8===0?"needs_reply":"reviewed",fields:{contactId:flagshipId("contacts",i),
       provider:"not_connected",outboundVerified:false}});
