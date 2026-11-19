@@ -17,6 +17,7 @@ import { ScreenErrorBoundary } from "@/app/ErrorBoundary";
 import { applicationLoadFailures, loadNativeApplication, prefetchNativeApplication } from "@/applications";
 const CommandPalette = lazy(() => import("@/app/CommandPalette").then(module => ({ default: module.CommandPalette })));
 import { recordNavigation, readNavigation } from "@/platform/navigationContinuity";
+import { readAppJourney, recordAppJourney, rememberedAppRoute, previousJourney, scopedJourneyUrl, emptyJourney, type AppJourney, type JourneyEntry } from "@/platform/appJourney";
 import { IntentPrefetchController } from "@/app/nativePrefetch";
 const AttentionCentre = lazy(() => import("@/app/AttentionCentre").then(module => ({ default: module.AttentionCentre })));
 const AskPanel = lazy(() => import("@/app/AskPanel").then(module => ({ default: module.AskPanel })));
@@ -67,6 +68,53 @@ export function AppShell() {
   const activeScreen = activeMatch?.screen;
   const activeCode = activeScreen?.applicationCode ?? "HQ";
   const appModule = getApp(activeCode);
+  /* One journey per organisation, role and person, scoped to this browser tab.
+     Cross-app links, not just rail clicks, participate in this history. */
+  const journeyScope = `${org.id}:${role}:${actor}`;
+  const journeyUrl = location.pathname + location.search + location.hash;
+  const currentJourneyApp = isWorkspaceArea ? `WS:${activeArea}` : activeScreen?.applicationCode ?? null;
+  const [journeyView, setJourneyView] = useState<{ scope: string; state: AppJourney }>(() => ({
+    scope: journeyScope, state: readAppJourney(journeyScope, org.slug),
+  }));
+  const journey = journeyView.scope === journeyScope ? journeyView.state : emptyJourney();
+  useEffect(() => {
+    if (!currentJourneyApp) {
+      setJourneyView({ scope: journeyScope, state: readAppJourney(journeyScope, org.slug) });
+      return;
+    }
+    setJourneyView({
+      scope: journeyScope,
+      state: recordAppJourney(journeyScope, org.slug, currentJourneyApp, journeyUrl),
+    });
+  }, [journeyScope, org.slug, currentJourneyApp, journeyUrl]);
+
+  function canReturnTo(entry: JourneyEntry): boolean {
+    if (!scopedJourneyUrl(entry.url, org.slug)) return false;
+    const targetPath = entry.url.split(/[?#]/)[0];
+    if (entry.app.startsWith("WS:")) {
+      return targetPath.startsWith(`/o/${org.slug}/workspace/`)
+        && entry.app === `WS:${currentWorkArea(targetPath)}`;
+    }
+    const destination = findScreen(targetPath)?.screen;
+    return !!destination && destination.applicationCode === entry.app
+      && canOpenLegacyScreen(role, destination);
+  }
+  function resumeNativeApp(code: string): string {
+    const fallback = appEntry(code, org.slug);
+    const remembered = rememberedAppRoute(journey, org.slug, code);
+    return remembered && canReturnTo({ app: code, url: remembered }) ? remembered : fallback;
+  }
+  const recentAppCodes = [...new Set([...journey.trail].reverse().map(item => item.app))]
+    .filter(code => !code.startsWith("WS:") && APP_ENTRIES[code] && canOpen(role, code)).slice(0, 5);
+  const pendingReturn = journey.trail.at(-1)?.app === currentJourneyApp ? previousJourney(journey) : null;
+  const returnTo = pendingReturn && canReturnTo(pendingReturn) ? pendingReturn : null;
+  const returnName = returnTo
+    ? returnTo.app.startsWith("WS:")
+      ? WORK_AREAS.find(area => `WS:${area.id}` === returnTo.app)?.label ?? "Workspace"
+      : APP_ENTRIES[returnTo.app]?.short ?? "Previous app"
+    : "";
+  const returnScreen = returnTo ? findScreen(returnTo.url.split(/[?#]/)[0])?.screen : null;
+
   const activeGroup = NAV_GROUPS.find(group => group.apps.some(app => app.code === activeCode));
   // Return to the active native application category without carrying record IDs.
   const contextualCategory = activeGroup?.label ?? null;
@@ -229,7 +277,6 @@ export function AppShell() {
   useEffect(() => {
     if (navOpenedAt.current !== location.pathname) setNavOpen(false);
     const container = document.querySelector<HTMLElement>(".hq-scroll");
-    if (container) container.scrollTop = 0;
     // A keyboard/screen-reader user needs a reliable focus destination after
     // client-side routing. Skip the focus move for the first shell mount.
     const heading = container?.querySelector<HTMLElement>("h1");
@@ -251,6 +298,19 @@ export function AppShell() {
   }, [navOpen]);
 
   useEffect(() => {ui.setCommand(false);ui.setAsk(false);ui.setNotes(false);}, [org.id]);
+
+  /* Save and restore page scroll by actual route and tab. No document or form
+     contents enter storage; this map exists only for the current mounted shell. */
+  const scrollByRoute = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    const container = document.querySelector<HTMLElement>(".hq-scroll");
+    if (!container) return;
+    const key = `${org.id}:${journeyUrl}`;
+    container.scrollTop = scrollByRoute.current.get(key) ?? 0;
+    const remember = () => scrollByRoute.current.set(key, container.scrollTop);
+    container.addEventListener("scroll", remember, { passive: true });
+    return () => { remember(); container.removeEventListener("scroll", remember); };
+  }, [org.id, journeyUrl]);
 
   useEffect(() => {
     recordNavigation(org.id, org.slug, location.pathname);
@@ -367,7 +427,7 @@ export function AppShell() {
           <div className="hq-rail-group">
             {favourites.slice(0,8).map(app => {
               const Icon = app.icon;
-              return <Link key={app.code} to={appEntry(app.code,org.slug)}
+              return <Link key={app.code} to={resumeNativeApp(app.code)}
                 className="hq-rail-btn" data-active={!isWorkspaceArea && activeCode === app.code ? "true" : undefined}
                 aria-current={!isWorkspaceArea && activeCode === app.code ? "page" : undefined}
                 title={app.short} aria-label={app.short}><Icon size={19} strokeWidth={1.8}/></Link>;
@@ -387,6 +447,23 @@ export function AppShell() {
                 <h2 className="ds-grow ds-truncate">{appModule.short}</h2>
               </Row>
               <p>{appModule.purpose}</p>
+              <details className="hq-app-switch">
+                <summary>Switch application <ChevronDown size={14} aria-hidden="true" /></summary>
+                <nav className="hq-app-switch-list" aria-label="Recently visited applications">
+                  {recentAppCodes.filter(code => code !== activeCode).map(code => {
+                    const item = APP_ENTRIES[code];
+                    const Icon = item.icon;
+                    return <Link key={code} to={resumeNativeApp(code)} onClick={event => {
+                      const details = event.currentTarget.closest("details");
+                      if (details) details.open = false;
+                    }}><Icon size={15} aria-hidden="true"/><span className="ds-truncate">{item.short}</span><span className="ds-sr-only">, resume last screen</span></Link>;
+                  })}
+                  <Link to={workAreaPath(org.slug,"apps")} onClick={event => {
+                    const details = event.currentTarget.closest("details");
+                    if (details) details.open = false;
+                  }}><MenuIcon size={15} aria-hidden="true"/>All applications</Link>
+                </nav>
+              </details>
             </div>
             <div className="hq-appnav-body">
               {appModule.nav.map((section) => (
@@ -426,7 +503,7 @@ export function AppShell() {
                   <div className="hq-appnav-related-links">
                     {relatedPeers.map(peer => {
                       const PeerIcon = peer.icon;
-                      return <Link key={peer.code} to={appEntry(peer.code, org.slug)} className="hq-navlink">
+                      return <Link key={peer.code} to={resumeNativeApp(peer.code)} className="hq-navlink">
                         <PeerIcon size={15} />
                         <span className="ds-truncate">{peer.short}</span>
                       </Link>;
@@ -439,6 +516,15 @@ export function AppShell() {
         )}
 
         <main className="hq-main" id="main">
+          {returnTo && <nav className="hq-journey-bar" aria-label="Return to previous workspace">
+            <button type="button" className="hq-journey-return" onClick={() => navigate(returnTo.url)}
+              title={`Return to ${returnName} at your previous position`}>
+              <ArrowLeft size={16} aria-hidden="true"/>
+              <span>Back to <strong>{returnName}</strong></span>
+            </button>
+            {returnScreen && <span className="hq-journey-page ds-truncate">{returnScreen.title}</span>}
+            <span className="hq-journey-context">Your place is saved</span>
+          </nav>}
           {/* The page scrolls here, above the tray, so the tray never covers content. */}
           <div className="hq-scroll">
           {applicationLoadFailures().length > 0 && (
