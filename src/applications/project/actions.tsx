@@ -1,4 +1,5 @@
 import { useState, useSyncExternalStore } from "react";
+import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { Button, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useEvents, useRecord } from "@/platform/workspace";
@@ -308,6 +309,14 @@ export function AttachFile({ context, close }: { context: ScreenContext; close: 
 export function NewTask({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCollections(["projects", "employees"]);
   const project = data.projects.find((row) => row.id === context.params.id) ?? data.projects.find((row) => row.status !== "archived");
+  const draftScope = `project:new-task:${context.org.id}:${context.actor}:${project?.id ?? "none"}`;
+  const [title, setTitle] = useWorkingField(draftScope, "title", "");
+  const [summary, setSummary] = useWorkingField(draftScope, "summary", "");
+  const [stage, setStage] = useWorkingField(draftScope, "stage", "backlog");
+  const [priority, setPriority] = useWorkingField(draftScope, "priority", "normal");
+  const [assignee, setAssignee] = useWorkingField(draftScope, "assignee", context.actor);
+  const [estimate, setEstimate] = useWorkingField(draftScope, "estimate", "4");
+  const [due, setDue] = useWorkingField(draftScope, "due", "");
   if (!project) return <Empty title="No project to add a task to" />;
   return (
     <form
@@ -325,23 +334,30 @@ export function NewTask({ context, close }: { context: ScreenContext; close: () 
           parentId: project.id, startAt: context.now.toISOString(), endAt: end.toISOString(), dueAt: end.toISOString(),
           fields: { stage: String(form.get("stage") ?? "backlog"), assignee: String(form.get("assignee") ?? context.actor), priority: String(form.get("priority") ?? "normal"), estimateHours: Number(form.get("estimate") ?? 4), loggedHours: 0, sprint: "", kind: "task", dependsOn: "", delegatedToAgent: false },
         }, `Task created on ${project.title}: ${title}`);
+        clearWorkingDraft(draftScope);
         context.select(created.id);
         context.toast("Task created", `${title} is on the ${project.title} board.`);
         close();
       }}
     >
       <Properties rows={[{ label: "Project", value: project.title }]} />
-      <Field label="Task" required><TextInput name="title" required /></Field>
-      <Field label="Detail"><TextArea name="summary" rows={2} /></Field>
+      <Field label="Task" required><TextInput name="title" value={title} onChange={event => setTitle(event.target.value)} required /></Field>
+      <Field label="Detail"><TextArea name="summary" value={summary} onChange={event => setSummary(event.target.value)} rows={2} /></Field>
       <Row gap={3}>
-        <Field label="Stage"><Select name="stage" defaultValue="backlog">{LANES.filter((lane) => lane.id !== "done").map((lane) => <option key={lane.id} value={lane.id}>{lane.label}</option>)}</Select></Field>
-        <Field label="Priority"><Select name="priority" defaultValue="normal">{["low", "normal", "high"].map((value) => <option key={value}>{value}</option>)}</Select></Field>
+        <Field label="Stage"><Select name="stage" value={stage} onChange={event => setStage(event.target.value)}>{LANES.filter((lane) => lane.id !== "done").map((lane) => <option key={lane.id} value={lane.id}>{lane.label}</option>)}</Select></Field>
+        <Field label="Priority"><Select name="priority" value={priority} onChange={event => setPriority(event.target.value)}>{["low", "normal", "high"].map((value) => <option key={value}>{value}</option>)}</Select></Field>
       </Row>
       <Row gap={3}>
-        <Field label="Owner"><Select name="assignee" defaultValue={context.actor}>{data.employees.filter((row) => row.status !== "alumni").map((row) => <option key={row.id}>{row.title}</option>)}</Select></Field>
-        <Field label="Estimate (hours)"><TextInput name="estimate" inputMode="numeric" align="end" defaultValue="4" /></Field>
+        <Field label="Owner"><Select name="assignee" value={assignee} onChange={event => setAssignee(event.target.value)}>{data.employees.filter((row) => row.status !== "alumni").map((row) => <option key={row.id}>{row.title}</option>)}</Select></Field>
+        <Field label="Estimate (hours)"><TextInput name="estimate" inputMode="numeric" align="end" value={estimate} onChange={event => setEstimate(event.target.value)} /></Field>
       </Row>
-      <Field label="Due"><TextInput type="date" name="due" /></Field>
+      <Field label="Due"><TextInput type="date" name="due" value={due} onChange={event => setDue(event.target.value)} /></Field>
+      <Row gap={2}><span className="ds-subtle">Draft kept in this tab until you create or discard it.</span>
+        <Button type="button" variant="ghost" onClick={() => {
+          clearWorkingDraft(draftScope);
+          setTitle(""); setSummary(""); setStage("backlog"); setPriority("normal");
+          setAssignee(context.actor); setEstimate("4"); setDue(""); close();
+        }}>Discard draft</Button></Row>
     </form>
   );
 }

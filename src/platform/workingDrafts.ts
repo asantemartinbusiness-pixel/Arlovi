@@ -23,10 +23,17 @@ export function clearWorkingDraft(scope: string): void {
   workingDrafts.delete(scope);
 }
 export function useWorkingField<T>(scope: string, field: string, fallback: T): [T, (next: T) => void] {
-  const [value, setValue] = useState<T>(() => readWorkingField(scope, field, fallback));
+  // A mounted editor must never display another organisation's earlier
+  // draft during a company / actor switch. Resolve the keyed value immediately,
+  // rather than waiting for an effect after the component has painted.
+  const key = `${scope}:${field}`;
+  const [entry, setEntry] = useState<{ key: string; value: T }>(
+    () => ({ key, value: readWorkingField(scope, field, fallback) }),
+  );
+  const value = entry.key === key ? entry.value : readWorkingField(scope, field, fallback);
   const update = useCallback((next: T) => {
     rememberWorkingField(scope, field, next);
-    setValue(next);
-  }, [scope, field]);
+    setEntry({ key, value: next });
+  }, [scope, field, key]);
   return [value, update];
 }

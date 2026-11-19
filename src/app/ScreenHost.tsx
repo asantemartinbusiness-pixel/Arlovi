@@ -86,9 +86,11 @@ export function ScreenHost() {
       select: setSelectedId,
       openOverlay: (id, payload) => {
         setOverlay({ id, payload });
-        // New invoice is a resumable, payload-free workflow. Encode its overlay
-        // in the URL so a cross-app return can reopen the editor exactly.
-        if (screen.applicationCode === "FIN" && id === "New invoice" && payload === undefined && linkedOverlay !== id) {
+        // Only opted-in draft-safe, payload-free editors are deep-linked.
+        // Other overlays may require private payloads or explicit save/discard.
+        const isResumable = (screen.applicationCode === "FIN" && id === "New invoice")
+          || (screen.applicationCode === "PROJECT" && ["create project", "Project template", "new task"].includes(id));
+        if (isResumable && payload === undefined && linkedOverlay !== id) {
           const query = new URLSearchParams(location.search);
           query.set("overlay", id);
           navigate(`${location.pathname}?${query.toString()}${location.hash}`, { replace: true });

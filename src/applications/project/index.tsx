@@ -21,6 +21,7 @@ import {
 } from "./actions";
 import { getRecord } from "@/platform/repo";
 import { clockNow } from "@/platform/clock";
+import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { createProjectFromTemplate, type ProjectPhase } from "./creation";
 import { positiveHours, taskMoveDecision } from "./progression";
 
@@ -43,8 +44,9 @@ type Phase = ProjectPhase;
 
 function ProjectFromTemplate({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useProjectData();
-  const [templateId, setTemplateId] = useState("");
-  const [title, setTitle] = useState("");
+  const draftScope = `project:create:${context.org.id}:${context.actor}`;
+  const [templateId, setTemplateId] = useWorkingField(draftScope, "templateId", "");
+  const [title, setTitle] = useWorkingField(draftScope, "title", "");
   const template = data.templates.find((row) => row.id === templateId);
   const phases = (template?.body as { phases?: Phase[] } | undefined)?.phases ?? [];
   const duplicate = data.projects.some((project) => project.title.trim().toLowerCase() === title.trim().toLowerCase());
@@ -66,6 +68,7 @@ function ProjectFromTemplate({ context, close }: { context: ScreenContext; close
             actor: context.actor, now: clockNow(),
           }, title, template);
           await context.mutate.putMany(plan.records, plan.messages, plan.expectedRevisions, plan.eventTypes);
+          clearWorkingDraft(draftScope);
           context.toast("Project created", plan.tasks.length
             ? `${plan.tasks.length} tasks and their project were saved together.`
             : "A new empty project is ready for its plan.");
@@ -96,6 +99,13 @@ function ProjectFromTemplate({ context, close }: { context: ScreenContext; close
       <Notice tone="info" title="A clone starts clean">
         Confidential attachments, comments and approvals from the source project are not copied. Only the phase and task structure is.
       </Notice>
+      <Row gap={2}>
+        <span className="ds-subtle">Draft retained in this browser tab if you close and return.</span>
+        <Button type="button" variant="ghost" onClick={() => {
+          clearWorkingDraft(draftScope);
+          setTemplateId(""); setTitle(""); close();
+        }}>Discard draft</Button>
+      </Row>
     </form>
   );
 }

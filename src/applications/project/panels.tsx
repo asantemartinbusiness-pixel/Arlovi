@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { Activity, CalendarRange, FolderKanban, LayoutDashboard, ListChecks, Timer, Users } from "lucide-react";
 import {
   Avatar, BarChart, Button, Card, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice,
@@ -564,7 +565,8 @@ export function TaskDetail({ context, lens }: { context: ScreenContext; lens: st
   const task = context.params.id
     ? (record?.collection === "tasks" && record.organizationId === org.id ? record : undefined)
     : data.tasks[0];
-  const [comment, setComment] = useState("");
+  const commentScope = `project:task-comment:${org.id}:${context.actor}:${task?.id ?? "none"}`;
+  const [comment, setComment] = useWorkingField(commentScope, "comment", "");
   if (!task) return <Empty title="No task" icon={<ListChecks size={20} />} />;
   const project = data.projects.find((row) => row.id === task.parentId);
   const dependencies = dependenciesOf(task).map((id) => data.tasks.find((row) => row.id === id)).filter((row): row is Rec => Boolean(row));
@@ -585,6 +587,7 @@ export function TaskDetail({ context, lens }: { context: ScreenContext; lens: st
             event.preventDefault();
             if (!comment.trim()) return;
             await context.mutate.log(`${context.actor} on ${task.title}: ${comment.trim()}`, { entityId: task.id, type: "comment" });
+            clearWorkingDraft(commentScope);
             context.toast("Comment recorded", "It is in the task's activity, attributed to you.");
             setComment("");
           }}
