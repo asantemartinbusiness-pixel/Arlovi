@@ -869,7 +869,7 @@ export const careApp = registerApp({
       overlays: [
         { id: "case filter", kind: "modal", title: "Filter cases", width: 460, render: ({ close, ...context }) => <CaseFilter context={context} close={close} /> },
         { id: "Ticket create", kind: "modal", title: "Create a case", width: 620, render: ({ close, ...context }) => <TicketCreate context={context} close={close} />, footer: submitFooter("cr-create", "Create case") },
-        { id: "bulk assignment", kind: "modal", title: "Route unassigned cases", width: 680, render: ({ close, ...context }) => <BulkAssignment context={context} close={close} /> },
+        { id: "bulk assignment", kind: "modal", title: "Route unassigned cases", width: 740, presentation: { noRecordContext: true, guidance: "Review the active cases without an owner, choose one accountable person, and confirm that their existing SLA and priority remain unchanged." }, render: ({ close, ...context }) => <BulkAssignment context={context} close={close} /> },
         { id: "priority change", kind: "modal", title: "Change priority", width: 560, render: ({ close, ...context }) => <PriorityChange context={context} close={close} />, footer: submitFooter("cr-priority", "Change priority") },
       ],
     },
