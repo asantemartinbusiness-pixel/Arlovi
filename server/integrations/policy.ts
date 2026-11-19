@@ -74,6 +74,12 @@ function validApproval(
   operation: IntegrationOperation,
   now: number,
 ): boolean {
+  // Financial operations cannot be approved with an unbounded amount, and
+  // neither negative nor fractional monetary values can bypass a limit.
+  if (operation.kind === "financial" &&
+      (operation.amountMinor === undefined ||
+       !Number.isSafeInteger(operation.amountMinor) || operation.amountMinor < 0 ||
+       approval?.amountLimitMinor === undefined)) return false;
   if (!approval || approval.state !== "approved" ||
       approval.organizationId !== connection.organizationId ||
       approval.connectionId !== connection.id ||
