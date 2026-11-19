@@ -38,7 +38,8 @@ test("pinning an app updates native navigation and remains scoped to the company
 test("role view hides unavailable native applications without claiming authentication", async ({ page }) => {
   await page.goto("/o/northline/workspace/apps");
   await page.getByRole("button", { name: /Profile and preferences/ }).click();
-  await page.getByRole("menuitem", { name: "Client", exact: true }).click();
+  await page.getByRole("menuitem", { name: /Preview as/ }).press("ArrowRight");
+  await page.getByRole("menuitemradio", { name: "Client", exact: true }).press("Enter");
   await expect(page.locator(".apps-directory-open")).toHaveCount(3);
   await expect(page.getByRole("link", { name: "Portals", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Finance", exact: true })).toHaveCount(0);
@@ -115,7 +116,7 @@ test("favourites filter only displays pinned apps and can reset safely", async (
   await page.getByRole("navigation", { name: "Application categories" }).getByRole("button", { name: /Favourites/ }).click();
   await expect(page).toHaveURL(/saved=1/);
   await expect(page.locator(".apps-directory-open")).toHaveCount(1);
-  await expect(page.getByRole("link", { name: "Finance", exact: true })).toBeVisible();
+  await expect(page.locator('.apps-directory-open[aria-label="Finance"]')).toBeVisible();
   await page.getByRole("navigation", { name: "Application categories" }).getByRole("button", { name: /Favourites/ }).click();
   await expect(page.locator(".apps-directory-open")).toHaveCount(35);
 });

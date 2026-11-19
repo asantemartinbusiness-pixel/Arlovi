@@ -22,7 +22,8 @@ test("portal directory and client dashboard display the same unique shared recor
 test("unmatched browser-local client role never falls back to another client's portal", async ({ page }) => {
   await page.goto("/o/northline/portal/portals/nl-portals-001/dashboard");
   await page.getByRole("button", { name: /Profile and preferences/ }).click();
-  await page.getByRole("menuitem", { name: "Client", exact: true }).click();
+  await page.getByRole("menuitem", { name: /Preview as/ }).press("ArrowRight");
+  await page.getByRole("menuitemradio", { name: "Client", exact: true }).press("Enter");
   await expect(page.getByText("No portal is shared with this view")).toBeVisible();
   await expect(page.getByText("Harrow House Interiors", { exact: true })).toHaveCount(0);
 });

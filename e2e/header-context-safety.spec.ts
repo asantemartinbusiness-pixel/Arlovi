@@ -98,7 +98,7 @@ test("switching a local role view never strands the user on a hidden native appl
   await page.goto("/o/northline/mission/missions");
   await page.getByRole("button", {name: /Profile and preferences/}).click();
   await page.getByRole("menuitem", {name: /Preview as Owner/}).click();
-  await page.getByRole("menuitemradio", {name: "Client", exact: true}).click();
+  await page.getByRole("menuitemradio", {name: "Client", exact: true}).press("Enter");
   await expect(page).toHaveURL(/\/o\/northline\/portal\//);
   await expect(page.getByText(/Outside the Client view/)).toHaveCount(0);
 });

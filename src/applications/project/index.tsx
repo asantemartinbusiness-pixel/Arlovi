@@ -72,8 +72,8 @@ function ProjectFromTemplate({ context, close }: { context: ScreenContext; close
           context.toast("Project created", plan.tasks.length
             ? `${plan.tasks.length} tasks and their project were saved together.`
             : "A new empty project is ready for its plan.");
-          context.navigate(`/o/${context.org.slug}/project/projects/${plan.project.id}`);
           close();
+          context.navigate(`/o/${context.org.slug}/project/projects/${plan.project.id}`);
         } catch (error) {
           context.toast("Project was not created", error instanceof Error ? error.message
             : "The template or company changed. Review the selection and retry.", "failed");

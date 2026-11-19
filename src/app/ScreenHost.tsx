@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MoreHorizontal } from "lucide-react";
 import { Breadcrumbs, Button, Drawer, Menu, Modal, Notice, Tabs, TabPanel } from "@/design-system";
@@ -17,6 +17,9 @@ export function ScreenHost() {
   useApplicationRegistryRevision();
   const location = useLocation();
   const navigate = useNavigate();
+  // The route transition and modal closing may happen in the same callback.
+  // Do not let closing the old deep-linked overlay navigate back to its route.
+  const routeChangePending = useRef(false);
   const workspace = useWorkspace();
   const toast = useToast();
   const match = findScreen(location.pathname);
@@ -85,6 +88,7 @@ export function ScreenHost() {
       selectedId,
       select: setSelectedId,
       openOverlay: (id, payload) => {
+        routeChangePending.current = false;
         setOverlay({ id, payload });
         // Only opted-in draft-safe, payload-free editors are deep-linked.
         // Other overlays may require private payloads or explicit save/discard.
@@ -103,7 +107,7 @@ export function ScreenHost() {
       },
       closeOverlay: () => {
         setOverlay(null);
-        if (linkedOverlay) {
+        if (linkedOverlay && !routeChangePending.current) {
           const query = new URLSearchParams(location.search);
           query.delete("overlay");
           const suffix = query.toString();
@@ -111,7 +115,11 @@ export function ScreenHost() {
         }
       },
       overlayPayload: overlay?.payload,
-      navigate,
+      navigate: (path) => {
+        const current = location.pathname + location.search + location.hash;
+        if (path !== current) routeChangePending.current = true;
+        navigate(path);
+      },
       path: (route, id) => route.replace(":org", workspace.org.slug).replace(":id", id ?? selectedId ?? "").replace(":slug", "showroom-consult"),
       toast,
       mutate,
@@ -121,7 +129,8 @@ export function ScreenHost() {
       dateTime: workspace.dateTime,
       relative: workspace.relative,
     };
-  }, [screen, workspace, match?.params, activeTab, setTab, selectedId, overlay, navigate, toast, mutate]);
+  }, [screen, workspace, match?.params, activeTab, setTab, selectedId, overlay, navigate, toast, mutate,
+    linkedOverlay, location.pathname, location.search, location.hash]);
 
   if (!screen || !context) {
     return (
