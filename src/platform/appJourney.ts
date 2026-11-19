@@ -16,7 +16,10 @@ const validApp = (value: unknown): value is string =>
   typeof value === "string" && /^(?:[A-Z][A-Z0-9_-]*|WS:(?:home|company|spaces|work|apps))$/.test(value);
 
 export function scopedJourneyUrl(url: string, slug: string): boolean {
-  if (typeof url !== "string" || url.length > MAX_PATH || /[\\\u0000-\u001f]/.test(url)) return false;
+  if (typeof url !== "string" || url.length > MAX_PATH) return false;
+  // Avoid untrusted control bytes or Windows path separators without a regex
+  // control range (which is intentionally rejected by ESLint).
+  if (url.includes("\\") || [...url].some(char => char.charCodeAt(0) < 32)) return false;
   const prefix = `/o/${slug}/`;
   if (!url.startsWith(prefix)) return false;
   try {
