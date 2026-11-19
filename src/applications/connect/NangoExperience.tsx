@@ -5,7 +5,7 @@ import type { ScreenContext } from "@/platform/registry";
 import { BUSINESS_GOALS, SUGGESTED_INTEGRATIONS, type IntegrationGoal, type SuggestedIntegration } from "./nangoCatalog";
 import "./nango-experience.css";
 
-type Status = { available: boolean; integrations: string[]; note?: string };
+type Status = { available: boolean; cloudRegistry?: boolean; integrations: string[]; note?: string };
 type ConnectedAccount = { id: string; integrationId: string; provider: string; created: string; needsAttention: boolean; ownedByMe: boolean };
 type ConnectionPage = { connections: ConnectedAccount[]; page: number; nextPage: number | null };
 
@@ -335,5 +335,68 @@ export function NangoLiveConnections({ context }: { context: ScreenContext }) {
         </div>)}
       {nextPage && <Button size="sm" variant="secondary" busy={busy} onClick={() => void load(nextPage)}>Show more accounts</Button>}
     </div>}
+    {status?.cloudRegistry && <ArloviActivationPanel context={context} />}
   </section>;
+}
+
+
+type RegistryAccount = {
+  id: string; providerName: string; integrationId: string; connectionName: string;
+  ownership: "personal" | "organization" | "department";
+  status: "pending" | "authorised" | "needs_attention" | "suspended" | "disconnected";
+  activation: "inactive" | "read_only" | "approved_writes";
+  syncHealth: "not_configured" | "healthy" | "degraded" | "failed";
+  readVerifiedAt: string | null; updatedAt: string; needsAttention: boolean;
+};
+
+export function ArloviActivationPanel({ context }: { context: ScreenContext }) {
+  const [records, setRecords] = useState<RegistryAccount[] | null>(null);
+  const [nextPage, setNextPage] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    // A company switch must never retain another company's metadata.
+    setRecords(null);
+    setNextPage(null);
+    setError("");
+  }, [context.org.id]);
+
+  const refresh = async (page = 1) => {
+    if (busy) return;
+    setBusy(true); setError("");
+    try {
+      const params = new URLSearchParams({ organizationId: context.org.id, page: String(page) });
+      const result = await readJson<{ connections: RegistryAccount[]; nextPage: number | null }>(
+        "/api/integrations/registry?" + params);
+      setRecords(previous => page === 1 ? result.connections : [...(previous ?? []), ...result.connections]);
+      setNextPage(result.nextPage);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Your activation records could not be loaded.");
+    } finally { setBusy(false); }
+  };
+  const activationLabels: Record<RegistryAccount["activation"], string> = {
+    inactive: "Not activated", read_only: "Read-only", approved_writes: "Approved writes",
+  };
+  return <div className="connect-activation" aria-label="Arlovi connection activation">
+    <div>
+      <h4>What Arlovi can use</h4>
+      <p className="ds-subtle">Account sign-in, verified data access and synchronisation are separate. Only approved operations become available inside your apps.</p>
+    </div>
+    <Button size="sm" variant="secondary" busy={busy} onClick={() => void refresh(1)}>Review activation</Button>
+    {error && <Notice tone="warning" title="Activation records unavailable">
+      {error === "NOT_AUTHORISED" ? "Sign in with your company's verified cloud account to review integration settings." : error}
+    </Notice>}
+    {records && <div className="connect-live-list">
+      {records.length === 0 && <p className="ds-subtle">No activated connections are recorded in Arlovi Cloud for this company.</p>}
+      {records.map(record => <div key={record.id} className="connect-live-account">
+        <div>
+          <strong>{record.connectionName || record.providerName}</strong>
+          <small>{record.ownership} account · {record.status.replace(/_/g, " ")}</small>
+          <small>Sync: {record.syncHealth.replace(/_/g, " ")}</small>
+        </div>
+        <span className="connect-guide-state">{activationLabels[record.activation]}</span>
+      </div>)}
+      {nextPage && <Button size="sm" variant="secondary" busy={busy} onClick={() => void refresh(nextPage)}>Show more accounts</Button>}
+    </div>}
+  </div>;
 }
