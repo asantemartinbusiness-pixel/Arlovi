@@ -13,6 +13,7 @@ import { clockIso, freshness } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { downloadCsv } from "@/applications/t6kit/kit";
 import "./integrations.css";
+import { GuidedMarketplace, NangoLiveConnections } from "./NangoExperience";
 import { ConnectionStatePill, MappingPanel, capabilityIdOf } from "./mappingPanel";
 import { STATE_LABELS, connectionState, readMapping } from "./mapping";
 import {
@@ -81,13 +82,13 @@ export function Marketplace({ context, lens }: { context: ScreenContext; lens: "
       <div>
         <span className="connect-eyebrow">PLATFORM / INTEGRATIONS</span>
         <h2>Connect the tools your work depends on.</h2>
-        <p>Explore provider requirements, permissions and local alternatives before requesting access. Nothing is externally connected yet.</p>
+        <p>Discover software that fits your business, then review secure connection requirements. Existing local capabilities remain available while providers are set up.</p>
       </div>
       <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>View connections</Button>
     </div>
     <div className="connect-marketplace-metrics" aria-label="Integration catalogue summary">
-      <div><span>Available contracts</span><strong>{accessibleCount}</strong></div>
-      <div><span>Live connections</span><strong>0</strong></div>
+      <div><span>Local contracts</span><strong>{accessibleCount}</strong></div>
+      <div><span>Live connections in local register</span><strong>0</strong></div>
       <div><span>Local alternatives</span><strong>{CONNECTOR_ENTRIES.filter(entry => entry.capability.localEquivalent).length}</strong></div>
       <div><span>Categories</span><strong>{CATEGORIES.length}</strong></div>
     </div>
@@ -133,6 +134,7 @@ export function Marketplace({ context, lens }: { context: ScreenContext; lens: "
 
   return <Stack gap={4}>
     {marketplaceOverview}
+    <GuidedMarketplace context={context} />
     <div className="connect-marketplace-toolbar">
       <label className="connect-marketplace-search">
         <Search size={17} aria-hidden="true" />
@@ -166,7 +168,7 @@ export function Marketplace({ context, lens }: { context: ScreenContext; lens: "
     </Empty> : <div className="connect-marketplace-grid" aria-label="Integration catalogue">
       {matched.map(entry => <ConnectorCard key={entry.capability.id} entry={entry} context={context} records={records} loaded={loaded} />)}
     </div>}
-    <p className="connect-marketplace-boundary"><strong>Every provider here is not connected.</strong> Reviewing an integration or recording an install request does not grant access, send data or activate a sync.</p>
+    <p className="connect-marketplace-boundary"><strong>Local capability contracts are separate from Nango authorisations.</strong> Reviewing an integration does not grant access, send data or activate a synchronisation.</p>
   </Stack>;
 }
 
@@ -700,12 +702,13 @@ export function Connections({ context, lens }: { context: ScreenContext; lens: "
       <div><span>Connector records</span><strong>{records.length}</strong></div>
       <div><span>Pending setup</span><strong>{active.length}</strong></div>
       <div><span>Disabled</span><strong>{records.length - active.length}</strong></div>
-      <div><span>Verified connections</span><strong>0</strong></div>
+      <div><span>Local verified connections</span><strong>0</strong></div>
     </div>
   </section>;
 
   return <Stack gap={4}>
     {overview}
+    {lens === "All" && <NangoLiveConnections context={context} />}
     {lens !== "Healthy" && <div className="connect-connections-toolbar">
       <label className="connect-connections-search">
         <Search size={17} aria-hidden="true" />
