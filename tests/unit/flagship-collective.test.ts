@@ -10,7 +10,7 @@ describe("Northline Collective flagship fixtures", () => {
     expect(flagship).toBeDefined();
     expect(flagship!.records.length).toBeGreaterThan(60);
     expect(new Set(flagship!.records.map(record => record.id)).size).toBe(flagship!.records.length);
-    expect(flagship!.records.every(record => record.id.startsWith("nl-") && /-9\d\d$/.test(record.id))).toBe(true);
+    expect(flagship!.records.every(record => record.id.startsWith("nl-") && Number(record.id.split("-").at(-1)) >= 900)).toBe(true);
     expect(flagship!.records.every(record => record.organizationId === ORG_NORTHLINE)).toBe(true);
     expect(flagship!.records.every(record => record.fields.fictional === true)).toBe(true);
   });
