@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Avatar, Button, Checkbox, Empty, FactGrid, Field, ModalActions, OverlayActions, ModalInFlight, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Avatar, Button, Checkbox, Empty, FactGrid, Field, OverlayActions, ModalInFlight, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
@@ -805,15 +805,14 @@ export function RecordingConsent({ context, close }: { context: ScreenContext; c
         { label: "Recording possible here", value: <Pill tone="warning">No — no conferencing service</Pill> },
       ]} />
       <Notice tone="info">Even with everyone's consent recorded, nothing is recorded: {NO_CONFERENCING}</Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Close</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" disabled={everyoneMode} onClick={async () => {
+      <OverlayActions
+        primary={<Button variant="primary" disabled={everyoneMode} onClick={async () => {
           await context.mutate.patch(meeting.id, { fields: { ...meeting.fields, recordingConsent: consented.join(","), consentComplete: all, consentRecordedBy: context.actor, consentRecordedAt: clockIso() } }, { expectRevision: meeting.revision, event: `Recording consent recorded on ${meeting.title} by ${context.actor}: ${consented.length} of ${attendees.length} agreed` });
           context.toast("Consent recorded", all ? "Everyone agreed. Recording is still not available in this workspace." : `${consented.length} of ${attendees.length} agreed, so recording would not be allowed.`);
           close();
-        }}>Record the answers</Button>
-      </Row>
+        }}>Record the answers</Button>}
+        end={<Button variant="ghost" onClick={close}>Close</Button>}
+      />
     </Stack>
   );
 }
@@ -899,17 +898,16 @@ export function Dialer({ context, close }: { context: ScreenContext; close: () =
         </Select>
       </Field>
       {!contact && <Field label="Number"><TextInput inputMode="tel" value={number} onChange={(event) => setNumber(event.target.value)} /></Field>}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Close</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" disabled={!target} onClick={async () => {
+      <OverlayActions
+        primary={<Button variant="primary" disabled={!target} onClick={async () => {
           const call = await context.mutate.create({ collection: "calls", title: `${target} — not placed`, status: "not placed", summary: `${original ? "Return call" : "Call"} recorded by ${context.actor}; no telephony service is connected.`, at: clockIso(), fields: { contactId: contact?.id ?? "", direction: "outbound", seconds: 0, outcome: "not placed", voicemail: false, queue: "Direct", returnOf: original?.id ?? "", number: contact ? String(contact.fields.phone ?? "") : number.trim() } }, `${original ? "Return call" : "Call"} to ${target} recorded by ${context.actor}`);
           if (original) await context.mutate.patch(original.id, { fields: { ...original.fields, returnedBy: context.actor, returnCallId: call.id } }, { expectRevision: original.revision, event: `${original.title} returned by ${context.actor} (not placed: no telephony)` });
           await logBoundary(context, "telephony", `Call to ${target} not placed`, call.id);
           context.toast("Call recorded, not placed", boundaryText("telephony"), "info");
           close();
-        }}>{original ? "Record the return call" : "Record the call"}</Button>
-      </Row>
+        }}>{original ? "Record the return call" : "Record the call"}</Button>}
+        end={<Button variant="ghost" onClick={close}>Close</Button>}
+      />
     </Stack>
   );
 }
@@ -941,15 +939,14 @@ export function Voicemail({ context, close }: { context: ScreenContext; close: (
         { label: "Reviewed", value: call.fields.heardBy ? `By ${String(call.fields.heardBy)}` : "Not yet" },
       ]} />
       <Boundary id="telephony" title="There is no audio to play" />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Close</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" disabled={Boolean(call.fields.heardBy)} onClick={async () => {
+      <OverlayActions
+        primary={<Button variant="primary" disabled={Boolean(call.fields.heardBy)} onClick={async () => {
           await context.mutate.patch(call.id, { fields: { ...call.fields, heardBy: context.actor, heardAt: clockIso() } }, { expectRevision: call.revision, event: `Voicemail note from ${call.title} reviewed by ${context.actor}` });
           context.toast("Marked reviewed", "The voicemail note is recorded as dealt with.");
           close();
-        }}>Mark the voicemail reviewed</Button>
-      </Row>
+        }}>Mark the voicemail reviewed</Button>}
+        end={<Button variant="ghost" onClick={close}>Close</Button>}
+      />
     </Stack>
   );
 }

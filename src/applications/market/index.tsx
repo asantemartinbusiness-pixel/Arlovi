@@ -1,10 +1,10 @@
+import { Link } from "react-router-dom";
 import { CalendarDays, Images, LayoutTemplate, Mail, Megaphone, MousePointerClick, Search, Target, TrendingUp, Users } from "lucide-react";
-import { Empty, Notice, Pill, Properties, Row, Stack } from "@/design-system";
+import { Empty, Notice, Pill, Properties, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { GrowthOverviewNav } from "@/app/GrowthOverviewNav";
-import { CampaignDetailContext } from "./CampaignDetailContext";
 import { MarketingWorkAreaHeader } from "./MarketingWorkAreaHeader";
-import { useRecord } from "@/platform/workspace";
+import { useRecord, useWorkspace } from "@/platform/workspace";
 import { confirmOverlay, submitFooter } from "@/applications/market/kit";
 import {
   archiveCampaign, AttributionFilter, CompareCampaigns, exportChannelTable, forkTemplate, pauseAdCampaign,
@@ -119,19 +119,22 @@ export const marketApp = registerApp({
     /* ------------------------------ 003 ------------------------------ */
     "ARL-MARKET-003": {
       id: "ARL-MARKET-003",
-      header: (context: ScreenContext) => <CampaignDetailContext context={context} />,
       title: () => "Campaign",
-      subtitle: () => "Objectives, audience, creative, channel plan and the budget committed against it.",
+      record: (context) => ({
+        title: <CampaignHeading id={context.params.id} part="title" />,
+        status: <CampaignHeading id={context.params.id} part="status" />,
+        subtitle: <CampaignHeading id={context.params.id} part="subtitle" />,
+        meta: [
+          <Link key="back" to={context.path("/o/:org/market/campaigns")}>All campaigns</Link>,
+          <CampaignHeading key="owner" id={context.params.id} part="owner" />,
+          <CampaignHeading key="window" id={context.params.id} part="window" />,
+          <CampaignHeading key="budget" id={context.params.id} part="budget" />,
+        ],
+      }),
       tabs: ["Overview", "Plan", "Assets", "Channels", "Results", "Activity"].map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <CampaignDetail context={context} lens={lens} />,
       })),
-      statusStrip: () => (
-        <Row gap={2} wrap>
-          <Pill tone="warning" dot>Delivery not connected</Pill>
-          <span className="ds-subtle">Scheduling, approvals and spend are records in this browser. Nothing is sent to an advertising or mail provider.</span>
-        </Row>
-      ),
       actions: [
         { id: "approve", label: "Approve plan", placement: "primary", capability: "publish_campaign", run: (context) => context.openOverlay("plan approval", { id: campaignOf(context) }) },
         { id: "launch", label: "Launch locally", placement: "primary", capability: "publish_campaign", run: (context) => context.openOverlay("launch approval") },
@@ -141,7 +144,7 @@ export const marketApp = registerApp({
       ],
       overlays: [
         { id: "Creative preview", kind: "drawer", title: "Creative preview", width: 520, render: ({ ...context }) => <CreativePreview context={context} /> },
-        { id: "launch approval", kind: "modal", title: "Launch approval", width: 560, render: ({ close, ...context }) => <LaunchApproval context={context} close={close} />, footer: submitFooter("launch-approval", "Record launch") },
+        { id: "launch approval", kind: "modal", title: "Launch approval", width: 560, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <LaunchApproval context={context} close={close} />, footer: submitFooter("launch-approval", "Record launch") },
         { id: "pause consequence", kind: "modal", title: "What pausing does", tone: "danger", width: 560, render: ({ close, ...context }) => <PauseConsequence context={context} close={close} /> },
         { id: "email builder", kind: "modal", title: "Campaign brief and email", width: 620, render: ({ close, ...context }) => <EmailBuilder context={context} close={close} />, footer: submitFooter("email-builder", "Save draft") },
         { id: "Metric source", kind: "drawer", title: "Where this figure comes from", width: 560, render: ({ ...context }) => <MetricSource context={context} /> },
@@ -219,7 +222,7 @@ export const marketApp = registerApp({
       overlays: [
         { id: "Audience preview", kind: "drawer", title: "Audience preview", width: 620, render: ({ ...context }) => <AudiencePreview context={context} /> },
         { id: "send review", kind: "modal", title: "Send review", width: 620, render: ({ close, ...context }) => <SendReview context={context} close={close} />, footer: submitFooter("send-review", "Record recipients") },
-        { id: "suppression check", kind: "drawer", title: "Suppression check", width: 620, render: () => <SuppressionCheck /> },
+        { id: "suppression check", kind: "drawer", title: "Suppression check", width: 620, presentation: { noRecordContext: true }, render: ({ ...context }) => <SuppressionCheck context={context} /> },
         { id: "email builder", kind: "drawer", title: "Email builder", width: 640, render: ({ close, ...context }) => <EmailBuilder context={context} close={close} />, footer: submitFooter("email-builder", "Save draft") },
         confirmOverlay,
       ],
@@ -369,6 +372,20 @@ export const marketApp = registerApp({
     },
   },
 });
+
+function CampaignHeading({ id, part }: { id: string | undefined; part: "title" | "status" | "subtitle" | "owner" | "window" | "budget" }) {
+  const campaign = useRecord(id);
+  const { money, date } = useWorkspace();
+  if (!campaign) return part === "title" ? <>Campaign</> : null;
+  switch (part) {
+    case "title": return <>{campaign.title}</>;
+    case "status": return <Pill tone={campaign.status === "active" || campaign.status === "approved" ? "success" : campaign.status === "approval" ? "warning" : "neutral"} dot>{campaign.status === "approval" ? "Awaiting approval" : campaign.status.replaceAll("_", " ")}</Pill>;
+    case "subtitle": return <>{campaign.summary}</>;
+    case "owner": return <>Owner {campaign.ownerName}</>;
+    case "window": return <span className="ds-num">{campaign.startAt && campaign.endAt ? `${date(campaign.startAt)} to ${date(campaign.endAt)}` : "Not scheduled"}</span>;
+    default: return <span className="ds-num">{money(Number(campaign.fields.budgetMinor ?? campaign.amountMinor ?? 0))} budget</span>;
+  }
+}
 
 function CampaignInspector({ context }: { context: ScreenContext }) {
   const campaign = useRecord(context.params.id);

@@ -4,11 +4,9 @@ import {
 } from "lucide-react";
 import {
   Avatar, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Select,
-  Stack, Stat, StatRow, TextArea, TextInput,
-} from "@/design-system";
+  Stack, Stat, StatRow, TextArea, TextInput, OverlayActions } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
-import { capabilityById } from "@/platform/capability";
 import { sameDay } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { ChannelList, Conversation } from "./chat";
@@ -288,6 +286,7 @@ export function ChannelConversation({ context, lens }: { context: ScreenContext;
           context={context}
           channel={channel}
           messages={messages}
+          showHeader={false}
           onCreateTask={async (message) => {
             await context.mutate.create({
               collection: "tasks",
@@ -558,7 +557,7 @@ export function Announcements({ context, lens }: { context: ScreenContext; lens:
   const staffCount = data.employees.filter((employee) => employee.status !== "alumni").length;
 
   return rows.length === 0 ? (
-    <Empty title={`No ${lens.toLowerCase()} announcements`} icon={<Megaphone size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("draft announcement")}>Draft one</Button>} />
+    <Empty title={lens === "All" ? "No announcements yet" : `No ${lens.toLowerCase()} announcements`} icon={<Megaphone size={20} />} action={<Button variant="primary" onClick={() => context.openOverlay("draft announcement")}>Draft one</Button>} />
   ) : (
     <Stack gap={3}>
       {rows.map((post) => (
@@ -850,15 +849,14 @@ export function PhishingReport({ context, close }: { context: ScreenContext; clo
       <Notice tone="warning" title="What reporting does here">
         It moves the thread to Spam and records the report against your name. There is no provider to notify and no filter to train.
       </Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button variant="danger" onClick={async () => {
+      <OverlayActions variant="confirm"
+        primary={<Button variant="danger" onClick={async () => {
           await context.mutate.patch(thread.id, { status: "spam", fields: { ...thread.fields, folder: "spam", risk: "phishing", reportedBy: context.actor } }, { expectRevision: thread.revision, event: `${thread.title} reported as phishing by ${context.actor}` });
           context.toast("Reported", "The thread is in Spam and the report is on the record.");
           close();
-        }}>Report and move to Spam</Button>
-      </Row>
+        }}>Report and move to Spam</Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     </Stack>
   );
 }

@@ -17,6 +17,7 @@ import {
 import { attributionFilter, PageChecksCard, useAttributionFilter } from "./actions";
 import { CampaignLibraryWorkspace } from "./CampaignLibraryWorkspace";
 import { AudienceSegmentsLibrary } from "./AudienceSegmentsLibrary";
+import { LaunchChecklist, launchRows } from "./readiness";
 
 /* ====================================================================== *
  * MARKET panels. Each tab in the approved contract renders its own panel.
@@ -330,7 +331,7 @@ export function CampaignDetail({ context, lens }: { context: ScreenContext; lens
   if (lens === "Channels") {
     return (
       <Stack gap={4}>
-        <ProviderBoundary id="site.publish" title="Channel delivery is not connected" />
+        <ProviderBoundary custom id="social.publish" title="No channel account is connected">Budgets and schedules here are records in this workspace. Nothing is delivered to a network.</ProviderBoundary>
         <Grid>
           {channels.map((channel) => (
             <Card key={channel.network} span={6} title={networkOf(channel.network).label} subtitle={networkOf(channel.network).media}
@@ -408,39 +409,37 @@ export function CampaignDetail({ context, lens }: { context: ScreenContext; lens
     );
   }
 
+  const rows = launchRows(context, campaign, audience, data.contacts, now);
+  const blocking = rows.filter((row) => row.state === "blocked").length;
   return (
     <Grid>
-      <Card span={12} title={campaign.title} subtitle={campaign.summary}
-        actions={<Row gap={2}><Pill tone={toneForStatus(campaign.status)} dot>{campaign.status}</Pill><Pill tone="warning">Delivery not connected</Pill></Row>}>
-        <Grid>
-          <Card span={4} title="Objective" flush><div className="ds-card-body"><strong>{String(campaign.fields.objective ?? "Not set")}</strong><p className="ds-subtle">Owner {campaign.ownerName}</p></div></Card>
-          <Card span={4} title="Window" flush><div className="ds-card-body"><strong>{context.date(campaign.startAt)} – {context.date(campaign.endAt)}</strong><p className="ds-subtle">{freshness(campaign.startAt, now).known ? `Started ${context.relative(campaign.startAt)}` : "No start recorded"}</p></div></Card>
-          <Card span={4} title="Budget" flush><div className="ds-card-body"><strong>{context.money(totals.budgetMinor)}</strong><p className="ds-subtle">{context.money(totals.spentMinor)} committed locally</p></div></Card>
-        </Grid>
+      <Card span={7} title="Before it can launch" subtitle={blocking === 0 ? "Every check passes. Launch records it here; nothing is published." : `${blocking} ${blocking === 1 ? "check needs" : "checks need"} attention`}
+        actions={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("launch approval")}>Open launch approval</Button>}>
+        <LaunchChecklist rows={rows} />
       </Card>
-      <Card span={6} title="Products in the campaign" subtitle="Linked by the channel plan">
+      <Card span={5} title="Creative" subtitle="Approval state of each piece">
         <Stack gap={2}>
-          {(body.creatives ?? []).length === 0 && <span className="ds-subtle">No creative links a product yet.</span>}
-          {(body.creatives ?? []).map((creative) => <Row key={creative.id} gap={2}><span className="ds-grow">{creative.title}</span><Pill tone={creative.status === "approved" ? "success" : "warning"}>{creative.status.replace("_", " ")}</Pill></Row>)}
+          {(body.creatives ?? []).length === 0 && <span className="ds-subtle">No creative is attached yet.</span>}
+          {(body.creatives ?? []).map((creative) => (
+            <Row key={creative.id} gap={2}>
+              <span className="ds-grow ds-truncate">{creative.title}</span>
+              <Pill tone={creative.status === "approved" ? "success" : "warning"}>{creative.status.replace("_", " ")}</Pill>
+            </Row>
+          ))}
         </Stack>
       </Card>
-      <Card span={6} title="Scheduled content" subtitle={`${posts.length} items on this campaign`}>
+      <Card span={12} title="Scheduled content" subtitle={`${posts.length} ${posts.length === 1 ? "item" : "items"} on this campaign`}>
         {posts.length === 0 ? <span className="ds-subtle">No posts are scheduled against this campaign.</span> : (
           <Stack gap={2}>
             {posts.map((post) => (
               <Row key={post.id} gap={2}>
                 <span className="ds-grow ds-truncate">{post.title}</span>
-                <span className="ds-subtle">{context.dateTime(post.startAt)}</span>
+                <span className="ds-subtle ds-num">{context.dateTime(post.startAt)}</span>
                 <Pill tone={post.status === "published" ? "success" : post.status === "failed" ? "danger" : "warning"}>{post.status}</Pill>
               </Row>
             ))}
           </Stack>
         )}
-      </Card>
-      <Card span={12}>
-        <Notice tone="warning" title="Pausing stops local scheduling only">
-          No advertising provider is connected, so pausing this campaign stops the local schedule and records the decision. It cannot stop spend at a provider, because no spend authorisation was ever issued from here.
-        </Notice>
       </Card>
     </Grid>
   );
@@ -790,9 +789,6 @@ export function EmailCampaigns({ context, lens }: { context: ScreenContext; lens
           { key: "delivery", header: "Delivery", cell: () => <Pill tone="warning">Not connected</Pill> },
         ]}
       />}
-    <Notice tone="info" title="Email preparation is local">
-      Campaign status, segment eligibility and send windows are stored in this workspace. No external email delivery, open-rate or click-rate evidence is available.
-    </Notice>
   </Stack>;
 }
 
@@ -901,7 +897,7 @@ export function Advertising({ context, lens }: { context: ScreenContext; lens: s
   if (lens === "Accounts") {
     return (
       <Stack gap={4}>
-        <ProviderBoundary id="payment.capture" title="No ad account is connected" />
+        <ProviderBoundary custom id="ads.account" title="No ad account is connected">Spend shown here is committed in this workspace. No platform has authorised or reported any of it.</ProviderBoundary>
         <Grid>
           {["Google Ads", "Meta Ads", "LinkedIn Ads", "X Ads"].map((platform) => (
             <Card key={platform} span={6} title={platform} subtitle="No account, no spend authorisation, no reported figures"

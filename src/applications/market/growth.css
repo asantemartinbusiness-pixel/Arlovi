@@ -115,3 +115,14 @@
 /* Plan approval decisions */
 .t4-approval-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .t4-approval-history li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--text-xs); overflow-wrap: anywhere; }
+
+/* Launch checklist: the signature of Marketing — the sequence a campaign must clear before anything publishes. */
+.mk-launch{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.mk-launch-row{display:grid;grid-template-columns:22px minmax(86px,.6fr) minmax(0,2fr) auto;align-items:center;gap:var(--space-3);padding:var(--space-2) 0;border-top:1px solid var(--border-subtle)}
+.mk-launch-row:first-child{border-top:0}
+.mk-launch-n{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:var(--text-xs);color:var(--fg-subtle)}
+.mk-launch-label{font-weight:600;font-size:var(--text-sm)}
+.mk-launch-value{display:flex;flex-direction:column;min-width:0;font-size:var(--text-sm)}
+.mk-launch-value small{color:var(--fg-subtle);font-size:var(--text-xs)}
+.mk-launch-row[data-state="note"] .mk-launch-label{color:var(--warning)}
+@media(max-width:560px){.mk-launch-row{grid-template-columns:20px 1fr auto}.mk-launch-value{grid-column:2 / -1;grid-row:2}}

@@ -38,40 +38,43 @@ async function noHorizontalScroll(page: Page): Promise<void> {
 
 test("COMMS email: a draft is kept as you type, never sent, and found by search", async ({ page }) => {
   await open(page, "/comms/email?tab=Drafts", "Email Inbox");
-  await expect(main(page).getByText("Not sent — no mail provider connected")).toBeVisible();
-  await main(page).getByRole("button", { name: "New draft" }).click();
+  // One statement on the page: no mail service, nothing delivered.
+  await expect(page.getByText("No mail service is connected, so nothing is delivered.")).toBeVisible();
+  await page.getByRole("button", { name: "Compose", exact: true }).click();
 
   const compose = dialog(page);
-  await compose.getByLabel("To").fill("not-an-address");
+  await compose.getByRole("textbox", { name: "To" }).fill("not-an-address");
   await expect(compose.getByText("One of those is not an address")).toBeVisible();
   await expect(compose.getByText("Fix the addresses to save")).toBeVisible();
-  await compose.getByLabel("To").fill("orders@kilnworks.example");
+  await compose.getByRole("textbox", { name: "To" }).fill("orders@kilnworks.example");
   await compose.getByLabel("Subject").fill("Kiln shelf replacement");
-  await compose.getByLabel("Message").fill("Could you quote for six cordierite shelves?");
+  await compose.getByRole("textbox", { name: "Message" }).fill("Could you quote for six cordierite shelves?");
   // Autosave writes the draft without pressing anything.
   await expect(compose.getByText(/^Saved in this browser/)).toBeVisible();
-  await expect(compose.getByText("Not sent — no mail provider connected")).toBeVisible();
+  await expect(compose.getByText("Kept as a local draft")).toBeVisible();
   await compose.getByRole("button", { name: "Cancel" }).click();
 
-  const row = main(page).getByRole("row", { name: /Kiln shelf replacement/ });
-  await expect(row).toContainText("Not sent", { ignoreCase: true });
+  const row = main(page).getByRole("button", { name: /Kiln shelf replacement/ });
+  await expect(row).toContainText("Not delivered");
   await reload(page);
-  await expect(main(page).getByRole("row", { name: /Kiln shelf replacement/ })).toBeVisible();
+  await expect(main(page).getByRole("button", { name: /Kiln shelf replacement/ })).toBeVisible();
 
   // Reopen the draft: the editor holds what was saved; an edit is kept.
-  await main(page).getByRole("row", { name: /Kiln shelf replacement/ }).getByText("Kiln shelf replacement").dblclick();
+  await main(page).getByRole("button", { name: /Kiln shelf replacement/ }).click();
+  await expect(main(page).getByText("Local draft, not delivered")).toBeVisible();
+  await main(page).getByRole("button", { name: "Open" }).click();
   await expect(dialog(page).getByLabel("Subject")).toHaveValue("Kiln shelf replacement");
   await dialog(page).getByLabel("Message").fill("Could you quote for eight cordierite shelves?");
   await dialog(page).getByRole("button", { name: "Save as a draft" }).click();
   await expect(dialog(page)).toHaveCount(0);
 
   // Search runs across every folder.
-  await page.getByRole("tab", { name: "Inbox" }).click();
-  await main(page).getByRole("searchbox", { name: "Search all mail" }).fill("cordierite eight");
-  await expect(main(page).getByText("1 thread match across every folder")).toBeVisible();
-  await expect(main(page).getByRole("row", { name: /Kiln shelf replacement/ })).toContainText("drafts");
-  await main(page).getByRole("searchbox", { name: "Search all mail" }).fill("zz-nothing-here");
-  await expect(main(page).getByText("No mail matches")).toBeVisible();
+  await page.getByRole("tab", { name: "Inbox", exact: true }).click();
+  await main(page).getByRole("searchbox", { name: "Search email conversations" }).fill("cordierite eight");
+  await expect(main(page).getByText("1 conversation", { exact: true })).toBeVisible();
+  await expect(main(page).getByRole("button", { name: /Kiln shelf replacement/ })).toBeVisible();
+  await main(page).getByRole("searchbox", { name: "Search email conversations" }).fill("zz-nothing-here");
+  await expect(main(page).getByText("No matching conversations")).toBeVisible();
 });
 
 test("COMMS calendar: create from a free hour with a clash hint, edit it, see it on the agenda", async ({ page }) => {
@@ -148,7 +151,7 @@ test("COMMS meeting: answers are recorded by name, actions become tasks", async 
 });
 
 test("HR leaver checklist hands workspace access to ADMIN, which closes it by suspending", async ({ page }) => {
-  await open(page, "/hr/employees/nl-employees-022?tab=Access", "Employee profile");
+  await open(page, "/hr/employees/nl-employees-022?tab=Access", "Sable Nguyen");
   await expect(main(page).getByText("Sable Nguyen").first()).toBeVisible();
   await main(page).getByRole("button", { name: "Start offboarding" }).click();
   const modal = dialog(page);
@@ -179,7 +182,7 @@ test("HR leaver checklist hands workspace access to ADMIN, which closes it by su
   await expect(page.getByText(/1 leaver step closed in People/)).toBeVisible();
   await expect(main(page).getByRole("group", { name: "Leaver Sable Nguyen" })).toHaveCount(0);
 
-  await open(page, "/hr/employees/nl-employees-022?tab=Access", "Employee profile");
+  await open(page, "/hr/employees/nl-employees-022?tab=Access", "Sable Nguyen");
   await expect(main(page).getByRole("checkbox", { name: "Workspace access suspended in Administration" })).toBeChecked();
   await expect(main(page).getByText("2 of 4 steps done")).toBeVisible();
 });
@@ -212,7 +215,7 @@ test.describe("mobile", () => {
 
   test("email drafts, calendar day and a meeting fit a phone", async ({ page }) => {
     await open(page, "/comms/email?tab=Drafts", "Email Inbox");
-    await expect(main(page).getByText("Not sent — no mail provider connected")).toBeVisible();
+    await expect(page.getByText("No mail service is connected, so nothing is delivered.")).toBeVisible();
     await noHorizontalScroll(page);
     await open(page, "/comms/calendar?tab=Day", "Calendar");
     await expect(main(page).getByText("Winter collection review")).toBeVisible();

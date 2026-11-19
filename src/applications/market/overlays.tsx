@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Meter, Notice, Pill, Properties, Row, Select,
-  Stack, TextArea, TextInput,
+  Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Meter, Notice, OverlayActions, OverlayCancel,
+  OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
+import { LaunchChecklist, launchBlocked, launchRows } from "./readiness";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
 import { ProviderBoundary } from "@/applications/market/kit";
@@ -376,7 +377,8 @@ export function DuplicateRules({ context, close }: { context: ScreenContext; clo
       <Notice tone="warning" title="A copy must not inherit permission to spend">
         If an ad account were connected, duplicating a live campaign would otherwise create a second authorised spender with the same budget. The copy therefore always lands as a draft with zero committed spend.
       </Notice>
-      <Button
+      <OverlayActions
+        primary={<Button
         variant="primary"
         onClick={async () => {
           await context.mutate.create({
@@ -395,7 +397,9 @@ export function DuplicateRules({ context, close }: { context: ScreenContext; clo
         }}
       >
         Duplicate as draft
-      </Button>
+      </Button>}
+        end={<OverlayCancel>Cancel</OverlayCancel>}
+      />
     </Stack>
   );
 }
@@ -435,11 +439,11 @@ export function LaunchApproval({ context, close }: { context: ScreenContext; clo
   const data = useMarketData();
   const { actor, now } = useWorkspace();
   const campaign = useRecord(context.params.id) ?? data.campaigns[0];
-  const body = bodyOf<CampaignBody>(campaign, {});
   if (!campaign) return <Empty title="No campaign" />;
-  const approvalReady = String(campaign.fields.approval) === "approved";
-  const creativeReady = (body.creatives ?? []).length > 0 && (body.creatives ?? []).every((creative) => creative.status === "approved");
-  const blocked = !approvalReady || !creativeReady;
+  const audience = data.audiences.find((item) => item.id === String(campaign.fields.audienceId ?? ""));
+  const rows = launchRows(context, campaign, audience, data.contacts, now);
+  const blocked = launchBlocked(campaign);
+  const attention = rows.filter((row) => row.state === "blocked");
   return (
     <form
       id="launch-approval"
@@ -448,17 +452,24 @@ export function LaunchApproval({ context, close }: { context: ScreenContext; clo
         event.preventDefault();
         if (blocked) return;
         await context.mutate.patch(campaign.id, { status: "active", fields: { ...campaign.fields, launchedBy: actor, launchedAt: now.toISOString() } }, { expectRevision: campaign.revision, event: `${campaign.title} launched locally by ${actor}` });
-        context.toast("Launched locally", `${campaign.title} is active in this workspace. Scheduled content is queued locally; nothing was published.`);
+        context.toast("Launch recorded", `${campaign.title} is active in this workspace. Nothing was published.`);
         close();
       }}
     >
-      <Stack gap={2}>
-        <Row gap={2}><Pill tone={approvalReady ? "success" : "danger"} dot>{approvalReady ? "Ready" : "Blocked"}</Pill><span className="ds-grow">Plan approval recorded</span></Row>
-        <Row gap={2}><Pill tone={creativeReady ? "success" : "danger"} dot>{creativeReady ? "Ready" : "Blocked"}</Pill><span className="ds-grow">Creative approved</span></Row>
-        <Row gap={2}><Pill tone="warning" dot>Not connected</Pill><span className="ds-grow">Delivery provider</span></Row>
-      </Stack>
-      {blocked && <Notice tone="danger" title="Launch is blocked">Record a plan approval and approve every creative first.</Notice>}
-      <ProviderBoundary id="site.publish" title="Launching changes this record only" />
+      <OverlaySummary
+        eyebrow="Campaign"
+        title={campaign.title}
+        status={<Pill tone={campaign.status === "active" ? "success" : "neutral"} dot>{campaign.status.replaceAll("_", " ")}</Pill>}
+        meta={[`Owner ${campaign.ownerName}`]}
+      />
+      <OverlaySection title="Launch checklist" hint={blocked ? `${attention.length} to fix before this can be recorded` : "Everything this launch depends on"}>
+        <LaunchChecklist rows={rows} />
+      </OverlaySection>
+      <Notice tone={blocked ? "danger" : "warning"} title={blocked ? "Launch is blocked" : "Recording a launch publishes nothing"}>
+        {blocked
+          ? "Record a plan approval and approve every creative first."
+          : "It marks the campaign active here and queues its content locally. No advertising or mail provider is connected, so nothing leaves this workspace."}
+      </Notice>
     </form>
   );
 }
@@ -470,27 +481,33 @@ export function PauseConsequence({ context, close }: { context: ScreenContext; c
   if (!campaign) return <Empty title="No campaign" />;
   return (
     <Stack gap={4}>
-      <Notice tone="warning" title="What pausing can and cannot do">
-        Pausing sets this campaign to paused and holds its {posts.length} queued item{posts.length === 1 ? "" : "s"} in this browser. It cannot stop spend at an advertising platform: no account is connected, so no spend was ever authorised from here. If an account were connected, a pause would still take minutes to take effect and late-reported spend could still arrive.
-      </Notice>
-      <Properties rows={[
-        { label: "Queued items held", value: String(posts.length) },
-        { label: "Committed spend so far", value: context.money(Number(campaign.fields.spentMinor ?? 0)) },
-        { label: "Provider spend stopped", value: <Pill tone="warning">Cannot be confirmed</Pill> },
+      <FactGrid columns={3} items={[
+        { label: "Queued items held", value: String(posts.length), mono: true },
+        { label: "Committed spend", value: context.money(Number(campaign.fields.spentMinor ?? 0)), mono: true },
+        { label: "Provider spend stopped", value: "Cannot be confirmed", tone: "warning" },
       ]} />
-      <Button
-        variant="danger"
-        onClick={async () => {
-          await context.mutate.patch(campaign.id, { status: "paused", fields: { ...campaign.fields, approval: "paused" } }, { expectRevision: campaign.revision, event: `${campaign.title} paused` });
-          for (const post of posts) {
-            await context.mutate.patch(post.id, { status: "draft", fields: { ...post.fields, delivery: "ready_local" } }, { event: `${post.title} held because its campaign was paused` });
-          }
-          context.toast("Paused", `${campaign.title} is paused and ${posts.length} queued item${posts.length === 1 ? " was" : "s were"} returned to drafts.`);
-          close();
-        }}
-      >
-        Pause and hold queued items
-      </Button>
+      <Notice tone="warning" title="Pausing stops this workspace's schedule only">
+        It holds {posts.length} queued item{posts.length === 1 ? "" : "s"} here. No advertising account is connected, so no spend was authorised from Arlovi and none can be stopped from it.
+      </Notice>
+      <OverlayActions
+        variant="confirm"
+        end={<OverlayCancel>Cancel</OverlayCancel>}
+        primary={(
+          <Button
+            variant="danger"
+            onClick={async () => {
+              await context.mutate.patch(campaign.id, { status: "paused", fields: { ...campaign.fields, approval: "paused" } }, { expectRevision: campaign.revision, event: `${campaign.title} paused` });
+              for (const post of posts) {
+                await context.mutate.patch(post.id, { status: "draft", fields: { ...post.fields, delivery: "ready_local" } }, { event: `${post.title} held because its campaign was paused` });
+              }
+              context.toast("Paused", `${campaign.title} is paused and ${posts.length} queued item${posts.length === 1 ? " was" : "s were"} returned to drafts.`);
+              close();
+            }}
+          >
+            Pause and hold queued items
+          </Button>
+        )}
+      />
     </Stack>
   );
 }
@@ -596,23 +613,26 @@ export function PublishPreview({ context, close }: { context: ScreenContext; clo
         { label: "Media", value: body.media?.[0]?.name ?? "None attached" },
         { label: "Account", value: <Pill tone="warning">Not connected</Pill> },
       ]} />
-      <ProviderBoundary id="site.publish" title="Publishing is not available" >
-        Pressing publish would normally hand this caption and media to the network. With no account authorised, the only honest action is to queue it here.
+      <ProviderBoundary custom id="social.publish" title="No social account is connected">
+        Publishing would hand this caption and media to the network. Nothing is sent: the post is queued here until an account is authorised.
       </ProviderBoundary>
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          disabled={over}
-          onClick={async () => {
-            await context.mutate.patch(post.id, { status: "scheduled", fields: { ...post.fields, delivery: "queued_local", approval: "approved", error: "" } }, { expectRevision: post.revision, event: `${post.title} queued locally for ${post.startAt}` });
-            context.toast("Queued locally", "The item is approved and queued in this browser. It has not been published.");
-            close();
-          }}
-        >
-          Approve and queue locally
-        </Button>
-        <Button variant="secondary" disabled>Publish now — needs a connected account</Button>
-      </Row>
+      <OverlayActions
+        primary={(
+          <Button
+            variant="primary"
+            disabled={over}
+            onClick={async () => {
+              await context.mutate.patch(post.id, { status: "scheduled", fields: { ...post.fields, delivery: "queued_local", approval: "approved", error: "" } }, { expectRevision: post.revision, event: `${post.title} queued locally for ${post.startAt}` });
+              context.toast("Queued locally", "The item is approved and queued in this browser. It has not been published.");
+              close();
+            }}
+          >
+            Approve and queue locally
+          </Button>
+        )}
+        secondary={<Button variant="secondary" disabled>Publish now (needs an account)</Button>}
+        end={<OverlayCancel>Cancel</OverlayCancel>}
+      />
     </Stack>
   );
 }
@@ -721,7 +741,7 @@ export function PostComposer({ context, close }: { context: ScreenContext; close
       <Stack gap={4}>
         {networks.map((network) => <NetworkPreview key={network} network={network} caption={caption} />)}
       </Stack>
-      <ProviderBoundary id="site.publish" title="This composer stops at the publish boundary" />
+      <ProviderBoundary custom id="social.publish" title="Nothing is published from here">No social account is connected. Saving keeps the post in this workspace.</ProviderBoundary>
     </form>
   );
 }
@@ -925,32 +945,44 @@ export function SendReview({ context, close }: { context: ScreenContext; close: 
   );
 }
 
-export function SuppressionCheck() {
+export function SuppressionCheck({ context }: { context: ScreenContext }) {
   const data = useMarketData();
   const { now } = useWorkspace();
   const suppressed = data.contacts.filter((contact) => contact.fields.suppressed === true);
-  const wouldHaveMatched = data.audiences.map((audience) => {
+  const rows = data.audiences.map((audience) => {
     const result = evaluateSegment(audience, data.contacts, now);
     const caught = result.excluded.filter((item) => item.contact.fields.suppressed === true).length;
-    return { audience, held: result.excluded.length, caught };
+    const ruled = (bodyOf<AudienceBody>(audience, {}).exclusions ?? []).includes("suppressed");
+    return { audience, held: result.excluded.length, caught, ruled };
   });
+  const missing = rows.filter((row) => !row.ruled);
+  async function addRule(audience: Rec) {
+    const body = bodyOf<AudienceBody>(audience, {});
+    await context.mutate.patch(audience.id, { body: { ...body, exclusions: [...new Set([...(body.exclusions ?? []), "suppressed"])] } }, { expectRevision: audience.revision, event: `Suppression rule added to ${audience.title} by ${context.actor}` });
+    context.toast("Suppression rule added", `${audience.title} now holds back suppressed contacts.`);
+  }
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Suppression list", value: `${suppressed.length} contacts` },
-        { label: "Applied", value: "Before every count, preview and send review" },
-        { label: "Source", value: "The suppressed field on each contact record" },
-      ]} />
-      <DataGrid rows={wouldHaveMatched} rowId={(row) => row.audience.id} label="Suppression by segment" filterable={false}
+      <OverlaySummary
+        eyebrow="Email send safety"
+        title={`${suppressed.length} suppressed ${suppressed.length === 1 ? "contact" : "contacts"}`}
+        status={missing.length === 0 ? <Pill tone="success" dot>Every segment excludes them</Pill> : <Pill tone="danger" dot>{missing.length} {missing.length === 1 ? "segment does" : "segments do"} not</Pill>}
+        meta={["Read from the suppressed field on each contact", "Applied before every count, preview and send review"]}
+      />
+      <DataGrid rows={rows} rowId={(row) => row.audience.id} label="Suppression by segment" filterable={false}
         columns={[
           { key: "segment", header: "Segment", primary: true, cell: (row) => row.audience.title },
-          { key: "held", header: "Held back", align: "end", cell: (row) => String(row.held) },
-          { key: "caught", header: "Suppressed, caught", align: "end", cell: (row) => String(row.caught) },
-          { key: "rule", header: "Exclusion rule", cell: (row) => ((bodyOf<AudienceBody>(row.audience, {}).exclusions ?? []).includes("suppressed") ? <Pill tone="success">Suppression excluded</Pill> : <Pill tone="danger">No suppression rule</Pill>) },
+          { key: "held", header: "Held back", align: "end", cell: (row) => <span className="ds-num">{row.held}</span> },
+          { key: "caught", header: "Suppressed, caught", align: "end", cell: (row) => <span className="ds-num">{row.caught}</span> },
+          { key: "rule", header: "Exclusion rule", cell: (row) => (row.ruled
+            ? <Pill tone="success">Excluded</Pill>
+            : <Button size="sm" variant="secondary" onClick={() => void addRule(row.audience)}>Add the rule</Button>) },
         ]} />
-      <Notice tone="danger" title="A segment without the suppression rule cannot be approved for sending">
-        The send review refuses to record recipients for a segment that does not exclude suppressed contacts.
-      </Notice>
+      {missing.length > 0 && (
+        <Notice tone="danger" title="These segments cannot be approved for sending">
+          {missing.map((row) => row.audience.title).join(", ")}: the send review refuses to record recipients for a segment that does not exclude suppressed contacts.
+        </Notice>
+      )}
     </Stack>
   );
 }

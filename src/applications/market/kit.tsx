@@ -26,8 +26,13 @@ export const submitFooter = (formId: string, label: string) => ({ close }: { clo
  * The honest provider boundary. Never claims a remote action happened: it
  * names the provider, the capability state and what was kept locally instead.
  */
-export function ProviderBoundary({ id, title, children }: { id: string; title?: string; children?: ReactNode }) {
+export function ProviderBoundary({ id, title, children, custom }: { id: string; title?: string; children?: ReactNode; custom?: boolean }) {
   const capability = capabilityById(id);
+  if (custom) {
+    return (
+      <Notice tone="warning" title={title ?? "Not connected"} actions={<Pill tone="warning">Not connected</Pill>}>{children}</Notice>
+    );
+  }
   if (!capability) {
     return <Notice tone="warning" title={title ?? "No provider is connected"}>{children}</Notice>;
   }

@@ -332,3 +332,6 @@
 .cm-compose-reference-list>span{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border-default);background:var(--bg-inset);padding:5px 8px;border-radius:6px;font-size:11px;max-width:100%;overflow-wrap:anywhere}
 .cm-compose-reference-list button{border:0;background:transparent;cursor:pointer;color:var(--fg-subtle);display:flex;padding:2px}
 @media(max-width:600px){.cm-compose-tool-entry{flex-wrap:wrap}.cm-compose-suggestions{min-width:0}}
+.cmx-message-tags em.cmx-notdelivered{background:var(--warning-soft);color:var(--warning)}
+/* On a phone the page tab strip already switches every mail area; the rail would be a second tab layer. */
+@media(max-width:800px){.cmx-rail{display:none}.cmx-shell{grid-template-columns:minmax(0,1fr)}}
