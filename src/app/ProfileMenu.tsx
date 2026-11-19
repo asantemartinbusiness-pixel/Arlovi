@@ -1,3 +1,4 @@
+import { useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import {
@@ -42,6 +43,7 @@ export function ProfileMenu({
 }: ProfileMenuProps) {
   const { org, role } = useWorkspace();
   const ui = useUi();
+  const [roleExpanded, setRoleExpanded] = useState(false);
   const navigate = useNavigate();
   const displayName = org.ownerName?.trim() || "Local workspace profile";
   const paletteName = palettes.find(item => item.id === ui.palette)?.label ?? "Colour";
@@ -200,28 +202,34 @@ export function ProfileMenu({
 
           <DropdownMenu.Separator className="profile-menu__separator" />
           <DropdownMenu.Label className="profile-menu__label">Role view (not a security boundary)</DropdownMenu.Label>
-          <DropdownMenu.Sub>
-            <DropdownMenu.SubTrigger className="profile-menu__item">
-              <UserRound size={17} aria-hidden="true"/>
-              <span className="profile-menu__item-title">Preview as {ROLE_LABELS[role]}</span>
-              <span className="profile-menu__value">Local</span>
-              <ChevronRight size={15} aria-hidden="true" className="profile-menu__chevron"/>
-            </DropdownMenu.SubTrigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.SubContent className="ds-popover profile-menu__sub" sideOffset={8} collisionPadding={12}>
-                <DropdownMenu.Label className="profile-menu__label">Preview navigation as</DropdownMenu.Label>
-                <DropdownMenu.RadioGroup value={role} onValueChange={value => onRoleViewChange(value as Role)}>
-                  {ROLE_VIEWS.map(item => (
-                    <DropdownMenu.RadioItem className="profile-menu__item" key={item} value={item}>
-                      <span className="profile-menu__item-title">{ROLE_LABELS[item]}</span>
-                      {item === role && <Check size={15} aria-hidden="true" className="profile-menu__selection"/>}
-                    </DropdownMenu.RadioItem>
-                  ))}
-                </DropdownMenu.RadioGroup>
-                <p className="profile-menu__hint">Preview only. It does not change account permissions or grant access.</p>
-              </DropdownMenu.SubContent>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Sub>
+          <DropdownMenu.Item className="profile-menu__item"
+            aria-expanded={roleExpanded} aria-controls="profile-role-views"
+            onKeyDown={event => {
+              if (event.key === "ArrowRight") { event.preventDefault(); setRoleExpanded(true); }
+              if (event.key === "ArrowLeft" && roleExpanded) { event.preventDefault(); setRoleExpanded(false); }
+            }}
+            onSelect={event => { event.preventDefault(); setRoleExpanded(open => !open); }}>
+            <UserRound size={17} aria-hidden="true"/>
+            <span className="profile-menu__item-title">Preview as {ROLE_LABELS[role]}</span>
+            <span className="profile-menu__value">Local</span>
+            <ChevronRight size={15} aria-hidden="true" className="profile-menu__chevron"
+              style={{ transform: roleExpanded ? "rotate(90deg)" : undefined }}/>
+          </DropdownMenu.Item>
+          {roleExpanded && (
+            <div id="profile-role-views" className="profile-menu__inline-roles">
+              <DropdownMenu.Label className="profile-menu__label">Preview navigation as</DropdownMenu.Label>
+              <DropdownMenu.RadioGroup value={role}
+                onValueChange={value => { setRoleExpanded(false); onRoleViewChange(value as Role); }}>
+                {ROLE_VIEWS.map(item => (
+                  <DropdownMenu.RadioItem className="profile-menu__item" key={item} value={item}>
+                    <span className="profile-menu__item-title">{ROLE_LABELS[item]}</span>
+                    {item === role && <Check size={15} aria-hidden="true" className="profile-menu__selection"/>}
+                  </DropdownMenu.RadioItem>
+                ))}
+              </DropdownMenu.RadioGroup>
+              <p className="profile-menu__hint">Preview only. It does not change account permissions or grant access.</p>
+            </div>
+          )}
 
           <DropdownMenu.Separator className="profile-menu__separator" />
           <DropdownMenu.Item className="profile-menu__item" onSelect={onStartTour}>

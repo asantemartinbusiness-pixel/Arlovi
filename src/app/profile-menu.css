@@ -204,3 +204,8 @@
 @media (prefers-reduced-motion: reduce) {
   .profile-menu.ds-popover, .profile-menu__sub.ds-popover { animation: none; }
 }
+
+/* Preview roles in the same surface: no unstable nested flyout on touch. */
+.profile-menu__inline-roles { margin: 4px 2px 8px; padding: 5px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--bg-inset); }
+.profile-menu__inline-roles .profile-menu__item { min-height: 36px; }
+.profile-menu__inline-roles .profile-menu__hint { margin-top: 3px; }
