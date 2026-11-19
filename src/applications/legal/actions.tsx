@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Button, Checkbox, Empty, Field, ModalActions, Notice, OverlayActions, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
@@ -377,18 +377,14 @@ export function SharePack({ context, close }: { context: ScreenContext; close: (
       <Field label="Or an external address (auditor, solicitor)"><TextInput type="email" value={external} onChange={(event) => setExternal(event.target.value)} /></Field>
       {refused && <Notice tone="danger" title="Sharing outside is refused">{held ? "A legal hold is on. " : ""}{restricted ? "The pack holds restricted records. " : ""}{!context.can("export_data") ? "This role view may not export. " : ""}Inside sharing is still possible.</Notice>}
       {outside && !refused && <Boundary id="email.send" />}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" disabled={(!to && !outside) || refused} onClick={async () => {
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={<Button variant="primary" disabled={(!to && !outside) || refused} onClick={async () => {
           const recipients = [to, external.trim()].filter(Boolean);
           const shared = [...new Set([...String(pack.fields.sharedWith ?? "").split(",").filter(Boolean), ...recipients])];
           await context.mutate.patch(pack.id, { fields: { ...pack.fields, sharedWith: shared.join(","), sharedBy: context.actor } }, { expectRevision: pack.revision, event: `${pack.title} shared with ${recipients.join(", ")} by ${context.actor}` });
           if (outside) await logBoundary(context, "email.send", `Share of ${pack.title} with ${external.trim()} queued locally`, pack.id);
           context.toast("Shared", outside ? `Recorded. ${external.trim()} has not been sent anything: no mail provider is connected.` : `${to} can see ${pack.title} in this workspace.`);
           close();
-        }}>Share the pack</Button>
-      </Row>
+        }}>Share the pack</Button>} /></ModalActions>
     </Stack>
   );
 }

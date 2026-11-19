@@ -53,7 +53,7 @@ test("LEGAL contract workspace: obligations, review cycle, key dates, links and 
   // Projects are loaded with the Projects application; open it once so the contract can link one.
   await open(page, "/project/projects");
   await expect(main(page).getByText("Clerkenwell showroom refit").first()).toBeVisible();
-  await open(page, "/legal/contracts/nl-contracts-020", "Contract");
+  await open(page, "/legal/contracts/nl-contracts-020", "Thames Timber");
 
   // Obligations: add one, complete it.
   const obligations = card(page, "Obligations from this contract");
@@ -100,7 +100,7 @@ test("LEGAL contract workspace: obligations, review cycle, key dates, links and 
   await expect(page).toHaveURL(/\/project\/projects\/nl-projects-020/);
 
   // A stored version appears in History and survives a reload.
-  await open(page, "/legal/contracts/nl-contracts-020", "Contract");
+  await open(page, "/legal/contracts/nl-contracts-020", "Thames Timber");
   await page.getByRole("tab", { name: "History" }).click();
   await main(page).getByRole("button", { name: "Store a new version" }).click();
   const versionForm = main(page).getByRole("form", { name: "Store a new version" });
@@ -197,7 +197,7 @@ test.describe("mobile", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test("contract workspace and care inbox fit a phone", async ({ page }) => {
-    await open(page, "/legal/contracts/nl-contracts-024", "Contract");
+    await open(page, "/legal/contracts/nl-contracts-024", "Kestrel Brokers");
     await expect(card(page, "Key dates and renewal").getByText("The notice date has passed")).toBeVisible();
     const obligations = card(page, "Obligations from this contract");
     await obligations.scrollIntoViewIfNeeded();

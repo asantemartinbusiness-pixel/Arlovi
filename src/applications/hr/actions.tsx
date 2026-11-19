@@ -1,7 +1,7 @@
 import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useState } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
-import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Button, Checkbox, Empty, Field, ModalActions, Notice, OverlayActions, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { addDays, clockIso } from "@/platform/clock";
@@ -81,15 +81,11 @@ export function DirectoryFilter({ context, close }: { context: ScreenContext; cl
           {departments.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
         </Select>
       </Field>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" onClick={() => {
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={<Button variant="primary" onClick={() => {
           setDirectoryTeam(value);
           if (context.tab === "Teams") context.setTab("People");
           close();
-        }}>Apply the filter</Button>
-      </Row>
+        }}>Apply the filter</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -887,11 +883,7 @@ export function ReconcileRun({ context, close }: { context: ScreenContext; close
         </Notice>
         {error && <Notice tone="danger" title="Comparison not saved">{error}</Notice>}
       </PeopleDialogSection>
-      <Row gap={2} wrap>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/ledger`)}>Open ledger</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" disabled={!chosen || difference === undefined || !checked}
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} secondary={<Button variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/fin/ledger`)}>Open ledger</Button>} primary={<Button variant="primary" disabled={!chosen || difference === undefined || !checked}
           onClick={async () => {
             if (!chosen || difference === undefined || !checked) return;
             setError("");
@@ -911,8 +903,7 @@ export function ReconcileRun({ context, close }: { context: ScreenContext; close
             } catch (reason) {
               setError(reason instanceof Error ? reason.message : "The comparison could not be recorded.");
             }
-          }}>Record comparison</Button>
-      </Row>
+          }}>Record comparison</Button>} /></ModalActions>
     </Stack>
   );
 }

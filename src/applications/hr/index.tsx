@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { Briefcase, CalendarDays, ClipboardCheck, GraduationCap, Receipt, UserPlus, Users, Clock } from "lucide-react";
 import {
-  Button, Checkbox, DataGrid, Empty, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Checkbox, DataGrid, DrawerActions, Empty, Field, FactGrid, ModalActions, OVERLAY_WIDTH, OverlayActions, OverlaySummary, OverlaySection, ModalInFlight, ModalUnsavedChanges, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
+import type { Rec } from "@/domain/types";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import { capabilityById } from "@/platform/capability";
 import {
   ApplicantProfile, CandidateProfileOverlay, EmployeeDirectory, EmployeeProfile, LeaveApproval,
   LeaveForm, LeaveScreen, Learning, Onboarding, Payroll, PayrollReview, PeopleOverview, Performance,
-  PositionEditor, Recruitment, Scheduling, SegmentedInspector, StaffingSummary,
+  PositionEditor, Recruitment, ScorecardOverlay, Scheduling, SegmentedInspector, StaffingSummary,
 } from "./panels";
 import { RoleViewNote, leaveBalance, submitFooter } from "./kit";
 import { kitOverlays, needsSelection } from "./opsKit";
@@ -46,6 +47,81 @@ function MailBoundary() {
     <Notice tone="warning" title={`${capability?.label ?? "Send email"} — ${capability?.state.replace("_", " ") ?? "not connected"}`}>
       {capability?.localEquivalent} {capability?.note}
     </Notice>
+  );
+}
+
+function useApplicant(context: ScreenContext) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  return scopedDetailRecord(useRecord(payload?.id ?? context.params.id ?? context.selectedId), context.org.id, "applicants");
+}
+
+/** What has actually been drafted to this candidate. Nothing here has been delivered. */
+function ApplicantComms({ context }: { context: ScreenContext }) {
+  const applicant = useApplicant(context);
+  const drafts = useCollections(["emailThreads"]).emailThreads.filter((row) => applicant && row.parentId === applicant.id);
+  if (!applicant) return <Empty title="Candidate unavailable">Open a candidate to see what has been drafted to them.</Empty>;
+  return (
+    <Stack gap={4}>
+      <OverlaySummary eyebrow="Communications with" title={applicant.title}
+        meta={[`Applied ${context.date(applicant.at ?? applicant.createdAt)}`, String(applicant.fields.email ?? "") || "No email recorded"]} />
+      <OverlaySection title="Drafted here" hint="Kept in Arlovi; none of these has been sent">
+        {drafts.length === 0
+          ? <Empty title="Nothing drafted yet">Use Message the candidate to write a first draft.</Empty>
+          : <Stack gap={2}>{drafts.map((row) => (
+            <Row key={row.id} gap={2}>
+              <span className="ds-grow ds-truncate">{row.title}</span>
+              <span className="ds-subtle ds-num">{context.date(row.createdAt)}</span>
+              <Pill tone="warning">Not sent</Pill>
+            </Row>
+          ))}</Stack>}
+      </OverlaySection>
+      <MailBoundary />
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={() => context.openOverlay("message candidate", { id: applicant.id })}>Draft a message</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
+    </Stack>
+  );
+}
+
+function RejectionPreview({ context, close }: { context: ScreenContext; close: () => void }) {
+  const applicant = useApplicant(context);
+  const first = applicant?.title.split(" ")[0] ?? "there";
+  return (
+    <Stack gap={4}>
+      <div className="ds-panel" style={{ padding: "var(--space-4)" }}>
+        <p>Dear {first},</p>
+        <p>Thank you for applying{applicant?.fields.role ? ` for the ${String(applicant.fields.role)} role` : ""} and for the time you gave the process. On this occasion we are not taking your application further.</p>
+        <p>We would be glad to hear from you again when something closer to your experience comes up.</p>
+      </div>
+      <Notice tone="warning" title="A reason is recorded, not sent">
+        The reason a hiring manager gives stays on the record in {context.org.shortName}. Sending this message needs a connected mailbox, and
+        previewing it changes nothing on the candidate.
+      </Notice>
+      <ModalActions><OverlayActions primary={<OverlayCancel>Close preview</OverlayCancel>}
+        secondary={applicant ? <Button variant="secondary" onClick={() => { close(); context.openOverlay("stage decision", { id: applicant.id }); }}>Record the decision</Button> : undefined} /></ModalActions>
+    </Stack>
+  );
+}
+
+function WelcomePreview({ context }: { context: ScreenContext; close?: () => void }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const starter = scopedDetailRecord(useRecord(payload?.id ?? context.selectedId), context.org.id, "employees");
+  const mentor = String(starter?.fields.mentor ?? "").trim();
+  return (
+    <Stack gap={4}>
+      <div className="ds-panel" style={{ padding: "var(--space-4)" }}>
+        <p>Welcome to {context.org.name}{starter ? `, ${starter.title.split(" ")[0]}` : ""}.</p>
+        <p>Your onboarding checklist is in People{mentor ? `, and ${mentor} will be your mentor` : ", and a mentor will be named before your first day"}.</p>
+      </div>
+      <Notice tone="info" title="A template, not a delivered message">
+        {starter ? `Drafted for ${starter.title}.` : "Select a starter on the onboarding board to name them."} Nothing is sent from here.
+      </Notice>
+      <MailBoundary />
+      <ModalActions><OverlayActions primary={<OverlayCancel>Close preview</OverlayCancel>} /></ModalActions>
+    </Stack>
   );
 }
 
@@ -111,10 +187,7 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
         <Checkbox checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} label={`I, ${context.actor}, authorise recording this departure for ${employee.title}.`} />
       </PeopleDialogSection>
       {error && <Notice tone="danger" title="Departure could not be completed">{error}</Notice>}
-      <ModalActions>
-        <OverlayCancel disabled={saving}>Cancel</OverlayCancel>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions><OverlayActions variant="confirm" end={<OverlayCancel disabled={saving}>Cancel</OverlayCancel>} primary={<Button
           variant="danger"
           disabled={!canSubmit}
           onClick={async () => {
@@ -160,8 +233,7 @@ function OffboardingConfirmation({ context, close }: { context: ScreenContext; c
           }}
         >
           {saving ? "Recording…" : "Record departure"}
-        </Button>
-      </ModalActions>
+        </Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -341,7 +413,6 @@ export const hrApp = registerApp({
   screens: {
     "ARL-HR-001": {
       id: "ARL-HR-001",
-      subtitle: (context) => `People, agents and the decisions waiting on ${context.org.shortName}.`,
       tabs: (["Overview", "My team", "HR tasks", "Trends"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <PeopleOverview context={context} lens={lens} />,
@@ -365,7 +436,6 @@ export const hrApp = registerApp({
 
     "ARL-HR-002": {
       id: "ARL-HR-002",
-      subtitle: () => "People who work here, and the AI employees listed apart from them.",
       tabs: (["People", "Teams", "Contractors", "Alumni"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <EmployeeDirectory context={context} lens={lens} />,
@@ -477,7 +547,6 @@ export const hrApp = registerApp({
 
     "ARL-HR-004": {
       id: "ARL-HR-004",
-      subtitle: () => "Open positions, the people applying and where each decision sits.",
       tabs: (["Positions", "Candidates", "Interviews", "Offers"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <Recruitment context={context} lens={lens} />,
@@ -492,7 +561,7 @@ export const hrApp = registerApp({
       overlays: [
         { id: "schedule interview", kind: "modal", title: "Schedule an interview", width: 560, render: ({ close, ...context }) => <ScheduleInterview context={context} close={close} />, footer: submitFooter("hr-interview", "Schedule the interview") },
         { id: "Job spec editor", kind: "modal", title: "Job specification", width: 600, render: ({ close, ...context }) => <PositionEditor context={context} close={close} />, footer: submitFooter("hr-position", "Save position") },
-        { id: "candidate profile", kind: "drawer", title: "Candidate", width: 520, render: ({ ...context }) => <CandidateProfileOverlay context={context} /> },
+        { id: "candidate profile", kind: "drawer", title: "Candidate", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <CandidateProfileOverlay context={context} /> },
         { id: "offer approval", kind: "modal", title: "Issue an offer", width: 560, render: ({ close, ...context }) => <OfferApproval context={context} close={close} /> },
       ],
     },
@@ -517,34 +586,14 @@ export const hrApp = registerApp({
         { id: "stage decision", kind: "modal", title: "Review and move stage", width: 560, render: ({ close, ...context }) => <StageDecision context={context} close={close} />, footer: submitFooter("hr-stage", "Record the decision") },
         { id: "message candidate", kind: "modal", title: "Message the candidate", width: 560, render: ({ close, ...context }) => <ApplicantMessage context={context} close={close} />, footer: submitFooter("hr-applicant-message", "Keep as a draft") },
         { id: "schedule interview", kind: "modal", title: "Schedule an interview", width: 560, render: ({ close, ...context }) => <ScheduleInterview context={context} close={close} />, footer: submitFooter("hr-interview", "Schedule the interview") },
-        { id: "Applicant communications", kind: "drawer", title: "Communications with this candidate", width: 480, render: ({ ...context }) => (
-          <Stack gap={3}>
-            <Properties rows={[
-              { label: "Application received", value: context.date(context.now) },
-              { label: "Acknowledgement", value: "Drafted locally, not sent" },
-              { label: "Interview invitation", value: "Drafted locally, not sent" },
-            ]} />
-            <MailBoundary />
-          </Stack>
-        ) },
-        { id: "interviewer scorecard", kind: "drawer", title: "Interview scorecard", width: 520, render: ({ ...context }) => <CandidateProfileOverlay context={context} /> },
-        { id: "rejection preview", kind: "modal", title: "Rejection, previewed before anyone sees it", width: 560, render: ({ ...context }) => (
-          <Stack gap={3}>
-            <div className="ds-panel" style={{ padding: "var(--space-4)" }}>
-              <p>Thank you for applying and for the time you gave the process. On this occasion we are not taking your application further.</p>
-              <p>We would be glad to hear from you again when something closer to your experience comes up.</p>
-            </div>
-            <Notice tone="warning" title="A reason is recorded against the candidate, not sent">
-              The reason a hiring manager gives stays on the record in {context.org.shortName}. Sending this message needs a connected mailbox.
-            </Notice>
-          </Stack>
-        ) },
+        { id: "Applicant communications", kind: "drawer", title: "Communications with this candidate", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <ApplicantComms context={context} /> },
+        { id: "interviewer scorecard", kind: "drawer", title: "Interview scorecard", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ ...context }) => <ScorecardOverlay context={context} /> },
+        { id: "rejection preview", kind: "modal", title: "Rejection, previewed before anyone sees it", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <RejectionPreview context={context} close={close} /> },
       ],
     },
 
     "ARL-HR-006": {
       id: "ARL-HR-006",
-      subtitle: () => "Checklists that run across People, the manager, IT access and Finance.",
       tabs: (["Incoming", "In progress", "Waiting", "Completed"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <Onboarding context={context} lens={lens} />,
@@ -561,21 +610,12 @@ export const hrApp = registerApp({
         { id: "assign mentor", kind: "modal", title: "Assign a mentor", width: 500, render: ({ close, ...context }) => <MentorAssign context={context} close={close} />, footer: submitFooter("hr-mentor", "Assign the mentor") },
         { id: "Onboarding template", kind: "modal", title: "Launch an onboarding checklist", width: 560, render: ({ close, ...context }) => <OnboardingLaunch context={context} close={close} />, footer: submitFooter("hr-onboarding", "Launch checklist") },
         { id: "IT access", kind: "drawer", title: "Access requests for this starter", width: 500, render: ({ ...context }) => <ITAccess context={context} /> },
-        { id: "welcome preview", kind: "modal", title: "Welcome note", width: 520, render: ({ ...context }) => (
-          <Stack gap={3}>
-            <div className="ds-panel" style={{ padding: "var(--space-4)" }}>
-              <p>Welcome to {context.org.name}. Your first morning starts at the bench with Rowan; the studio eats together at one.</p>
-              <p>Your checklist is in People, and your mentor will walk you through the safety file before you touch a tool.</p>
-            </div>
-            <MailBoundary />
-          </Stack>
-        ) },
+        { id: "welcome preview", kind: "modal", title: "Welcome note", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <WelcomePreview context={context} close={close} /> },
       ],
     },
 
     "ARL-HR-007": {
       id: "ARL-HR-007",
-      subtitle: () => "Balances, the team calendar and the decisions that move them.",
       tabs: (["My leave", "Team calendar", "Approvals", "Policy"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <LeaveScreen context={context} lens={lens} />,
@@ -640,7 +680,7 @@ export const hrApp = registerApp({
       ],
       overlays: [
         { id: "reconcile run", kind: "modal", title: "Reconcile the run to the ledger", width: 560, render: ({ close, ...context }) => <ReconcileRun context={context} close={close} /> },
-        { id: "Payroll review", kind: "drawer", title: "Payroll evidence", width: 700, presentation: { noRecordContext: true, guidance: "Select an actual payroll run and distinguish saved run evidence from today’s illustrative salary calculations." }, render: ({ ...context }) => <PayrollReview context={context} /> },
+        { id: "Payroll review", kind: "drawer", title: "Payroll evidence", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true, guidance: "Select an actual payroll run and distinguish saved run evidence from today’s illustrative salary calculations." }, render: ({ ...context }) => <PayrollReview context={context} /> },
         { id: "exception report", kind: "modal", title: "Payroll exceptions", width: 600, render: ({ ...context }) => <PayrollExceptions context={context} /> },
         { id: "submission signoff", kind: "modal", title: "Payroll human approval", width: 620, capability: "view_payroll", presentation: { noRecordContext: true, guidance: "Review the saved draft, recorded exceptions and filing limitations before signing off locally." }, render: ({ close, ...context }) => <PayrollSignoff context={context} close={close} /> },
       ],
@@ -648,7 +688,6 @@ export const hrApp = registerApp({
 
     "ARL-HR-010": {
       id: "ARL-HR-010",
-      subtitle: () => "Cycles, evidence and ratings a named person is accountable for.",
       tabs: (["Cycles", "My reviews", "Team", "Templates"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <Performance context={context} lens={lens} />,
@@ -682,7 +721,6 @@ export const hrApp = registerApp({
 
     "ARL-HR-011": {
       id: "ARL-HR-011",
-      subtitle: () => "Courses, published policies and who has acknowledged which version.",
       tabs: (["Courses", "Policies", "Compliance", "My learning"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <Learning context={context} lens={lens} />,
@@ -737,10 +775,7 @@ function OfferApproval({ context, close }: { context: ScreenContext; close: () =
       {!scored && <Notice tone="danger" title="No scorecard on record">An offer needs a recorded, evidence-based scorecard by an accountable person first.</Notice>}
       <p className="ds-prose">Issuing records the offer as made by {context.actor} and keeps the letter as a local draft. The candidate is not hired until they accept and somebody records it.</p>
       <MailBoundary />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Close</Button>
-        <span className="ds-grow" />
-        <Button
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Close</Button>} primary={<Button
           variant="primary"
           disabled={!context.can("edit_people") || issued || !scored}
           onClick={async () => {
@@ -752,8 +787,7 @@ function OfferApproval({ context, close }: { context: ScreenContext; close: () =
           }}
         >
           Issue the offer
-        </Button>
-      </Row>
+        </Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -1018,16 +1052,17 @@ function TimeReview({ context, close }: { context: ScreenContext; close: () => v
     && Number(entry.fields.hours) <= 24;
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Person", value: person?.title ?? "Unlinked — needs verified employee" },
-        { label: "Work date", value: context.date(entry.startAt) },
-        { label: "Time recorded", value: `${String(entry.fields.hours ?? "Not recorded")} hours` },
-        { label: "Project", value: project?.title ?? (entry.fields.projectId ? "Project unavailable" : "Internal / no project") },
+      <OverlaySummary
+        eyebrow="Time entry"
+        title={person?.title ?? "Unlinked entry"}
+        status={<Pill tone={inconsistent ? "danger" : done ? "success" : "warning"} dot>{inconsistent ? "Needs reconciliation" : done ? "Approved" : "Awaiting review"}</Pill>}
+        meta={[context.date(entry.startAt), `${String(entry.fields.hours ?? "?")} hours`]}
+      />
+      <FactGrid columns={2} items={[
+        { label: "Project", value: project?.title ?? (entry.fields.projectId ? "Project unavailable" : "Internal, no project") },
         { label: "Project task", value: task?.title ?? (entry.fields.taskId ? "Task unavailable" : "Not linked") },
         { label: "Submitted by", value: String(entry.fields.filedBy ?? entry.ownerName ?? "Not recorded") },
-        { label: "State", value: inconsistent ? "Approval record mismatch" : done ? "Approved in Arlovi" : "Awaiting review" },
-        { label: "Approved by", value: String(entry.fields.approvedBy || "Not yet approved") },
-        { label: "Approved at", value: entry.fields.approvedAt ? context.dateTime(String(entry.fields.approvedAt)) : "Not recorded" },
+        { label: "Approved by", value: String(entry.fields.approvedBy || "Not yet approved"), hint: entry.fields.approvedAt ? context.dateTime(String(entry.fields.approvedAt)) : undefined },
         { label: "Last correction", value: entry.fields.correctionReason ? String(entry.fields.correctionReason) : "None recorded" },
       ]} />
       {!person && <Notice tone="warning" title="Employee association must be verified">This entry contains a name but no matching current company employee record. Link the correct employee in Time Correction before approval.</Notice>}
@@ -1036,14 +1071,9 @@ function TimeReview({ context, close }: { context: ScreenContext; close: () => v
       <Notice tone="info" title="Human decision, no external payment">
         Reviewing this entry can change its local approval state and audit history. No connected payroll, invoicing or banking provider is updated.
       </Notice>
-      <Row gap={2} wrap>
-        {project && <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${context.org.slug}/project/projects/${project.id}`); }}>Open Project</Button>}
-        {!done && <Button variant="secondary" onClick={() => {
-          close(); context.select(entry.id); context.openOverlay("time correction");
-        }}>Correct entry</Button>}
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close</Button>
-        {!done && <Button variant="primary" disabled={!person || !validHours || (Boolean(entry.fields.projectId) && !project)}
+      <DrawerActions>
+        <OverlayActions
+          primary={done ? <OverlayCancel>Close</OverlayCancel> : <Button variant="primary" disabled={!person || !validHours || (Boolean(entry.fields.projectId) && !project)}
           onClick={async () => {
             try {
               const plan = planTimesheetApprovals({
@@ -1057,36 +1087,51 @@ function TimeReview({ context, close }: { context: ScreenContext; close: () => v
               context.toast("Hours not approved", error instanceof Error ? error.message : "Reload the entry and retry.", "blocked");
             }
           }}>Approve hours</Button>}
-      </Row>
+          secondary={!done ? <Button variant="secondary" onClick={() => {
+            close(); context.select(entry.id); context.openOverlay("time correction");
+          }}>Correct entry</Button> : (project ? <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${context.org.slug}/project/projects/${project.id}`); }}>Open Project</Button> : undefined)}
+          end={!done ? <OverlayCancel>Close</OverlayCancel> : undefined}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
 
 function Overtime({ context }: { context: ScreenContext }) {
   const data = useCollections(["shifts"]);
-  const overtime = data.shifts.filter((shift) => shift.fields.kind === "shift" && shift.fields.overtime === true);
+  const overtime = data.shifts.filter((shift) => shift.fields.kind === "shift" && shift.fields.overtime === true)
+    .sort((a, b) => Number(a.fields.overtimeApproved === true) - Number(b.fields.overtimeApproved === true) || (a.startAt ?? "").localeCompare(b.startAt ?? ""));
+  const waiting = overtime.filter((shift) => shift.fields.overtimeApproved !== true);
+  const hours = (rows: Rec[]) => rows.reduce((sum, shift) => sum + (Number(shift.fields.hours) || 0), 0);
   return overtime.length === 0 ? <Empty title="No overtime on the roster" /> : (
-    <Stack gap={2}>
-      {overtime.map((shift) => (
-        <Row key={shift.id} gap={2} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-          <div className="ds-grow">
-            <strong>{String(shift.fields.employeeName ?? "")}</strong>
-            <p className="ds-subtle">{context.date(shift.startAt)} · {String(shift.fields.hours ?? 0)} hours</p>
-          </div>
-          {shift.fields.overtimeApproved === true ? (
-            <Pill tone="success">Approved locally</Pill>
-          ) : (
-            <Button size="sm" variant="secondary" onClick={async () => {
-              const saved = await context.mutate.patch(shift.id, { fields: {
-                ...shift.fields, overtimeApproved: true, overtimeApprovedBy: context.actor,
-                overtimeApprovedAt: clockIso(),
-              } }, { expectRevision: shift.revision,
-                event: `Overtime reviewed for ${String(shift.fields.employeeName ?? "")} by ${context.actor}` });
-              if (saved) context.toast("Overtime recorded", "The local approval was saved. Payroll is not submitted automatically.");
-            }}>Approve</Button>
-          )}
-        </Row>
-      ))}
+    <Stack gap={4}>
+      <FactGrid columns={3} items={[
+        { label: "Waiting", value: String(waiting.length), mono: true, tone: waiting.length ? "warning" : undefined },
+        { label: "Hours waiting", value: String(hours(waiting)), mono: true },
+        { label: "Approved", value: String(overtime.length - waiting.length), mono: true, tone: "success" },
+      ]} />
+      <Stack gap={2}>
+        {overtime.map((shift) => (
+          <Row key={shift.id} gap={2} className="ds-panel" style={{ padding: "var(--space-3)" }}>
+            <div className="ds-grow">
+              <strong>{String(shift.fields.employeeName ?? "")}</strong>
+              <p className="ds-subtle"><span className="ds-num">{context.date(shift.startAt)}</span> · <span className="ds-num">{String(shift.fields.hours ?? 0)}</span> hours</p>
+            </div>
+            {shift.fields.overtimeApproved === true ? (
+              <Pill tone="success" dot>Approved locally</Pill>
+            ) : (
+              <Button size="sm" variant="secondary" disabled={!context.can("edit_people")} onClick={async () => {
+                const saved = await context.mutate.patch(shift.id, { fields: {
+                  ...shift.fields, overtimeApproved: true, overtimeApprovedBy: context.actor,
+                  overtimeApprovedAt: clockIso(),
+                } }, { expectRevision: shift.revision,
+                  event: `Overtime reviewed for ${String(shift.fields.employeeName ?? "")} by ${context.actor}` });
+                if (saved) context.toast("Overtime approved", "The local approval was saved. Payroll is not submitted automatically.");
+              }}>Approve the overtime</Button>
+            )}
+          </Row>
+        ))}
+      </Stack>
     </Stack>
   );
 }
@@ -1244,10 +1289,7 @@ function PayrollSignoff({ context, close }: { context: ScreenContext; close: () 
         </Notice>
         {error && <Notice tone="danger" title="Run not approved">{error}</Notice>}
       </PeopleDialogSection>
-      <ModalActions>
-        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
-        <span className="ds-grow" />
-        <Button variant="primary" busy={busy} disabled={!ready || busy} onClick={async () => {
+      <ModalActions><OverlayActions variant="confirm" end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>} primary={<Button variant="primary" busy={busy} disabled={!ready || busy} onClick={async () => {
           if (!ready || busy || !context.can("view_payroll")) return;
           setBusy(true);
           setError("");
@@ -1267,8 +1309,7 @@ function PayrollSignoff({ context, close }: { context: ScreenContext; close: () 
           } finally {
             setBusy(false);
           }
-        }}>Approve local draft</Button>
-      </ModalActions>
+        }}>Approve local draft</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -1644,10 +1685,7 @@ function PolicyPublication({ context, close }: { context: ScreenContext; close: 
         </Notice>}
         {error && <Notice tone="danger" title="Revision not published">{error}</Notice>}
       </PeopleDialogSection>
-      <Row gap={2} wrap>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" disabled={!valid} onClick={async () => {
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={<Button variant="primary" disabled={!valid} onClick={async () => {
           setError("");
           if (!valid || !next) return;
           try {
@@ -1669,8 +1707,7 @@ function PolicyPublication({ context, close }: { context: ScreenContext; close: 
           } catch (problem) {
             setError(problem instanceof Error ? problem.message : "The policy revision could not be saved.");
           }
-        }}>Publish version {next || "—"}</Button>
-      </Row>
+        }}>Publish version {next || "—"}</Button>} /></ModalActions>
     </Stack>
   );
 }

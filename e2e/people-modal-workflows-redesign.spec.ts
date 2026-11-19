@@ -151,7 +151,9 @@ test("Offboarding requires a reason and human confirmation and never claims exte
   const employeeId = await createQaEmployee(page);
   expect(employeeId).toBeTruthy();
   await page.goto(`/o/northline/hr/employees/${employeeId}`);
-  await page.locator("#main").getByRole("button", { name: "Offboard" }).first().click();
+  // A4: the page head carries the screen actions; Offboard (destructive) lives in the overflow menu, not beside the name.
+  await page.locator("#main").getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "Offboard" }).click();
   const modal = page.getByRole("dialog");
   await expect(modal.getByRole("heading", { name: "Record a departure" })).toBeVisible();
   await expect(modal.locator(".hr-dialog-section")).toHaveCount(3);

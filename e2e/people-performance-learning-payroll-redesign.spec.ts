@@ -9,7 +9,7 @@ test("Performance has distinct Cycles, My reviews, Team and Templates screens", 
     ["Templates", "Structure before judgement."],
   ]) {
     await page.goto(`/o/northline/hr/performance?tab=${encodeURIComponent(tab)}`);
-    await expect(main.getByRole("heading", { name: heading })).toBeVisible();
+    await expect(main.getByRole("region", { name: heading })).toBeVisible();
     if (tab !== "Team" || await main.locator(".ops-metrics").count() > 0) {
       await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
     }
@@ -35,7 +35,7 @@ test("Learning & Policies presents four pages with live search and real required
     ["My learning", "Your learning record, in context."],
   ]) {
     await page.goto(`/o/northline/hr/learning?tab=${encodeURIComponent(tab)}`);
-    await expect(main.getByRole("heading", { name: heading })).toBeVisible();
+    await expect(main.getByRole("region", { name: heading })).toBeVisible();
     await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
   }
   await page.goto("/o/northline/hr/learning?tab=Courses");
@@ -52,24 +52,20 @@ test("Learning & Policies presents four pages with live search and real required
 
 test("Payroll separates runs, salary inputs, human approvals and illustrative payslips", async ({ page }) => {
   const main = page.locator("#main");
-  for (const [tab, heading] of [
-    ["Runs", "A controlled view of payroll runs."],
-    ["Inputs", "Know what every pay calculation uses."],
-    ["Approvals", "Decisions before any external submission."],
-    ["Payslips", "Illustrative pay, not issued payslips."],
-  ]) {
+  for (const tab of ["Runs", "Inputs", "Approvals", "Payslips"]) {
     await page.goto(`/o/northline/hr/payroll?tab=${encodeURIComponent(tab)}`);
-    if (await main.getByRole("heading", { name: "Payroll is restricted." }).count()) {
+    if (await main.getByRole("region", { name: "Payroll is restricted." }).count()) {
       await expect(main).toContainText("restricted");
       continue;
     }
-    await expect(main.getByRole("heading", { name: heading })).toBeVisible();
+    // A4: the restating tab headline is gone; the tab is proven by its own content and the estimate notice.
+    await expect(main.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
     await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
-    await expect(main).toContainText("These are estimates, not verified payroll");
+    await expect(main).toContainText("Estimates, not verified payroll");
   }
   await page.goto("/o/northline/hr/payroll?tab=Runs");
-  if (await main.getByRole("heading", { name: "Payroll is restricted." }).count()) return;
-  const state = main.getByRole("group", { name: "Filter payroll run states" });
+  if (await main.getByRole("region", { name: "Payroll is restricted." }).count()) return;
+  const state = main.getByRole("group", { name: "Find and filter payroll runs" });
   await state.getByRole("button", { name: "Draft", exact: true }).click();
   await expect(state.getByRole("button", { name: "Draft", exact: true })).toHaveAttribute("aria-pressed", "true");
   await state.getByRole("button", { name: "Approved", exact: true }).click();
@@ -81,7 +77,7 @@ test("Payroll separates runs, salary inputs, human approvals and illustrative pa
 test("Missing employee salary remains a missing input, not a computed zero payslip", async ({ page }) => {
   await page.goto("/o/northline/hr/payroll?tab=Inputs");
   const main = page.locator("#main");
-  if (await main.getByRole("heading", { name: "Payroll is restricted." }).count()) return;
+  if (await main.getByRole("region", { name: "Payroll is restricted." }).count()) return;
   await page.evaluate(async () => {
     const path = "/src/platform/repo.ts";
     const repo = await import(/* @vite-ignore */ path) as typeof import("../src/platform/repo");

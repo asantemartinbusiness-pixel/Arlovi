@@ -593,7 +593,7 @@ test("WF-06 Hire-to-onboard: offer on evidence, employee record, IT access decis
   // Payroll: the new starter is an input to the next run.
   await open(page, "/hr/payroll?tab=Inputs", "Payroll");
   await expect(main(page).getByRole("row", { name: /Marta Nowak/ })).toContainText("full-time");
-  await expect(main(page).getByText(/Nothing on this page is filed or paid/)).toBeVisible();
+  await expect(main(page).getByText(/Nothing is filed and nothing is paid/)).toBeVisible();
 });
 
 test("WF-10 Booking-to-service: atomic slot, deposit boundary, check-in, service history", async ({ page }) => {
