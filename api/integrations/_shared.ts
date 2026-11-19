@@ -58,7 +58,7 @@ export async function identify(req: Request, orgId: string): Promise<Identity | 
   };
 }
 
-export async function nango(path: string, init: RequestInit = {}): Promise<Response | globalThis.Response> {
+export async function nango(path: string, init: RequestInit = {}): Promise<globalThis.Response> {
   // Note: this returns the fetch Response. Never return the Nango secret to clients.
   if (!process.env.NANGO_SECRET_KEY) throw new Error("NANGO_NOT_CONFIGURED");
   return fetch("https://api.nango.dev" + path, {
