@@ -6,6 +6,7 @@ import {
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
+import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { freshness } from "@/platform/clock";
 import type { Rec } from "@/domain/types";
 import { activitiesFor, probabilityOf, stageOf } from "@/domain/crm-pipeline";
@@ -409,12 +410,13 @@ export function CrmMetricDrilldown({ context }: { context: ScreenContext }) {
 export function NewLead({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCrmData();
   const { now } = useWorkspace();
-  const [title, setTitle] = useState("");
-  const [source, setSource] = useState("website");
-  const [amount, setAmount] = useState(0);
-  const [contactId, setContactId] = useState("");
-  const [companyId, setCompanyId] = useState("");
-  const [note, setNote] = useState("");
+  const draftScope = `crm:new-lead:${context.org.id}:${context.actor}`;
+  const [title, setTitle] = useWorkingField(draftScope, "title", "");
+  const [source, setSource] = useWorkingField(draftScope, "source", "website");
+  const [amount, setAmount] = useWorkingField(draftScope, "amountMinor", 0);
+  const [contactId, setContactId] = useWorkingField(draftScope, "contactId", "");
+  const [companyId, setCompanyId] = useWorkingField(draftScope, "companyId", "");
+  const [note, setNote] = useWorkingField(draftScope, "note", "");
   const [busy, setBusy] = useState(false);
   const contact = contactById(data, contactId);
 
@@ -438,6 +440,7 @@ export function NewLead({ context, close }: { context: ScreenContext; close: () 
           at: now.toISOString(),
           fields,
         }, `Lead ${title.trim()} created`);
+        clearWorkingDraft(draftScope);
         context.toast("Lead created", contact
           ? `${created.title} is in the inbox against ${contact.title}.`
           : `${created.title} is in the inbox. Without a contact record it cannot be converted to a deal.`);
@@ -478,8 +481,10 @@ export function NewLead({ context, close }: { context: ScreenContext; close: () 
       <Field label="Notes"><TextArea aria-label="Notes" value={note} rows={3} onChange={(event) => setNote(event.target.value)} /></Field>
       <Row gap={2}>
         <Button type="submit" variant="primary" busy={busy} disabled={!title.trim()}>Create the lead</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
+        <Button variant="ghost" onClick={close}>Close & keep draft</Button>
+        <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
+      <p className="ds-subtle">Your lead details remain in this browser tab until you create or discard them.</p>
     </form>
   );
 }

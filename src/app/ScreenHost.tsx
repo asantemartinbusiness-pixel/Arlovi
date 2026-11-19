@@ -90,7 +90,7 @@ export function ScreenHost() {
         // Other overlays may require private payloads or explicit save/discard.
         const isResumable = (screen.applicationCode === "FIN" && id === "New invoice")
           || (screen.applicationCode === "PROJECT" && ["create project", "Project template", "new task"].includes(id))
-          || (screen.applicationCode === "CRM" && id === "Contact form")
+          || (screen.applicationCode === "CRM" && ["Contact form", "new lead"].includes(id))
           || (screen.applicationCode === "HR" && id === "new position")
           || (screen.applicationCode === "DOCS" && id === "New doc");
         if (isResumable && payload === undefined && linkedOverlay !== id) {

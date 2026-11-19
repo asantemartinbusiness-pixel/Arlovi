@@ -385,8 +385,10 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
         >
           Merge into {keep.title}
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
+        <Button variant="ghost" onClick={close}>Close & keep draft</Button>
+        <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
+      <p className="ds-subtle">Message text is held in this tab only until you save or discard it. Nothing is sent externally.</p>
     </Stack>
   );
 }
@@ -752,7 +754,8 @@ export function ContactFiles({ context }: { context: ScreenContext }) {
 export function ComposeMessage({ context, close }: { context: ScreenContext; close: () => void }) {
   const { contact } = useContact(context);
   const { org } = useWorkspace();
-  const [body, setBody] = useState("");
+  const draftScope = `crm:contact-message:${org.id}:${context.actor}:${contact?.id ?? "none"}`;
+  const [body, setBody] = useWorkingField(draftScope, "body", "");
   const [busy, setBusy] = useState(false);
   if (!contact) return <Empty title="No contact selected" />;
   const to = String(contact.fields.email ?? "");
@@ -797,6 +800,7 @@ export function ComposeMessage({ context, close }: { context: ScreenContext; clo
               parentId: contact.id,
               fields: { kind: "email", contactId: contact.id, delivery: "not_connected", owner: context.actor },
             }, `Activity logged for the draft to ${contact.title}`);
+            clearWorkingDraft(draftScope);
             context.toast("Draft saved", `The message to ${to} is kept in this workspace and logged as an activity. No mail provider is connected.`, "info");
             setBusy(false);
             close();
