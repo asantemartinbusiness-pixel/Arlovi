@@ -103,10 +103,11 @@
 .pg-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .pg-tabs { padding-inline: var(--page-pad); margin-block-start: var(--space-1); }
 .pg-strip {
-  display: flex; align-items: center; gap: var(--space-3); min-height: var(--statusbar-h);
-  padding: 0 var(--page-pad); font-size: var(--text-xs); color: var(--fg-muted);
-  border-bottom: 1px solid var(--border-subtle); background: var(--bg-inset);
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-3); min-height: var(--statusbar-h);
+  padding: var(--space-1) var(--page-pad); font-size: var(--text-xs); color: var(--fg-muted);
+  border-bottom: 1px solid var(--border-subtle); background: var(--bg-inset); min-width: 0;
 }
+.pg-strip > * { min-width: 0; }
 .pg-body { padding: var(--pg-body-top) var(--page-pad) var(--space-9); flex: 1; min-width: 0; }
 .pg-body[data-pad="none"] { padding: 0; }
 .pg-split { display: grid; grid-template-columns: minmax(0, 1fr) var(--inspector-w); flex: 1; min-height: 0; }
