@@ -59,10 +59,89 @@ function EditorialMark() {
   return <span className="nc-brand-mark" aria-hidden="true"><span>N</span><span className="nc-brand-dot"/></span>;
 }
 
+function GalleryArt({ art }: { art: typeof WORK[number]["art"] }) {
+  if (art === "cove") return <Sculpture variant="cove" />;
+  if (art === "lighthouse") return <svg className="nc-scene-art nc-scene-lighthouse" viewBox="0 0 800 620"
+    role="img" aria-label="Original architectural drawing of a calm hotel interior with broad limestone archways">
+    <defs>
+      <linearGradient id="nc-lh-wall" x1="0" y1="0" x2="0.8" y2="1">
+        <stop stopColor="#d7d1c4"/><stop offset="1" stopColor="#989185"/>
+      </linearGradient>
+      <linearGradient id="nc-lh-floor" x1="0" y1="0" x2="1" y2=".7">
+        <stop stopColor="#b6ab98"/><stop offset="1" stopColor="#897d6e"/>
+      </linearGradient>
+      <filter id="nc-lh-blur"><feGaussianBlur stdDeviation="16"/></filter>
+    </defs>
+    <rect width="800" height="620" fill="url(#nc-lh-wall)"/>
+    <path d="M0 450L800 420V620H0Z" fill="url(#nc-lh-floor)"/>
+    <rect x="143" y="66" width="506" height="395" rx="250" fill="#6e7069"/>
+    <rect x="181" y="104" width="429" height="358" rx="212" fill="#c5c0b4"/>
+    <path d="M221 465V310A174 174 0 0 1 569 310V465" fill="#848879"/>
+    <path d="M260 466V312A134 134 0 0 1 529 312V466" fill="#c8c2ae"/>
+    <path d="M301 462V333A93 93 0 0 1 488 333V462" fill="#e0d4b9"/>
+    <path d="M349 462V339A45 45 0 0 1 439 339V462" fill="#8f8e7e"/>
+    <ellipse cx="398" cy="476" rx="185" ry="18" fill="#443a32" opacity=".27" filter="url(#nc-lh-blur)"/>
+    <path d="M183 427Q191 390 240 392H544Q592 390 598 427V478H183Z" fill="#b6ab94"/>
+    <rect x="192" y="449" width="395" height="39" rx="13" fill="#8d8576"/>
+    <rect x="220" y="476" width="17" height="48" fill="#61584c"/>
+    <rect x="546" y="476" width="17" height="48" fill="#61584c"/>
+    <rect x="380" y="485" width="10" height="80" fill="#6d594b"/>
+    <ellipse cx="386" cy="478" rx="67" ry="10" fill="#a28164"/>
+    <path d="M385 70V243" stroke="#302d29" strokeWidth="2"/>
+    <path d="M334 259Q332 231 385 226Q437 232 434 259L447 305Q391 326 321 305Z" fill="#9a6648"/>
+    <ellipse cx="385" cy="307" rx="63" ry="8" fill="#40362e"/>
+    <text x="35" y="578" fill="#49483f" fontSize="12" fontFamily="monospace" letterSpacing="3">LIGHTHOUSE / HOSPITALITY STUDY</text>
+  </svg>;
+  if (art === "alder") return <svg className="nc-scene-art nc-scene-alder" viewBox="0 0 800 620"
+    role="img" aria-label="Original modern residential interior illustration with sculptural seating and an olive arch">
+    <defs><linearGradient id="nc-alder-wall" x1=".2" y1="0" x2=".7" y2="1">
+      <stop stopColor="#d6d1bf"/><stop offset="1" stopColor="#abb09e"/></linearGradient>
+      <linearGradient id="nc-alder-ground" x1="0" y1="0" x2="1" y2="1">
+      <stop stopColor="#d8c5a9"/><stop offset="1" stopColor="#a58f77"/></linearGradient></defs>
+    <rect width="800" height="620" fill="url(#nc-alder-wall)"/>
+    <path d="M0 455H800V620H0Z" fill="url(#nc-alder-ground)"/>
+    <path d="M134 460V186Q134 72 258 72H550Q662 73 662 186V460Z" fill="#7e8979"/>
+    <path d="M173 461V182Q173 105 262 105H550Q622 106 622 182V461Z" fill="#bec3b0"/>
+    <path d="M401 106V463M173 268H621" stroke="#7a8677" strokeWidth="10" opacity=".58"/>
+    <path d="M105 470Q105 388 182 388H533Q607 389 608 470V513H105Z" fill="#eee3cb"/>
+    <path d="M107 483Q320 470 609 483V520Q386 543 107 520Z" fill="#c0af91"/>
+    <path d="M135 511V540M575 511V540" stroke="#806f60" strokeWidth="12"/>
+    <ellipse cx="515" cy="562" rx="176" ry="20" fill="#837362" opacity=".18"/>
+    <ellipse cx="518" cy="531" rx="120" ry="32" fill="#7c5540"/>
+    <path d="M476 545V581M562 545V580" stroke="#4e392d" strokeWidth="13"/>
+    <path d="M676 481L668 284" stroke="#5a5c45" strokeWidth="6"/>
+    <path d="M668 335Q623 304 645 265Q688 293 668 335M665 366Q712 341 722 303Q672 315 665 366" fill="#78836c"/>
+    <rect x="652" y="479" width="48" height="50" rx="3" fill="#b68d70"/>
+    <text x="35" y="582" fill="#45483e" fontSize="12" fontFamily="monospace" letterSpacing="3">ALDER / RESIDENTIAL STUDY</text>
+  </svg>;
+  return <svg className="nc-scene-art nc-scene-materials" viewBox="0 0 800 620"
+    role="img" aria-label="Original editorial still-life illustration of ceramic forms, fabric and colour swatches">
+    <defs>
+      <linearGradient id="nc-material-paper" x1="0" y1="0" x2="1" y2="1">
+        <stop stopColor="#dfd2bd"/><stop offset="1" stopColor="#b5a68e"/></linearGradient>
+      <linearGradient id="nc-material-ceramic" x1="0" y1="0" x2="1" y2=".8">
+        <stop stopColor="#dcb18d"/><stop offset=".6" stopColor="#a96f51"/><stop offset="1" stopColor="#714e39"/></linearGradient>
+    </defs>
+    <rect width="800" height="620" fill="#d4c7b3"/>
+    <path d="M0 48L647 0L801 620L210 620Z" fill="url(#nc-material-paper)"/>
+    <path d="M70 620L0 310L348 124L510 620Z" fill="#b6b9a2"/>
+    <path d="M107 620L38 341L329 183L462 620Z" fill="#dad5c5"/>
+    <path d="M172 620L120 366L312 271L402 620Z" fill="#aaa694"/>
+    <ellipse cx="552" cy="523" rx="144" ry="32" fill="#615447" opacity=".17"/>
+    <path d="M444 226Q452 180 508 185H613Q675 191 677 238L647 478Q612 537 511 507L459 480Z" fill="url(#nc-material-ceramic)"/>
+    <ellipse cx="561" cy="227" rx="113" ry="24" fill="#6f4c39"/>
+    <ellipse cx="562" cy="229" rx="75" ry="13" fill="#d9bca2"/>
+    <rect x="437" y="515" width="257" height="12" rx="5" fill="#5b5147"/>
+    <path d="M84 92H336" stroke="#847767" strokeWidth="3"/>
+    <text x="82" y="79" fontFamily="monospace" fontSize="13" letterSpacing="3" fill="#46453c">MATERIAL NOTE / 004</text>
+    <text x="49" y="576" fontSize="12" fontFamily="monospace" letterSpacing="3" fill="#49483f">SAMPLES / IN PROGRESS</text>
+  </svg>;
+}
+
 function ArtCard({ art }: { art: typeof WORK[number]["art"] }) {
   return <div className={`nc-work-art nc-work-art-${art}`}>
     <div className="nc-work-art-grid" aria-hidden="true"/>
-    <Sculpture variant={art}/>
+    <GalleryArt art={art}/>
     <span className="nc-art-index" aria-hidden="true">NORTHLINE / 2026</span>
   </div>;
 }
