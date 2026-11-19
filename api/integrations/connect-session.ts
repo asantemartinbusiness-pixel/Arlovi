@@ -1,5 +1,5 @@
-import type { Request, Response } from "./_shared";
-import { bodyObject, configuredIntegrations, identify, json, nango, ready, sameOrigin } from "./_shared";
+import type { Request, Response } from "../../server/integrations/shared";
+import { bodyObject, configuredIntegrations, identify, json, nango, ready, sameOrigin } from "../../server/integrations/shared";
 
 export default async function handler(req: Request, res: Response) {
   if (req.method !== "POST") return json(res, 405, { error: "METHOD_NOT_ALLOWED" });
