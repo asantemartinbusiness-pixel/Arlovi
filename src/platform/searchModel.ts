@@ -96,8 +96,13 @@ export function searchHits(hits: SearchHit[], options: SearchOptions, limit = 40
   const seen = new Set<string>();
   const visible: SearchHit[] = [];
   for (const item of ranked) {
-    if (seen.has(item.hit.to)) continue;
-    seen.add(item.hit.to);
+    // Several records may share a collection list route. They must remain
+    // individually discoverable rather than disappear under URL deduplication.
+    const identity = item.hit.kind === "record" && item.hit.recordId
+      ? `record:${item.hit.recordId}`
+      : item.hit.to;
+    if (seen.has(identity)) continue;
+    seen.add(identity);
     visible.push(item.hit);
     if (visible.length === limit) break;
   }
