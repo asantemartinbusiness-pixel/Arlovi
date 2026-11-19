@@ -1,4 +1,4 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 /**
  * Explicitly opt-in, in-memory working drafts. Sensitive draft fields never
@@ -42,10 +42,14 @@ export function useWorkingField<T>(scope: string, field: string, fallback: T): [
  * multi-line quote editors. Keep authoritative values in memory, not URLs. */
 export function useWorkingState<T>(scope: string, field: string, fallback: T): [T, Dispatch<SetStateAction<T>>] {
   const [value, write] = useWorkingField(scope, field, fallback);
+  // Keep the dispatch stable while the value changes; callers may use it in
+  // effects that hydrate an editor from an existing record.
+  const current = useRef(value);
+  useEffect(() => { current.current = value; }, [value]);
   const update = useCallback<Dispatch<SetStateAction<T>>>((next) => {
-    const latest = readWorkingField(scope, field, value);
-    const resolved = typeof next === "function" ? (next as (current: T) => T)(latest) : next;
+    const latest = readWorkingField(scope, field, current.current);
+    const resolved = typeof next === "function" ? (next as (previous: T) => T)(latest) : next;
     write(resolved);
-  }, [scope, field, value, write]);
+  }, [scope, field, write]);
   return [value, update];
 }
