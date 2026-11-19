@@ -200,7 +200,7 @@ export function createFlagshipRecords(now: string = SEED_NOW): { records: Rec[];
     `${CLIENTS[i%CLIENTS.length]} · ${["Interior programme","Lighting specification","Creative launch","Digital experience"][i%4]}`,{
     status:i%11===0?"at_risk":i%5===0?"completed":"active",
     amountMinor:i===1?18_500_000:((i%12)+1)*360_000,
-    fields:{clientId:flagshipId("contacts",i%600+1),
+    fields:{clientId:flagshipId("contacts",(i-1)%600+1),
       lead:PEOPLE[i%PEOPLE.length],phase:["discovery","concept","delivery","review"][i%4],
       startDate:daysFrom(now,-(i*7)%180),endDate:daysFrom(now,((i*11)%130)+14)}});
   for(let i=1;i<=600;i++)add("tasks",i,`${["Review materials","Prepare specification","Confirm supplier","Send approval pack","Check installation","Client review"][i%6]} · ${String(i).padStart(3,"0")}`,{
@@ -253,9 +253,9 @@ export function createFlagshipRecords(now: string = SEED_NOW): { records: Rec[];
   for(let i=1;i<=80;i++)add("meetings",i,`${["Client design review","Pipeline standup","Production planning","Leadership review"][i%4]} ${i}`,{
     startAt:daysFrom(now,(i%50)-10),fields:{projectId:flagshipId("projects",i%75+1),
       channel:"internal",externalCalendar:"not_connected"}});
-  for(let i=1;i<=20;i++)add("portals",i,`${CLIENTS[i%CLIENTS.length]} · client space`,{
-    fields:{contactId:flagshipId("contacts",i%600+1),
-      projectId:flagshipId("projects",i%75+1),access:"invitation_required",
+  for(let i=1;i<=20;i++)add("portals",i,`${CLIENTS[(i-1)%CLIENTS.length]} · client space`,{
+    fields:{contactId:flagshipId("contacts",(i-1)%600+1),
+      projectId:flagshipId("projects",i),access:"invitation_required",
       publishedExternally:false},body:{sections:["Overview","Approvals","Documents","Milestones","Messages"]}});
 
   const roles=["Chief of Staff","Sales Director","Financial Analyst","Marketing Strategist",
