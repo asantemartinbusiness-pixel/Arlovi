@@ -47,6 +47,29 @@ tables), wide 760 (comparisons, matrices). Never leave a 640 drawer with a five-
    `document.documentElement.dataset.scaleTier="large"`): no horizontal overflow, no double scrollbars, no
    clipped controls, keyboard reachable, Escape/outside-click guarded when dirty.
 
+## Design craft (applies to every screen and overlay you touch)
+
+Arlovi's visual system is fixed (tokens, type, selection pop, provenance edge). Your freedom is in how each
+application expresses itself inside it. Use it deliberately:
+
+- **One signature per application.** Decide, and write at the top of your disposition file, the single
+  characteristic device each of your apps is remembered by (Finance: ledger figures and the reconciliation
+  rhythm; People: the person and their lifecycle; Projects: dependency and time; Care: the clock against the
+  SLA; etc.). Spend expressive colour and graphic emphasis there and keep everything around it quiet.
+- **Structure encodes meaning.** Eyebrows, numbering, dividers, section order and tab order must say
+  something true about the content (a real sequence, a real hierarchy, a real grouping). Remove devices
+  that only decorate.
+- **Typography carries hierarchy, not size inflation.** Use the platform's 6-step hierarchy; amounts, ids,
+  dates and codes in mono tabular figures; never introduce ad-hoc font sizes.
+- **Copy is design material.** Sentence case, plain verbs, controls named for what happens ("Post the
+  receipt", "Approve the leave"), the same verb through the flow (button → toast → history). Empty states
+  invite the next action; errors say what went wrong and how to fix it, without apology or vagueness.
+  Delete sentences that restate the title or describe the page to itself.
+- **Motion only where it explains** (a drawer arriving, a section expanding, a row confirming a save).
+  Reduced motion respected. No ambient effects.
+- **Mirror check before you report:** look at your own after-screenshots and remove one thing from each
+  screen that is not earning its place.
+
 ## Required evidence before reporting
 
 - `npm run typecheck` and `npm run lint` green.
