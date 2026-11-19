@@ -3,6 +3,7 @@ import { ArrowRight, ArrowUpRight, Menu, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { db } from "@/runtime/db";
 import { ORG_COLLECTIVE } from "@/domain/types";
+import { clockIso } from "@/platform/clock";
 import type { Rec, Audit } from "@/domain/types";
 import "./northline-showcase.css";
 
@@ -79,7 +80,7 @@ export default function NorthlineShowcase() {
     event.preventDefault();
     if(status==="saving" || !name.trim() || !email.trim() || !request.trim() || !consent)return;
     setStatus("saving");
-    const now = new Date().toISOString();
+    const now = clockIso();
     const key = crypto.randomUUID();
     const contactId = `nc-web-contact-${key}`;
     const leadId = `nc-web-lead-${key}`;
