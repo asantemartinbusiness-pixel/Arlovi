@@ -970,7 +970,7 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
   const settledRecords = useSettledOrgRecords();
   const seeds = useSeedStatus();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const request = data.dataRequests.find((row) => row.id === (payload?.id ?? context.selectedId));
+  const request = data.dataRequests.find((row) => row.id === (payload?.id ?? context.selectedId) && row.organizationId === context.org.id);
   const [busy, setBusy] = useState(false);
   const [reviewed, setReviewed] = useState(false);
   const [reason, setReason] = useState("");
@@ -998,7 +998,7 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
   const executeReady = Boolean(reviewStored) && candidateIds.length > 0 &&
     context.can("delete_records") && executionPhrase === "DELETE" && reviewed && !busy &&
     request.fields.legalHold !== true;
-  const eligible = context.can("delete_records") && subject.length > 0 && reviewed && reason.trim().length >= 10 && !busy;
+  const eligible = context.can("delete_records") && subject.length > 0 && collections.length > 0 && request.fields.legalHold !== true && !reviewStored && reviewed && reason.trim().length >= 10 && !busy;
 
   async function executeErasure() {
     if (!executeReady || !settledRecords) return;
@@ -1041,7 +1041,7 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
         setError("The subject request changed. Reopen it and repeat the review.");
         return;
       }
-      context.toast("Erasure review recorded", "No records were deleted. Execution requires a revision-checked atomic deletion service.");
+      context.toast("Erasure review recorded", "No records were deleted. Reopen this request to confirm eligible local erasure.");
       close();
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Could not save this erasure review.";
@@ -1055,10 +1055,9 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
   return (
     <Stack gap={4}>
       <ModalInFlight when={busy} />
-      <Notice tone="warning" title="Erasure execution is unavailable in this browser">
-        The previous per-record deletion could partially succeed if a later removal failed.
-        Until a single atomic, revision-checked deletion operation can enforce legal holds
-        and update the request together, this panel records a review only. It does not delete records or contact external systems.
+      <Notice tone="warning" title="Permanent deletion of local browser records">
+        Review the impact first. A second deliberate confirmation may erase eligible records in one revision-checked local transaction.
+        This does not erase information from external providers, synced services or backups, and is not a legal-compliance determination.
       </Notice>
       <Properties rows={[
         { label: "Verified request", value: request.title },
@@ -1069,9 +1068,15 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
         { label: "Hold policies", value: held.map((policy) => policy.title).join("; ") || "None recorded" },
         { label: "Execution status", value: String(request.fields.erasureExecutionStatus ?? "Not reviewed") },
       ]} />
-      <Field label="Review rationale" required hint="At least 10 characters; explain the lawful basis, scope and any held records.">
-        <TextArea value={reason} onChange={(event) => setReason(event.target.value)} />
-      </Field>
+      {reviewStored ? (
+        <Field label="Type DELETE to confirm local erasure" required hint="This permanently removes the eligible local records listed above.">
+          <TextInput value={executionPhrase} onChange={(event) => setExecutionPhrase(event.target.value.toUpperCase())} />
+        </Field>
+      ) : (
+        <Field label="Review rationale" required hint="At least 10 characters; explain the lawful basis, scope and any held records.">
+          <TextArea value={reason} onChange={(event) => setReason(event.target.value)} />
+        </Field>
+      )}
       <Checkbox checked={reviewed} onChange={(event) => setReviewed(event.target.checked)}
         label={reviewStored
           ? "I independently rechecked the subject, scope, legal holds and permanent local deletion."
