@@ -136,6 +136,7 @@ export function SiteLibrary({ context, scope }: { context: ScreenContext; scope:
               <div>
                 <Link to={url}>Dashboard <ArrowUpRight size={14} aria-hidden="true" /></Link>
                 <Link to={`${url}/builder`}>Editor</Link>
+                {record.id === "nc-sites-0001" && <Link to="/showcase/northline-collective" aria-label="Open Northline Collective bespoke portfolio preview">Portfolio preview <ArrowUpRight size={14} aria-hidden="true" /></Link>}
               </div>
             </div>
           </article>;
