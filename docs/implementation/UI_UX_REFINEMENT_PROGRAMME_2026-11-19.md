@@ -112,27 +112,54 @@ SectionNav({ items: { id; label; count? }[], value, onChange })  // in-page sect
 KeyValueList({ items: { label; value; mono? }[], columns?: 1|2 })
 ```
 
-### Phase 2 — application waves (after foundations land; each worker owns only its app folders)
+### Phase 2 — application packages (HR-approved split, 19 Nov)
 
-| Package | Applications (folders under `src/applications/`) | Focus |
-| --- | --- | --- |
-| W1 Money | `fin`, `proc` | invoice/bill/PO inspectors, approvals, ledger forms, payables |
-| W2 Revenue | `crm`, `commerce`, `book`, `market` | contact/company/deal panels, orders, bookings, campaigns |
-| W3 People & service | `hr`, `care`, `comms`, `legal` | employee profile, cases, conversations, matters |
-| W4 Operations | `project`, `hq`, `inbox`, `admin`, `portal` | task/project panels, Executive Home polish, approvals, permissions |
-| W5 Intelligence | `ai`, `brain`, `team`, `mission`, `auto` | conversation, knowledge, agent, mission and workflow panels |
-| W6 Platform | `analytics`, `connect`, `it`, `forms`, `asset`, `web`, `build` | reports, connections, incidents, forms, assets, sites, builder |
-| W7 Studio | `docs`, `sheets`, `present`, `design`, `photo`, `layout`, `video`, `motion` | editor inspectors, export/share dialogs, library screens |
-| W8 Workspace shell | `src/app/*` except files owned by F-B | workspace home, apps directory, command palette, attention centre, profile menu, display preferences |
+Sized from measured TSX lines and catalogue overlay counts (one worker handles ≈10k lines / 60–80 overlays).
+Maximum 7 application workers at once plus one standing reviewer. Wave A starts when F-A and F-B land;
+Wave B is a rolling queue, each package taking the slot freed when an A package is accepted.
+
+| Pkg | Applications (folders) | Also owns | Size |
+| --- | --- | --- | --- |
+| A1 | `fin` | `shared/operational-surfaces.*` | 9.7k / 41 overlays |
+| A2 | `proc`, `commerce` | | 8.6k / 67 |
+| A3 | `crm`, `book` | | 10.8k / 57 |
+| A4 | `hr`, `legal` | | 9.7k / 54 |
+| A5 | `hq`, `project`, `inbox` | | 10.2k / 82 |
+| A6 | `market`, `comms` | | 9.7k / 69 |
+| A7 | `admin` + workspace shell (`src/app/*` not owned by F-B/F-A) | | 11.3k / 33 + shell |
+| B1 | `docs`, `sheets`, `present` | | 12.2k / 67 |
+| B2 | `design`, `layout` | `visual/` | 8.6k / 45 |
+| B3 | `photo`, `video`, `motion` | | 10.5k / 60 |
+| B4 | `web`, `build` | | 9.2k / 63 |
+| B5 | `connect`, `it`, `forms` | `t6kit/` | 10.7k / 75 |
+| B6 | `auto`, `analytics` | | 11.4k / 54 |
+| B7 | `care`, `portal`, `asset` | | 9.8k / 63 |
+| B8 | `ai`, `brain` | `t2_shared/` | 7.6k / 61 |
+| B9 | `team`, `mission` | | 7.3k / 66 |
+
+A package that uses a kit owned by another package files a request instead of editing the kit. Cross-app
+e2e specs (`crm-finance-handoff`, `full-visual-audit`, `native-overlay-experience`, `modal-experience`,
+`drawer-experience`, `deep`, `workflows`) are owned by QA.
 
 Every Phase 2 worker: audits every screen and every overlay of its apps, records a disposition per overlay
-(Refined / Enhanced / Restructured / Rebuilt / Verified) in `docs/implementation/ui-ux-dispositions/<package>.md`,
-implements improvements, keeps functionality connected to real data, and verifies in the browser.
+(Refined / Enhanced / Restructured / Rebuilt / Verified — a Verified row needs a one-line reason and a
+screenshot path) in `docs/implementation/ui-ux-dispositions/<package>.md`, implements improvements, keeps
+functionality connected to real data, and verifies in the browser. If more than 40% of a package's rows are
+Verified/Refined, the reviewer opens 10 of those overlays at random.
+
+Contract corrections adopted: `ScreenDef.record` renders `RecordHeader` as the page head (title = h1);
+`OverlaySummary` goes through the overlay `head` slot and replaces `OverlayRecordContext`; `OverlayActions`
+has `variant: "form" | "confirm"`; one shared `Fact` type for `FactGrid` and `KeyValueList`; width presets
+stay numbers; `SectionNav` keeps its state in the URL and is never a second tab layer.
 
 ### Shared QA & review
 
 - QA baseline (Phase 0) and QA regression (Phase 3): Playwright suites, a11y, viewport, visual sweep.
-- Opus HR / delivery director: staffing, structured review findings per package, acceptance.
+- Standing reviewer R (Sonnet, never writes app code) reviews every package; Opus HR accepts each package
+  after opening ≥15% of its overlays at random via `?overlay=`.
+- Finding format (one line each):
+  `ID PKG-NNN | S1 blocker / S2 major / S3 minor / S4 nit | route + overlay id + file:line | viewport/tier | defect (evidence path) | required correction | verify by`
+- Acceptance: no open S1/S2; ≤5 S3 each logged in the disposition file; gates green.
 
 ## 6. Delegation contract (every worker brief includes these)
 
