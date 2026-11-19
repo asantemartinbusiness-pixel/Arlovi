@@ -11,6 +11,8 @@ export interface AppJourney { trail: JourneyEntry[]; byApp: Record<string, strin
 const MAX_TRAIL = 18;
 const MAX_PATH = 1600;
 const EMPTY = (): AppJourney => ({ trail: [], byApp: {} });
+/** Same-tab fallback for environments that block sessionStorage. */
+const inMemoryJourneys = new Map<string, AppJourney>();
 
 const validApp = (value: unknown): value is string =>
   typeof value === "string" && /^(?:[A-Z][A-Z0-9_-]*|WS:(?:home|company|spaces|work|apps))$/.test(value);
@@ -61,10 +63,12 @@ function sessionKey(scope: string): string {
   return `arlovi-app-journey-v1:${encodeURIComponent(scope)}`;
 }
 export function readAppJourney(scope: string, slug: string): AppJourney {
+  const storageKey = sessionKey(scope);
+  const fallback = () => inMemoryJourneys.get(storageKey) ?? EMPTY();
   try {
-    if (typeof sessionStorage === "undefined") return EMPTY();
-    const raw = sessionStorage.getItem(sessionKey(scope));
-    if (!raw) return EMPTY();
+    if (typeof sessionStorage === "undefined") return fallback();
+    const raw = sessionStorage.getItem(storageKey);
+    if (!raw) return fallback();
     const data: unknown = JSON.parse(raw);
     if (!data || typeof data !== "object") return EMPTY();
     const candidate = data as Partial<AppJourney>;
@@ -80,13 +84,16 @@ export function readAppJourney(scope: string, slug: string): AppJourney {
         }
       }
     }
-    return { trail, byApp };
-  } catch { return EMPTY(); }
+    const restored = { trail, byApp };
+    inMemoryJourneys.set(storageKey, restored);
+    return restored;
+  } catch { return fallback(); }
 }
 export function recordAppJourney(scope: string, slug: string, app: string, url: string): AppJourney {
   const previous = readAppJourney(scope, slug);
   const next = advanceJourney(previous, slug, app, url);
   if (next === previous) return previous;
+  inMemoryJourneys.set(sessionKey(scope), next);
   try {
     if (typeof sessionStorage !== "undefined") {
       sessionStorage.setItem(sessionKey(scope), JSON.stringify(next));
