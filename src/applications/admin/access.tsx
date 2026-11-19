@@ -184,10 +184,15 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
   const canRestore = request.status === "approved" && canDecide && eligibleMember &&
     ROLES.includes(to) && ROLES.includes(String(request.fields.fromRole) as Role) &&
     String(member?.fields.role) === to && !laterApproved && restoreNote.trim().length >= 10 && !busy;
-  const canApprove = !busy && !decided && canDecide && eligibleMember && validRole && !stale && !expired && note.trim().length >= 10;
+  // Demo-level separation of duties only: actor names come from the selected
+  // role view, not a verified identity, so this is NOT server authorization.
+  const selfReview = String(request.fields.requestedBy ?? "").trim() === context.actor ||
+    String(request.fields.memberId ?? "") === String(data.members.find((row) => row.title === context.actor)?.id ?? "");
+  const canApprove = !busy && !decided && canDecide && eligibleMember && validRole && !stale && !expired && !selfReview && note.trim().length >= 10;
 
   async function decide(outcome: "approved" | "declined") {
     if (!request || busy || decided || !canDecide) return;
+    if (selfReview) { setError("A different reviewer must decide this access request."); return; }
     if (outcome === "approved" && !canApprove) { setError("The member, current role or review rationale needs attention."); return; }
     if (outcome === "declined" && note.trim().length < 10) { setError("Say why, so the person knows what would change the answer."); return; }
     setBusy(true);
@@ -267,7 +272,8 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
         ] : []),
       ]} />
       {stale && !decided && <Notice tone="danger" title="The person's role changed since they asked">They asked from {ROLE_LABELS[String(request.fields.fromRole) as Role]}; they now hold {ROLE_LABELS[from]}. Approval is blocked until a new request reflects their current role.</Notice>}
-      {expired && !decided && <Notice tone="warning" title="Request expired">Approval is blocked. A fresh request is required.</Notice>}
+      {expired && !decided && <Notice tone="warning" title="Request expired">Approval is blocked. A fresh request is required.</Notice>
+      {selfReview && !decided && <Notice tone="danger" title="Independent review required">The requester or affected member cannot decide this request in the local approval workflow. A different reviewer must take the decision.</Notice>}
       {!eligibleMember && !decided && <Notice tone="danger" title="Member unavailable">An active human member is required before approval.</Notice>}
       {!validRole && !decided && <Notice tone="danger" title="Invalid role change">Select two different recognised role views.</Notice>}
       <Card eyebrow="EXACT CHANGE" prov="posted" title="What approving would change">
@@ -319,7 +325,7 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
           onClick={() => void restorePreviousRole()}>Restore previous local role</Button>}
         {!decided && (
           <>
-            <Button variant="danger" busy={busy} disabled={!canDecide || busy || note.trim().length < 10} onClick={() => void decide("declined")}>Decline</Button>
+            <Button variant="danger" busy={busy} disabled={!canDecide || selfReview || busy || note.trim().length < 10} onClick={() => void decide("declined")}>Decline</Button>
             <Button variant="primary" busy={busy} disabled={!canApprove} onClick={() => void decide("approved")}>Approve and change role</Button>
           </>
         )}
