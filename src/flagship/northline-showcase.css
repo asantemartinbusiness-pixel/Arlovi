@@ -1,0 +1,116 @@
+/* Northline Collective — a bespoke editorial identity; isolated from Arlovi's application UI. */
+.nc-page{--nc-ink:#252923;--nc-paper:#f2efe8;--nc-copper:#a25237;--nc-sage:#828b77;--nc-line:rgba(37,41,35,.2);color:var(--nc-ink);background:var(--nc-paper);font-family:Arial,Helvetica,sans-serif;font-weight:400;overflow-x:clip}
+.nc-page *{box-sizing:border-box}
+.nc-page a{color:inherit;text-decoration:none}
+.nc-page button,.nc-page input,.nc-page textarea{font:inherit}
+.nc-page button{cursor:pointer}
+.nc-page ::selection{background:var(--nc-copper);color:#fff}
+.nc-demo-bar{min-height:34px;padding:9px 4.5vw;background:#242821;color:#efeadf;font:10px/1.35 Arial,sans-serif;letter-spacing:.16em;display:flex;gap:13px;align-items:center;justify-content:center;text-align:center}
+.nc-demo-bar>a{display:inline-flex;gap:3px;align-items:center;margin-left:18px;border-bottom:1px solid #9caaa2;padding-bottom:2px;text-transform:none;letter-spacing:0;font-size:11px}
+.nc-header{height:104px;padding:0 4.5vw;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--nc-line);position:relative;z-index:30;background:var(--nc-paper)}
+.nc-brand{display:flex;align-items:center;gap:12px;font-size:25px;letter-spacing:-.075em;font-weight:600;line-height:1}
+.nc-brand-secondary{color:var(--nc-copper);font-style:italic;font-family:Georgia,serif;font-weight:400;letter-spacing:-.055em}
+.nc-brand-mark{height:36px;width:36px;display:inline-flex;align-items:center;justify-content:center;position:relative;border:2px solid currentColor;font:700 23px Georgia,serif;letter-spacing:-.07em}
+.nc-brand-mark .nc-brand-dot{position:absolute;width:7px;height:7px;border-radius:100%;background:var(--nc-copper);top:-5px;right:-5px}
+.nc-nav{display:flex;align-items:center;gap:clamp(22px,3vw,58px)}
+.nc-nav>a{font-size:12px;letter-spacing:.03em;transition:color .25s ease}
+.nc-nav>a:hover,.nc-nav>a:focus-visible{color:var(--nc-copper)}
+.nc-nav .nc-nav-cta{display:flex;align-items:center;gap:16px;border:1px solid currentColor;padding:15px 18px;margin-left:16px}
+.nc-menu{display:none;border:0;background:transparent;color:inherit}
+.nc-page a:focus-visible,.nc-page button:focus-visible,.nc-page input:focus-visible,.nc-page textarea:focus-visible{outline:2px solid var(--nc-copper);outline-offset:4px}
+.nc-hero{min-height:min(820px,80vw);display:grid;grid-template-columns:1fr 44%;position:relative;border-bottom:1px solid var(--nc-line)}
+.nc-hero-copy{position:relative;z-index:2;padding:clamp(72px,11vw,165px) 2vw 95px 6.5vw;display:flex;flex-direction:column;align-items:flex-start}
+.nc-eyebrow{font:11px/1.45 Arial,sans-serif;letter-spacing:.18em;font-weight:600;display:flex;align-items:center;gap:13px}
+.nc-eyebrow-rule{width:35px;height:2px;background:var(--nc-copper)}
+.nc-hero h1,.nc-intro h2,.nc-work h2,.nc-manifesto h2,.nc-contact h2{font-family:Georgia,'Times New Roman',serif;font-weight:400;letter-spacing:-.075em}
+.nc-hero h1{font-size:clamp(76px,8.5vw,148px);line-height:.99;margin:70px -12vw 31px 0;max-width:1080px}
+.nc-page em{font-style:italic;color:var(--nc-copper);font-weight:400}
+.nc-hero-intro{font-size:clamp(16px,1.5vw,22px);line-height:1.5;max-width:480px;letter-spacing:-.02em}
+.nc-circle-link{display:flex;gap:30px;align-items:center;margin-top:62px;font-size:13px;font-weight:600}
+.nc-circle-arrow{width:64px;height:64px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid currentColor;transition:background .3s,color .3s,transform .3s}
+.nc-circle-link:hover .nc-circle-arrow{background:var(--nc-ink);color:var(--nc-paper);transform:rotate(45deg)}
+.nc-hero-art{position:relative;overflow:hidden;background:linear-gradient(152deg,#dcd6c9 5%,#e7ddcb 47%,#9d9181 100%);display:flex;align-items:center;justify-content:center}
+.nc-hero-art:before{content:"";position:absolute;width:125%;height:180%;border-radius:50%;background:radial-gradient(ellipse,#fff5d5 0%,rgba(234,208,166,.4) 36%,transparent 68%);top:-22%;left:-25%;opacity:.68}
+.nc-hero-art-surface{position:absolute;bottom:0;height:20%;width:100%;background:linear-gradient(0deg,rgba(87,72,55,.25),transparent)}
+.nc-sculpture{width:100%;height:100%;display:block;max-height:720px;filter:drop-shadow(3px 22px 18px rgba(34,26,22,.15))}
+.nc-sculpture-hero{position:relative;width:118%;max-width:780px;min-width:490px;transform:translate(-1%,1%)}
+.nc-sculpture-art{transform-origin:330px 220px;animation:nc-sculpture-float 11s ease-in-out infinite}
+@keyframes nc-sculpture-float{0%,100%{transform:translateY(0)}50%{transform:translateY(13px)}}
+.nc-hero-art-label{position:absolute;bottom:32px;left:36px;right:36px;display:flex;justify-content:space-between;font-size:10px;font-weight:600;letter-spacing:.14em}
+.nc-hero-folio{position:absolute;bottom:32px;left:6.5vw;display:flex;gap:110px;font-size:10px;letter-spacing:.14em;font-weight:600;color:#707569}
+.nc-intro,.nc-disciplines,.nc-work,.nc-contact{padding:100px 6.5vw 125px}
+.nc-section-meta{display:flex;justify-content:space-between;gap:15px;padding-bottom:20px;border-bottom:1px solid var(--nc-line);font-size:10px;font-weight:600;letter-spacing:.15em;line-height:1.4}
+.nc-intro-layout{padding-top:95px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.8fr);gap:9vw;align-items:start}
+.nc-intro h2{font-size:clamp(72px,7vw,118px);line-height:1.06;margin:0;max-width:800px}
+.nc-intro-layout>div{padding-top:17px;max-width:450px}
+.nc-intro-layout p{font-size:clamp(16px,1.5vw,21px);line-height:1.62;letter-spacing:-.02em;margin:0 0 20px}
+.nc-intro-layout p+p{font-size:16px;color:#62675c}
+.nc-text-link{display:inline-flex;align-items:center;gap:24px;padding:14px 0;margin-top:28px;border-bottom:1px solid var(--nc-ink);font-size:13px;font-weight:600;transition:color .2s}
+.nc-text-link:hover{color:var(--nc-copper)}
+.nc-disciplines{padding-top:30px;background:#e8e4dc}
+.nc-discipline-grid{display:grid;grid-template-columns:repeat(3,1fr);margin-top:75px;border-top:1px solid var(--nc-line);border-left:1px solid var(--nc-line)}
+.nc-discipline{min-height:400px;padding:45px 38px 35px;position:relative;display:flex;flex-direction:column;border-right:1px solid var(--nc-line);border-bottom:1px solid var(--nc-line);transition:background .35s ease,color .35s}
+.nc-discipline:hover{background:var(--nc-ink);color:var(--nc-paper)}
+.nc-discipline-number{font-size:11px;letter-spacing:.16em;font-weight:600}
+.nc-discipline h3{font-family:Georgia,serif;font-size:clamp(38px,3.8vw,64px);line-height:1.06;letter-spacing:-.06em;font-weight:400;max-width:360px;margin:85px 0 16px}
+.nc-discipline p{font-size:14px;line-height:1.65;max-width:325px;color:inherit;opacity:.77}
+.nc-discipline-arrow{position:absolute;right:34px;bottom:35px;border:1px solid currentColor;border-radius:100%;height:48px;width:48px;display:flex;align-items:center;justify-content:center}
+.nc-work{padding-top:100px}
+.nc-work-head{display:flex;align-items:end;justify-content:space-between;gap:30px;padding:70px 0 48px}
+.nc-work h2{font-size:clamp(60px,6.8vw,110px);line-height:1.05;margin:0;max-width:780px}
+.nc-filters{display:flex;flex-wrap:wrap;gap:5px;align-items:center;justify-content:flex-end;padding-bottom:12px}
+.nc-filter{font-size:12px;padding:12px 16px;background:transparent;border:1px solid transparent;border-radius:0;color:var(--nc-ink);white-space:nowrap}
+.nc-filter-active{border-color:var(--nc-ink)}
+.nc-filter:not(.nc-filter-active):hover{color:var(--nc-copper)}
+.nc-work-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:22px;row-gap:74px}
+.nc-work-card{min-width:0}
+.nc-work-art{aspect-ratio:1.22;position:relative;overflow:hidden;background:linear-gradient(135deg,#cec4b6,#e7dfcf);display:flex;align-items:center;justify-content:center}
+.nc-work-art-grid{position:absolute;inset:0;opacity:.25;background-image:linear-gradient(90deg,#857b6f 1px,transparent 1px),linear-gradient(0deg,#857b6f 1px,transparent 1px);background-size:12.5% 12.5%;pointer-events:none}
+.nc-work-art .nc-sculpture{height:100%;width:80%;max-height:600px;transition:transform 1.1s cubic-bezier(.16,1,.3,1)}
+.nc-work-art .nc-scene-art{display:block;width:100%;height:100%;object-fit:cover;transition:transform 1.1s cubic-bezier(.16,1,.3,1)}
+.nc-work-card:hover .nc-scene-art{transform:scale(1.035)}
+.nc-work-card:hover .nc-sculpture{transform:scale(1.045) translateY(-12px)}
+.nc-work-art-lighthouse{background:linear-gradient(132deg,#ddd7c9,#8b8478)}
+.nc-work-art-cove{background:linear-gradient(120deg,#c5baa8,#f0dfbe)}
+.nc-work-art-alder{background:linear-gradient(120deg,#d9d5c7,#b3b49d)}
+.nc-work-art-materials{background:linear-gradient(135deg,#b8b3a2,#d2baa3)}
+.nc-art-index{position:absolute;left:22px;bottom:22px;font-size:9px;letter-spacing:.15em}
+.nc-work-caption{padding:20px 2px 0}
+.nc-work-caption>span{font-size:10px;letter-spacing:.12em;color:#727466;text-transform:uppercase}
+.nc-work-caption h3{font:400 clamp(30px,3.2vw,52px)/1.1 Georgia,serif;letter-spacing:-.055em;margin:16px 0 8px}
+.nc-work-caption p{font-size:15px;color:#62675c;line-height:1.5;margin:0}
+.nc-manifesto{min-height:630px;position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--nc-ink);color:var(--nc-paper);padding:110px 24px;text-align:center}
+.nc-manifesto .nc-eyebrow{position:relative;z-index:2;font-size:10px;opacity:.86}
+.nc-manifesto h2{position:relative;z-index:2;margin:60px auto 35px;max-width:1150px;font-size:clamp(72px,9vw,148px);line-height:1.06}
+.nc-manifesto h2 em{color:#d8a081}
+.nc-manifesto p:not(.nc-eyebrow){position:relative;z-index:2;max-width:600px;font-size:18px;line-height:1.6;color:#d4d0c8}
+.nc-manifesto-folio{position:absolute;bottom:27px;right:5vw;font-size:10px;letter-spacing:.14em;color:#c3bbb0}
+.nc-manifesto-orbit{position:absolute;left:50%;top:52%;width:900px;height:900px;border:1px solid rgba(240,224,211,.12);border-radius:50%;transform:translate(-50%,-50%)}
+.nc-manifesto-orbit:after,.nc-manifesto-orbit:before{content:"";position:absolute;inset:15%;border:1px solid rgba(240,224,211,.12);border-radius:50%}
+.nc-manifesto-orbit:after{inset:32%}
+.nc-manifesto-orbit>span{position:absolute;top:7%;left:25%;width:18px;height:18px;background:var(--nc-copper);border-radius:50%;box-shadow:0 0 100px 70px rgba(162,82,55,.15)}
+.nc-contact{padding-top:110px;padding-bottom:140px}
+.nc-contact-layout{display:grid;grid-template-columns:1fr .75fr;gap:10vw;padding-top:80px}
+.nc-contact h2{margin:0 0 33px;max-width:730px;font-size:clamp(70px,7.7vw,124px);line-height:1.04}
+.nc-contact-layout>div>p{font-size:19px;line-height:1.55;max-width:450px}
+.nc-contact-layout .nc-demo-disclosure{margin-top:46px;max-width:440px;font-size:12px;line-height:1.7;color:#686f65;border-left:2px solid var(--nc-copper);padding-left:18px}
+.nc-form{padding-top:15px;display:flex;flex-direction:column;gap:26px}
+.nc-form>label:not(.nc-consent){display:flex;flex-direction:column;gap:14px;font-size:10px;letter-spacing:.14em;font-weight:600}
+.nc-form input:not([type=checkbox]),.nc-form textarea{background:transparent;border:0;border-bottom:1px solid #aca99f;outline:0;border-radius:0;padding:15px 0 18px;color:var(--nc-ink);font-size:17px;letter-spacing:0;resize:vertical;width:100%;font-weight:400}
+.nc-form input:not([type=checkbox]):focus,.nc-form textarea:focus{border-color:var(--nc-copper);outline:0}
+.nc-form input::placeholder,.nc-form textarea::placeholder{color:#868b80}
+.nc-consent{display:flex;align-items:start;gap:13px;font-size:12px;line-height:1.5;color:#666d63}
+.nc-consent input{accent-color:var(--nc-copper);margin-top:2px;min-width:16px;min-height:16px}
+.nc-submit{border:0;background:var(--nc-copper);color:#fff;padding:22px 26px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:16px;transition:background .2s,transform .2s}
+.nc-submit:not(:disabled):hover{background:var(--nc-ink);transform:translateY(-2px)}
+.nc-submit:disabled{opacity:.65;cursor:wait}
+.nc-form-status{font-size:13px;color:#335d3c;line-height:1.5}
+.nc-form-error{color:#a33b32}
+.nc-footer{background:#e3ded5;padding:55px 6.5vw 30px}
+.nc-footer-top{display:flex;align-items:center;gap:22px;font:400 clamp(28px,4vw,60px) Georgia,serif;letter-spacing:-.05em}
+.nc-footer-top>a{margin-left:auto;align-self:flex-start;font:600 12px Arial,sans-serif;letter-spacing:0;border-bottom:1px solid var(--nc-ink);padding:8px 0}
+.nc-footer-bottom{border-top:1px solid var(--nc-line);margin-top:85px;padding-top:25px;display:flex;justify-content:space-between;gap:30px;flex-wrap:wrap;font-size:10px;letter-spacing:.11em}
+.nc-footer-bottom>a{display:inline-flex;align-items:center;gap:6px}
+@media(max-width:1050px){.nc-header{height:82px}.nc-nav{gap:20px}.nc-nav .nc-nav-cta{margin-left:0}.nc-hero{grid-template-columns:1fr 42%}.nc-hero h1{font-size:clamp(65px,8vw,110px)}.nc-hero-copy{padding-top:85px}.nc-work-head{display:block}.nc-filters{justify-content:flex-start;margin-top:28px}.nc-discipline{min-height:350px;padding:30px 25px}.nc-discipline h3{font-size:42px}}
+@media(max-width:720px){.nc-demo-bar{flex-wrap:wrap;font-size:8px;min-height:44px;padding:7px 16px}.nc-demo-bar>a{margin-left:0}.nc-header{height:72px;padding:0 5vw}.nc-brand{font-size:22px}.nc-brand-mark{height:29px;width:29px;font-size:18px}.nc-menu{display:flex;align-items:center;justify-content:center}.nc-nav{display:none;position:absolute;top:72px;left:0;right:0;z-index:10;background:var(--nc-paper);padding:26px 5vw 38px;box-shadow:0 24px 35px #2428201a}.nc-nav-open{display:flex;flex-direction:column;align-items:flex-start;gap:27px}.nc-nav>a{font-size:18px}.nc-hero{display:flex;flex-direction:column}.nc-hero-copy{padding:62px 7vw 80px}.nc-hero h1{font-size:clamp(65px,15vw,110px);margin:48px 0 27px;max-width:650px}.nc-hero-intro{font-size:17px;max-width:440px}.nc-circle-link{margin-top:35px}.nc-hero-art{height:480px}.nc-sculpture-hero{width:90%;min-width:0;max-width:520px}.nc-hero-folio{position:static;padding:22px 7vw;gap:20px;justify-content:space-between}.nc-intro,.nc-disciplines,.nc-work,.nc-contact{padding:68px 6vw 85px}.nc-section-meta{font-size:9px;gap:24px}.nc-intro-layout,.nc-contact-layout{display:block;padding-top:53px}.nc-intro h2,.nc-contact h2{font-size:clamp(59px,12vw,90px)}.nc-intro-layout>div{padding-top:30px}.nc-discipline-grid{display:block;margin-top:50px}.nc-discipline{min-height:300px;border-right:1px solid var(--nc-line)}.nc-discipline h3{margin-top:62px}.nc-work-head{padding-top:55px}.nc-work h2{font-size:clamp(52px,10vw,88px)}.nc-work-grid{grid-template-columns:1fr;gap:55px}.nc-work-art{aspect-ratio:1.12}.nc-manifesto{min-height:510px;padding:90px 5vw}.nc-manifesto h2{font-size:clamp(55px,11vw,88px)}.nc-manifesto-orbit{width:640px;height:640px}.nc-contact-layout .nc-demo-disclosure{margin-top:28px}.nc-form{margin-top:50px}.nc-footer{padding:45px 6vw 24px}.nc-footer-top{flex-wrap:wrap;font-size:32px}.nc-footer-top>a{width:100%;margin:14px 0 0}.nc-footer-bottom{margin-top:55px;gap:15px;flex-direction:column;line-height:1.5}}
+@media(prefers-reduced-motion:reduce){.nc-page *{scroll-behavior:auto!important;animation:none!important;transition-duration:.01ms!important}}

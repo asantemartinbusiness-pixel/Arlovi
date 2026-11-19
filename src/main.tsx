@@ -1,4 +1,5 @@
-import { StrictMode, useEffect, useState } from "react";
+import { StrictMode, Suspense, lazy, useEffect, useState } from "react";
+const NorthlineShowcase = lazy(() => import("@/flagship/NorthlineShowcase"));
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
@@ -86,6 +87,7 @@ function Boot() {
       <Routes>
         <Route path="/" element={<WorkspaceEntry recoveredSlug={recoveredSlug} />} />
         <Route path="/welcome" element={<IdentityEntry mode="welcome"/>} />
+        <Route path="/showcase/northline-collective" element={<Suspense fallback={<div role="status" style={{padding:32}}>Opening the Northline showcase…</div>}><NorthlineShowcase /></Suspense>} />
         <Route path="/choose-workspace" element={<WorkspaceChooser/>} />
         <Route path="/auth/sign-in" element={<IdentityEntry mode="sign-in"/>} />
         <Route path="/auth/sign-up" element={<IdentityEntry mode="sign-up"/>} />

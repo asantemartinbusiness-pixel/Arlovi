@@ -1,4 +1,4 @@
-import { ORG_HARBOR, ORG_NORTHLINE } from "@/domain/types";
+import { ORG_COLLECTIVE, ORG_HARBOR, ORG_NORTHLINE } from "@/domain/types";
 import { db } from "@/runtime/db";
 
 export interface OrgProfile {
@@ -20,6 +20,17 @@ export interface OrgProfile {
 const LOCAL_ORGS_KEY = "arlovi-local-organizations-v1";
 
 export const ORGS: OrgProfile[] = [
+  {
+    id: ORG_COLLECTIVE,
+    slug: "collective",
+    name: "Northline Collective",
+    shortName: "Collective",
+    currency: "GBP",
+    locale: "en-GB",
+    timezone: "Europe/London",
+    jurisdiction: "GB",
+    accent: "#A25237",
+  },
   {
     id: ORG_NORTHLINE,
     slug: "northline",
@@ -44,7 +55,7 @@ export const ORGS: OrgProfile[] = [
     registration: "EIN 88-4410923",
     accent: "#0f8780",
   },
-  ...loadLocalOrganizations(),
+  ...loadLocalOrganizations().filter((item) => ![ORG_NORTHLINE, ORG_HARBOR, ORG_COLLECTIVE].includes(item.id)),
 ];
 
 function loadLocalOrganizations(): OrgProfile[] {

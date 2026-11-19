@@ -1,5 +1,6 @@
 export const ORG_NORTHLINE = "org-northline";
 export const ORG_HARBOR = "org-harbor";
+export const ORG_COLLECTIVE = "org-northline-collective";
 export const SEED_NOW = "2026-11-14T09:30:00.000Z";
 
 export type Role = "owner" | "finance" | "sales" | "people" | "member" | "client";
@@ -76,12 +77,13 @@ export function localeFor(orgId: string): string {
 }
 
 export function slugFor(orgId: string): string {
-  return orgId === ORG_HARBOR ? "harbor" : "northline";
+  return orgId === ORG_COLLECTIVE ? "collective" : orgId === ORG_HARBOR ? "harbor" : "northline";
 }
 
 export function orgFromSlug(slug: string): string | null {
   if (slug === "northline") return ORG_NORTHLINE;
   if (slug === "harbor") return ORG_HARBOR;
+  if (slug === "collective") return ORG_COLLECTIVE;
   return null;
 }
 
