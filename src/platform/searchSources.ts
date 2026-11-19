@@ -38,10 +38,3 @@ export function integrationSearchHits(orgSlug: string): SearchHit[] {
   }));
 }
 
-/** No record can become a remote hit solely because a local connector says "ready". */
-export function isVerifiedRemoteSearchResult(hit: SearchHit): boolean {
-  return hit.sourceType === "remote"
-    && hit.sourceState === "verified_external"
-    && typeof hit.sourceName === "string"
-    && hit.sourceName.length > 0;
-}
