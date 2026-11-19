@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Database, FileClock, KeyRound, Lock, Scale, Server } from "lucide-react";
 import {
-  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayCancel, Pill,
+  BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, ModalActions, ModalInFlight, Notice, OverlayCancel, Pill,
   Properties, Row, Select, Stack, Stat, StatRow, Switch, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
@@ -859,8 +859,8 @@ export function DataRequestOverlay({ context, close }: { context: ScreenContext;
 
   return (
     <Stack gap={4}>
-      <ModalUnsavedChanges when={identityReviewed} />
-      <ModalInFlight when={busy} />
+      <DrawerUnsavedChanges when={identityReviewed} />
+      <DrawerInFlight when={busy} />
       <Properties rows={[
         { label: "Subject", value: subject || "Missing subject identity" },
         { label: "Request", value: request.title },
@@ -901,7 +901,7 @@ export function DataRequestOverlay({ context, close }: { context: ScreenContext;
         onChange={event => setIdentityReviewed(event.target.checked)}
         label="I independently verified the requester's identity and confirmed the collection scope before preparing a copy." />
       {error && <Notice tone="danger" title="Privacy action could not be completed">{error}</Notice>}
-      <ModalActions>
+      <DrawerActions>
         <OverlayCancel disabled={busy}>Close review</OverlayCancel>
         <span className="ds-grow" />
         <Button variant="secondary" busy={busy} disabled={!canRestrict}
@@ -960,7 +960,7 @@ export function DataRequestOverlay({ context, close }: { context: ScreenContext;
           onClick={() => context.openOverlay("deletion impact", { id: request.id })}>
           Review deletion impact…
         </Button>
-      </ModalActions>
+      </DrawerActions>
     </Stack>
   );
 }
