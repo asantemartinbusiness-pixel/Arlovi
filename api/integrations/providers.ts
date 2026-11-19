@@ -30,11 +30,21 @@ export default async function handler(req: Request, res: Response) {
           })),
       };
     }
-    const query = new URL(req.url || "/", "https://arlovi.invalid").searchParams.get("q")?.trim().toLowerCase() || "";
+    const params = new URL(req.url || "/", "https://arlovi.invalid").searchParams;
+    const query = params.get("q")?.trim().toLowerCase().slice(0, 120) || "";
+    const page = Number(params.get("page") || "1");
+    if (!Number.isSafeInteger(page) || page < 1 || page > 100) {
+      return json(res, 400, { error: "INVALID_PAGE" });
+    }
     const items = query
       ? cached.providers.filter(item => (item.name + " " + item.id + " " + item.categories.join(" ")).toLowerCase().includes(query))
       : cached.providers;
-    json(res, 200, { providers: items.slice(0, 100), total: items.length, source: "nango" });
+    const pageSize = 48;
+    const offset = (page - 1) * pageSize;
+    json(res, 200, {
+      providers: items.slice(offset, offset + pageSize), total: items.length,
+      page, nextPage: offset + pageSize < items.length ? page + 1 : null, source: "nango",
+    });
   } catch {
     json(res, 502, { error: "CATALOGUE_UNAVAILABLE", message: "The connector directory is temporarily unavailable." });
   }
