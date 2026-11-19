@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
+import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord } from "@/platform/workspace";
@@ -269,7 +270,8 @@ export function toggleReduceMotion(context: ScreenContext): void {
 export function Annotate({ context, close }: { context: ScreenContext; close: () => void }) {
   const editor = useDeckEditor(context, useDeckFor(context));
   const session = useStore(presenterUi);
-  const [text, setText] = useState("");
+  const draftScope = `present:annotation:${context.org.id}:${context.actor}:${context.params.id ?? "none"}:${editor.slide.id}`;
+  const [text, setText] = useWorkingField(draftScope, "text", "");
   const notes = session.annotations[editor.slide.id] ?? [];
   return (
     <form
@@ -279,11 +281,15 @@ export function Annotate({ context, close }: { context: ScreenContext; close: ()
         event.preventDefault();
         if (!text.trim()) return;
         presenterUi.set((state) => ({ ...state, annotations: { ...state.annotations, [editor.slide.id]: [...(state.annotations[editor.slide.id] ?? []), { id: nextId("an"), text: text.trim(), at: clockIso() }] } }));
+        clearWorkingDraft(draftScope);
         close();
       }}
     >
       <p className="ds-prose">An annotation is drawn over slide {editor.deck.index + 1} on the audience display while you present. It is not saved into the deck.</p>
       <Field label="Annotation" required><TextArea rows={2} value={text} onChange={(event) => setText(event.target.value)} required autoFocus placeholder="Lead time is now six weeks" /></Field>
+      <Row gap={2}><span className="ds-subtle">Unposted annotation text is retained in this tab, not saved in the deck.</span>
+        <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
+      </Row>
       {notes.length > 0 && (
         <Stack gap={1}>
           {notes.map((item) => (

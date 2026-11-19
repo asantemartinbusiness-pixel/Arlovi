@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord } from "@/platform/workspace";
@@ -114,7 +115,9 @@ export function EditCell({ context, close }: { context: ScreenContext; close: ()
   const editor = useWorkbookEditor(context, useWorkbookFor(context));
   const { col, row } = editor.selection.active;
   const address = cellAddress(col, row);
-  const [raw, setRaw] = useState(editor.sheet.cells[address] ?? "");
+  const draftScope = `sheets:edit-cell:${context.org.id}:${context.actor}:${context.params.id ?? "none"}:${editor.sheet.id}:${address}`;
+  const [draftRaw, setRaw] = useWorkingField<string | undefined>(draftScope, "raw", undefined);
+  const raw = draftRaw ?? editor.sheet.cells[address] ?? "";
   const blocked = blockedByProtection(editor, [address]);
   return (
     <form
@@ -124,6 +127,7 @@ export function EditCell({ context, close }: { context: ScreenContext; close: ()
         event.preventDefault();
         if (blocked) return;
         editor.commitSheet(setCell(editor.sheet, address, raw), `Edit ${address}`);
+        clearWorkingDraft(draftScope);
         close();
       }}
     >
@@ -132,21 +136,42 @@ export function EditCell({ context, close }: { context: ScreenContext; close: ()
       </Field>
       {blocked && <Notice tone="danger" title="Protected">{blocked}. The reason is listed in Collaboration.</Notice>}
       <Properties rows={[{ label: "Shows now", value: String(editor.values[address]?.value ?? "") || "empty" }]} />
+      <Row gap={2}><span className="ds-subtle">Uncommitted cell text stays in this browser tab if you switch apps.</span>
+        <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
+      </Row>
     </form>
   );
 }
 
 export function PasteCells({ context, close }: { context: ScreenContext; close: () => void }) {
   const editor = useWorkbookEditor(context, useWorkbookFor(context));
-  const [text, setText] = useState("");
+  const { col, row } = editor.selection.active;
+  const draftScope = `sheets:paste:${context.org.id}:${context.actor}:${context.params.id ?? "none"}:${editor.sheet.id}:${cellAddress(col, row)}`;
+  const [text, setText] = useWorkingField(draftScope, "text", "");
   return (
     <form
       id="sheets-paste"
       className="ds-stack ds-gap-3"
-      onSubmit={(event) => { event.preventDefault(); if (text) { pasteInto(context, editor, text); close(); } }}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!text) return;
+        // A protected cell must not consume the draft. An error message
+        // remains visible so the person can review the selection.
+        const lines = text.replace(/\r/g, "").split("\n");
+        const width = Math.max(...lines.map(line => line.split("\t").length));
+        const addresses: string[] = [];
+        for (let r = 0; r < lines.length; r++) for (let c = 0; c < width; c++) addresses.push(cellAddress(col + c, row + r));
+        if (blockedByProtection(editor, addresses)) { pasteInto(context, editor, text); return; }
+        pasteInto(context, editor, text);
+        clearWorkingDraft(draftScope);
+        close();
+      }}
     >
       <Notice tone="info" title="The browser did not share the clipboard">Paste the cells here (tab between columns, a new line per row). They go in from {cellAddress(editor.selection.active.col, editor.selection.active.row)}.</Notice>
       <TextArea rows={6} value={text} onChange={(event) => setText(event.target.value)} autoFocus aria-label="Cells to paste" style={{ fontFamily: "var(--font-mono)" }} />
+      <Row gap={2}><span className="ds-subtle">Clipboard text is held in this tab only until pasted or discarded.</span>
+        <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
+      </Row>
     </form>
   );
 }
@@ -529,8 +554,10 @@ export function PublishWorkbook({ context, close }: { context: ScreenContext; cl
 
 export function CommentCell({ context, close }: { context: ScreenContext; close: () => void }) {
   const editor = useWorkbookEditor(context, useWorkbookFor(context));
-  const [address, setAddress] = useState(cellAddress(editor.selection.active.col, editor.selection.active.row));
-  const [body, setBody] = useState("");
+  const draftScope = `sheets:comment:${context.org.id}:${context.actor}:${context.params.id ?? "none"}:${editor.sheet.id}`;
+  const [draftAddress, setAddress] = useWorkingField<string | undefined>(draftScope, "address", undefined);
+  const address = draftAddress ?? cellAddress(editor.selection.active.col, editor.selection.active.row);
+  const [body, setBody] = useWorkingField(draftScope, "body", "");
   const valid = /^[A-Z]{1,3}[1-9]\d*$/.test(address.trim().toUpperCase());
   return (
     <form
@@ -540,11 +567,15 @@ export function CommentCell({ context, close }: { context: ScreenContext; close:
         event.preventDefault();
         if (!valid || !body.trim()) return;
         editor.commit({ ...editor.workbook, comments: [{ id: nextId("cm"), sheetId: editor.sheet.id, address: address.trim().toUpperCase(), author: context.actor, at: context.now.toISOString(), body: body.trim(), resolved: false }, ...editor.workbook.comments] }, `Comment on ${address.toUpperCase()}`);
+        clearWorkingDraft(draftScope);
         close();
       }}
     >
       <Field label={`Cell on ${editor.sheet.name}`} error={valid ? undefined : "Use an address like B4."}><TextInput value={address} onChange={(event) => setAddress(event.target.value)} style={{ fontFamily: "var(--font-mono)" }} /></Field>
       <Field label="Comment" required><TextArea rows={3} value={body} onChange={(event) => setBody(event.target.value)} required autoFocus /></Field>
+      <Row gap={2}><span className="ds-subtle">This comment is not saved until you submit.</span>
+        <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
+      </Row>
     </form>
   );
 }
