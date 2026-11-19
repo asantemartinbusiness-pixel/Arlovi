@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
+import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { Link } from "react-router-dom";
 import { FileText, Plus, Printer, Send, Trash2 } from "lucide-react";
 import {
@@ -1119,6 +1120,7 @@ export function NewInvoice({ context, close }: { context: ScreenContext; close: 
         <TaxSummary totals={preview} context={context} />
       </Card>
 
+      <WorkingDraftStatus scope={draftScope} />
       <Row gap={2}>
         <Button type="submit" variant="primary" busy={busy} disabled={!numbersKnown || duplicate || !number.trim()}>Create draft</Button>
         <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
