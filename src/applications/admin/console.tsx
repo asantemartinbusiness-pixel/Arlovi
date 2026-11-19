@@ -987,6 +987,7 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
   const retention = ofKind(data.policies, "retention").filter((policy) =>
     csvList(policy.fields.collections).some((entry) => collections.includes(entry)));
   const held = retention.filter((policy) => policy.fields.legalHold === true);
+  const requestHeld = request.fields.legalHold === true;
   const covered = subject ? subjectRecords(request, settledRecords) : [];
   const deletable = covered.filter((record) => !held.some((policy) => csvList(policy.fields.collections).includes(record.collection)));
   const blocked = covered.filter((record) => held.some((policy) => csvList(policy.fields.collections).includes(record.collection)));
@@ -997,8 +998,8 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
     csvList(request.fields.erasureCandidateIds).every((id) => candidateIds.includes(id));
   const executeReady = Boolean(reviewStored) && candidateIds.length > 0 &&
     context.can("delete_records") && executionPhrase === "DELETE" && reviewed && !busy &&
-    request.fields.legalHold !== true;
-  const eligible = context.can("delete_records") && subject.length > 0 && collections.length > 0 && request.fields.legalHold !== true && !reviewStored && reviewed && reason.trim().length >= 10 && !busy;
+    !requestHeld;
+  const eligible = context.can("delete_records") && subject.length > 0 && collections.length > 0 && !requestHeld && !reviewStored && reviewed && reason.trim().length >= 10 && !busy;
 
   async function executeErasure() {
     if (!executeReady || !settledRecords) return;
@@ -1059,6 +1060,12 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
         Review the impact first. A second deliberate confirmation may erase eligible records in one revision-checked local transaction.
         This does not erase information from external providers, synced services or backups, and is not a legal-compliance determination.
       </Notice>
+      {requestHeld && <Notice tone="danger" title="A legal hold applies">
+        Erasure is refused while the hold stands. This request cannot be reviewed for execution until the hold is independently resolved.
+      </Notice>}
+      {held.length > 0 && <Notice tone="warning" title="Retention policies exclude records">
+        {held.map((policy) => policy.title).join("; ")} — records covered by these policies will be retained.
+      </Notice>}
       <Properties rows={[
         { label: "Verified request", value: request.title },
         { label: "Subject", value: subject || "Subject identity missing" },
