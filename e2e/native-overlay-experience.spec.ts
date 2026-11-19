@@ -165,3 +165,20 @@ test("privacy erasure refuses to choose a subject request by default", async ({ 
   await expect(dialog).toContainText("Select a subject request before reviewing erasure");
   await expect(dialog.getByRole("button", { name: /Delete .* local records/ })).toHaveCount(0);
 });
+
+test("access request form requires a deliberately chosen member and role", async ({ page }) => {
+  await page.goto("/o/northline/admin/roles?overlay=access%20request%20form");
+  const dialog = page.getByRole("dialog", { name: "Request access" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("combobox", { name: "Who needs access" })).toHaveValue("");
+  await expect(dialog.getByRole("combobox", { name: "Role view requested" })).toHaveValue("");
+  await expect(dialog.getByRole("button", { name: "Send for review" })).toBeDisabled();
+});
+
+test("access approval cannot choose an arbitrary request", async ({ page }) => {
+  await page.goto("/o/northline/admin/roles?overlay=access%20review");
+  const drawer = page.getByRole("dialog", { name: "Review access request" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toContainText("Select a request");
+  await expect(drawer.getByRole("button", { name: "Approve and change role" })).toHaveCount(0);
+});
