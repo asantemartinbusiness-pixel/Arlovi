@@ -294,6 +294,8 @@ export function AccessRequestForm({ context, close }: { context: ScreenContext; 
   const from = (String(chosen?.fields.role ?? "member")) as Role;
   const target = requested || "";
   const change = chosen && target && target !== from ? accessChange(from, target) : null;
+  const pendingRequest = chosen && ofKind(data.policies, "accessRequest").find((row) =>
+    row.status === "open" && row.organizationId === context.org.id && row.fields.memberId === chosen.id);
 
   return (
     <Stack gap={4}>
@@ -313,6 +315,13 @@ export function AccessRequestForm({ context, close }: { context: ScreenContext; 
         {change.gained.length ? `Would add ${change.gained.map(capabilityLabel).join(", ")}.` : "Adds no capabilities."}
         {change.lost.length ? ` Would remove ${change.lost.map(capabilityLabel).join(", ")}.` : ""}
       </p>}
+      {pendingRequest && <Notice tone="warning" title="A request is already waiting">
+        {chosen?.title} already has an open access request. Review or decline it before submitting another role change.
+      </Notice>}
+      <Notice tone="info" title="Role access is not temporary by default">
+        This requests a persistent local role view. An expiry on a request only limits when it may be approved;
+        it does not automatically revoke an approved role. Do not use this for time-limited privileged access.
+      </Notice>
       <Field label="Why" required error={error || undefined}>
         <TextArea rows={3} value={reason} onChange={(event) => { setReason(event.target.value); setError(""); }} placeholder="Covering month-end while Jonah is away" />
       </Field>
@@ -322,11 +331,11 @@ export function AccessRequestForm({ context, close }: { context: ScreenContext; 
         <Button
           variant="primary"
           busy={busy}
-          disabled={!chosen || !target || target === from || reason.trim().length < 10 || busy}
+          disabled={!chosen || !target || target === from || reason.trim().length < 10 || busy || Boolean(pendingRequest)}
           onClick={async () => {
-            if (!chosen || !target || target === from || busy) return;
+            if (!chosen || !target || target === from || busy || pendingRequest) return;
             if (reason.trim().length < 10) { setError("Provide a specific reason of at least 10 characters."); return; }
-            if (ofKind(data.policies, "accessRequest").some((row) => row.status === "open" && row.fields.memberId === chosen.id && row.fields.requestedRole === target)) {
+            if (ofKind(data.policies, "accessRequest").some((row) => row.status === "open" && row.fields.memberId === chosen.id)) {
               setError("That request is already waiting for review."); return;
             }
             setBusy(true);
