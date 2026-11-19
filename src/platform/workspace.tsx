@@ -162,6 +162,7 @@ export interface Mutations {
   remove: (id: string, event?: string) => Promise<void>;
   putMany: (records: Rec[], messages?: string[], expectedRevisions?: Record<string, number>, eventTypes?: ("create" | "update")[]) => Promise<void>;
   confirmReconciliation: (bankAccountCode: string, statementId: string, note: string) => Promise<Rec>;
+  executeReviewedErasure: (requestId: string, revisions: Record<string, number>, candidateIds: string[], requestRevision: number) => Promise<{ deleted: number; retained: number }>;
   log: (message: string, options?: { entityId?: string; type?: string; capability?: Audit["capability"] }) => Promise<void>;
 }
 
@@ -229,6 +230,9 @@ export function useMutations(screenId?: string): Mutations {
         org.id,
         expectedRevisions,
       );
+    },
+    async executeReviewedErasure(requestId, revisions, candidateIds, requestRevision) {
+      return repo.executeReviewedErasure(org.id, requestId, revisions, candidateIds, requestRevision, context());
     },
     async confirmReconciliation(bankAccountCode, statementId, note) {
       const ctx = context();
