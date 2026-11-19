@@ -17,7 +17,7 @@ export function readConnectedSearchHits(raw: unknown, orgSlug: string): SearchHi
       || typeof h.sourceName !== "string" || !h.sourceName.trim() || h.sourceName.length > 150
       || typeof h.title !== "string" || !h.title.trim() || h.title.length > 180
       || typeof h.to !== "string" || !h.to.startsWith("/") || h.to.startsWith("//")
-      || /[\u0000-\u001f]/.test(h.to)) continue;
+      || h.to.length > 2048 || [...h.to].some(character => character.charCodeAt(0) < 32)) continue;
     let path: string;
     try {
       const url = new URL(h.to, "https://arlovi.invalid");
