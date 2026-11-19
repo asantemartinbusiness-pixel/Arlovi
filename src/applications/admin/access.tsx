@@ -227,7 +227,7 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
   }
 
   async function restorePreviousRole() {
-    if (!canRestore || !member || busy) return;
+    if (!request || !canRestore || !member || busy) return;
     setBusy(true);
     setError("");
     try {
