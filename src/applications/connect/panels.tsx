@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Activity, Plug, RefreshCcw, Search, ShieldAlert, ShieldCheck, Webhook, X,
 } from "lucide-react";
@@ -62,7 +63,10 @@ function StateCell({ entry }: { entry: ConnectorEntry }) {
 
 export function Marketplace({ context, lens }: { context: ScreenContext; lens: "Featured" | "Categories" | "Installed" | "Custom" }) {
   const { rows: records, loaded } = useCollectionState("connectors");
-  const [query, setQuery] = useState("");
+  const location = useLocation();
+  // A global-search catalogue result opens the marketplace already filtered.
+  // URL parameters never imply an authenticated provider connection.
+  const [query, setQuery] = useState(() => new URLSearchParams(location.search).get("q")?.slice(0, 150) ?? "");
   const [category, setCategory] = useState<"All" | ConnectorEntry["category"]>("Communication");
   const accessibleCount = CONNECTOR_ENTRIES.length;
   const matched = (lens === "Featured" && !query.trim()
