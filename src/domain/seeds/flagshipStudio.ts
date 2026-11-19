@@ -1,4 +1,5 @@
 import { registerSeed } from "@/domain/seedRegistry";
+import { NORTHLINE_COLORS } from "@/domain/flagship/identity";
 import type { Rec } from "@/domain/types";
 import type { DesignDoc, SceneNode, ScenePage } from "@/applications/design/scene";
 import type { PublicationDoc, Page, ParagraphStyle, Frame } from "@/applications/layout/flow";
@@ -11,9 +12,11 @@ import type { PublicationDoc, Page, ParagraphStyle, Frame } from "@/applications
  * This contributor uses 91x IDs, separate from the 90x flagship core records.
  */
 const C = {
-  ink: "#192421", leaf: "#425047", paper: "#EEEAE1", white: "#FFF9EF",
-  clay: "#BA6B4C", gold: "#C9A078", rose: "#AC8B84",
-  slate: "#7E8982", fog: "#D8D6CD",
+  ink: NORTHLINE_COLORS.ink, leaf: NORTHLINE_COLORS.darkRule,
+  paper: NORTHLINE_COLORS.canvas, white: NORTHLINE_COLORS.white,
+  clay: NORTHLINE_COLORS.violet, gold: NORTHLINE_COLORS.acid,
+  rose: NORTHLINE_COLORS.apricot, slate: NORTHLINE_COLORS.bluePaper,
+  fog: NORTHLINE_COLORS.rule,
 };
 type Kind = SceneNode["kind"];
 const N = (id: string, kind: Kind, name: string, x: number, y: number, w: number, h: number, extra: Partial<SceneNode> = {}): SceneNode => ({
@@ -25,15 +28,15 @@ const block = (id: string, name: string, x: number,y: number,w: number,h: number
 const circle = (id:string,name:string,x:number,y:number,w:number,h:number,fill:string) =>
   N(id,"ellipse",name,x,y,w,h,{fill:{type:"solid",color:fill}});
 const textNode = (id:string,name:string,text:string,x:number,y:number,w:number,h:number,size:number,color:string,serif=false,weight=400):SceneNode =>
-  N(id,"text",name,x,y,w,h,{text,textStyle:{family:serif?"Georgia":"Inter",size,weight,lineHeight:serif?1.04:1.22,letterSpacing:serif?-1.4:0.6,align:"start",color}});
+  N(id,"text",name,x,y,w,h,{text,textStyle:{family:serif?"Newsreader":"Manrope",size,weight,lineHeight:serif?1.04:1.22,letterSpacing:serif?-1.4:0.6,align:"start",color}});
 const line = (id:string,name:string,x:number,y:number,w:number,h:number,color:string,width=2) =>
   N(id,"line",name,x,y,w,h,{stroke:{color,width,align:"center"}});
 const palette = Object.entries(C).map(([id,value])=>({id:"collective-"+id,name:id.toUpperCase(),value,group:"Northline Collective"}));
 const textStyles = [
-  {id:"type-display",name:"Editorial / 98",family:"Georgia",size:98,weight:400,lineHeight:1.04,letterSpacing:-1.4},
-  {id:"type-title",name:"Title / 44",family:"Georgia",size:44,weight:400,lineHeight:1.08,letterSpacing:-1},
-  {id:"type-kicker",name:"Label / 14",family:"Inter",size:14,weight:700,lineHeight:1.3,letterSpacing:2},
-  {id:"type-copy",name:"Body / 22",family:"Inter",size:22,weight:400,lineHeight:1.4,letterSpacing:0},
+  {id:"type-display",name:"Editorial / 98",family:"Manrope",size:98,weight:700,lineHeight:1.04,letterSpacing:-1.4},
+  {id:"type-title",name:"Title / 44",family:"Newsreader",size:44,weight:500,lineHeight:1.08,letterSpacing:-1},
+  {id:"type-kicker",name:"Label / 14",family:"DM Mono",size:14,weight:400,lineHeight:1.3,letterSpacing:2},
+  {id:"type-copy",name:"Body / 22",family:"Manrope",size:22,weight:400,lineHeight:1.4,letterSpacing:0},
 ];
 const page = (id:string,name:string,width:number,height:number,children:SceneNode[],background=C.paper):ScenePage => {
   const frameId=id+"-frame";
@@ -127,10 +130,10 @@ const PT=72/25.4;
 const mm=(n:number)=>n*PT;
 const A4={id:"a4",name:"A4 portrait",width:595.28,height:841.89};
 const paragraphStyles:ParagraphStyle[]=[
-  {id:"cover",name:"Display",family:"Georgia",size:38,leading:43,tracking:-1.2,weight:400,align:"left",spaceBefore:0,spaceAfter:12,firstLineIndent:0,hyphenate:false,alignToBaseline:false,color:C.ink},
-  {id:"intro",name:"Introduction",family:"Georgia",size:16,leading:24,tracking:0,weight:400,align:"left",spaceBefore:0,spaceAfter:12,firstLineIndent:0,hyphenate:false,alignToBaseline:false,color:C.ink},
+  {id:"cover",name:"Display",family:"Newsreader",size:38,leading:43,tracking:-1.2,weight:400,align:"left",spaceBefore:0,spaceAfter:12,firstLineIndent:0,hyphenate:false,alignToBaseline:false,color:C.ink},
+  {id:"intro",name:"Introduction",family:"Newsreader",size:16,leading:24,tracking:0,weight:400,align:"left",spaceBefore:0,spaceAfter:12,firstLineIndent:0,hyphenate:false,alignToBaseline:false,color:C.ink},
   {id:"body",name:"Reading text",family:"Georgia",size:11,leading:17,tracking:0,weight:400,align:"left",spaceBefore:0,spaceAfter:6,firstLineIndent:0,hyphenate:true,alignToBaseline:true,color:C.ink},
-  {id:"label",name:"Label",family:"Inter",size:10,leading:14,tracking:1,weight:700,align:"left",spaceBefore:0,spaceAfter:10,firstLineIndent:0,hyphenate:false,alignToBaseline:false,color:C.clay},
+  {id:"label",name:"Label",family:"DM Mono",size:10,leading:14,tracking:1,weight:700,align:"left",spaceBefore:0,spaceAfter:10,firstLineIndent:0,hyphenate:false,alignToBaseline:false,color:C.clay},
 ];
 const publication = ():PublicationDoc => {
   const chapters=[
@@ -169,17 +172,17 @@ const publication = ():PublicationDoc => {
     baseline:{start:mm(24),step:17,visible:false},
     columns:{count:1,gutter:mm(5),visible:false},pages,masters:[],stories,
     paragraphStyles:[...paragraphStyles,coverStyle],
-    characterStyles:[],activePageId:"pub-p1",colourMode:"RGB",fonts:["Georgia","Inter"],
+    characterStyles:[],activePageId:"pub-p1",colourMode:"RGB",fonts:["Newsreader","Manrope","DM Mono","Georgia"],
   };
 };
-const grade = {exposure:0.12,contrast:9,saturation:-6,temperature:16,tint:0,highlights:-9,shadows:10,curve:[{x:0,y:0},{x:110,y:102},{x:255,y:249}]};
+const grade = {exposure:0.12,contrast:9,saturation:-6,temperature:4,tint:0,highlights:-9,shadows:10,curve:[{x:0,y:0},{x:110,y:102},{x:255,y:249}]};
 const photoDoc = (name:string,width:number,height:number,accent:string) => ({
   version:2,width,height,layers:[
     {id:"plate",name:"Procedurally generated plate — not original photography",kind:"pixel",visible:true,locked:false,opacity:1,blend:"normal",x:0,y:0,w:width,h:height,rotation:0},
     {id:"shade",name:"Art direction / soft material wash",kind:"fill",visible:true,locked:false,opacity:.13,blend:"multiply",color:accent,x:0,y:0,w:width,h:height,rotation:0},
     {id:"finish",name:"Natural contrast and warm mineral grade",kind:"adjustment",visible:true,locked:false,opacity:1,blend:"normal",x:0,y:0,w:0,h:0,rotation:0,adjust:grade},
   ],activeLayerId:"finish",
-  presets:[{id:"grade-editorial",name:"Collective — Editorial Mineral",adjust:grade}],
+  presets:[{id:"grade-editorial",name:"Collective — Paper and Acid",adjust:grade}],
   profile:"sRGB IEC61966-2.1",rights:{license:"Demonstration artwork only",credit:"Generated in local canvas; no photography or model release obtained"},
   origin:name+" — generated raster preview in the native Arlovi photo editor. Replace with original photography before publishing.",
   history:[],
@@ -202,7 +205,7 @@ const sequence=()=>{
       opacity:1,transform:transformations,effects:[{id:"grade-"+i,kind:"temperature",amount:9,bypassed:false}],fadeIn:i===0?1:0.3,fadeOut:i===3?1.3:0},
     {id:"title-"+i,trackId:"t1",start:c.start+3,sourceIn:0,duration:7,sourceId:"",name:c.id+" / title",
       text:["What we touch.","Where we belong.","What we share.","What remains."][i],
-      textStyle:{size:72,weight:400,color:"#F6F0E7",align:"center",family:"Georgia"},opacity:1,transform:transformations,
+      textStyle:{size:72,weight:400,color:"#F6F0E7",align:"center",family:"Newsreader"},opacity:1,transform:transformations,
       effects:[],fadeIn:1.4,fadeOut:1.2},
   ]);
   clips.push({id:"tone",trackId:"a1",start:0,sourceIn:0,duration:60,sourceId:"src-tone",name:"Original generative atmosphere",
