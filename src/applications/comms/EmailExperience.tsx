@@ -204,7 +204,7 @@ export function EmailExperience({ context, lens }: { context: ScreenContext; len
                 ) : rows.length === 0 ? (
                   <MailEmpty lens={lens} query={query || (view==="all"?"":"filtered")} onCompose={()=>compose()} onSetup={()=>changeFolder("Accounts & domains")}/>
                 ) : (
-                  <div className="cmx-select-state"><div><Mail size={28}/></div><h3>Select a conversation</h3><p>Read messages, review linked business records and take action without leaving the inbox.</p></div>
+                  <div className="cmx-select-state"><div><Mail size={28}/></div><h3>Select a conversation</h3><p>Read messages, review linked business records and take action without leaving the mailbox.</p></div>
                 )}
               </section>
             </div>

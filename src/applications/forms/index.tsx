@@ -1,5 +1,5 @@
 import { BarChart3, ClipboardList, Inbox, Send, SlidersHorizontal, Workflow } from "lucide-react";
-import { Empty, Field, Notice, Pill, Properties, Stack, TextInput } from "@/design-system";
+import { Empty, Field, KeyValueList, Notice, Pill, Stack, TextInput } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useCollection } from "@/platform/workspace";
 import { closeFooter, submitFooter } from "@/applications/t6kit/kit";
@@ -12,6 +12,7 @@ import {
   ThemeInspector,
 } from "./panels";
 import { saveForm, useFormsUi } from "./state";
+import { formRecordHeader } from "./recordHeads";
 import { openAct } from "@/applications/t6kit/act";
 import {
   CompareVersions, ExperimentReport, assignSubmission, connectRule, createExperiment, exportAnalytics, exportSubmissions,
@@ -108,7 +109,7 @@ function DuplicateConfirm({ context, close }: { context: ScreenContext; close: (
       }}
     >
       <Field label="Name of the copy" required><TextInput name="title" defaultValue={`${source.title} copy`} required /></Field>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Questions copied", value: String(model.fields.length) },
         { label: "Rules copied", value: String(model.logic.length) },
         { label: "Submissions copied", value: "None" },
@@ -204,7 +205,7 @@ export const formsApp = registerApp({
     "ARL-FORMS-003": {
       id: "ARL-FORMS-003",
       title: () => "Conditional logic",
-      subtitle: () => "Rules that show, hide and require. A hidden question is never validated, so it cannot block a submission.",
+      record: formRecordHeader,
       tabs: (["Rules", "Preview", "Test", "History"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <LogicScreen context={context} lens={lens} />,
@@ -228,7 +229,7 @@ export const formsApp = registerApp({
     "ARL-FORMS-004": {
       id: "ARL-FORMS-004",
       title: () => "Submissions",
-      subtitle: (context) => `Answers held in ${context.org.name}, with the version each one answered.`,
+      record: formRecordHeader,
       tabs: (["All", "New", "Reviewed", "Routed"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <SubmissionsScreen context={context} lens={lens} />,
@@ -251,7 +252,7 @@ export const formsApp = registerApp({
     "ARL-FORMS-005": {
       id: "ARL-FORMS-005",
       title: () => "Design & publish",
-      subtitle: () => "The live form on the Embed tab writes a real submission record, and records the version it answered.",
+      record: formRecordHeader,
       tabs: (["Design", "Embed", "Access", "Analytics"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <PublishScreen context={context} lens={lens} />,
@@ -274,7 +275,7 @@ export const formsApp = registerApp({
     "ARL-FORMS-006": {
       id: "ARL-FORMS-006",
       title: () => "Form analytics",
-      subtitle: () => "Counts that come from the records are shown. Anything that needs a hosted page is left blank with the reason.",
+      record: formRecordHeader,
       tabs: (["Funnel", "Responses", "Sources", "Timing"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <FormAnalytics context={context} lens={lens} />,

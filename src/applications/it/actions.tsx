@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Siren } from "lucide-react";
-import { Button, Empty, Field, Notice, Pill, Properties, Row, Select, Stack } from "@/design-system";
+import { Button, Empty, Field, KeyValueList, Notice, Pill, Row, Select, Stack } from "@/design-system";
 import type { Audit, Rec } from "@/domain/types";
 import type { OverlayDef, ScreenContext } from "@/platform/registry";
 import { useCollection, useEvents, useWorkspace } from "@/platform/workspace";
@@ -51,7 +51,7 @@ const useWatchDiagnostics = () => useItUi((state) => `${state.ranAt}|${state.run
 function IncidentFacts({ record }: ActInput) {
   if (!record) return null;
   return (
-    <Properties rows={[
+    <KeyValueList items={[
       { label: "State", value: <Pill tone="info" dot>{record.status.replace(/_/g, " ")}</Pill> },
       { label: "Severity", value: String(record.fields.severity ?? "medium") },
       { label: "Owner", value: String(record.fields.owner ?? record.ownerName) },
@@ -65,7 +65,7 @@ function DiagnosticsGate({ record, context }: ActInput) {
   const verified = Boolean(record && ui.ranAt && ui.ranAt > (record.at ?? record.createdAt));
   return (
     <Stack gap={2}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Opened", value: record ? <span className="ds-num">{context.dateTime(record.at ?? record.createdAt)}</span> : "—" },
         { label: "Last diagnostics run", value: ui.ranAt ? <span className="ds-num">{context.dateTime(ui.ranAt)}</span> : "Not in this session" },
         { label: "Verified since opening", value: verified ? <Pill tone="success">yes</Pill> : <Pill tone="warning">no</Pill> },
@@ -231,7 +231,7 @@ export const approveRepair = actOverlay({
   Details: ({ record }) => (
     <Stack gap={2}>
       {record?.fields.repairApprovedBy && <Notice tone="success" title="Already approved">{`Approved by ${String(record.fields.repairApprovedBy)}: ${String(record.fields.repairPlan ?? "")}`}</Notice>}
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Re-run the diagnostics", value: <Pill tone="success">allowed</Pill> },
         { label: "Export a backup", value: <Pill tone="success">allowed</Pill> },
         { label: "Re-index a collection", value: <Pill tone="success">allowed</Pill> },
@@ -291,7 +291,7 @@ export function IncidentDetailPanel({ context }: { context: ScreenContext }) {
     <Stack gap={3}>
       <strong>{record.title}</strong>
       <p className="ds-prose">{record.summary}</p>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "State", value: <Pill tone="info" dot>{record.status.replace(/_/g, " ")}</Pill> },
         { label: "Severity", value: String(record.fields.severity ?? "medium") },
         { label: "Owner", value: String(record.fields.owner ?? record.ownerName) },
@@ -541,7 +541,7 @@ export const runbookEditor = actOverlay({
   noun: "runbook",
   candidates: (rows) => rows.filter((record) => kind(record) === "runbook"),
   consequence: () => "The title and steps can be edited. Whether a runbook is allowlisted cannot be changed here: a runbook never widens its own privileges.",
-  Details: ({ record }) => <Properties rows={[{ label: "Allowlisted", value: record?.fields.allowed === false ? <Pill tone="warning">no — needs a person</Pill> : <Pill tone="success">yes — reversible and local</Pill> }]} />,
+  Details: ({ record }) => <KeyValueList items={[{ label: "Allowlisted", value: record?.fields.allowed === false ? <Pill tone="warning">no — needs a person</Pill> : <Pill tone="success">yes — reversible and local</Pill> }]} />,
   fields: ({ record }) => [
     { name: "title", label: "Title", required: true, initial: record?.title },
     { name: "summary", label: "Steps", kind: "textarea", required: true, initial: record?.summary },
@@ -732,7 +732,7 @@ export function ReleaseDiff({ context }: { context: ScreenContext }) {
   const previous = record.history[0];
   return (
     <Stack gap={3}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Release", value: record.title },
         { label: "Revision", value: <span className="ds-num">{String(record.revision)}</span> },
         { label: "Compared with", value: previous ? <span className="ds-num">{context.dateTime(previous.at)}</span> : "No earlier revision" },
@@ -845,7 +845,7 @@ export function ReportBuilderPanel({ context }: { context: ScreenContext }) {
           <option value="all">Everything recorded</option>
         </Select>
       </Field>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Incidents in the period", value: <span className="ds-num">{String(rows.length)}</span> },
         { label: "Resolved", value: <span className="ds-num">{String(resolved.length)}</span> },
         { label: "Mean time to resolve", value: mttr === undefined ? <Pill tone="warning">no resolved incident</Pill> : <span className="ds-num">{`${mttr} hours`}</span> },

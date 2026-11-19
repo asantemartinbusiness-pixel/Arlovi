@@ -3,7 +3,6 @@ import { expect, test } from "@playwright/test";
 test("Present library displays search, deck counters and a recoverable empty state", async ({ page }) => {
   await page.goto("/o/northline/present/decks");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Presentations in progress." })).toBeVisible();
   await expect(main.getByLabel("Presentation library overview")).toBeVisible();
   await main.getByRole("searchbox", { name: "Find a presentation" }).fill("present-qa-no-matching-deck");
   await expect(main.getByText("No presentations match this search")).toBeVisible();
@@ -14,7 +13,6 @@ test("Present library displays search, deck counters and a recoverable empty sta
 test("Present shared library never interprets another owner as external access", async ({ page }) => {
   await page.goto("/o/northline/present/decks?tab=Shared");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Recorded sharing." })).toBeVisible();
   await expect(main).toContainText("These records do not grant public or workspace access.");
 });
 
@@ -53,10 +51,8 @@ test("Animation and audience screens expose visible workflow status", async ({ p
   });
   await page.goto(`/o/northline/present/decks/${id}/animation?tab=Slides`);
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Motion with purpose." })).toBeVisible();
   await expect(main.getByLabel("Animation workflow overview")).toBeVisible();
   await page.goto(`/o/northline/present/decks/${id}/present?tab=Audience`);
-  await expect(main.getByRole("heading", { name: "What your audience will see." })).toBeVisible();
   await expect(main.getByLabel("Audience session overview")).toBeVisible();
 });
 
@@ -75,7 +71,6 @@ test("Present review export states source output limitations clearly", async ({ 
   });
   await page.goto(`/o/northline/present/decks/${id}/review?tab=Export`);
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Ready for the room." })).toBeVisible();
   await expect(main.getByLabel("Presentation review overview")).toBeVisible();
   await expect(main).toContainText("PPTX is not produced here");
 });

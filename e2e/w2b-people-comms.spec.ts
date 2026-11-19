@@ -37,7 +37,7 @@ async function noHorizontalScroll(page: Page): Promise<void> {
 }
 
 test("COMMS email: a draft is kept as you type, never sent, and found by search", async ({ page }) => {
-  await open(page, "/comms/email?tab=Drafts", "Email Inbox");
+  await open(page, "/comms/email?tab=Drafts", "Email");
   // One statement on the page: no mail service, nothing delivered.
   await expect(page.getByText("No mail service is connected, so nothing is delivered.")).toBeVisible();
   await page.getByRole("button", { name: "Compose", exact: true }).click();
@@ -214,7 +214,7 @@ test.describe("mobile", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test("email drafts, calendar day and a meeting fit a phone", async ({ page }) => {
-    await open(page, "/comms/email?tab=Drafts", "Email Inbox");
+    await open(page, "/comms/email?tab=Drafts", "Email");
     await expect(page.getByText("No mail service is connected, so nothing is delivered.")).toBeVisible();
     await noHorizontalScroll(page);
     await open(page, "/comms/calendar?tab=Day", "Calendar");

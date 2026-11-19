@@ -1,5 +1,5 @@
 import { Activity, FileText, HardDrive, Server, ShieldAlert, Siren, Wrench } from "lucide-react";
-import { Button, Notice, Properties, Stack } from "@/design-system";
+import { Button, KeyValueList, Notice, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { closeFooter, submitFooter } from "@/applications/t6kit/kit";
 import { openAct } from "@/applications/t6kit/act";
@@ -15,6 +15,7 @@ import {
   OperationsHome, RedactionRules, Releases, ReliabilityReports, Remediation,
   RestoreConfirmation, SecurityCentre, ServiceInspector, SystemHealth, TraceWaterfall,
 } from "./panels";
+import { incidentRecordHeader } from "./recordHeads";
 
 /* ====================================================================== *
  * IT — IT Operations & Reliability
@@ -62,7 +63,7 @@ function EscalationRules({ context }: { context: ScreenContext }) {
       <Notice tone="warning" title="Nothing can page anyone from here">
         Escalation means reaching a person on a channel this workspace does not have. Raising severity changes the register and writes an audit entry; it does not send anything.
       </Notice>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "On high severity", value: "The incident moves to the top of the queue and is marked" },
         { label: "Notification", value: "Not connected" },
         { label: "On-call rota", value: "Not modelled — it would be a list nobody is paged from" },
@@ -101,7 +102,7 @@ function SessionRevoke({ context }: { context: ScreenContext }) {
       <Notice tone="warning" title="There is no session to revoke">
         No account system issued one. The workspace is open to anything that can open this browser profile, and saying otherwise would be the most dangerous sentence in the product.
       </Notice>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Sessions issued", value: <span className="ds-num">0</span> },
         { label: "Tokens held", value: <span className="ds-num">0</span> },
         { label: "What would end access", value: "Clearing site data for this origin in the browser" },
@@ -117,7 +118,7 @@ function PolicySimulation({ context }: { context: ScreenContext }) {
       <Notice tone="info" title="A simulation shows what the interface would offer">
         Switching the role view changes which applications and actions this interface presents. It does not change what the data layer will return, because there is no server enforcing anything.
       </Notice>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Current role view", value: <span className="ds-num">{context.role}</span> },
         { label: "Enforced by", value: "This interface" },
         { label: "Not enforced by", value: "Any server" },
@@ -218,7 +219,7 @@ export const itApp = registerApp({
     "ARL-IT-003": {
       id: "ARL-IT-003",
       title: () => "Incident",
-      subtitle: () => "Timeline, evidence and a resolution gated on a real check.",
+      record: incidentRecordHeader,
       tabs: (["Overview", "Timeline", "Evidence", "Remediation", "Postmortem"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <IncidentDetail context={context} lens={lens} />,

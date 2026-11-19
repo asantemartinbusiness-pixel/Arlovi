@@ -15,3 +15,9 @@
 .vd-cue[data-reviewed] { border-color: var(--success); }
 .vd-cue[data-selected] { outline: 2px solid var(--accent); outline-offset: -1px; z-index: 3; }
 .vd-cue:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* Render boundary: what the export does on this machine, and what it does not produce. */
+.vd-boundary { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border-default); border-inline-start: 3px solid var(--warning); border-radius: var(--radius-md); background: var(--bg-surface); }
+.vd-boundary[data-ok] { border-inline-start-color: var(--success); }
+.vd-boundary-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-3); align-items: start; font-size: var(--text-sm); }
+@media (max-width: 640px) { .vd-boundary-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); } }

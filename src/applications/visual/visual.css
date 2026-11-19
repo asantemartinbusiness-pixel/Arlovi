@@ -200,3 +200,13 @@
 .vx-use { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: var(--space-2) var(--space-3); text-align: start; border-bottom: 1px solid var(--border-subtle); font-size: var(--text-sm); }
 .vx-use:hover { background: var(--bg-hover); }
 .vx-use:focus-visible { box-shadow: var(--focus-ring); outline: none; }
+
+/* tool and token grids, font rows (additive) */
+.vx-toolgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-2); }
+.vx-tokengrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: var(--space-2); }
+.vx-token { display: flex; flex-direction: column; gap: var(--space-1); align-items: stretch; padding: var(--space-1); border-radius: var(--radius-sm); text-align: start; }
+.vx-token:hover:not(:disabled) { background: var(--bg-hover); }
+.vx-token:disabled { opacity: 0.5; cursor: not-allowed; }
+.vx-token:focus-visible { box-shadow: var(--focus-ring); outline: none; }
+.vx-token-chip { height: 36px; border-radius: var(--radius-sm); border: 1px solid var(--border-default); }
+.vx-fontrow { padding: var(--space-2) 0; border-bottom: 1px solid var(--border-subtle); }

@@ -1224,7 +1224,8 @@ export function Promotions({ context, lens }: { context: ScreenContext; lens: st
               <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Offer builder", { id: promotion.id })}>Edit</Button>
               <Button size="sm" variant="ghost" onClick={() => context.openOverlay("margin check", { id: promotion.id })}>Margin check</Button>
               {live && <Button size="sm" variant="ghost" onClick={async () => {
-                await context.mutate.patch(promotion.id, { status: "paused" }, { expectRevision: promotion.revision, event: `${promotion.title} paused` });
+                const ok29 = await context.mutate.patch(promotion.id, { status: "paused" }, { expectRevision: promotion.revision, event: `${promotion.title} paused` });
+                if (!ok29) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
                 context.toast("Paused", `${promotion.title} no longer applies at checkout in this workspace.`);
               }}>Pause</Button>}
             </>}>

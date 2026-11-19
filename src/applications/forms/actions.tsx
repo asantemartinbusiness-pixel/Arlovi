@@ -1,7 +1,7 @@
 import { exportResultsCsv } from "./results";
 import { useState } from "react";
 import { BarChart3 } from "lucide-react";
-import { Empty, Field, Notice, Pill, Properties, Select, Stack } from "@/design-system";
+import { Empty, Field, KeyValueList, Notice, Pill, Select, Stack } from "@/design-system";
 import type { Rec } from "@/domain/types";
 import type { ScreenContext } from "@/platform/registry";
 import { useChildren } from "@/platform/workspace";
@@ -169,7 +169,7 @@ export const fixLogic = actOverlay({
   consequence: () => "Each fix is computed from the branch check and changes one thing: removes a rule that points nowhere, corrects a value to a real option, moves a question, or makes an unreachable required question optional so it cannot block a submission.",
   Details: ({ record }: ActInput) => {
     const issues = logicIssues(form(record));
-    return <Properties rows={[{ label: "Problems now", value: <Pill tone={issues.some((issue) => issue.level === "fail") ? "danger" : issues.length ? "warning" : "success"}>{issues.length}</Pill> }]} />;
+    return <KeyValueList items={[{ label: "Problems now", value: <Pill tone={issues.some((issue) => issue.level === "fail") ? "danger" : issues.length ? "warning" : "success"}>{issues.length}</Pill> }]} />;
   },
   blocked: ({ record }) => (record && logicFixes(form(record)).length === 0 ? "No problem has a fix that can be computed. The branch check may pass, or the remaining problems need a decision." : undefined),
   fields: ({ record }) => [{ name: "fix", label: "Fix", kind: "select", options: logicFixes(form(record)).map((fix) => ({ value: fix.id, label: fix.label })) }],
@@ -332,7 +332,7 @@ export function ExperimentReport({ context }: { context: ScreenContext }) {
   const ready = rowsA.length >= minimum && rowsB.length >= minimum;
   return (
     <Stack gap={3}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Hypothesis", value: String(armA.fields.hypothesis ?? "") },
         { label: `Arm A · ${armA.title}`, value: <span className="ds-num">{`${rowsA.length} submissions`}</span> },
         { label: `Arm B · ${armB.title}`, value: <span className="ds-num">{`${rowsB.length} submissions`}</span> },

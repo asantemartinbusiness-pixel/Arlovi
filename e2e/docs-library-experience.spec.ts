@@ -3,7 +3,6 @@ import { expect, test } from "@playwright/test";
 test("Documents library presents distinct working states and filters across viewports", async ({ page }) => {
   await page.goto("/o/northline/docs/files");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Your document workspace." })).toBeVisible();
   await expect(main.getByLabel("Document library summary")).toBeVisible();
   for (const label of ["Active documents", "Drafts", "In review", "Confidential"]) {
     await expect(main.getByLabel("Document library summary")).toContainText(label);
@@ -23,7 +22,6 @@ test("Documents library presents distinct working states and filters across view
 test("Documents shared tab describes recorded local sharing, not another person's ownership", async ({ page }) => {
   await page.goto("/o/northline/docs/files?tab=Shared");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Recorded sharing activity." })).toBeVisible();
   await expect(main).toContainText("This does not mean a public link or external access exists.");
   await expect(main.getByRole("button", { name: "New document" }).first()).toBeVisible();
 });
@@ -31,7 +29,6 @@ test("Documents shared tab describes recorded local sharing, not another person'
 test("Documents library archive and search have distinct empty and filter reset states", async ({ page }) => {
   await page.goto("/o/northline/docs/files?tab=Archive");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "The document archive." })).toBeVisible();
   await main.getByRole("searchbox", { name: "Search" }).fill("unfindable-qa-archive-test-string");
   await expect(main.getByText("No documents match the filters")).toBeVisible();
   await main.getByRole("button", { name: "Clear filters" }).first().click();
@@ -147,7 +144,6 @@ test("Document reviewer assignment exposes reason, existing state, and no email 
 test("Template governance offers discoverable status and search filters", async ({ page }) => {
   await page.goto("/o/northline/docs/templates");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Masters that keep work consistent." })).toBeVisible();
   await expect(main.getByLabel("Template governance summary")).toBeVisible();
   await main.getByRole("searchbox", { name: "Search masters" }).fill("unfindable-qa-template-reference");
   await expect(main).toContainText("No templates match");
@@ -193,7 +189,6 @@ test("Documents brand insights show grounded company context and template handof
   });
   await page.goto(`/o/northline/docs/documents/${id}/insights?tab=Brand`);
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Brand alignment, with evidence." })).toBeVisible();
   await expect(main).toContainText("Brand assets are not automatically embedded");
   await main.getByRole("button", { name: "Open templates" }).click();
   await expect(page).toHaveURL(/\/docs\/templates/);

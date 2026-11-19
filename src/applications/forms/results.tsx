@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Card, Empty, Grid, Meter, Pill, Properties, Row, Stack } from "@/design-system";
+import { Button, Card, Empty, Grid, KeyValueList, Meter, Pill, Row, Stack } from "@/design-system";
 import { Inbox } from "lucide-react";
 import type { ScreenContext } from "@/platform/registry";
 import type { Rec } from "@/domain/types";
@@ -88,7 +88,7 @@ function SummaryBody({ summary, total }: { summary: QuestionSummary; total: numb
   }
   if (summary.kind === "number") {
     return (
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Average", value: <span className="ds-num">{formatNumber(summary.mean)}</span> },
         { label: "Median", value: <span className="ds-num">{formatNumber(summary.median)}</span> },
         { label: "Lowest – highest", value: <span className="ds-num">{`${formatNumber(summary.min)} – ${formatNumber(summary.max)}`}</span> },

@@ -258,7 +258,7 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
 
       <div className="ds-grid-wrap">
         <div className="ds-grid-scroll">
-          <table className="ds-table">
+          <table className="ds-table" style={{ minWidth: 880 }}>
             <caption className="ds-sr-only">Quote lines</caption>
             <thead>
               <tr>

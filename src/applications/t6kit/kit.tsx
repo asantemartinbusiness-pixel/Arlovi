@@ -8,7 +8,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
-import { Button, Notice, Pill, Properties, Row, Stack } from "@/design-system";
+import { Button, KeyValueList, Notice, OverlayActions, Pill, Row, Stack } from "@/design-system";
 import { CAPABILITY_LABELS, CAPABILITY_TONE, capabilityById, type ProviderCapability } from "@/platform/capability";
 import type { ScreenContext } from "@/platform/registry";
 import { downloadFile } from "@/runtime/db";
@@ -25,11 +25,23 @@ import "./kit.css";
 export function submitFooter(formId: string, label: string) {
   return function Footer({ close }: { close: () => void }) {
     return (
-      <>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <span className="ds-grow" />
-        <Button variant="primary" type="submit" form={formId}>{label}</Button>
-      </>
+      <OverlayActions
+        primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
+    );
+  };
+}
+
+/** Confirmation footer: [Cancel] … [Confirm], for dialogs that ask before doing something hard to undo. */
+export function confirmFooter(formId: string, label: string, tone: "primary" | "danger" = "primary") {
+  return function Footer({ close }: { close: () => void }) {
+    return (
+      <OverlayActions
+        variant="confirm"
+        primary={<Button variant={tone} type="submit" form={formId}>{label}</Button>}
+        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      />
     );
   };
 }
@@ -71,7 +83,7 @@ export function BoundaryNotice({
 export function CapabilityCard({ capability, scopes }: { capability: ProviderCapability; scopes: string[] }) {
   return (
     <Stack gap={3}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Provider", value: capability.provider },
         { label: "State", value: <Pill tone={CAPABILITY_TONE[capability.state]} dot>{CAPABILITY_LABELS[capability.state]}</Pill> },
         { label: "Would enable", value: capability.label },

@@ -8,7 +8,8 @@ import {
 import {
   BarChart, Button, ButtonGroup, Card, Checkbox, DataGrid, DonutChart, Empty, Field, Grid,
   InspectorSection, KeyValueList, LineChart, Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat,
-  StatRow, Switch, Tabs, TextArea, TextInput, Tool, Toolbar, ToolbarSeparator,
+  StatRow, Switch, Tabs, TextArea, TextInput, Tool, Toolbar, ToolbarSeparator, type RecordHeaderProps,
+  OVERLAY_WIDTH, OverlaySummary,
 } from "@/design-system";
 import { getScreenDef, registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
 import { useGuardRefresh } from "@/applications/design/sharedDoc";
@@ -33,6 +34,7 @@ import {
 import { SheetGrid, singleSelection } from "./grid";
 import { boxAddresses, protectedSet, SAVE_LABEL, SAVE_TONE, useWorkbookEditor, type WorkbookEditor } from "./state";
 import { ChangePreview, proposeChange } from "./preview";
+import { LibraryStrip, RecordCardGrid, ViewToggle, useLibraryView } from "../docs/libraryKit";
 import "./sheets.css";
 
 /* ====================================================================== *
@@ -63,6 +65,22 @@ function WorkbookOverlaySummary({ context }: { context: ScreenContext }) {
       meta={[String(record.fields.folder ?? "Unfiled"), record.ownerName, `Revision ${record.revision}`]}
     />
   );
+}
+function WorkbookTitle({ context }: { context: ScreenContext }) { return <>{useWorkbook(context)?.title ?? "Workbook"}</>; }
+function WorkbookStatus({ context }: { context: ScreenContext }) {
+  const record = useWorkbook(context);
+  return record ? <Pill tone={record.status === "archived" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill> : null;
+}
+function WorkbookFacts({ context }: { context: ScreenContext }) {
+  const record = useWorkbook(context);
+  if (!record) return null;
+  const book = readWorkbook(record.body);
+  const formulas = book.sheets.reduce((total, sheet) => total + Object.values(sheet.cells).filter((raw) => raw.startsWith("=")).length, 0);
+  return <>{book.sheets.length} sheet{book.sheets.length === 1 ? "" : "s"} · {formulas} formula{formulas === 1 ? "" : "s"} · {record.ownerName} · revision {record.revision}</>;
+}
+/** Identity block for the workbook pages beside the grid. Runs outside hook rules, so each piece reads the record itself. */
+function workbookRecord(context: ScreenContext): RecordHeaderProps {
+  return { title: <WorkbookTitle context={context} />, status: <WorkbookStatus context={context} />, meta: [<WorkbookFacts key="facts" context={context} />] };
 }
 const workbookSummary = (context: ScreenContext) => <WorkbookOverlaySummary context={context} />;
 
@@ -246,6 +264,7 @@ function WorkbookLibrary({ context, tab }: { context: ScreenContext; tab: "Recen
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [folder, setFolder] = useState("all");
+  const [view, setView] = useLibraryView("sheets");
   const active = useMemo(() => workbooks.filter((record) => record.status !== "archived"), [workbooks]);
   const folders = [...new Set(workbooks.map((record) => String(record.fields.folder ?? "Unfiled")))];
   const templateCount = workbooks.filter((record) => record.fields.isTemplate === true || record.status === "template").length;
@@ -278,33 +297,58 @@ function WorkbookLibrary({ context, tab }: { context: ScreenContext; tab: "Recen
 
   return (
     <Stack gap={4}>
-      <div className="sx-library-header">
-        <div>
-          <span className="sx-library-eyebrow">SHEETS / WORKBOOK LIBRARY</span>
-          <h2>{tab === "Shared" ? "Recorded collaboration." : tab === "Templates" ? "Reusable workbook structures." : tab === "Mine" ? "Your models and data." : "Your workbook workspace."}</h2>
-          <p>{tab === "Shared" ? "Workbooks with a locally recorded sharing list. This is not an external permission or invitation." : "Find, review and open calculation models without losing the context of your company."}</p>
-        </div>
+      <LibraryStrip
+        label="Workbook library overview"
+        items={[
+          { label: "Active workbooks", value: active.length },
+          { label: "Owned by you", value: active.filter((record) => record.ownerName === actor).length },
+          { label: "Sharing recorded", value: sharedCount },
+          { label: "Templates", value: templateCount },
+        ]}
+      >
+        <ViewToggle label="Library view" value={view} onChange={setView} />
         <Button variant="primary" onClick={() => context.openOverlay("new workbook")}>New workbook</Button>
-      </div>
-      <div className="sx-library-metrics" aria-label="Workbook library overview">
-        <div><span>Active workbooks</span><strong>{active.length}</strong><small>Excludes archived workbooks</small></div>
-        <div><span>Owned by you</span><strong>{active.filter((record) => record.ownerName === actor).length}</strong><small>Your working models</small></div>
-        <div><span>Sharing recorded</span><strong>{sharedCount}</strong><small>Local record only</small></div>
-        <div><span>Templates</span><strong>{templateCount}</strong><small>Reusable structures</small></div>
-      </div>
-      <div className="sx-library-filters">
-        <Row gap={3} wrap>
-          <Field label="Search"><TextInput aria-label="Search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Title, summary or tag" /></Field>
-          <Field label="Status"><Select aria-label="Workbook status" value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="all">All statuses</option><option value="active">Active</option><option value="draft">Draft</option><option value="archived">Archived</option><option value="template">Template</option>
-          </Select></Field>
-          <Field label="Folder"><Select aria-label="Workbook folder" value={folder} onChange={(event) => setFolder(event.target.value)}>
-            <option value="all">All folders</option>{folders.map((name) => <option key={name} value={name}>{name}</option>)}
-          </Select></Field>
-          {hasFilters && <Button size="sm" variant="ghost" onClick={() => { setQuery(""); setStatus("all"); setFolder("all"); }}>Clear filters</Button>}
-        </Row>
+      </LibraryStrip>
+      {tab === "Shared" && <p className="ds-subtle">A recorded sharing list is not an external permission or invitation.</p>}
+      <div className="lk-toolbar">
+        <div className="lk-grow"><TextInput aria-label="Search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Title, summary or tag" /></div>
+        <Select aria-label="Workbook status" value={status} onChange={(event) => setStatus(event.target.value)}>
+          <option value="all">All statuses</option><option value="active">Active</option><option value="draft">Draft</option><option value="archived">Archived</option><option value="template">Template</option>
+        </Select>
+        <Select aria-label="Workbook folder" value={folder} onChange={(event) => setFolder(event.target.value)}>
+          <option value="all">All folders</option>{folders.map((name) => <option key={name} value={name}>{name}</option>)}
+        </Select>
+        {hasFilters && <Button size="sm" variant="ghost" onClick={() => { setQuery(""); setStatus("all"); setFolder("all"); }}>Clear filters</Button>}
       </div>
       {rows.length === 0 && <Empty title="No workbooks match your filters" action={<Button variant="secondary" onClick={() => { setQuery(""); setStatus("all"); setFolder("all"); }}>Reset filters</Button>}>Try another title, folder or status.</Empty>}
+      {view === "cards" ? (
+        <RecordCardGrid
+          label={`${tab} workbooks`}
+          cards={rows.map((row) => {
+            const book = readWorkbook(row.body);
+            const formulas = book.sheets.reduce((total, sheet) => total + Object.values(sheet.cells).filter((raw) => raw.startsWith("=")).length, 0);
+            return {
+              id: row.id, title: row.title, icon: <FileSpreadsheet size={15} />,
+              status: <Pill tone={row.status === "archived" ? "warning" : "neutral"}>{row.status.replace("_", " ")}</Pill>,
+              preview: row.summary || undefined,
+              meta: [`${book.sheets.length} sheet${book.sheets.length === 1 ? "" : "s"}`, `${formulas} formula${formulas === 1 ? "" : "s"}`, row.ownerName, `Changed ${context.relative(row.updatedAt)}`],
+              selected: context.selectedId === row.id,
+              onSelect: () => context.select(row.id),
+              onOpen: () => context.navigate(`/o/${org.slug}/sheets/workbooks/${row.id}`),
+              actions: (
+                <>
+                  <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${org.slug}/sheets/workbooks/${row.id}`)}>Open</Button>
+                  <Button size="sm" variant="ghost" onClick={() => void context.mutate.create({
+                    collection: "workbooks", title: `${row.title} copy`, status: "active", summary: row.summary,
+                    tags: row.tags, fields: { ...row.fields }, body: readWorkbook(row.body),
+                  }, `${row.title} duplicated`)}>Duplicate</Button>
+                  <Button size="sm" variant="ghost" onClick={() => context.openOverlay("share", { id: row.id })}>Share</Button>
+                </>
+              ),
+            };
+          })}
+        />
+      ) : (
       <DataGrid
         rows={rows}
         rowId={(row) => row.id}
@@ -334,6 +378,7 @@ function WorkbookLibrary({ context, tab }: { context: ScreenContext; tab: "Recen
           { label: "Archive", onRun: (selected) => selected.forEach((row) => void context.mutate.patch(row.id, { status: "archived" }, { expectRevision: row.revision, event: `${row.title} archived` })) },
         ]}
       />
+      )}
     </Stack>
   );
 }
@@ -803,9 +848,7 @@ function FormulaManager({ context, tab }: { context: ScreenContext; tab: "All" |
   const overview = (
     <div className="sx-formula-overview">
       <div className="sx-formula-header">
-        <span className="sx-library-eyebrow">SHEETS / CALCULATION AUDIT</span>
-        <h2>Understand every result.</h2>
-        <p>Trace formula dependencies, inspect errors and navigate named ranges. All calculations are evaluated in this workbook, not by an external service.</p>
+        
       </div>
       <div className="sx-formula-metrics" aria-label="Calculation overview">
         <div><span>Formulas</span><strong>{formulas.length}</strong><small>Across {editor.workbook.sheets.length} sheets</small></div>
@@ -1130,8 +1173,7 @@ function DataTables({ context, tab }: { context: ScreenContext; tab: "Tables" | 
   return (
     <Stack gap={4}>
       <div className="sx-formula-overview">
-        <div className="sx-formula-header"><span className="sx-library-eyebrow">SHEETS / STRUCTURED DATA</span><h2>Structure behind the cells.</h2>
-          <p>Review table definitions, typed columns and validation rules. Table schemas describe ranges; they do not move or rewrite the underlying values.</p>
+        <div className="sx-formula-header">
         </div>
         <div className="sx-formula-metrics" aria-label="Structured data overview">
           <div><span>Tables</span><strong>{editor.workbook.tables.length}</strong><small>Defined structures</small></div>
@@ -1287,8 +1329,7 @@ function ChartsScreen({ context, tab }: { context: ScreenContext; tab: "Charts" 
     return (
       <Stack gap={4}>
         <div className="sx-formula-overview">
-          <div className="sx-formula-header"><span className="sx-library-eyebrow">SHEETS / VISUAL ANALYSIS</span><h2>Dashboard from your data.</h2>
-            <p>Every chart reads a workbook range. Review each source and return to the grid to correct values or formulas.</p></div>
+          <div className="sx-formula-header"></div>
           <div className="sx-formula-metrics" aria-label="Chart dashboard overview">
             <div><span>Charts</span><strong>{editor.workbook.charts.length}</strong><small>Linked to workbook ranges</small></div>
             <div><span>Sheets</span><strong>{editor.workbook.sheets.length}</strong><small>Available sources</small></div>
@@ -1403,8 +1444,7 @@ function ImportExport({ context, tab }: { context: ScreenContext; tab: "Imports"
     return (
       <Stack gap={4}>
         <div className="sx-formula-overview">
-          <div className="sx-formula-header"><span className="sx-library-eyebrow">SHEETS / DATA PORTABILITY</span><h2>Know exactly what you export.</h2>
-            <p>Choose calculated values, original formula text or the structured workbook. Downloads stay on the device; no external integration is implied.</p></div>
+          <div className="sx-formula-header"></div>
           <div className="sx-formula-metrics" aria-label="Export overview">
             <div><span>Sheet</span><strong className="sx-compact-value">{editor.sheet.name}</strong><small>Current worksheet</small></div>
             <div><span>Rows</span><strong>{rowsEvaluated.length}</strong><small>In calculated CSV</small></div>
@@ -1541,9 +1581,7 @@ function Collaboration({ context, tab }: { context: ScreenContext; tab: "Comment
   const collaborationOverview = (
     <div className="sx-formula-overview">
       <div className="sx-formula-header">
-        <span className="sx-library-eyebrow">SHEETS / COLLABORATION & VERSIONING</span>
-        <h2>A clear record of changes.</h2>
-        <p>Review comments, deliberate saved versions, local range protection and cell differences. Shared names are recorded here, but no external access is granted.</p>
+        
       </div>
       <div className="sx-formula-metrics" aria-label="Workbook collaboration overview">
         <div><span>Open comments</span><strong>{openComments}</strong><small>Awaiting review</small></div>
@@ -2770,6 +2808,7 @@ registerApp({
 
     "ARL-SHEETS-003": {
       id: "ARL-SHEETS-003",
+      record: workbookRecord,
       title: () => "Formula manager",
       tabs: (["All", "Errors", "Dependencies", "Named ranges"] as const).map((id) => ({ id, render: (context) => <FormulaManager context={context} tab={id} /> })),
       actions: [
@@ -2808,6 +2847,7 @@ registerApp({
 
     "ARL-SHEETS-004": {
       id: "ARL-SHEETS-004",
+      record: workbookRecord,
       title: () => "Data tables",
       tabs: (["Tables", "Views", "Relationships", "Validation"] as const).map((id) => ({ id, render: (context) => <DataTables context={context} tab={id} /> })),
       actions: [
@@ -2826,6 +2866,7 @@ registerApp({
 
     "ARL-SHEETS-005": {
       id: "ARL-SHEETS-005",
+      record: workbookRecord,
       title: () => "Charts & dashboards",
       tabs: (["Charts", "Pivot", "Dashboard", "Presentation"] as const).map((id) => ({ id, render: (context) => <ChartsScreen context={context} tab={id} /> })),
       actions: [
@@ -2846,6 +2887,7 @@ registerApp({
 
     "ARL-SHEETS-006": {
       id: "ARL-SHEETS-006",
+      record: workbookRecord,
       title: () => "Import & export",
       tabs: (["Imports", "Exports", "Errors", "History"] as const).map((id) => ({ id, render: (context) => <ImportExport context={context} tab={id} /> })),
       actions: [
@@ -2870,6 +2912,7 @@ registerApp({
 
     "ARL-SHEETS-007": {
       id: "ARL-SHEETS-007",
+      record: workbookRecord,
       title: () => "Collaboration & versioning",
       tabs: (["Comments", "History", "Permissions", "Changes"] as const).map((id) => ({ id, render: (context) => <Collaboration context={context} tab={id} /> })),
       actions: [

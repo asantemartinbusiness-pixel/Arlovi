@@ -11,7 +11,7 @@ import { RoleViewNote, leaveBalance } from "./kit";
 import { recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
 import { scopedDetailRecord } from "@/platform/recordScope";
 import { csvCell, planHireApplicant, planLeaveDecision } from "./decisions";
-import { newRecord } from "@/platform/repo";
+import { knownRecord, newRecord } from "@/platform/repo";
 import { planShiftSwap, planTimesheetApprovals } from "./workforce";
 import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
 export { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
@@ -461,14 +461,27 @@ export async function verifyCompletion(context: ScreenContext): Promise<void> {
 
 /* ---------------- ARL-HR-007 · approve / decline / adjust balance ---------------- */
 
+/** The requester's name from the employee record the request points at; never the request's owner. */
+function requesterName(request: Rec): string {
+  const named = String(request.fields.employeeName ?? "").trim();
+  if (named) return named;
+  const employee = knownRecord(String(request.fields.employeeId ?? ""));
+  return employee?.title ?? "the requester";
+}
+
 async function leaveRequestFor(context: ScreenContext, verb: string, then: (request: Rec) => void): Promise<void> {
   const chosen = await recordOf(context, context.selectedId, "leaveRequests");
-  if (chosen && chosen.status === "requested") { then(chosen); return; }
+  if (chosen && chosen.status === "requested") {
+    const { getRecordInOrg } = await import("@/platform/repo");
+    const id = String(chosen.fields.employeeId ?? "");
+    if (id) await getRecordInOrg(context.org.id, id);
+    then(chosen); return;
+  }
   pickRecord(context, {
     title: `${verb} a leave request`,
     collection: "leaveRequests",
     filter: (row) => row.status === "requested",
-    describe: (row) => `${context.date(row.startAt)} – ${context.date(row.endAt)} · ${String(row.fields.type ?? "annual")}`,
+    describe: (row) => `${requesterName(row)} · ${String(row.fields.type ?? "annual")} · ${context.date(row.startAt)} – ${context.date(row.endAt)}`,
     pickLabel: verb,
     empty: "Nothing is waiting for a decision",
     onPick: then,
@@ -477,7 +490,7 @@ async function leaveRequestFor(context: ScreenContext, verb: string, then: (requ
 
 export function approveLeave(context: ScreenContext): Promise<void> {
   return leaveRequestFor(context, "Approve", (request) => {
-    const who = String(request.fields.employeeName ?? request.ownerName);
+    const who = requesterName(request);
     askFirst(context, {
       title: "Approve leave",
       body: `${who} is booked away ${context.date(request.startAt)} – ${context.date(request.endAt)}. The request and the balance both change, and the approval is recorded against ${context.actor}.`,
@@ -503,7 +516,7 @@ export function approveLeave(context: ScreenContext): Promise<void> {
 
 export function declineLeave(context: ScreenContext): Promise<void> {
   return leaveRequestFor(context, "Decline", (request) => {
-    const who = String(request.fields.employeeName ?? request.ownerName);
+    const who = requesterName(request);
     askFirst(context, {
       title: "Decline leave",
       body: `${who}'s request for ${context.date(request.startAt)} – ${context.date(request.endAt)} is recorded as declined by ${context.actor}. No balance moves.`,

@@ -4,7 +4,8 @@ import {
   Layers as LayersIcon, SlidersHorizontal, Images, Download, Circle, Undo2, Redo2,
 } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill, Properties,
+  Button, Card, Checkbox, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, KeyValueList, Meter, ModalActions, Notice,
+  OverlayActions, OverlayCancel, OverlaySection, OverlaySummary, OVERLAY_WIDTH, Pill, Properties,
   Row, Select, Stack, Stat, StatRow, TextInput, Tool, Toolbar, ToolbarSeparator,
 } from "@/design-system";
 import { registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
@@ -19,7 +20,7 @@ import {
   newAdjustmentLayer, patchLayer, selectionBoundsOf,
   type Adjust, type PhotoLayer, type RasterDoc,
 } from "./raster";
-import { addToAssetLibrary, batchUi, buildBatch, downloadResults, exportImage, exportUi, heldBatchFiles, outputSize, runBatch, testSample } from "./jobs";
+import { addToAssetLibrary, batchUi, buildBatch, downloadResults, exportImage, exportUi, heldBatchFiles, outputSize, planBatch, runBatch, testSample, type PlannedName } from "./jobs";
 import { canUndoShared, editShared, readShared, sharedHandle, undoShared, useGuardRefresh, useSharedDoc } from "@/applications/design/sharedDoc";
 import { PhotoCanvas, useImageBank, LayerThumb, type ImageBank } from "./canvas";
 import { AdjustControls, CurveEditor, HistogramView, LayerProperties, PhotoLayers, useHistogram } from "./panels";
@@ -34,6 +35,8 @@ import "./photo.css";
 /* ====================================================================== *
  * PHOTO — Photo & Image Editing
  * ====================================================================== */
+
+const LICENCES = ["Unknown", "Company-owned", "Licensed — single use", "Licensed — unlimited", "Creative Commons BY", "Model released", "No model release"];
 
 function usePhotoDoc(context: ScreenContext) {
   const record = useRecord(context.params.id);
@@ -202,7 +205,7 @@ function RasterEditor({ context, actions }: { context: ScreenContext; actions: A
       actions={actions}
       tabs={[{ id: "Edit" }, { id: "Layers" }, { id: "Adjust" }, { id: "Review" }]}
       title={record.title}
-      subtitle={<Row gap={2} wrap><SaveState handle={handle} />{doc && <span>{doc.width} × {doc.height} · {doc.layers.length} layers</span>}</Row>}
+      subtitle={<Row gap={2} wrap><SaveState handle={handle} />{doc && <span><span className="ds-num">{doc.width} × {doc.height}</span> · {doc.layers.length} layers</span>}{doc && <button type="button" className="ph-licence" onClick={() => context.openOverlay("rights")} aria-label={`Licence: ${doc.rights.license}. Open rights`}><Pill tone={doc.rights.license === "Unknown" ? "danger" : "neutral"}>{doc.rights.license}</Pill></button>}</Row>}
       backTo={{ label: "Photo", to: `/o/${context.org.slug}/photo/photos` }}
       tools={
         <div className="ph-tools">
@@ -222,7 +225,16 @@ function RasterEditor({ context, actions }: { context: ScreenContext; actions: A
       left={
         <Stack gap={3}>
           <RecoveryNotice handle={handle as DocHandle<unknown>} />
-          {doc && <Notice tone="info" title="Where these pixels come from">{doc.origin}</Notice>}
+          {doc && (
+            <PanelGroup title="Source and rights">
+              <p className="vx-mini">{doc.origin}</p>
+              <KeyValueList items={[
+                { label: "Licence", value: doc.rights.license, tone: doc.rights.license === "Unknown" ? "danger" : undefined },
+                { label: "Credit", value: doc.rights.credit },
+                { label: "Profile", value: doc.profile },
+              ]} />
+            </PanelGroup>
+          )}
           <PanelGroup title="Layers">{<PhotoLayers handle={handle} bank={bank} onOpenBlend={() => context.openOverlay("Tool options")} />}</PanelGroup>
         </Stack>
       }
@@ -778,6 +790,26 @@ function moveLayerLocal(doc: RasterDoc, id: string, delta: number): RasterDoc {
 
 /* ---------------------------- PHOTO-006 ---------------------------- */
 
+/** The file names a run would produce with today's settings. Recomputed when the queue or the output settings change. */
+function useBatchPlan(): PlannedName[] | undefined {
+  const batch = useStore(batchUi);
+  const [plan, setPlan] = useState<PlannedName[]>();
+  useEffect(() => {
+    let live = true;
+    if (batch.jobs.length === 0) { setPlan([]); return; }
+    void planBatch().then((next) => { if (live) setPlan(next); });
+    return () => { live = false; };
+  }, [batch.jobs, batch.format, batch.pattern, batch.longEdge]);
+  return plan;
+}
+
+/** Run the queue; when any output name is already taken, the decision is made explicit first. */
+async function requestRun(context: ScreenContext): Promise<void> {
+  const plan = await planBatch();
+  if (plan.some((item) => item.collision)) { context.openOverlay("overwrite confirmation"); return; }
+  await runBatch(context);
+}
+
 function BatchScreen({ context, lens }: { context: ScreenContext; lens: "Queue" | "Presets" | "Results" | "Failed" }) {
   const photos = useCollection("photos");
   const batch = useStore(batchUi);
@@ -817,7 +849,6 @@ function BatchScreen({ context, lens }: { context: ScreenContext; lens: "Queue" 
         </Card>
         <Card span={6} title="Sample" subtitle="Run one job to check the settings before the whole queue">
           <Stack gap={3}>
-            <p className="ds-prose">A sample writes one file with exactly the settings on the left, so the size and quality are the real ones.</p>
             <Button
               variant="primary"
               busy={running}
@@ -834,7 +865,7 @@ function BatchScreen({ context, lens }: { context: ScreenContext; lens: "Queue" 
   }
 
   if (lens === "Results" || lens === "Failed") {
-    const rows = jobs.filter((job) => (lens === "Failed" ? job.state === "failed" : job.state === "done"));
+    const rows = jobs.filter((job) => (lens === "Failed" ? job.state === "failed" : job.state === "done" || job.state === "skipped"));
     return (
       <Card
         title={lens === "Failed" ? "Jobs that failed" : "Files written"}
@@ -843,7 +874,7 @@ function BatchScreen({ context, lens }: { context: ScreenContext; lens: "Queue" 
       >
         {rows.length === 0 ? (
           <Empty title={lens === "Failed" ? "Nothing failed" : "Nothing written yet"}>
-            {lens === "Failed" ? "Every job that has run so far produced a file." : "Build a queue and run it; each file downloads from this browser."}
+            {lens === "Failed" ? "Every job that has run so far produced a file." : "Build a queue on the Queue tab and run it; each file downloads from this browser."}
           </Empty>
         ) : (
           <DataGrid
@@ -863,9 +894,22 @@ function BatchScreen({ context, lens }: { context: ScreenContext; lens: "Queue" 
     );
   }
 
+  return <BatchQueue context={context} />;
+}
+
+function BatchQueue({ context }: { context: ScreenContext }) {
+  const photos = useCollection("photos");
+  const batch = useStore(batchUi);
+  const plan = useBatchPlan();
+  const { jobs, chosen, format, longEdge, pattern, running, done } = batch;
+  const setChosen = (next: string[] | ((current: string[]) => string[])) => batchUi.set((current) => ({ ...current, chosen: typeof next === "function" ? next(current.chosen) : next }));
+  const build = () => buildBatch(context, new Map(photos.map((row) => [row.id, row.title])));
+  const queued = jobs.filter((job) => job.state === "queued").length;
+  const clashes = (plan ?? []).filter((item) => item.collision);
+  const planOf = new Map((plan ?? []).map((item) => [item.jobId, item]));
   return (
     <Grid>
-      <Card span={7} title="Choose the images" subtitle={`${chosen.length} of ${photos.length} selected`}>
+      <Card span={6} title="Choose the images" subtitle={`${chosen.length} of ${photos.length} selected`} actions={<Row gap={1}><Button size="sm" variant="ghost" onClick={() => setChosen(photos.filter((row) => row.status !== "unreadable").map((row) => row.id))}>Select every readable image</Button><Button size="sm" variant="ghost" onClick={() => setChosen([])}>Clear</Button></Row>}>
         <DataGrid
           rows={photos}
           rowId={(row) => row.id}
@@ -886,38 +930,45 @@ function BatchScreen({ context, lens }: { context: ScreenContext; lens: "Queue" 
             },
           ]}
         />
-        <Row gap={2} wrap style={{ marginBlockStart: 12 }}>
-          <Button variant="secondary" onClick={() => setChosen(photos.map((row) => row.id))}>Select every image</Button>
-          <Button variant="ghost" onClick={() => setChosen([])}>Clear</Button>
-        </Row>
       </Card>
-      <Card span={5} title="Queue" subtitle={jobs.length === 0 ? "Not built yet" : `${done} of ${jobs.length} finished`}>
+      <Card span={6} title="Queue" subtitle={jobs.length === 0 ? "Not built yet" : `${done} of ${jobs.length} finished`}>
         <Stack gap={3}>
           {jobs.length > 0 && <Meter value={done} max={jobs.length} label="Batch progress" />}
-          <Properties rows={[
-            { label: "Format", value: format.toUpperCase() },
-            { label: "Longest edge", value: `${longEdge}px` },
-            { label: "Naming", value: pattern },
+          <KeyValueList columns={2} items={[
+            { label: "Format", value: format.toUpperCase(), mono: true },
+            { label: "Longest edge", value: `${longEdge}px`, mono: true },
+            { label: "Naming", value: pattern, mono: true },
+            { label: "If a name is taken", value: batch.onCollision === "skip" ? "skip it" : "keep both, add a counter" },
           ]} />
+          {jobs.length > 0 && (
+            <div className="ph-plan" role="list" aria-label="Planned output files">
+              {jobs.map((job) => {
+                const item = planOf.get(job.id);
+                const name = job.outName ?? item?.name;
+                return (
+                  <div key={job.id} role="listitem" className="ph-plan-row" data-collision={item?.collision && job.state === "queued" ? "true" : undefined}>
+                    <span className="ph-plan-title ds-truncate">{job.title}</span>
+                    <span className="ph-plan-name ds-num ds-truncate" title={name}>{name ?? "…"}</span>
+                    {item?.collision && job.state === "queued"
+                      ? <Pill tone="warning">name taken</Pill>
+                      : <Pill tone={job.state === "done" ? "success" : job.state === "failed" ? "danger" : job.state === "running" ? "info" : "neutral"} dot>{job.state}</Pill>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {clashes.length > 0 && (
+            <Notice tone="warning" title={`${clashes.length} output name${clashes.length === 1 ? " is" : "s are"} already taken`}>
+              This page cannot replace a file on your disk, so nothing is overwritten. You choose, before the run, whether to keep both or skip the duplicate.
+              <div><Button size="sm" variant="secondary" onClick={() => context.openOverlay("overwrite confirmation")}>Review the names</Button></div>
+            </Notice>
+          )}
           <Row gap={2} wrap>
-            <Button variant="secondary" disabled={chosen.length === 0} onClick={build}>Build the batch</Button>
-            <Button variant="primary" busy={running} disabled={jobs.filter((job) => job.state === "queued").length === 0} onClick={() => void execute()}>
-              Run {jobs.filter((job) => job.state === "queued").length} job{jobs.filter((job) => job.state === "queued").length === 1 ? "" : "s"}
+            <Button variant="secondary" disabled={chosen.length === 0 || running} onClick={build}>{jobs.length ? "Rebuild the batch" : "Build the batch"}</Button>
+            <Button variant="primary" busy={running} disabled={queued === 0} onClick={() => void requestRun(context)}>
+              {clashes.length > 0 ? `Review names, then run ${queued}` : `Run ${queued} job${queued === 1 ? "" : "s"}`}
             </Button>
           </Row>
-          {jobs.length > 0 && (
-            <Stack gap={1}>
-              {jobs.map((job) => (
-                <Row key={job.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2)" }}>
-                  <span className="ds-grow">{job.title}</span>
-                  <Pill tone={job.state === "done" ? "success" : job.state === "failed" ? "danger" : job.state === "running" ? "info" : "neutral"} dot>{job.state}</Pill>
-                </Row>
-              ))}
-            </Stack>
-          )}
-          <Notice tone="info" title="A stopped run resumes where it left off">
-            Jobs already marked done are skipped when the queue is run again, and a name that already exists in this run gets a counter instead of overwriting.
-          </Notice>
         </Stack>
       </Card>
     </Grid>
@@ -1022,18 +1073,19 @@ function ExportScreen({ context, lens }: { context: ScreenContext; lens: "Export
           <Field label="Width"><TextInput type="number" value={width} onChange={(event) => setWidth(Math.max(1, Number(event.target.value)))} /></Field>
           <SliderBoxLocal label="Scale" value={scale * 100} min={10} max={400} onChange={(value) => setScale(value / 100)} suffix="%" />
           <Checkbox label="Keep the aspect ratio" checked={keepAspect} onChange={(event) => setKeepAspect(event.target.checked)} />
-          <Properties rows={[
-            { label: "Output", value: `${outWidth} × ${outHeight}` },
-            { label: "Aspect", value: keepAspect ? `kept at ${(doc.width / doc.height).toFixed(3)}` : `changed to ${(outWidth / outHeight).toFixed(3)}` },
-            { label: "Transparency", value: format === "jpeg" ? "flattened onto white" : hasAlpha ? "kept" : "no transparent pixels" },
-            { label: "Profile", value: `${doc.profile} recorded; the file is written in sRGB` },
+          <KeyValueList items={[
+            { label: "Output", value: `${outWidth} × ${outHeight}`, mono: true },
+            { label: "Aspect", value: keepAspect ? `kept at ${(doc.width / doc.height).toFixed(3)}` : `changed to ${(outWidth / outHeight).toFixed(3)}`, mono: true, tone: keepAspect ? undefined : "warning" },
+            { label: "Transparency", value: format === "jpeg" ? "flattened onto white" : hasAlpha ? "kept" : "no transparent pixels", tone: format === "jpeg" ? "warning" : undefined },
+            { label: "Profile", value: `${doc.profile} recorded; written as sRGB` },
+            { label: "Licence", value: doc.rights.license, tone: doc.rights.license === "Unknown" ? "danger" : undefined },
           ]} />
           {!keepAspect && <Notice tone="warning" title="The aspect ratio will change">The output is {(outWidth / outHeight).toFixed(3)} against the source {(doc.width / doc.height).toFixed(3)}. The image will be stretched.</Notice>}
-          {format === "jpeg" && <Notice tone="warning" title="JPEG drops transparency">Transparent pixels are composited onto white before encoding. Choose PNG or WebP to keep them.</Notice>}
           <Row gap={2} wrap>
+            <Button variant="primary" busy={busy} onClick={() => { if (exportChanges(doc, settings).length > 0) context.openOverlay("export check"); else void makeFile(true); }}>Export</Button>
             <Button variant="secondary" busy={busy} onClick={() => void makeFile(false)}>Preview the real file</Button>
-            <Button variant="primary" busy={busy} onClick={() => void makeFile(true)}>Export</Button>
             <Button variant="ghost" onClick={() => context.openOverlay("profile handling")}>Profile…</Button>
+            <Button variant="ghost" onClick={() => context.openOverlay("rights")}>Rights…</Button>
           </Row>
         </Stack>
       </Card>
@@ -1065,10 +1117,7 @@ function BulkImport({ context, close }: { context: ScreenContext; close: () => v
   const [busy, setBusy] = useState(false);
   return (
     <Stack gap={3}>
-      <Notice tone="info" title="Files are decoded in this browser">
-        Nothing is uploaded. Each image becomes a record with its pixels stored in the workspace database.
-      </Notice>
-      <Field label="Images" hint="PNG, JPEG, WebP, GIF, AVIF and BMP are decoded. Anything else is reported rather than dropped.">
+      <Field label="Images" hint="Decoded in this browser; nothing is uploaded. PNG, JPEG, WebP, GIF, AVIF and BMP are decoded. Anything else is reported rather than dropped.">
         <input
           type="file"
           multiple
@@ -1145,9 +1194,14 @@ function BulkImport({ context, close }: { context: ScreenContext; close: () => v
           <Notice tone={results.some((item) => item.state === "rejected") ? "warning" : "success"} title={`${results.filter((item) => item.state === "ok").length} imported, ${results.filter((item) => item.state === "rejected").length} rejected`}>
             A rejected file is still kept as a record with the reason, so the library never loses track of it. Every import starts with its licence marked Unknown.
           </Notice>
-          <Button variant="primary" onClick={close}>Done</Button>
         </Stack>
       )}
+      <ModalActions>
+        <OverlayActions
+          primary={results.length > 0 ? <Button variant="primary" onClick={close}>Done</Button> : undefined}
+          end={<OverlayCancel disabled={busy}>{results.length > 0 ? "Close" : "Cancel"}</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1160,19 +1214,43 @@ function AssetDetail({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={3}>
       <PhotoPreview record={record.id} doc={doc} height={200} />
-      <Properties rows={[
-        { label: "Title", value: record.title },
-        { label: "Pixels", value: <span className="ds-num">{doc.width} × {doc.height}</span> },
-        { label: "Layers", value: doc.layers.length },
-        { label: "Adjustment layers", value: doc.layers.filter((layer) => layer.kind === "adjustment").length },
-        { label: "Masks", value: doc.layers.filter((layer) => layer.mask).length },
+      <FactGrid columns={3} items={[
+        { label: "Pixels", value: `${doc.width} × ${doc.height}`, mono: true },
+        { label: "Layers", value: doc.layers.length, mono: true, hint: `${doc.layers.filter((layer) => layer.kind === "adjustment").length} adjustment · ${doc.layers.filter((layer) => layer.mask).length} masked` },
         { label: "Profile", value: doc.profile },
-        { label: "Origin", value: doc.origin },
-        { label: "Owner", value: record.ownerName },
-        { label: "Updated", value: context.dateTime(record.updatedAt) },
       ]} />
-      <Button variant="primary" onClick={() => context.navigate(context.path("/o/:org/photo/photos/:id", record.id))}>Open in the editor</Button>
+      <OverlaySection title="Source" hint="Where the pixels came from">
+        <p className="ds-prose">{doc.origin}</p>
+        <KeyValueList items={[
+          { label: "Owner", value: record.ownerName },
+          { label: "Updated", value: context.dateTime(record.updatedAt) },
+        ]} />
+      </OverlaySection>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={() => context.navigate(context.path("/o/:org/photo/photos/:id", record.id))}>Open in the editor</Button>}
+          secondary={<Button variant="secondary" onClick={() => context.openOverlay("license", { id: record.id })}>Rights</Button>}
+        />
+      </DrawerActions>
     </Stack>
+  );
+}
+
+/** Identity block shared by the image drawers: a thumbnail, the title, the licence and the size. */
+function PhotoSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const record = useRecord(payload?.id ?? context.params.id ?? context.selectedId);
+  if (!record) return null;
+  const doc = parsePhoto(record.body);
+  const licence = String(record.fields.license ?? doc.rights.license);
+  return (
+    <OverlaySummary
+      eyebrow="Image"
+      title={record.title}
+      avatar={<div className="ph-summary-thumb"><PhotoPreview record={record.id} doc={doc} height={48} /></div>}
+      status={<Pill tone={licence === "Unknown" ? "danger" : "neutral"}>{licence}</Pill>}
+      meta={[<span className="ds-num" key="px">{doc.width} × {doc.height}</span>, `${doc.layers.length} layer${doc.layers.length === 1 ? "" : "s"}`, record.status]}
+    />
   );
 }
 
@@ -1182,58 +1260,60 @@ function LicencePanel({ context }: { context: ScreenContext }) {
   const [credit, setCredit] = useState("");
   if (!record) return <Empty title="Select an image first" />;
   const licence = String(record.fields.license ?? "Unknown");
+  const saved = String(record.fields.credit ?? "not recorded");
   return (
     <Stack gap={3}>
       {licence === "Unknown" && <Notice tone="danger" title="Do not publish this image">Its licence is unknown. Record where it came from before it is used anywhere.</Notice>}
-      <Field label="Licence">
+      <OverlaySection title="Licence" hint="Saved on the record as soon as you change it">
         <Select
+          aria-label="Licence"
           value={licence}
           onChange={(event) => { void context.mutate.patch(record.id, { fields: { ...record.fields, license: event.target.value } }, { event: `Licence set on ${record.title}` }); }}
         >
-          {["Unknown", "Company-owned", "Licensed — single use", "Licensed — unlimited", "Creative Commons BY", "Model released", "No model release"].map((option) => <option key={option}>{option}</option>)}
+          {LICENCES.map((option) => <option key={option}>{option}</option>)}
         </Select>
-      </Field>
-      <Field label="Credit">
-        <Row gap={2}>
-          <TextInput value={credit} placeholder={String(record.fields.credit ?? "not recorded")} onChange={(event) => setCredit(event.target.value)} />
-          <Button size="sm" variant="secondary" disabled={!credit} onClick={() => { void context.mutate.patch(record.id, { fields: { ...record.fields, credit } }, { event: `Credit recorded on ${record.title}` }); setCredit(""); }}>Save</Button>
-        </Row>
-      </Field>
-      <Properties rows={[
-        { label: "Record", value: record.title },
-        { label: "Current credit", value: String(record.fields.credit ?? "not recorded") },
-      ]} />
+      </OverlaySection>
+      <OverlaySection title="Credit" hint={`Now: ${saved}`}>
+        <TextInput aria-label="Credit" value={credit} placeholder={saved} onChange={(event) => setCredit(event.target.value)} />
+      </OverlaySection>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" disabled={!credit.trim()} onClick={() => { void context.mutate.patch(record.id, { fields: { ...record.fields, credit: credit.trim() } }, { event: `Credit recorded on ${record.title}` }); setCredit(""); }}>Save the credit</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
 
-function ToolOptions({ context }: { context: ScreenContext }) {
+function ToolOptions({ context: _context }: { context: ScreenContext }) {
   const ui = useStore(photoUi);
   return (
     <Stack gap={3}>
-      <PanelGroup title="Brush">
+      <OverlaySection title="Brush">
         <SliderBoxLocal label="Size" value={ui.brush.size} min={1} max={400} onChange={(value) => photoUi.set((c) => ({ ...c, brush: { ...c.brush, size: value } }))} suffix="px" />
         <SliderBoxLocal label="Softness" value={Math.round(ui.brush.softness * 100)} min={0} max={100} onChange={(value) => photoUi.set((c) => ({ ...c, brush: { ...c.brush, softness: value / 100 } }))} suffix="%" />
         <SliderBoxLocal label="Opacity" value={Math.round(ui.brush.opacity * 100)} min={1} max={100} onChange={(value) => photoUi.set((c) => ({ ...c, brush: { ...c.brush, opacity: value / 100 } }))} suffix="%" />
-      </PanelGroup>
-      <ShortcutTable
-        rows={[
-          { keys: "B / E", does: "Brush and eraser" },
-          { keys: "[ and ]", does: "Smaller and larger brush" },
-          { keys: "I", does: "Pick a colour from the canvas" },
-          { keys: "M / N / L", does: "Rectangular, elliptical and lasso selection" },
-          { keys: "C", does: "Crop" },
-          { keys: "Arrows", does: "Move the active layer, Shift for ten pixels" },
-          { keys: "⌘Z / ⇧⌘Z", does: "Undo and redo" },
-          { keys: "⌘D", does: "Deselect" },
-          { keys: "⌘I", does: "Invert the selection" },
-          { keys: "0", does: "Reset the zoom" },
-        ]}
-      />
-      <Notice tone="warning" title="The clone tool is not a clone tool yet">
+      </OverlaySection>
+      <OverlaySection title="Clone" tone="warning">
         Choosing Clone paints with the brush. Sampling from one place and stamping it in another is not implemented, and the tool does not pretend otherwise.
-      </Notice>
-      <Button variant="ghost" onClick={() => context.closeOverlay()}>Close</Button>
+      </OverlaySection>
+      <OverlaySection title="Keys" flush>
+        <ShortcutTable
+          rows={[
+            { keys: "B / E", does: "Brush and eraser" },
+            { keys: "[ and ]", does: "Smaller and larger brush" },
+            { keys: "I", does: "Pick a colour from the canvas" },
+            { keys: "M / N / L", does: "Rectangular, elliptical and lasso selection" },
+            { keys: "C", does: "Crop" },
+            { keys: "Arrows", does: "Move the active layer, Shift for ten pixels" },
+            { keys: "⌘Z / ⇧⌘Z", does: "Undo and redo" },
+            { keys: "⌘D", does: "Deselect" },
+            { keys: "⌘I", does: "Invert the selection" },
+            { keys: "0", does: "Reset the zoom" },
+          ]}
+        />
+      </OverlaySection>
     </Stack>
   );
 }
@@ -1245,60 +1325,62 @@ function CanvasSize({ context, close }: { context: ScreenContext; close: () => v
   const doc = handle.doc;
   useEffect(() => { if (doc && width === 0) { setWidth(doc.width); setHeight(doc.height); } }, [doc, width]);
   if (!record || !doc) return <Empty title="Open an image first" />;
+  const smaller = width < doc.width || height < doc.height;
   return (
-    <Stack gap={3}>
-      <Properties rows={[{ label: "Now", value: <span className="ds-num">{doc.width} × {doc.height}</span> }]} />
+    <form
+      id="photo-canvas-size"
+      className="ds-stack ds-gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        handle.edit((current) => ({ ...current, width, height }), "Change the canvas size");
+        context.toast("Canvas resized", `Now ${width} × ${height}. Layer pixels were not touched.`);
+        close();
+      }}
+    >
+      <FactGrid columns={2} dense items={[
+        { label: "Now", value: `${doc.width} × ${doc.height}`, mono: true },
+        { label: "After", value: `${width} × ${height}`, mono: true, tone: smaller ? "warning" : undefined },
+      ]} />
       <Row gap={2}>
-        <Field label="Width"><TextInput type="number" value={width} onChange={(event) => setWidth(Math.max(1, Number(event.target.value)))} /></Field>
-        <Field label="Height"><TextInput type="number" value={height} onChange={(event) => setHeight(Math.max(1, Number(event.target.value)))} /></Field>
+        <Field label="Width"><TextInput type="number" min={1} value={width} onChange={(event) => setWidth(Math.max(1, Number(event.target.value)))} /></Field>
+        <Field label="Height"><TextInput type="number" min={1} value={height} onChange={(event) => setHeight(Math.max(1, Number(event.target.value)))} /></Field>
       </Row>
-      <Notice tone="warning" title="This changes the canvas, not the layers">
-        Layers keep their own pixels and position. Making the canvas smaller hides what falls outside it; it does not delete it.
-      </Notice>
-      <Button
-        variant="primary"
-        onClick={() => {
-          handle.edit((current) => ({ ...current, width, height }), "Change the canvas size");
-          context.toast("Canvas resized", `Now ${width} × ${height}. Layer pixels were not touched.`);
-          close();
-        }}
-      >
-        Resize the canvas
-      </Button>
-    </Stack>
+      <p className="vx-mini">{smaller ? "Smaller: what falls outside the canvas is hidden, not deleted. Undo restores the size." : "Layers keep their own pixels and position; only the canvas changes."}</p>
+    </form>
   );
 }
 
 function AdjustmentLayerPicker({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, handle } = usePhotoDoc(context);
   if (!record || !handle.doc) return <Empty title="Open an image first" />;
-  const presets: { name: string; adjust: Partial<Adjust> }[] = [
-    { name: "Exposure", adjust: { exposure: 0.3 } },
-    { name: "Contrast", adjust: { contrast: 18 } },
-    { name: "Saturation", adjust: { saturation: 15 } },
-    { name: "Temperature", adjust: { temperature: 18 } },
-    { name: "Curves", adjust: { curve: [{ x: 0, y: 8 }, { x: 128, y: 138 }, { x: 255, y: 250 }] } },
-    { name: "Black and white", adjust: { saturation: -100, contrast: 12 } },
+  const presets: { name: string; adjust: Partial<Adjust>; what: string }[] = [
+    { name: "Exposure", adjust: { exposure: 0.3 }, what: "+0.3 stop" },
+    { name: "Contrast", adjust: { contrast: 18 }, what: "+18" },
+    { name: "Saturation", adjust: { saturation: 15 }, what: "+15" },
+    { name: "Temperature", adjust: { temperature: 18 }, what: "warmer" },
+    { name: "Curves", adjust: { curve: [{ x: 0, y: 8 }, { x: 128, y: 138 }, { x: 255, y: 250 }] }, what: "soft lift" },
+    { name: "Black and white", adjust: { saturation: -100, contrast: 12 }, what: "desaturated" },
   ];
   return (
     <Stack gap={3}>
-      <Notice tone="info" title="Non-destructive">An adjustment layer rewrites what is composited below it. The pixels on the layers themselves are never changed.</Notice>
-      <Grid>
+      <p className="ds-prose">An adjustment layer rewrites what is composited below it; the pixels on the layers themselves are never changed, and it can be switched off at any time.</p>
+      <div className="ph-picker-grid">
         {presets.map((preset) => (
-          <Card key={preset.name} span={4} pad="tight">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                handle.edit((current) => addLayer(current, newAdjustmentLayer(`adj-${wallMs().toString(36)}`, preset.name, preset.adjust)), `Add a ${preset.name.toLowerCase()} layer`);
-                context.toast("Adjustment added", `${preset.name} sits above the stack and can be turned off at any time.`);
-                close();
-              }}
-            >
-              {preset.name}
-            </Button>
-          </Card>
+          <button
+            key={preset.name}
+            type="button"
+            className="ph-picker-item"
+            onClick={() => {
+              handle.edit((current) => addLayer(current, newAdjustmentLayer(`adj-${wallMs().toString(36)}`, preset.name, preset.adjust)), `Add a ${preset.name.toLowerCase()} layer`);
+              context.toast("Adjustment added", `${preset.name} sits above the stack and can be turned off at any time.`);
+              close();
+            }}
+          >
+            <strong>{preset.name}</strong>
+            <span className="vx-mini">{preset.what}</span>
+          </button>
         ))}
-      </Grid>
+      </div>
     </Stack>
   );
 }
@@ -1309,28 +1391,29 @@ function SelectionOptions({ context }: { context: ScreenContext }) {
   const doc = handle.doc;
   return (
     <Stack gap={3}>
-      {doc.selection ? (
-        <Properties rows={[
-          { label: "Kind", value: doc.selection.kind },
-          { label: "Feather", value: <span className="ds-num">{doc.selection.feather}px</span> },
-          { label: "Inverted", value: doc.selection.inverted ? "yes" : "no" },
-          { label: "Points", value: doc.selection.points?.length ?? "—" },
-        ]} />
-      ) : <p className="ds-subtle">Nothing is selected.</p>}
-      <Row gap={2} wrap>
-        <Button size="sm" variant="secondary" disabled={!doc.selection} onClick={() => handle.edit((current) => ({ ...current, selection: current.selection ? { ...current.selection, inverted: !current.selection.inverted } : undefined }), "Invert the selection")}>Invert</Button>
-        <Button size="sm" variant="secondary" disabled={!doc.selection} onClick={() => handle.edit((current) => ({ ...current, selection: undefined }), "Clear the selection")}>Deselect</Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => handle.edit((current) => ({ ...current, selection: { kind: "rect", rect: { x: 0, y: 0, w: current.width, h: current.height }, feather: 0, inverted: false } }), "Select everything")}
-        >
-          Select everything
-        </Button>
-      </Row>
-      <Notice tone="info" title="A selection survives a crop">
-        When a crop is baked the selection is carried through the same translation and rotation, so it stays over the same part of the picture.
-      </Notice>
+      <OverlaySection title="Current selection">
+        {doc.selection ? (
+          <FactGrid columns={2} dense items={[
+            { label: "Kind", value: doc.selection.kind },
+            { label: "Feather", value: `${doc.selection.feather}px`, mono: true },
+            { label: "Inverted", value: doc.selection.inverted ? "yes" : "no" },
+            { label: "Outline points", value: doc.selection.points?.length ?? "none", mono: true },
+          ]} />
+        ) : <p className="ds-subtle">Nothing is selected.</p>}
+      </OverlaySection>
+      <OverlaySection title="Change it" hint="A selection survives a crop: it is carried through the same translation and rotation.">
+        <Row gap={2} wrap>
+          <Button size="sm" variant="secondary" disabled={!doc.selection} onClick={() => handle.edit((current) => ({ ...current, selection: current.selection ? { ...current.selection, inverted: !current.selection.inverted } : undefined }), "Invert the selection")}>Invert</Button>
+          <Button size="sm" variant="secondary" disabled={!doc.selection} onClick={() => handle.edit((current) => ({ ...current, selection: undefined }), "Clear the selection")}>Deselect</Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => handle.edit((current) => ({ ...current, selection: { kind: "rect", rect: { x: 0, y: 0, w: current.width, h: current.height }, feather: 0, inverted: false } }), "Select everything")}
+          >
+            Select everything
+          </Button>
+        </Row>
+      </OverlaySection>
     </Stack>
   );
 }
@@ -1342,8 +1425,7 @@ function QuickMask({ context }: { context: ScreenContext }) {
   const layer = layerById(doc, doc.activeLayerId);
   return (
     <Stack gap={3}>
-      <Notice tone="info" title="Quick mask">Paint in black to hide, white to show. The mask is a real greyscale image stored on the layer.</Notice>
-      {layer?.mask ? <img src={layer.mask} alt={`Mask on ${layer.name}`} style={{ width: "100%", borderRadius: 6, border: "1px solid var(--border-default)" }} /> : <p className="ds-subtle">{layer?.name ?? "This layer"} has no mask yet.</p>}
+      <p className="ds-prose">Paint black to hide, white to show. The mask is a real greyscale image stored on <strong>{layer?.name ?? "the layer"}</strong>.</p>
       <Row gap={2} wrap>
         <Button
           size="sm"
@@ -1360,9 +1442,13 @@ function QuickMask({ context }: { context: ScreenContext }) {
         >
           Add a white mask
         </Button>
-        <Button size="sm" variant="ghost" disabled={!layer?.mask} onClick={() => handle.edit((current) => patchLayer(current, layer!.id, { maskEnabled: !layer!.maskEnabled }), "Toggle the mask")}>Toggle</Button>
+        <Button size="sm" variant="ghost" disabled={!layer?.mask} aria-pressed={Boolean(layer?.maskEnabled)} onClick={() => handle.edit((current) => patchLayer(current, layer!.id, { maskEnabled: !layer!.maskEnabled }), "Toggle the mask")}>{layer?.maskEnabled ? "Mask on" : "Mask off"}</Button>
+        {!layer?.mask && <span className="vx-mini">This layer has no mask yet.</span>}
       </Row>
-      <div style={{ position: "relative", height: 240 }}><PhotoCanvas handle={handle} bank={bank} paintTarget="mask" /></div>
+      <Grid>
+        {layer?.mask && <Card span={4} title="Mask" pad="tight"><img src={layer.mask} alt={`Mask on ${layer.name}`} style={{ width: "100%", borderRadius: 6, border: "1px solid var(--border-default)" }} /></Card>}
+        <Card span={layer?.mask ? 8 : 12} title="Paint the mask" pad="tight"><div style={{ position: "relative", height: 240 }}><PhotoCanvas handle={handle} bank={bank} paintTarget="mask" /></div></Card>
+      </Grid>
     </Stack>
   );
 }
@@ -1374,8 +1460,8 @@ function HistogramOverlay({ context }: { context: ScreenContext }) {
   if (!record) return <Empty title="Open an image first" />;
   return (
     <Stack gap={3}>
-      <PanelGroup title="After adjustments"><HistogramView data={data} height={110} /></PanelGroup>
-      <PanelGroup title="Before adjustments"><HistogramView data={before} height={110} /></PanelGroup>
+      <OverlaySection title="After adjustments"><HistogramView data={data} height={110} /></OverlaySection>
+      <OverlaySection title="Before adjustments"><HistogramView data={before} height={110} /></OverlaySection>
       {data && data.clippedWhite / Math.max(1, data.counted) > 0.02 && (
         <Notice tone="warning" title="Highlights are clipping">{((data.clippedWhite / data.counted) * 100).toFixed(1)}% of the pixels are at or near pure white. Pull the exposure or the highlights down to recover them.</Notice>
       )}
@@ -1392,12 +1478,12 @@ function ColourPicker({ context }: { context: ScreenContext }) {
   if (!record) return <Empty title="Open an image first" />;
   return (
     <Stack gap={3}>
-      <Notice tone="info" title="Click the image to sample a pixel">The value is read from the composited canvas, so it is the colour you can actually see.</Notice>
       <Row gap={3}>
-        <div style={{ width: 56, height: 56, borderRadius: 8, background: ui.brush.color, border: "1px solid var(--border-default)" }} />
-        <Properties rows={[{ label: "Brush colour", value: <span className="ds-num">{ui.brush.color}</span> }]} />
+        <div style={{ width: 48, height: 48, borderRadius: 8, background: ui.brush.color, border: "1px solid var(--border-default)", flex: "none" }} />
+        <KeyValueList items={[{ label: "Brush colour", value: ui.brush.color, mono: true }]} />
+        <Button size="sm" variant="secondary" onClick={() => setPhotoTool("eyedropper")}>Use the eyedropper</Button>
       </Row>
-      <Button size="sm" variant="secondary" onClick={() => setPhotoTool("eyedropper")}>Choose the eyedropper</Button>
+      <p className="vx-mini">Click the image to sample a pixel. The value is read from the composited canvas, so it is the colour you can actually see.</p>
       <div style={{ position: "relative", height: 260 }}><PhotoCanvas handle={handle} bank={bank} showSelectionOverlay={false} /></div>
     </Stack>
   );
@@ -1411,12 +1497,12 @@ function ProfileWarning({ context }: { context: ScreenContext }) {
       <Notice tone="warning" title="Colour management is not implemented">
         This editor works in the browser's canvas, which is sRGB. A document can record a different profile so a later converter knows what was intended, but no conversion happens here and every file exported is sRGB.
       </Notice>
-      <Properties rows={[
+      <FactGrid columns={3} dense items={[
         { label: "Document profile", value: handle.doc.profile },
-        { label: "Working space", value: "sRGB (the browser canvas)" },
+        { label: "Working space", value: "sRGB (canvas)" },
         { label: "Export profile", value: "sRGB, untagged" },
       ]} />
-      <Field label="Document profile">
+      <Field label="Record a different intended profile">
         <Select value={handle.doc.profile} onChange={(event) => handle.edit((current) => ({ ...current, profile: event.target.value }), "Change the colour profile")}>
           {["sRGB IEC61966-2.1", "Display P3", "Adobe RGB (1998)", "ProPhoto RGB"].map((option) => <option key={option}>{option}</option>)}
         </Select>
@@ -1433,7 +1519,7 @@ function BlendPicker({ context, close }: { context: ScreenContext; close: () => 
   if (!layer) return <Empty title="Select a layer" />;
   return (
     <Stack gap={3}>
-      <p className="ds-prose">Each preview is the real composite with that mode applied to <strong>{layer.name}</strong>.</p>
+      <p className="ds-prose">Each preview is the real composite with that mode applied to <strong>{layer.name}</strong>. Now: <strong>{layer.blend}</strong>.</p>
       <Grid>
         {["normal", "multiply", "screen", "overlay", "darken", "lighten", "soft-light", "difference", "luminosity"].map((mode) => (
           <Card key={mode} span={4} pad="tight">
@@ -1441,6 +1527,7 @@ function BlendPicker({ context, close }: { context: ScreenContext; close: () => 
             <Button
               size="sm"
               variant={layer.blend === mode ? "primary" : "ghost"}
+              aria-pressed={layer.blend === mode}
               onClick={() => { handle.edit((current) => patchLayer(current, layer.id, { blend: mode as PhotoLayer["blend"] }), "Change the blend mode"); close(); }}
             >
               {mode}
@@ -1459,17 +1546,17 @@ function LinkedObject({ context }: { context: ScreenContext }) {
   const doc = handle.doc;
   return (
     <Stack gap={3}>
-      <Notice tone="info" title="Place an asset as a layer">
-        The asset's pixels are copied into a new layer. There is no live link back to the asset record, and this says so rather than implying one.
-      </Notice>
+      <p className="ds-prose">The asset's pixels are copied into a new layer. There is no live link back to the asset record; its licence is shown so it can be checked.</p>
       {assets.length === 0 ? <Empty title="No assets in this workspace" /> : (
         <Stack gap={2}>
           {assets.slice(0, 8).map((asset) => {
             const body = asset.body as { src?: string; width?: number; height?: number } | undefined;
+            const licence = String(asset.fields.license ?? "not recorded");
             return (
               <Row key={asset.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2)" }}>
-                <span className="ds-grow">{asset.title}</span>
+                <span className="ds-grow ds-truncate">{asset.title}</span>
                 {body?.width && <span className="ds-num">{body.width} × {body.height}</span>}
+                <Pill tone={licence === "Unknown" || licence === "not recorded" ? "warning" : "neutral"}>{licence}</Pill>
                 <Button
                   size="sm"
                   variant="secondary"
@@ -1481,7 +1568,7 @@ function LinkedObject({ context }: { context: ScreenContext }) {
                       src: body!.src, naturalWidth: body?.width, naturalHeight: body?.height,
                       x: 0, y: 0, w: body?.width ?? current.width, h: body?.height ?? current.height, rotation: 0,
                     }), `Place ${asset.title}`);
-                    context.toast("Placed", `${asset.title} is a new layer. Its licence is ${String(asset.fields.license ?? "not recorded")}.`);
+                    context.toast("Placed", `${asset.title} is a new layer. Its licence is ${licence}.`);
                   }}
                 >
                   Place
@@ -1491,7 +1578,7 @@ function LinkedObject({ context }: { context: ScreenContext }) {
           })}
         </Stack>
       )}
-      <Properties rows={[{ label: "Layers now", value: doc.layers.length }]} />
+      <p className="vx-mini">{doc.layers.length} layer{doc.layers.length === 1 ? "" : "s"} now.</p>
     </Stack>
   );
 }
@@ -1636,13 +1723,13 @@ function CloneSource({ context, close }: { context: ScreenContext; close: () => 
         close();
       }}
     >
-      <p className="ds-prose">The clone stamp copies pixels from a source point onto where you paint, keeping the distance between them for the whole stroke. Alt-click on the canvas sets the source, or type it here.</p>
+      <p className="ds-prose">Alt-click on the canvas sets the source, or type it here. The stamp keeps the distance between source and stroke for the whole stroke.</p>
       <Row gap={3} wrap>
         <Field label="Source x (px)"><TextInput type="number" value={x} onChange={(event) => setX(event.target.value)} autoFocus /></Field>
         <Field label="Source y (px)"><TextInput type="number" value={y} onChange={(event) => setY(event.target.value)} /></Field>
       </Row>
-      <Properties rows={[{ label: "Image", value: `${doc.width} × ${doc.height}` }, { label: "Brush size", value: `${ui.brush.size}px` }]} />
-      {!ui.cloneSource && <Notice tone="info" title="No source set yet">Without one, the stamp samples 60px to the right of where a stroke starts.</Notice>}
+      <FactGrid columns={2} dense items={[{ label: "Image", value: `${doc.width} × ${doc.height}`, mono: true }, { label: "Brush size", value: `${ui.brush.size}px`, mono: true }]} />
+      {!ui.cloneSource && <p className="vx-mini">No source set yet: without one, the stamp samples 60px to the right of where a stroke starts.</p>}
     </form>
   );
 }
@@ -1678,8 +1765,7 @@ function RefineEdge({ context, close }: { context: ScreenContext; close: () => v
     >
       <SliderBoxLocal label="Feather" value={feather} min={0} max={80} onChange={setFeather} suffix="px" />
       <SliderBoxLocal label="Grow or shrink" value={grow} min={-40} max={40} onChange={setGrow} suffix="px" />
-      {!canGrow && <p className="vx-mini">This selection has no outline to grow.</p>}
-      <Notice tone="info" title="Applied where the selection is used">The feather softens the mask a selection makes and the fill it paints. Growing moves the outline outwards from its centre.</Notice>
+      <p className="vx-mini">{canGrow ? "Feather softens the mask and fill a selection makes; growing moves the outline outwards from its centre." : "This selection has no outline to grow."}</p>
     </form>
   );
 }
@@ -1699,7 +1785,6 @@ function TagImage({ context, close }: { context: ScreenContext; close: () => voi
         close();
       }}
     >
-      <Properties rows={[{ label: "Image", value: record.title }]} />
       <Field label="Tags" hint="Separate tags with commas."><TextInput value={text} onChange={(event) => setText(event.target.value)} autoFocus placeholder="review, catalogue, spring" /></Field>
     </form>
   );
@@ -1716,7 +1801,7 @@ function SelectImage({ context, close }: { context: ScreenContext; close: () => 
         <Stack gap={1}>
           {rows.map((record) => (
             <Row key={record.id} gap={2} className="ds-panel" style={{ padding: "var(--space-1) var(--space-2)" }}>
-              <span className="ds-grow">{record.title}</span>
+              <span className="ds-grow ds-truncate">{record.title}</span>
               {record.id === context.selectedId && <Pill tone="info">selected</Pill>}
               <Button size="sm" variant="secondary" onClick={() => { context.select(record.id); close(); }}>Select</Button>
             </Row>
@@ -1736,11 +1821,10 @@ function CompareImages({ context }: { context: ScreenContext }) {
   const a = parsePhoto(first.body);
   const b = other ? parsePhoto(other.body) : undefined;
   const facts = (doc: RasterDoc) => [
-    { label: "Pixels", value: <span className="ds-num">{doc.width} × {doc.height}</span> },
-    { label: "Aspect", value: <span className="ds-num">{(doc.width / doc.height).toFixed(3)}</span> },
-    { label: "Layers", value: doc.layers.length },
-    { label: "Adjustments", value: doc.layers.filter((layer) => layer.kind === "adjustment").length },
-    { label: "Licence", value: doc.rights.license },
+    { label: "Pixels", value: `${doc.width} × ${doc.height}`, mono: true },
+    { label: "Aspect", value: (doc.width / doc.height).toFixed(3), mono: true },
+    { label: "Layers", value: `${doc.layers.length} · ${doc.layers.filter((layer) => layer.kind === "adjustment").length} adjustment`, mono: true },
+    { label: "Licence", value: doc.rights.license, tone: doc.rights.license === "Unknown" ? ("danger" as const) : undefined },
   ];
   return (
     <Stack gap={3}>
@@ -1750,8 +1834,8 @@ function CompareImages({ context }: { context: ScreenContext }) {
         </Select>
       </Field>
       <Grid>
-        <Card span={6} title={first.title} pad="tight"><Stack gap={2}><PhotoPreview record={first.id} doc={a} height={180} /><Properties rows={facts(a)} /></Stack></Card>
-        <Card span={6} title={other?.title ?? "Nothing to compare"} pad="tight">{b && other ? <Stack gap={2}><PhotoPreview record={other.id} doc={b} height={180} /><Properties rows={facts(b)} /></Stack> : <Empty title="Only one image in the library" />}</Card>
+        <Card span={6} title={first.title} pad="tight"><Stack gap={2}><PhotoPreview record={first.id} doc={a} height={180} /><KeyValueList items={facts(a)} /></Stack></Card>
+        <Card span={6} title={other?.title ?? "Nothing to compare"} pad="tight">{b && other ? <Stack gap={2}><PhotoPreview record={other.id} doc={b} height={180} /><KeyValueList items={facts(b)} /></Stack> : <Empty title="Only one image in the library" />}</Card>
       </Grid>
     </Stack>
   );
@@ -1766,35 +1850,36 @@ function ReplaceLayer({ context, close }: { context: ScreenContext; close: () =>
   if (!layer || layer.kind !== "pixel") return <Notice tone="info" title="Choose a pixel layer">Replacing swaps the pixels of the active pixel layer for an asset's, keeping its name, position, blend, opacity and mask.</Notice>;
   const usable = assets.filter((asset) => (asset.body as { src?: string } | undefined)?.src);
   return (
-    <Stack gap={2}>
-      <Properties rows={[{ label: "Layer", value: layer.name }, { label: "Blend", value: layer.blend }, { label: "Opacity", value: `${Math.round(layer.opacity * 100)}%` }]} />
-      {usable.length === 0 ? <Empty title="No asset with pixels in this workspace" /> : usable.slice(0, 12).map((asset) => {
-        const body = asset.body as { src: string; width?: number; height?: number };
-        return (
-          <Row key={asset.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2)" }}>
-            <span className="ds-grow">{asset.title}</span>
-            {body.width && <span className="ds-num">{body.width} × {body.height}</span>}
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                handle.edit((current) => patchLayer(current, layer.id, { src: body.src, naturalWidth: body.width, naturalHeight: body.height }), `Replace ${layer.name} with ${asset.title}`);
-                void context.mutate.log(`Replaced the pixels of ${layer.name} with ${asset.title} (licence ${String(asset.fields.license ?? "not recorded")})`, { entityId: record.id, type: "update" });
-                bumpPixels();
-                close();
-              }}
-            >
-              Replace with this
-            </Button>
-          </Row>
-        );
-      })}
-      <Notice tone="info" title="Undoable, and the old pixels are kept">Undo restores the previous pixels; the record also keeps the earlier version as a snapshot.</Notice>
+    <Stack gap={3}>
+      <FactGrid columns={3} dense items={[{ label: "Layer", value: layer.name }, { label: "Blend", value: layer.blend }, { label: "Opacity", value: `${Math.round(layer.opacity * 100)}%`, mono: true }]} />
+      <OverlaySection title="Replace with" hint="Undo restores the previous pixels; the record also keeps the earlier version as a snapshot.">
+        {usable.length === 0 ? <Empty title="No asset with pixels in this workspace" /> : usable.slice(0, 12).map((asset) => {
+          const body = asset.body as { src: string; width?: number; height?: number };
+          return (
+            <Row key={asset.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2)" }}>
+              <span className="ds-grow ds-truncate">{asset.title}</span>
+              {body.width && <span className="ds-num">{body.width} × {body.height}</span>}
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  handle.edit((current) => patchLayer(current, layer.id, { src: body.src, naturalWidth: body.width, naturalHeight: body.height }), `Replace ${layer.name} with ${asset.title}`);
+                  void context.mutate.log(`Replaced the pixels of ${layer.name} with ${asset.title} (licence ${String(asset.fields.license ?? "not recorded")})`, { entityId: record.id, type: "update" });
+                  bumpPixels();
+                  close();
+                }}
+              >
+                Replace with this
+              </Button>
+            </Row>
+          );
+        })}
+      </OverlaySection>
     </Stack>
   );
 }
 
-function FormatOverlay() {
+function FormatOverlay({ close }: { close: () => void }) {
   const settings = useStore(exportUi);
   return (
     <Stack gap={3}>
@@ -1807,7 +1892,7 @@ function FormatOverlay() {
       </Field>
       {settings.format !== "png" && <SliderBoxLocal label="Quality" value={Math.round(settings.quality * 100)} min={5} max={100} onChange={(value) => exportUi.set((current) => ({ ...current, quality: value / 100 }))} suffix="%" />}
       {settings.format === "jpeg" && <Notice tone="warning" title="JPEG drops transparency">Transparent pixels are composited onto white. Choose PNG or WebP to keep them.</Notice>}
-      <p className="vx-mini">The choice applies to the next export and preview on this screen.</p>
+      <ModalActions><OverlayActions primary={<Button variant="primary" onClick={close}>Use this format</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -1821,15 +1906,20 @@ function ExportCheck({ context, close }: { context: ScreenContext; close: () => 
   const changes = exportChanges(doc, settings);
   return (
     <Stack gap={3}>
-      <Notice tone="warning" title="This export changes the picture">
-        <ul>{changes.map((change) => <li key={change}>{change}</li>)}</ul>
-      </Notice>
-      <Properties rows={[{ label: "Output", value: `${width} × ${height} ${settings.format.toUpperCase()}` }, { label: "Source", value: `${doc.width} × ${doc.height}` }]} />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Change the settings</Button>
-        <span className="ds-grow" />
-        <Button variant="outline-danger" onClick={async () => { close(); await exportImage(context, true); }}>Export anyway</Button>
-      </Row>
+      <OverlaySection title="This export changes the picture" tone="warning">
+        <ul className="ds-list">{changes.map((change) => <li key={change}>{change}</li>)}</ul>
+      </OverlaySection>
+      <FactGrid columns={2} dense items={[
+        { label: "Source", value: `${doc.width} × ${doc.height}`, mono: true },
+        { label: "Output", value: `${width} × ${height} ${settings.format.toUpperCase()}`, mono: true, tone: "warning" },
+      ]} />
+      <ModalActions>
+        <OverlayActions
+          variant="confirm"
+          end={<OverlayCancel>Change the settings</OverlayCancel>}
+          primary={<Button variant="outline-danger" onClick={async () => { close(); await exportImage(context, true); }}>Export anyway</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1888,12 +1978,12 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "Bulk import", kind: "modal", title: "Import images", width: 560, render: ({ close, ...context }) => <BulkImport context={context} close={close} /> },
-        { id: "asset detail", kind: "drawer", title: "Image", width: 440, render: ({ ...context }) => <AssetDetail context={context} /> },
-        { id: "license", kind: "drawer", title: "Rights", width: 420, render: ({ ...context }) => <LicencePanel context={context} /> },
-        { id: "tag image", kind: "modal", title: "Tag an image", width: 440, render: ({ close, ...context }) => <TagImage context={context} close={close} />, footer: photoFooter("photo-tag", "Save the tags") },
-        { id: "select image", kind: "modal", title: "Select an image", width: 480, render: ({ close, ...context }) => <SelectImage context={context} close={close} /> },
-        { id: "compare images", kind: "modal", title: "Compare images", width: 820, render: ({ ...context }) => <CompareImages context={context} /> },
+        { id: "Bulk import", kind: "modal", title: "Import images", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <BulkImport context={context} close={close} /> },
+        { id: "asset detail", kind: "drawer", title: "Image", width: OVERLAY_WIDTH.form, summary: (context) => <PhotoSummary context={context} />, render: ({ ...context }) => <AssetDetail context={context} /> },
+        { id: "license", kind: "drawer", title: "Rights", width: OVERLAY_WIDTH.compact, summary: (context) => <PhotoSummary context={context} />, render: ({ ...context }) => <LicencePanel context={context} /> },
+        { id: "tag image", kind: "modal", title: "Tag an image", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <TagImage context={context} close={close} />, footer: photoFooter("photo-tag", "Save the tags") },
+        { id: "select image", kind: "modal", title: "Select an image", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <SelectImage context={context} close={close} /> },
+        { id: "compare images", kind: "modal", title: "Compare images", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <CompareImages context={context} /> },
       ],
     },
 
@@ -1907,10 +1997,11 @@ registerApp({
       })),
       actions: EDITOR_ACTIONS,
       overlays: [
-        { id: "Tool options", kind: "drawer", title: "Tool options", width: 420, render: ({ ...context }) => <ToolOptions context={context} /> },
-        { id: "canvas size", kind: "modal", title: "Canvas size", width: 460, render: ({ close, ...context }) => <CanvasSize context={context} close={close} /> },
-        { id: "adjustment layer", kind: "modal", title: "Add an adjustment layer", width: 560, render: ({ close, ...context }) => <AdjustmentLayerPicker context={context} close={close} /> },
-        { id: "clone source", kind: "modal", title: "Clone stamp", width: 460, render: ({ close, ...context }) => <CloneSource context={context} close={close} />, footer: photoFooter("photo-clone-source", "Set the source") },
+        { id: "Tool options", kind: "drawer", title: "Tool options", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <ToolOptions context={context} /> },
+        { id: "canvas size", kind: "modal", title: "Canvas size", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <CanvasSize context={context} close={close} />, footer: photoFooter("photo-canvas-size", "Resize the canvas") },
+        { id: "rights", kind: "drawer", title: "Rights", width: OVERLAY_WIDTH.compact, summary: (context) => <PhotoSummary context={context} />, render: ({ ...context }) => <RightsOverlay context={context} /> },
+        { id: "adjustment layer", kind: "modal", title: "Add an adjustment layer", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AdjustmentLayerPicker context={context} close={close} /> },
+        { id: "clone source", kind: "modal", title: "Clone stamp", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <CloneSource context={context} close={close} />, footer: photoFooter("photo-clone-source", "Set the source") },
       ],
     },
 
@@ -1924,8 +2015,8 @@ registerApp({
       })),
       actions: MASK_ACTIONS,
       overlays: [
-        { id: "Selection options", kind: "drawer", title: "Selection", width: 420, render: ({ ...context }) => <SelectionOptions context={context} /> },
-        { id: "refinement", kind: "modal", title: "Refine the edge", width: 480, render: ({ close, ...context }) => <RefineEdge context={context} close={close} />, footer: photoFooter("photo-refine", "Apply") },
+        { id: "Selection options", kind: "drawer", title: "Selection", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <SelectionOptions context={context} /> },
+        { id: "refinement", kind: "modal", title: "Refine the edge", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <RefineEdge context={context} close={close} />, footer: photoFooter("photo-refine", "Apply") },
         { id: "quick mask", kind: "modal", title: "Quick mask", width: 640, render: ({ ...context }) => <QuickMask context={context} /> },
       ],
     },
@@ -1966,8 +2057,8 @@ registerApp({
         { id: "compare", label: "Compare", placement: "overflow", run: () => photoUi.set((current) => ({ ...current, compare: !current.compare })) },
       ],
       overlays: [
-        { id: "Histogram", kind: "drawer", title: "Histogram", width: 420, render: ({ ...context }) => <HistogramOverlay context={context} /> },
-        { id: "colour picker", kind: "modal", title: "Pick a colour", width: 620, render: ({ ...context }) => <ColourPicker context={context} /> },
+        { id: "Histogram", kind: "drawer", title: "Histogram", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <HistogramOverlay context={context} /> },
+        { id: "colour picker", kind: "modal", title: "Pick a colour", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ColourPicker context={context} /> },
         { id: "profile warning", kind: "modal", title: "Colour profiles", width: 520, render: ({ ...context }) => <ProfileWarning context={context} /> },
       ],
     },
@@ -2013,10 +2104,10 @@ registerApp({
         { id: "place", label: "Place an asset as a new layer", placement: "overflow", run: (context) => context.openOverlay("linked object") },
       ],
       overlays: [
-        { id: "Blend picker", kind: "modal", title: "Blend mode", width: 680, render: ({ close, ...context }) => <BlendPicker context={context} close={close} /> },
-        { id: "layer properties", kind: "drawer", title: "Layer", width: 400, render: ({ ...context }) => <LayerPropertiesOverlay context={context} /> },
-        { id: "linked object", kind: "modal", title: "Place an asset", width: 560, render: ({ ...context }) => <LinkedObject context={context} /> },
-        { id: "replace layer", kind: "modal", title: "Replace a layer's pixels", width: 560, render: ({ close, ...context }) => <ReplaceLayer context={context} close={close} /> },
+        { id: "Blend picker", kind: "modal", title: "Blend mode", width: OVERLAY_WIDTH.wide, render: ({ close, ...context }) => <BlendPicker context={context} close={close} /> },
+        { id: "layer properties", kind: "drawer", title: "Layer", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <LayerPropertiesOverlay context={context} /> },
+        { id: "linked object", kind: "modal", title: "Place an asset", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <LinkedObject context={context} /> },
+        { id: "replace layer", kind: "modal", title: "Replace a layer's pixels", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ReplaceLayer context={context} close={close} /> },
       ],
     },
 
@@ -2041,40 +2132,14 @@ registerApp({
         {
           id: "execute", label: "Run the queue", placement: "secondary",
           guard: () => (batchUi.get().running ? "The batch is running" : batchUi.get().jobs.some((job) => job.state === "queued") ? undefined : "Build the batch first"),
-          run: (context) => runBatch(context),
+          run: (context) => requestRun(context),
         },
         { id: "download", label: "Download the results", placement: "overflow", guard: () => (heldBatchFiles().length ? undefined : "No file from this session is held"), run: (context) => downloadResults(context) },
       ],
       overlays: [
-        { id: "Preset editor", kind: "modal", title: "Batch preset", width: 520, render: () => (
-          <Stack gap={3}>
-            <Notice tone="info" title="Presets live on the screen for now">
-              The format, size and naming on the Presets tab apply to the queue immediately. Storing a named preset on the workspace is not built; this says so instead of pretending to save one.
-            </Notice>
-            <Properties rows={[
-              { label: "What is applied", value: "Format, quality, longest edge and the file-name pattern" },
-              { label: "What is stored", value: "Nothing yet" },
-            ]} />
-          </Stack>
-        ) },
-        { id: "overwrite confirmation", kind: "modal", title: "Name collisions", tone: "danger", width: 480, render: () => (
-          <Stack gap={3}>
-            <Notice tone="warning" title="Nothing is overwritten">
-              Two images that produce the same file name get a counter appended, deterministically and in queue order, so a batch run twice produces the same names in the same order.
-            </Notice>
-            <Properties rows={[
-              { label: "First", value: <span className="ds-num">arc-lamp-1600x1067.jpg</span> },
-              { label: "Second", value: <span className="ds-num">arc-lamp-1600x1067-2.jpg</span> },
-            ]} />
-            <Notice tone="info" title="Where the files go">Each one downloads through the browser. This page cannot see the download folder, so it cannot check what is already there.</Notice>
-          </Stack>
-        ) },
-        { id: "result report", kind: "drawer", title: "Batch report", width: 460, render: ({ ...context }) => (
-          <Stack gap={3}>
-            <BatchReport />
-            <Button variant="secondary" onClick={() => context.setTab("Results")}>Open the results</Button>
-          </Stack>
-        ) },
+        { id: "Preset editor", kind: "modal", title: "Batch preset", width: OVERLAY_WIDTH.compact, render: ({ close }) => <PresetEditor close={close} /> },
+        { id: "overwrite confirmation", kind: "modal", title: "Before the files are written", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <OutputNames context={context} close={close} /> },
+        { id: "result report", kind: "drawer", title: "Batch report", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <BatchReportDrawer context={context} /> },
       ],
     },
 
@@ -2104,40 +2169,100 @@ registerApp({
         { id: "upload to asset library", label: "Add to the asset library", placement: "overflow", guard: (context) => needsImage(context) ?? (exportUi.get().busy ? "An export is running" : undefined), run: (context) => addToAssetLibrary(context) },
       ],
       overlays: [
-        { id: "Export preview", kind: "modal", title: "Export preview", width: 680, render: ({ ...context }) => <ExportScreen context={context} lens="Export" /> },
-        { id: "rights", kind: "drawer", title: "Rights", width: 420, render: ({ ...context }) => <RightsOverlay context={context} /> },
+        { id: "Export preview", kind: "modal", title: "Export preview", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <ExportScreen context={context} lens="Export" /> },
+        { id: "rights", kind: "drawer", title: "Rights", width: OVERLAY_WIDTH.compact, summary: (context) => <PhotoSummary context={context} />, render: ({ ...context }) => <RightsOverlay context={context} /> },
         { id: "profile handling", kind: "modal", title: "Colour profiles", width: 520, render: ({ ...context }) => <ProfileWarning context={context} /> },
-        { id: "format", kind: "modal", title: "Export format", width: 460, render: () => <FormatOverlay /> },
-        { id: "export check", kind: "modal", title: "Before the file is written", width: 480, render: ({ close, ...context }) => <ExportCheck context={context} close={close} /> },
+        { id: "format", kind: "modal", title: "Export format", width: OVERLAY_WIDTH.compact, render: ({ close }) => <FormatOverlay close={close} /> },
+        { id: "export check", kind: "modal", title: "Before the file is written", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <ExportCheck context={context} close={close} /> },
       ],
     },
   },
 });
 
 function photoFooter(form: string, label: string) {
-  return ({ close }: { close: () => void }) => (
-    <>
-      <Button variant="ghost" onClick={close}>Cancel</Button>
-      <span className="ds-grow" />
-      <Button variant="primary" type="submit" form={form}>{label}</Button>
-    </>
+  return ({ close: _close }: { close: () => void }) => (
+    <OverlayActions primary={<Button variant="primary" type="submit" form={form}>{label}</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} />
   );
 }
 
-function BatchReport() {
+function PresetEditor({ close }: { close: () => void }) {
+  const batch = useStore(batchUi);
+  return (
+    <Stack gap={3}>
+      <FactGrid columns={2} dense items={[
+        { label: "Format", value: batch.format.toUpperCase(), mono: true },
+        { label: "Longest edge", value: `${batch.longEdge}px`, mono: true },
+        { label: "Quality", value: batch.format === "png" ? "lossless" : `${Math.round(batch.quality * 100)}%`, mono: true },
+        { label: "File name", value: batch.pattern, mono: true },
+      ]} />
+      <OverlaySection title="Not stored yet" tone="info">
+        These settings apply to the queue immediately. Saving a named preset on the workspace is not built, and this does not pretend to save one.
+      </OverlaySection>
+      <ModalActions><OverlayActions primary={<Button variant="primary" onClick={close}>Keep these settings</Button>} /></ModalActions>
+    </Stack>
+  );
+}
+
+/** The decision that stands in for "overwrite": the names a run would write, what collides, and what to do about it. */
+function OutputNames({ context, close }: { context: ScreenContext; close: () => void }) {
+  const batch = useStore(batchUi);
+  const plan = useBatchPlan();
+  if (batch.jobs.length === 0) return <Empty title="Build the batch first">The names a run would write are previewed here once the queue exists.</Empty>;
+  if (!plan) return <Empty title="Working out the file names…" />;
+  const clashes = plan.filter((item) => item.collision);
+  const skipping = batch.onCollision === "skip";
+  const writes = plan.length - (skipping ? clashes.length : 0);
+  return (
+    <Stack gap={3}>
+      <p className="ds-prose">This page cannot replace a file on your disk: every file is a new browser download, and it cannot see the download folder. So the choice is what to do when a name is already taken in this session.</p>
+      <div className="ph-plan" role="list" aria-label="Output names">
+        {plan.map((item) => (
+          <div key={item.jobId} role="listitem" className="ph-plan-row" data-collision={item.collision ? "true" : undefined}>
+            <span className="ph-plan-title ds-truncate">{item.title}</span>
+            <span className="ph-plan-name ds-num ds-truncate" title={item.name}>
+              {item.collision ? (skipping ? <s>{item.root}</s> : <>{item.root} → <strong>{item.name}</strong></>) : item.name}
+            </span>
+            {item.collision ? <Pill tone="warning">{skipping ? "skipped" : item.collision === "batch" ? "renamed, same batch" : "renamed, written before"}</Pill> : <Pill tone="success">new</Pill>}
+          </div>
+        ))}
+      </div>
+      {clashes.length > 0 && (
+        <Field label="Where a name is taken">
+          <Select value={batch.onCollision} onChange={(event) => batchUi.set((current) => ({ ...current, onCollision: event.target.value as "counter" | "skip" }))}>
+            <option value="counter">Keep both: add a counter to the new file</option>
+            <option value="skip">Skip the duplicate: write nothing for it</option>
+          </Select>
+        </Field>
+      )}
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" disabled={writes === 0 || batch.running} onClick={() => { close(); void runBatch(context); }}>{`Write ${writes} file${writes === 1 ? "" : "s"}`}</Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
+    </Stack>
+  );
+}
+
+function BatchReportDrawer({ context }: { context: ScreenContext }) {
   const batch = useStore(batchUi);
   const done = batch.jobs.filter((job) => job.state === "done");
   const failed = batch.jobs.filter((job) => job.state === "failed");
+  const skipped = batch.jobs.filter((job) => job.state === "skipped");
   if (batch.jobs.length === 0) return <Empty title="No batch has run in this session" />;
   return (
-    <Stack gap={2}>
-      <Properties rows={[
-        { label: "Jobs", value: batch.jobs.length },
-        { label: "Written", value: done.length },
-        { label: "Failed", value: failed.length },
-        { label: "Bytes written", value: done.reduce((sum, job) => sum + (job.bytes ?? 0), 0).toLocaleString() },
+    <Stack gap={3}>
+      <FactGrid columns={4} items={[
+        { label: "Jobs", value: batch.jobs.length, mono: true },
+        { label: "Written", value: done.length, mono: true, tone: done.length ? "success" : undefined },
+        { label: "Skipped", value: skipped.length, mono: true },
+        { label: "Failed", value: failed.length, mono: true, tone: failed.length ? "danger" : undefined },
       ]} />
-      {failed.map((job) => <Notice key={job.id} tone="danger" title={job.title}>{job.reason}</Notice>)}
+      <KeyValueList items={[{ label: "Bytes written", value: done.reduce((sum, job) => sum + (job.bytes ?? 0), 0).toLocaleString(), mono: true }]} />
+      {[...failed, ...skipped].map((job) => <Notice key={job.id} tone={job.state === "failed" ? "danger" : "info"} title={job.title}>{job.reason}</Notice>)}
+      <DrawerActions>
+        <OverlayActions primary={<Button variant="primary" onClick={() => context.setTab("Results")}>Open the results</Button>} end={<OverlayCancel>Close</OverlayCancel>} />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -2154,16 +2279,15 @@ function RightsOverlay({ context }: { context: ScreenContext }) {
   const doc = handle.doc;
   return (
     <Stack gap={3}>
-      <Field label="Licence">
-        <Select value={doc.rights.license} onChange={(event) => handle.edit((current) => ({ ...current, rights: { ...current.rights, license: event.target.value } }), "Change the licence")}>
-          {["Unknown", "Company-owned", "Licensed — single use", "Licensed — unlimited", "Creative Commons BY", "Model released", "No model release"].map((option) => <option key={option}>{option}</option>)}
-        </Select>
-      </Field>
-      <Field label="Credit">
-        <TextInput value={doc.rights.credit} onChange={(event) => handle.edit((current) => ({ ...current, rights: { ...current.rights, credit: event.target.value } }), "Change the credit")} />
-      </Field>
       {doc.rights.license === "Unknown" && <Notice tone="danger" title="Do not publish">Resolve the licence before this image leaves the workspace.</Notice>}
-      <Notice tone="info" title="Rights travel with the export">An export copied into the asset library carries this licence and credit onto the new record.</Notice>
+      <OverlaySection title="Licence" hint="Travels with every export copied into the asset library">
+        <Select aria-label="Licence" value={doc.rights.license} onChange={(event) => handle.edit((current) => ({ ...current, rights: { ...current.rights, license: event.target.value } }), "Change the licence")}>
+          {LICENCES.map((option) => <option key={option}>{option}</option>)}
+        </Select>
+      </OverlaySection>
+      <OverlaySection title="Credit">
+        <TextInput aria-label="Credit" value={doc.rights.credit} onChange={(event) => handle.edit((current) => ({ ...current, rights: { ...current.rights, credit: event.target.value } }), "Change the credit")} />
+      </OverlaySection>
     </Stack>
   );
 }

@@ -576,6 +576,7 @@ export const commsApp = registerApp({
 
     "ARL-COMMS-005": {
       id: "ARL-COMMS-005",
+      title: () => "Email",
       subtitle: () => "Mail is kept in this browser. No mail service is connected, so nothing is delivered.",
       tabs: (["Inbox", "Sent", "Drafts", "Archive", "Spam", "Shared inboxes", "Accounts & domains", "Sender identities"] as EmailArea[]).map((lens) => ({
         id: lens, render: (context: ScreenContext) => <EmailExperience context={context} lens={lens} />, count: () => mailTabCount(lens),

@@ -815,7 +815,7 @@ export function ResourceEditor({ context, close }: { context: ScreenContext; clo
   const capacity = Math.floor(Number(capacityText));
   const capacityError = !Number.isFinite(capacity) || capacity < 1 || capacity > 200 ? "Enter a whole number from 1 to 200" : undefined;
   const invalid = !title.trim() || !/\d{2}:\d{2}\D+\d{2}:\d{2}/.test(hours) || Boolean(capacityError);
-  const parsed = workingHours({ fields: { workingHours: hours } } as Rec);
+  const parsed = workingHours({ fields: { workingHours: hours } } as unknown as Rec);
   const offeredHours = (parsed.endHour - parsed.startHour) * parsed.days.length * (capacityError ? 1 : capacity);
   const upcoming = existing ? data.bookings.filter((booking) => String(booking.fields.resourceId) === existing.id && isLive(booking) && booking.startAt && new Date(booking.startAt) >= now).length : 0;
   return (

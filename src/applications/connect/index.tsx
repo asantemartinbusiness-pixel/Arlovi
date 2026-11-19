@@ -8,8 +8,9 @@ import {
   RetryReview, RevokeGrant, RiskSummary, ScopeReview, SyncCentre, openConnector, useConnector,
 } from "./panels";
 import { CONNECTOR_ENTRIES } from "./catalog";
+import { connectorRecordHeader } from "./recordHeads";
 import { NangoGuidedSetup } from "./NangoExperience";
-import { Button, Notice, Properties, Stack } from "@/design-system";
+import { Button, KeyValueList, Notice, Stack } from "@/design-system";
 import { openAct } from "@/applications/t6kit/act";
 import {
   CompareConnectors, ProviderLimits, SchemaDiff, attemptAuthorisation, cancelAuthorisation, chooseTargetsOverlay,
@@ -33,7 +34,7 @@ function ScopeChangePanel({ context }: { context: ScreenContext }) {
       <Notice tone="warning" title="A scope cannot be changed without a grant">
         Widening or narrowing access means asking the provider again. With no grant, there is nothing to re-ask about.
       </Notice>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Scopes granted", value: <span className="ds-num">0</span> },
         { label: "Change would require", value: "A fresh authorisation, approved by the account holder" },
       ]} />
@@ -59,7 +60,7 @@ function ReconnectDialog({ context }: { context: ScreenContext }) {
 function HealthReport({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={3}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Capabilities in the register", value: <span className="ds-num">{String(CONNECTOR_ENTRIES.length)}</span> },
         { label: "Connected", value: <span className="ds-num">0</span> },
         { label: "Local checks that passed", value: <span className="ds-num">2</span> },
@@ -147,7 +148,7 @@ export const connectApp = registerApp({
     "ARL-CONNECT-002": {
       id: "ARL-CONNECT-002",
       title: () => "Connector",
-      subtitle: () => "Read scopes and write scopes are shown apart, because they are not the same decision.",
+      record: (context) => connectorRecordHeader(context, "connector"),
       tabs: (["Overview", "Capabilities", "Permissions", "Versions", "Help"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <ConnectorDetail context={context} lens={lens} />,
@@ -172,7 +173,7 @@ export const connectApp = registerApp({
     "ARL-CONNECT-003": {
       id: "ARL-CONNECT-003",
       title: () => "Authorise a connector",
-      subtitle: () => "The flow runs as far as it can and then stops, without leaving a connection behind.",
+      record: (context) => connectorRecordHeader(context, "authorise"),
       tabs: (["Account", "Permissions", "Test", "Confirm"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <ConnectionWizard context={context} lens={lens} />,
@@ -222,7 +223,7 @@ export const connectApp = registerApp({
     "ARL-CONNECT-005": {
       id: "ARL-CONNECT-005",
       title: () => "Connection",
-      subtitle: () => "What this connection would be allowed to do, and what it holds now, which is nothing.",
+      record: (context) => connectorRecordHeader(context, "connection"),
       tabs: (["Overview", "Capabilities", "Sync", "Activity", "Security"] as const).map((lens) => ({
         id: lens,
         render: (context: ScreenContext) => <ConnectionDetail context={context} lens={lens} />,
@@ -329,7 +330,7 @@ export const connectApp = registerApp({
               <Notice tone="danger" title="No credential field is offered">
                 An adapter's credential belongs in an encrypted store on a server. Typed into this browser it would sit in IndexedDB in plain text. Nothing here stores one, and nothing generates one.
               </Notice>
-              <Properties rows={[
+              <KeyValueList items={[
                 { label: "Credentials stored", value: <span className="ds-num">0</span> },
                 { label: "Credentials generated", value: <span className="ds-num">0</span> },
                 { label: "What an adapter declares instead", value: "The name of the scope it would need" },

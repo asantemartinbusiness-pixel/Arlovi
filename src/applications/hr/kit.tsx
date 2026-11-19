@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { Button, Notice, OverlayActions, Pill } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import type { Rec } from "@/domain/types";
@@ -73,10 +73,11 @@ export function PeopleHeader({ title, actions, note }: {
   actions?: ReactNode;
   note?: ReactNode;
 }) {
+  const noteId = useId();
   if (!actions && !note) return null;
   return (
-    <section className="hr-bar" aria-label={title}>
-      {note && <p className="hr-bar-note">{note}</p>}
+    <section className="hr-bar" aria-labelledby={note ? noteId : undefined} aria-label={note ? undefined : title}>
+      {note && <p className="hr-bar-note" id={noteId}>{note}</p>}
       {actions && <div className="hr-bar-actions">{actions}</div>}
     </section>
   );

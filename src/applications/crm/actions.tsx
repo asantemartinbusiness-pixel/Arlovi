@@ -896,7 +896,7 @@ export function MergeGroups({ groups, onPick, context }: { groups: { key: string
     <Stack gap={3}>
       <p className="ds-subtle">Choose the group to review. Consent and suppression on every record are shown before anything changes.</p>
       {groups.map((group) => (
-        <Row key={group.key} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
+        <Row key={group.key} gap={3} wrap className="ds-panel" style={{ padding: "var(--space-3)" }}>
           <strong className="ds-grow">{group.rows[0].title}</strong>
           {group.rows.map((row) => <ConsentPill key={row.id} contact={row} />)}
           <span className="ds-subtle">{group.rows.length} records · oldest {context.date(group.rows.map((row) => row.createdAt).sort()[0])}</span>

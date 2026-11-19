@@ -9,6 +9,7 @@ import {
   BarChart, Button, ButtonGroup, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, InspectorSection,
   Menu, Meter, Notice, OverlayActions, OverlayCancel, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Switch, Tabs,
   TextArea, TextInput, Tool, Toolbar, ToolbarSeparator, type RecordHeaderProps,
+  OVERLAY_WIDTH, OverlaySummary,
 } from "@/design-system";
 import { getScreenDef, registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
@@ -30,6 +31,7 @@ import { useGuardRefresh } from "@/applications/design/sharedDoc";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { createStore, useStore } from "@/applications/visual/kit";
 import { CommentPopoverBody, FormatPopoverBody, ImagePopoverBody, LinkPopoverBody, PopoverTool, StylesPopoverBody, TablePopoverBody, openDocPopover } from "./popovers";
+import { LibraryStrip, RecordCardGrid, ViewToggle, useLibraryView } from "./libraryKit";
 import "./docs.css";
 
 /* ====================================================================== *
@@ -192,12 +194,24 @@ function OutlineTree({
 
 type LibraryTab = "Recent" | "My docs" | "Shared" | "Templates" | "Archive";
 
+/** A copy starts as a draft with its own history: comments, approvals and links are not carried over. */
+async function duplicateDocument(context: ScreenContext, source: Rec): Promise<void> {
+  const model = readDoc(source.body, context.actor, context.now.toISOString());
+  const created = await context.mutate.create({
+    collection: "documents", title: `${source.title} copy`, status: "draft", summary: source.summary,
+    tags: source.tags, fields: { ...source.fields, approvals: "", signatureStatus: "not_requested" },
+    body: { ...model, comments: [], shares: [] },
+  }, `${source.title} duplicated`);
+  context.toast("Duplicated", `${created.title} is a draft. Comments, approvals and sharing records were not copied.`);
+}
+
 function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: LibraryTab }) {
   const data = useCollections(["documents", "templates"]);
   const { org, actor, now } = useWorkspace();
   const [query, setQuery] = useState("");
   const [folder, setFolder] = useState<string>("All folders");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [view, setView] = useLibraryView("docs");
 
   const documents = data.documents.filter((record) => !record.tags.includes("recovered"));
   const folders = ["All folders", ...new Set(documents.map((record) => String(record.fields.folder ?? "Unfiled")))];
@@ -262,43 +276,37 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
 
   return (
     <Stack gap={4}>
-      <div className="dx-library-header">
-        <div>
-          <span className="dx-library-eyebrow">DOCUMENTS / {tab.toUpperCase()}</span>
-          <h2>{tab === "Recent" ? "Your document workspace." : tab === "My docs" ? "Work you've authored." : tab === "Shared" ? "Recorded sharing activity." : "The document archive."}</h2>
-          <p>{tab === "Shared" ? "Documents with a local sharing record are listed here. This does not mean a public link or external access exists." : tab === "Archive" ? "Archived records remain in the local library until explicitly removed." : "Find, review and continue working with company documents without losing their version history."}</p>
-        </div>
+      <LibraryStrip
+        label="Document library summary"
+        items={[
+          { label: "Active documents", value: activeDocuments.length },
+          { label: "Drafts", value: drafts.length },
+          { label: "In review", value: pendingReview.length, tone: pendingReview.length ? "warning" : undefined },
+          { label: "Confidential", value: confidentialCount },
+        ]}
+      >
+        <ViewToggle label="Library view" value={view} onChange={setView} />
         <Button variant="primary" onClick={() => context.openOverlay("New doc")}>New document</Button>
-      </div>
-      <div className="dx-library-metrics" aria-label="Document library summary">
-        <div><span>Active documents</span><strong>{activeDocuments.length}</strong><small>Excluding archive</small></div>
-        <div><span>Drafts</span><strong>{drafts.length}</strong><small>Not published</small></div>
-        <div><span>In review</span><strong>{pendingReview.length}</strong><small>Needs a human decision</small></div>
-        <div><span>Confidential</span><strong>{confidentialCount}</strong><small>Restricted previews only</small></div>
-      </div>
-      <div className="dx-library-filters">
-      <Row gap={3} wrap>
-        <Field label="Search" hint="Confidential documents match on title and tags only.">
-          <TextInput aria-label="Search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles and text" />
-        </Field>
-        <Field label="Folder">
-          <Select aria-label="Folder" value={folder} onChange={(event) => setFolder(event.target.value)}>
-            {folders.map((name) => <option key={name} value={name}>{name}</option>)}
-          </Select>
-        </Field>
-      </Row>
-      {tab !== "Archive" && (
-        <Row gap={2} wrap>
-          <span className="ds-subtle">Status</span>
-          {(["all", "draft", "in_review", "published"] as const).map((state) => (
-            <Button key={state} size="sm" variant={statusFilter === state ? "secondary" : "ghost"}
-              aria-pressed={statusFilter === state} onClick={() => setStatusFilter(state)}>
-              {state === "all" ? "All states" : state === "in_review" ? "In review" : state === "published" ? "Published" : "Drafts"}
-            </Button>
-          ))}
-        </Row>
-      )}
-      {activeFilters && <Button size="sm" variant="ghost" onClick={clearFilters}>Clear filters</Button>}
+      </LibraryStrip>
+      {tab === "Shared" && <p className="ds-subtle">A local sharing record is not a public link: no document here is reachable outside this workspace.</p>}
+      <div className="lk-toolbar">
+        <div className="lk-grow">
+          <TextInput aria-label="Search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search titles and text (confidential: title and tags only)" />
+        </div>
+        <Select aria-label="Folder" value={folder} onChange={(event) => setFolder(event.target.value)}>
+          {folders.map((name) => <option key={name} value={name}>{name}</option>)}
+        </Select>
+        {tab !== "Archive" && (
+          <Row gap={1} wrap>
+            {(["all", "draft", "in_review", "published"] as const).map((state) => (
+              <Button key={state} size="sm" variant={statusFilter === state ? "secondary" : "ghost"}
+                aria-pressed={statusFilter === state} onClick={() => setStatusFilter(state)}>
+                {state === "all" ? "All states" : state === "in_review" ? "In review" : state === "published" ? "Published" : "Drafts"}
+              </Button>
+            ))}
+          </Row>
+        )}
+        {activeFilters && <Button size="sm" variant="ghost" onClick={clearFilters}>Clear filters</Button>}
       </div>
 
       {confidentialHidden && (
@@ -315,6 +323,30 @@ function DocumentLibrary({ context, tab }: { context: ScreenContext; tab: Librar
         >
           {activeFilters ? "Try another status, folder or search term." : tab === "Shared" ? "No documents have local sharing records yet. Open a document to record a workspace share." : "Create a document, or start from a governed template."}
         </Empty>
+      ) : view === "cards" ? (
+        <RecordCardGrid
+          label={`${tab} documents`}
+          cards={rows.map((row) => {
+            const confidential = row.fields.confidential === true;
+            const model = readDoc(row.body, row.ownerName, row.updatedAt);
+            return {
+              id: row.id, title: row.title, icon: <FileText size={15} />,
+              status: <Pill tone={row.status === "published" ? "success" : row.status === "in_review" ? "warning" : "neutral"}>{row.status.replace("_", " ")}</Pill>,
+              preview: confidential ? "Confidential: the body is not previewed." : toPlainText(model).slice(0, 220) || "Empty document.",
+              meta: [String(row.fields.folder ?? "Unfiled"), row.ownerName, `Changed ${context.relative(row.updatedAt)}`, confidential ? "Confidential" : null],
+              selected: context.selectedId === row.id,
+              onSelect: () => context.select(row.id),
+              onOpen: () => context.navigate(`/o/${org.slug}/docs/documents/${row.id}`),
+              actions: (
+                <>
+                  <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${org.slug}/docs/documents/${row.id}`)}>Open</Button>
+                  <Button size="sm" variant="ghost" onClick={() => void duplicateDocument(context, row)}>Duplicate</Button>
+                  <Button size="sm" variant="ghost" onClick={() => context.openOverlay("sharing", { id: row.id })}>Share</Button>
+                </>
+              ),
+            };
+          })}
+        />
       ) : (
         <DataGrid
           rows={rows}
@@ -1328,9 +1360,7 @@ function TemplatesScreen({ context, tab }: { context: ScreenContext; tab: "All" 
   return (
     <Stack gap={4}>
       <div className="dx-library-header">
-        <div><span className="dx-library-eyebrow">DOCUMENTS / TEMPLATE GOVERNANCE</span>
-          <h2>Masters that keep work consistent.</h2>
-          <p>Choose a company, department or personal template. A master supplies starting content; existing documents remain independent, including signed copies.</p>
+        <div>
         </div>
         <Button variant="primary" onClick={() => context.openOverlay("Template editor")}>New template</Button>
       </div>
@@ -1808,8 +1838,7 @@ function InsightsScreen({ context, tab }: { context: ScreenContext; tab: "Writin
     return (
       <Stack gap={4}>
         <div className="dx-library-header">
-          <div><span className="dx-library-eyebrow">DOCUMENTS / COMPANY EXPRESSION</span><h2>Brand alignment, with evidence.</h2>
-            <p>Review how this document reflects the selected company. Checks are local rules, not a certified brand audit or an applied print identity.</p>
+          <div>
           </div>
           <Button variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/docs/templates`)}>Open templates</Button>
         </div>
@@ -3488,6 +3517,14 @@ registerApp({
       actions: [
         { id: "Create", label: "New document", placement: "primary", run: (context) => context.openOverlay("New doc") },
         { id: "upload", label: "Upload", placement: "secondary", icon: <Upload size={15} />, run: (context) => context.openOverlay("New doc", { upload: true }) },
+        {
+          id: "duplicate", label: "Duplicate", placement: "overflow",
+          guard: (context) => (context.selectedId ? undefined : "Select a document first"),
+          run: async (context) => {
+            const source = context.selectedId ? await import("@/platform/repo").then((module) => module.getRecord(context.selectedId!)) : undefined;
+            if (source) await duplicateDocument(context, source);
+          },
+        },
         { id: "search", label: "Search documents…", placement: "overflow", run: (context) => context.openOverlay("search documents") },
         { id: "move", label: "Move to folder", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a document first"), run: (context) => context.openOverlay("folder selector") },
         { id: "share", label: "Share", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a document first"), run: (context) => context.openOverlay("sharing") },

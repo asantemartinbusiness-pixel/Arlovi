@@ -1,10 +1,7 @@
 import { useState } from "react";
 import "./library.css";
 import { ClipboardList, Copy, FileText, Inbox, Link2, ShieldAlert, Workflow } from "lucide-react";
-import {
-  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Notice, Pill, Properties,
-  Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput,
-} from "@/design-system";
+import { BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, KeyValueList, Notice, Pill, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useChildren, useCollection, useEvents, useWorkspace } from "@/platform/workspace";
 import { daysBetween, wallMs } from "@/platform/clock";
@@ -506,7 +503,7 @@ export function InvalidPathPanel({ context }: { context: ScreenContext }) {
   const issues = logicIssues(model);
   return (
     <Stack gap={3}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Rules", value: String(model.logic.length) },
         { label: "Fields", value: String(model.fields.length) },
         { label: "Problems", value: <Pill tone={issues.some((issue) => issue.level === "fail") ? "danger" : issues.length ? "warning" : "success"}>{issues.length}</Pill> },
@@ -689,7 +686,7 @@ export function SubmissionDrawer({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={4}>
       <div><span className="ds-subtle">FORMS / RESPONSE DETAIL</span><h3 style={{ margin: "var(--space-2) 0" }}>{submission.title}</h3><p className="ds-subtle">Review the original answers and record a follow-up. Sensitive values stay hidden unless revealed explicitly.</p></div>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "From", value: submission.title },
         { label: "Received", value: context.dateTime(submission.at ?? submission.createdAt) },
         { label: "Answered version", value: String(submission.fields.formVersion ?? "not recorded") },
@@ -697,7 +694,7 @@ export function SubmissionDrawer({ context }: { context: ScreenContext }) {
         { label: "Notification", value: String(submission.fields.notificationState ?? "not recorded").replace(/_/g, " ") },
       ]} />
       <h4>Answers</h4>
-      <Properties rows={Object.entries(submission.fields)
+      <KeyValueList items={Object.entries(submission.fields)
         .filter(([key]) => !["formVersion", "notificationState", "assignee"].includes(key))
         .map(([key, value]) => ({
           label: key,
@@ -730,7 +727,7 @@ export function PrivacyControl({ context }: { context: ScreenContext }) {
   const overdue = children.filter((row) => daysBetween(new Date(row.at ?? row.createdAt), now) > model.settings.retentionDays);
   return (
     <Stack gap={3}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Retention period", value: `${model.settings.retentionDays} days` },
         { label: "Submissions held", value: String(children.length) },
         { label: "Past the period", value: <Pill tone={overdue.length ? "warning" : "success"}>{overdue.length}</Pill> },
@@ -778,7 +775,7 @@ export function RouteRetry({ context }: { context: ScreenContext }) {
   const wanted = children.filter((row) => row.fields.notificationState === "not_sent_no_mail_provider");
   return (
     <Stack gap={3}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Notification wanted", value: model.settings.notifyEnabled ? "Yes" : "No" },
         { label: "Recipient", value: model.settings.notifyTo || "Not set" },
         { label: "Submissions waiting", value: String(wanted.length) },
@@ -875,7 +872,7 @@ export function PublishScreen({ context, lens }: { context: ScreenContext; lens:
       <Grid>
         <Card span={6} eyebrow="ACCESS" prov="human" title="Who can answer" subtitle="Shapes the interface; it is not an account security boundary">
           <Stack gap={3}>
-            <Properties rows={[
+            <KeyValueList items={[
               { label: "Audience preference", value: model.settings.access === "link" ? "Link mode (local only)" : "Workspace mode (local only)" },
               { label: "State", value: <Pill tone={model.settings.closed ? "warning" : "success"} dot>{model.settings.closed ? "Closed" : "Open"}</Pill> },
               { label: "Version", value: String(model.settings.version) },
@@ -896,7 +893,7 @@ export function PublishScreen({ context, lens }: { context: ScreenContext; lens:
         </Card>
         <Card span={6} eyebrow="VERSIONS" prov="posted" title="Version trail" subtitle="So an old answer is readable against the form it answered">
           <Stack gap={3}>
-            <Properties rows={[
+            <KeyValueList items={[
               { label: "Current version", value: String(model.settings.version) },
               { label: "Questions", value: String(model.fields.filter((field) => !STRUCTURAL.includes(field.type)).length) },
               { label: "Rules", value: String(model.logic.length) },
@@ -950,7 +947,7 @@ export function PublishReviewForm({ context, close }: { context: ScreenContext; 
           </ul>
         </Notice>
       )}
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Questions", value: String(answerable.length) },
         { label: "Pages", value: String(pages(model).length) },
         { label: "Rules", value: String(model.logic.length) },
@@ -1009,7 +1006,7 @@ export function AccessControlPanel({ context }: { context: ScreenContext }) {
   if (!record) return <NoForm />;
   return (
     <Stack gap={3}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Audience", value: model.settings.access === "link" ? "Anyone with the link" : "People in this workspace" },
         { label: "Open", value: model.settings.closed ? "No" : "Yes" },
         { label: "Retention", value: `${model.settings.retentionDays} days` },
@@ -1063,7 +1060,7 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
           Views, starts and abandonment all require a counter on the page a person opens. Nothing is hosted and nothing is counted, so three of the four figures above are blank rather than estimated. The one that is real is the number of submissions.
         </Notice>
         <Card eyebrow="MEASURED" prov="posted" title="What is measurable" subtitle="From the records themselves">
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Submissions", value: String(children.length) },
             { label: "Distinct versions answered", value: String(new Set(children.map((row) => String(row.fields.formVersion ?? "?"))).size) },
             { label: "Reviewed", value: String(children.filter((row) => row.status !== "new").length) },
@@ -1126,7 +1123,7 @@ export function FormAnalytics({ context, lens }: { context: ScreenContext; lens:
           Where a person came from is in the request headers of a hosted page. There is no hosted page, so no source is recorded and none is guessed.
         </Notice>
         <Card eyebrow="MEASURED" prov="posted" title="What the record does know" subtitle="Everything below is read from the submission itself">
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Created by", value: children.length ? [...new Set(children.map((row) => row.createdBy))].join(", ") : "No submissions" },
             { label: "Organisation", value: context.org.name },
             { label: "Versions answered", value: children.length ? [...new Set(children.map((row) => String(row.fields.formVersion ?? "?")))].join(", ") : "None" },
@@ -1207,7 +1204,7 @@ export function FieldInsight({ context }: { context: ScreenContext }) {
         <Notice tone="neutral" title="No submissions to learn from">There is nothing to compare until the form has been answered.</Notice>
       ) : worst && worst.empty > 0 ? (
         <>
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Question", value: worst.field.label },
             { label: "Left empty", value: `${worst.empty} of ${children.length}` },
             { label: "Required", value: worst.field.required ? "Yes" : "No" },
@@ -1232,7 +1229,7 @@ export function ShareDialog({ context }: { context: ScreenContext }) {
   const link = `/o/${context.org.slug}/forms/forms/${record.id}/publish`;
   return (
     <Stack gap={3}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Form", value: record.title },
         { label: "State", value: <Pill tone={record.status === "live" ? "success" : "neutral"}>{record.status}</Pill> },
         { label: "Version", value: String(model.settings.version) },

@@ -98,20 +98,13 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
 
   const palette = (
     <div className="t6-pane" key="palette">
-      <Stack gap={4}>
-        <div>
-          <h3 style={{ fontSize: "var(--text-md)" }}>Components</h3>
-          <p className="ds-subtle">Press to add after the selection, or drag onto a position. New components bind to {model.entities[0]?.name ?? "the first entity"}.</p>
-        </div>
-        <div className="t6-palette">
-          {(Object.keys(COMPONENT_LABELS) as ComponentKind[]).map((kind) => (
-            <PaletteChip key={kind} type={kind} label={COMPONENT_LABELS[kind]} hint={COMPONENT_HINTS[kind]} icon={COMPONENT_ICONS[kind]} onInsert={() => insert(kind)} />
-          ))}
-        </div>
-        <Notice tone="info" title="Keyboard equivalent">
-          Each component has Move up and Move down buttons, and the grip picks it up with Space.
-        </Notice>
-      </Stack>
+      <h3 className="bb-pane-title">Components</h3>
+      <div className="t6-palette" role="group" aria-label={`Components. Press to add after the selection, or drag onto a position. New components bind to ${model.entities[0]?.name ?? "the first entity"}.`}>
+        {(Object.keys(COMPONENT_LABELS) as ComponentKind[]).map((kind) => (
+          <PaletteChip key={kind} type={kind} label={COMPONENT_LABELS[kind]} hint={COMPONENT_HINTS[kind]} icon={COMPONENT_ICONS[kind]} onInsert={() => insert(kind)} />
+        ))}
+      </div>
+      <p className="bb-pane-note">New components bind to {model.entities[0]?.name ?? "the first entity"}.</p>
     </div>
   );
 
@@ -174,7 +167,7 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
   );
 
   const inspector = (
-    <div className="t6-pane" data-kind="inspector" key="inspector">
+    <div className="t6-pane bb-inspector" data-kind="inspector" key="inspector">
       {component
         ? <ComponentInspector component={component} model={model} onEdit={(patch) => void editComponent(context, record.id, component.id, patch, `Edited ${component.title}`)} onRemove={() => { setComponents(screen!.components.filter((item) => item.id !== component.id), `Removed ${component.title}`); ui.selectComponent(""); }} />
         : <Empty title="No component selected" icon={<LayoutList size={18} />}>Select one on the canvas to bind it to an entity and choose its fields.</Empty>}
@@ -240,9 +233,7 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
   const responsive = (
     <div className="t6-pane" data-kind="canvas" style={{ gridColumn: "1 / -1" }} key="responsive">
       <Stack gap={4}>
-        <Notice tone="info" title="The generated layout uses the same twelve-column grid as this workspace">
-          Each component declares a span. The grid collapses to one column under 900px, so what you see below is what the built screen does.
-        </Notice>
+        <p className="ds-subtle">Twelve-column grid; each component declares a span and the grid collapses to one column under 900px.</p>
         <DeviceLayoutPreview components={(screen?.components ?? []).map((item) => ({ id: item.id, title: item.title, span: item.span }))} />
         <Grid>
           {(screen?.components ?? []).map((item) => (
@@ -285,26 +276,19 @@ export function AppBuilder({ context }: { context: ScreenContext }) {
 
   return (
     <div className="t6-shell">
-      <section className="t6-build-editor-overview" aria-label="Build editor overview">
-        <Row gap={3} wrap>
-          <div className="ds-grow" style={{ minWidth: 220 }}>
-            <span className="ds-subtle">BUILD / VISUAL WORKSPACE</span>
-            <h2>{record.title}</h2>
-            <p className="ds-subtle">Structure your application, bind real data, inspect components and test the experience before release.</p>
-          </div>
-          <Row gap={2} wrap>
-            <Button size="sm" variant="secondary" onClick={() => context.setTab("Data")}>Data model</Button>
-            <Button size="sm" variant="secondary" onClick={() => context.setTab("Preview")}>Preview</Button>
-            <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>Checks</Button>
-          </Row>
-        </Row>
-        <div className="t6-build-library-metrics" aria-label="Builder model status">
-          <div><span>Screens</span><strong>{model.screens.length}</strong></div>
-          <div><span>Components</span><strong>{componentCount}</strong></div>
-          <div><span>Entities</span><strong>{model.entities.length}</strong></div>
-          <div><span>Unbound components</span><strong>{unboundCount}</strong></div>
+      <section className="bb-bar" aria-label="Build editor overview">
+        <div className="bb-bar-stats" role="group" aria-label="Builder model status">
+          <span><b className="ds-num">{model.screens.length}</b> screens</span>
+          <span><b className="ds-num">{componentCount}</b> components</span>
+          <span><b className="ds-num">{model.entities.length}</b> entities</span>
+          <span data-tone={unboundCount > 0 ? "warning" : undefined}><b className="ds-num">{unboundCount}</b> unbound</span>
+          {totals.fail > 0 && <button type="button" className="bb-bar-fail" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>{totals.fail} failing {totals.fail === 1 ? "check" : "checks"}</button>}
         </div>
-        {totals.fail > 0 && <Notice tone="warning" title={`${totals.fail} failing model checks`}>Review the model checks before relying on a generated release.</Notice>}
+        <div className="bb-bar-links">
+          <Button size="sm" variant="ghost" onClick={() => context.setTab("Data")}>Data model</Button>
+          <Button size="sm" variant="ghost" onClick={() => context.setTab("Preview")}>Preview</Button>
+          <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/build/projects/${record.id}/tests`)}>Checks</Button>
+        </div>
       </section>
       <div className="t6-shell-bar">
         <Toolbar label="App builder">
@@ -369,11 +353,14 @@ export function ComponentInspector({
   const [removeId, setRemoveId] = useState<string | null>(null);
   return (
     <Stack gap={3}>
-      <div className="t6-build-component-context" aria-label="Selected Build component">
-        <span className="ds-subtle">BUILD / COMPONENT SETTINGS</span>
-        <Row gap={2} wrap><strong className="ds-grow">{component.title || "Untitled component"}</strong><Pill tone="neutral">{COMPONENT_LABELS[component.kind]}</Pill></Row>
-        <p className="ds-subtle">{component.kind === "text" ? "Static screen content" : entity ? `Reads ${entity.name} · ${component.fieldIds.length || "default"} field selection` : "No entity selected yet"}</p>
-      </div>
+      <header className="bb-insp-head" aria-label="Selected Build component">
+        <div className="ds-grow">
+          <span className="ds-eyebrow">Selected component</span>
+          <strong className="bb-insp-title">{component.title || "Untitled component"}</strong>
+          <span className="ds-subtle">{component.kind === "text" ? "Static screen content" : entity ? `Reads ${entity.name} · ${component.fieldIds.length || "default"} field selection` : "No entity selected yet"}</span>
+        </div>
+        <Pill tone="neutral">{COMPONENT_LABELS[component.kind]}</Pill>
+      </header>
       <Field label="Title"><TextInput value={component.title} onChange={(event) => onEdit({ title: event.target.value })} /></Field>
       {component.kind === "text" ? (
         <Field label="Copy"><TextArea rows={4} value={component.text} onChange={(event) => onEdit({ text: event.target.value })} /></Field>

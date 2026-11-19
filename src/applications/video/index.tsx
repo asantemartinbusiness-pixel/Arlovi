@@ -5,7 +5,8 @@ import {
   SquareSplitHorizontal, ArrowLeftToLine, ArrowRightToLine,
 } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill, Properties,
+  Button, Card, Checkbox, DataGrid, DrawerActions, Empty, FactGrid, Field, Grid, KeyValueList, Meter, ModalActions, Notice,
+  OverlayActions, OverlayCancel, OverlaySection, OverlaySummary, OVERLAY_WIDTH, Pill, Properties,
   Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Tool, Toolbar,
 } from "@/design-system";
 import { registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
@@ -313,7 +314,7 @@ function timelineHeight(doc: VideoDoc): number {
   return 26 + doc.tracks.reduce((sum, track) => sum + track.height, 0) + 32;
 }
 
-function ClipPanel({ handle, context }: { handle: DocHandle<VideoDoc>; context: ScreenContext }) {
+function ClipPanel({ handle, context, inOverlay }: { handle: DocHandle<VideoDoc>; context: ScreenContext; inOverlay?: boolean }) {
   const ui = useStore(videoUi);
   const doc = handle.doc;
   if (!doc) return null;
@@ -321,34 +322,35 @@ function ClipPanel({ handle, context }: { handle: DocHandle<VideoDoc>; context: 
   if (!clip) {
     return (
       <Stack gap={3}>
-        <Notice tone="info" title="No clip selected">Click a clip on the timeline. Drag its ends to trim, and use the ripple or roll tool to change the edit.</Notice>
         <PanelGroup title="Sequence">
-          <Properties rows={[
-            { label: "Duration", value: <span className="ds-num">{timecode(doc.duration, doc.fps)}</span> },
-            { label: "Content ends", value: <span className="ds-num">{timecode(sequenceDuration(doc), doc.fps)}</span> },
-            { label: "Frame", value: <span className="ds-num">{doc.width} × {doc.height} at {doc.fps} fps</span> },
-            { label: "Clips", value: doc.clips.length },
+          <KeyValueList items={[
+            { label: "Duration", value: timecode(doc.duration, doc.fps), mono: true },
+            { label: "Content ends", value: timecode(sequenceDuration(doc), doc.fps), mono: true },
+            { label: "Frame", value: `${doc.width} × ${doc.height} at ${doc.fps} fps`, mono: true },
+            { label: "Clips", value: doc.clips.length, mono: true },
           ]} />
         </PanelGroup>
+        <p className="vx-mini">Select a clip on the timeline to trim, retime or grade it. Drag its ends to trim; the ripple and roll tools change the edit.</p>
       </Stack>
     );
   }
   const source = sourceOf(doc, clip);
   const set = (patch: Partial<Clip>, label: string) => handle.edit((current) => patchClip(current, clip.id, patch), label);
+  const locked = lockReason(doc, clip);
   return (
     <Stack gap={3}>
       <PanelGroup title={clip.name}>
-        <Properties rows={[
-          { label: "Starts", value: <span className="ds-num">{timecode(clip.start, doc.fps)}</span> },
-          { label: "Ends", value: <span className="ds-num">{timecode(clipEnd(clip), doc.fps)}</span> },
-          { label: "Duration", value: <span className="ds-num">{timecode(clip.duration, doc.fps)} ({Math.round(clip.duration * doc.fps)} frames)</span> },
-          { label: "Source in", value: <span className="ds-num">{timecode(clip.sourceIn, doc.fps)}</span> },
+        <KeyValueList items={[
+          { label: "Starts", value: timecode(clip.start, doc.fps), mono: true },
+          { label: "Ends", value: timecode(clipEnd(clip), doc.fps), mono: true },
+          { label: "Duration", value: `${timecode(clip.duration, doc.fps)} (${Math.round(clip.duration * doc.fps)} frames)`, mono: true },
+          { label: "Source in", value: timecode(clip.sourceIn, doc.fps), mono: true },
           { label: "Source", value: source ? `${source.name} (${timecode(source.duration, doc.fps)})` : "none" },
         ]} />
       </PanelGroup>
-      {lockReason(doc, clip) && (
+      {locked && (
         <Notice tone="warning" title="Locked">
-          {lockReason(doc, clip)} It cannot be moved, trimmed, split or deleted until it is unlocked.
+          {locked} It cannot be moved, trimmed, split or deleted until it is unlocked.
         </Notice>
       )}
       <PanelGroup title="Trim by the frame">
@@ -365,12 +367,12 @@ function ClipPanel({ handle, context }: { handle: DocHandle<VideoDoc>; context: 
           ))}
         </Row>
         <Row gap={1} wrap>
-          <Button size="sm" variant="ghost" disabled={Boolean(lockReason(doc, clip))} onClick={() => handle.edit((current) => trimToTime(current, clip.id, "start", ui.playhead), "Trim the head to the playhead")}>Head to playhead</Button>
-          <Button size="sm" variant="ghost" disabled={Boolean(lockReason(doc, clip))} onClick={() => handle.edit((current) => trimToTime(current, clip.id, "end", ui.playhead), "Trim the tail to the playhead")}>Tail to playhead</Button>
+          <Button size="sm" variant="ghost" disabled={Boolean(locked)} onClick={() => handle.edit((current) => trimToTime(current, clip.id, "start", ui.playhead), "Trim the head to the playhead")}>Head to playhead</Button>
+          <Button size="sm" variant="ghost" disabled={Boolean(locked)} onClick={() => handle.edit((current) => trimToTime(current, clip.id, "end", ui.playhead), "Trim the tail to the playhead")}>Tail to playhead</Button>
         </Row>
         <Row gap={1} wrap>
-          <Button size="sm" variant="secondary" onClick={() => { const result = splitClip(doc, clip.id, ui.playhead); if (result.newClipId) handle.edit(() => result.doc, "Split at the playhead"); else context.toast("Nothing to split", lockReason(doc, clip) ?? "The playhead is not inside this clip, or it is within a frame of an edge.", "blocked"); }}>Split at the playhead</Button>
-          <Button size="sm" variant="ghost" onClick={() => { handle.edit((current) => rippleDelete(current, clip.id), "Ripple delete"); videoUi.set((current) => ({ ...current, selectedClipId: undefined })); }}>Ripple delete</Button>
+          <Button size="sm" variant="secondary" onClick={() => { const result = splitClip(doc, clip.id, ui.playhead); if (result.newClipId) handle.edit(() => result.doc, "Split at the playhead"); else context.toast("Nothing to split", locked ?? "The playhead is not inside this clip, or it is within a frame of an edge.", "blocked"); }}>Split at the playhead</Button>
+          <Button size="sm" variant="outline-danger" title="Removes the clip and closes the gap. Undo restores it." onClick={() => { handle.edit((current) => rippleDelete(current, clip.id), "Ripple delete"); videoUi.set((current) => ({ ...current, selectedClipId: undefined })); }}>Ripple delete</Button>
         </Row>
       </PanelGroup>
       <PanelGroup title="Transform and opacity">
@@ -392,7 +394,7 @@ function ClipPanel({ handle, context }: { handle: DocHandle<VideoDoc>; context: 
           </div>
         </PanelGroup>
       )}
-      <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Clip property")}>More…</Button>
+      {!inOverlay && <Button size="sm" variant="secondary" onClick={() => context.openOverlay("Clip property")}>More…</Button>}
     </Stack>
   );
 }
@@ -580,13 +582,22 @@ function CaptionPanel({ handle, context }: { handle: DocHandle<VideoDoc>; contex
 function ExportPanel({ handle, context, record }: { handle: DocHandle<VideoDoc>; context: ScreenContext; record: string }) {
   const doc = handle.doc;
   const support = useMemo(() => recorderSupport(), []);
+  const render = useStore(renderUi);
   if (!doc) return null;
+  const preset = RENDER_PRESETS[render.preset];
+  const frames = Math.round(doc.duration * (preset ? doc.fps : doc.fps));
   return (
     <Stack gap={3}>
-      <Notice tone={support.webm ? "info" : "warning"} title={support.webm ? "This browser can encode WebM" : "This browser cannot encode video"}>
-        {support.reason}
-      </Notice>
-      <Button variant="secondary" onClick={() => context.navigate(context.path("/o/:org/video/projects/:id/export", context.params.id))}>Open the export screen</Button>
+      <PanelGroup title="Where it renders">
+        <KeyValueList items={[
+          { label: "Renderer", value: "This browser, on this machine" },
+          { label: "Container", value: support.webm ? "WebM" : "none available", tone: support.webm ? undefined : "danger" },
+          { label: "Frames", value: String(frames), mono: true },
+          { label: "Not produced", value: "MP4, H.264, a hosted render" },
+        ]} />
+        {!support.webm && <p className="vx-mini">{support.reason}</p>}
+      </PanelGroup>
+      <Button variant="primary" onClick={() => context.navigate(context.path("/o/:org/video/projects/:id/export", context.params.id))}>Open the render screen</Button>
       <Button
         variant="ghost"
         onClick={() => {
@@ -1339,34 +1350,27 @@ function ExportScreen({ context, lens }: { context: ScreenContext; lens: "Export
     );
   }
 
+  const frames = Math.round(doc.duration * presets[preset].fps);
   return (
     <Grid>
-      <Card span={5} eyebrow="EXPORT" prov="human" title="Render settings">
+      <Card span={5} eyebrow="RENDER" prov="human" title="Render settings">
         <Stack gap={3}>
           <Field label="Preset">
             <Select value={preset} disabled={busy} onChange={(event) => setPreset(event.target.value)}>
               {Object.keys(presets).map((key) => <option key={key}>{key}</option>)}
             </Select>
           </Field>
-          <Properties rows={[
-            { label: "Frame", value: <span className="ds-num">{presets[preset].width} × {presets[preset].height}</span> },
-            { label: "Rate", value: <span className="ds-num">{presets[preset].fps} fps</span> },
-            { label: "Bitrate", value: <span className="ds-num">{(presets[preset].bitrate / 1_000_000).toFixed(1)} Mb/s</span> },
-            { label: "Frames to draw", value: <span className="ds-num">{Math.round(doc.duration * presets[preset].fps)}</span> },
-            { label: "Container", value: support.mimeType ?? "unavailable" },
+          <FactGrid columns={2} dense items={[
+            { label: "Frame", value: `${presets[preset].width} × ${presets[preset].height}`, mono: true },
+            { label: "Rate", value: `${presets[preset].fps} fps`, mono: true },
+            { label: "Bitrate", value: `${(presets[preset].bitrate / 1_000_000).toFixed(1)} Mb/s`, mono: true },
+            { label: "Frames to draw", value: frames, mono: true },
+            { label: "Container", value: support.mimeType ?? "unavailable", mono: true, tone: support.webm ? undefined : "danger" },
           ]} />
-          {support.webm ? (
-            <Notice tone="info" title="What the export actually does">
-              Every frame is drawn onto a canvas and the canvas stream is handed to the browser's recorder, which encodes WebM. It runs in real time — a {Math.round(doc.duration)} second sequence takes about {Math.round(doc.duration)} seconds — and the resulting file is checked for a non-zero size before it is offered.
-            </Notice>
-          ) : (
-            <Notice tone="danger" title="This browser cannot encode a video file">
-              {support.reason} Nothing here can produce an MP4: there is no encoder for it in a browser without shipping one, and none is shipped. The contact sheet and the frame sequence below are what can honestly be produced.
-            </Notice>
-          )}
-          <Notice tone="warning" title="No MP4, and no render farm">
-            H.264 and HEVC are not produced here. There is no render service connected, so every frame is drawn by this machine. A hosted render would be a different capability and is not pretending to exist.
-          </Notice>
+          <div className="vd-boundary" data-ok={support.webm || undefined}>
+            <div className="vd-boundary-row"><Pill tone={support.webm ? "success" : "danger"} dot>Renders here</Pill><span>{support.webm ? <>This machine draws every frame and records WebM in real time, about <span className="ds-num">{Math.round(doc.duration)}</span> s. The file is checked for a non-zero size before it is offered.</> : <>{support.reason} No video file can be produced here.</>}</span></div>
+            <div className="vd-boundary-row"><Pill tone="warning" dot>Not produced</Pill><span>MP4, H.264 and HEVC. No render service is connected, and nothing is uploaded.</span></div>
+          </div>
           {progress && (
             <div>
               <Meter value={progress.frame} max={progress.frames} label="Render progress" />
@@ -1375,13 +1379,13 @@ function ExportScreen({ context, lens }: { context: ScreenContext; lens: "Export
           )}
           <Row gap={2} wrap>
             <Button variant="primary" busy={busy} disabled={!support.webm} onClick={() => void runExport()}>
-              {support.webm ? `Render ${Math.round(doc.duration * presets[preset].fps)} frames to WebM` : "WebM is unavailable here"}
+              {support.webm ? `Render ${frames} frames to WebM` : "WebM is unavailable here"}
             </Button>
             {busy && <Button variant="outline-danger" onClick={() => cancelRender(context)}>Cancel</Button>}
           </Row>
         </Stack>
       </Card>
-      <Card span={7} eyebrow="ALWAYS AVAILABLE" prov="human" title="What can be produced without an encoder" subtitle="These need no codec support at all">
+      <Card span={7} eyebrow="WITHOUT AN ENCODER" prov="human" title="What can be produced anywhere" subtitle="A numbered PNG sequence is lossless and can be encoded elsewhere; it never depends on this browser's encoder.">
         <Stack gap={3}>
           <PreviewMonitor doc={doc} time={videoUi.get().playhead} height={200} />
           <Row gap={2} wrap>
@@ -1426,9 +1430,6 @@ function ExportScreen({ context, lens }: { context: ScreenContext; lens: "Export
               Edit list (JSON)
             </Button>
           </Row>
-          <Notice tone="info" title="Why a frame sequence is offered">
-            A numbered sequence of PNGs is lossless and can be encoded anywhere. It is slower to download than a video file and much larger, which is why it is not the default, but it never depends on what this browser can encode.
-          </Notice>
         </Stack>
       </Card>
     </Grid>
@@ -1631,7 +1632,7 @@ function NewSequence({ context, close }: { context: ScreenContext; close: () => 
   return (
     <form
       id="video-new-sequence"
-      className="ds-stack ds-gap-4"
+      className="ds-stack ds-gap-3"
       onSubmit={async (event) => {
         event.preventDefault();
         const [width, height] = size.split("x").map(Number);
@@ -1649,9 +1650,9 @@ function NewSequence({ context, close }: { context: ScreenContext; close: () => 
         context.navigate(context.path("/o/:org/video/projects/:id", made.id));
       }}
     >
-      <Field label="Name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} required placeholder="Showroom walkthrough" /></Field>
+      <Field label="Name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} required placeholder="Showroom walkthrough" autoFocus /></Field>
       <Row gap={3} wrap>
-        <Field label="Frame rate">
+        <Field label="Frame rate" hint="Fixed at creation">
           <Select value={fps} onChange={(event) => setFps(Number(event.target.value))}>
             {[24, 25, 30, 50, 60].map((rate) => <option key={rate} value={rate}>{rate} fps</option>)}
           </Select>
@@ -1662,9 +1663,7 @@ function NewSequence({ context, close }: { context: ScreenContext; close: () => 
           </Select>
         </Field>
       </Row>
-      <Notice tone="info" title="The timebase is fixed at creation">
-        Every clip is snapped to a whole frame at this rate. A source shot at another rate is conformed by mapping frames, not by guessing.
-      </Notice>
+      <p className="vx-mini">Every clip snaps to a whole frame at this rate. A source shot at another rate is conformed by mapping frames, not by guessing.</p>
     </form>
   );
 }
@@ -1677,42 +1676,49 @@ function MediaImport({ context, close }: { context: ScreenContext; close: () => 
   if (!record || !handle.doc) return <Empty title="Open a project first" />;
   return (
     <Stack gap={3}>
-      <Notice tone="warning" title="No video file is stored in this workspace">
-        A source added here is a generated shot: a look and a motion the renderer draws from. It is honest about what it is, and the preview, the scrub and the export all use it.
-      </Notice>
-      <Field label="Name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="Workshop hands" /></Field>
-      <Field label="Kind">
-        <Select value={kind} onChange={(event) => setKind(event.target.value as "video")}>
-          <option value="video">Picture</option>
-          <option value="audio">Audio</option>
-        </Select>
-      </Field>
-      <Field label="Licence">
-        <Select value={license} onChange={(event) => setLicense(event.target.value)}>
-          {["Unknown", "Company-owned", "Licensed — single use", "Licensed — unlimited", "Model released", "No model release"].map((option) => <option key={option}>{option}</option>)}
-        </Select>
-      </Field>
-      {license === "Unknown" && <Notice tone="danger" title="Rights are not recorded">A clip whose rights are unknown is flagged in the project list and should not be delivered.</Notice>}
-      <Button
-        variant="primary"
-        disabled={!name.trim()}
-        onClick={() => {
-          const id = `src-${wallMs().toString(36)}`;
-          handle.edit((current) => ({
-            ...current,
-            sources: [...current.sources, {
-              id, name, kind, duration: 20,
-              look: { hue: (current.sources.length * 47) % 360, motion: "pan", subject: kind === "audio" ? "bars" : "room", grain: 0.05 },
-              tone: kind === "audio" ? { root: 110, kind: "room", tempo: 90 } : undefined,
-              license, credit: "not recorded", proxy: "generated",
-            }],
-          }), `Add the source ${name}`);
-          context.toast("Source added", `${name} is in the media bin of ${record.title}. Nothing was uploaded: the picture is generated.`);
-          close();
-        }}
-      >
-        Add the source
-      </Button>
+      <p className="ds-prose">No video file is stored in this workspace. A source added here is a generated shot: a look and a motion the renderer draws from, used by the preview, the scrub and the export.</p>
+      <Field label="Name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="Workshop hands" autoFocus /></Field>
+      <Row gap={3} wrap>
+        <Field label="Kind">
+          <Select value={kind} onChange={(event) => setKind(event.target.value as "video")}>
+            <option value="video">Picture</option>
+            <option value="audio">Audio</option>
+          </Select>
+        </Field>
+        <Field label="Licence">
+          <Select value={license} onChange={(event) => setLicense(event.target.value)}>
+            {SOURCE_LICENCES.map((option) => <option key={option}>{option}</option>)}
+          </Select>
+        </Field>
+      </Row>
+      {license === "Unknown" && <Notice tone="danger" title="Rights are not recorded">A source whose rights are unknown is flagged in the project list and should not be delivered.</Notice>}
+      <ModalActions>
+        <OverlayActions
+          primary={
+            <Button
+              variant="primary"
+              disabled={!name.trim()}
+              onClick={() => {
+                const id = `src-${wallMs().toString(36)}`;
+                handle.edit((current) => ({
+                  ...current,
+                  sources: [...current.sources, {
+                    id, name, kind, duration: 20,
+                    look: { hue: (current.sources.length * 47) % 360, motion: "pan", subject: kind === "audio" ? "bars" : "room", grain: 0.05 },
+                    tone: kind === "audio" ? { root: 110, kind: "room", tempo: 90 } : undefined,
+                    license, credit: "not recorded", proxy: "generated",
+                  }],
+                }), `Add the source ${name}`);
+                context.toast("Source added", `${name} is in the media bin of ${record.title}. Nothing was uploaded: the picture is generated.`);
+                close();
+              }}
+            >
+              Add the source
+            </Button>
+          }
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -1720,7 +1726,7 @@ function MediaImport({ context, close }: { context: ScreenContext; close: () => 
 function ClipProperty({ context }: { context: ScreenContext }) {
   const { record, handle } = useVideoDoc(context);
   if (!record || !handle.doc) return <Empty title="Open a project first" />;
-  return <ClipPanel handle={handle} context={context} />;
+  return <ClipPanel handle={handle} context={context} inOverlay />;
 }
 
 function TransitionEditor({ context, close }: { context: ScreenContext; close: () => void }) {
@@ -1739,10 +1745,10 @@ function TransitionEditor({ context, close }: { context: ScreenContext; close: (
         <Notice tone="warning" title="Nothing precedes this clip">A transition needs a clip on each side of the join.</Notice>
       ) : (
         <>
-          <Properties rows={[
+          <FactGrid columns={3} dense items={[
             { label: "From", value: previous.name },
             { label: "To", value: clip.name },
-            { label: "At", value: <span className="ds-num">{timecode(clip.start, doc.fps)}</span> },
+            { label: "At", value: timecode(clip.start, doc.fps), mono: true },
           ]} />
           <Field label="Kind">
             <Select
@@ -1759,7 +1765,7 @@ function TransitionEditor({ context, close }: { context: ScreenContext; close: (
               <option value="wipe-left">Wipe from the left</option>
             </Select>
           </Field>
-          <Field label={`Duration ${existing?.duration.toFixed(2) ?? "0.80"}s`}>
+          <Field label={`Duration ${existing?.duration.toFixed(2) ?? "0.80"}s`} hint="The compositor mixes the two clips across this time, so scrubbing through the join shows the real mix.">
             <input
               className="vx-range"
               type="range"
@@ -1776,12 +1782,12 @@ function TransitionEditor({ context, close }: { context: ScreenContext; close: (
               }), "Set the transition duration")}
             />
           </Field>
-          {existing && (
-            <Button size="sm" variant="ghost" onClick={() => { handle.edit((current) => ({ ...current, transitions: current.transitions.filter((transition) => transition.id !== existing.id) }), "Remove the transition"); close(); }}>Remove the transition</Button>
-          )}
-          <Notice tone="info" title="The transition is rendered, not drawn as a label">
-            The compositor mixes the two clips across the duration, so scrubbing through the join shows the real mix at every frame.
-          </Notice>
+          <ModalActions>
+            <OverlayActions
+              primary={<Button variant="primary" onClick={close}>Done</Button>}
+              end={existing ? <Button variant="outline-danger" onClick={() => { handle.edit((current) => ({ ...current, transitions: current.transitions.filter((transition) => transition.id !== existing.id) }), "Remove the transition"); close(); }}>Remove the transition</Button> : undefined}
+            />
+          </ModalActions>
         </>
       )}
     </Stack>
@@ -1794,14 +1800,14 @@ function ProxyStatus({ context }: { context: ScreenContext }) {
   const doc = handle.doc;
   return (
     <Stack gap={3}>
-      <Notice tone="info" title="There is nothing to transcode">
-        Each source's picture is generated at whatever size is asked for, so a smaller proxy would be no faster. Where a real file existed, this is where its transcode would be queued.
-      </Notice>
-      <Properties rows={[
-        { label: "Sources", value: doc.sources.length },
-        { label: "Generated on demand", value: doc.sources.filter((source) => source.proxy === "generated").length },
-        { label: "Offline", value: doc.sources.filter((source) => source.missing).length },
+      <FactGrid columns={3} items={[
+        { label: "Sources", value: doc.sources.length, mono: true },
+        { label: "Generated on demand", value: doc.sources.filter((source) => source.proxy === "generated").length, mono: true },
+        { label: "Offline", value: doc.sources.filter((source) => source.missing).length, mono: true, tone: doc.sources.some((source) => source.missing) ? "danger" : undefined },
       ]} />
+      <OverlaySection title="There is nothing to transcode" tone="info">
+        Each source's picture is generated at whatever size is asked for, so a smaller proxy would be no faster. Where a real file existed, this is where its transcode would be queued.
+      </OverlaySection>
     </Stack>
   );
 }
@@ -1814,17 +1820,9 @@ function MediaInspector({ context }: { context: ScreenContext }) {
   const source = doc.sources.find((item) => item.id === payload?.id) ?? doc.sources[0];
   if (!source) return <Empty title="No sources" />;
   const uses = doc.clips.filter((clip) => clip.sourceId === source.id);
+  const patchSource = (change: Partial<MediaSource>, label: string) => handle.edit((current) => ({ ...current, sources: current.sources.map((item) => (item.id === source.id ? { ...item, ...change } : item)) }), label);
   return (
     <Stack gap={3}>
-      <Properties rows={[
-        { label: "Name", value: source.name },
-        { label: "Kind", value: source.kind },
-        { label: "Duration", value: <span className="ds-num">{timecode(source.duration, doc.fps)}</span> },
-        { label: "Used by", value: <><span className="ds-num">{uses.length}</span> clips</> },
-        { label: "Licence", value: source.license },
-        { label: "Credit", value: source.credit },
-        { label: "State", value: source.missing ? "offline" : "present" },
-      ]} />
       {source.kind !== "audio" && (
         <img
           src={frameDataUrl({ ...doc, tracks: [{ id: "preview", name: "preview", kind: "video", order: 1, muted: false, solo: false, locked: false, height: 40 }], clips: [{ id: "preview", trackId: "preview", start: 0, sourceIn: 0, duration: source.duration, sourceId: source.id, name: source.name, opacity: 1, transform: { scale: 1, x: 0, y: 0, rotation: 0 }, effects: [], fadeIn: 0, fadeOut: 0 }] }, source.duration / 3, 400)}
@@ -1832,15 +1830,94 @@ function MediaInspector({ context }: { context: ScreenContext }) {
           style={{ width: "100%", borderRadius: 6 }}
         />
       )}
-      <Field label="Licence">
-        <Select value={source.license} onChange={(event) => handle.edit((current) => ({ ...current, sources: current.sources.map((item) => (item.id === source.id ? { ...item, license: event.target.value } : item)) }), "Change the licence")}>
-          {["Unknown", "Company-owned", "Licensed — single use", "Licensed — unlimited", "Model released", "No model release"].map((option) => <option key={option}>{option}</option>)}
-        </Select>
-      </Field>
-      <Field label="Credit">
-        <TextInput value={source.credit} onChange={(event) => handle.edit((current) => ({ ...current, sources: current.sources.map((item) => (item.id === source.id ? { ...item, credit: event.target.value } : item)) }), "Change the credit")} />
-      </Field>
+      <FactGrid columns={3} dense items={[
+        { label: "Duration", value: timecode(source.duration, doc.fps), mono: true },
+        { label: "Used by", value: `${uses.length} clip${uses.length === 1 ? "" : "s"}`, mono: true },
+        { label: "State", value: source.missing ? "offline" : "present", tone: source.missing ? "danger" : undefined },
+      ]} />
+      <OverlaySection title="Rights" hint="Saved as you change them" tone={source.license === "Unknown" ? "danger" : "neutral"}>
+        <Field label="Licence">
+          <Select value={source.license} onChange={(event) => patchSource({ license: event.target.value }, "Change the licence")}>
+            {SOURCE_LICENCES.map((option) => <option key={option}>{option}</option>)}
+          </Select>
+        </Field>
+        <Field label="Credit">
+          <TextInput value={source.credit} onChange={(event) => patchSource({ credit: event.target.value }, "Change the credit")} />
+        </Field>
+        {source.license === "Unknown" && <p className="vx-mini">Unknown rights block delivery: record where this source came from.</p>}
+      </OverlaySection>
     </Stack>
+  );
+}
+
+/** Identity block for a source: its name, licence and length. */
+function SourceSummary({ context }: { context: ScreenContext }) {
+  const { record, handle } = useVideoDoc(context);
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const doc = handle.doc;
+  const source = doc?.sources.find((item) => item.id === payload?.id) ?? doc?.sources[0];
+  if (!record || !doc || !source) return null;
+  return (
+    <OverlaySummary
+      eyebrow={source.kind === "audio" ? "Audio source" : "Picture source"}
+      title={source.name}
+      status={<Pill tone={source.license === "Unknown" ? "danger" : "neutral"}>{source.license}</Pill>}
+      meta={[<span className="ds-num" key="d">{timecode(source.duration, doc.fps)}</span>, source.missing ? "offline" : "present", record.title]}
+    />
+  );
+}
+
+/** Identity block for the selected clip: where it sits on the timeline. */
+function ClipSummary({ context }: { context: ScreenContext }) {
+  const { record, handle } = useVideoDoc(context);
+  const ui = useStore(videoUi);
+  const doc = handle.doc;
+  const clip = doc?.clips.find((item) => item.id === ui.selectedClipId);
+  if (!record || !doc) return null;
+  if (!clip) return <OverlaySummary eyebrow="Clip" title="No clip selected" meta={[record.title]} />;
+  const track = doc.tracks.find((item) => item.id === clip.trackId);
+  return (
+    <OverlaySummary
+      eyebrow="Clip"
+      title={clip.name}
+      status={lockReason(doc, clip) ? <Pill tone="warning">locked</Pill> : undefined}
+      meta={[track?.name, <span className="ds-num" key="r">{timecode(clip.start, doc.fps)} → {timecode(clipEnd(clip), doc.fps)}</span>]}
+    />
+  );
+}
+
+/** Identity block for an audio track. */
+function TrackSummary({ context }: { context: ScreenContext }) {
+  const { record, handle } = useVideoDoc(context);
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const doc = handle.doc;
+  const track = doc?.tracks.find((item) => item.id === payload?.id) ?? doc?.tracks.find((item) => item.kind === "audio");
+  if (!record || !doc || !track) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Audio track"
+      title={track.name}
+      status={track.muted ? <Pill tone="warning">muted</Pill> : track.solo ? <Pill tone="info">solo</Pill> : undefined}
+      meta={[<span className="ds-num" key="g">{(track.gainDb ?? 0).toFixed(1)} dB</span>, `${clipsOnTrack(doc, track.id).length} clips`]}
+    />
+  );
+}
+
+/** Identity block for a caption cue. */
+function CueSummary({ context }: { context: ScreenContext }) {
+  const { record, handle } = useVideoDoc(context);
+  const ui = useStore(videoUi);
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const doc = handle.doc;
+  const cue = doc?.captions.find((item) => item.id === payload?.id) ?? doc?.captions.find((item) => ui.playhead >= item.start && ui.playhead < item.end);
+  if (!record || !doc || !cue) return null;
+  return (
+    <OverlaySummary
+      eyebrow={`Caption cue · ${cue.language}`}
+      title={<span className="ds-num">{timecode(cue.start, doc.fps)} → {timecode(cue.end, doc.fps)}</span>}
+      status={<Pill tone={cue.reviewed ? "success" : "warning"}>{cue.reviewed ? "checked" : "not checked"}</Pill>}
+      meta={[cue.speaker || "no speaker named"]}
+    />
   );
 }
 
@@ -1850,12 +1927,11 @@ function RelinkFile({ context, close }: { context: ScreenContext; close: () => v
   const missing = handle.doc.sources.filter((source) => source.missing);
   return (
     <Stack gap={3}>
-      <Notice tone="warning" title="There is no file system to search">
-        A real editor would search a folder for the file by name. Nothing here can read your disk, so relinking marks the source as present and uses the generated picture, which the clip says on its face.
-      </Notice>
+      <p className="ds-prose">There is no file system to search: nothing here can read your disk. Relinking marks the source as present and uses the generated picture, which the clip says on its face.</p>
       {missing.length === 0 ? <Notice tone="success" title="Nothing is offline" /> : missing.map((source) => (
         <Row key={source.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2)" }}>
-          <span className="ds-grow">{source.name}</span>
+          <span className="ds-grow ds-truncate">{source.name}</span>
+          <Pill tone="danger">offline</Pill>
           <Button
             size="sm"
             variant="secondary"
@@ -1884,20 +1960,16 @@ function MixerProperty({ context }: { context: ScreenContext }) {
   const doc = handle.doc;
   const track = doc.tracks.find((item) => item.id === payload?.id) ?? doc.tracks.find((item) => item.kind === "audio");
   if (!track) return <Empty title="No audio track" />;
+  const patchTrack = (change: Partial<typeof track>, label: string) => handle.edit((current) => ({ ...current, tracks: current.tracks.map((item) => (item.id === track.id ? { ...item, ...change } : item)) }), label);
   return (
     <Stack gap={3}>
-      <Field label="Name"><TextInput value={track.name} onChange={(event) => handle.edit((current) => ({ ...current, tracks: current.tracks.map((item) => (item.id === track.id ? { ...item, name: event.target.value } : item)) }), "Rename the track")} /></Field>
-      <Field label={`Gain ${(track.gainDb ?? 0).toFixed(1)} dB`}>
-        <input className="vx-range" type="range" min={-40} max={12} step={0.5} value={track.gainDb ?? 0} aria-label="Gain" onChange={(event) => handle.edit((current) => ({ ...current, tracks: current.tracks.map((item) => (item.id === track.id ? { ...item, gainDb: Number(event.target.value) } : item)) }), "Change the gain")} />
+      <Field label="Name"><TextInput value={track.name} onChange={(event) => patchTrack({ name: event.target.value }, "Rename the track")} /></Field>
+      <Field label={`Gain ${(track.gainDb ?? 0).toFixed(1)} dB`} hint={`A factor of ${dbToGain(track.gainDb ?? 0).toFixed(3)}`}>
+        <input className="vx-range" type="range" min={-40} max={12} step={0.5} value={track.gainDb ?? 0} aria-label="Gain" onChange={(event) => patchTrack({ gainDb: Number(event.target.value) }, "Change the gain")} />
       </Field>
-      <Field label={`Pan ${(track.pan ?? 0).toFixed(2)}`}>
-        <input className="vx-range" type="range" min={-1} max={1} step={0.05} value={track.pan ?? 0} aria-label="Pan" onChange={(event) => handle.edit((current) => ({ ...current, tracks: current.tracks.map((item) => (item.id === track.id ? { ...item, pan: Number(event.target.value) } : item)) }), "Change the pan")} />
+      <Field label={`Pan ${(track.pan ?? 0).toFixed(2)}`} hint="Stored on the track. The mix is summed to mono, so pan does not change what you hear.">
+        <input className="vx-range" type="range" min={-1} max={1} step={0.05} value={track.pan ?? 0} aria-label="Pan" onChange={(event) => patchTrack({ pan: Number(event.target.value) }, "Change the pan")} />
       </Field>
-      <Notice tone="warning" title="Pan is stored but the mix is mono">The mix is summed to one channel, so a pan value is recorded on the track and does not change what you hear. It is not applied silently.</Notice>
-      <Properties rows={[
-        { label: "Gain as a factor", value: <span className="ds-num">{dbToGain(track.gainDb ?? 0).toFixed(3)}</span> },
-        { label: "Clips", value: clipsOnTrack(doc, track.id).length },
-      ]} />
     </Stack>
   );
 }
@@ -1910,18 +1982,15 @@ function LoudnessReview({ context }: { context: ScreenContext }) {
   const loudness = measureLoudness(mix);
   return (
     <Stack gap={3}>
-      <Properties rows={[
-        { label: "Approximate loudness", value: <span className="ds-num">{loudness.approximateLufs} LUFS</span> },
-        { label: "Target", value: <span className="ds-num">{doc.loudnessTarget} LUFS</span> },
-        { label: "RMS", value: <span className="ds-num">{loudness.rms.toFixed(1)} dBFS</span> },
-        { label: "Sample peak", value: <span className="ds-num">{loudness.samplePeakDb.toFixed(1)} dBFS</span> },
-        { label: "Clipped samples", value: <span className="ds-num">{loudness.clippedSamples}</span> },
+      <FactGrid columns={4} items={[
+        { label: "Approx. loudness", value: `${loudness.approximateLufs} LUFS`, mono: true },
+        { label: "Target", value: `${doc.loudnessTarget} LUFS`, mono: true },
+        { label: "Sample peak", value: `${loudness.samplePeakDb.toFixed(1)} dBFS`, mono: true },
+        { label: "Clipped samples", value: loudness.clippedSamples, mono: true, tone: loudness.clippedSamples > 0 ? "danger" : undefined },
       ]} />
-      {loudness.clippedSamples > 0 && <Notice tone="danger" title="The mix clips">Samples reach full scale. Lower a track's gain.</Notice>}
-      <Notice tone="warning" title="Not a compliance meter">
-        A certified measurement applies K-weighting and gating. This is RMS with a fixed offset over the same samples. Useful for comparison; not evidence of compliance.
-      </Notice>
       <MixWaveform doc={doc} seconds={Math.min(doc.duration, 30)} height={100} label="Programme waveform" />
+      {loudness.clippedSamples > 0 && <Notice tone="danger" title="The mix clips">Samples reach full scale. Lower a track's gain.</Notice>}
+      <p className="vx-mini">Not a compliance meter: RMS <span className="ds-num">{loudness.rms.toFixed(1)} dBFS</span> with a fixed offset, not a gated K-weighted measurement. Useful for comparison; not evidence of compliance.</p>
     </Stack>
   );
 }
@@ -1929,12 +1998,12 @@ function LoudnessReview({ context }: { context: ScreenContext }) {
 function VoiceCleanup() {
   return (
     <Stack gap={3}>
-      <Notice tone="warning" title="Voice cleanup is not implemented">
+      <OverlaySection title="Voice cleanup is not implemented" tone="warning">
         De-noise, de-reverb and voice isolation all need signal processing that is not built here. The mixer's gain and fades are real; nothing else is claimed.
-      </Notice>
-      <Notice tone="info" title="Consent comes first anyway">
+      </OverlaySection>
+      <OverlaySection title="Consent comes first anyway" tone="info">
         A voice in a project needs the speaker's consent on the record before it is processed or published. No model is connected that could synthesise or alter a voice.
-      </Notice>
+      </OverlaySection>
     </Stack>
   );
 }
@@ -1947,19 +2016,26 @@ function CaptionEditorOverlay({ context }: { context: ScreenContext }) {
   const doc = handle.doc;
   const caption = doc.captions.find((item) => item.id === payload?.id) ?? doc.captions.find((item) => ui.playhead >= item.start && ui.playhead < item.end);
   if (!caption) return <Empty title="No cue at the playhead" />;
+  const patch = (change: Partial<typeof caption>, label: string) => handle.edit((current) => ({ ...current, captions: current.captions.map((item) => (item.id === caption.id ? { ...item, ...change } : item)) }), label);
+  const speed = Math.round(caption.text.length / Math.max(0.1, caption.end - caption.start));
   return (
     <Stack gap={3}>
-      <PreviewMonitor doc={doc} time={(caption.start + caption.end) / 2} height={180} captions />
+      <PreviewMonitor doc={doc} time={(caption.start + caption.end) / 2} height={160} captions />
       <Row gap={2} wrap>
-        <Field label="In (s)"><TextInput type="number" step={0.1} value={caption.start} onChange={(event) => handle.edit((current) => ({ ...current, captions: current.captions.map((item) => (item.id === caption.id ? { ...item, start: Number(event.target.value) } : item)) }), "Change the cue timing")} /></Field>
-        <Field label="Out (s)"><TextInput type="number" step={0.1} value={caption.end} onChange={(event) => handle.edit((current) => ({ ...current, captions: current.captions.map((item) => (item.id === caption.id ? { ...item, end: Number(event.target.value) } : item)) }), "Change the cue timing")} /></Field>
+        <Field label="In (s)"><TextInput type="number" step={0.1} value={caption.start} onChange={(event) => patch({ start: Number(event.target.value) }, "Change the cue timing")} /></Field>
+        <Field label="Out (s)"><TextInput type="number" step={0.1} value={caption.end} onChange={(event) => patch({ end: Number(event.target.value) }, "Change the cue timing")} /></Field>
       </Row>
-      <Field label="Text"><TextArea rows={3} value={caption.text} onChange={(event) => handle.edit((current) => ({ ...current, captions: current.captions.map((item) => (item.id === caption.id ? { ...item, text: event.target.value, reviewed: false } : item)) }), "Edit the cue")} /></Field>
-      <Properties rows={[
-        { label: "Reading speed", value: <><span className="ds-num">{Math.round(caption.text.length / Math.max(0.1, caption.end - caption.start))}</span> characters a second</> },
-        { label: "On screen", value: <span className="ds-num">{(caption.end - caption.start).toFixed(2)}s</span> },
-        { label: "Checked", value: caption.reviewed ? "yes" : "not yet" },
+      <Field label="Text" hint="Editing the text marks the cue as not yet checked by a person."><TextArea rows={3} value={caption.text} onChange={(event) => patch({ text: event.target.value, reviewed: false }, "Edit the cue")} /></Field>
+      <FactGrid columns={2} dense items={[
+        { label: "Reading speed", value: `${speed} characters a second`, mono: true, tone: speed > 20 ? "warning" : undefined },
+        { label: "On screen", value: `${(caption.end - caption.start).toFixed(2)}s`, mono: true },
       ]} />
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" disabled={caption.reviewed} onClick={() => patch({ reviewed: true }, "Mark the cue as checked")}>{caption.reviewed ? "Checked" : "Mark as checked"}</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -1970,9 +2046,7 @@ function SpeakerVerification({ context }: { context: ScreenContext }) {
   const speakers = [...new Set(handle.doc.captions.map((caption) => caption.speaker).filter(Boolean))];
   return (
     <Stack gap={3}>
-      <Notice tone="warning" title="Speakers are typed, not identified">
-        Nothing here recognises a voice. A speaker label is whatever a person wrote on the cue, and it is listed below so it can be checked.
-      </Notice>
+      <p className="ds-prose">Nothing here recognises a voice. A speaker label is whatever a person wrote on the cue; it is listed so it can be checked.</p>
       {speakers.length === 0 ? <p className="ds-subtle">No cue names a speaker.</p> : (
         <Stack gap={2}>
           {speakers.map((speaker) => (
@@ -1992,41 +2066,78 @@ function LanguageReview({ context }: { context: ScreenContext }) {
   if (!record || !handle.doc) return <Empty title="Open a project first" />;
   const doc = handle.doc;
   const languages = [...new Set(doc.captions.map((caption) => caption.language))];
+  if (languages.length === 0) return <Empty title="No caption tracks" />;
   return (
     <Stack gap={3}>
       {languages.map((language) => {
         const cues = doc.captions.filter((caption) => caption.language === language);
         const empty = cues.filter((cue) => !cue.text.trim()).length;
+        const checked = cues.filter((cue) => cue.reviewed).length;
         return (
-          <Notice key={language} tone={empty > 0 ? "warning" : cues.every((cue) => cue.reviewed) ? "success" : "info"} title={`${language}: ${cues.length} cues`}>
-            {empty > 0 ? `${empty} cues have no text. They were created with the timings of another track and still need writing.` : `${cues.filter((cue) => cue.reviewed).length} have been checked by a person.`}
-          </Notice>
+          <OverlaySection key={language} title={`${language} · ${cues.length} cues`} tone={empty > 0 ? "warning" : checked === cues.length ? "success" : "info"}>
+            {empty > 0 ? `${empty} cues have no text. They were created with the timings of another track and still need writing.` : `${checked} of ${cues.length} checked by a person. Subtitle text is not word-perfect until it has been.`}
+          </OverlaySection>
         );
       })}
-      {languages.length === 0 && <Empty title="No caption tracks" />}
     </Stack>
   );
 }
 
 function RenderSettings({ context }: { context: ScreenContext }) {
-  return <ExportScreen context={context} lens="Export" />;
+  const { record, handle } = useVideoDoc(context);
+  const render = useStore(renderUi);
+  const support = useMemo(() => recorderSupport(), []);
+  if (!record || !handle.doc) return <Empty title="Open a project first" />;
+  const doc = handle.doc;
+  const preset = { ...(RENDER_PRESETS[render.preset] ?? RENDER_PRESETS[Object.keys(RENDER_PRESETS)[0]]), fps: doc.fps };
+  const frames = Math.round(doc.duration * preset.fps);
+  const seconds = Math.round(doc.duration);
+  return (
+    <Stack gap={3}>
+      <OverlaySection title="Settings">
+        <Field label="Preset">
+          <Select value={render.preset} disabled={render.busy} onChange={(event) => renderUi.set((current) => ({ ...current, preset: event.target.value }))}>
+            {Object.keys(RENDER_PRESETS).map((key) => <option key={key}>{key}</option>)}
+          </Select>
+        </Field>
+        <FactGrid columns={4} dense items={[
+          { label: "Frame", value: `${preset.width} × ${preset.height}`, mono: true },
+          { label: "Rate", value: `${preset.fps} fps`, mono: true },
+          { label: "Bitrate", value: `${(preset.bitrate / 1_000_000).toFixed(1)} Mb/s`, mono: true },
+          { label: "Frames", value: frames, mono: true },
+        ]} />
+      </OverlaySection>
+      <OverlaySection title="What happens when you press Render" tone={support.webm ? "info" : "danger"}>
+        {support.webm
+          ? <>This machine draws all <span className="ds-num">{frames}</span> frames and records them as WebM in real time, about <span className="ds-num">{seconds}</span> seconds. The file is checked for a non-zero size before it is offered, and it downloads here. Nothing is uploaded.</>
+          : <>This browser cannot encode a video file. {support.reason} The contact sheet and the frame sequence are what can be produced.</>}
+      </OverlaySection>
+      <ModalActions>
+        <OverlayActions
+          primary={<Button variant="primary" disabled={!support.webm || render.busy} onClick={() => { context.closeOverlay(); void startRender(context, record.title, render.preset); }}>{`Render ${frames} frames to WebM`}</Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
+    </Stack>
+  );
 }
 
 function Compatibility() {
   const support = recorderSupport();
+  const can = (type: string) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type);
   return (
     <Stack gap={3}>
-      <Notice tone={support.webm ? "success" : "danger"} title={support.webm ? "WebM can be encoded here" : "No video encoding is available"}>{support.reason}</Notice>
-      <Properties rows={[
-        { label: "WebM / VP9", value: typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "supported" : "not supported" },
-        { label: "WebM / VP8", value: typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported("video/webm;codecs=vp8") ? "supported" : "not supported" },
-        { label: "MP4 / H.264", value: "not produced — no encoder is shipped with this application" },
+      <KeyValueList items={[
+        { label: "WebM / VP9", value: can("video/webm;codecs=vp9") ? "supported" : "not supported", tone: can("video/webm;codecs=vp9") ? "success" : undefined },
+        { label: "WebM / VP8", value: can("video/webm;codecs=vp8") ? "supported" : "not supported", tone: can("video/webm;codecs=vp8") ? "success" : undefined },
+        { label: "MP4 / H.264", value: "not produced: no encoder is shipped" },
         { label: "ProRes or DNxHD", value: "not produced" },
-        { label: "Frame sequence", value: "always available; PNG is drawn by the same renderer" },
+        { label: "Frame sequence", value: "always available; drawn by the same renderer" },
       ]} />
-      <Notice tone="warning" title="What a delivery spec would need">
-        A broadcaster asking for ProRes at a given loudness cannot be served from here. The honest route is a frame sequence plus the WAV mix, encoded elsewhere.
-      </Notice>
+      {!support.webm && <Notice tone="danger" title="No video encoding is available">{support.reason}</Notice>}
+      <OverlaySection title="If a delivery spec asks for more" tone="warning">
+        A broadcaster asking for ProRes at a given loudness cannot be served from here. Send a frame sequence plus the WAV mix, encoded elsewhere.
+      </OverlaySection>
     </Stack>
   );
 }
@@ -2039,25 +2150,19 @@ function DeliveryConfirmation({ context }: { context: ScreenContext }) {
     <Stack gap={3}>
       {done.length === 0 ? (
         <Notice tone="warning" title="Nothing has been rendered">No file has been produced for this project, so there is nothing to confirm as delivered.</Notice>
-      ) : (
-        <>
-          <Notice tone="success" title={`${done.length} files were written`}>Each one was checked for a non-zero size before it was offered for download.</Notice>
-          {done.map((job) => (
-            <Properties
-              key={job.id}
-              rows={[
-                { label: "File", value: <span className="ds-num">{job.artifact}</span> },
-                { label: "Size", value: <span className="ds-num">{((job.bytes ?? 0) / 1024 / 1024).toFixed(2)} MB</span> },
-                { label: "Frames", value: <span className="ds-num">{job.frames}</span> },
-                { label: "What happened", value: job.note },
-              ]}
-            />
-          ))}
-        </>
-      )}
-      <Notice tone="warning" title="Delivery is not connected">
+      ) : done.map((job) => (
+        <OverlaySection key={job.id} title={<span className="ds-num">{job.artifact}</span>} hint="Checked for a non-zero size before it was offered">
+          <FactGrid columns={3} dense items={[
+            { label: "Size", value: `${((job.bytes ?? 0) / 1024 / 1024).toFixed(2)} MB`, mono: true },
+            { label: "Frames", value: job.frames ?? "—", mono: true },
+            { label: "Publishing", value: job.delivery ? CAPABILITY_LABELS[job.delivery.state] : "not requested" },
+          ]} />
+          {job.note && <p className="vx-mini">{job.note}</p>}
+        </OverlaySection>
+      ))}
+      <OverlaySection title="Delivery is not connected" tone="warning">
         There is no destination to send a file to. A render downloads to this machine, and the record keeps what was produced.
-      </Notice>
+      </OverlaySection>
     </Stack>
   );
 }
@@ -2081,7 +2186,7 @@ function FinalSignoff({ context, close }: { context: ScreenContext; close: () =>
   return (
     <form
       id="video-signoff"
-      className="ds-stack ds-gap-4"
+      className="ds-stack ds-gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         handle.edit((current) => ({
@@ -2092,9 +2197,10 @@ function FinalSignoff({ context, close }: { context: ScreenContext; close: () =>
         close();
       }}
     >
-      <Notice tone="info" title={`This binds to revision ${record.revision} and digest ${cutDigest(doc)}`}>
-        The digest is computed from every clip's source, position and duration. Change the cut and the approval no longer matches it.
-      </Notice>
+      <FactGrid columns={2} dense items={[
+        { label: "Binds to revision", value: record.revision, mono: true },
+        { label: "Cut digest", value: cutDigest(doc), mono: true, hint: "From every clip's source, position and duration. Change the cut and the approval no longer matches it." },
+      ]} />
       {state === "approved" && openNotes > 0 && (
         <Notice tone="warning" title={`${openNotes} review notes are still open`}>
           Approving does not close them. They stay open on the Comments tab and anyone delivering this cut will see them.
@@ -2211,11 +2317,10 @@ function TagSource({ context, close }: { context: ScreenContext; close: () => vo
         close();
       }}
     >
-      <Properties rows={[{ label: "Source", value: source.name }, { label: "Kind", value: source.kind }]} />
-      <Field label="Tags" hint="Separate tags with commas.">
+      <FactGrid columns={2} dense items={[{ label: "Source", value: source.name }, { label: "Kind", value: source.kind }]} />
+      <Field label="Tags" hint="Separate tags with commas. A tag helps find a source; its rights are recorded on its licence.">
         <TextInput value={text} onChange={(event) => setText(event.target.value)} placeholder="b-roll, showroom, approved" autoFocus />
       </Field>
-      <Notice tone="info" title="A tag is not a licence">Tags help find a source. Its rights are recorded on its licence, which is set in the inspector.</Notice>
     </form>
   );
 }
@@ -2317,16 +2422,18 @@ function ExportMixWarning({ context, close }: { context: ScreenContext; close: (
   return (
     <Stack gap={3}>
       {problems.length === 0 ? <Notice tone="success" title="The mix passes">No clipping, and the loudness is within a unit of the target.</Notice> : (
-        <Notice tone="danger" title="The mix fails its checks">
-          <ul>{problems.map((problem) => <li key={problem}>{problem}</li>)}</ul>
-        </Notice>
+        <OverlaySection title="The mix fails its checks" tone="danger">
+          <ul className="ds-list">{problems.map((problem) => <li key={problem}>{problem}</li>)}</ul>
+        </OverlaySection>
       )}
-      <Notice tone="warning" title="An approximate meter">RMS with a fixed offset, not a gated K-weighted measurement. Fix the level on the Mixer tab or export anyway with the failures stated.</Notice>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Keep mixing</Button>
-        <span className="ds-grow" />
-        <Button variant={problems.length ? "outline-danger" : "primary"} onClick={async () => { await writeMix(context); close(); }}>{problems.length ? "Export the WAV anyway" : "Export the WAV"}</Button>
-      </Row>
+      <p className="vx-mini">An approximate meter: RMS with a fixed offset, not a gated K-weighted measurement. Fix the level on the Mixer tab, or export with the failures stated.</p>
+      <ModalActions>
+        <OverlayActions
+          variant="confirm"
+          end={<OverlayCancel>Keep mixing</OverlayCancel>}
+          primary={<Button variant={problems.length ? "outline-danger" : "primary"} onClick={async () => { await writeMix(context); close(); }}>{problems.length ? "Export the WAV anyway" : "Export the WAV"}</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -2379,27 +2486,29 @@ function ApplyPreset({ context, close }: { context: ScreenContext; close: () => 
   if (!clip) return <Notice tone="info" title="Select a clip">A preset replaces one clip's effect stack.</Notice>;
   const presets = [...BUILT_IN_PRESETS, ...(doc.effectPresets ?? [])];
   return (
-    <Stack gap={2}>
+    <Stack gap={3}>
       {clip.effects.length > 0 && <Notice tone="warning" title={`${clip.name} already has ${clip.effects.length} effects`}>Applying a preset replaces them. Undo takes it back.</Notice>}
-      {presets.map((preset, index) => (
-        <Row key={`${preset.name}-${index}`} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
-          <div className="ds-grow">
-            <strong>{preset.name}</strong>
-            <p className="vx-mini">{preset.effects.map((effect) => `${effect.kind} ${effect.amount}`).join(" · ")}</p>
-          </div>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => {
-              handle.edit((current) => patchClip(current, clip.id, { effects: presetEffects(preset) }), `Apply ${preset.name}`);
-              void context.mutate.log(`Applied ${preset.name} to ${clip.name}`, { entityId: record.id, type: "update" });
-              close();
-            }}
-          >
-            Apply
-          </Button>
-        </Row>
-      ))}
+      <Stack gap={2}>
+        {presets.map((preset, index) => (
+          <Row key={`${preset.name}-${index}`} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
+            <div className="ds-grow">
+              <strong>{preset.name}</strong>
+              <p className="vx-mini ds-num">{preset.effects.map((effect) => `${effect.kind} ${effect.amount}`).join(" · ")}</p>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                handle.edit((current) => patchClip(current, clip.id, { effects: presetEffects(preset) }), `Apply ${preset.name}`);
+                void context.mutate.log(`Applied ${preset.name} to ${clip.name}`, { entityId: record.id, type: "update" });
+                close();
+              }}
+            >
+              Apply
+            </Button>
+          </Row>
+        ))}
+      </Stack>
     </Stack>
   );
 }
@@ -2428,14 +2537,13 @@ function SavePreset({ context, close }: { context: ScreenContext; close: () => v
         close();
       }}
     >
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "From", value: clip.name },
-        { label: "Effects", value: clip.effects.filter((effect) => !effect.bypassed).map((effect) => `${effect.kind} ${effect.amount}`).join(" · ") || "every effect is bypassed" },
+        { label: "Effects", value: clip.effects.filter((effect) => !effect.bypassed).map((effect) => `${effect.kind} ${effect.amount}`).join(" · ") || "every effect is bypassed", mono: true },
       ]} />
-      <Field label="Preset name" required error={taken ? "A preset already has this name." : undefined}>
+      <Field label="Preset name" required error={taken ? "A preset already has this name." : undefined} hint="Bypassed effects are left out. The preset is saved with this project and appears on the Presets tab.">
         <TextInput value={name} onChange={(event) => setName(event.target.value)} required autoFocus placeholder="Warm interior" />
       </Field>
-      <p className="vx-mini">Bypassed effects are left out. The preset is saved with this project and appears on the Presets tab.</p>
     </form>
   );
 }
@@ -2477,8 +2585,10 @@ function RenderPreview({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={3}>
       {sheet ? <img src={sheet.url} alt={`Twelve frames of ${record.title}, from ${timecode(sheet.times[0], doc.fps)} to ${timecode(sheet.times[sheet.times.length - 1], doc.fps)}`} style={{ width: "100%", borderRadius: 6 }} /> : <p className="ds-subtle">Rendering twelve frames…</p>}
-      <p className="vx-mini">Twelve frames drawn just now by the same renderer the export uses, evenly spaced across the sequence. This is a preview of the picture, not of the encoder.</p>
-      <Button variant="secondary" disabled={!sheet} onClick={() => { if (sheet) downloadBlob(`${slug(record.title)}-preview.png`, sheet.blob); }}>Download the preview (PNG)</Button>
+      <p className="vx-mini">Twelve frames drawn just now by the renderer the export uses, evenly spaced across the sequence. A preview of the picture, not of the encoder.</p>
+      <ModalActions>
+        <OverlayActions primary={<Button variant="primary" disabled={!sheet} onClick={() => { if (sheet) downloadBlob(`${slug(record.title)}-preview.png`, sheet.blob); }}>Download the preview (PNG)</Button>} end={<OverlayCancel>Close</OverlayCancel>} />
+      </ModalActions>
     </Stack>
   );
 }
@@ -2504,15 +2614,14 @@ function PublishRender({ context, close }: { context: ScreenContext; close: () =
         close();
       }}
     >
-      <Properties rows={[
-        { label: "File", value: <span className="ds-num">{job.artifact}</span> },
-        { label: "Size", value: <span className="ds-num">{((job.bytes ?? 0) / 1024 / 1024).toFixed(2)} MB</span> },
-        { label: "Approval", value: approved ? `approved by ${approved.by} for this cut` : "no approval covers this cut" },
-        { label: "Video host", value: <Pill tone="warning">{CAPABILITY_LABELS.not_connected}</Pill> },
+      <FactGrid columns={2} dense items={[
+        { label: "File", value: job.artifact, mono: true },
+        { label: "Size", value: `${((job.bytes ?? 0) / 1024 / 1024).toFixed(2)} MB`, mono: true },
+        { label: "Approval", value: approved ? `approved by ${approved.by} for this cut` : "no approval covers this cut", tone: approved ? "success" : "warning" },
+        { label: "Video host", value: CAPABILITY_LABELS.not_connected, tone: "warning" },
       ]} />
+      <Field label="Destination" hint="Publishing records the request against the render as queued locally. Nothing is uploaded; the file stays on this machine until a host is connected."><TextInput value={destination} onChange={(event) => setDestination(event.target.value)} required /></Field>
       {!approved && <Notice tone="warning" title="This cut is not approved">Publishing an unapproved cut is allowed, and it is stated on the request.</Notice>}
-      <Field label="Destination"><TextInput value={destination} onChange={(event) => setDestination(event.target.value)} required /></Field>
-      <Notice tone="warning" title="Nothing is uploaded">No video host is connected. Publishing records the request against the render as queued locally; the file stays on this machine until a host is connected.</Notice>
     </form>
   );
 }
@@ -2557,12 +2666,8 @@ function VersionCompare({ context }: { context: ScreenContext }) {
 }
 
 function formFooter(form: string, label: string) {
-  return ({ close }: { close: () => void }) => (
-    <>
-      <Button variant="ghost" onClick={close}>Cancel</Button>
-      <span className="ds-grow" />
-      <Button variant="primary" type="submit" form={form}>{label}</Button>
-    </>
+  return ({ close: _close }: { close: () => void }) => (
+    <OverlayActions primary={<Button variant="primary" type="submit" form={form}>{label}</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} />
   );
 }
 
@@ -2907,13 +3012,9 @@ registerApp({
             if (!support.webm) return support.reason;
             return renderUi.get().busy ? "A render is already running" : undefined;
           },
-          run: async (context) => {
-            const { db } = await import("@/runtime/db");
-            const record = context.params.id ? await db.records.get(context.params.id) : undefined;
-            if (!record) return;
-            context.setTab("Export");
-            await startRender(context, record.title, renderUi.get().preset);
-          },
+          /* Rendering takes the machine for as long as the film runs, so the command asks first and says what it will do. */
+          run: (context) => { context.setTab("Export"); context.openOverlay("Render settings"); },
+        },
         },
         {
           id: "cancel", label: "Cancel the render", placement: "overflow", tone: "danger",
@@ -3004,19 +3105,20 @@ function ProjectSettings({ context }: { context: ScreenContext }) {
   const record = useRecord(payload?.id ?? context.selectedId);
   if (!record) return <Empty title="Select a project first" />;
   const doc = parseVideo(record.body);
+  const unknown = doc.sources.filter((source) => source.license === "Unknown").length;
   return (
     <Stack gap={3}>
-      <Properties rows={[
-        { label: "Project", value: record.title },
-        { label: "Frame", value: <span className="ds-num">{doc.width} × {doc.height}</span> },
-        { label: "Rate", value: <span className="ds-num">{doc.fps} fps</span> },
-        { label: "Duration", value: <span className="ds-num">{timecode(doc.duration, doc.fps)}</span> },
-        { label: "Clips", value: doc.clips.length },
-        { label: "Sources", value: doc.sources.length },
-        { label: "Rights unknown", value: doc.sources.filter((source) => source.license === "Unknown").length },
-        { label: "Revision", value: <span className="ds-num">{record.revision}</span> },
+      <FactGrid columns={2} items={[
+        { label: "Frame", value: `${doc.width} × ${doc.height}`, mono: true },
+        { label: "Rate", value: `${doc.fps} fps`, mono: true },
+        { label: "Duration", value: timecode(doc.duration, doc.fps), mono: true },
+        { label: "Clips · sources", value: `${doc.clips.length} · ${doc.sources.length}`, mono: true },
+        { label: "Rights unknown", value: unknown, mono: true, tone: unknown ? "danger" : undefined },
+        { label: "Revision", value: record.revision, mono: true },
       ]} />
-      <Button variant="primary" onClick={() => context.navigate(context.path("/o/:org/video/projects/:id", record.id))}>Open the timeline</Button>
+      <DrawerActions>
+        <OverlayActions primary={<Button variant="primary" onClick={() => context.navigate(context.path("/o/:org/video/projects/:id", record.id))}>Open the timeline</Button>} end={<OverlayCancel>Close</OverlayCancel>} />
+      </DrawerActions>
     </Stack>
   );
 }

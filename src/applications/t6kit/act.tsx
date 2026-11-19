@@ -1,6 +1,6 @@
 import { useEffect, useId, useState, type ComponentType, type ReactNode } from "react";
 import { create } from "zustand";
-import { Button, Checkbox, Empty, Field, Notice, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Button, Checkbox, Empty, Field, Notice, OVERLAY_WIDTH, OverlayActions, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { Rec } from "@/domain/types";
 import type { OverlayDef, ScreenContext } from "@/platform/registry";
 import { useCollection } from "@/platform/workspace";
@@ -68,6 +68,8 @@ export interface ActSpec {
   useWatch?: () => unknown;
   /** Close after a successful apply (default true). */
   closeOnDone?: boolean;
+  /** Identity block for the overlay head (an `OverlaySummary`); replaces the generic record chip. */
+  summary?: OverlayDef["summary"];
 }
 
 interface ActUi {
@@ -203,21 +205,27 @@ function ActBody({ spec, context, close }: { spec: ActSpec; context: ScreenConte
 function ActFooter({ spec, close }: { spec: ActSpec; close: () => void }) {
   const blocked = useActUi((state) => state.blocked[spec.id]);
   const busy = useActUi((state) => Boolean(state.busy[spec.id]));
+  const danger = spec.tone === "danger";
+  const submit = (
+    <Button
+      variant={danger ? "danger" : "primary"}
+      type="submit"
+      form={formId(spec.id)}
+      disabled={Boolean(blocked)}
+      title={blocked}
+      busy={busy}
+    >
+      {spec.submit}
+    </Button>
+  );
+  // A destructive action is a confirmation: [Cancel] ... [Confirm]. Everything else leads with its primary.
   return (
-    <>
-      <Button variant="ghost" onClick={close}>Cancel</Button>
-      <span className="ds-grow" />
-      <Button
-        variant={spec.tone === "danger" ? "danger" : "primary"}
-        type="submit"
-        form={formId(spec.id)}
-        disabled={Boolean(blocked)}
-        title={blocked}
-        busy={busy}
-      >
-        {spec.submit}
-      </Button>
-    </>
+    <OverlayActions
+      variant={danger ? "confirm" : "form"}
+      primary={submit}
+      end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+      busy={false}
+    />
   );
 }
 
@@ -227,7 +235,8 @@ export function actOverlay(spec: ActSpec): OverlayDef {
     kind: spec.kind ?? "modal",
     title: spec.title,
     tone: spec.tone,
-    width: spec.width ?? 560,
+    width: spec.width ?? OVERLAY_WIDTH.form,
+    summary: spec.summary,
     render: ({ close, ...context }) => <ActBody spec={spec} context={context} close={close} />,
     footer: ({ close }) => <ActFooter spec={spec} close={close} />,
   };

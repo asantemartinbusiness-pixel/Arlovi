@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Field, Notice, Pill, Properties, Row, Select, Stack } from "@/design-system";
+import { Button, Field, KeyValueList, Notice, Pill, Row, Select, Stack } from "@/design-system";
 import type { Audit, Rec } from "@/domain/types";
 import type { ScreenContext } from "@/platform/registry";
 import { CAPABILITY_LABELS } from "@/platform/capability";
@@ -50,7 +50,7 @@ function ConnectorFacts({ record }: ActInput) {
   if (!record) return null;
   const entry = entryForRecord(record.fields);
   return (
-    <Properties rows={[
+    <KeyValueList items={[
       { label: "Connector", value: record.title },
       { label: "Capability", value: entry?.capability.label ?? "Custom" },
       { label: "Register state", value: <Pill tone="warning" dot>{CAPABILITY_LABELS[entry?.capability.state ?? "not_connected"]}</Pill> },
@@ -153,7 +153,7 @@ export function ProviderLimits({ context }: { context: ScreenContext }) {
   const entry = entryById(payload?.id ?? "") ?? routeEntry(context, records) ?? CONNECTOR_ENTRIES[0];
   return (
     <Stack gap={3}>
-      <Properties rows={[{ label: "Connector", value: entry.capability.label }, { label: "Provider", value: entry.capability.provider }]} />
+      <KeyValueList items={[{ label: "Connector", value: entry.capability.label }, { label: "Provider", value: entry.capability.provider }]} />
       <h4>Limits the provider imposes</h4>
       {entry.limits.length === 0 ? <span className="ds-subtle">No limits are published for this capability.</span> : <ul className="ds-prose">{entry.limits.map((limit) => <li key={limit}>{limit}</li>)}</ul>}
       <h4>Claims this directory does not repeat</h4>
@@ -249,7 +249,7 @@ export const attemptAuthorisation = actOverlay({
     return `An authorisation for ${entry.capability.label} sends you to a page ${entry.capability.provider.toLowerCase()} controls, and expects a callback to an address this workspace does not have. The attempt is recorded as blocked and nothing is marked connected.`;
   },
   Details: () => (
-    <Properties rows={[
+    <KeyValueList items={[
       { label: "Redirect address", value: <Pill tone="danger">none exists</Pill> },
       { label: "Callback receiver", value: <Pill tone="danger">none exists</Pill> },
       { label: "State after the attempt", value: "Unchanged: not connected" },
@@ -725,7 +725,7 @@ export const registerAction = actOverlay({
   candidates: (records) => records.filter(isCustom),
   consequence: () => "Paste one operation declaration. It is validated against the contract and, if it holds, appended to the adapter. Text from a provider is data: a declaration never changes what this workspace may do until a person approves the adapter.",
   fields: ({ context }) => [{ name: "declaration", label: "Declaration (JSON)", kind: "textarea", required: true, initial: (context.overlayPayload as { draft?: string } | undefined)?.draft, placeholder: '{ "name": "send_statement", "kind": "action", "scopes": ["statements.write"], "localEquivalent": "The statement is prepared and left as a draft." }' }],
-  Details: ({ record }) => (record ? <Properties rows={[{ label: "Registered now", value: adapterOperations(record.body).map((operation) => operation.name).join(", ") || "none" }]} /> : null),
+  Details: ({ record }) => (record ? <KeyValueList items={[{ label: "Registered now", value: adapterOperations(record.body).map((operation) => operation.name).join(", ") || "none" }]} /> : null),
   submit: "Validate and register",
   apply: async ({ record, values, context }) => {
     if (!record) return;
@@ -793,7 +793,7 @@ export const reconcileReceipts = actOverlay({
     const rows = (watched as Audit[] | undefined) ?? [];
     const pending = rows.filter((row) => row.capability === "queued_local" || row.capability === "awaiting_external_confirmation").length;
     return (
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Receipts", value: <span className="ds-num">{String(rows.length)}</span> },
         { label: "Accepted but unconfirmed", value: <span className="ds-num">{String(pending)}</span> },
         { label: "With provider evidence", value: <span className="ds-num">0</span> },
@@ -824,7 +824,7 @@ export const openMission = actOverlay({
   useWatch: () => useEvents(undefined, 400).filter(isReceipt),
   Details: ({ record, watched }) => {
     const linked = ((watched as Audit[] | undefined) ?? []).filter((event) => record && event.entityId === record.id).length;
-    return record ? <Properties rows={[{ label: "Receipts linked to it", value: <span className="ds-num">{String(linked)}</span> }, { label: "State", value: record.status }]} /> : null;
+    return record ? <KeyValueList items={[{ label: "Receipts linked to it", value: <span className="ds-num">{String(linked)}</span> }, { label: "State", value: record.status }]} /> : null;
   },
   submit: "Open the mission",
   apply: async ({ record, context }) => {

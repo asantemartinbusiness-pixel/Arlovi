@@ -86,11 +86,12 @@ function RequisitionFormBody({ context, close, existing, loaded }: { context: Sc
           warehouseId: data.warehouses[0]?.id ?? "",
         };
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          const ok1 = await context.mutate.patch(existing.id, {
             summary: note, amountMinor: totals.grossMinor,
             fields: { ...existing.fields, ...fields, number: String(existing.fields.number ?? number) },
             body: { lines, revisions: existingBody.revisions ?? [] },
           }, { expectRevision: existing.revision, event: `Requisition ${existing.title} edited` });
+          if (!ok1) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
         } else {
           await context.mutate.create({
             collection: "purchaseOrders", title: number, status: "awaiting_approval",
@@ -405,7 +406,8 @@ export function SupplierForm({ context, close }: { context: ScreenContext; close
           contactName: String(existing?.fields.contactName ?? ""),
         };
         if (existing) {
-          await context.mutate.patch(existing.id, { title: title.trim(), fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Supplier ${title.trim()} edited` });
+          const ok2 = await context.mutate.patch(existing.id, { title: title.trim(), fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Supplier ${title.trim()} edited` });
+          if (!ok2) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
         } else {
           await context.mutate.create({ collection: "suppliers", title: title.trim(), status: "review", summary: "", tags: [category.toLowerCase()], fields, body: { deliveries: [], notes: "" } }, `Supplier ${title.trim()} added for review`);
         }
@@ -457,10 +459,11 @@ export function SupplierVerification({ context, close }: { context: ScreenContex
       onSubmit={async (event) => {
         event.preventDefault();
         if (invalid) return;
-        await context.mutate.patch(supplier.id, {
+        const ok3 = await context.mutate.patch(supplier.id, {
           status: "approved",
           fields: { ...supplier.fields, bankLast4: last4.trim(), bankVerifiedAt: now.toISOString(), approvedBy: actor, verifiedWith: contact.trim() },
         }, { expectRevision: supplier.revision, event: `Bank detail verified for ${supplier.title} with ${contact.trim()} by ${actor}` });
+        if (!ok3) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
         context.toast("Verification recorded", `${supplier.title} is approved with an account ending ${last4.trim()}, verified with ${contact.trim()}.`);
         close();
       }}
@@ -542,10 +545,11 @@ export function RiskEscalation({ context, close }: { context: ScreenContext; clo
       onSubmit={async (event) => {
         event.preventDefault();
         if (!reason.trim()) return;
-        await context.mutate.patch(supplier.id, {
+        const ok4 = await context.mutate.patch(supplier.id, {
           status: "review",
           fields: { ...supplier.fields, flaggedBy: actor, flagReason: reason.trim() },
         }, { expectRevision: supplier.revision, event: `${supplier.title} flagged for review by ${actor}: ${reason.trim()}` });
+        if (!ok4) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
         context.toast("Flagged for review", `${supplier.title} is under review. New requisitions will show the state to the approver.`);
         close();
       }}
@@ -621,7 +625,7 @@ function PoEditorForm({ context, close, existing, preset, loaded }: { context: S
           requisitionId: fromRequisition || String(existing?.fields.requisitionId ?? ""),
         };
         if (existing) {
-          await context.mutate.patch(existing.id, {
+          const ok5 = await context.mutate.patch(existing.id, {
             summary: note, amountMinor: totals.grossMinor, dueAt: new Date(`${dueAt}T12:00:00`).toISOString(),
             fields: { ...existing.fields, ...fields },
             body: {
@@ -631,6 +635,7 @@ function PoEditorForm({ context, close, existing, preset, loaded }: { context: S
                 : existingBody.revisions ?? [],
             },
           }, { expectRevision: existing.revision, event: `${existing.title} revised to version ${fields.version}` });
+          if (!ok5) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
           context.toast(alreadySent ? "Revision recorded" : "Order saved", alreadySent ? `${existing.title} is now version ${fields.version}. The supplier would need the revision, not a second order.` : "The draft is saved.");
         } else {
           await context.mutate.create({
@@ -639,7 +644,8 @@ function PoEditorForm({ context, close, existing, preset, loaded }: { context: S
             summary: note || source?.summary || "", ownerName: actor, tags: ["po"], fields, body: { lines, revisions: [] },
           }, `Purchase order ${number} raised`);
           if (source) {
-            await context.mutate.patch(source.id, { status: "converted" }, { expectRevision: source.revision, event: `${source.title} converted into ${number}` });
+            const ok6 = await context.mutate.patch(source.id, { status: "converted" }, { expectRevision: source.revision, event: `${source.title} converted into ${number}` });
+            if (!ok6) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
           }
           context.toast("Purchase order raised", source ? `${number} carries ${source.title}'s approval by ${String(source.fields.approver)}.` : `${number} is a draft and needs approval before it can be issued.`);
         }
@@ -834,10 +840,11 @@ export function SendPreview({ context, close }: { context: ScreenContext; close:
               variant="primary"
               disabled={!approved}
               onClick={async () => {
-                await context.mutate.patch(order.id, {
+                const ok7 = await context.mutate.patch(order.id, {
                   status: "sent",
                   fields: { ...order.fields, sentAt: now.toISOString(), sentBy: actor },
                 }, { expectRevision: order.revision, event: `${order.title} marked as issued by ${actor}` });
+                if (!ok7) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
                 context.toast("Marked as issued", `${order.title} is recorded as issued. Nothing was sent: no supplier connection exists.`);
                 close();
               }}
@@ -874,7 +881,8 @@ export function LocationEditor({ context, close }: { context: ScreenContext; clo
         if (invalid) return;
         const fields = { code: code.trim().toUpperCase(), capacityUnits: Number(capacity) || 0, bins: Number(bins) || 0, managerName: manager.trim(), locationId: String(existing?.fields.locationId ?? "") };
         if (existing) {
-          await context.mutate.patch(existing.id, { title: title.trim(), fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Warehouse ${title.trim()} edited` });
+          const ok8 = await context.mutate.patch(existing.id, { title: title.trim(), fields: { ...existing.fields, ...fields } }, { expectRevision: existing.revision, event: `Warehouse ${title.trim()} edited` });
+          if (!ok8) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
         } else {
           await context.mutate.create({ collection: "warehouses", title: title.trim(), status: "active", summary: "", fields }, `Warehouse ${title.trim()} created`);
         }
@@ -1064,7 +1072,7 @@ function ScanOverlayForm({ context, close, receipt, presetOrder, loaded }: { con
         const number = `GRN-${85 + data.receipts.length}`;
 
         if (receipt && receipt.status === "expected") {
-          await context.mutate.patch(receipt.id, {
+          const ok9 = await context.mutate.patch(receipt.id, {
             status: damaged ? "exception" : complete ? "complete" : "exception",
             at: now.toISOString(),
             fields: {
@@ -1076,6 +1084,7 @@ function ScanOverlayForm({ context, close, receipt, presetOrder, loaded }: { con
             },
             body: { lines: receiptLines, scans },
           }, { expectRevision: receipt.revision, event: `${receipt.title} received by ${actor}` });
+          if (!ok9) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
         } else {
           await context.mutate.create({
             collection: "receipts",
@@ -1098,10 +1107,11 @@ function ScanOverlayForm({ context, close, receipt, presetOrder, loaded }: { con
           }, `Goods receipt ${number} raised against ${order.title}`);
         }
 
-        await context.mutate.patch(order.id, {
+        const ok10 = await context.mutate.patch(order.id, {
           status: complete ? "received" : order.status,
           body: { ...body, lines },
-        }, { event: `${order.title} receipted: ${totalReceived} units` });
+        }, { expectRevision: order.revision, event: `${order.title} receipted: ${totalReceived} units` });
+        if (!ok10) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
 
         for (const row of outstanding) {
           const quantity = countFor(row.line.id);
@@ -1204,10 +1214,11 @@ export function Discrepancy({ context, close }: { context: ScreenContext; close:
       onSubmit={async (event) => {
         event.preventDefault();
         if (!note.trim()) return;
-        await context.mutate.patch(receipt.id, {
+        const ok11 = await context.mutate.patch(receipt.id, {
           status: "exception",
           fields: { ...receipt.fields, discrepancy: kind, discrepancyNote: note.trim(), flaggedBy: actor },
         }, { expectRevision: receipt.revision, event: `Discrepancy on ${receipt.title}: ${kind}` });
+        if (!ok11) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
         context.toast("Discrepancy recorded", "The supplier invoice for this order will not match until it is resolved.");
         close();
       }}
@@ -1567,10 +1578,11 @@ export function ThreeWayMatch({ context, close }: { context: ScreenContext; clos
               variant="primary"
               disabled={!payable || String(bill.fields.payment) === "paid_local"}
               onClick={async () => {
-                await context.mutate.patch(bill.id, {
+                const ok12 = await context.mutate.patch(bill.id, {
                   status: "approved",
                   fields: { ...bill.fields, matchState: "matched", approvedBy: actor, payment: "approved_local" },
                 }, { expectRevision: bill.revision, event: `${bill.title} approved for payment by ${actor} after a three-way match` });
+                if (!ok12) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
                 context.toast("Approved for payment", `${bill.title} is cleared by the match. Paying it is a separate step in the ledger, outside this screen.`);
                 close();
               }}
@@ -1651,10 +1663,11 @@ export function SupplierReview({ context, close }: { context: ScreenContext; clo
       onSubmit={async (event) => {
         event.preventDefault();
         if (!note.trim()) return;
-        await context.mutate.patch(supplier.id, {
+        const ok13 = await context.mutate.patch(supplier.id, {
           status: outcome === "approve" ? "approved" : outcome === "archive" ? "archived" : "review",
           fields: { ...supplier.fields, reviewedBy: actor, reviewNote: note.trim() },
         }, { expectRevision: supplier.revision, event: `${supplier.title} reviewed by ${actor}: ${outcome}` });
+        if (!ok13) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
         context.toast("Review recorded", `${supplier.title} is now ${outcome === "approve" ? "approved" : outcome === "archive" ? "archived" : "still under review"}.`);
         close();
       }}

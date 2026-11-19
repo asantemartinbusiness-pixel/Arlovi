@@ -3,9 +3,10 @@ import {
   Boxes, Code2, Database, Gauge, KeyRound, LayoutTemplate, Rocket, ShieldCheck, TestTube2, Workflow,
 } from "lucide-react";
 import {
-  Button, Card, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Card, Checkbox, Empty, FactGrid, Field, Notice, OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
+import { projectSummary } from "./summary";
 import { useWorkspace } from "@/platform/workspace";
 import { closeFooter, submitFooter } from "@/applications/t6kit/kit";
 import {
@@ -15,9 +16,10 @@ import { AppBuilder, ComponentInspector, NoProject, useAppRecord } from "./build
 import {
   ApiScreen, AppOverview, AuthScreen, CodeScreen, DatabaseScreen, DeployScreen, ExpressionEditor,
   IntegrationsScreen, MigrationPanel, MonitorScreen, ProjectLibrary,
-  ProjectSetupForm, ReleaseApproval, TestsScreen,
+  ProjectSetupForm, TestsScreen,
 } from "./panels";
 import { editComponent, saveApp, useBuildUi } from "./state";
+import { ReleaseApproval, ReleaseSummary, RollbackImpact, RollbackSummary } from "./release";
 import {
   ConfigInspector, EditFileForm, importRepository, EventInspector, SafeCommandPanel, TraceInspector, addComponent, approveFix, askEngineer,
   attachIntegration, branchProject, commitChange, configureProvider, createIncident, deployFunctions, editStyles,
@@ -644,9 +646,9 @@ export const buildApp = registerApp({
         { id: "failing checks", label: "Failing checks", placement: "overflow", run: (context) => context.openOverlay("Incident inspector") },
       ],
       overlays: [
-        { id: "Incident inspector", kind: "drawer", title: "Failing checks", width: 520, render: ({ ...context }) => <IncidentInspector context={context} /> },
-        { id: "release preview", kind: "modal", title: "Release review", width: 620, presentation: { guidance: "Inspect the project, target environment and checks before recording a release decision." }, render: ({ close, ...context }) => <ReleaseApproval context={context} close={close} /> },
-        { id: "task creation", kind: "modal", title: "Create a task", width: 520, render: ({ close, ...context }) => <TaskCreation context={context} close={close} />, footer: submitFooter("task-creation", "Create the task") },
+        { id: "Incident inspector", kind: "drawer", summary: projectSummary, title: "Failing checks", width: 520, render: ({ ...context }) => <IncidentInspector context={context} /> },
+        { id: "release preview", kind: "modal", title: "Release review", width: 640, summary: ({ close: _c, ...context }) => <ReleaseSummary context={context} />, presentation: { guidance: "Inspect the project, target environment and checks before recording a release decision." }, render: ({ close, ...context }) => <ReleaseApproval context={context} close={close} /> },
+        { id: "task creation", kind: "modal", summary: projectSummary, title: "Create a task", width: 520, render: ({ close, ...context }) => <TaskCreation context={context} close={close} />, footer: submitFooter("task-creation", "Create the task") },
         askEngineer,
       ],
     },
@@ -675,9 +677,9 @@ export const buildApp = registerApp({
         { id: "responsive widths", label: "Responsive widths", placement: "overflow", run: (context) => context.setTab("Responsive") },
       ],
       overlays: [
-        { id: "Component inspector", kind: "drawer", title: "Component", width: 460, render: ({ ...context }) => <ComponentInspectorOverlay context={context} /> },
-        { id: "expression editor", kind: "modal", title: "Automation", width: 640, render: ({ close, ...context }) => <ExpressionEditor context={context} close={close} />, footer: submitFooter("expression-editor", "Save automation") },
-        { id: "binding test", kind: "drawer", title: "Binding test", width: 520, render: ({ ...context }) => <BindingTest context={context} /> },
+        { id: "Component inspector", kind: "drawer", summary: projectSummary, title: "Component", width: 460, render: ({ ...context }) => <ComponentInspectorOverlay context={context} /> },
+        { id: "expression editor", kind: "modal", summary: projectSummary, title: "Automation", width: 640, render: ({ close, ...context }) => <ExpressionEditor context={context} close={close} />, footer: submitFooter("expression-editor", "Save automation") },
+        { id: "binding test", kind: "drawer", summary: projectSummary, title: "Binding test", width: 520, render: ({ ...context }) => <BindingTest context={context} /> },
         addComponent, editStyles,
       ],
     },
@@ -701,10 +703,10 @@ export const buildApp = registerApp({
         { id: "change history", label: "Change history", placement: "overflow", run: (context) => context.setTab("Source control") },
       ],
       overlays: [
-        { id: "File search", kind: "modal", title: "Search the generated files", width: 620, render: ({ ...context }) => <FileSearch context={context} />, footer: closeFooter() },
-        { id: "diff review", kind: "drawer", title: "Generated output", width: 640, render: ({ ...context }) => <DiffReview context={context} /> },
-        { id: "command authorization", kind: "modal", title: "Run a safe command", tone: "danger", width: 600, render: ({ ...context }) => <CommandAuthorization context={context} />, footer: closeFooter() },
-        { id: "edit file", kind: "modal", title: "Edit a file", width: 680, render: ({ close, ...context }) => <EditFileForm context={context} close={close} />, footer: submitFooter("edit-file", "Save the file") },
+        { id: "File search", kind: "modal", summary: projectSummary, title: "Search the generated files", width: 620, render: ({ ...context }) => <FileSearch context={context} />, footer: closeFooter() },
+        { id: "diff review", kind: "drawer", summary: projectSummary, title: "Generated output", width: 640, render: ({ ...context }) => <DiffReview context={context} /> },
+        { id: "command authorization", kind: "modal", summary: projectSummary, title: "Run a safe command", tone: "danger", width: 600, render: ({ ...context }) => <CommandAuthorization context={context} />, footer: closeFooter() },
+        { id: "edit file", kind: "modal", summary: projectSummary, title: "Edit a file", width: 680, render: ({ close, ...context }) => <EditFileForm context={context} close={close} />, footer: submitFooter("edit-file", "Save the file") },
         commitChange, branchProject,
       ],
     },
@@ -739,10 +741,10 @@ export const buildApp = registerApp({
         { id: "migration check", label: "Migration check", placement: "overflow", run: (context) => context.openOverlay("migration diff") },
       ],
       overlays: [
-        { id: "Column editor", kind: "modal", title: "Field", width: 560, render: ({ close, ...context }) => <ColumnEditor context={context} close={close} />, footer: submitFooter("column-editor", "Save field") },
-        { id: "migration diff", kind: "drawer", title: "Migration diff", width: 640, render: ({ ...context }) => <MigrationDiff context={context} /> },
+        { id: "Column editor", kind: "modal", summary: projectSummary, title: "Field", width: 560, render: ({ close, ...context }) => <ColumnEditor context={context} close={close} />, footer: submitFooter("column-editor", "Save field") },
+        { id: "migration diff", kind: "drawer", summary: projectSummary, title: "Migration diff", width: 640, render: ({ ...context }) => <MigrationDiff context={context} /> },
         {
-          id: "access policy", kind: "drawer", title: "Access policy", width: 520,
+          id: "access policy", kind: "drawer", summary: projectSummary, title: "Access policy", width: 520,
           render: ({ ...context }) => <MigrationPanel context={context} />,
         },
         validatePolicy, seedEntity,
@@ -766,11 +768,11 @@ export const buildApp = registerApp({
         { id: "contracts", label: "Contracts", placement: "overflow", run: (context) => context.setTab("Contracts") },
       ],
       overlays: [
-        { id: "Request builder", kind: "modal", title: "Endpoint", width: 580, render: ({ close, ...context }) => <RequestBuilder context={context} close={close} />, footer: submitFooter("request-builder", "Define the endpoint") },
-        { id: "auth inspector", kind: "drawer", title: "Authorisation", width: 520, render: ({ ...context }) => <AuthInspector context={context} /> },
-        { id: "function diff", kind: "drawer", title: "Generated contracts", width: 640, render: ({ ...context }) => <DiffReview context={context} /> },
+        { id: "Request builder", kind: "modal", summary: projectSummary, title: "Endpoint", width: 580, render: ({ close, ...context }) => <RequestBuilder context={context} close={close} />, footer: submitFooter("request-builder", "Define the endpoint") },
+        { id: "auth inspector", kind: "drawer", summary: projectSummary, title: "Authorisation", width: 520, render: ({ ...context }) => <AuthInspector context={context} /> },
+        { id: "function diff", kind: "drawer", summary: projectSummary, title: "Generated contracts", width: 640, render: ({ ...context }) => <DiffReview context={context} /> },
         testEndpoint, deployFunctions,
-        { id: "trace inspector", kind: "drawer", title: "Request path", width: 560, render: ({ ...context }) => <TraceInspector context={context} /> },
+        { id: "trace inspector", kind: "drawer", summary: projectSummary, title: "Request path", width: 560, render: ({ ...context }) => <TraceInspector context={context} /> },
       ],
     },
 
@@ -789,9 +791,9 @@ export const buildApp = registerApp({
         { id: "providers", label: "Providers", placement: "overflow", run: (context) => context.setTab("Providers") },
       ],
       overlays: [
-        { id: "Role editor", kind: "modal", title: "New role", width: 520, render: ({ close, ...context }) => <RoleEditorForm context={context} close={close} />, footer: submitFooter("role-editor", "Create the role") },
-        { id: "policy simulator", kind: "drawer", title: "Policy simulation", width: 580, render: ({ ...context }) => <PolicySimulator context={context} /> },
-        { id: "authentication issue", kind: "modal", title: "What this method needs", width: 520, render: ({ ...context }) => <AuthIssuePanel context={context} />, footer: closeFooter() },
+        { id: "Role editor", kind: "modal", summary: projectSummary, title: "New role", width: 520, render: ({ close, ...context }) => <RoleEditorForm context={context} close={close} />, footer: submitFooter("role-editor", "Create the role") },
+        { id: "policy simulator", kind: "drawer", summary: projectSummary, title: "Policy simulation", width: 580, render: ({ ...context }) => <PolicySimulator context={context} /> },
+        { id: "authentication issue", kind: "modal", summary: projectSummary, title: "What this method needs", width: 520, render: ({ ...context }) => <AuthIssuePanel context={context} />, footer: closeFooter() },
         configureProvider, revokeSessions,
       ],
     },
@@ -812,10 +814,10 @@ export const buildApp = registerApp({
         { id: "flaky checks", label: "Flaky checks", placement: "overflow", run: (context) => context.openOverlay("flaky test tracker") },
       ],
       overlays: [
-        { id: "Test report", kind: "drawer", title: "Check report", width: 600, render: ({ ...context }) => <TestReport context={context} /> },
+        { id: "Test report", kind: "drawer", summary: projectSummary, title: "Check report", width: 600, render: ({ ...context }) => <TestReport context={context} /> },
         approveFix,
         {
-          id: "flaky test tracker", kind: "modal", title: "Flaky checks", width: 520,
+          id: "flaky test tracker", kind: "modal", summary: projectSummary, title: "Flaky checks", width: 520,
           render: () => (
             <Stack gap={3}>
               <Notice tone="info" title="None of these checks can be flaky">
@@ -849,11 +851,11 @@ export const buildApp = registerApp({
         { id: "build logs", label: "Build logs", placement: "overflow", run: (context) => context.setTab("Logs") },
       ],
       overlays: [
-        { id: "Release approval", kind: "modal", title: "Release review", width: 640, render: ({ close, ...context }) => <ReleaseApproval context={context} close={close} /> },
-        { id: "diff", kind: "drawer", title: "Generated output", width: 640, render: ({ ...context }) => <DiffReview context={context} /> },
-        { id: "rollback impact", kind: "modal", title: "Rollback", width: 540, render: ({ ...context }) => <RollbackImpact context={context} />, footer: closeFooter() },
+        { id: "Release approval", kind: "modal", title: "Release review", width: 640, summary: ({ close: _c, ...context }) => <ReleaseSummary context={context} />, render: ({ close, ...context }) => <ReleaseApproval context={context} close={close} /> },
+        { id: "diff", kind: "drawer", summary: projectSummary, title: "Generated output", width: 640, render: ({ ...context }) => <DiffReview context={context} /> },
+        { id: "rollback impact", kind: "modal", title: "Roll back the model", tone: "danger", width: 560, summary: ({ close: _c, ...context }) => <RollbackSummary context={context} />, render: ({ close, ...context }) => <RollbackImpact context={context} close={close} /> },
         pauseDeployments,
-        { id: "config inspector", kind: "drawer", title: "Configuration", width: 600, render: ({ ...context }) => <ConfigInspector context={context} /> },
+        { id: "config inspector", kind: "drawer", summary: projectSummary, title: "Configuration", width: 600, render: ({ ...context }) => <ConfigInspector context={context} /> },
       ],
     },
 
@@ -875,23 +877,13 @@ export const buildApp = registerApp({
       ],
       overlays: [
         {
-          id: "Secret input", kind: "modal", title: "Keys", tone: "danger", width: 560,
-          render: () => (
-            <Stack gap={3}>
-              <Notice tone="danger" title="There is no field to type a key into">
-                A credential written here would sit in IndexedDB in plain text. Rather than offer a form that looks safe, this workspace stores no secret at all and generates none.
-              </Notice>
-              <Properties rows={[
-                { label: "Stored secrets", value: <span className="ds-num">0</span> },
-                { label: "Generated credentials", value: <span className="ds-num">0</span> },
-                { label: "Where they would belong", value: "A server with an encrypted store, once one exists" },
-              ]} />
-            </Stack>
-          ),
+          id: "Secret input", kind: "modal", title: "Keys", tone: "danger", width: 520,
+          summary: ({ close: _c, ...context }) => <SecretSummary context={context} />,
+          render: ({ ...context }) => <SecretInput context={context} />,
           footer: closeFooter(),
         },
         {
-          id: "webhook test", kind: "modal", title: "Webhook test", width: 520,
+          id: "webhook test", kind: "modal", summary: projectSummary, title: "Webhook test", width: 520,
           render: () => (
             <Notice tone="warning" title="A webhook cannot be tested from here">
               Testing means sending a request and reading the response. This workspace makes no network calls, so the result would be fabricated. No test is offered.
@@ -900,7 +892,7 @@ export const buildApp = registerApp({
           footer: closeFooter(),
         },
         {
-          id: "revocation", kind: "modal", title: "Revocation", width: 520,
+          id: "revocation", kind: "modal", summary: projectSummary, title: "Revocation", width: 520,
           render: ({ ...context }) => (
             <Stack gap={3}>
               <Notice tone="info" title="There is no grant to revoke">
@@ -933,15 +925,46 @@ export const buildApp = registerApp({
         { id: "budget", label: "Budget", placement: "overflow", run: (context) => context.openOverlay("budget panel") },
       ],
       overlays: [
-        { id: "Trace viewer", kind: "drawer", title: "Read path", width: 580, render: ({ ...context }) => <TraceViewer context={context} /> },
+        { id: "Trace viewer", kind: "drawer", summary: projectSummary, title: "Read path", width: 580, render: ({ ...context }) => <TraceViewer context={context} /> },
         tuneMonitor, createIncident,
-        { id: "event inspector", kind: "drawer", title: "Event", width: 560, render: ({ ...context }) => <EventInspector context={context} /> },
-        { id: "budget panel", kind: "drawer", title: "Budget", width: 480, render: ({ ...context }) => <BudgetPanel context={context} /> },
-        { id: "Incident inspector", kind: "drawer", title: "Failing checks", width: 520, render: ({ ...context }) => <IncidentInspector context={context} /> },
+        { id: "event inspector", kind: "drawer", summary: projectSummary, title: "Event", width: 560, render: ({ ...context }) => <EventInspector context={context} /> },
+        { id: "budget panel", kind: "drawer", summary: projectSummary, title: "Budget", width: 480, render: ({ ...context }) => <BudgetPanel context={context} /> },
+        { id: "Incident inspector", kind: "drawer", summary: projectSummary, title: "Failing checks", width: 520, render: ({ ...context }) => <IncidentInspector context={context} /> },
       ],
     },
   },
 });
+
+function SecretSummary({ context }: { context: ScreenContext }) {
+  const { record } = useAppRecord(context);
+  if (!record) return null;
+  return <OverlaySummary eyebrow="Project" title={record.title} status={<Pill tone="warning">No value can be stored</Pill>} meta={["0 stored", "0 generated"]} />;
+}
+
+/**
+ * The field is masked and disabled on purpose: a credential written here would sit in
+ * IndexedDB in plain text. It never echoes, is never read back and no value ever leaves the form.
+ */
+function SecretInput({ context }: { context: ScreenContext }) {
+  const { record } = useAppRecord(context);
+  if (!record) return <NoProject />;
+  const keys = [
+    { name: "DATABASE_URL", usedBy: "The server that would hold the entities" },
+    { name: "MAIL_API_KEY", usedBy: "Any automation step that notifies" },
+    { name: "SESSION_SECRET", usedBy: "Signing sessions once an auth provider exists" },
+  ];
+  return (
+    <Stack gap={4}>
+      <Field label="Secret value" hint="Masked and never shown back. Disabled until an encrypted server-side store exists.">
+        <TextInput type="password" name="secret-value" value="" readOnly disabled autoComplete="off" placeholder="••••••••••••" aria-label="Secret value, unavailable" />
+      </Field>
+      <OverlaySection title="Keys this app would need" hint="Names only; the value is never part of the model.">
+        <FactGrid columns={2} dense items={keys.map((key) => ({ label: <code>{key.name}</code>, value: <Pill tone="warning">not set</Pill>, hint: key.usedBy }))} />
+      </OverlaySection>
+      <p className="ds-subtle">A key reaches generated code, logs and assistants only by name.</p>
+    </Stack>
+  );
+}
 
 function FileSearch({ context }: { context: ScreenContext }) {
   const { record, model } = useAppRecord(context);
@@ -1001,48 +1024,6 @@ function TestReport({ context }: { context: ScreenContext }) {
       <Notice tone="warning" title="A green suite is not a working feature">
         These checks read the model. They say the design is consistent; they cannot say the built app behaves correctly, because nothing executes it.
       </Notice>
-    </Stack>
-  );
-}
-
-function RollbackImpact({ context }: { context: ScreenContext }) {
-  const { record, model } = useAppRecord(context);
-  if (!record) return <NoProject />;
-  const releases = [...model.releases].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
-  const latest = releases[0];
-  const previous = releases.find((release) => release.state === "built");
-  return (
-    <Stack gap={3}>
-      <Properties rows={[
-        { label: "Latest attempt", value: latest ? <span className="ds-num">{context.dateTime(latest.at)}</span> : "None" },
-        { label: "Outcome", value: latest ? latest.state.replace("_", " ") : "None" },
-        { label: "Earlier build", value: previous ? <span className="ds-num">{context.dateTime(previous.at)}</span> : "None recorded" },
-        { label: "Revisions kept", value: <span className="ds-num">{String(record.history.length)}</span> },
-      ]} />
-      {!latest ? (
-        <Notice tone="neutral" title="Nothing to roll back">No release has been attempted for this project.</Notice>
-      ) : (
-        <>
-          <Notice tone="info" title="A rollback here restores the model">
-            Nothing is running, so a rollback means writing an earlier revision of the model back onto the record. {record.history.length} revisions are kept.
-          </Notice>
-          <Button
-            variant="outline-danger"
-            disabled={record.history.length === 0}
-            onClick={async () => {
-              const snapshot = record.history[0];
-              await context.mutate.patch(record.id, { body: snapshot.body }, { event: `Model rolled back to the revision saved ${snapshot.at}` });
-              await saveApp(context, { ...record, body: snapshot.body, revision: record.revision + 1 }, {
-                ...model,
-                releases: model.releases.map((release) => (release.id === latest.id ? { ...release, state: "rolled_back" as const, note: "Rolled back to the previous model revision." } : release)),
-              }, "Release marked rolled back");
-              context.toast("Rolled back", "The previous model revision was written back and the release is marked rolled back.");
-            }}
-          >
-            Roll back to the previous revision
-          </Button>
-        </>
-      )}
     </Stack>
   );
 }

@@ -321,3 +321,4 @@
 .cmx-message-tags em.cmx-notdelivered{background:var(--warning-soft);color:var(--warning)}
 /* On a phone the page tab strip already switches every mail area; the rail would be a second tab layer. */
 
+.cmx-filter:focus-visible,.cmx-message:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}

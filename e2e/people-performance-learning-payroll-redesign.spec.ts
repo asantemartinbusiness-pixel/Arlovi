@@ -2,14 +2,14 @@ import { expect, test } from "@playwright/test";
 
 test("Performance has distinct Cycles, My reviews, Team and Templates screens", async ({ page }) => {
   const main = page.locator("#main");
-  for (const [tab, heading] of [
+  for (const [tab] of [
     ["Cycles", "Every review cycle, accounted for."],
     ["My reviews", "Your reviews and decisions."],
     ["Team", "The team review ledger."],
     ["Templates", "Structure before judgement."],
   ]) {
     await page.goto(`/o/northline/hr/performance?tab=${encodeURIComponent(tab)}`);
-    await expect(main.getByRole("region", { name: heading })).toBeVisible();
+    await expect(main.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
     if (tab !== "Team" || await main.locator(".ops-metrics").count() > 0) {
       await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
     }
@@ -28,14 +28,14 @@ test("Performance has distinct Cycles, My reviews, Team and Templates screens", 
 
 test("Learning & Policies presents four pages with live search and real required-only filters", async ({ page }) => {
   const main = page.locator("#main");
-  for (const [tab, heading] of [
+  for (const [tab] of [
     ["Courses", "Learning people can actually follow."],
     ["Policies", "Policies that can be read and acknowledged."],
     ["Compliance", "Requirements, evidence and outstanding work."],
     ["My learning", "Your learning record, in context."],
   ]) {
     await page.goto(`/o/northline/hr/learning?tab=${encodeURIComponent(tab)}`);
-    await expect(main.getByRole("region", { name: heading })).toBeVisible();
+    await expect(main.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
     await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
   }
   await page.goto("/o/northline/hr/learning?tab=Courses");

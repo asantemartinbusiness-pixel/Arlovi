@@ -10,7 +10,8 @@ import {
 import {
   Button, ButtonGroup, Card, Checkbox, DataGrid, Empty, Field, Grid, InspectorSection, Meter,
   Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Switch, Tabs, TextArea,
-  TextInput, Tool, Toolbar, ToolbarSeparator,
+  TextInput, Tool, Toolbar, ToolbarSeparator, type RecordHeaderProps,
+  OVERLAY_WIDTH, OverlaySummary,
 } from "@/design-system";
 import { getScreenDef, registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
@@ -35,6 +36,7 @@ import {
 } from "./actions";
 import { useStore } from "@/applications/visual/kit";
 import { useGuardRefresh } from "@/applications/design/sharedDoc";
+import { LibraryStrip } from "../docs/libraryKit";
 import "./present.css";
 
 /* ====================================================================== *
@@ -66,6 +68,22 @@ function DeckOverlaySummary({ context }: { context: ScreenContext }) {
       meta={[record.ownerName, `Revision ${record.revision}`]}
     />
   );
+}
+function DeckTitle({ context }: { context: ScreenContext }) { return <>{useDeck(context)?.title ?? "Deck"}</>; }
+function DeckStatus({ context }: { context: ScreenContext }) {
+  const record = useDeck(context);
+  return record ? <Pill tone={record.status === "published" ? "success" : "neutral"}>{record.status.replace("_", " ")}</Pill> : null;
+}
+function DeckFacts({ context }: { context: ScreenContext }) {
+  const record = useDeck(context);
+  if (!record) return null;
+  const deck = readDeck(record.body);
+  const open = deck.comments.filter((item) => !item.resolved).length;
+  return <>{deck.slides.length} slide{deck.slides.length === 1 ? "" : "s"} · {deck.theme.name} · {record.ownerName} · {open} open comment{open === 1 ? "" : "s"}</>;
+}
+/** Identity block for the deck pages beside the editor. Runs outside hook rules, so each piece reads the record itself. */
+function deckRecord(context: ScreenContext): RecordHeaderProps {
+  return { title: <DeckTitle context={context} />, status: <DeckStatus context={context} />, meta: [<DeckFacts key="facts" context={context} />] };
 }
 const deckSummary = (context: ScreenContext) => <DeckOverlaySummary context={context} />;
 
@@ -217,19 +235,20 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
 
   return (
     <Stack gap={4}>
-      <div className="pr-library-heading">
-        <div><span className="pr-library-eyebrow">PRESENT / DECK LIBRARY</span>
-          <h2>{tab === "Shared" ? "Recorded sharing." : tab === "Templates" ? "Reusable presentations." : tab === "Archived" ? "Presentation archive." : "Presentations in progress."}</h2>
-          <p>{tab === "Shared" ? "Decks with a locally recorded sharing list or active sharing-intent entry appear here. These records do not grant public or workspace access." : "Find and present the right deck with its source, review state and design context visible."}</p>
-        </div>
+      <LibraryStrip
+        label="Presentation library overview"
+        items={[
+          { label: "Current decks", value: decks.filter((record) => record.status !== "archived").length },
+          { label: "Templates", value: decks.filter((record) => record.fields.isTemplate === true).length },
+          { label: "Archived", value: decks.filter((record) => record.status === "archived").length },
+        ]}
+      >
         <Button variant="primary" onClick={() => context.openOverlay("new deck")}>New presentation</Button>
+      </LibraryStrip>
+      {tab === "Shared" && <p className="ds-subtle">A recorded sharing entry does not grant public or workspace access.</p>}
+      <div className="lk-toolbar">
+        <div className="lk-grow"><TextInput type="search" aria-label="Find a presentation" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, summary or tags" /></div>
       </div>
-      <div className="pr-library-overview" aria-label="Presentation library overview">
-        <div><span>Current decks</span><strong>{decks.filter((record) => record.status !== "archived").length}</strong></div>
-        <div><span>Templates</span><strong>{decks.filter((record) => record.fields.isTemplate === true).length}</strong></div>
-        <div><span>Archived</span><strong>{decks.filter((record) => record.status === "archived").length}</strong></div>
-      </div>
-      <Field label="Find a presentation"><TextInput type="search" aria-label="Find a presentation" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, summary or tags" /></Field>
       {rows.length === 0 ? <Empty title={query.trim() ? "No presentations match this search" : `No ${tab.toLowerCase()} presentations`} icon={<Presentation size={20} />}
         action={query.trim()
           ? <Button variant="secondary" onClick={() => setQuery("")}>Clear search</Button>
@@ -257,6 +276,10 @@ function DeckLibrary({ context, tab }: { context: ScreenContext; tab: "Recent" |
               <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${org.slug}/present/decks/${record.id}`)}>Edit</Button>
               <Button size="sm" variant="secondary" icon={<Play size={14} />} onClick={() => context.navigate(`/o/${org.slug}/present/decks/${record.id}/present`)}>Present</Button>
               <Button size="sm" variant="ghost" onClick={() => context.openOverlay("template preview", { id: record.id })}>Preview</Button>
+              <Button size="sm" variant="ghost" onClick={() => void context.mutate.create({
+                collection: "decks", title: `${record.title} copy`, status: "draft", summary: record.summary,
+                tags: record.tags, fields: { ...record.fields }, body: readDeck(record.body),
+              }, `${record.title} duplicated`).then(() => context.toast("Duplicated", "Every slide, object and theme token was copied."))}>Duplicate</Button>
             </>}
           >
             <Stack gap={3}>
@@ -960,8 +983,7 @@ function ThemeScreen({ context, tab }: { context: ScreenContext; tab: "Masters" 
   return (
     <Stack gap={4}>
       <div className="pr-library-heading">
-        <div><span className="pr-library-eyebrow">PRESENT / DESIGN GOVERNANCE</span><h2>One coherent visual language.</h2>
-          <p>Inspect master layouts, see which slides have been customised and resolve typography before applying changes across the deck.</p></div>
+        <div></div>
         <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button>
       </div>
       <div className="pr-library-overview" aria-label="Presentation theme overview">
@@ -1197,8 +1219,7 @@ function AnimationScreen({ context, tab }: { context: ScreenContext; tab: "Slide
   const longTransitions = editor.deck.slides.filter((slide) => slide.transition.durationMs > 600).length;
   const animationOverview = (
     <section className="pr-workflow-overview" aria-label="Animation workflow overview">
-      <div className="pr-library-heading"><div><span className="pr-library-eyebrow">PRESENT / MOTION WORKSPACE</span>
-        <h2>Motion with purpose.</h2><p>Review every slide transition and object animation, including timing and reduced-motion behaviour before presenting.</p>
+      <div className="pr-library-heading"><div>
       </div><Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button></div>
       <div className="pr-library-overview">
         <div><span>Slide transitions</span><strong>{editor.deck.slides.filter((slide) => slide.transition.effect !== "none").length}</strong></div>
@@ -1573,9 +1594,7 @@ function PresenterScreen({ context, tab }: { context: ScreenContext; tab: "Audie
     return (
       <Stack gap={4}>
         <div className="pr-library-heading">
-          <div><span className="pr-library-eyebrow">PRESENT / AUDIENCE VIEW</span>
-            <h2>What your audience will see.</h2>
-            <p>Preview the current slide without speaker notes. Hidden slides stay out of the visible presentation sequence.</p>
+          <div>
           </div>
           <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button>
         </div>
@@ -1784,8 +1803,7 @@ function ReviewScreen({ context, tab }: { context: ScreenContext; tab: "Comments
   const reviewOverview = (
     <section className="pr-workflow-overview" aria-label="Presentation review overview">
       <div className="pr-library-heading">
-        <div><span className="pr-library-eyebrow">PRESENT / REVIEW & DELIVERY</span><h2>Ready for the room.</h2>
-          <p>Review unresolved feedback, output quality and saved changes before distributing a presentation. Exports are generated locally.</p></div>
+        <div></div>
         <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}`)}>Back to editor</Button>
       </div>
       <div className="pr-library-overview">
@@ -3126,6 +3144,7 @@ registerApp({
 
     "ARL-PRESENT-003": {
       id: "ARL-PRESENT-003",
+      record: deckRecord,
       title: () => "Master & theme",
       tabs: (["Masters", "Colours", "Fonts", "Layouts"] as const).map((id) => ({ id, render: (context) => <ThemeScreen context={context} tab={id} /> })),
       actions: [
@@ -3143,6 +3162,7 @@ registerApp({
 
     "ARL-PRESENT-004": {
       id: "ARL-PRESENT-004",
+      record: deckRecord,
       title: () => "Charts & data",
       tabs: (["Charts", "Tables", "Sources", "Refresh"] as const).map((id) => ({ id, render: (context) => <DataScreen context={context} tab={id} /> })),
       actions: [
@@ -3161,6 +3181,7 @@ registerApp({
 
     "ARL-PRESENT-005": {
       id: "ARL-PRESENT-005",
+      record: deckRecord,
       title: () => "Transitions & animation",
       tabs: (["Slides", "Objects", "Timing", "Preview"] as const).map((id) => ({ id, render: (context) => <AnimationScreen context={context} tab={id} /> })),
       actions: [
@@ -3179,6 +3200,7 @@ registerApp({
 
     "ARL-PRESENT-006": {
       id: "ARL-PRESENT-006",
+      record: deckRecord,
       title: () => "Presenter mode",
       tabs: (["Audience", "Presenter", "Rehearsal"] as const).map((id) => ({
         id,
@@ -3209,6 +3231,7 @@ registerApp({
 
     "ARL-PRESENT-007": {
       id: "ARL-PRESENT-007",
+      record: deckRecord,
       title: () => "Review & publish",
       tabs: (["Comments", "History", "Export", "Publish"] as const).map((id) => ({ id, render: (context) => <ReviewScreen context={context} tab={id} /> })),
       actions: [

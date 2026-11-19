@@ -310,3 +310,26 @@ export function reviewProgress(entries: ReviewEntry[]): { decided: number; total
     complete: entries.length > 0 && decided === entries.length,
   };
 }
+
+/* ------------------------------ Incident clock ------------------------------ */
+
+export const SEVERITY_TONE: Record<string, "danger" | "warning" | "neutral"> = {
+  high: "danger", critical: "danger", medium: "warning", low: "neutral",
+};
+
+/**
+ * How long an incident has been open, from the moment it was recorded to its
+ * resolution (or to now while it is still open). This is elapsed time only:
+ * no response target is invented, because none is configured for this workspace.
+ */
+export function incidentClock(record: Rec, now: Date): { label: string; ms: number; stopped: boolean } {
+  const start = Date.parse(record.at ?? record.createdAt);
+  const stopped = record.status === "resolved" || record.status === "closed";
+  const end = stopped && record.endAt ? Date.parse(record.endAt) : now.getTime();
+  const ms = Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) : 0;
+  const minutes = Math.floor(ms / 60000);
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const label = days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+  return { label, ms, stopped };
+}

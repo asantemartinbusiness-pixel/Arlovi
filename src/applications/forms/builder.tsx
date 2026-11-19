@@ -4,10 +4,7 @@ import {
   AlignLeft, Calendar, CheckSquare, ChevronsUpDown, FileText, Hash, Heading, ListChecks,
   Mail, Minus, Paperclip, Star, Type,
 } from "lucide-react";
-import {
-  Button, Card, Checkbox, Empty, Field, Grid, Notice, Pill, Properties, Row, Segmented,
-  Select, Stack, Tabs, TextArea, TextInput, Toolbar, ToolbarSeparator,
-} from "@/design-system";
+import { Button, Card, Checkbox, Empty, Field, Grid, KeyValueList, Notice, Pill, Row, Segmented, Select, Stack, Tabs, TextArea, TextInput, Toolbar, ToolbarSeparator } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
@@ -528,7 +525,7 @@ export function FormSettingsPanel({ context, record, model }: { context: ScreenC
       </Card>
       <Card span={5} eyebrow="NOTIFICATION" prov="unknown" title="Notification" subtitle="Where this stops">
         <Stack gap={3}>
-          <Properties rows={[
+          <KeyValueList items={[
             { label: "Mail provider", value: <Pill tone="warning" dot>Not connected</Pill> },
             { label: "On submission", value: model.settings.notifyEnabled ? "The intention is recorded on the submission" : "Nothing is attempted" },
             { label: "Recipient", value: model.settings.notifyTo || "Not set" },

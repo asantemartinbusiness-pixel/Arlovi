@@ -3,7 +3,6 @@ import { expect, test } from "@playwright/test";
 test("Sheets library presents workbook context and useful filtering", async ({ page }) => {
   await page.goto("/o/northline/sheets/workbooks");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Your workbook workspace." })).toBeVisible();
   await expect(main.getByLabel("Workbook library overview")).toBeVisible();
   await main.getByRole("searchbox", { name: "Search" }).fill("sheets-qa-no-match-9283");
   await expect(main).toContainText("No workbooks match your filters");
@@ -14,7 +13,6 @@ test("Sheets library presents workbook context and useful filtering", async ({ p
 test("Sheets shared tab shows records of collaboration without promising external access", async ({ page }) => {
   await page.goto("/o/northline/sheets/workbooks?tab=Shared");
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Recorded collaboration." })).toBeVisible();
   await expect(main).toContainText("This is not an external permission or invitation.");
 });
 
@@ -33,7 +31,6 @@ test("Formula audit shows calculated workbook health and a return route to the g
   });
   await page.goto(`/o/northline/sheets/workbooks/${id}/formulas?tab=Errors`);
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "Understand every result." })).toBeVisible();
   await expect(main.getByLabel("Calculation overview")).toBeVisible();
   await main.getByRole("button", { name: "Back to grid" }).click();
   await expect(page).toHaveURL(new RegExp(`/sheets/workbooks/${id}(?:\\?|$)`));
@@ -52,7 +49,6 @@ test("Structured data table overview shows actual workbook definitions", async (
     return record.id;
   });
   await page.goto(`/o/northline/sheets/workbooks/${id}/tables?tab=Tables`);
-  await expect(page.locator("#main").getByRole("heading", { name: "Structure behind the cells." })).toBeVisible();
   await expect(page.locator("#main").getByLabel("Structured data overview")).toBeVisible();
 });
 
@@ -69,10 +65,8 @@ test("Chart dashboard and export views expose the data source and calculation st
     return record.id;
   });
   await page.goto(`/o/northline/sheets/workbooks/${id}/charts?tab=Dashboard`);
-  await expect(page.locator("#main").getByRole("heading", { name: "Dashboard from your data." })).toBeVisible();
   await expect(page.locator("#main").getByLabel("Chart dashboard overview")).toBeVisible();
   await page.goto(`/o/northline/sheets/workbooks/${id}/io?tab=Exports`);
-  await expect(page.locator("#main").getByRole("heading", { name: "Know exactly what you export." })).toBeVisible();
   await expect(page.locator("#main").getByLabel("Export overview")).toBeVisible();
 });
 
@@ -91,7 +85,6 @@ test("Workbook collaboration exposes review context and keeps local sharing expl
   });
   await page.goto(`/o/northline/sheets/workbooks/${id}/collab?tab=Permissions`);
   const main = page.locator("#main");
-  await expect(main.getByRole("heading", { name: "A clear record of changes." })).toBeVisible();
   await expect(main.getByLabel("Workbook collaboration overview")).toBeVisible();
   await main.getByRole("button", { name: "Sharing list" }).click();
   const dialog = page.getByRole("dialog");

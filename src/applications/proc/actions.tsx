@@ -69,7 +69,8 @@ export function LinkContract({ context, close }: { context: ScreenContext; close
         if (!chosen) return;
         const saved = await context.mutate.patch(chosen.id, { fields: { ...chosen.fields, supplierId: supplier.id, linkedBy: context.actor, linkedAt: iso(context), previousSupplierId: String(chosen.fields.supplierId ?? "") } }, { expectRevision: chosen.revision, event: `${chosen.title} linked to ${supplier.title} by ${context.actor}` });
         if (!saved) return;
-        await context.mutate.patch(supplier.id, { fields: { ...supplier.fields, contractCount: linked.length + 1 } }, { expectRevision: supplier.revision, event: `${chosen.title} linked to ${supplier.title}` });
+        const ok14 = await context.mutate.patch(supplier.id, { fields: { ...supplier.fields, contractCount: linked.length + 1 } }, { expectRevision: supplier.revision, event: `${chosen.title} linked to ${supplier.title}` });
+        if (!ok14) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
         context.toast("Contract linked", `${chosen.title} now belongs to ${supplier.title}. Its clauses still need a qualified review.`);
         close();
       }}

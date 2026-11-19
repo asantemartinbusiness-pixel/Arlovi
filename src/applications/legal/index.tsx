@@ -342,6 +342,7 @@ function SignAuthorization({ context, close }: { context: ScreenContext; close: 
   const [busy, setBusy] = useState(false);
   if (!contract) return <Empty title="Choose a contract first" icon={<FileText size={20} />}>Recording a signature applies to one contract. None is substituted.</Empty>;
   const executed = contract.fields.immutableSigned === true;
+  const approvedForSigning = contract.status === "approved" || contract.status === "awaiting_signature";
   return (
     <Stack gap={4}>
       <ModalUnsavedChanges when={confirmed} />
@@ -356,6 +357,11 @@ function SignAuthorization({ context, close }: { context: ScreenContext; close: 
         { label: "Value", value: contract.amountMinor ? context.money(contract.amountMinor) : "Not a fixed value", mono: true },
         { label: "Authority", value: context.can("view_legal") ? "Held by this role view" : "Not held by this role view", tone: context.can("view_legal") ? undefined : "warning" },
       ]} />
+      {!executed && !approvedForSigning && (
+        <Notice tone="warning" title="Approval has not happened">
+          This contract is {lifecycleLabel(contract.status)}. It can be recorded as signed only once it is approved or awaiting signature.
+        </Notice>
+      )}
       {executed
         ? <Notice tone="info" title="Already executed">This contract was recorded as signed on {context.date(String(contract.fields.signedAt ?? ""))}. The executed version is immutable; a variation is stored as a new version.</Notice>
         : <Notice tone="danger" title="This fixes the executed version">
@@ -365,7 +371,7 @@ function SignAuthorization({ context, close }: { context: ScreenContext; close: 
       <Checkbox
         label={`I am ${context.actor} and I am recording that this was signed outside this workspace`}
         checked={confirmed}
-        disabled={executed || busy}
+        disabled={executed || busy || !approvedForSigning}
         onChange={(event) => setConfirmed(event.target.checked)}
       />
       <ModalActions>
@@ -375,7 +381,7 @@ function SignAuthorization({ context, close }: { context: ScreenContext; close: 
           primary={<Button
             variant="danger"
             busy={busy}
-            disabled={!confirmed || executed || busy || !context.can("view_legal")}
+            disabled={!confirmed || executed || !approvedForSigning || busy || !context.can("view_legal")}
             onClick={async () => {
               setBusy(true);
               try {

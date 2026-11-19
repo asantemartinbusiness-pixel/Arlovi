@@ -8,9 +8,9 @@ test("People Overview has distinct interactive Overview, My team, HR tasks and T
     ["HR tasks", "People decisions, in one queue."],
     ["Trends", "Understand the shape of the team."],
   ];
-  for (const [tab, heading] of tabs) {
+  for (const [tab] of tabs) {
     await page.goto(`/o/northline/hr/home?tab=${encodeURIComponent(tab)}`);
-    await expect(main.getByRole("region", { name: heading })).toBeVisible();
+    await expect(main.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
     if (tab !== "Overview") await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
   }
   await page.goto("/o/northline/hr/home?tab=HR%20tasks");
@@ -25,7 +25,7 @@ test("People Overview has distinct interactive Overview, My team, HR tasks and T
 test("Employee Directory has searchable people and real team filters across responsive layouts", async ({ page }) => {
   await page.goto("/o/northline/hr/employees?tab=People");
   const main = page.locator("#main");
-  await expect(main.getByRole("region", { name: "People, with context." })).toBeVisible();
+  await expect(main.locator(".hr-bar")).toBeVisible();
   await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
   const search = main.getByRole("textbox", { name: "Search employee directory" });
   await search.fill("qa-name-that-does-not-exist-76354");
@@ -48,20 +48,20 @@ test("Employee Directory has searchable people and real team filters across resp
 
 test("Directory Team, Contractor and Alumni tabs retain distinct content and company-scoped counts", async ({ page }) => {
   const main = page.locator("#main");
-  for (const [tab, heading] of [
+  for (const [tab] of [
     ["Teams", "Explore how teams connect."],
     ["Contractors", "The extended workforce."],
     ["Alumni", "People who helped build the work."],
   ]) {
     await page.goto(`/o/northline/hr/employees?tab=${encodeURIComponent(tab)}`);
-    await expect(main.getByRole("region", { name: heading })).toBeVisible();
+    await expect(main.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
     await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(4);
   }
   await page.goto("/o/northline/hr/employees?tab=Teams");
   const button = main.getByRole("button", { name: "Explore team" }).first();
   if (await button.count()) {
     await button.click();
-    await expect(main.getByRole("region", { name: "People, with context." })).toBeVisible();
+    await expect(main.locator(".hr-bar")).toBeVisible();
     const filter = main.getByLabel("Filter by department");
     await expect(filter).not.toHaveValue("");
   }
@@ -81,8 +81,13 @@ test("Every employee-profile tab shares one identity head, company scope and rec
   // Empty counts are not shown as tiles; only recorded facts make a tile.
   await page.goto("/o/northline/hr/employees/nl-employees-001?tab=Overview");
   await expect(main.locator(".ops-metrics .ops-metric")).toHaveCount(0);
+  // A4 review: the Overview carries an "At a glance" card (open work, or "Nothing open") and folds empty contact rows into one line.
+  await expect(main.getByText("What is open for this person")).toBeVisible();
+  await expect(main.getByText("No contact details recorded.")).toBeVisible();
+  await page.goto("/o/northline/hr/employees/nl-employees-007?tab=Overview");
+  await expect(main.getByText("What is open for this person")).toBeVisible();
   await page.getByRole("navigation", { name: "People navigation" }).getByText("Employee Directory").click();
-  await expect(main.getByRole("region", { name: "People, with context." })).toBeVisible();
+  await expect(main.locator(".hr-bar")).toBeVisible();
 });
 
 test("Profile content does not expose an employee from another organisation", async ({ page }) => {

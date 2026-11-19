@@ -382,10 +382,11 @@ function BuyerMessageForm({ context, close, subject, to, name }: { context: Scre
           fields: { to, channel: "email", relatesTo: subject.id, delivery: "not_connected", draftedBy: context.actor },
         }, `Message to ${name} about ${subject.title} kept as a local draft`);
         const body = subject.collection === "orders" ? bodyOf<OrderBody>(subject, {}) : undefined;
-        await context.mutate.patch(subject.id, {
+        const ok27 = await context.mutate.patch(subject.id, {
           fields: { ...subject.fields, lastContactDraftAt: iso(context), lastContactDraftBy: context.actor },
           ...(body ? { body: { ...body, timeline: [...(body.timeline ?? []), { at: iso(context), label: "Message drafted", detail: `${title.trim()} — kept locally for ${to}; not sent.` }] } } : {}),
         }, { expectRevision: subject.revision });
+        if (!ok27) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
         await context.mutate.log(`Message to ${to} drafted for ${subject.title}; no mail provider is connected.`, { entityId: subject.id, type: "email.draft", capability: "ready_local" });
         context.toast("Kept as a draft", `The message to ${name} is saved against ${subject.title}. It was not sent.`);
         close();
@@ -429,7 +430,8 @@ async function storefrontRecord(context: ScreenContext): Promise<Rec> {
 
 export async function setStoreLayout(context: ScreenContext, layout: string) {
   const record = await storefrontRecord(context);
-  await context.mutate.patch(record.id, { fields: { ...record.fields, layout } }, { expectRevision: record.revision, event: `Storefront layout template set to ${layout} by ${context.actor}` });
+  const ok28 = await context.mutate.patch(record.id, { fields: { ...record.fields, layout } }, { expectRevision: record.revision, event: `Storefront layout template set to ${layout} by ${context.actor}` });
+  if (!ok28) { context.toast("Not saved", "The record changed after it was opened. Close, check the latest version and try again.", "blocked"); return; }
 }
 
 export function ThemeInspector({ context, close }: { context: ScreenContext; close: () => void }) {

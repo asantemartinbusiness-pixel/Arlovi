@@ -47,7 +47,7 @@ export function AgentWorkBoard({ scope = null }: { scope?: Scope }) {
   }
   const readyToAssign = Boolean(taskId && agentId) && !pending.some(a => a.fields.taskId === taskId);
   return <section className="ws-section ws-agent-work" aria-label="AI work assignments">
-    <div className="ws-agent-heading"><div><span className="ws-agent-eyebrow">AI WORKFORCE / DELEGATION</span><h2>AI workforce</h2><p>Prepare assignments, link work to AI employee contracts and review evidence in one place. Provider execution is not configured.</p></div><Bot size={25} aria-hidden="true"/></div>
+    <div className="ws-agent-heading"><div><span className="ws-agent-eyebrow">AI WORKFORCE / DELEGATION</span><h2>AI work assignments</h2><p>Prepare assignments, link work to AI employee contracts and review evidence in one place. Provider execution is not configured.</p></div><Bot size={25} aria-hidden="true"/></div>
     <div className="ws-agent-overview" aria-label="AI assignment overview"><div><span>Awaiting provider</span><strong>{pending.length}</strong><small>Not executing</small></div><div><span>Available agents</span><strong>{activeAgents.length}</strong><small>Active contracts</small></div><div><span>Assignable tasks</span><strong>{selectableTasks.length}</strong><small>In this workspace</small></div></div>
     <div className="ws-agent-capability" role="status"><PauseCircle size={18}/><div><strong>Execution unavailable</strong><span>{model?.note ?? "No language model is connected."} Assignments remain pending, not running.</span></div></div>
     {error && <p role="alert" className="ws-agent-error">{error}</p>}

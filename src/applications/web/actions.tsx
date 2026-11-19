@@ -13,6 +13,7 @@ import {
 } from "./model";
 import { NoSite, SiteFormTester, useSiteRecord } from "./panels";
 import { saveSite, useWebUi, BREAKPOINTS, type Breakpoint } from "./state";
+import { siteSummary } from "./summary";
 
 /* ====================================================================== *
  * WEB contract actions. Structural writes go through saveSite (undo stack
@@ -68,6 +69,7 @@ export function SitePreview({ context }: { context: ScreenContext }) {
 
 export const insertBlock = actOverlay({
   id: "insert panel",
+  summary: siteSummary,
   title: "Insert a block",
   collection: "sites",
   noun: "site",
@@ -112,6 +114,7 @@ function selectedBlock(record?: Rec) {
 
 export const resizeBlock = actOverlay({
   id: "resize block",
+  summary: siteSummary,
   title: "Resize the block",
   collection: "sites",
   noun: "site",
@@ -138,6 +141,7 @@ export const resizeBlock = actOverlay({
 
 export const reorderBlock = actOverlay({
   id: "reorder blocks",
+  summary: siteSummary,
   title: "Move the block",
   collection: "sites",
   noun: "site",
@@ -167,6 +171,7 @@ export const reorderBlock = actOverlay({
 
 export const publishComponent = actOverlay({
   id: "publish component",
+  summary: siteSummary,
   title: "Publish a component",
   collection: "sites",
   noun: "site",
@@ -191,6 +196,7 @@ export const publishComponent = actOverlay({
 
 export const importComponents = actOverlay({
   id: "import components",
+  summary: siteSummary,
   title: "Import a component",
   collection: "sites",
   noun: "site to import into",
@@ -222,6 +228,7 @@ function matchesFor(app: SiteModel, componentId: string) {
 
 export const updateEverywhere = actOverlay({
   id: "breaking change",
+  summary: siteSummary,
   title: "Update everywhere",
   tone: "danger",
   collection: "sites",
@@ -263,6 +270,7 @@ export const updateEverywhere = actOverlay({
 
 export const bulkPublish = actOverlay({
   id: "bulk publish",
+  summary: siteSummary,
   title: "Publish entries",
   collection: "sites",
   noun: "site",
@@ -295,6 +303,7 @@ export const bulkPublish = actOverlay({
 
 export const pickEntry = actOverlay({
   id: "pick entry",
+  summary: siteSummary,
   title: "Edit an entry",
   collection: "sites",
   noun: "site",
@@ -318,6 +327,7 @@ export const pickEntry = actOverlay({
 
 export const reorderMenu = actOverlay({
   id: "reorder menu",
+  summary: siteSummary,
   title: "Reorder the menu",
   collection: "sites",
   noun: "site",
@@ -375,6 +385,7 @@ export function TestSubmissionPanel({ context }: { context: ScreenContext }) {
 
 export const publishSiteForm = actOverlay({
   id: "publish site form",
+  summary: siteSummary,
   title: "Publish a site form",
   collection: "sites",
   noun: "site",
@@ -425,6 +436,7 @@ export async function retestAudit(context: ScreenContext): Promise<void> {
 
 export const rollbackDeployment = actOverlay({
   id: "rollback deployment",
+  summary: siteSummary,
   title: "Roll back a deployment",
   tone: "danger",
   collection: "sites",

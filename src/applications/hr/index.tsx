@@ -541,7 +541,7 @@ export const hrApp = registerApp({
           render: ({ close, ...context }) => <PeopleFileReference context={context} close={close} />,
           footer: submitFooter("hr-document", "Save reference") },
         { id: "access request", kind: "modal", title: "Request access", width: 520, render: ({ close, ...context }) => <AccessRequest context={context} close={close} />, footer: submitFooter("hr-access", "Send the request") },
-        { id: "offboarding confirmation", kind: "modal", title: "Offboard this person", tone: "danger", width: 640, capability: "edit_people", presentation: { selectedRecord: true, collection: "employees", guidance: "Record the departure, verify the handover and identify access that must be revoked outside Arlovi." }, render: ({ close, ...context }) => <OffboardingConfirmation context={context} close={close} /> },
+        { id: "offboarding confirmation", kind: "modal", title: "Offboard this person", tone: "danger", width: 640, capability: "edit_people", presentation: { selectedRecord: true, collection: "employees" }, render: ({ close, ...context }) => <OffboardingConfirmation context={context} close={close} /> },
       ],
     },
 
@@ -680,9 +680,9 @@ export const hrApp = registerApp({
       ],
       overlays: [
         { id: "reconcile run", kind: "modal", title: "Reconcile the run to the ledger", width: 560, render: ({ close, ...context }) => <ReconcileRun context={context} close={close} /> },
-        { id: "Payroll review", kind: "drawer", title: "Payroll evidence", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true, guidance: "Select an actual payroll run and distinguish saved run evidence from today’s illustrative salary calculations." }, render: ({ ...context }) => <PayrollReview context={context} /> },
+        { id: "Payroll review", kind: "drawer", title: "Payroll evidence", width: OVERLAY_WIDTH.record, presentation: { noRecordContext: true }, render: ({ ...context }) => <PayrollReview context={context} /> },
         { id: "exception report", kind: "modal", title: "Payroll exceptions", width: 600, render: ({ ...context }) => <PayrollExceptions context={context} /> },
-        { id: "submission signoff", kind: "modal", title: "Payroll human approval", width: 620, capability: "view_payroll", presentation: { noRecordContext: true, guidance: "Review the saved draft, recorded exceptions and filing limitations before signing off locally." }, render: ({ close, ...context }) => <PayrollSignoff context={context} close={close} /> },
+        { id: "submission signoff", kind: "modal", title: "Payroll human approval", width: 620, capability: "view_payroll", presentation: { noRecordContext: true }, render: ({ close, ...context }) => <PayrollSignoff context={context} close={close} /> },
       ],
     },
 

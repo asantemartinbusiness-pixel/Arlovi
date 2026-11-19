@@ -31,7 +31,7 @@ import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
 export function useHrData() {
   return useCollections([
     "employees", "members", "departments", "applicants", "positions", "leaveRequests",
-    "shifts", "payrollRuns", "reviews", "policies", "courses", "tasks",
+    "shifts", "payrollRuns", "reviews", "policies", "courses", "tasks", "emailThreads",
   ]);
 }
 
@@ -867,6 +867,20 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
     );
   }
 
+  const nowMs = context.now.getTime();
+  const sortedLeave = [...leave].filter((request) => request.status !== "declined")
+    .sort((x, y) => String(x.startAt ?? "").localeCompare(String(y.startAt ?? "")));
+  const nextLeave = sortedLeave.find((request) => Date.parse(String(request.startAt ?? "")) >= nowMs) ?? sortedLeave[sortedLeave.length - 1];
+  const lastChange = employee.history[0];
+  const glance: { label: string; value: ReactNode; mono?: boolean }[] = [
+    nextLeave ? { label: Date.parse(String(nextLeave.startAt ?? "")) >= nowMs ? "Next leave" : "Latest leave", value: `${String(nextLeave.fields.type ?? "annual")} · ${context.date(nextLeave.startAt)} – ${context.date(nextLeave.endAt)} · ${nextLeave.status}` } : null,
+    outstandingReviews[0] ? { label: "Performance review", value: `${outstandingReviews[0].title} · ${outstandingReviews[0].status}` } : null,
+    onboarding.length > 0 ? { label: "Onboarding", value: `${doneSteps} of ${onboarding.length} steps done` } : null,
+    linkedDocs.length > 0 ? { label: "Documents", value: `${linkedDocs.length} · ${linkedDocs[0].title} (${linkedDocs[0].fields.kind === "peopleFile" ? "reference only" : linkedDocs[0].status.replace("_", " ")})` } : null,
+    pendingAccess.length > 0 ? { label: "Access requests", value: `${pendingAccess.length} pending, local only` } : null,
+    lastChange ? { label: "Last record change", value: `${context.date(lastChange.at)} · ${lastChange.summary || "No summary recorded"}` } : null,
+  ].filter((item): item is NonNullable<typeof item> => item !== null);
+  const noContact = ["email", "phone", "dateOfBirth", "emergencyContact"].every((key) => !employee.fields[key]);
   return withProfileFrame(
     <Grid>
       <Card span={5} eyebrow="WORK" title="Role and line" prov="human">
@@ -881,15 +895,22 @@ export function EmployeeProfile({ context, lens }: { context: ScreenContext; len
           ].filter((item): item is NonNullable<typeof item> => item !== null)} />
         </Stack>
       </Card>
-      <Card span={7} title="Contact" subtitle="Shown according to this person's privacy setting">
+      <Card span={7} eyebrow="AT A GLANCE" title="What is open for this person">
+        {glance.length === 0
+          ? <span className="ds-subtle">Nothing open.</span>
+          : <KeyValueList items={glance} />}
+      </Card>
+      <Card span={12} title="Contact" subtitle="Shown according to this person's privacy setting">
         <Stack gap={3}>
-          <KeyValueList items={[
-            { label: "Work email", value: String(employee.fields.email ?? "Not recorded") },
-            { label: "Phone", value: <span className="ds-subtle">{String(employee.fields.phone ?? "Not shared")}</span> },
-            { label: "Date of birth", value: context.can("view_payroll") ? String(employee.fields.dateOfBirth ?? "Not recorded") : "Hidden in this role view" },
-            { label: "Emergency contact", value: context.can("view_payroll") ? String(employee.fields.emergencyContact ?? "Not recorded") : "Hidden in this role view" },
-          ]} />
-          {!context.can("view_payroll") && <RoleViewNote what="Date of birth and emergency contact" />}
+          {noContact
+            ? <span className="ds-subtle">No contact details recorded.</span>
+            : <KeyValueList columns={2} items={[
+              { label: "Work email", value: String(employee.fields.email ?? "Not recorded") },
+              { label: "Phone", value: <span className="ds-subtle">{String(employee.fields.phone ?? "Not shared")}</span> },
+              { label: "Date of birth", value: context.can("view_payroll") ? String(employee.fields.dateOfBirth ?? "Not recorded") : "Hidden in this role view" },
+              { label: "Emergency contact", value: context.can("view_payroll") ? String(employee.fields.emergencyContact ?? "Not recorded") : "Hidden in this role view" },
+            ]} />}
+          {!noContact && !context.can("view_payroll") && <RoleViewNote what="Date of birth and emergency contact" />}
         </Stack>
       </Card>
     </Grid>
@@ -1217,8 +1238,19 @@ export function ApplicantProfile({ context, lens }: { context: ScreenContext; le
   }
 
   const rating = Number(applicant.fields.rating ?? 0);
+  const drafts = data.emailThreads.filter((row) => row.parentId === applicant.id);
+  const interviewAt = String(applicant.fields.interviewAt ?? "");
+  const standing = [
+    { label: "Interview", value: interviewAt ? context.dateTime(interviewAt) : "None scheduled" },
+    { label: "Scorecard", value: rating > 0 ? `${rating} of 5` : "None recorded" },
+    { label: "Last decision", value: applicant.fields.decidedBy ? `${String(applicant.fields.stage ?? applicant.status)} by ${String(applicant.fields.decidedBy)}${applicant.fields.decidedAt ? `, ${context.date(String(applicant.fields.decidedAt))}` : ""}` : "None recorded" },
+    { label: "Messages kept", value: drafts.length ? `${drafts.length} draft${drafts.length === 1 ? "" : "s"}, none sent` : "None" },
+  ];
   return (
     <Grid>
+      <Card span={12} eyebrow="WHERE IT STANDS" title="Latest on this application">
+        <KeyValueList columns={2} items={standing} />
+      </Card>
       <Card span={5} eyebrow="APPLICATION" title="Application record">
         <Stack gap={3}>
           <KeyValueList items={[

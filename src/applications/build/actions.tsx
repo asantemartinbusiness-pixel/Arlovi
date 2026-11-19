@@ -15,6 +15,7 @@ import {
 import { NoProject, useAppRecord } from "./builder";
 import { saveApp, useBuildUi } from "./state";
 import { wallMs } from "@/platform/clock";
+import { projectSummary } from "./summary";
 
 /* ====================================================================== *
  * BUILD contract actions. Every write goes through saveApp (patch with
@@ -69,6 +70,7 @@ function FailingSummary({ record }: ActInput) {
 
 export const askEngineer = actOverlay({
   id: "ask engineer",
+  summary: projectSummary,
   title: "Ask an engineer",
   collection: "appProjects",
   noun: "project",
@@ -105,6 +107,7 @@ export const askEngineer = actOverlay({
 
 export const addComponent = actOverlay({
   id: "add component",
+  summary: projectSummary,
   title: "Add a component",
   collection: "appProjects",
   noun: "project",
@@ -141,6 +144,7 @@ export const addComponent = actOverlay({
 
 export const editStyles = actOverlay({
   id: "edit styles",
+  summary: projectSummary,
   title: "Edit the component's style",
   collection: "appProjects",
   noun: "project",
@@ -225,6 +229,7 @@ export function EditFileForm({ context, close }: { context: ScreenContext; close
 
 export const commitChange = actOverlay({
   id: "commit",
+  summary: projectSummary,
   title: "Commit a version",
   collection: "appProjects",
   noun: "project",
@@ -254,6 +259,7 @@ export const commitChange = actOverlay({
 
 export const branchProject = actOverlay({
   id: "branch",
+  summary: projectSummary,
   title: "Branch the project",
   collection: "appProjects",
   noun: "project",
@@ -308,6 +314,7 @@ export function SafeCommandPanel({ context }: { context: ScreenContext }) {
 
 export const validatePolicy = actOverlay({
   id: "validate policy",
+  summary: projectSummary,
   title: "Validate the access policy",
   collection: "appProjects",
   noun: "project",
@@ -345,6 +352,7 @@ export function IssueList({ issues, empty }: { issues: ModelIssue[]; empty: stri
 
 export const seedEntity = actOverlay({
   id: "seed",
+  summary: projectSummary,
   title: "Seed an entity",
   collection: "appProjects",
   noun: "project",
@@ -391,6 +399,7 @@ export const seedEntity = actOverlay({
 
 export const testEndpoint = actOverlay({
   id: "test endpoint",
+  summary: projectSummary,
   title: "Test an endpoint",
   collection: "appProjects",
   noun: "project",
@@ -436,6 +445,7 @@ export const testEndpoint = actOverlay({
 
 export const deployFunctions = actOverlay({
   id: "deploy functions",
+  summary: projectSummary,
   title: "Deploy the API",
   collection: "appProjects",
   noun: "project",
@@ -510,6 +520,7 @@ export function TraceInspector({ context }: { context: ScreenContext }) {
 
 export const configureProvider = actOverlay({
   id: "configure provider",
+  summary: projectSummary,
   title: "Configure a sign-in provider",
   collection: "appProjects",
   noun: "project",
@@ -532,6 +543,7 @@ export const configureProvider = actOverlay({
 
 export const revokeSessions = actOverlay({
   id: "revoke session",
+  summary: projectSummary,
   title: "Revoke sessions",
   tone: "danger",
   collection: "appProjects",
@@ -595,6 +607,7 @@ export function deterministicFixes(app: AppModel): ProposedFix[] {
 
 export const approveFix = actOverlay({
   id: "AI patch review",
+  summary: projectSummary,
   title: "Approve a fix",
   kind: "drawer",
   width: 600,
@@ -623,6 +636,7 @@ export const approveFix = actOverlay({
 
 export const pauseDeployments = actOverlay({
   id: "pause deployments",
+  summary: projectSummary,
   title: "Pause or resume deployments",
   collection: "appProjects",
   noun: "project",
@@ -673,6 +687,7 @@ const attached = (record?: Rec) => String(record?.fields.integrations ?? "").spl
 
 export const attachIntegration = actOverlay({
   id: "attach integration",
+  summary: projectSummary,
   title: "Attach an integration",
   collection: "appProjects",
   noun: "project",
@@ -700,6 +715,7 @@ function AttachedList({ record, watched }: ActInput) {
 
 export const testIntegrations = actOverlay({
   id: "test integrations",
+  summary: projectSummary,
   title: "Test the attached integrations",
   collection: "appProjects",
   noun: "project",
@@ -722,6 +738,7 @@ export const testIntegrations = actOverlay({
 
 export const rotateSecret = actOverlay({
   id: "rotate secret",
+  summary: projectSummary,
   title: "Rotate a secret",
   collection: "appProjects",
   noun: "project",
@@ -744,6 +761,7 @@ export const rotateSecret = actOverlay({
 
 export const revokeIntegration = actOverlay({
   id: "revoke integration",
+  summary: projectSummary,
   title: "Revoke an integration",
   tone: "danger",
   collection: "appProjects",
@@ -794,6 +812,7 @@ export function EventInspector({ context }: { context: ScreenContext }) {
 
 export const createIncident = actOverlay({
   id: "create incident",
+  summary: projectSummary,
   title: "Create an incident",
   collection: "appProjects",
   noun: "project",
@@ -820,6 +839,7 @@ export const createIncident = actOverlay({
 
 export const tuneMonitor = actOverlay({
   id: "alert rule",
+  summary: projectSummary,
   title: "Tune the monitor",
   collection: "appProjects",
   noun: "project",
@@ -872,6 +892,7 @@ const REPO_ADDRESS = /^(https:\/\/|git@)[a-z0-9.-]+\.[a-z]{2,}[:/][\w.-]+\/[\w.-
 
 export const importRepository = actOverlay({
   id: "Git import",
+  summary: projectSummary,
   title: "Import a repository",
   consequenceTitle: "Nothing is fetched or run",
   consequence: () => "The repository address is recorded as a draft project waiting for its import. Fetching needs a network call this workspace does not make; when it can happen, the manifest is read without running it and every file stays read-only until a person approves it.",

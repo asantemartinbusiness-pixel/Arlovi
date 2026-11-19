@@ -6,7 +6,7 @@ import {
 import {
   Button, Card, Checkbox, DataGrid, DrawerActions, Empty, Field, FactGrid, Grid, ModalActions, Notice, OVERLAY_WIDTH, OverlayActions, OverlayCancel,
   OverlaySection, OverlaySummary, PageSection, Pill, Properties,
-  KeyValueList, Row, Select, Stack, TextArea, TextInput, Tool, Toolbar, ToolbarSeparator,
+  KeyValueList, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Tool, Toolbar, ToolbarSeparator,
 } from "@/design-system";
 import { registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord, useWorkspace } from "@/platform/workspace";
@@ -1264,9 +1264,6 @@ function byseverityCount(issues: PreflightIssue[], severity: PreflightIssue["sev
   return issues.filter((issue) => issue.severity === severity).length;
 }
 
-function byServerity(count: number): string {
-  return String(count);
-}
 
 /* ------------------------------ export helpers ------------------------------ */
 

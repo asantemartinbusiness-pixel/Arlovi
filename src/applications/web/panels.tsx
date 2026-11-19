@@ -94,17 +94,21 @@ export function SiteDashboard({ context, lens }: { context: ScreenContext; lens:
   if (lens === "Overview") {
     return (
       <Stack gap={5}>
-        <section className="web-site-workspace" aria-label="Website working area">
-          <div className="web-site-workspace-head">
-            <div>
-              <span className="web-library-eyebrow">WEBSITES / SITE WORKSPACE</span>
-              <h2>{record.title}</h2>
-              <p>Continue editing, review quality and prepare a release without leaving this site.</p>
-            </div>
-            <div className="web-site-workspace-actions">
-              <Button size="sm" variant="primary" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/builder`)}>Edit website</Button>
-              <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/quality`)}>Quality checks</Button>
-            </div>
+        <section className="web-site-workspace" data-compact aria-label="Website working area">
+          <div className="web-routes" role="group" aria-label="Route tree">
+            <h3 className="web-pane-title">Route tree <span className="ds-subtle ds-num">{site.pages.length}</span></h3>
+            <ul>
+              {site.pages.map((page) => (
+                <li key={page.id}>
+                  <button type="button" className="web-route" aria-label={`Edit ${page.name} at ${page.path}`}
+                    onClick={() => { ui.setPage(page.id); context.navigate(`/o/${context.org.slug}/web/sites/${record.id}/builder`); }}>
+                    <code>{page.path}</code>
+                    <span className="web-route-name">{page.name}</span>
+                    <span className="ds-subtle ds-num">{page.blocks.length} {page.blocks.length === 1 ? "block" : "blocks"}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
           <nav className="web-site-workflow" aria-label="Site work areas">
             {([
