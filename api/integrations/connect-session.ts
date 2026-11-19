@@ -1,5 +1,5 @@
 import type { Request, Response } from "../../server/integrations/shared";
-import { bodyObject, configuredIntegrations, identify, json, nango, ready, sameOrigin } from "../../server/integrations/shared";
+import { bodyObject, configuredIntegrations, identify, isSafeConnectLink, json, nango, ready, sameOrigin } from "../../server/integrations/shared";
 
 export default async function handler(req: Request, res: Response) {
   if (req.method !== "POST") return json(res, 405, { error: "METHOD_NOT_ALLOWED" });
@@ -29,7 +29,7 @@ export default async function handler(req: Request, res: Response) {
     const result = await response.json() as { data?: { connect_link?: string; expires_at?: string } };
     const link = result.data?.connect_link;
     // Never send Nango secret keys, refresh tokens or raw provider credentials.
-    if (!link || !/^https:\/\//.test(link)) {
+    if (!isSafeConnectLink(link)) {
       return json(res, 502, { error: "NO_CONNECT_LINK", message: "The provider did not return a usable connection link." });
     }
     return json(res, 200, { connectLink: link, expiresAt: result.data?.expires_at ?? null });
