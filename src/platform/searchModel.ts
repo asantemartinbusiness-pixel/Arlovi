@@ -2,7 +2,7 @@
  * Shared, deterministic ranking for the browser-local Arlovi search surface.
  * Retrieval and authorisation remain responsibilities of each search provider.
  */
-export type SearchScope = "all" | "this-app" | "my-work" | "files" | "people" | "actions" | "apps";
+export type SearchScope = "all" | "this-app" | "my-work" | "files" | "people" | "mail" | "actions" | "apps";
 export type SearchKind = "record" | "app" | "screen" | "workspace" | "resume" | "saved" | "action" | "return";
 
 export interface SearchHit {
@@ -16,6 +16,9 @@ export interface SearchHit {
   collection?: string;
   recordId?: string;
   summary?: string;
+  /** Local, in-memory text only; never sent to an external search service. */
+  contentText?: string;
+  previewFields?: ReadonlyArray<{ label: string; value: string }>;
   status?: string;
   ownerName?: string;
   updatedAt?: string;
@@ -35,6 +38,7 @@ export const SEARCH_SCOPES: ReadonlyArray<{ id: SearchScope; label: string }> = 
   { id: "my-work", label: "My work" },
   { id: "files", label: "Files" },
   { id: "people", label: "People" },
+  { id: "mail", label: "Mail" },
   { id: "apps", label: "Apps" },
   { id: "actions", label: "Actions" },
 ];
@@ -55,6 +59,7 @@ export function matchesScope(hit: SearchHit, scope: SearchScope, activeApp?: str
       || (hit.kind === "app" && ["DOCS", "SHEETS", "PRESENT", "DESIGN"].includes(hit.appCode ?? ""));
     case "people": return Boolean(hit.collection && PEOPLE_COLLECTIONS.has(hit.collection))
       || (hit.kind === "app" && hit.appCode === "HR");
+    case "mail": return hit.collection === "emailThreads" || (hit.kind === "app" && hit.appCode === "COMMS");
     case "apps": return hit.kind === "app" || hit.kind === "screen" || hit.kind === "workspace";
     case "actions": return hit.kind === "action";
   }
@@ -69,8 +74,9 @@ export function scoreSearchHit(hit: SearchHit, rawQuery: string): number {
   const detail = normalizeSearch(hit.detail);
   const keywords = normalizeSearch(hit.keywords ?? "");
   const summary = normalizeSearch(hit.summary ?? "");
+  const content = normalizeSearch(hit.contentText ?? "");
   const tokens = query.split(/\s+/).filter(Boolean);
-  const corpus = [title, id, detail, keywords, summary].join(" ");
+  const corpus = [title, id, detail, keywords, summary, content].join(" ");
   if (!tokens.every(token => corpus.includes(token))) return 0;
   let score = 10;
   if (id && id === query) score += 220;
@@ -80,6 +86,8 @@ export function scoreSearchHit(hit: SearchHit, rawQuery: string): number {
   else if (title.includes(query)) score += 65;
   if (keywords.includes(query)) score += 16;
   if (detail.includes(query)) score += 10;
+  // Document and local mail content are relevant but never outrank exact IDs.
+  if (content.includes(query)) score += 12;
   if (hit.kind === "record") score += 14;
   if (hit.kind === "app") score += 8;
   if (hit.kind === "saved") score += 4;
@@ -107,4 +115,20 @@ export function searchHits(hits: SearchHit[], options: SearchOptions, limit = 40
     if (visible.length === limit) break;
   }
   return visible;
+}
+
+/** A short preview snippet for a real document/mail body match, not review comments. */
+export function matchingContentSnippet(hit: SearchHit, query: string, maxLength = 170): string | undefined {
+  const content = hit.contentText;
+  const phrase = query.trim();
+  if (!content || !phrase) return undefined;
+  const plain = normalizeSearch(content);
+  const needle = normalizeSearch(phrase);
+  const first = needle.split(/\s+/).find(token => token.length > 0);
+  const index = plain.indexOf(needle) >= 0 ? plain.indexOf(needle)
+    : first ? plain.indexOf(first) : -1;
+  if (index < 0) return undefined;
+  const start = Math.max(0, index - 44);
+  const end = Math.min(content.length, start + maxLength);
+  return (start ? "…" : "") + content.slice(start, end).trim() + (end < content.length ? "…" : "");
 }

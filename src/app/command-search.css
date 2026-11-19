@@ -282,3 +282,33 @@
 @media (prefers-reduced-motion: reduce) {
   .search-v2 :is(button, input), .hq-palette.search-v2 { animation: none; transition: none; }
 }
+
+/* Search 2.2 — factual content excerpts are shown only for locally indexed,
+   non-confidential document text or local mail messages. */
+.search-v2 .search-v2-hit-copy .search-v2-hit-snippet {
+  display: block;
+  max-width: 100%;
+  color: var(--fg-muted, var(--fg-subtle));
+  font-size: 11px;
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-v2 .search-v2-hit:has(.search-v2-hit-snippet) {
+  min-height: 72px;
+}
+.search-v2-content-excerpt {
+  padding: 11px 12px;
+  background: var(--bg-subtle, var(--selected-bg));
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  max-height: 164px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.search-v2-content-excerpt mark {
+  color: inherit;
+  background: var(--selected-bg);
+  border-radius: 3px;
+}
