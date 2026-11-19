@@ -102,15 +102,17 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const candidates = useMemo<SearchHit[]>(() => {
     const currentUrl = location.pathname + location.search + location.hash;
     const previous = journey.trail.at(-1)?.url === currentUrl ? previousJourney(journey) : null;
-    const returnApp = previous && resumable.find(item => item.to === previous.url);
-    const back: SearchHit[] = returnApp
-      ? [{
-          key: "return-to-previous-app", kind: "return", group: "Your journey",
-          title: `Back to ${returnApp.title}`, detail: returnApp.page,
-          to: returnApp.to, appCode: returnApp.code,
-          keywords: "back return previous continue",
-        }]
-      : [];
+    const previousScreen = previous && findScreen(previous.url.split(/[?#]/)[0])?.screen;
+    const canReturn = previous && previousScreen
+      && previousScreen.applicationCode === previous.app
+      && canOpenLegacyScreen(role, previousScreen)
+      && safeLocation(previous.url, org.slug);
+    const back: SearchHit[] = canReturn ? [{
+      key: "return-to-previous-app", kind: "return", group: "Your journey",
+      title: `Back to ${APP_ENTRIES[previous.app]?.short ?? previousScreen.applicationName}`,
+      detail: previousScreen.title, to: previous.url, appCode: previous.app,
+      keywords: "back return previous continue",
+    }] : [];
 
     const continued: SearchHit[] = resumable
       .filter(item => item.to !== currentUrl)
@@ -131,7 +133,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         to: `/o/${org.slug}/workspace/resources`, keywords: "documents files resources", appCode: "DOCS" },
       { key: "go-people", title: "Find people and collaboration", detail: "People",
         to: `/o/${org.slug}/workspace/people`, keywords: "employees directory", appCode: "HR" },
-      { key: "go-account", title: "Open account preferences", detail: "Settings",
+      { key: "go-account", title: "Account and data settings", detail: "Preferences",
         to: `/o/${org.slug}/workspace/account`, keywords: "profile preferences", appCode: "HQ" },
     ].filter(item => item.appCode === "HQ" || canOpen(role, item.appCode ?? "HQ"))
       .map(item => ({ ...item, kind: "action" as const, group: "Quick actions" }));
@@ -167,7 +169,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     const pages: SearchHit[] = screens
       .filter(screen => canOpenLegacyScreen(role, screen) && !/:id\b|:slug\b/.test(screen.route))
       .map(screen => ({
-        key: `screen-${screen.id}`, kind: "screen" as const, group: "Screens",
+        key: `page-${screen.id}`, kind: "screen" as const, group: "Screens",
         title: screen.title, detail: APP_ENTRIES[screen.applicationCode]?.short ?? screen.applicationName,
         to: screen.route.replace(":org", org.slug),
         appCode: screen.applicationCode, keywords: screen.purpose,
@@ -183,7 +185,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
         const assignee = typeof record.fields.assignee === "string" ? record.fields.assignee : "";
         return {
           key: `record-${record.id}`, kind: "record" as const, group: "Records",
-          title: record.title, detail: `${recordCategory(record.collection)} · ${record.status.replace(/_/g, " ")}`,
+          title: record.title, detail: `${record.collection} · ${record.status.replace(/_/g, " ")}`,
           summary: record.summary, status: record.status,
           ownerName: record.ownerName, updatedAt: record.updatedAt,
           recordId: record.id, collection: record.collection,
@@ -220,14 +222,29 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
 
   const hits = useMemo(() => {
     // Keep the opening state short; do not dump every screen in a tall menu.
-    const opening = query.trim() ? candidates : candidates.filter(hit =>
-      ["return", "resume", "saved", "app", "action"].includes(hit.kind));
+    const opening = query.trim() ? candidates : [
+      ...candidates.filter(hit => ["return", "resume", "saved", "action"].includes(hit.kind)).slice(0, 8),
+      ...candidates.filter(hit => hit.kind === "screen").slice(0, 4),
+      ...candidates.filter(hit => hit.kind === "app").slice(0, 6),
+    ];
     const limit = query.trim() ? MAX_RECORD_RESULTS : 15;
     return searchHits(opening, { query, scope, activeApp: currentApp }, limit);
   }, [candidates, query, scope, currentApp]);
 
   useEffect(() => { setIndex(0); }, [query, scope]);
   useEffect(() => { inputRef.current?.focus(); }, []);
+  // Capture Escape before the browser's native search-field clear behaviour
+  // can consume it; this also covers focused preview/scoping controls.
+  useEffect(() => {
+    const handleEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", handleEscape, true);
+    return () => window.removeEventListener("keydown", handleEscape, true);
+  }, [onClose]);
   useEffect(() => {
     listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
   }, [index, hits]);
@@ -285,7 +302,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
             <Search size={21} aria-hidden="true" />
             <input className="hq-palette-input" ref={inputRef} type="search" role="combobox"
               aria-expanded="true" aria-controls="palette-list"
-              aria-activedescendant={hits.length ? `palette-option-${Math.min(index, hits.length - 1)}` : undefined}
+              aria-activedescendant={hits.length ? hits[Math.min(index, hits.length - 1)].key : undefined}
               aria-autocomplete="list" aria-label={`Search screens, records and actions in ${org.name}`}
               placeholder={`Search anything in ${org.name}`} value={query}
               maxLength={MAX_QUERY_LENGTH}
@@ -313,8 +330,9 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
             {hits.length === 0 && <div className="search-v2-empty" role="status">
               <Search size={24} aria-hidden="true"/>
               <strong>No matching results</strong>
-              <p>{scope !== "all" ? "Try Everything or a different search term." :
-                "Try another word, a record reference or an application name."}</p>
+              <p>Nothing in {org.name} matches “{query}” in this search. {scope !== "all"
+                ? "Try Everything or a different search term."
+                : "Try another word, a record reference or an application name."}</p>
               <button type="button" onClick={() => { setScope("all"); setQuery(""); inputRef.current?.focus(); }}>
                 Reset search <ArrowRight size={15}/>
               </button>
@@ -325,7 +343,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
               const Icon = APP_ENTRIES[hit.appCode ?? ""]?.icon ?? iconFor(hit.kind);
               return <div key={hit.key} className="search-v2-result-group">
                 {header && <div className="search-v2-group-label">{header}</div>}
-                <button type="button" id={`palette-option-${position}`} role="option"
+                <button type="button" id={hit.key} role="option"
                   aria-selected={position === index} className="hq-palette-item search-v2-hit"
                   onMouseEnter={() => setIndex(position)} onClick={() => go(hit)}>
                   <span className={`search-v2-icon search-v2-icon--${hit.kind}`}><Icon size={18}/></span>
