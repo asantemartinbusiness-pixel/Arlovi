@@ -178,9 +178,13 @@ orchestrator. 8. No new dependencies. 9. No fabricated completion; provider boun
 | Phase 0 baseline | done | §1, scratchpad `shots/before/` |
 | F-A overlay foundations | integrated (commits 9ee8367, ed8bc77) | typecheck pass; 824 unit tests pass incl. `tests/unit/overlay-kit.test.ts`; modal/drawer/native-overlay/toast specs pass except pre-existing `drawer-experience.spec.ts:48` (assigned to A1); shots `shots/F-A/` |
 | F-B page & shell foundations | integrated (commit 5f0169b) | page body top 172.7px → 123.1px on Finance invoices at 1440×900; h1 43.2px → 25.6px; Executive Home toasts 4 → 0; a11y spec 37/37 (baseline had many contrast failures); 5 pre-existing failures remain (display-scale ×3, display-scaling ×1 → A7; execution-preflight ×1 → QA); shots `shots/F-B/` |
-| QA baseline | running | `scratchpad/qa-baseline/BASELINE.md` |
-| Wave A (A1–A7) | in progress | per-package disposition files |
-| Wave B (B1–B9) | queued | |
+| QA baseline | done | `ui-ux-dispositions/QA_BASELINE.md`: 627 Playwright tests on the untouched build; 427 pass, 164 fail, 36 skipped. 92 failures are environmental (tests import `/src/platform/repo.ts`, which only a Vite dev server serves — later gates run on the dev server). 38 persistent pre-existing failures, classified: outdated expectations (home h1 text, 'AI work assignments' heading, 'explicit deny'), one product defect (deep CRM 'Create a quote' React error), the rest unclear (display-scale slider, profile menu, favourites, drawer-experience, workflows WF-01/06/11/13/19/20, roster specs). a11y contrast unstable across runs. |
+| A6 Marketing + Communications | committed fa9eb99, in review | 96 overlay rows; `shots/A6/` |
+| A1 Finance | part 1 committed a5e3cfb, returned for completion | ~62 rows; `shots/A1/` |
+| A4 People + Legal | committed 37ba8f2, in review | 81 rows, 18 page reviews; `shots/A4/` |
+| A2, A3, A5, A7 | in progress | |
+| B1 Docs+Sheets+Present, B2 Design+Layout | in progress | |
+| B3–B9 | queued | |
 
 ## 8. Definition of done per component
 
