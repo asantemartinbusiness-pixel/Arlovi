@@ -103,3 +103,14 @@ The shared Drawer now has `DrawerInFlight` to prevent close/Escape/scrim dismiss
 | Legal / signature handover | A selected approved contract and actual counterparty/status/version, acknowledgement, stale-revision handling and anchored actions | Status changes locally to awaiting signature; no signing email, certificate or external request is sent |
 
 Regressions include explicit-selection and provider-boundary checks for these overlays. The previous shared UI work remains unchanged, and this is not an assertion that all 957 catalogue entries have undergone manual review.
+
+## Fourth pass — People payroll, Customer Care routing and Administration privacy
+
+| Overlay | UX refinement | Integrity and trust boundary |
+|---|---|---|
+| HR · Payroll review | Explicit organisation-scoped run picker; saved period, gross, approval and people separate from current employee estimates | Never substitutes the first salary-sensitive run. Clearly distinguishes illustrative current calculations from approved historical payroll; no filings or transfers |
+| HR · Payroll human sign-off | Requires a selected draft rather than the first available draft; keeps exception/source checks and two acknowledgements, adds in-flight and unsaved confirmation controls | Cannot sign off a stale or already approved run silently; local approval is not payment or filing |
+| CARE · Bulk route unassigned cases | Actual company cases and eligible human owner, SLA preview, explicit acknowledgment and persistent buttons | Single revision-checked transaction: either all target cases are assigned, or none are; retains case status, priority, queue and SLA. No DOM query or default employee |
+| ADMIN · Subject request | Displays identified request, collection scope and matching count; asks for identity verification before CSV export; clearer limitation copy and docked actions | Requires export/policy permissions, uses revision-safe audit update, and states that marking a record restricted does not enforce restrictions externally |
+
+An ambiguous Keep editing locator in the receipt browser test was also corrected; it had been matching both the confirmation X button and the explicit Keep editing action. Historical browser QA includes other failures not automatically attributable to this overlay PR, so certification requires checking each failure separately. This iteration does not claim all approved overlay entries have passed browser usability testing.
