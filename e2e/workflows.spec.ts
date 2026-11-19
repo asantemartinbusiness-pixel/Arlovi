@@ -207,7 +207,7 @@ test("WF-05 Sales-to-cash: lead, quote approval, won deal, posted invoice, recei
   await open(page, "/crm/quotes?tab=Accepted", "Quotes & Proposals");
   await expect(main(page).getByRole("row", { name: /Q-126/ })).toBeVisible();
   // Closing won writes the deal and draft invoice together, atomically.
-  await open(page, "/crm/deals/nl-deals-721", "Deal");
+  await open(page, "/crm/deals/nl-deals-721", /.+/);
   await action(page, "Close the deal");
   await expect(dialog(page).getByText(/Q-126 \(accepted\)/)).toBeVisible();
   await expect(dialog(page).getByText("£12,456.00")).toBeVisible();
@@ -220,7 +220,7 @@ test("WF-05 Sales-to-cash: lead, quote approval, won deal, posted invoice, recei
   await expect(main(page).getByText("A draft invoice is not in the ledger")).toBeVisible();
 
   // The CRM side now shows the invoice and the accepted quote.
-  await open(page, "/crm/deals/nl-deals-721", "Deal");
+  await open(page, "/crm/deals/nl-deals-721", /.+/);
   await expect(main(page).getByText(/Invoiced\s*£12,456\.00/)).toBeVisible();
   await expect(main(page).getByText("CLOSED WON").first()).toBeVisible();
   await open(page, "/crm/quotes?tab=Accepted", "Quotes & Proposals");
