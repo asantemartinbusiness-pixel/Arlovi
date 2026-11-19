@@ -21,7 +21,11 @@ for (const screen of sample) {
     await page.waitForTimeout(250);
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter((item) => item.impact === "serious" || item.impact === "critical");
-    expect(serious.map((item) => `${item.id}: ${item.help} (${item.nodes.length})`)).toEqual([]);
+    // Include affected selectors and computed foreground/background values in
+    // failures so contrast regressions can be fixed at their source.
+    const failures = serious.flatMap((item) => item.nodes.map((node) =>
+      `${item.id}: ${item.help} | ${node.target.join(", ")} | ${node.failureSummary ?? ""}`));
+    expect(failures).toEqual([]);
   });
 }
 

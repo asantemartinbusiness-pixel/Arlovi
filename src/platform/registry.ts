@@ -77,6 +77,19 @@ export interface OverlayDef {
   width?: number;
   tone?: "danger";
   blocking?: boolean;
+  /** Presentation hints owned by the application; never inferred from title text. */
+  presentation?: {
+    /** Optional task-specific instructions when description is absent. */
+    guidance?: string;
+    /** Opt in to including the page's selected record in overlay context. */
+    selectedRecord?: boolean;
+    /** Restrict record-backed flows to their real collection. */
+    collection?: string;
+    /** Omit record context on creation or sensitive confirmation surfaces. */
+    noRecordContext?: boolean;
+  };
+  /** Visible role-view guard for direct-link overlays. Backend authorization remains separate. */
+  capability?: Capability;
   render: (context: ScreenContext & { close: () => void }) => ReactNode;
   footer?: (context: ScreenContext & { close: () => void }) => ReactNode;
 }

@@ -6,8 +6,8 @@ import {
   Redo2, Search, Strikethrough, Table as TableIcon, Underline, Undo2, Upload,
 } from "lucide-react";
 import {
-  BarChart, Button, ButtonGroup, Card, Checkbox, DataGrid, Empty, Field, Grid, InspectorSection,
-  Meter, Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Switch, Tabs,
+  BarChart, Button, ButtonGroup, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, InspectorSection,
+  Meter, Notice, OverlayCancel, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Switch, Tabs,
   TextArea, TextInput, Tool, Toolbar, ToolbarSeparator,
 } from "@/design-system";
 import { getScreenDef, registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
@@ -1873,10 +1873,17 @@ function FolderSelector({ context, close }: { context: ScreenContext; close: () 
 
 function SharingOverlay({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const record = useRecord(payload?.id ?? context.selectedId);
+  const candidate = useRecord(payload?.id ?? context.params.id ?? context.selectedId);
+  const record = candidate?.organizationId === context.org.id && candidate.collection === "documents"
+    ? candidate : undefined;
   const [scope, setScope] = useState<"workspace" | "link">("workspace");
   const [note, setNote] = useState("");
-  if (!record) return <Empty title="Select a document first" />;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const dirty = scope !== "workspace" || Boolean(note.trim());
+  if (!record) return <Empty title="Select the document to share">No other document is substituted when the selected record is missing or belongs to another company.</Empty>;
+  const confidential = record.fields.confidential === true;
+  const unsafeScope = confidential && scope === "link";
   const model = readDoc(record.body, record.ownerName, record.updatedAt);
   return (
     <form
@@ -1884,32 +1891,62 @@ function SharingOverlay({ context, close }: { context: ScreenContext; close: () 
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        const next: DocModel = {
-          ...model,
-          shares: [{ id: nextId("sh"), at: context.now.toISOString(), scope, note: note || "No note" }, ...model.shares],
-        };
-        await context.mutate.patch(record.id, { body: next }, { expectRevision: record.revision, event: `Share link created on ${record.title} (${scope})` });
-        context.toast("Share recorded", "The link is on the record with its scope and can be revoked from Publishing.");
-        close();
+        if (busy || unsafeScope) return;
+        setBusy(true);
+        setError("");
+        try {
+          const next: DocModel = {
+            ...model,
+            shares: [{ id: nextId("sh"), at: context.now.toISOString(), scope, note: note.trim() || "No note" }, ...model.shares],
+          };
+          const saved = await context.mutate.patch(record.id, { body: next }, {
+            expectRevision: record.revision, event: `Local share permission recorded on ${record.title} (${scope})`,
+          });
+          if (!saved) {
+            setError("The document changed while this panel was open. Reload it before saving sharing instructions.");
+            return;
+          }
+          context.toast("Sharing instruction recorded", "This document now has a local sharing entry; no public link was created or delivered.");
+          close();
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "The sharing instruction could not be saved.");
+        } finally {
+          setBusy(false);
+        }
       }}
     >
-      <Field label="Who can open it">
-        <Select aria-label="Who can open it" value={scope} onChange={(event) => setScope(event.target.value as "workspace" | "link")}>
-          <option value="workspace">This workspace only</option>
-          <option value="link">Anyone with the link</option>
+      <DrawerUnsavedChanges when={dirty} />
+      <DrawerInFlight when={busy} />
+      <Properties rows={[
+        { label: "Document", value: record.title },
+        { label: "Classification", value: confidential ? "Confidential" : "Standard" },
+        { label: "Existing sharing records", value: String(model.shares.length) },
+      ]} />
+      <Field label="Sharing instruction">
+        <Select aria-label="Sharing instruction" value={scope} disabled={busy}
+          onChange={(event) => setScope(event.target.value as "workspace" | "link")}>
+          <option value="workspace">People in this workspace</option>
+          {!confidential && <option value="link">Link permission (local record only)</option>}
         </Select>
       </Field>
-      <Field label="Why" hint="Recorded with the link so a later reviewer knows what it was for.">
-        <TextInput aria-label="Why" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Sent to the Clerkenwell project manager" />
+      <Field label="Purpose" hint="Stored on the document for future reviewers. Do not include credentials.">
+        <TextInput aria-label="Purpose" value={note} disabled={busy}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder="Review with the project manager" />
       </Field>
-      {scope === "link" && (
-        <Notice tone="warning" title="A link here is a local record, not a public URL">
-          No hosting is connected, so nothing becomes reachable outside this browser. The link appears under Publishing with a revoke button, and revoking is recorded with its time.
-        </Notice>
-      )}
-      {record.fields.confidential === true && (
-        <Notice tone="danger" title="This document is marked confidential">Confidential documents are excluded from broad previews. Creating a link anyway is recorded against the document.</Notice>
-      )}
+      <Notice tone={confidential ? "warning" : "info"} title={confidential ? "Confidential document" : "No external sharing provider connected"}>
+        {confidential
+          ? "Broad link permissions are unavailable for this confidential document. This local sharing record does not grant authenticated access outside the browser."
+          : "Arlovi will record the chosen permission on this document only. It cannot produce a public URL, send an invitation, or verify recipient access."}
+      </Notice>
+      {error && <Notice tone="danger" title="Sharing could not be saved">{error}</Notice>}
+      <DrawerActions>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
+        <span className="ds-grow" />
+        <Button variant="primary" type="submit" form="sharing" busy={busy} disabled={busy || unsafeScope}>
+          Record sharing instruction
+        </Button>
+      </DrawerActions>
     </form>
   );
 }
@@ -3336,7 +3373,7 @@ registerApp({
         { id: "search documents", kind: "modal", title: "Search documents", width: 600, render: (context) => <SearchDocuments context={context} close={context.close} /> },
         { id: "New doc", kind: "modal", title: "New document", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="new-doc">Create</Button></>, render: (context) => <NewDocumentOverlay context={context} close={context.close} /> },
         { id: "folder selector", kind: "modal", title: "Move to folder", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="folder-selector">Move</Button></>, render: (context) => <FolderSelector context={context} close={context.close} /> },
-        { id: "sharing", kind: "drawer", title: "Sharing", width: 460, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="sharing">Record link</Button></>, render: (context) => <SharingOverlay context={context} close={context.close} /> },
+        { id: "sharing", kind: "drawer", title: "Sharing", width: 500, presentation: { selectedRecord: true, collection: "documents", guidance: "Review this document’s classification, existing sharing entries and local permission record. No public URL is created." }, render: (context) => <SharingOverlay context={context} close={context.close} /> },
         { id: "trash confirm", kind: "modal", title: "Delete documents", tone: "danger", blocking: true, width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Keep them</Button><Button variant="outline-danger" type="submit" form="trash-confirm">Delete</Button></>, render: (context) => <TrashConfirm context={context} close={context.close} /> },
       ],
     },

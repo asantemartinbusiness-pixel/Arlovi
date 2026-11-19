@@ -645,7 +645,7 @@ export const buildApp = registerApp({
       ],
       overlays: [
         { id: "Incident inspector", kind: "drawer", title: "Failing checks", width: 520, render: ({ ...context }) => <IncidentInspector context={context} /> },
-        { id: "release preview", kind: "modal", title: "Release review", width: 620, render: ({ close, ...context }) => <ReleaseApproval context={context} close={close} /> },
+        { id: "release preview", kind: "modal", title: "Release review", width: 620, presentation: { guidance: "Inspect the project, target environment and checks before recording a release decision." }, render: ({ close, ...context }) => <ReleaseApproval context={context} close={close} /> },
         { id: "task creation", kind: "modal", title: "Create a task", width: 520, render: ({ close, ...context }) => <TaskCreation context={context} close={close} />, footer: submitFooter("task-creation", "Create the task") },
         askEngineer,
       ],

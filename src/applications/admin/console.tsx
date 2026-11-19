@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Database, FileClock, KeyRound, Lock, Scale, Server } from "lucide-react";
 import {
-  BarChart, Button, Card, Checkbox, DataGrid, Empty, Field, Grid, Meter, Notice, Pill,
+  BarChart, Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, ModalActions, ModalInFlight, Notice, OverlayCancel, Pill,
   Properties, Row, Select, Stack, Stat, StatRow, Switch, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
@@ -11,6 +11,7 @@ import { ROLE_LABELS } from "@/platform/policy";
 import type { Audit, Rec } from "@/domain/types";
 import { csvCell, csvList, ofKind, SeedsFailedNotice, StepUp, useAdmin, useSeeded, useSeedStatus, useSettledOrgRecords } from "./pieces";
 import { clockIso } from "@/platform/clock";
+import { revisedRecord } from "@/platform/repo";
 
 /* ====================================================================== *
  * ADMIN console — security, audit, privacy, billing, recovery, developer.
@@ -269,36 +270,91 @@ export function ProviderSetup({ context, close }: { context: ScreenContext; clos
 export function EmergencyRevoke({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const single = data.sessions.find((row) => row.id === (payload?.id ?? context.selectedId));
-  const others = data.sessions.filter((row) => row.status === "active" && row.fields.current !== true);
+  const initialId = payload?.id ?? context.selectedId ?? "";
+  const active = data.sessions.filter(row => row.status === "active" && row.fields.current !== true);
+  const [scope, setScope] = useState<"single" | "all" | "none">(initialId ? "single" : "none");
+  const [selectedId, setSelectedId] = useState(initialId);
+  const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
-  const target = single && single.fields.current !== true ? [single] : others;
+  const [error, setError] = useState("");
+  const target = scope === "all" ? active : scope === "single"
+    ? active.filter(row => row.id === selectedId) : [];
+  const canSubmit = context.can("manage_policy") && !busy && target.length > 0 && confirmation === "REVOKE";
 
   return (
-    <StepUp
-      word="REVOKE"
-      label={target.length === 1 ? `Revoke ${target[0].title}` : `Revoke ${target.length} sessions`}
-      busy={busy}
-      onConfirm={async () => {
-        setBusy(true);
-        try {
-          for (const session of target) {
-            await context.mutate.patch(session.id, {
-              status: "revoked",
-              fields: { ...session.fields, revokedBy: context.actor, revokedAt: context.now.toISOString() },
-            }, { event: `Session revoked: ${session.title}`, expectRevision: session.revision });
-          }
-          context.toast("Revoked", `${target.length} ${target.length === 1 ? "session record" : "session records"} marked revoked. Your own session is untouched.`);
-          close();
-        } finally { setBusy(false); }
-      }}
-    >
+    <Stack gap={4}>
+      <ModalInFlight when={busy} />
+      <Notice tone="warning" title="Record a session revocation — not a live provider logout">
+        This action changes Arlovi's local session records. No identity provider is connected,
+        so it cannot terminate a remote device session or force a user to sign out.
+      </Notice>
+      <Field label="Revocation scope" required>
+        <Select aria-label="Revocation scope" value={scope} disabled={busy}
+          onChange={event => { setScope(event.target.value as "single" | "all" | "none"); setConfirmation(""); setError(""); }}>
+          <option value="none">Choose which sessions to record</option>
+          <option value="single">One other active session</option>
+          <option value="all">All other active sessions ({active.length})</option>
+        </Select>
+      </Field>
+      {scope === "single" && (
+        <Field label="Session" required>
+          <Select aria-label="Session" value={selectedId} disabled={busy}
+            onChange={event => { setSelectedId(event.target.value); setConfirmation(""); setError(""); }}>
+            <option value="">Select an active session</option>
+            {active.map(row => <option key={row.id} value={row.id}>{row.title}</option>)}
+          </Select>
+        </Field>
+      )}
+      {scope === "all" && <Notice tone="danger" title="Bulk revocation affects every other active session">
+        {active.length} active session record(s) will be marked revoked. The current local session remains unchanged.
+      </Notice>}
       <Properties rows={[
-        { label: "Sessions affected", value: target.map((row) => row.title).join("; ") || "None" },
-        { label: "Your session", value: "Left alone, so you are not locked out of the console" },
-        { label: "What this does here", value: "Marks the session records revoked. With no server, nothing is torn down remotely." },
+        { label: "Affected session records", value: String(target.length) },
+        { label: "Sessions", value: target.map(row => row.title).join("; ") || "None selected" },
+        { label: "Current session", value: "Not included in the revocation" },
+        { label: "Real provider sign-out", value: "Not connected; no remote session termination" },
       ]} />
-    </StepUp>
+      {target.length > 0 && (
+        <Field label="Type REVOKE to confirm" required>
+          <TextInput aria-label="Type REVOKE to confirm" value={confirmation}
+            disabled={busy} autoComplete="off"
+            onChange={event => setConfirmation(event.target.value.toUpperCase())} />
+        </Field>
+      )}
+      {error && <Notice tone="danger" title="Revocation could not be recorded">{error}</Notice>}
+      <ModalActions>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
+        <span className="ds-grow" />
+        <Button variant="danger" busy={busy} disabled={!canSubmit}
+          onClick={async () => {
+            if (!canSubmit) return;
+            setBusy(true);
+            setError("");
+            try {
+              const editor = { actor: context.actor, now: clockIso() };
+              const records = target.map(row => revisedRecord(row, {
+                status: "revoked", fields: { ...row.fields,
+                  revokedBy: context.actor, revokedAt: editor.now },
+              }, editor));
+              await context.mutate.putMany(
+                records,
+                target.map(row => `Session revocation recorded for ${row.title} by ${context.actor}`),
+                Object.fromEntries(target.map(row => [row.id, row.revision])),
+                target.map(() => "update"),
+              );
+              context.toast("Session records marked revoked",
+                `${target.length} session record(s) updated locally. No remote identity provider was contacted.`);
+              close();
+            } catch (cause) {
+              const message = cause instanceof Error ? cause.message : "The sessions may have changed. Reload before retrying.";
+              setError(message);
+              context.toast("Revocation not recorded", message, "failed");
+            } finally { setBusy(false); }
+          }}>
+          Record revocation{target.length > 0 ? ` (${target.length})` : ""}
+        </Button>
+      </ModalActions>
+    </Stack>
   );
 }
 
@@ -775,7 +831,7 @@ export function subjectRecords(request: Rec, records: Rec[]): Rec[] {
   return [...matched.values()];
 }
 
-export function DataRequestOverlay({ context, close }: { context: ScreenContext; close: () => void }) {
+export function DataRequestOverlay({ context, close: _close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
   const settledRecords = useSettledOrgRecords();
   const seeds = useSeedStatus();
@@ -783,75 +839,128 @@ export function DataRequestOverlay({ context, close }: { context: ScreenContext;
   const counting = settledRecords === null;
   const records = settledRecords ?? [];
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const request = data.dataRequests.find((row) => row.id === (payload?.id ?? context.selectedId));
+  const request = data.dataRequests.find(row =>
+    row.id === (payload?.id ?? context.selectedId) && row.organizationId === context.org.id);
+  const [identityReviewed, setIdentityReviewed] = useState(false);
   const [busy, setBusy] = useState(false);
-  if (!request) return <Empty title="Select a request" icon={<Scale size={20} />}>Choose a request to review it.</Empty>;
+  const [error, setError] = useState("");
+  if (!request) return <Empty title="Choose a subject request" icon={<Scale size={20} />}>
+    Select the actual privacy request. Arlovi will not substitute a different person's request.
+  </Empty>;
 
-  const subject = String(request.fields.subject ?? "");
+  const subject = String(request.fields.subject ?? "").trim();
   const collections = csvList(request.fields.collections);
   const matching = subjectRecords(request, records);
   const hold = request.fields.legalHold === true;
+  const ready = !counting && !seedsFailed && subject.length > 0 && collections.length > 0;
+  const canExport = ready && identityReviewed && !busy && context.can("export_data");
+  const canRestrict = !busy && context.can("manage_policy") && request.status !== "restricted";
+  const canDelete = ready && !busy && !hold && context.can("delete_records");
 
   return (
     <Stack gap={4}>
+      <DrawerUnsavedChanges when={identityReviewed} />
+      <DrawerInFlight when={busy} />
       <Properties rows={[
-        { label: "Subject", value: subject },
-        { label: "Kind", value: String(request.fields.type) },
+        { label: "Subject", value: subject || "Missing subject identity" },
+        { label: "Request", value: request.title },
+        { label: "Kind", value: String(request.fields.type ?? "Not recorded") },
         { label: "Received", value: context.dateTime(request.at) },
-        { label: "Due", value: request.dueAt ? `${context.date(request.dueAt)} (${context.relative(request.dueAt)})` : "No deadline recorded" },
-        { label: "Basis", value: String(request.fields.lawfulBasis ?? "") },
+        { label: "Due", value: request.dueAt
+          ? `${context.date(request.dueAt)} (${context.relative(request.dueAt)})`
+          : "No deadline recorded" },
+        { label: "Basis", value: String(request.fields.lawfulBasis ?? "Not recorded") },
         { label: "Handler", value: String(request.fields.handler ?? "Unassigned") },
-        { label: "Records matched now", value: seedsFailed ? "Not every application's records could be loaded" : counting ? "Counting records from every application…" : `${matching.length} across ${collections.length} collections` },
-        ...(counting ? [] : [{ label: "Where they are", value: collections.map((collection) => `${collection} ${matching.filter((row) => row.collection === collection).length}`).join(" · ") }]),
+        { label: "Records counted", value: seedsFailed
+          ? "Some application records could not be loaded"
+          : counting ? "Still counting organisation records"
+          : `${matching.length} matches in ${collections.length} requested collection(s)` },
+        ...(!counting ? [{
+          label: "Collection scope",
+          value: collections.map(collection =>
+            `${collection}: ${matching.filter(row => row.collection === collection).length}`).join(" · "),
+        }] : []),
       ]} />
       {seedsFailed && <SeedsFailedNotice retry={seeds.retry} />}
-      {hold && (
-        <Notice tone="danger" title="A legal hold applies">
-          {String(request.fields.holdReason ?? "A hold is recorded against these records.")} Erasure is refused while the hold stands.
-          The person must be told that their request is lawfully restricted, not quietly ignored.
-        </Notice>
-      )}
-      <Row gap={2} wrap>
-        <Button
-          variant="primary"
-          busy={busy}
-          disabled={counting}
-          title={seedsFailed ? "Unavailable: not every application's records could be loaded" : counting ? "Wait until every record has been counted" : undefined}
+      {hold && <Notice tone="danger" title="Legal hold recorded">
+        {String(request.fields.holdReason ?? "This request is under a recorded hold.")}
+        Erasure is blocked while the hold remains. Review actual legal obligations outside this local workspace.
+      </Notice>}
+      {!subject && <Notice tone="danger" title="Subject identification missing">
+        An export cannot be prepared without an identified request subject. Correct the request first.
+      </Notice>}
+      {collections.length === 0 && <Notice tone="warning" title="No requested collections recorded">
+        The export and deletion preview remain unavailable until the record scope is defined.
+      </Notice>}
+      <Notice tone="info" title="Privacy actions are local records, not complete compliance workflows">
+        The browser can prepare a scoped CSV and record a local processing restriction.
+        It cannot authenticate a data subject, enforce restrictions in external systems
+        or establish whether an erasure meets every applicable legal obligation.
+      </Notice>
+      <Checkbox checked={identityReviewed} disabled={busy || !ready}
+        onChange={event => setIdentityReviewed(event.target.checked)}
+        label="I independently verified the requester's identity and confirmed the collection scope before preparing a copy." />
+      {error && <Notice tone="danger" title="Privacy action could not be completed">{error}</Notice>}
+      <DrawerActions>
+        <OverlayCancel disabled={busy}>Close review</OverlayCancel>
+        <span className="ds-grow" />
+        <Button variant="secondary" busy={busy} disabled={!canRestrict}
+          title={!context.can("manage_policy") ? "Policy-management permission required" : undefined}
           onClick={async () => {
+            if (!canRestrict) return;
             setBusy(true);
+            setError("");
+            try {
+              const saved = await context.mutate.patch(request.id, {
+                status: "restricted",
+                fields: { ...request.fields, restrictedBy: context.actor,
+                  restrictedAt: context.now.toISOString() },
+              }, { event: `Local processing restriction flag recorded for ${subject}`,
+                expectRevision: request.revision });
+              if (!saved) { setError("The request changed. Reopen the latest version before trying again."); return; }
+              context.toast("Local restriction recorded",
+                "The request was marked restricted here. External processors and other systems were not automatically restricted.");
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : "Review the request before retrying.");
+            } finally { setBusy(false); }
+          }}>
+          Mark locally restricted
+        </Button>
+        <Button variant="primary" busy={busy} disabled={!canExport}
+          title={!context.can("export_data") ? "Export permission required" : !ready ? "Identify the subject and finish counting records first" : undefined}
+          onClick={async () => {
+            if (!canExport) return;
+            setBusy(true);
+            setError("");
             try {
               const header = "collection,id,title,status,summary,updated\n";
-              const body = matching.map((record) => [record.collection, record.id, record.title, record.status, record.summary, record.updatedAt].map(quote).join(",")).join("\n");
-              // Persist the audit receipt before initiating a browser download,
-              // so a navigation cannot lose the evidence of preparation.
-              await context.mutate.patch(request.id, { fields: { exportPreparedAt: context.now.toISOString(), exportPreparedBy: context.actor } }, { event: `Subject data export prepared for ${subject} (${matching.length} records)` });
+              const body = matching.map(record =>
+                [record.collection, record.id, record.title, record.status, record.summary, record.updatedAt]
+                  .map(quote).join(",")).join("\n");
+              const saved = await context.mutate.patch(request.id, {
+                fields: { ...request.fields, exportPreparedAt: context.now.toISOString(),
+                  exportPreparedBy: context.actor, exportedCount: matching.length },
+              }, { expectRevision: request.revision,
+                event: `Scoped subject data copy prepared for ${subject} (${matching.length} records)` });
+              if (!saved) { setError("The request changed. No CSV was downloaded. Reopen the latest request."); return; }
               download(`${context.org.slug}-${subject.replace(/\W+/g, "-").toLowerCase()}-data.csv`, header + body);
-              context.toast("Copy prepared", `${matching.length} records downloaded as CSV, and the request records that it happened.`);
+              context.toast("CSV prepared",
+                `${matching.length} current record(s) downloaded locally. No external delivery occurred.`);
+              setIdentityReviewed(false);
+            } catch (cause) {
+              const message = cause instanceof Error ? cause.message : "The data copy could not be prepared.";
+              setError(message);
+              context.toast("Export not prepared", message, "failed");
             } finally { setBusy(false); }
-          }}
-        >
-          Export their data
+          }}>
+          Export scoped CSV
         </Button>
-        <Button
-          variant="secondary"
-          onClick={async () => {
-            await context.mutate.patch(request.id, { status: "restricted", fields: { ...request.fields, restrictedBy: context.actor, restrictedAt: context.now.toISOString() } }, { event: `Processing restricted for ${subject}`, expectRevision: request.revision });
-            context.toast("Processing restricted", "The request is marked restricted: the records stay but are not used further.");
-          }}
-        >
-          Restrict processing
+        <Button variant="outline-danger" disabled={!canDelete}
+          title={hold ? "Legal hold recorded" : !context.can("delete_records") ? "Deletion permission required" : !ready ? "Finish counting the records and verify the subject" : undefined}
+          onClick={() => context.openOverlay("deletion impact", { id: request.id })}>
+          Review deletion impact…
         </Button>
-        <Button
-          variant="outline-danger"
-          disabled={hold || seedsFailed}
-          title={hold ? "A legal hold prevents deletion" : seedsFailed ? "Unavailable: not every application's records could be loaded" : undefined}
-          onClick={() => context.openOverlay("deletion impact", { id: request.id })}
-        >
-          Delete where lawful…
-        </Button>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+      </DrawerActions>
     </Stack>
   );
 }
@@ -861,63 +970,133 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
   const settledRecords = useSettledOrgRecords();
   const seeds = useSeedStatus();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const request = data.dataRequests.find((row) => row.id === (payload?.id ?? context.selectedId));
+  const request = data.dataRequests.find((row) => row.id === (payload?.id ?? context.selectedId) && row.organizationId === context.org.id);
   const [busy, setBusy] = useState(false);
-  if (!request) return <Empty title="Select a request" />;
+  const [reviewed, setReviewed] = useState(false);
+  const [reason, setReason] = useState("");
+  const [executionPhrase, setExecutionPhrase] = useState("");
+  const [error, setError] = useState("");
+  if (!request) return <Empty title="Select a subject request before reviewing erasure" />;
   if (seeds.status === "failed") return <SeedsFailedNotice retry={seeds.retry} />;
   if (settledRecords === null) {
-    return (
-      <Notice tone="info" title="Counting the records this request covers">
-        Records from every application are still arriving in this browser. Deletion is offered once the full set is known, so no record
-        is missed.
-      </Notice>
-    );
+    return <Notice tone="info" title="Counting matching records">Erasure review is unavailable until all application records are loaded.</Notice>;
   }
-  const records = settledRecords;
 
-  const subject = String(request.fields.subject ?? "");
+  const subject = String(request.fields.subject ?? "").trim();
   const collections = csvList(request.fields.collections);
-  const retention = ofKind(data.policies, "retention").filter((policy) => csvList(policy.fields.collections).some((entry) => collections.includes(entry)));
+  const retention = ofKind(data.policies, "retention").filter((policy) =>
+    csvList(policy.fields.collections).some((entry) => collections.includes(entry)));
   const held = retention.filter((policy) => policy.fields.legalHold === true);
-  const covered = subjectRecords(request, records);
+  const requestHeld = request.fields.legalHold === true;
+  const covered = subject ? subjectRecords(request, settledRecords) : [];
   const deletable = covered.filter((record) => !held.some((policy) => csvList(policy.fields.collections).includes(record.collection)));
   const blocked = covered.filter((record) => held.some((policy) => csvList(policy.fields.collections).includes(record.collection)));
+  const candidateIds = deletable.map((record) => record.id);
+  const reviewStored = request.fields.erasureExecutionStatus === "not_executed" &&
+    request.fields.erasureReviewedBy &&
+    csvList(request.fields.erasureCandidateIds).length === candidateIds.length &&
+    csvList(request.fields.erasureCandidateIds).every((id) => candidateIds.includes(id));
+  const executeReady = Boolean(reviewStored) && candidateIds.length > 0 &&
+    context.can("delete_records") && executionPhrase === "DELETE" && reviewed && !busy &&
+    !requestHeld;
+  const eligible = context.can("delete_records") && subject.length > 0 && collections.length > 0 && !requestHeld && !reviewStored && reviewed && reason.trim().length >= 10 && !busy;
+
+  async function executeErasure() {
+    if (!executeReady || !settledRecords) return;
+    setBusy(true);
+    setError("");
+    try {
+      const revisions = Object.fromEntries(settledRecords.map((record) => [record.id, record.revision]));
+      const result = await context.mutate.executeReviewedErasure(request!.id, revisions, candidateIds, request!.revision);
+      context.toast("Local erasure completed", `${result.deleted} record(s) removed in one transaction. External systems were not affected.`);
+      close();
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Erasure failed. No records were removed.";
+      setError(message);
+      context.toast("Erasure blocked", message, "failed");
+    } finally { setBusy(false); }
+  }
+
+  async function recordReview() {
+    if (!eligible) return;
+    setBusy(true);
+    setError("");
+    try {
+      const saved = await context.mutate.patch(request!.id, {
+        fields: {
+          ...request!.fields,
+          erasureReviewedBy: context.actor,
+          erasureReviewedAt: context.now.toISOString(),
+          erasureReason: reason.trim(),
+          erasureCandidateIds: deletable.map((record) => record.id).join(","),
+          erasureRetainedIds: blocked.map((record) => record.id).join(","),
+          erasureSourceRevision: request!.revision,
+          erasureSnapshot: JSON.stringify(Object.fromEntries(settledRecords!.map((record) => [record.id, record.revision]))),
+          erasureExecutionStatus: "not_executed",
+        },
+      }, {
+        event: `Erasure impact reviewed for ${subject}; no records removed`,
+        expectRevision: request!.revision,
+      });
+      if (!saved) {
+        setError("The subject request changed. Reopen it and repeat the review.");
+        return;
+      }
+      context.toast("Erasure review recorded", "No records were deleted. Reopen this request to confirm eligible local erasure.");
+      close();
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Could not save this erasure review.";
+      setError(message);
+      context.toast("Review not saved", message, "failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
-    <StepUp
-      word="DELETE"
-      label={deletable.length ? `Delete ${deletable.length} ${deletable.length === 1 ? "record" : "records"}` : "Nothing may be deleted"}
-      busy={busy}
-      onConfirm={async () => {
-        if (deletable.length === 0) {
-          context.toast("Nothing deleted", "Every matching record is under a retention rule or a legal hold.", "blocked");
-          return;
-        }
-        setBusy(true);
-        try {
-          for (const record of deletable) {
-            await context.mutate.remove(record.id, `Erasure request ${request.id}: deleted ${record.collection} ${record.id}`);
-          }
-          await context.mutate.patch(request.id, {
-            status: blocked.length ? "partially_completed" : "completed",
-            fields: { ...request.fields, deletedCount: deletable.length, blockedCount: blocked.length, completedBy: context.actor },
-          }, { event: `Erasure completed for ${subject}: ${deletable.length} deleted, ${blocked.length} retained under a hold` });
-          context.toast("Deleted where lawful", `${deletable.length} removed, ${blocked.length} kept under a legal hold.`);
-          close();
-        } finally { setBusy(false); }
-      }}
-    >
-      <Properties rows={[
-        { label: "Subject", value: subject },
-        { label: "Records that may be deleted", value: deletable.length ? deletable.map((record) => `${record.collection}/${record.id}`).join(", ") : "None" },
-        { label: "Records that must be kept", value: blocked.length ? blocked.map((record) => `${record.collection}/${record.id}`).join(", ") : "None" },
-        { label: "Rules preventing deletion", value: held.map((policy) => policy.title).join("; ") || "None" },
-      ]} />
-      <Notice tone="warning" title="Deleting is permanent and audited">
-        Each deletion is written to the audit trail with the request that justified it. Links from other records to a deleted record
-        will show as unavailable rather than silently disappearing.
+    <Stack gap={4}>
+      <ModalInFlight when={busy} />
+      <Notice tone="warning" title="Permanent deletion of local browser records">
+        Review the impact first. A second deliberate confirmation may erase eligible records in one revision-checked local transaction.
+        This does not erase information from external providers, synced services or backups, and is not a legal-compliance determination.
       </Notice>
-    </StepUp>
+      {requestHeld && <Notice tone="danger" title="A legal hold applies">
+        Erasure is refused while the hold stands. This request cannot be reviewed for execution until the hold is independently resolved.
+      </Notice>}
+      {held.length > 0 && <Notice tone="warning" title="Retention policies exclude records">
+        {held.map((policy) => policy.title).join("; ")} — records covered by these policies will be retained.
+      </Notice>}
+      <Properties rows={[
+        { label: "Verified request", value: request.title },
+        { label: "Subject", value: subject || "Subject identity missing" },
+        { label: "Matching records", value: String(covered.length) },
+        { label: "Potentially erasable", value: deletable.length ? deletable.map((record) => `${record.collection}/${record.id}`).join(", ") : "None" },
+        { label: "Excluded by legal hold", value: blocked.length ? blocked.map((record) => `${record.collection}/${record.id}`).join(", ") : "None" },
+        { label: "Hold policies", value: held.map((policy) => policy.title).join("; ") || "None recorded" },
+        { label: "Execution status", value: String(request.fields.erasureExecutionStatus ?? "Not reviewed") },
+      ]} />
+      {reviewStored ? (
+        <Field label="Type DELETE to confirm local erasure" required hint="This permanently removes the eligible local records listed above.">
+          <TextInput value={executionPhrase} onChange={(event) => setExecutionPhrase(event.target.value.toUpperCase())} />
+        </Field>
+      ) : (
+        <Field label="Review rationale" required hint="At least 10 characters; explain the lawful basis, scope and any held records.">
+          <TextArea value={reason} onChange={(event) => setReason(event.target.value)} />
+        </Field>
+      )}
+      <Checkbox checked={reviewed} onChange={(event) => setReviewed(event.target.checked)}
+        label={reviewStored
+          ? "I independently rechecked the subject, scope, legal holds and permanent local deletion."
+          : "I checked the subject, scope and retention holds. This saves an impact review only."} />
+      {!context.can("delete_records") && <Notice tone="warning" title="Permission required">Only a role with record-deletion capability may record this erasure review.</Notice>}
+      {error && <Notice tone="danger" title="Review not saved">{error}</Notice>}
+      <ModalActions>
+        <Button variant="ghost" disabled={busy} onClick={close}>Keep request unchanged</Button>
+        {reviewStored
+          ? <Button variant="danger" busy={busy} disabled={!executeReady} onClick={() => void executeErasure()}>Delete {candidateIds.length} local records</Button>
+          : <Button variant="primary" busy={busy} disabled={!eligible} onClick={() => void recordReview()}>Record erasure review</Button>}
+      </ModalActions>
+    </Stack>
   );
 }
 

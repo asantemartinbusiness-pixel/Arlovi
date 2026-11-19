@@ -11,7 +11,8 @@ const go = async (page: Page, path: string) => {
 test("capabilities are searchable and explained", async ({ page }) => {
   await go(page, "/admin/roles?tab=Effective%20access");
   const main = page.locator("#main");
-  const rows = main.locator("table tbody tr");
+  await main.getByRole("button", { name: "Current access preview" }).click();
+  const rows = main.getByRole("table", { name: "Capabilities held by each role view" }).locator("tbody tr");
   await expect(rows).toHaveCount(14);
   await main.getByLabel("Search capabilities").fill("salaries");
   await expect(rows).toHaveCount(1);
@@ -33,9 +34,11 @@ test("an access request is declined only with a reason, approved with the exact 
   await expect(dialog).toContainText("Post journal");
   await expect(dialog).toContainText("This includes high-risk capabilities");
 
-  // Declining needs a reason.
-  await dialog.getByRole("button", { name: "Decline" }).click();
-  await expect(dialog.getByText("Say why")).toBeVisible();
+  // Both decisions require an explicit reason; no one-click approval.
+  await expect(dialog.getByRole("button", { name: "Decline" })).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "Approve and change role" })).toBeDisabled();
+  await dialog.getByRole("textbox", { name: "Decision rationale" }).fill("Approved for a documented journal review assignment.");
+  await expect(dialog.getByRole("button", { name: "Approve and change role" })).toBeEnabled();
   await dialog.getByRole("button", { name: "Approve and change role" }).click();
   await expect(dialog).toHaveCount(0);
 

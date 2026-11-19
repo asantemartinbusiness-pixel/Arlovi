@@ -5,7 +5,7 @@ import {
   BookOpen, CalendarDays, ClipboardCheck, GraduationCap, Inbox, UserPlus, Users,
 } from "lucide-react";
 import {
-  Avatar, BarChart, Button, Card, Checkbox, DataGrid, DonutChart, Empty, Field, Grid, Meter, Notice,
+  Avatar, BarChart, Button, Card, Checkbox, DataGrid, DonutChart, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, Notice, OverlayCancel,
   Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
@@ -3070,14 +3070,26 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
   const [deciding, setDeciding] = useState(false);
   const [error, setError] = useState("");
   const pending = data.leaveRequests.filter((request) => request.status === "requested");
-  const explicitId = payload?.id ?? context.selectedId;
-  const chosen = explicitId
-    ? pending.find((request) => request.id === explicitId)
-    : pending[0];
-  if (!chosen) return <Empty title={explicitId ? "The selected leave request is unavailable" : "Nothing is waiting for a decision"}
-    icon={<ClipboardCheck size={20} />}>
-    {explicitId ? "A request may have been decided in another view. Select a current request and try again." : "New leave requests appear here for a named human reviewer."}
-  </Empty>;
+  const [selectedRequestId, setSelectedRequestId] = useState(payload?.id ?? context.selectedId ?? "");
+  const chosen = selectedRequestId ? pending.find((request) => request.id === selectedRequestId) : undefined;
+  if (!chosen) return (
+    <Stack gap={3}>
+      <Notice tone={selectedRequestId ? "warning" : "info"} title={selectedRequestId ? "This request is no longer available" : "Choose the leave request to review"}>
+        {selectedRequestId ? "The request may already have been decided or is outside this workspace. Select an available request instead." : "Choose an actual request before recording an approval or decline. No other request is substituted."}
+      </Notice>
+      {pending.length > 0 ? (
+        <Field label="Pending leave request">
+          <Select aria-label="Pending leave request" value={selectedRequestId}
+            onChange={(event) => { setSelectedRequestId(event.target.value); setReviewed(false); setError(""); }}>
+            <option value="">Select a request</option>
+            {pending.map(request => <option key={request.id} value={request.id}>{leavePerson(request, data.employees)} · {context.date(request.startAt)}–{context.date(request.endAt)}</option>)}
+          </Select>
+        </Field>
+      ) : <Empty title="No leave requests awaiting approval" icon={<ClipboardCheck size={20} />}>
+        New requests appear here for a named reviewer.
+      </Empty>}
+    </Stack>
+  );
   const employee = data.employees.find((row) => row.id === chosen.fields.employeeId);
   const count = leaveDays(chosen);
   const balance = employee ? leaveBalance(employee) : undefined;
@@ -3111,6 +3123,8 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
   };
   return (
     <Stack gap={4}>
+      <DrawerInFlight when={deciding} />
+      <DrawerUnsavedChanges when={reviewed} />
       <PeopleDialogLead eyebrow="PEOPLE / LEAVE DECISION" title="Review a leave request"
         description="Confirm the applicant, dates, available evidence and your responsibility before recording a decision."
         status={<Pill tone="warning">Decision required</Pill>} />
@@ -3136,6 +3150,10 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
           ? balance.left >= count ? `${balance.left - count} days` : "Insufficient recorded allowance"
           : annual ? "Unavailable until allowance is verified" : "Annual balance unchanged" },
       ]} />
+      <Button variant="secondary" size="sm" disabled={reviewed || deciding}
+        onClick={() => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/hr/scheduling?tab=Roster`); }}>
+        Check team roster before deciding
+      </Button>
       {!canApprove && <Notice tone="warning" title="Human reviewer role required">
         The current role view cannot approve or decline a request. Review it from an authorised People role.
       </Notice>}
@@ -3144,12 +3162,12 @@ export function LeaveApproval({ context }: { context: ScreenContext }) {
       <Checkbox checked={reviewed} onChange={(event) => setReviewed(event.target.checked)}
         label={`I, ${context.actor}, reviewed this request, recorded balance and available coverage evidence.`} />
       {error && <Notice tone="danger" title="Decision could not be saved">{error}</Notice>}
-      <Row gap={2} wrap>
+      <DrawerActions>
         <Button variant="primary" disabled={!canApprove || !reviewed || deciding} onClick={() => decision("approved")}>{deciding ? "Saving…" : "Approve"}</Button>
         <Button variant="outline-danger" disabled={!canApprove || !reviewed || deciding} onClick={() => decision("declined")}>Decline</Button>
         <span className="ds-grow" />
-        <Button variant="secondary" onClick={() => { context.closeOverlay(); context.navigate(`/o/${context.org.slug}/hr/scheduling?tab=Roster`); }}>Check roster</Button>
-      </Row>
+        <OverlayCancel disabled={deciding}>Close review</OverlayCancel>
+      </DrawerActions>
       <Notice tone="info">This records a local review. The request and employee balance are updated atomically; no external calendar or payroll provider is connected.</Notice>
       </PeopleDialogSection>
     </Stack>
@@ -3258,48 +3276,93 @@ export function CandidateProfileOverlay({ context }: { context: ScreenContext })
 export function PayrollReview({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const data = useCollections(["payrollRuns", "employees"]);
-  const wantedId = payload?.id ?? context.selectedId;
-  const run = wantedId
-    ? data.payrollRuns.find((row) => row.id === wantedId && row.organizationId === context.org.id)
-    : data.payrollRuns[0];
+  const [selectedRunId, setSelectedRunId] = useState(payload?.id ?? context.selectedId ?? "");
+  // Payroll is sensitive. Resolve only an explicitly selected run within this
+  // organisation; never display the first run from a broad list as a fallback.
+  const runs = data.payrollRuns.filter(row => row.organizationId === context.org.id);
+  const run = runs.find(row => row.id === selectedRunId);
   if (!context.can("view_payroll")) return <RoleViewNote what="Payroll detail" />;
-  if (!run) return <Empty title={wantedId ? "Selected payroll run unavailable" : "No payroll run"}>
-    Open a payroll run from this company. A missing selection never falls back to an unrelated record.
-  </Empty>;
-  const eligible = data.employees.filter((employee) => !["alumni", "terminated"].includes(employee.status)
-    && employee.fields.employment !== "contractor");
+  if (!run) return (
+    <Stack gap={3}>
+      <Notice tone={selectedRunId ? "warning" : "info"}
+        title={selectedRunId ? "Selected payroll run unavailable" : "Choose a payroll run to review"}>
+        {selectedRunId
+          ? "This run may have changed or does not belong to this company. No other run has been substituted."
+          : "Select a run before opening sensitive salary evidence. Current salary estimates are not historical payslips."}
+      </Notice>
+      {runs.length ? <Field label="Company payroll run">
+        <Select aria-label="Company payroll run" value={selectedRunId}
+          onChange={event => setSelectedRunId(event.target.value)}>
+          <option value="">Select a payroll run</option>
+          {runs.map(row => <option key={row.id} value={row.id}>
+            {row.title} · {String(row.fields.period ?? "Period not recorded")} · {row.status}
+          </option>)}
+        </Select>
+      </Field> : <Empty title="No payroll runs in this company" />}
+    </Stack>
+  );
+  const eligible = data.employees.filter(employee =>
+    employee.organizationId === context.org.id &&
+    !["alumni", "terminated"].includes(employee.status) &&
+    employee.fields.employment !== "contractor");
   const salaryKnown = (employee: Rec) => employee.fields.salaryMinor !== undefined
     && employee.fields.salaryMinor !== null && String(employee.fields.salaryMinor).trim() !== ""
     && Number.isFinite(Number(employee.fields.salaryMinor)) && Number(employee.fields.salaryMinor) >= 0;
-  const missing = eligible.filter((employee) => !salaryKnown(employee));
+  const missing = eligible.filter(employee => !salaryKnown(employee));
   const lines = computePayroll(eligible.filter(salaryKnown));
+  const estimatedGross = lines.reduce((sum, line) => sum + line.grossMinor, 0);
+  const estimatedNet = lines.reduce((sum, line) => sum + line.netMinor, 0);
+  const recordedGross = run.fields.grossMinor;
+  const hasRecordedGross = recordedGross !== undefined &&
+    Number.isFinite(Number(recordedGross)) && Number(recordedGross) >= 0;
+  const recordedPeople = run.fields.people;
+  const currentDifferent = hasRecordedGross && Number(recordedGross) !== estimatedGross;
+
   return (
     <Stack gap={4}>
+      <Notice tone="info" title="Saved run and current payroll estimate are different records">
+        The approved or draft run details below are saved against {run.title}. The employee table is
+        calculated from today's personnel records and must not be treated as that historical run's
+        payslips, deduction schedule or payment instruction.
+      </Notice>
       <Properties rows={[
-        { label: "Run", value: run.title },
-        { label: "Period", value: String(run.fields.period ?? "") },
-        { label: "Status", value: <Pill tone={run.status === "approved" ? "success" : "warning"}>{run.status}</Pill> },
-        { label: "People", value: String(lines.length) },
-        { label: "Current salary estimate gross", value: context.money(lines.reduce((sum, line) => sum + line.grossMinor, 0)) },
-        { label: "Current salary estimate net", value: context.money(lines.reduce((sum, line) => sum + line.netMinor, 0)) },
-        { label: "Recorded run amount", value: run.amountMinor === undefined ? "Not recorded" : context.money(run.amountMinor) },
-        { label: "Missing salary inputs", value: String(missing.length) },
+        { label: "Payroll run", value: run.title },
+        { label: "Recorded period", value: String(run.fields.period ?? "Not recorded") },
+        { label: "Recorded status", value: <Pill tone={run.status === "approved" ? "success" : "warning"}>{run.status}</Pill> },
+        { label: "Saved gross amount", value: hasRecordedGross ? context.money(Number(recordedGross)) : "Not recorded" },
+        { label: "Saved run value", value: run.amountMinor === undefined ? "Not recorded" : context.money(run.amountMinor) },
+        { label: "Recorded people", value: recordedPeople === undefined ? "Not recorded" : String(recordedPeople) },
+        { label: "Saved approval", value: run.fields.approvedAt
+          ? `${String(run.fields.approvedBy ?? "Unknown reviewer")} · ${context.dateTime(String(run.fields.approvedAt))}`
+          : "No approval recorded" },
+      ]} />
+      {currentDifferent && <Notice tone="warning" title="Current estimates differ from the saved run">
+        The current gross estimate ({context.money(estimatedGross)}) is different from the
+        saved gross amount ({context.money(Number(recordedGross))}). Check the saved run's
+        preparation evidence before making a payroll decision.
+      </Notice>}
+      <Properties rows={[
+        { label: "Current payroll estimate — people", value: String(lines.length) },
+        { label: "Current payroll estimate — gross", value: context.money(estimatedGross) },
+        { label: "Current payroll estimate — net", value: context.money(estimatedNet) },
+        { label: "Employees missing salary inputs", value: String(missing.length) },
       ]} />
       <DataGrid
         rows={lines}
-        rowId={(row) => row.employeeId}
-        label="Run detail"
+        rowId={row => row.employeeId}
+        label="Illustrative current employee salary breakdown"
         filterable={false}
         columns={[
-          { key: "name", header: "Person", primary: true, cell: (row) => row.name },
-          { key: "gross", header: "Gross", align: "end", cell: (row) => <span className="ds-num">{context.money(row.grossMinor)}</span> },
-          { key: "net", header: "Net", align: "end", cell: (row) => <span className="ds-num">{context.money(row.netMinor)}</span> },
+          { key: "name", header: "Person", primary: true, cell: row => row.name },
+          { key: "gross", header: "Current gross estimate", align: "end", cell: row => <span className="ds-num">{context.money(row.grossMinor)}</span> },
+          { key: "net", header: "Current net estimate", align: "end", cell: row => <span className="ds-num">{context.money(row.netMinor)}</span> },
         ]}
       />
-      <Notice tone="warning" title="Current estimates, not a run-specific payslip or filing">
-        The figures above use current salaries on employee records, excluding {missing.length} people with absent or invalid salary
-        inputs. They do not reconstruct this run's historical approved amounts. Deductions are illustrative, do not apply the
-        current rules for {context.org.jurisdiction}, and make no external payment or authority submission.
+      <Notice tone="warning" title="Estimates are not payroll certification">
+        Calculations use current salaries and exclude {missing.length} employee(s) with invalid
+        or missing salary inputs. The illustrative deductions do not implement the current
+        payroll rules for {context.org.jurisdiction}. Nothing here files taxes, issues payslips
+        or transfers wages. Verify the saved run and external payroll system separately.
       </Notice>
     </Stack>
   );

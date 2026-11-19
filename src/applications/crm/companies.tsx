@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Building2, Inbox, Target } from "lucide-react";
 import {
-  Avatar, Button, Card, DataGrid, Empty, Field, Grid, Meter, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Avatar, Button, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, Meter, MoneyInput, Notice, OverlayCancel, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
@@ -16,6 +16,7 @@ import {
 import type { CrmData } from "./data";
 import { ActivityPill, ConsentPill, Money, StagePill } from "./parts";
 import { clockIso } from "@/platform/clock";
+import { revisedRecord } from "@/platform/repo";
 import { AccountProfileView, accountHref } from "./account";
 
 /* ---------------------------- CRM-004 ---------------------------- */
@@ -314,85 +315,153 @@ export function RelationshipInspector({ context }: { context: ScreenContext }) {
 
 export function CompanyMergePreview({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCrmData();
-  const [leftId, setLeftId] = useState(context.selectedId ?? data.companies[0]?.id ?? "");
-  const [rightId, setRightId] = useState(data.companies[1]?.id ?? "");
+  const payload = context.overlayPayload as { id?: unknown } | undefined;
+  const [leftId, setLeftId] = useState(
+    typeof payload?.id === "string" ? payload.id : context.selectedId ?? "",
+  );
+  const [rightId, setRightId] = useState("");
+  const [reviewed, setReviewed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const left = companyById(data, leftId);
   const right = companyById(data, rightId);
-
-  if (!left || !right) return <Empty title="Two accounts are needed to merge" />;
-
-  const conflicts = (["industry", "city", "owner"] as const)
-    .filter((field) => left.fields[field] && right.fields[field] && left.fields[field] !== right.fields[field])
-    .map((field) => ({ field, left: String(left.fields[field]), right: String(right.fields[field]) }));
+  const valid = Boolean(left && right && left.id !== right.id
+    && left.status !== "merged" && right.status !== "merged");
+  const contacts = right && valid ? contactsOfCompany(data, right.id) : [];
+  const deals = right && valid ? dealsOfCompany(data, right.id) : [];
+  const conflicts = left && right && valid
+    ? Object.keys(right.fields)
+      .filter(field => left.fields[field] !== undefined
+        && left.fields[field] !== "" && right.fields[field] !== undefined
+        && right.fields[field] !== "" && left.fields[field] !== right.fields[field])
+      .map(field => ({ field, left: String(left.fields[field]), right: String(right.fields[field]) }))
+    : [];
 
   return (
     <Stack gap={4}>
-      <Notice tone="warning" title="A merge keeps every source id and every conflict">
-        Nothing is silently dropped. The kept account records which ids it absorbed, and any field the two disagree on is listed below and kept as a note.
+      <DrawerInFlight when={busy} />
+      <DrawerUnsavedChanges when={reviewed || Boolean(leftId && rightId)} />
+      <Notice tone="warning" title="Review both companies before merging">
+        Select the account to retain and the separate account to absorb. Only linked contacts and deals
+        move in this operation; other record links may need review. Nothing is automatically deleted.
       </Notice>
       <Row gap={3} wrap>
-        <Field label="Keep">
-          <Select aria-label="Keep" value={leftId} onChange={(event) => setLeftId(event.target.value)}>
-            {data.companies.map((company) => <option key={company.id} value={company.id}>{company.title}</option>)}
+        <Field label="Keep this account" required>
+          <Select aria-label="Keep this account" value={leftId} disabled={busy}
+            onChange={(event) => { setLeftId(event.target.value); setReviewed(false); setError(""); }}>
+            <option value="">Choose the retained account</option>
+            {data.companies.filter(company => company.status !== "merged").map(company =>
+              <option key={company.id} value={company.id}>{company.title}</option>)}
           </Select>
         </Field>
-        <Field label="Merge in">
-          <Select aria-label="Merge in" value={rightId} onChange={(event) => setRightId(event.target.value)}>
-            {data.companies.filter((company) => company.id !== leftId).map((company) => <option key={company.id} value={company.id}>{company.title}</option>)}
+        <Field label="Merge this account into it" required>
+          <Select aria-label="Merge this account into it" value={rightId} disabled={busy}
+            onChange={(event) => { setRightId(event.target.value); setReviewed(false); setError(""); }}>
+            <option value="">Choose the source account</option>
+            {data.companies.filter(company => company.status !== "merged" && company.id !== leftId).map(company =>
+              <option key={company.id} value={company.id}>{company.title}</option>)}
           </Select>
         </Field>
       </Row>
-      <Properties rows={[
-        { label: "Contacts moving", value: String(contactsOfCompany(data, right.id).length) },
-        { label: "Deals moving", value: String(dealsOfCompany(data, right.id).length) },
-        { label: "Conflicting fields", value: conflicts.length ? conflicts.map((item) => item.field).join(", ") : "None" },
-        { label: "Source ids kept", value: `${left.id}, ${right.id}` },
-      ]} />
-      {conflicts.length > 0 && (
-        <Card eyebrow="CONFLICTS" prov="human" title="Where the two records disagree">
-          <Stack gap={2}>
-            {conflicts.map((item) => (
-              <Row key={item.field} gap={3}>
-                <span className="ds-grow">{item.field}</span>
-                <Pill tone="success">{item.left}</Pill>
-                <span className="ds-subtle">against</span>
-                <Pill tone="warning">{item.right}</Pill>
-              </Row>
-            ))}
-          </Stack>
-        </Card>
+      {!valid ? (
+        <Notice tone="info" title="Two different active company records are required">
+          Select the source and retained accounts to preview field conflicts and linked work. No first
+          company is substituted, and already merged records cannot be merged again.
+        </Notice>
+      ) : (
+        <>
+          <Properties rows={[
+            { label: "Retained account", value: left!.title },
+            { label: "Source account", value: right!.title },
+            { label: "Contacts moving", value: String(contacts.length) },
+            { label: "Deals moving", value: String(deals.length) },
+            { label: "Field conflicts", value: String(conflicts.length) },
+            { label: "Both source IDs retained", value: `${left!.id}, ${right!.id}` },
+          ]} />
+          {conflicts.length > 0 && (
+            <Card eyebrow="CONFLICTS" prov="human" title="Differences that need review">
+              <Stack gap={2}>
+                {conflicts.map(item => (
+                  <Row key={item.field} gap={3} wrap>
+                    <span className="ds-grow">{item.field}</span>
+                    <Pill tone="success">{item.left}</Pill>
+                    <span className="ds-subtle">instead of</span>
+                    <Pill tone="warning">{item.right}</Pill>
+                  </Row>
+                ))}
+              </Stack>
+            </Card>
+          )}
+          <Checkbox checked={reviewed} disabled={busy}
+            onChange={event => setReviewed(event.target.checked)}
+            label={`I have checked the ${contacts.length} contact(s), ${deals.length} deal(s), and ${conflicts.length} field difference(s) before merging ${right!.title} into ${left!.title}.`} />
+        </>
       )}
-      <Row gap={2}>
-        <Button
-          variant="primary"
-          busy={busy}
-          disabled={!context.can("edit_pipeline")}
+      {error && <Notice tone="danger" title="Account merge was not saved">{error}</Notice>}
+      <DrawerActions>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
+        <span className="ds-grow" />
+        <Button variant="primary" busy={busy}
+          disabled={!valid || !reviewed || busy || !context.can("edit_pipeline")}
+          title={!context.can("edit_pipeline") ? "CRM editing permission required" : undefined}
           onClick={async () => {
+            if (!valid || !left || !right || !reviewed || busy || !context.can("edit_pipeline")) return;
             setBusy(true);
-            const fields: Record<string, string | number | boolean> = { ...left.fields };
-            for (const [field, value] of Object.entries(right.fields)) {
-              if (fields[field] === undefined || fields[field] === "") fields[field] = value;
+            setError("");
+            try {
+              const fields: Record<string, string | number | boolean> = { ...left.fields };
+              for (const [field, value] of Object.entries(right.fields)) {
+                if (fields[field] === undefined || fields[field] === "") fields[field] = value;
+              }
+              fields.mergedFrom = [...new Set([
+                ...String(left.fields.mergedFrom ?? "").split(",").map(part => part.trim()).filter(Boolean),
+                right.id,
+              ])].join(", ");
+              if (conflicts.length > 0) {
+                fields.mergeConflicts = [
+                  String(left.fields.mergeConflicts ?? ""),
+                  ...conflicts.map(item => `${item.field}: kept ${item.left}; source ${item.right}`),
+                ].filter(Boolean).join("; ");
+              }
+              const editor = { actor: context.actor, now: clockIso() };
+              const original = [left, ...contacts, ...deals, right];
+              const records = [
+                revisedRecord(left, { fields }, editor),
+                ...contacts.map(contact => revisedRecord(contact, {
+                  fields: { ...contact.fields, companyId: left.id },
+                }, editor)),
+                ...deals.map(deal => revisedRecord(deal, {
+                  parentId: left.id, fields: { ...deal.fields, companyId: left.id },
+                }, editor)),
+                revisedRecord(right, {
+                  status: "merged", fields: { ...right.fields, mergedInto: left.id },
+                }, editor),
+              ];
+              // An all-or-nothing revision-checked transaction: stale linked
+              // contacts, deals or either company abort the entire merge.
+              await context.mutate.putMany(
+                records,
+                records.map((record, index) => index === 0
+                  ? `Account ${right.title} merged into ${left.title}`
+                  : index === records.length - 1
+                    ? `${right.title} marked merged into ${left.title}`
+                    : `${record.title} transferred to ${left.title}`),
+                Object.fromEntries(original.map(record => [record.id, record.revision])),
+                records.map(() => "update"),
+              );
+              context.toast("Accounts merged", `${right.title} is marked merged. ${contacts.length} contact(s) and ${deals.length} deal(s) now reference ${left.title}; both IDs remain in the audit trail.`);
+              close();
+            } catch (cause) {
+              const message = cause instanceof Error ? cause.message : "Records changed. Reload both companies before retrying.";
+              setError(message);
+              context.toast("Account merge blocked", message, "blocked");
+            } finally {
+              setBusy(false);
             }
-            fields.mergedFrom = right.id;
-            if (conflicts.length > 0) fields.mergeConflicts = conflicts.map((item) => `${item.field}: kept ${item.left}, discarded ${item.right}`).join("; ");
-            await context.mutate.patch(left.id, { fields }, { expectRevision: left.revision, event: `Account ${right.title} merged into ${left.title}` });
-            for (const contact of contactsOfCompany(data, right.id)) {
-              await context.mutate.patch(contact.id, { fields: { ...contact.fields, companyId: left.id } }, { event: `${contact.title} moved to ${left.title}` });
-            }
-            for (const deal of dealsOfCompany(data, right.id)) {
-              await context.mutate.patch(deal.id, { parentId: left.id, fields: { ...deal.fields, companyId: left.id } }, { event: `${deal.title} moved to ${left.title}` });
-            }
-            await context.mutate.patch(right.id, { status: "merged", fields: { ...right.fields, mergedInto: left.id } }, { event: `${right.title} marked merged` });
-            context.toast("Accounts merged", `${right.title} is marked merged and its records now point at ${left.title}. Both ids are kept.`);
-            setBusy(false);
-            close();
-          }}
-        >
-          Merge into {left.title}
+          }}>
+          {right ? `Merge into ${left?.title ?? "retained account"}` : "Review and merge"}
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </DrawerActions>
     </Stack>
   );
 }

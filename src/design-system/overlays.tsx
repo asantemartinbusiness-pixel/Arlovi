@@ -7,6 +7,21 @@ import { X } from "lucide-react";
 import { Button } from "./primitives";
 
 
+/**
+ * Use in app-owned form footers for Cancel. Radix routes the close request
+ * through the existing dirty/in-flight guard, unlike calling close() directly.
+ * Successful mutations can still call their supplied close() callback.
+ */
+export function OverlayCancel({
+  children = "Cancel", disabled = false,
+}: { children?: ReactNode; disabled?: boolean }) {
+  return (
+    <Dialog.Close asChild>
+      <Button variant="ghost" disabled={disabled}>{children}</Button>
+    </Dialog.Close>
+  );
+}
+
 /** A press on a toast is not an intent to leave the dialog. */
 function fromToast(event: { target: EventTarget | null }): boolean {
   return event.target instanceof Element && Boolean(event.target.closest(".ds-toasts"));
@@ -52,7 +67,7 @@ export function ModalInFlight({ when }: { when: boolean }) {
  * Escape and focus return. Dismissal of edited forms requires confirmation.
  */
 export function Modal({
-  open, onOpenChange, title, description, children, footer, width = 560, tone, blocking,
+  open, onOpenChange, title, description, children, footer, width = 560, tone, blocking, origin, head, application,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -63,6 +78,9 @@ export function Modal({
   width?: number;
   tone?: "danger";
   blocking?: boolean;
+  origin?: ReactNode;
+  head?: ReactNode;
+  application?: string;
 }) {
   const [footerTarget, setFooterTarget] = useState<HTMLElement | null>(null);
   const [isDirty, setDirty] = useState(false);
@@ -86,12 +104,14 @@ export function Modal({
             <Dialog.Overlay className="ds-overlay" />
             <Dialog.Content
               className="ds-modal"
+              data-native-app={application}
               style={{ ["--modal-w" as string]: `${width}px` }}
               onEscapeKeyDown={(event) => { if (blocking || inFlight) event.preventDefault(); }}
               onInteractOutside={(event) => { if (blocking || inFlight || fromToast(event)) event.preventDefault(); }}
             >
               <header className="ds-overlay-head">
                 <div className="ds-grow">
+                  {origin}
                   <Dialog.Title asChild>
                     <h2 style={tone === "danger" ? { color: "var(--danger)" } : undefined}>{title}</h2>
                   </Dialog.Title>
@@ -99,6 +119,7 @@ export function Modal({
                     ? <Dialog.Description className="ds-card-sub">{description}</Dialog.Description>
                     : <Dialog.Description className="ds-overlay-visually-hidden">Review the details and available actions in this dialog.</Dialog.Description>}
                 </div>
+                {head}
                 <Dialog.Close asChild>
                   <Button variant="ghost" size="sm" iconOnly aria-label="Close" title="Close dialog" disabled={blocking || inFlight}>
                     <X size={16} aria-hidden="true" />
@@ -147,6 +168,7 @@ export function Modal({
  */
 const DrawerFooterTarget = createContext<HTMLElement | null>(null);
 const DrawerDirtyRegistrar = createContext<((dirty: boolean) => void) | null>(null);
+const DrawerBusyRegistrar = createContext<((busy: boolean) => void) | null>(null);
 
 /** Place this inside drawer content to dock its actions below the scroll region. */
 export function DrawerActions({ children }: { children: ReactNode }) {
@@ -165,13 +187,23 @@ export function DrawerUnsavedChanges({ when }: { when: boolean }) {
   return null;
 }
 
+/** Prevent a pending native drawer mutation being dismissed through Escape or the scrim. */
+export function DrawerInFlight({ when }: { when: boolean }) {
+  const register = useContext(DrawerBusyRegistrar);
+  useEffect(() => {
+    register?.(when);
+    return () => register?.(false);
+  }, [register, when]);
+  return null;
+}
+
 /**
  * Drawer — contextual detail beside the work, keeping the page URL and filters.
  * Focus stays trapped by Radix and returns to the invoking control after close.
  * At narrow viewport widths the same content becomes a bottom sheet.
  */
 export function Drawer({
-  open, onOpenChange, title, subtitle, children, footer, width = 440, head,
+  open, onOpenChange, title, subtitle, children, footer, width = 440, head, origin, application,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -181,11 +213,15 @@ export function Drawer({
   footer?: ReactNode;
   width?: number;
   head?: ReactNode;
+  origin?: ReactNode;
+  application?: string;
 }) {
   const [footerTarget, setFooterTarget] = useState<HTMLElement | null>(null);
   const [isDirty, setDirty] = useState(false);
+  const [inFlight, setInFlight] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const requestOpenChange = (next: boolean) => {
+    if (!next && inFlight) return;
     if (!next && isDirty) {
       setConfirmDiscard(true);
       return;
@@ -195,17 +231,21 @@ export function Drawer({
 
   return (
     <DrawerDirtyRegistrar.Provider value={setDirty}>
+      <DrawerBusyRegistrar.Provider value={setInFlight}>
       <DrawerFooterTarget.Provider value={footerTarget}>
         <Dialog.Root open={open} onOpenChange={requestOpenChange}>
           <Dialog.Portal>
             <Dialog.Overlay className="ds-overlay ds-drawer-scrim" />
             <Dialog.Content
               className="ds-drawer"
+              data-native-app={application}
               style={{ ["--drawer-w" as string]: `${width}px` }}
-              onInteractOutside={(event) => { if (fromToast(event)) event.preventDefault(); }}
+              onEscapeKeyDown={(event) => { if (inFlight) event.preventDefault(); }}
+              onInteractOutside={(event) => { if (inFlight || fromToast(event)) event.preventDefault(); }}
             >
               <header className="ds-overlay-head">
                 <div className="ds-grow">
+                  {origin}
                   <Dialog.Title asChild><h2>{title}</h2></Dialog.Title>
                   {subtitle
                     ? <Dialog.Description className="ds-card-sub">{subtitle}</Dialog.Description>
@@ -213,7 +253,7 @@ export function Drawer({
                 </div>
                 {head}
                 <Dialog.Close asChild>
-                  <Button variant="ghost" size="sm" iconOnly aria-label="Close panel">
+                  <Button variant="ghost" size="sm" iconOnly aria-label="Close panel" disabled={inFlight}>
                     <X size={16} aria-hidden="true" />
                   </Button>
                 </Dialog.Close>
@@ -240,6 +280,7 @@ export function Drawer({
           <p className="ds-prose">You can return to this record, but the changes you just made will be lost.</p>
         </Modal>
       </DrawerFooterTarget.Provider>
+      </DrawerBusyRegistrar.Provider>
     </DrawerDirtyRegistrar.Provider>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Lock, Plus, RotateCcw, Trash2, Unlock } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, DataGrid, Empty, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, OverlayCancel, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useEvents, useRecord, useWorkspace } from "@/platform/workspace";
@@ -14,6 +14,7 @@ import type { JLine, PostCheck } from "@/domain/fin-ledger";
 import { useFinData } from "./data";
 import { AccountLabel, Amount, BooksLoading, SourceNote } from "./parts";
 import { clockIso, wallMs } from "@/platform/clock";
+import { newRecord, revisedRecord } from "@/platform/repo";
 
 /* ---------------------------- FIN-003 ---------------------------- */
 
@@ -647,6 +648,7 @@ export function ReverseConfirmation({ context, close }: { context: ScreenContext
   const [date, setDate] = useState(now.toISOString().slice(0, 10));
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   if (!journal) return <Empty title="Select a posted journal first">Open a journal from the Entries or Journals tab, then reverse it.</Empty>;
   if (journal.status !== "posted") {
@@ -663,8 +665,16 @@ export function ReverseConfirmation({ context, close }: { context: ScreenContext
 
   return (
     <Stack gap={4}>
+      <ModalUnsavedChanges when={reason.trim().length > 0 || date !== now.toISOString().slice(0, 10)} />
+      <ModalInFlight when={busy} />
+      <Properties rows={[
+        { label: "Original journal", value: journal.title },
+        { label: "Original posting date", value: context.date(journalDate(journal)) },
+        { label: "Journal amount", value: context.money(lines.reduce((sum, line) => sum + line.debitMinor, 0)) },
+        { label: "Reversal period", value: period },
+      ]} />
       <Notice tone="warning" title="A reversal adds an entry, it does not remove one">
-        {journal.title} stays in the ledger and is marked reversed. The offsetting journal below is posted with today&apos;s date so the audit trail shows when the correction was made.
+        {journal.title} stays in the ledger and is marked reversed. The offsetting journal below is posted with the chosen reversal date so the audit trail shows when the correction was made.
       </Notice>
       <Row gap={3} wrap>
         <Field label="Reversal date" required hint={`Posts into ${period}`}>
@@ -692,38 +702,55 @@ export function ReverseConfirmation({ context, close }: { context: ScreenContext
         </div>
       </div>
       {check.reason && <Notice tone="danger" title="The reversal cannot be posted">{check.reason}</Notice>}
-      <Row gap={2}>
+      {error && <Notice tone="danger" title="Reversal could not be saved">{error}</Notice>}
+      <ModalActions>
         <Button
           variant="danger"
           busy={busy}
-          disabled={Boolean(check.reason) || !reason.trim() || !context.can("post_journal")}
+          disabled={busy || Boolean(check.reason) || reason.trim().length < 10 || !context.can("post_journal")}
+          title={!context.can("post_journal") ? "Finance posting permission required" : check.reason || (reason.trim().length < 10 ? "Add a reason of at least 10 characters" : undefined)}
           onClick={async () => {
+            if (busy || check.reason || reason.trim().length < 10 || !context.can("post_journal")) return;
             setBusy(true);
-            const created = await context.mutate.create({
-              collection: "journals",
-              title: `Reversal · ${journal.title}`,
-              status: "posted",
-              summary: reason,
-              amountMinor: lines.reduce((sum, line) => sum + line.debitMinor, 0),
-              at: `${date}T09:00:00.000Z`,
-              parentId: journal.id,
-              tags: ["ledger", "reversal"],
-              fields: { date, source: "reversal", reversesId: journal.id, reason },
-              body: { date, memo: `Reversal of ${journal.title}: ${reason}`, lines, reversesId: journal.id },
-            }, `Reversed ${journal.title}`);
-            await context.mutate.patch(journal.id, {
-              status: "reversed",
-              fields: { ...journal.fields, reversedBy: created.id, reversedAt: `${date}T09:00:00.000Z` },
-            }, { expectRevision: journal.revision, event: `${journal.title} marked reversed` });
-            context.toast("Reversal posted", `${created.title} is in the ledger. The original stays on the record, marked reversed.`);
-            setBusy(false);
-            close();
+            setError("");
+            try {
+              const writtenAt = clockIso();
+              const created = newRecord({
+                organizationId: context.org.id, currency: context.org.currency,
+                collection: "journals", title: `Reversal · ${journal.title}`, status: "posted",
+                summary: reason.trim(),
+                amountMinor: lines.reduce((sum, line) => sum + line.debitMinor, 0),
+                at: `${date}T09:00:00.000Z`, parentId: journal.id,
+                tags: ["ledger", "reversal"],
+                fields: { date, source: "reversal", reversesId: journal.id, reason: reason.trim() },
+                body: { date, memo: `Reversal of ${journal.title}: ${reason.trim()}`, lines, reversesId: journal.id },
+              }, { actor: context.actor, now: writtenAt, screenId: context.screen.id });
+              const reversed = revisedRecord(journal, {
+                status: "reversed",
+                fields: { ...journal.fields, reversedBy: created.id, reversedAt: `${date}T09:00:00.000Z` },
+              }, { actor: context.actor, now: writtenAt });
+              // Both records and their audit events commit together. A stale
+              // original revision cannot create an orphan offsetting journal.
+              await context.mutate.putMany(
+                [created, reversed],
+                [`Reversal posted for ${journal.title}`, `${journal.title} marked reversed`],
+                { [journal.id]: journal.revision }, ["create", "update"],
+              );
+              context.toast("Reversal posted", `${created.title} offsets the original journal, which remains on the ledger marked reversed.`);
+              close();
+            } catch (cause) {
+              const message = cause instanceof Error ? cause.message : "The original journal may have changed. Reopen and try again.";
+              setError(message);
+              context.toast("Reversal not posted", message, "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Post the reversal
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
+      </ModalActions>
     </Stack>
   );
 }

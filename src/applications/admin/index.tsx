@@ -107,7 +107,7 @@ export const adminApp = registerApp({
       ],
       overlays: [
         { id: "Invite wizard", kind: "modal", title: "Invite someone", width: 600, render: ({ close, ...context }) => <InviteWizard context={context} close={close} /> },
-        { id: "role impact", kind: "drawer", title: "What a role change does", width: 560, render: ({ close, ...context }) => <RoleImpact context={context} close={close} /> },
+        { id: "role impact", kind: "drawer", title: "What a role change does", width: 600, capability: "manage_policy", presentation: { selectedRecord: true, collection: "members", guidance: "Compare current and proposed capabilities, confirm the person and record the change without implying external account access." }, render: ({ close, ...context }) => <RoleImpact context={context} close={close} /> },
         { id: "revoke confirmation", kind: "modal", title: "Offboard", tone: "danger", width: 560, blocking: true, render: ({ close, ...context }) => <RevokeConfirmation context={context} close={close} /> },
         { id: "suspend member", kind: "modal", title: "Suspend a member", tone: "danger", width: 540, render: ({ close, ...context }) => <SuspendMember context={context} close={close} /> },
         { id: "export members", kind: "modal", title: "Export the member list", width: 500, render: ({ close, ...context }) => <MembersExport context={context} close={close} /> },
@@ -194,7 +194,7 @@ export const adminApp = registerApp({
       ],
       overlays: [
         { id: "Provider setup", kind: "modal", title: "Single sign-on", width: 560, render: ({ close, ...context }) => <ProviderSetup context={context} close={close} /> },
-        { id: "emergency revoke", kind: "modal", title: "Revoke sessions", tone: "danger", width: 560, blocking: true, render: ({ close, ...context }) => <EmergencyRevoke context={context} close={close} /> },
+        { id: "emergency revoke", kind: "modal", title: "Revoke sessions", tone: "danger", width: 620, capability: "manage_policy", presentation: { noRecordContext: true, guidance: "Choose one session or deliberately select all other active sessions. This records local revocation only; no identity-provider logout occurs." }, render: ({ close, ...context }) => <EmergencyRevoke context={context} close={close} /> },
         { id: "security review", kind: "modal", title: "Confirm a security change", width: 560, render: ({ close, ...context }) => <SecurityReview context={context} close={close} /> },
         { id: "export sessions", kind: "modal", title: "Export sessions", width: 500, render: ({ close, ...context }) => <SessionsExport context={context} close={close} /> },
       ],

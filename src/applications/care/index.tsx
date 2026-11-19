@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { BookOpen, Headphones, Inbox, Settings2, Smile, Timer, Wand2 } from "lucide-react";
 import {
-  Button, Checkbox, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow,
+  Button, Checkbox, DataGrid, Empty, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, Notice, OverlayCancel, Pill, Properties, Row, Select, Stack, Stat, StatRow,
   TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
@@ -20,7 +20,7 @@ import {
   ScheduleFollowUp, SlaReport, Staffing, TagCase, acknowledgeBreach, activateMacro, exportCases, exportQuality, reopenCase,
   retireSuperseded,
 } from "./actions";
-import { listByCollection } from "@/platform/repo";
+import { listByCollection, revisedRecord } from "@/platform/repo";
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
   <>
@@ -137,52 +137,95 @@ function TicketCreate({ context, close }: { context: ScreenContext; close: () =>
 function BulkAssignment({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCareData();
   const { now } = useWorkspace();
-  const unassigned = data.tickets.filter((ticket) => !ticket.fields.assignee && !["resolved", "closed"].includes(ticket.status));
+  const [assigneeId, setAssigneeId] = useState("");
+  const [reviewed, setReviewed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const unassigned = data.tickets.filter(ticket =>
+    ticket.organizationId === context.org.id &&
+    !ticket.fields.assignee && !["resolved", "closed"].includes(ticket.status));
+  const available = data.employees.filter(employee =>
+    employee.organizationId === context.org.id &&
+    !["alumni", "terminated"].includes(employee.status));
+  const assignee = available.find(employee => employee.id === assigneeId);
+  const canAssign = !busy && reviewed && Boolean(assignee) && unassigned.length > 0;
+
   return (
     <Stack gap={4}>
-      <p className="ds-prose">
-        {unassigned.length} cases have no owner. Routing them assigns each one and records who did it. Nothing is closed here:
-        a bulk close would need its own preview and the right permission.
-      </p>
-      {unassigned.length === 0 ? <Empty title="Every case has an owner" icon={<Inbox size={20} />} /> : (
+      <ModalUnsavedChanges when={Boolean(assigneeId) || reviewed} />
+      <ModalInFlight when={busy} />
+      <Notice tone="info" title="Assign open, unowned cases without closing them">
+        This action updates exactly the {unassigned.length} currently unassigned active case records in
+        this company. Their conversation history, queue, priority and existing SLA remain unchanged.
+      </Notice>
+      {unassigned.length === 0 ? <Empty title="Every active case has an owner" icon={<Inbox size={20} />} /> : (
         <DataGrid
           rows={unassigned}
-          rowId={(row) => row.id}
-          label="Cases that would be routed"
+          rowId={row => row.id}
+          label="Cases included in this assignment"
           filterable={false}
           columns={[
-            { key: "ref", header: "Case", cell: (row) => <span className="ds-num">{String(row.fields.ref ?? "")}</span>, width: "88px" },
-            { key: "subject", header: "Subject", primary: true, cell: (row) => row.title.replace(/^\S+\s/, "") },
-            { key: "queue", header: "Queue", cell: (row) => String(row.fields.queue ?? "") },
-            { key: "sla", header: "Clock", align: "end", cell: (row) => <span className="ds-num">{formatMinutes(slaState(row, policyFor(row, data.slas), now).remainingMinutes)}</span> },
+            { key: "ref", header: "Case", cell: row => <span className="ds-num">{String(row.fields.ref ?? row.id)}</span>, width: "88px" },
+            { key: "subject", header: "Subject", primary: true, cell: row => row.title },
+            { key: "queue", header: "Queue", cell: row => String(row.fields.queue ?? "Unassigned") },
+            { key: "sla", header: "SLA remaining", align: "end", cell: row =>
+              <span className="ds-num">{formatMinutes(slaState(row, policyFor(row, data.slas), now).remainingMinutes)}</span> },
           ]}
         />
       )}
-      <Field label="Assign all of these to">
-        <Select id="cr-bulk-owner" defaultValue="">
+      <Field label="Assign every listed case to" required
+        hint="Only current people in this organisation can be selected.">
+        <Select aria-label="Assign every listed case to" value={assigneeId} disabled={busy}
+          onChange={event => { setAssigneeId(event.target.value); setReviewed(false); setError(""); }}>
           <option value="">Choose a person</option>
-          {data.employees.filter((employee) => employee.status !== "alumni").map((employee) => <option key={employee.id}>{employee.title}</option>)}
+          {available.map(employee => <option key={employee.id} value={employee.id}>{employee.title}</option>)}
         </Select>
       </Field>
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
+      {assignee && (
+        <Properties rows={[
+          { label: "New owner", value: assignee.title },
+          { label: "Cases to assign", value: String(unassigned.length) },
+          { label: "Existing assigned cases", value: "Will not be modified" },
+        ]} />
+      )}
+      <Checkbox checked={reviewed} disabled={busy || !assignee || unassigned.length === 0}
+        onChange={event => setReviewed(event.target.checked)}
+        label={`I reviewed the ${unassigned.length} case(s) and confirmed ${assignee?.title ?? "the chosen person"} should become their owner.`} />
+      {error && <Notice tone="danger" title="Cases were not reassigned">{error}</Notice>}
+      <ModalActions>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
         <span className="ds-grow" />
-        <Button
-          variant="primary"
-          disabled={unassigned.length === 0}
+        <Button variant="primary" busy={busy} disabled={!canAssign}
           onClick={async () => {
-            const owner = document.querySelector<HTMLSelectElement>("#cr-bulk-owner")?.value;
-            if (!owner) { context.toast("Not routed", "Choose a person first.", "blocked"); return; }
-            for (const ticket of unassigned) {
-              await context.mutate.patch(ticket.id, { status: "open", fields: { ...ticket.fields, assignee: owner } }, { event: `${String(ticket.fields.ref ?? "")} routed to ${owner} by ${context.actor}` });
+            if (!canAssign || !assignee) return;
+            setBusy(true);
+            setError("");
+            try {
+              const editor = { actor: context.actor, now: now.toISOString() };
+              const changed = unassigned.map(ticket => revisedRecord(ticket, {
+                // Preserve case status, priority, queue, SLA and routing history.
+                fields: { ...ticket.fields, assignee: assignee.title },
+              }, editor));
+              await context.mutate.putMany(
+                changed,
+                unassigned.map(ticket => `${String(ticket.fields.ref ?? ticket.id)} assigned to ${assignee.title} by ${context.actor}`),
+                Object.fromEntries(unassigned.map(ticket => [ticket.id, ticket.revision])),
+                changed.map(() => "update"),
+              );
+              context.toast("Cases assigned",
+                `${changed.length} case(s) now belong to ${assignee.title}. No cases were closed or re-prioritised.`);
+              close();
+            } catch (cause) {
+              const message = cause instanceof Error ? cause.message : "One or more cases changed while you were reviewing. Reload the list before retrying.";
+              setError(message);
+              context.toast("Assignment not saved", message, "failed");
+            } finally {
+              setBusy(false);
             }
-            context.toast("Cases routed", `${unassigned.length} cases now belong to ${owner}, each with its own audit entry.`);
-            close();
-          }}
-        >
-          Route {unassigned.length} cases
+          }}>
+          Assign {unassigned.length} cases
         </Button>
-      </Row>
+      </ModalActions>
     </Stack>
   );
 }
@@ -778,7 +821,7 @@ export const careApp = registerApp({
         { id: "reassign case", kind: "modal", title: "Reassign a case", width: 560, render: ({ close, ...context }) => <ReassignCase context={context} close={close} />, footer: submitFooter("cr-reassign", "Reassign") },
         { id: "staffing", kind: "drawer", title: "Who covers which queue", width: 580, render: ({ close, ...context }) => <Staffing context={context} close={close} />, footer: submitFooter("cr-staffing", "Save the rota") },
         { id: "Queue rules", kind: "drawer", title: "How a case reaches a queue", width: 520, render: ({ ...context }) => <QueueRules context={context} /> },
-        { id: "SLA inspector", kind: "drawer", title: "Against the clock", width: 560, render: ({ ...context }) => <SlaInspector context={context} /> },
+        { id: "SLA inspector", kind: "drawer", title: "Against the clock", width: 560, presentation: { guidance: "Review response and resolution targets, elapsed time, ownership and escalation reasons." }, render: ({ ...context }) => <SlaInspector context={context} /> },
         { id: "service report", kind: "modal", title: "Service report", width: 640, render: ({ ...context }) => <ServiceReport context={context} /> },
       ],
     },
@@ -826,7 +869,7 @@ export const careApp = registerApp({
       overlays: [
         { id: "case filter", kind: "modal", title: "Filter cases", width: 460, render: ({ close, ...context }) => <CaseFilter context={context} close={close} /> },
         { id: "Ticket create", kind: "modal", title: "Create a case", width: 620, render: ({ close, ...context }) => <TicketCreate context={context} close={close} />, footer: submitFooter("cr-create", "Create case") },
-        { id: "bulk assignment", kind: "modal", title: "Route unassigned cases", width: 680, render: ({ close, ...context }) => <BulkAssignment context={context} close={close} /> },
+        { id: "bulk assignment", kind: "modal", title: "Route unassigned cases", width: 740, presentation: { noRecordContext: true, guidance: "Review the active cases without an owner, choose one accountable person, and confirm that their existing SLA and priority remain unchanged." }, render: ({ close, ...context }) => <BulkAssignment context={context} close={close} /> },
         { id: "priority change", kind: "modal", title: "Change priority", width: 560, render: ({ close, ...context }) => <PriorityChange context={context} close={close} />, footer: submitFooter("cr-priority", "Change priority") },
       ],
     },

@@ -183,7 +183,7 @@ export const crmApp = registerApp({
       overlays: [
         { id: "Account editor", kind: "modal", title: "Account", width: 640, render: ({ close, ...context }) => <AccountEditor context={context} close={close} /> },
         { id: "relationship inspector", kind: "drawer", title: "Relationships", width: 720, render: ({ ...context }) => <><RelationshipInspector context={context} /><CampaignsPanel context={context} /></> },
-        { id: "merge preview", kind: "drawer", title: "Merge two accounts", width: 720, render: ({ close, ...context }) => <CompanyMergePreview context={context} close={close} /> },
+        { id: "merge preview", kind: "drawer", title: "Merge two accounts", width: 760, capability: "edit_pipeline", presentation: { noRecordContext: true, guidance: "Choose both source and retained companies, review every conflicting field and affected relationship before committing the merge." }, render: ({ close, ...context }) => <CompanyMergePreview context={context} close={close} /> },
         { id: "export accounts", kind: "modal", title: "Export accounts", width: 520, render: ({ close, ...context }) => <CompanyExport context={context} close={close} run={(rows, data) => exportCompanies(context, data, rows)} /> },
       ],
     },
@@ -265,7 +265,7 @@ export const crmApp = registerApp({
       overlays: [
         { id: "Quote builder", kind: "drawer", title: "Quote builder", width: 1040, render: ({ close, ...context }) => <QuoteEditor context={context} close={close} /> },
         { id: "collaborator picker", kind: "drawer", title: "People and approvals", width: 620, render: ({ close, ...context }) => <><CollaboratorPicker context={context} close={close} /><RequestApproval context={context} close={close} /></> },
-        { id: "closure confirmation", kind: "modal", title: "Close the deal", width: 680, render: ({ close, ...context }) => <ClosureConfirmation context={context} close={close} /> },
+        { id: "closure confirmation", kind: "modal", title: "Close the deal", width: 680, capability: "edit_pipeline", presentation: { selectedRecord: true, collection: "deals", guidance: "Review customer, quote and tax evidence before closing won or handing over to Finance." }, render: ({ close, ...context }) => <ClosureConfirmation context={context} close={close} /> },
         { id: "stage change validation", kind: "modal", title: "Stage change", width: 620, render: ({ close, ...context }) => <StageChangeValidation context={context} close={close} /> },
       ],
     },

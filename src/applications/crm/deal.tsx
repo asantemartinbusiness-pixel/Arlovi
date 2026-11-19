@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Users } from "lucide-react";
 import {
-  Avatar, Button, Card, DataGrid, Empty, Field, Grid, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Meter,
+  Avatar, Button, Card, DataGrid, Empty, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput, Meter,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useEvents, useRecord, useWorkspace } from "@/platform/workspace";
@@ -591,6 +591,8 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
 
   return (
     <Stack gap={4}>
+      <ModalUnsavedChanges when={createInvoice !== "yes"} />
+      <ModalInFlight when={busy} />
       <Notice tone={guard ? "danger" : "info"} title={guard ? "This deal cannot be closed won yet" : "Closing won creates real records"}>
         {guard ?? "A won deal gets a draft invoice in Finance, linked both ways, priced line by line through the tax engine. A status alone would leave nothing to collect."}
       </Notice>
@@ -615,7 +617,7 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
           <option value="no">No, I will raise it myself</option>
         </Select>
       </Field>
-      <Row gap={2}>
+      <ModalActions>
         <Button
           variant="primary"
           busy={busy}
@@ -679,8 +681,8 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
           Close lost instead
         </Button>
         <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
+      </ModalActions>
       <span className="ds-subtle" style={{ fontSize: "var(--text-xs)" }}>
         {stageOf(deal).label} → {wonStage.label}. The same stage validation runs here as on the board.
       </span>

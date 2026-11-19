@@ -80,7 +80,7 @@ export const procApp = registerApp({
       ],
       overlays: [
         { id: "Requisition form", kind: "drawer", title: "Raise a requisition", width: 720, render: ({ close, ...context }) => <RequisitionForm context={context} close={close} />, footer: submitFooter("requisition-form", "Submit for approval") },
-        { id: "Requisition", kind: "drawer", title: "Requisition review", width: 700, render: ({ close, ...context }) => <RequisitionReview context={context} close={close} /> },
+        { id: "Requisition", kind: "drawer", title: "Requisition review", width: 740, presentation: { noRecordContext: true, guidance: "Choose an actual submitted requisition, inspect the budget and approval limit, and decide with a named reviewer and a recorded reason." }, render: ({ close, ...context }) => <RequisitionReview context={context} close={close} /> },
         { id: "stock alert", kind: "drawer", title: "Stock risk", width: 620, render: ({ ...context }) => <StockAlert context={context} /> },
         { id: "cost inspector", kind: "drawer", title: "Invoice", width: 620, render: ({ ...context }) => <CostInspector context={context} /> },
         { id: "three-way match", kind: "drawer", title: "Three-way match", width: 780, render: ({ close, ...context }) => <ThreeWayMatch context={context} close={close} /> },
@@ -271,7 +271,7 @@ export const procApp = registerApp({
       overlays: [
         { id: "Movement inspector", kind: "drawer", title: "Movement", width: 600, render: ({ ...context }) => <MovementInspector context={context} /> },
         { id: "count reconciliation", kind: "drawer", title: "Count reconciliation", width: 720, render: ({ close, ...context }) => <StockCount context={context} close={close} />, footer: submitFooter("stock-count", "Record variances") },
-        { id: "authorization", kind: "modal", title: "Record a movement", width: 640, render: ({ close, ...context }) => <MovementAuthorization context={context} close={close} />, footer: submitFooter("movement-authorization", "Record movement") },
+        { id: "authorization", kind: "modal", title: "Authorise stock movement", width: 640, presentation: { noRecordContext: true, guidance: "Choose a product, warehouse, signed quantity and reason; confirm how the recorded stock estimate will change." }, render: ({ close, ...context }) => <MovementAuthorization context={context} close={close} /> },
         confirmOverlay,
       ],
     },

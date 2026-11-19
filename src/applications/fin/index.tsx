@@ -174,7 +174,7 @@ export const finApp = registerApp({
       overlays: [
         { id: "Journal form", kind: "drawer", title: (context) => (context.selectedId ? "Journal" : "New journal"), width: 920, render: ({ close, ...context }) => <JournalForm context={context} close={close} /> },
         { id: "balancing validator", kind: "drawer", title: "Draft journals checked", width: 620, render: ({ ...context }) => <BalancingValidator context={context} /> },
-        { id: "reverse confirmation", kind: "modal", title: "Reverse a posted journal", width: 640, tone: "danger", render: ({ close, ...context }) => <ReverseConfirmation context={context} close={close} /> },
+        { id: "reverse confirmation", kind: "modal", title: "Reverse a posted journal", width: 680, tone: "danger", capability: "post_journal", presentation: { selectedRecord: true, collection: "journals", guidance: "Review the posted entries, choose an open reversal date and record a specific reason before creating the offsetting journal." }, render: ({ close, ...context }) => <ReverseConfirmation context={context} close={close} /> },
         { id: "journal search", kind: "drawer", title: "Search the ledger", width: 760, render: ({ close, ...context }) => <JournalSearch context={context} close={close} /> },
       ],
     },
@@ -235,7 +235,7 @@ export const finApp = registerApp({
       overlays: [
         { id: "Line item editor", kind: "drawer", title: "Line items", width: 1080, render: ({ close, ...context }) => <><LineEditor context={context} close={close} /><ApproveInvoice context={context} close={close} /></> },
         { id: "email preview", kind: "drawer", title: "Document and message", width: 900, render: ({ close, ...context }) => <><DocumentPreview context={context} /><EmailPreview context={context} close={close} /></> },
-        { id: "payment form", kind: "modal", title: "Record a payment", width: 620, render: ({ close, ...context }) => <PaymentForm context={context} close={close} /> },
+        { id: "payment form", kind: "modal", title: "Record a payment", width: 620, capability: "post_journal", presentation: { selectedRecord: true, collection: "invoices", guidance: "Check the outstanding balance, receipt date and destination account before posting a balanced journal." }, render: ({ close, ...context }) => <PaymentForm context={context} close={close} /> },
         { id: "void reason", kind: "modal", title: "Void or credit this invoice", width: 580, tone: "danger", render: ({ close, ...context }) => <VoidReason context={context} close={close} /> },
         { id: "approve invoice", kind: "modal", title: "Approve and post this invoice", width: 680, render: ({ close, ...context }) => <ApproveInvoice context={context} close={close} /> },
         { id: "send invoice", kind: "modal", title: "Send this invoice", width: 620, render: ({ close, ...context }) => <SendInvoice context={context} close={close} /> },

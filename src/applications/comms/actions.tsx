@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Avatar, Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Avatar, Button, Checkbox, Empty, Field, ModalActions, ModalInFlight, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
@@ -492,6 +492,7 @@ export function SendConfirmation({ context, close }: { context: ScreenContext; c
   const request = context.overlayPayload as SendRequest | undefined;
   const source = useRecord(request?.sourceId);
   const [checked, setChecked] = useState(false);
+  const [busy, setBusy] = useState(false);
   if (!request) {
     return (
       <Stack gap={4}>
@@ -510,6 +511,7 @@ export function SendConfirmation({ context, close }: { context: ScreenContext; c
   const needsCheck = sensitive || bulk || external.length > 0;
   return (
     <Stack gap={4}>
+      <ModalInFlight when={busy} />
       <Properties rows={[
         { label: "To", value: request.to.join(", ") },
         { label: "Subject", value: request.subject },
@@ -518,14 +520,18 @@ export function SendConfirmation({ context, close }: { context: ScreenContext; c
       ]} />
       {needsCheck && <Checkbox label={`I have checked these ${request.to.length} recipients and they should receive this`} checked={checked} onChange={(event) => setChecked(event.target.checked)} />}
       <Boundary id="email.send" />
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
+      <ModalActions>
+        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
         <span className="ds-grow" />
         <Button
           variant="primary"
-          disabled={needsCheck && !checked}
+          disabled={busy || (needsCheck && !checked)}
+          busy={busy}
           onClick={async () => {
-            const from = `${context.actor.split(" ")[0].toLowerCase()}@${domain}`;
+            if (busy || (needsCheck && !checked)) return;
+            setBusy(true);
+            try {
+              const from = `${context.actor.split(" ")[0].toLowerCase()}@${domain}`;
             const draft = await context.mutate.create({
               collection: "emailThreads", title: request.subject, status: "draft", summary: request.body.slice(0, 160), at: clockIso(), tags: ["draft"],
               fields: { folder: "drafts", from, to: request.to.join(", "), unread: false, risk: "none", labels: "draft", delivery: "queued_local", messageCount: 1, forwardedFrom: request.sourceId ?? "", recipientsConfirmedBy: needsCheck ? context.actor : "" },
@@ -534,11 +540,16 @@ export function SendConfirmation({ context, close }: { context: ScreenContext; c
             await logBoundary(context, "email.send", `Forward to ${request.to.join(", ")} queued locally`, draft.id);
             context.toast("Forward queued locally", boundaryText("email.send"));
             close();
+            } catch (error) {
+              context.toast("Forward not queued", error instanceof Error ? error.message : "Review the recipients and retry.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Queue the forward
         </Button>
-      </Row>
+      </ModalActions>
     </Stack>
   );
 }

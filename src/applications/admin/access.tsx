@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { KeyRound, Search } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Card, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -161,8 +161,9 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
   const data = useAdmin();
   const { role: viewerRole } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const request = ofKind(data.policies, "accessRequest").find((row) => row.id === (payload?.id ?? context.selectedId));
+  const request = ofKind(data.policies, "accessRequest").find((row) => row.id === (payload?.id ?? context.selectedId) && row.organizationId === context.org.id);
   const [note, setNote] = useState("");
+  const [restoreNote, setRestoreNote] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   if (!request) return <Empty title="Select a request" icon={<KeyRound size={20} />}>Choose an access request to review.</Empty>;
@@ -173,17 +174,34 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
   const change = accessChange(from, to);
   const decided = request.status !== "open";
   const canDecide = roleCan(viewerRole, "manage_policy");
-  const stale = member && String(member.fields.role) !== String(request.fields.fromRole);
+  const stale = Boolean(member && String(member.fields.role) !== String(request.fields.fromRole));
+  const eligibleMember = Boolean(member && member.organizationId === context.org.id && member.status === "active" && member.fields.kind !== "ai");
+  const validRole = ROLES.includes(from) && ROLES.includes(to) && from !== to;
+  const expired = Boolean(request.fields.expiresAt && Date.parse(String(request.fields.expiresAt)) <= Date.parse(clockIso()));
+  const laterApproved = ofKind(data.policies, "accessRequest").some((row) =>
+    row.id !== request.id && row.fields.memberId === request.fields.memberId &&
+    row.status === "approved" && String(row.fields.decidedAt ?? "") > String(request.fields.decidedAt ?? ""));
+  const canRestore = request.status === "approved" && canDecide && eligibleMember &&
+    ROLES.includes(to) && ROLES.includes(String(request.fields.fromRole) as Role) &&
+    String(member?.fields.role) === to && !laterApproved && restoreNote.trim().length >= 10 && !busy;
+  // Demo-level separation of duties only: actor names come from the selected
+  // role view, not a verified identity, so this is NOT server authorization.
+  const selfReview = String(request.fields.requestedBy ?? "").trim() === context.actor ||
+    String(request.fields.memberId ?? "") === String(data.members.find((row) => row.title === context.actor)?.id ?? "");
+  const canApprove = !busy && !decided && canDecide && eligibleMember && validRole && !stale && !expired && !selfReview && note.trim().length >= 10;
 
   async function decide(outcome: "approved" | "declined") {
-    if (!request) return;
-    if (outcome === "declined" && !note.trim()) { setError("Say why, so the person knows what would change the answer."); return; }
+    if (!request || busy || decided || !canDecide) return;
+    if (selfReview) { setError("A different reviewer must decide this access request."); return; }
+    if (outcome === "approved" && !canApprove) { setError("The member, current role or review rationale needs attention."); return; }
+    if (outcome === "declined" && note.trim().length < 10) { setError("Say why, so the person knows what would change the answer."); return; }
     setBusy(true);
+    setError("");
     try {
-      const requestFields = { ...request.fields, decidedBy: context.actor, decidedAt: clockIso(), decisionNote: note.trim() };
+      const requestFields = { ...request.fields, decidedBy: context.actor, decidedAt: clockIso(), decisionNote: note.trim(), memberRevisionAtReview: member?.revision ?? -1 };
       const requestEvent = `Access request ${outcome} by ${context.actor}: ${String(request.fields.memberName)} → ${to}${note.trim() ? ` (${note.trim()})` : ""}`;
       if (outcome === "approved") {
-        if (!member) { setError("The member is no longer in this workspace."); return; }
+        if (!member || !eligibleMember || stale || !validRole || expired) { setError("Member eligibility changed. Reopen the review."); return; }
         // The role change and the decision commit together, guarded by both
         // revisions: a conflict on either leaves neither half written.
         const now = clockIso();
@@ -198,6 +216,7 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
             ["update", "update"],
           );
         } catch (reason) {
+          setError(reason instanceof Error ? reason.message : "Role change could not be committed.");
           context.toast("Access not granted", reason instanceof Error && reason.name !== "ConflictError"
             ? reason.message
             : "The member or the request changed elsewhere. Reload and review it again.", "blocked");
@@ -207,25 +226,56 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
         const saved = await context.mutate.patch(request.id, { status: outcome, fields: requestFields }, { event: requestEvent, expectRevision: request.revision });
         if (!saved) return;
       }
-      context.toast(outcome === "approved" ? "Access granted" : "Request declined", outcome === "approved" ? `${String(request.fields.memberName)} now holds the ${ROLE_LABELS[to]} view.` : "The reason is stored on the request.");
+      context.toast(outcome === "approved" ? "Local role view updated" : "Request declined", outcome === "approved" ? `${String(request.fields.memberName)} now holds the ${ROLE_LABELS[to]} view locally. No identity provider was updated.` : "The reason is stored on the request.");
       close();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Decision failed."); } finally { setBusy(false); }
+  }
+
+  async function restorePreviousRole() {
+    if (!request || !canRestore || !member || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const now = clockIso();
+      const previousRole = String(request.fields.fromRole) as Role;
+      await context.mutate.putMany([
+        revisedRecord(member, { fields: { ...member.fields, role: previousRole } }, { actor: context.actor, now }),
+        revisedRecord(request, {
+          status: "restored",
+          fields: { ...request.fields, restoredBy: context.actor, restoredAt: now, restorationReason: restoreNote.trim() },
+        }, { actor: context.actor, now }),
+      ], [
+        `Role view restored from ${to} to ${previousRole} for ${member.title}`,
+        `Access approval ${request.id} manually restored by ${context.actor}: ${restoreNote.trim()}`,
+      ], { [member.id]: member.revision, [request.id]: request.revision }, ["update", "update"]);
+      context.toast("Previous local role restored", `${member.title} now has the ${ROLE_LABELS[previousRole]} role view in this browser. No external access was revoked.`);
+      close();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The restoration failed. Reload and review the latest role.");
     } finally { setBusy(false); }
   }
 
   return (
     <Stack gap={4}>
+      <DrawerInFlight when={busy} />
+      <DrawerUnsavedChanges when={(note.trim().length > 0 && !decided) || restoreNote.trim().length > 0} />
       <Properties rows={[
         { label: "Requested by", value: String(request.fields.memberName ?? request.ownerName) },
         { label: "Change", value: `${ROLE_LABELS[from]} → ${ROLE_LABELS[to] ?? to}` },
         { label: "Reason given", value: request.summary || "None given" },
         { label: "Asked", value: context.dateTime(request.at ?? request.createdAt) },
+        { label: "Grant expiry", value: "None — this local role persists until manually changed" },
         ...(decided ? [
           { label: "Decision", value: <Pill tone={request.status === "approved" ? "success" : "danger"}>{request.status}</Pill> },
           { label: "Decided by", value: `${String(request.fields.decidedBy ?? "")} · ${context.relative(String(request.fields.decidedAt ?? ""))}` },
           ...(request.fields.decisionNote ? [{ label: "Note", value: String(request.fields.decisionNote) }] : []),
         ] : []),
       ]} />
-      {stale && !decided && <Notice tone="warning" title="The person's role changed since they asked">They asked from {ROLE_LABELS[String(request.fields.fromRole) as Role]}; they now hold {ROLE_LABELS[from]}. The change below is from their current view.</Notice>}
+      {stale && !decided && <Notice tone="danger" title="The person's role changed since they asked">They asked from {ROLE_LABELS[String(request.fields.fromRole) as Role]}; they now hold {ROLE_LABELS[from]}. Approval is blocked until a new request reflects their current role.</Notice>}
+      {expired && !decided && <Notice tone="warning" title="Request expired">Approval is blocked. A fresh request is required.</Notice>}
+      {selfReview && !decided && <Notice tone="danger" title="Independent review required">The requester or affected member cannot decide this request in the local approval workflow. A different reviewer must take the decision.</Notice>}
+      {!eligibleMember && !decided && <Notice tone="danger" title="Member unavailable">An active human member is required before approval.</Notice>}
+      {!validRole && !decided && <Notice tone="danger" title="Invalid role change">Select two different recognised role views.</Notice>}
       <Card eyebrow="EXACT CHANGE" prov="posted" title="What approving would change">
         <Stack gap={3}>
           <div>
@@ -249,56 +299,81 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
       {change.gained.some((capability) => CAPABILITY_EXPLAINED[capability].risk === "high") && !decided && (
         <Notice tone="warning" title="This includes high-risk capabilities">Consider a narrower custom role instead of the whole view.</Notice>
       )}
+      {!decided && <Notice tone="info" title="Local policy only">Approvals update browser-local member records, not a connected identity provider or server-side permission enforcement.</Notice>}
       {!decided && !canDecide && <Notice tone="info" title="Only an owner can decide">Your role view cannot change roles. The request stays waiting for an owner.</Notice>}
       {!decided && (
-        <Field label="Note" hint="Required to decline. Stored on the request and in the audit trail." error={error || undefined}>
+        <Field label="Decision rationale" required hint="At least 10 characters for either decision; retained in the audit trail." error={error || undefined}>
           <TextArea rows={2} value={note} onChange={(event) => { setNote(event.target.value); setError(""); }} />
         </Field>
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>{decided ? "Close" : "Cancel"}</Button>
+      {request.status === "approved" && <Stack gap={2}>
+        <Notice tone="warning" title="Manual restoration only">
+          Restoring the earlier role will change this browser's member record, not terminate identity-provider sessions.
+          No automatic expiry or delegation is configured.
+        </Notice>
+        {laterApproved && <Notice tone="danger" title="A later approval exists">Review the person's latest access change before restoring an earlier role.</Notice>}
+        {String(member?.fields.role) !== to && <Notice tone="warning" title="Role changed since approval">The previous role cannot be restored from this decision without overwriting a newer change.</Notice>}
+        <Field label="Reason to restore previous role" required hint="At least 10 characters; retained with the original approval's audit history.">
+          <TextArea rows={2} value={restoreNote} onChange={(event) => { setRestoreNote(event.target.value); setError(""); }} />
+        </Field>
+      </Stack>}
+      {error && decided && <Notice tone="danger" title="Change not saved">{error}</Notice>}
+      <DrawerActions>
+        <Button variant="ghost" disabled={busy} onClick={close}>{decided ? "Close" : "Cancel"}</Button>
         <span className="ds-grow" />
+        {request.status === "approved" && <Button variant="danger" busy={busy} disabled={!canRestore}
+          onClick={() => void restorePreviousRole()}>Restore previous local role</Button>}
         {!decided && (
           <>
-            <Button variant="danger" busy={busy} disabled={!canDecide} onClick={() => void decide("declined")}>Decline</Button>
-            <Button variant="primary" busy={busy} disabled={!canDecide || !member} onClick={() => void decide("approved")}>Approve and change role</Button>
+            <Button variant="danger" busy={busy} disabled={!canDecide || selfReview || busy || note.trim().length < 10} onClick={() => void decide("declined")}>Decline</Button>
+            <Button variant="primary" busy={busy} disabled={!canApprove} onClick={() => void decide("approved")}>Approve and change role</Button>
           </>
         )}
-      </Row>
+      </DrawerActions>
     </Stack>
   );
 }
 
 export function AccessRequestForm({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
-  const people = useMemo(() => data.members.filter((row) => row.fields.kind !== "ai"), [data.members]);
-  const mine = people.find((row) => row.title === context.actor);
+  const people = useMemo(() => data.members.filter((row) => row.fields.kind !== "ai" && row.status === "active" && row.organizationId === context.org.id), [data.members, context.org.id]);
   const [memberId, setMemberId] = useState("");
-  const chosen = people.find((row) => row.id === (memberId || mine?.id)) ?? people[0];
+  const chosen = people.find((row) => row.id === memberId);
   const [requested, setRequested] = useState<Role | "">("");
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const from = (String(chosen?.fields.role ?? "member")) as Role;
-  const target = (requested || ROLES.find((entry) => entry !== from && entry !== "client") || "member") as Role;
-  const change = accessChange(from, target);
+  const target = requested || "";
+  const change = chosen && target && target !== from ? accessChange(from, target) : null;
+  const pendingRequest = chosen && ofKind(data.policies, "accessRequest").find((row) =>
+    row.status === "open" && row.organizationId === context.org.id && row.fields.memberId === chosen.id);
 
   return (
     <Stack gap={4}>
-      <Field label="Who needs access">
+      <Field label="Who needs access" required>
         <Select value={chosen?.id ?? ""} onChange={(event) => setMemberId(event.target.value)}>
+          <option value="">Choose a team member</option>
           {people.map((row) => <option key={row.id} value={row.id}>{row.title} · {ROLE_LABELS[String(row.fields.role) as Role] ?? String(row.fields.role)}</option>)}
         </Select>
       </Field>
-      <Field label="Role view requested">
+      <Field label="Role view requested" required>
         <Select value={target} onChange={(event) => setRequested(event.target.value as Role)}>
+          <option value="">Choose a requested role</option>
           {ROLES.filter((entry) => entry !== from).map((entry) => <option key={entry} value={entry}>{ROLE_LABELS[entry]}</option>)}
         </Select>
       </Field>
-      <p className="ds-subtle">
+      {change && <p className="ds-subtle">
         {change.gained.length ? `Would add ${change.gained.map(capabilityLabel).join(", ")}.` : "Adds no capabilities."}
         {change.lost.length ? ` Would remove ${change.lost.map(capabilityLabel).join(", ")}.` : ""}
-      </p>
+      </p>}
+      {pendingRequest && <Notice tone="warning" title="A request is already waiting">
+        {chosen?.title} already has an open access request. Review or decline it before submitting another role change.
+      </Notice>}
+      <Notice tone="info" title="Role access is not temporary by default">
+        This requests a persistent local role view. An expiry on a request only limits when it may be approved;
+        it does not automatically revoke an approved role. Do not use this for time-limited privileged access.
+      </Notice>
       <Field label="Why" required error={error || undefined}>
         <TextArea rows={3} value={reason} onChange={(event) => { setReason(event.target.value); setError(""); }} placeholder="Covering month-end while Jonah is away" />
       </Field>
@@ -308,11 +383,11 @@ export function AccessRequestForm({ context, close }: { context: ScreenContext; 
         <Button
           variant="primary"
           busy={busy}
-          disabled={!chosen}
+          disabled={!chosen || !target || target === from || reason.trim().length < 10 || busy || Boolean(pendingRequest)}
           onClick={async () => {
-            if (!chosen) return;
-            if (!reason.trim()) { setError("Give the reviewer a reason."); return; }
-            if (ofKind(data.policies, "accessRequest").some((row) => row.status === "open" && row.fields.memberId === chosen.id && row.fields.requestedRole === target)) {
+            if (!chosen || !target || target === from || busy || pendingRequest) return;
+            if (reason.trim().length < 10) { setError("Provide a specific reason of at least 10 characters."); return; }
+            if (ofKind(data.policies, "accessRequest").some((row) => row.status === "open" && row.fields.memberId === chosen.id)) {
               setError("That request is already waiting for review."); return;
             }
             setBusy(true);
@@ -328,7 +403,7 @@ export function AccessRequestForm({ context, close }: { context: ScreenContext; 
               }, `Access requested for ${chosen.title}: ${from} → ${target}`);
               context.toast("Request recorded", "An owner reviews it under Exceptions with the exact change shown.");
               close();
-            } finally { setBusy(false); }
+            } catch (cause) { setError(cause instanceof Error ? cause.message : "Request could not be saved."); } finally { setBusy(false); }
           }}
         >
           Send for review

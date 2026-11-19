@@ -226,6 +226,27 @@ export async function putRecord(record: Rec, context: WriteContext, event?: Omit
     if (previous && previous.organizationId !== record.organizationId) {
       throw new OrganizationScopeError(record.id, record.organizationId, previous.organizationId);
     }
+    if (record.collection === "policies" && record.fields.kind === "accessRequest" && record.status === "open") {
+      // Check the member and other pending requests in the SAME write transaction.
+      // Two tabs must not create duplicate or contradictory role requests.
+      const memberId = String(record.fields.memberId ?? "");
+      const requestedRole = String(record.fields.requestedRole ?? "");
+      const fromRole = String(record.fields.fromRole ?? "");
+      const member = await db.records.get(memberId);
+      if (!member || member.organizationId !== record.organizationId ||
+          member.collection !== "members" || member.status !== "active" ||
+          member.fields.kind === "ai" || String(member.fields.role) !== fromRole ||
+          !requestedRole || requestedRole === fromRole) {
+        throw new Error("The member or their role changed. Reopen the access request.");
+      }
+      const requests = await db.records.where("[organizationId+collection]")
+        .equals([record.organizationId, "policies"]).toArray();
+      if (requests.some((row) => row.id !== record.id &&
+          row.fields.kind === "accessRequest" && row.status === "open" &&
+          row.fields.memberId === memberId)) {
+        throw new Error("An access request for this member is already awaiting review.");
+      }
+    }
     await assertOpenJournalPeriod(record, previous);
     await db.records.put(record);
     if (event) {
@@ -272,6 +293,67 @@ export async function putMany(records: Rec[], context: WriteContext, events: Omi
           // When a caller asks for an atomic CAS batch, every other record in
           // that batch must be genuinely new rather than an unguarded update.
           throw new ConflictError(record.id, 0, original.revision);
+        }
+      }
+      // Access approval is a coupled domain transition, not merely two
+      // independent valid revisions. Verify the member and request still
+      // describe the same role change inside the write transaction.
+      for (const [index, next] of records.entries()) {
+        const previous = existing[index];
+        if (next.collection !== "policies" || next.fields.kind !== "accessRequest" ||
+            next.status !== "approved" || previous?.status === "approved") continue;
+        if (!previous || previous.status !== "open" || previous.fields.kind !== "accessRequest") {
+          throw new Error("Only an open access request can be approved.");
+        }
+        if (String(previous.fields.requestedBy ?? "") === context.actor ||
+            String(previous.fields.memberName ?? "") === context.actor) {
+          throw new Error("This local access decision requires a different reviewer.");
+        }
+        const memberId = String(previous.fields.memberId ?? "");
+        const memberIndex = records.findIndex((row) => row.id === memberId);
+        const member = memberIndex >= 0 ? existing[memberIndex] : undefined;
+        const changedMember = memberIndex >= 0 ? records[memberIndex] : undefined;
+        if (!member || !changedMember || member.collection !== "members" ||
+            member.organizationId !== scopeId || member.status !== "active" ||
+            member.fields.kind === "ai" ||
+            String(member.fields.role) !== String(previous.fields.fromRole) ||
+            String(changedMember.fields.role) !== String(previous.fields.requestedRole) ||
+            !String(next.fields.decisionNote ?? "").trim()) {
+          throw new Error("Access approval no longer matches the member's current role and reviewed request.");
+        }
+        const expiry = String(previous.fields.expiresAt ?? "");
+        if (expiry && (!Number.isFinite(Date.parse(expiry)) || Date.parse(expiry) <= Date.parse(context.now))) {
+          throw new Error("The access request has expired or has an invalid expiry.");
+        }
+      }
+      // Restoring an access approval requires the member to still hold exactly
+      // the granted role and the paired request to be approved. A newer role
+      // decision must not be overwritten by a stale restoration.
+      for (const [index, next] of records.entries()) {
+        if (next.collection !== "policies" || next.fields.kind !== "accessRequest" ||
+            next.status !== "restored") continue;
+        const prior = existing[index];
+        if (!prior || prior.status !== "approved" || prior.fields.kind !== "accessRequest") {
+          throw new Error("Only a currently approved access request can be restored.");
+        }
+        const memberId = String(prior.fields.memberId ?? "");
+        const memberIndex = records.findIndex((row) => row.id === memberId);
+        const member = memberIndex < 0 ? undefined : existing[memberIndex];
+        const updatedMember = memberIndex < 0 ? undefined : records[memberIndex];
+        if (!member || !updatedMember || member.collection !== "members" ||
+            member.organizationId !== scopeId || member.status !== "active" ||
+            String(member.fields.role) !== String(prior.fields.requestedRole) ||
+            String(updatedMember.fields.role) !== String(prior.fields.fromRole) ||
+            String(next.fields.restorationReason ?? "").trim().length < 10) {
+          throw new Error("The member's active role no longer matches the approved grant.");
+        }
+        const requests = await db.records.where("[organizationId+collection]")
+          .equals([scopeId, "policies"]).toArray();
+        if (requests.some((other) => other.id !== prior.id &&
+            other.fields.kind === "accessRequest" && other.fields.memberId === memberId &&
+            other.status === "approved" &&
+            String(other.fields.decidedAt ?? "") > String(prior.fields.decidedAt ?? ""))) {
+          throw new Error("A later approved access change exists. Reopen the latest decision.");
         }
       }
       // Creating a parent and children in one batch must be create-only.
@@ -408,6 +490,116 @@ export async function confirmBankReconciliation(
     prime(record);
     return record;
   });
+}
+
+/**
+ * Privacy erasure commits the selected records, the request status and audit
+ * events as a single IndexedDB transaction. The caller must supply the entire
+ * reviewed organisation snapshot, not just records it wishes to delete.
+ * This catches new, changed or removed records (including retention policies)
+ * before any deletion, avoiding partial effects and stale legal-hold decisions.
+ * This remains browser-local and is not a substitute for provider-side erasure.
+ */
+export async function executeReviewedErasure(
+  organizationId: string,
+  requestId: string,
+  snapshotRevisions: Record<string, number>,
+  candidateIds: string[],
+  expectedRequestRevision: number,
+  context: WriteContext,
+): Promise<{ deleted: number; retained: number }> {
+  if (!candidateIds.length) throw new Error("There are no eligible records to erase.");
+  if (new Set(candidateIds).size !== candidateIds.length) throw new Error("Erasure candidates contain duplicates.");
+  if (candidateIds.includes(requestId)) throw new Error("The subject request cannot erase itself.");
+  if (snapshotRevisions[requestId] !== expectedRequestRevision) throw new Error("The reviewed request revision is stale.");
+  const result = await db.transaction("rw", [db.records, db.events], async () => {
+    const latest = await db.records.where("organizationId").equals(organizationId).toArray();
+    const current = new Map(latest.map((record) => [record.id, record]));
+    const reviewedIds = Object.keys(snapshotRevisions);
+    if (latest.length !== reviewedIds.length) throw new Error("Records were added or removed since review. Reopen the erasure preview.");
+    for (const id of reviewedIds) {
+      const record = current.get(id);
+      if (!record || record.revision !== snapshotRevisions[id]) {
+        throw new ConflictError(id, snapshotRevisions[id], record?.revision ?? -1);
+      }
+    }
+    const request = current.get(requestId);
+    if (!request || request.collection !== "dataRequests" || request.organizationId !== organizationId) {
+      throw new Error("The selected subject request is no longer available.");
+    }
+    if (request.fields.legalHold === true) throw new Error("The subject request is under a legal hold.");
+    if (request.fields.erasureExecutionStatus !== "not_executed" || !request.fields.erasureReviewedBy) {
+      throw new Error("This request has no approved local erasure impact review.");
+    }
+    let reviewedSnapshot: Record<string, number>;
+    try {
+      reviewedSnapshot = JSON.parse(String(request.fields.erasureSnapshot ?? "")) as Record<string, number>;
+    } catch {
+      throw new Error("The recorded review lacks a valid revision snapshot. Record a fresh review.");
+    }
+    if (!reviewedSnapshot || typeof reviewedSnapshot !== "object" ||
+      Object.keys(reviewedSnapshot).length !== Object.keys(snapshotRevisions).length) {
+      throw new Error("The organisation changed since erasure review. Record a fresh review.");
+    }
+    for (const [id, revision] of Object.entries(snapshotRevisions)) {
+      const expected = id === requestId ? reviewedSnapshot[id] + 1 : reviewedSnapshot[id];
+      if (!Number.isInteger(reviewedSnapshot[id]) || revision !== expected) {
+        throw new Error("The erasure impact review is stale. Record a fresh review before deleting.");
+      }
+    }
+    const reviewedCandidates = String(request.fields.erasureCandidateIds ?? "").split(",").filter(Boolean);
+    if (reviewedCandidates.length !== candidateIds.length ||
+      reviewedCandidates.some((id) => !candidateIds.includes(id))) {
+      throw new Error("Erasure selection differs from the recorded impact review.");
+    }
+    const scope = String(request.fields.collections ?? "").split(",").map((entry) => entry.trim()).filter(Boolean);
+    const held = latest.filter((record) => record.collection === "policies" &&
+      record.fields.kind === "retention" && record.fields.legalHold === true);
+    for (const id of candidateIds) {
+      const record = current.get(id);
+      if (!record || record.organizationId !== organizationId || !scope.includes(record.collection)) {
+        throw new Error(`Candidate ${id} is outside this subject request scope.`);
+      }
+      if (record.collection === "journals" && record.status === "posted") {
+        throw new Error("Posted journals must be reversed, not deleted.");
+      }
+      if (held.some((policy) =>
+        String(policy.fields.collections ?? "").split(",").map((entry) => entry.trim()).includes(record.collection))) {
+        throw new Error(`A legal hold now prevents deletion from ${record.collection}.`);
+      }
+    }
+    const retained = String(request.fields.erasureRetainedIds ?? "").split(",").filter(Boolean).length;
+    // No awaits outside this transaction before committing the entire batch.
+    await db.records.bulkDelete(candidateIds);
+    const updated = revisedRecord(request, {
+      status: retained ? "partially_completed" : "completed",
+      fields: {
+        ...request.fields,
+        deletedCount: candidateIds.length,
+        blockedCount: retained,
+        completedBy: context.actor,
+        completedAt: context.now,
+        erasureExecutedLocally: true,
+        erasureExecutionStatus: "executed_locally",
+      },
+    }, context);
+    await db.records.put(updated);
+    await db.events.bulkAdd([
+      ...candidateIds.map((id) => ({
+        id: crypto.randomUUID(), organizationId, at: context.now, actor: context.actor,
+        type: "delete", entityId: id, screenId: context.screenId,
+        message: `Local erasure ${requestId} removed record ${id}`,
+      })),
+      {
+        id: crypto.randomUUID(), organizationId, at: context.now, actor: context.actor,
+        type: "update", entityId: requestId, screenId: context.screenId,
+        message: `Local erasure: ${candidateIds.length} records removed; ${retained} retained`,
+      },
+    ]);
+    return { deleted: candidateIds.length, retained };
+  });
+  for (const id of candidateIds) known.delete(id);
+  return result;
 }
 
 export async function deleteRecord(id: string, context: WriteContext, event?: Omit<Audit, "id" | "at" | "actor" | "organizationId">, expectedOrgId?: string): Promise<void> {

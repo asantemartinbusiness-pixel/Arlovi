@@ -140,7 +140,7 @@ export const bookApp = registerApp({
         { id: "cancel booking", kind: "modal", title: "Cancel booking", tone: "danger", width: 600, render: ({ close, ...context }) => <CancelBooking context={context} close={close} />, footer: submitFooter("cancel-booking", "Cancel booking") },
         { id: "refund rule", kind: "drawer", title: "Cancellation and fees", width: 560, render: ({ ...context }) => <RefundRule context={context} /> },
         { id: "customer message", kind: "modal", title: "Message the customer", width: 600, render: ({ close, ...context }) => <CustomerMessage context={context} close={close} />, footer: submitFooter("customer-message", "Record message") },
-        { id: "take deposit", kind: "modal", title: "Deposit", description: "Review the deposit and record its status without charging a card.", width: 600, render: ({ close, ...context }) => <TakeDeposit context={context} close={close} /> },
+        { id: "take deposit", kind: "modal", title: "Deposit", description: "Review the deposit and record its status without charging a card.", width: 600, presentation: { selectedRecord: true, collection: "bookings" }, render: ({ close, ...context }) => <TakeDeposit context={context} close={close} /> },
         confirmOverlay,
       ],
       inspector: (context) => <BookingFacts context={context} />,

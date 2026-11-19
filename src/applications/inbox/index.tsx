@@ -2753,7 +2753,7 @@ export const inboxApp = registerApp({
         { id: "escalation rules", label: "Escalation rules", placement: "overflow", run: (context) => context.navigate(`/o/${context.org.slug}/inbox/escalations`) },
       ],
       overlays: [
-        { id: "Approval review", kind: "drawer", title: "Review the request", width: 560, render: ({ close, ...context }) => <ApprovalReview context={context} close={close} /> },
+        { id: "Approval review", kind: "drawer", title: "Review the request", width: 560, presentation: { guidance: "Read the source request, authority, evidence and consequences before making an approval decision." }, render: ({ close, ...context }) => <ApprovalReview context={context} close={close} /> },
         { id: "step-up auth", kind: "modal", title: "Confirm this approval", width: 540, blocking: true, render: ({ close, ...context }) => <StepUpAuth context={context} close={close} /> },
         { id: "scope diff", kind: "modal", title: "Requested against held", width: 640, render: ({ close: _close, ...context }) => <ScopeDiff context={context} /> },
         { id: "delegate approval", kind: "modal", title: "Delegate this request", width: 580, render: ({ close, ...context }) => <DelegateApproval context={context} close={close} /> },
