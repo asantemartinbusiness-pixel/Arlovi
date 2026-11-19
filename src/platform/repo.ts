@@ -226,6 +226,27 @@ export async function putRecord(record: Rec, context: WriteContext, event?: Omit
     if (previous && previous.organizationId !== record.organizationId) {
       throw new OrganizationScopeError(record.id, record.organizationId, previous.organizationId);
     }
+    if (record.collection === "policies" && record.fields.kind === "accessRequest" && record.status === "open") {
+      // Check the member and other pending requests in the SAME write transaction.
+      // Two tabs must not create duplicate or contradictory role requests.
+      const memberId = String(record.fields.memberId ?? "");
+      const requestedRole = String(record.fields.requestedRole ?? "");
+      const fromRole = String(record.fields.fromRole ?? "");
+      const member = await db.records.get(memberId);
+      if (!member || member.organizationId !== record.organizationId ||
+          member.collection !== "members" || member.status !== "active" ||
+          member.fields.kind === "ai" || String(member.fields.role) !== fromRole ||
+          !requestedRole || requestedRole === fromRole) {
+        throw new Error("The member or their role changed. Reopen the access request.");
+      }
+      const requests = await db.records.where("[organizationId+collection]")
+        .equals([record.organizationId, "policies"]).toArray();
+      if (requests.some((row) => row.id !== record.id &&
+          row.fields.kind === "accessRequest" && row.status === "open" &&
+          row.fields.memberId === memberId)) {
+        throw new Error("An access request for this member is already awaiting review.");
+      }
+    }
     await assertOpenJournalPeriod(record, previous);
     await db.records.put(record);
     if (event) {
