@@ -13,6 +13,7 @@ const AccountCloud = lazy(() => import("@/app/AccountCloud").then(module => ({ d
 const WorkspaceHealth = lazy(() => import("@/app/WorkspaceHealth").then(module => ({ default: module.WorkspaceHealth })));
 const CompanySetupCentre = lazy(() => import("@/app/CompanySetupCentre").then(module => ({ default: module.CompanySetupCentre })));
 const AppsDirectory = lazy(() => import("@/app/AppsDirectory").then(module => ({ default: module.AppsDirectory })));
+const FlagshipShowcase = lazy(() => import("@/app/FlagshipShowcase"));
 const TaskApprovalBoard = lazy(() => import("@/app/TaskApprovalBoard").then(module => ({ default: module.TaskApprovalBoard })));
 const AgentWorkBoard = lazy(() => import("@/app/AgentWorkBoard").then(module => ({ default: module.AgentWorkBoard })));
 import { appEntry } from "@/app/catalog";
@@ -121,6 +122,7 @@ export function WorkspaceNavigation() {
   const detailKind = path[5] === "department" ? "department" : path[5] === "project" ? "project" : null;
   const detail = detailKind ? (detailKind === "department" ? departments : projects).find(item => item.id === path[6]) : undefined;
 
+  if (path[4] === "showcase") return <DeferredPanel><FlagshipShowcase/></DeferredPanel>;
   if (path[4] === "setup") return <DeferredPanel><CompanySetupCentre/></DeferredPanel>;
   if (path[4] === "health") return <div className="ws-content"><header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / WORKSPACE OPERATIONS</span><h1>Workspace health</h1><p>Read-only checks for your company records, applications and browser storage.</p></header><DeferredPanel><WorkspaceHealth/></DeferredPanel></div>;
   if (path[4] === "account") return <div className="ws-content"><header className="ws-page-head"><span className="ws-eyebrow">{org.name.toUpperCase()} / DATA & IDENTITY</span><h1>Account & data readiness</h1><p>Understand local data, export a secure handoff archive, and see what is required for cloud accounts and synchronisation.</p></header><DeferredPanel><AccountCloud/></DeferredPanel></div>;
