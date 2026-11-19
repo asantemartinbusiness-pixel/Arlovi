@@ -33,6 +33,14 @@ describe("Arlovi search ranking and scopes", () => {
     expect(matchesScope(hit({ kind: "action" }), "actions")).toBe(true);
   });
 
+  it("keeps separate records that share a list destination", () => {
+    const results = searchHits([
+      hit({ key: "one", recordId: "bill-1", title: "Bill supplier one", to: "/o/northline/fin/bills" }),
+      hit({ key: "two", recordId: "bill-2", title: "Bill supplier two", to: "/o/northline/fin/bills" }),
+    ], { query: "bill", scope: "all" });
+    expect(results.map(item => item.key)).toEqual(["one", "two"]);
+  });
+
   it("deduplicates identical destinations and honours result limits", () => {
     const results = searchHits([
       hit({ key: "first", title: "Finance", to: "/o/northline/fin/home" }),
