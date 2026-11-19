@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord } from "@/platform/workspace";
@@ -159,8 +160,9 @@ export function AlignObjects({ context, close }: { context: ScreenContext; close
 
 export function CreateLayout({ context, close }: { context: ScreenContext; close: () => void }) {
   const editor = useDeckEditor(context, useDeckFor(context));
-  const [basedOn, setBasedOn] = useState("");
-  const [name, setName] = useState("");
+  const draftScope = `present:create-layout:${context.org.id}:${context.actor}:${context.params.id ?? "none"}`;
+  const [basedOn, setBasedOn] = useWorkingField(draftScope, "basedOn", "");
+  const [name, setName] = useWorkingField(draftScope, "name", "");
   const base = layoutById(editor.deck, basedOn || editor.slide.layoutId);
   const taken = editor.deck.layouts.some((layout) => layout.name.toLowerCase() === name.trim().toLowerCase());
   return (
@@ -173,6 +175,7 @@ export function CreateLayout({ context, close }: { context: ScreenContext; close
         const layout = { ...base, id: nextId("ly"), name: name.trim(), placeholders: base.placeholders.map((placeholder) => ({ ...placeholder })), decoration: base.decoration?.map((item) => ({ ...item })) };
         editor.commit({ ...editor.deck, layouts: [...editor.deck.layouts, layout] }, `Create the layout ${layout.name}`);
         void context.mutate.log(`Layout ${layout.name} created from ${base.name}`, { entityId: context.params.id, type: "update" });
+        clearWorkingDraft(draftScope);
         context.setTab("Layouts");
         close();
       }}
@@ -185,6 +188,10 @@ export function CreateLayout({ context, close }: { context: ScreenContext; close
       <Field label="Name" required error={taken ? "A layout already has this name." : undefined}><TextInput value={name} onChange={(event) => setName(event.target.value)} required autoFocus placeholder="Two images and a caption" /></Field>
       <Properties rows={[{ label: "Placeholders copied", value: String(base.placeholders.length) }, { label: "Background", value: base.backgroundToken }]} />
       <p className="vx-mini">The new layout belongs to this deck's master. No slide uses it until it is applied.</p>
+      <Row gap={2}>
+        <span className="ds-subtle">Layout setup stays in memory while you work in another app.</span>
+        <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
+      </Row>
     </form>
   );
 }

@@ -29,6 +29,7 @@ import { DesignCanvas, PathCanvas } from "./canvas";
 import { DesignThumb, GeometryInspector, LayersPanel, PagesPanel } from "./panels";
 import { designUi, importSvg, parseDesign, requestFit, setSelection, setTool, starterDoc, type DesignTool, type ImportReport } from "./model";
 import { clockIso, wallMs } from "@/platform/clock";
+import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 
 /* ====================================================================== *
  * DESIGN — Vector Design & UI Studio
@@ -183,9 +184,10 @@ function FilesGallery({ context, lens }: { context: ScreenContext; lens: "Recent
 }
 
 function FileSetupForm({ context, close }: { context: ScreenContext; close: () => void }) {
-  const [name, setName] = useState("");
-  const [format, setFormat] = useState("Desktop 1440 × 900");
-  const [kind, setKind] = useState("file");
+  const draftScope = `design:new-file:${context.org.id}:${context.actor}`;
+  const [name, setName] = useWorkingField(draftScope, "name", "");
+  const [format, setFormat] = useWorkingField(draftScope, "format", "Desktop 1440 × 900");
+  const [kind, setKind] = useWorkingField(draftScope, "kind", "file");
   const sizes: Record<string, { w: number; h: number }> = {
     "Desktop 1440 × 900": { w: 1440, h: 900 },
     "Tablet 834 × 1112": { w: 834, h: 1112 },
@@ -213,6 +215,7 @@ function FileSetupForm({ context, close }: { context: ScreenContext; close: () =
           body: doc,
           fields: { kind, format, width: size.w, height: size.h },
         }, `Design file ${name || "Untitled design"} created`);
+        clearWorkingDraft(draftScope);
         context.toast("File created", `${made.title} is open with a ${format} artboard.`);
         close();
         context.navigate(context.path("/o/:org/design/files/:id", made.id));
@@ -231,6 +234,10 @@ function FileSetupForm({ context, close }: { context: ScreenContext; close: () =
         </Select>
       </Field>
       <Notice tone="info" title="Stays in this browser">The file is a record in this workspace. Nothing is uploaded.</Notice>
+      <Row gap={2}>
+        <span className="ds-subtle">New-file details remain in this browser tab until saved or discarded.</span>
+        <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
+      </Row>
     </form>
   );
 }

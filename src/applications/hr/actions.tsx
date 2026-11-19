@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useCollections, useRecord, useWorkspace } from "@/platform/workspace";
@@ -98,6 +99,17 @@ export function ProfileEditor({ context, close }: { context: ScreenContext; clos
   const candidate = useRecord(context.params.id);
   const employee = scopedDetailRecord(candidate, context.org.id, "employees");
   const data = useCollections(["departments", "employees"]);
+  const draftScope = `people:employee-profile:${context.org.id}:${context.actor}:${context.params.id ?? "none"}`;
+  const [draftTitle, setTitle] = useWorkingField<string | undefined>(draftScope, "title", undefined);
+  const [draftDepartment, setDepartment] = useWorkingField<string | undefined>(draftScope, "department", undefined);
+  const [draftManager, setManager] = useWorkingField<string | undefined>(draftScope, "manager", undefined);
+  const [draftOffice, setOffice] = useWorkingField<string | undefined>(draftScope, "office", undefined);
+  const [draftPhone, setPhone] = useWorkingField<string | undefined>(draftScope, "phone", undefined);
+  const title = draftTitle ?? String(employee?.fields.title ?? "");
+  const department = draftDepartment ?? String(employee?.fields.departmentId ?? "");
+  const manager = draftManager ?? String(employee?.fields.manager ?? "");
+  const office = draftOffice ?? String(employee?.fields.office ?? "");
+  const phone = draftPhone ?? String(employee?.fields.phone ?? "");
   if (!employee) return <Empty title="Employee unavailable">Open an employee from the directory before editing.</Empty>;
   return (
     <form
@@ -105,34 +117,35 @@ export function ProfileEditor({ context, close }: { context: ScreenContext; clos
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        const form = new FormData(event.currentTarget);
-        await context.mutate.patch(employee.id, {
+        const saved = await context.mutate.patch(employee.id, {
           fields: {
             ...employee.fields,
-            title: String(form.get("title") ?? ""),
-            departmentId: String(form.get("department") ?? ""),
-            manager: String(form.get("manager") ?? ""),
-            office: String(form.get("office") ?? ""),
-            phone: String(form.get("phone") ?? ""),
+            title, departmentId: department, manager, office, phone,
           },
         }, { expectRevision: employee.revision, event: `Profile of ${employee.title} updated by ${context.actor}` });
+        if (!saved) return;
+        clearWorkingDraft(draftScope);
         context.toast("Profile updated", `${employee.title}'s record changed; the previous version is kept in its history.`);
         close();
       }}
     >
-      <Field label="Job title" required><TextInput name="title" required defaultValue={String(employee.fields.title ?? "")} /></Field>
+      <Field label="Job title" required><TextInput name="title" required value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field label="Department">
-        <Select name="department" defaultValue={String(employee.fields.departmentId ?? "")}>
+        <Select name="department" value={department} onChange={(event) => setDepartment(event.target.value)}>
           {data.departments.map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}
         </Select>
       </Field>
       <Field label="Manager">
-        <Select name="manager" defaultValue={String(employee.fields.manager ?? "")}>
+        <Select name="manager" value={manager} onChange={(event) => setManager(event.target.value)}>
           {data.employees.filter((row) => live(row) && row.id !== employee.id).map((row) => <option key={row.id}>{row.title}</option>)}
         </Select>
       </Field>
-      <Field label="Office"><TextInput name="office" defaultValue={String(employee.fields.office ?? "")} /></Field>
-      <Field label="Work phone" hint="Personal contact detail is not offered to AI retrieval."><TextInput name="phone" defaultValue={String(employee.fields.phone ?? "")} /></Field>
+      <Field label="Office"><TextInput name="office" value={office} onChange={(event) => setOffice(event.target.value)} /></Field>
+      <Field label="Work phone" hint="Personal contact detail is not offered to AI retrieval."><TextInput name="phone" value={phone} onChange={(event) => setPhone(event.target.value)} /></Field>
+      <Row gap={2}>
+        <span className="ds-subtle">Unfinished profile changes are kept in memory in this tab.</span>
+        <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard changes</Button>
+      </Row>
     </form>
   );
 }

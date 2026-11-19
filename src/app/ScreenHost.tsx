@@ -91,8 +91,10 @@ export function ScreenHost() {
         const isResumable = (screen.applicationCode === "FIN" && id === "New invoice")
           || (screen.applicationCode === "PROJECT" && ["create project", "Project template", "new task"].includes(id))
           || (screen.applicationCode === "CRM" && ["Contact form", "new lead"].includes(id))
-          || (screen.applicationCode === "HR" && id === "new position")
-          || (screen.applicationCode === "DOCS" && id === "New doc");
+          || (screen.applicationCode === "HR" && ["new position", "profile editor"].includes(id))
+          || (screen.applicationCode === "DOCS" && id === "New doc")
+          || (screen.applicationCode === "DESIGN" && id === "File setup")
+          || (screen.applicationCode === "PRESENT" && id === "create layout");
         if (isResumable && payload === undefined && linkedOverlay !== id) {
           const query = new URLSearchParams(location.search);
           query.set("overlay", id);
