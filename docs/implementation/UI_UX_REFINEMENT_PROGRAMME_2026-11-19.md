@@ -176,10 +176,11 @@ orchestrator. 8. No new dependencies. 9. No fabricated completion; provider boun
 | Package | Status | Evidence |
 | --- | --- | --- |
 | Phase 0 baseline | done | §1, scratchpad `shots/before/` |
-| F-A | not started | |
-| F-B | not started | |
-| QA baseline | not started | |
-| W1–W8 | not started | |
+| F-A overlay foundations | integrated (commits 9ee8367, ed8bc77) | typecheck pass; 824 unit tests pass incl. `tests/unit/overlay-kit.test.ts`; modal/drawer/native-overlay/toast specs pass except pre-existing `drawer-experience.spec.ts:48` (assigned to A1); shots `shots/F-A/` |
+| F-B page & shell foundations | integrated (commit 5f0169b) | page body top 172.7px → 123.1px on Finance invoices at 1440×900; h1 43.2px → 25.6px; Executive Home toasts 4 → 0; a11y spec 37/37 (baseline had many contrast failures); 5 pre-existing failures remain (display-scale ×3, display-scaling ×1 → A7; execution-preflight ×1 → QA); shots `shots/F-B/` |
+| QA baseline | running | `scratchpad/qa-baseline/BASELINE.md` |
+| Wave A (A1–A7) | in progress | per-package disposition files |
+| Wave B (B1–B9) | queued | |
 
 ## 8. Definition of done per component
 
