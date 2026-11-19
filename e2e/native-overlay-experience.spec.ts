@@ -173,6 +173,7 @@ test("access request form requires a deliberately chosen member and role", async
   await expect(dialog.getByRole("combobox", { name: "Who needs access" })).toHaveValue("");
   await expect(dialog.getByRole("combobox", { name: "Role view requested" })).toHaveValue("");
   await expect(dialog.getByRole("button", { name: "Send for review" })).toBeDisabled();
+  await expect(dialog).toContainText("does not automatically revoke an approved role");
 });
 
 test("access approval cannot choose an arbitrary request", async ({ page }) => {
