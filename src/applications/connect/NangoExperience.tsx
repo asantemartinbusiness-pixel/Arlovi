@@ -122,7 +122,7 @@ export function GuidedMarketplace({ context }: { context: ScreenContext }) {
     <div className="connect-guide-info" role="status">
       <ShieldCheck size={16} aria-hidden="true"/>
       <span>{status?.available
-        ? "Connections are enabled for configured services. We'll always ask before linking an account."
+        ? "Secure setup is configured for selected services. Account authorisation still requires verification."
         : "Browse suggested tools now. Secure account connections will be available when company setup is complete."}</span>
     </div>
     {all && status?.available && <p className="connect-guide-disclaimer">Browse Nango provider metadata · {nangoTotal} matching providers · individual actions and account permissions require verification.</p>}
@@ -138,7 +138,7 @@ export function GuidedMarketplace({ context }: { context: ScreenContext }) {
           <p>{item.summary}</p>
           <div className="connect-guide-apps">{item.applications.join(" · ")}</div>
           <div className="connect-guide-card-footer">
-            <span className="connect-guide-state">{enabled ? "Available to connect" : "Explore connection"}</span>
+            <span className="connect-guide-state">{enabled ? "Setup enabled" : "Explore connection"}</span>
             <button type="button" onClick={() => context.openOverlay("Nango guided setup", { providerId: item.id, provider: item })}>
               Set up <ArrowRight size={15} aria-hidden="true"/>
             </button>
