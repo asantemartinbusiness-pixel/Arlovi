@@ -2,7 +2,7 @@
  * Shared, deterministic ranking for the browser-local Arlovi search surface.
  * Retrieval and authorisation remain responsibilities of each search provider.
  */
-export type SearchScope = "all" | "this-app" | "my-work" | "files" | "people" | "mail" | "integrations" | "actions" | "apps";
+export type SearchScope = "all" | "this-app" | "my-work" | "files" | "people" | "mail" | "integrations" | "connected" | "actions" | "apps";
 export type SearchKind = "record" | "app" | "screen" | "workspace" | "resume" | "saved" | "action" | "return" | "connector";
 
 import type { CapabilityState } from "@/domain/types";
@@ -46,6 +46,7 @@ export const SEARCH_SCOPES: ReadonlyArray<{ id: SearchScope; label: string }> = 
   { id: "people", label: "People" },
   { id: "mail", label: "Mail" },
   { id: "integrations", label: "Integrations" },
+  { id: "connected", label: "Connected" },
   { id: "apps", label: "Apps" },
   { id: "actions", label: "Actions" },
 ];
@@ -68,6 +69,7 @@ export function matchesScope(hit: SearchHit, scope: SearchScope, activeApp?: str
       || (hit.kind === "app" && hit.appCode === "HR");
     case "mail": return hit.collection === "emailThreads" || (hit.kind === "app" && hit.appCode === "COMMS");
     case "integrations": return hit.kind === "connector";
+    case "connected": return hit.sourceType === "remote" && hit.sourceState === "verified_external";
     case "apps": return hit.kind === "app" || hit.kind === "screen" || hit.kind === "workspace";
     case "actions": return hit.kind === "action";
   }

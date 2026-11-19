@@ -10,12 +10,20 @@ on:
       - "src/platform/capability.ts"
       - "src/applications/connect/panels.tsx"
       - "server/search/federation.ts"
+      - "server/search/authority.ts"
+      - "server/search/nangoDocuments.ts"
+      - "server/search/config.ts"
+      - "api/search/records.ts"
+      - "api/search/status.ts"
+      - "src/platform/connectedSearch.ts"
       - "src/platform/searchRecordProviders.ts"
       - "tests/unit/search-model.test.ts"
       - "tests/unit/search-federation.test.ts"
+      - "tests/unit/search-remote-gateway.test.ts"
       - "tests/unit/search-record-providers.test.ts"
       - "e2e/search-v2.spec.ts"
       - "e2e/search-sources.spec.ts"
+      - "e2e/search-remote-gate.spec.ts"
       - "e2e/search-native-content.spec.ts"
       - "e2e/command-resume.spec.ts"
       - "e2e/header-context-safety.spec.ts"
@@ -40,6 +48,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: npx vitest run tests/unit/search-model.test.ts tests/unit/search-federation.test.ts tests/unit/search-record-providers.test.ts tests/unit/navigation-continuity.test.ts tests/unit/app-journey.test.ts
+      - run: npx vitest run tests/unit/search-model.test.ts tests/unit/search-federation.test.ts tests/unit/search-remote-gateway.test.ts tests/unit/search-record-providers.test.ts tests/unit/navigation-continuity.test.ts tests/unit/app-journey.test.ts
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test e2e/search-v2.spec.ts e2e/search-sources.spec.ts e2e/search-native-content.spec.ts e2e/command-resume.spec.ts e2e/header-context-safety.spec.ts e2e/universal-header.spec.ts --grep="search|palette|quick destinations|Recent & Saved" --workers=2
+      - run: npx playwright test e2e/search-v2.spec.ts e2e/search-sources.spec.ts e2e/search-remote-gate.spec.ts e2e/search-native-content.spec.ts e2e/command-resume.spec.ts e2e/header-context-safety.spec.ts e2e/universal-header.spec.ts --grep="search|palette|quick destinations|Recent & Saved" --workers=2
