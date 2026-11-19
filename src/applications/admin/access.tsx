@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { KeyRound, Search } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Card, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -161,7 +161,7 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
   const data = useAdmin();
   const { role: viewerRole } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const request = ofKind(data.policies, "accessRequest").find((row) => row.id === (payload?.id ?? context.selectedId));
+  const request = ofKind(data.policies, "accessRequest").find((row) => row.id === (payload?.id ?? context.selectedId) && row.organizationId === context.org.id);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -173,17 +173,23 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
   const change = accessChange(from, to);
   const decided = request.status !== "open";
   const canDecide = roleCan(viewerRole, "manage_policy");
-  const stale = member && String(member.fields.role) !== String(request.fields.fromRole);
+  const stale = Boolean(member && String(member.fields.role) !== String(request.fields.fromRole));
+  const eligibleMember = Boolean(member && member.organizationId === context.org.id && member.status === "active" && member.fields.kind !== "ai");
+  const validRole = ROLES.includes(from) && ROLES.includes(to) && from !== to;
+  const expired = Boolean(request.fields.expiresAt && Date.parse(String(request.fields.expiresAt)) <= Date.now());
+  const canApprove = !busy && !decided && canDecide && eligibleMember && validRole && !stale && !expired && note.trim().length >= 10;
 
   async function decide(outcome: "approved" | "declined") {
-    if (!request) return;
-    if (outcome === "declined" && !note.trim()) { setError("Say why, so the person knows what would change the answer."); return; }
+    if (!request || busy || decided || !canDecide) return;
+    if (outcome === "approved" && !canApprove) { setError("The member, current role or review rationale needs attention."); return; }
+    if (outcome === "declined" && note.trim().length < 10) { setError("Say why, so the person knows what would change the answer."); return; }
     setBusy(true);
+    setError("");
     try {
-      const requestFields = { ...request.fields, decidedBy: context.actor, decidedAt: clockIso(), decisionNote: note.trim() };
+      const requestFields = { ...request.fields, decidedBy: context.actor, decidedAt: clockIso(), decisionNote: note.trim(), memberRevisionAtReview: member?.revision ?? -1 };
       const requestEvent = `Access request ${outcome} by ${context.actor}: ${String(request.fields.memberName)} → ${to}${note.trim() ? ` (${note.trim()})` : ""}`;
       if (outcome === "approved") {
-        if (!member) { setError("The member is no longer in this workspace."); return; }
+        if (!member || !eligibleMember || stale || !validRole || expired) { setError("Member eligibility changed. Reopen the review."); return; }
         // The role change and the decision commit together, guarded by both
         // revisions: a conflict on either leaves neither half written.
         const now = clockIso();
@@ -198,6 +204,7 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
             ["update", "update"],
           );
         } catch (reason) {
+          setError(reason instanceof Error ? reason.message : "Role change could not be committed.");
           context.toast("Access not granted", reason instanceof Error && reason.name !== "ConflictError"
             ? reason.message
             : "The member or the request changed elsewhere. Reload and review it again.", "blocked");
@@ -207,13 +214,15 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
         const saved = await context.mutate.patch(request.id, { status: outcome, fields: requestFields }, { event: requestEvent, expectRevision: request.revision });
         if (!saved) return;
       }
-      context.toast(outcome === "approved" ? "Access granted" : "Request declined", outcome === "approved" ? `${String(request.fields.memberName)} now holds the ${ROLE_LABELS[to]} view.` : "The reason is stored on the request.");
+      context.toast(outcome === "approved" ? "Local role view updated" : "Request declined", outcome === "approved" ? `${String(request.fields.memberName)} now holds the ${ROLE_LABELS[to]} view locally. No identity provider was updated.` : "The reason is stored on the request.");
       close();
-    } finally { setBusy(false); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Decision failed."); } finally { setBusy(false); }
   }
 
   return (
     <Stack gap={4}>
+      <DrawerInFlight when={busy} />
+      <DrawerUnsavedChanges when={note.trim().length > 0 && !decided} />
       <Properties rows={[
         { label: "Requested by", value: String(request.fields.memberName ?? request.ownerName) },
         { label: "Change", value: `${ROLE_LABELS[from]} → ${ROLE_LABELS[to] ?? to}` },
@@ -225,7 +234,10 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
           ...(request.fields.decisionNote ? [{ label: "Note", value: String(request.fields.decisionNote) }] : []),
         ] : []),
       ]} />
-      {stale && !decided && <Notice tone="warning" title="The person's role changed since they asked">They asked from {ROLE_LABELS[String(request.fields.fromRole) as Role]}; they now hold {ROLE_LABELS[from]}. The change below is from their current view.</Notice>}
+      {stale && !decided && <Notice tone="danger" title="The person's role changed since they asked">They asked from {ROLE_LABELS[String(request.fields.fromRole) as Role]}; they now hold {ROLE_LABELS[from]}. Approval is blocked until a new request reflects their current role.</Notice>}
+      {expired && !decided && <Notice tone="warning" title="Request expired">Approval is blocked. A fresh request is required.</Notice>}
+      {!eligibleMember && !decided && <Notice tone="danger" title="Member unavailable">An active human member is required before approval.</Notice>}
+      {!validRole && !decided && <Notice tone="danger" title="Invalid role change">Select two different recognised role views.</Notice>}
       <Card eyebrow="EXACT CHANGE" prov="posted" title="What approving would change">
         <Stack gap={3}>
           <div>
@@ -249,22 +261,23 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
       {change.gained.some((capability) => CAPABILITY_EXPLAINED[capability].risk === "high") && !decided && (
         <Notice tone="warning" title="This includes high-risk capabilities">Consider a narrower custom role instead of the whole view.</Notice>
       )}
+      {!decided && <Notice tone="info" title="Local policy only">Approvals update browser-local member records, not a connected identity provider or server-side permission enforcement.</Notice>}
       {!decided && !canDecide && <Notice tone="info" title="Only an owner can decide">Your role view cannot change roles. The request stays waiting for an owner.</Notice>}
       {!decided && (
-        <Field label="Note" hint="Required to decline. Stored on the request and in the audit trail." error={error || undefined}>
+        <Field label="Decision rationale" required hint="At least 10 characters for either decision; retained in the audit trail." error={error || undefined}>
           <TextArea rows={2} value={note} onChange={(event) => { setNote(event.target.value); setError(""); }} />
         </Field>
       )}
-      <Row gap={2}>
-        <Button variant="ghost" onClick={close}>{decided ? "Close" : "Cancel"}</Button>
+      <DrawerActions>
+        <Button variant="ghost" disabled={busy} onClick={close}>{decided ? "Close" : "Cancel"}</Button>
         <span className="ds-grow" />
         {!decided && (
           <>
-            <Button variant="danger" busy={busy} disabled={!canDecide} onClick={() => void decide("declined")}>Decline</Button>
-            <Button variant="primary" busy={busy} disabled={!canDecide || !member} onClick={() => void decide("approved")}>Approve and change role</Button>
+            <Button variant="danger" busy={busy} disabled={!canDecide || busy || note.trim().length < 10} onClick={() => void decide("declined")}>Decline</Button>
+            <Button variant="primary" busy={busy} disabled={!canApprove} onClick={() => void decide("approved")}>Approve and change role</Button>
           </>
         )}
-      </Row>
+      </DrawerActions>
     </Stack>
   );
 }
