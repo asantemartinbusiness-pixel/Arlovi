@@ -73,3 +73,64 @@ Configure these additional server-only variables:
 Nango currently sends the secure HMAC header alongside the legacy X-Nango-Signature. Use only the secure HMAC header. The downstream ingestion service must durably deduplicate events before acknowledging, verify company and connection ownership against its own records, and handle replay and retries. **That durable worker is not configured in the current frontend-only Arlovi environment.** The receiver therefore returns 503 until it exists.
 
 Reference: https://github.com/NangoHQ/nango/blob/master/packages/webhooks/lib/utils.ts
+
+
+## Dedicated Arlovi Cloud identity (next implementation)
+
+Arlovi already has a STAGED, unapplied account schema in
+infra/supabase/arlovi_cloud_schema.sql. This branch adds a second staged
+script, infra/supabase/arlovi_integrations_schema.sql, for connection
+metadata, account permissions, sync policies, an event inbox and canonical
+audit receipts. **Neither script has been run against any project.**
+
+A concrete server-only Supabase Auth + live RLS membership verifier now
+exists at server/integrations/supabaseIdentity.ts. It provides an optional
+alternative to the custom ARLOVI_SESSION_VERIFY_URL bridge.
+
+To use the cloud verification path, set both server-only variables:
+
+- ARLOVI_CLOUD_SUPABASE_URL: HTTPS URL of a new dedicated Arlovi project.
+- ARLOVI_CLOUD_SUPABASE_PUBLISHABLE_KEY: its publishable key (not service
+  role/secret). No Arlovi Cloud project or credentials are configured yet.
+
+For every Nango gateway request, Arlovi performs GET /auth/v1/user
+using the caller's Bearer access token and then GET /rest/v1/arlovi_memberships
+with the same token. The latter must pass the dedicated database's RLS policy.
+Only an **active** owner/admin membership permits Nango setup and company
+account management. A browser role selector or editable user_metadata claim
+is never sufficient. A missing or expired token is denied. The actual
+signed-in frontend must be connected to Arlovi Cloud before this path can
+serve real users. Demo org slugs are not interchangeable with cloud UUIDs;
+real-company ID mapping requires an authenticated migration.
+
+The staged integration schema has:
+- immutable company/provider/external connection identifiers;
+- separate authorisation, read-verification, sync and account-health states;
+- separate personal, company, and department connection ownership;
+- permissions for users, departments, applications, and AI employees;
+- no browser INSERT/UPDATE/DELETE grants on integration records;
+- RLS metadata reads and per-company child-reference validation;
+- private durable webhook inbox with unique event hashes and retry state;
+- server-authoritative audit receipt records.
+
+A signed webhook ingress is **not** a durable event queue. Its downstream
+ARLOVI_EVENT_INGEST_URL must persist and deduplicate the payload and verify
+actual company/connection ownership before acknowledging. Do not turn on
+webhook-triggered business actions before that worker is deployed and tested.
+
+## UI regression hardening
+
+An existing unrelated global QA issue caused notifications to intercept
+mobile workspace buttons. Arlovi toasts are now click-through except for
+their explicit action and dismiss buttons; a dedicated viewport E2E test
+guards this behavior. Other browser-suite failures must still be investigated
+individually before release.
+
+## Cloud deployment prerequisites
+
+Do not apply staged SQL to Hilis or Hilis QA. Create a **new** Arlovi database
+project with approved region/residency and cost. Run database security
+advisors, user/tenant RLS tests and migration dry runs before applying the
+cloud and integration schemas. No cloud storage is created automatically by
+this PR. Keep Supabase secret keys off the browser and avoid bypassing RLS
+in an untrusted server endpoint.
