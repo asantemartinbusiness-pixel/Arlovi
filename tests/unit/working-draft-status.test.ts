@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clearWorkingDraft, countWorkingDrafts, hasWorkingDraft,
+import { clearWorkingDraft, countAllWorkingDrafts, countWorkingDrafts, hasWorkingDraft,
   readWorkingField, rememberWorkingField, subscribeWorkingDrafts } from "@/platform/workingDrafts";
 
 describe("working draft save status", () => {
@@ -29,6 +29,16 @@ describe("working draft save status", () => {
     expect(countWorkingDrafts("org-status", "Alex")).toBe(1);
     clearWorkingDraft(scope);
     expect(hasWorkingDraft(scope)).toBe(false);
+  });
+  it("guards against hard reload while temporary work exists across companies", () => {
+    const a = "crm:new-lead:org-reload-a:Sam";
+    const b = "project:create:org-reload-b:Sam";
+    const before = countAllWorkingDrafts();
+    rememberWorkingField(a, "title", "One");
+    rememberWorkingField(b, "title", "Two");
+    expect(countAllWorkingDrafts()).toBe(before + 2);
+    clearWorkingDraft(a);clearWorkingDraft(b);
+    expect(countAllWorkingDrafts()).toBe(before);
   });
   it("counts company and actor scopes separately without revealing draft details", () => {
     const a = "crm:new-lead:org-one:Alex";

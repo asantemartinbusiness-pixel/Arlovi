@@ -22,6 +22,9 @@ export function hasWorkingDraft(scope: string): boolean {
   if (scope.startsWith("crm:quote:")) return fields.get("dirty") === true;
   return true;
 }
+export function countAllWorkingDrafts(): number {
+  return [...workingDrafts.keys()].filter(hasWorkingDraft).length;
+}
 export function countWorkingDrafts(orgId: string, actor: string): number {
   const marker = `:${orgId}:${actor}`;
   return [...workingDrafts.keys()].filter(scope =>
@@ -34,6 +37,10 @@ export function useWorkingDraftPresence(scope: string): boolean {
 export function useWorkingDraftCount(orgId: string, actor: string): number {
   useSyncExternalStore(subscribeWorkingDrafts, workingDraftRevision, () => 0);
   return countWorkingDrafts(orgId, actor);
+}
+export function useAllWorkingDraftCount(): number {
+  useSyncExternalStore(subscribeWorkingDrafts, workingDraftRevision, () => 0);
+  return countAllWorkingDrafts();
 }
 
 export function readWorkingField<T>(scope: string, field: string, fallback: T): T {
