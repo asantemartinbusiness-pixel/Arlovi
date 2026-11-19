@@ -50,3 +50,26 @@ Official API references:
 https://nango.dev/docs/reference/backend/http-api/connect/sessions/create
 https://nango.dev/docs/reference/backend/http-api/connections/list
 https://nango.dev/docs/reference/backend/http-api/providers/list
+
+## Next increment: verified account lifecycle and event ingress
+
+- Connections query Nango with server-side organization tags and pagination, then re-check tenant tags in the server projection. The owner=mine filter restricts the view to the current authenticated user.
+- Setup snapshots the user's existing provider connections before authorisation and only confirms a genuinely new healthy connection.
+- POST /api/integrations/reconnect-session checks company membership, connection ID and integration ID before issuing a short-lived reconnect link.
+- The Nango provider directory supports paginated discovery rather than truncating results.
+- Company Setup Centre has a direct Integrations entry alongside native apps.
+
+### Signed webhook boundary
+
+POST /api/integrations/webhook verifies the X-Nango-Hmac-Sha256 header against the original raw request bytes with the dedicated signing key. It rejects forwarded unverified-provider events, enforces an event size limit and hands signed content off to a trusted durable ingestion backend. It acknowledges an event only after that backend accepts it.
+
+Configure these additional server-only variables:
+
+- NANGO_WEBHOOK_SIGNING_KEY: Nango webhook signing key (not its API key).
+- ARLOVI_EVENT_INGEST_URL: trusted HTTPS endpoint backed by durable storage and an actual company connection registry.
+- ARLOVI_EVENT_INGEST_TOKEN: independent bearer credential for that endpoint.
+- NANGO_CONNECT_ALLOWED_ORIGINS (optional): explicit HTTPS origins for custom Nango Connect domains.
+
+Nango currently sends the secure HMAC header alongside the legacy X-Nango-Signature. Use only the secure HMAC header. The downstream ingestion service must durably deduplicate events before acknowledging, verify company and connection ownership against its own records, and handle replay and retries. **That durable worker is not configured in the current frontend-only Arlovi environment.** The receiver therefore returns 503 until it exists.
+
+Reference: https://github.com/NangoHQ/nango/blob/master/packages/webhooks/lib/utils.ts
