@@ -1,0 +1,59 @@
+/* Overlay kit: hierarchy primitives for modal and drawer bodies. */
+.ds-ov-section { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding-block: var(--space-3); border-top: 1px solid var(--border-subtle); }
+.ds-ov-section:first-child { border-top: 0; padding-block-start: 0; }
+.ds-ov-section:last-child { padding-block-end: 0; }
+.ds-ov-section[data-tone]:not([data-tone="neutral"]) { padding: var(--space-3); border: 1px solid var(--ov-tone-border); border-radius: var(--radius-md); background: var(--ov-tone-bg); margin-block: var(--space-2); }
+.ds-ov-section[data-flush="true"] { padding-block: 0; border-top: 0; }
+.ds-ov-section[data-tone="warning"] { --ov-tone-bg: var(--warning-soft); --ov-tone-border: var(--warning-border); --ov-tone-fg: var(--warning); }
+.ds-ov-section[data-tone="danger"] { --ov-tone-bg: var(--danger-soft); --ov-tone-border: var(--danger-border); --ov-tone-fg: var(--danger); }
+.ds-ov-section[data-tone="info"] { --ov-tone-bg: var(--info-soft); --ov-tone-border: var(--info-border); --ov-tone-fg: var(--info); }
+.ds-ov-section[data-tone="success"] { --ov-tone-bg: var(--success-soft); --ov-tone-border: var(--success-border); --ov-tone-fg: var(--success); }
+.ds-ov-section-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; }
+.ds-ov-section-titles { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ds-ov-section-title { margin: 0; font-size: var(--text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ov-tone-fg, var(--fg-subtle)); }
+.ds-ov-section-hint { margin: 0; font-size: var(--text-xs); line-height: 1.45; color: var(--fg-muted); }
+.ds-ov-section-actions { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.ds-ov-section-body { min-width: 0; }
+
+.ds-ov-facts-wrap { container-type: inline-size; min-width: 0; }
+.ds-ov-facts { display: grid; grid-template-columns: repeat(var(--ov-cols, 2), minmax(0, 1fr)); gap: var(--space-3) var(--space-4); margin: 0; }
+.ds-ov-facts[data-columns="2"] { --ov-cols: 2; }
+.ds-ov-facts[data-columns="3"] { --ov-cols: 3; }
+.ds-ov-facts[data-columns="4"] { --ov-cols: 4; }
+.ds-ov-facts[data-dense="true"] { gap: var(--space-2) var(--space-3); }
+.ds-ov-fact { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ds-ov-fact dt { font-size: var(--text-2xs); color: var(--fg-subtle); line-height: 1.3; }
+.ds-ov-fact dd { margin: 0; font-size: var(--text-sm); color: var(--fg-default); line-height: 1.35; overflow-wrap: anywhere; }
+.ds-ov-fact dd[data-mono="true"] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.ds-ov-fact .ds-ov-fact-hint { font-size: var(--text-2xs); color: var(--fg-subtle); }
+.ds-ov-fact[data-tone="warning"] dd:not(.ds-ov-fact-hint) { color: var(--warning); }
+.ds-ov-fact[data-tone="danger"] dd:not(.ds-ov-fact-hint) { color: var(--danger); }
+.ds-ov-fact[data-tone="accent"] dd:not(.ds-ov-fact-hint) { color: var(--accent-soft-fg); }
+.ds-ov-fact[data-tone="info"] dd:not(.ds-ov-fact-hint) { color: var(--info); }
+.ds-ov-fact[data-tone="success"] dd:not(.ds-ov-fact-hint) { color: var(--success); }
+@container (max-width: 520px) { .ds-ov-facts[data-columns="4"], .ds-ov-facts[data-columns="3"] { --ov-cols: 2; } }
+@container (max-width: 280px) { .ds-ov-facts { --ov-cols: 1 !important; } }
+
+.ds-ov-summary { display: flex; align-items: flex-start; gap: var(--space-3); min-width: 0; padding-block-end: var(--space-3); margin-block-end: var(--space-3); border-bottom: 1px solid var(--border-subtle); }
+.ds-ov-summary-avatar { flex: none; }
+.ds-ov-summary-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ds-ov-summary-eyebrow { font-size: var(--text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--fg-subtle); }
+.ds-ov-summary-line { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.ds-ov-summary-title { font-size: var(--text-lg, var(--text-xl)); font-weight: 500; letter-spacing: -0.02em; line-height: 1.25; overflow-wrap: anywhere; }
+.ds-ov-summary-status { display: inline-flex; flex: none; }
+.ds-ov-summary-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-2); font-size: var(--text-xs); color: var(--fg-muted); }
+.ds-ov-summary-meta > span + span::before { content: "\00b7"; margin-inline-end: var(--space-2); color: var(--fg-subtle); }
+.ds-ov-summary-actions { flex: none; display: flex; align-items: center; gap: var(--space-2); }
+@media (max-width: 599px) { .ds-ov-summary { flex-wrap: wrap; } .ds-ov-summary-actions { flex: 1 1 100%; } }
+
+.ds-ov-actions { display: flex; flex: 1 1 100%; align-items: center; gap: var(--space-2); min-width: 0; flex-wrap: wrap; }
+.ds-ov-actions > .ds-grow { flex: 1 1 0; min-width: var(--space-2); }
+@media (max-width: 599px) { .ds-ov-actions > .ds-btn { flex: 1 1 auto; } .ds-ov-actions > .ds-grow { display: none; } }
+
+/* OverlaySummary inside the Modal/Drawer `head` slot: full-width second row, sole identity block. */
+.ds-overlay-head { flex-wrap: wrap; }
+.ds-overlay-head > .ds-ov-summary { order: 3; flex: 1 1 100%; margin: 0; padding: 0; border: 0; }
+.ds-overlay-head:has(> .ds-ov-summary) .native-overlay-record { display: none; }
+.ds-ov-actions[data-variant="confirm"] > .ds-grow { flex: 1 1 0; }
+.ds-overlay-head > .ds-grow { flex: 1 1 0; min-width: 0; }
+.ds-modal:focus, .ds-drawer:focus, .ds-modal:focus-visible, .ds-drawer:focus-visible { outline: none; box-shadow: var(--shadow-3); }

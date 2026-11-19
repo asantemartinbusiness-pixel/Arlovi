@@ -80,6 +80,8 @@
 body:has([role=dialog]) .nt-toast-stack.ds-toasts{inset-block-start:var(--space-3);inset-block-end:auto;inset-inline-end:var(--space-3);inset-inline-start:auto}
 @media(max-width:599px){.nt-toast-stack.ds-toasts{inset-inline:var(--space-3);inset-block-end:calc(74px + env(safe-area-inset-bottom));max-width:none}.nt-toast{max-width:none;width:100%}}
 @media(prefers-reduced-motion:reduce){.nt-toast{animation:none}}
+.nt-toast-more{pointer-events:none;align-self:flex-end;font-size:var(--text-2xs);font-weight:600;color:var(--fg-muted);background:var(--bg-inset);border:1px solid var(--border-subtle);border-radius:var(--radius-pill);padding:2px var(--space-3);line-height:1.5}
+@media(max-width:599px){.nt-toast-more{align-self:center}}
 
 /* Persistent operational banners stay with the affected work area. */
 .nt-banner{display:flex;align-items:flex-start;gap:12px;padding:12px 15px;border:1px solid var(--border-default);border-left:3px solid var(--accent);border-radius:9px;background:var(--bg-surface);max-width:100%}
