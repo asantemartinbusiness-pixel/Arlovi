@@ -125,3 +125,14 @@
 .ws-collaboration-empty strong{color:var(--fg-default);font-size:var(--text-md)}
 .ws-collaboration-empty>a{margin-top:var(--space-2)}
 @media(max-width:680px){.ws-collaboration-head{flex-direction:column;align-items:stretch;padding:var(--space-4)}}
+
+
+/* The workspace's contextual navigation uses the same squared indicator
+   as native applications. Avoid border-radius/box-shadow state collisions. */
+.ws-sidebar .hq-navlink.ws-side-selected,
+.ws-sidebar .hq-navlink[aria-current="page"] {
+  box-shadow: none; border-radius: 9px; position: relative;
+}
+.ws-detail-tabs button[aria-current="page"], .ws-tabs button[aria-current="page"] {
+  border-radius: 0; box-shadow: none;
+}

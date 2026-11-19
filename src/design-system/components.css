@@ -384,3 +384,33 @@ body:has([role="dialog"]) .ds-toasts { inset-block-start: var(--space-4); inset-
 .ds-statrow > :nth-child(4n+4)::before { background:var(--studio-citrus); }
 .ds-card[data-prov="agent"] .ds-card-head .ds-eyebrow { color:var(--studio-violet-ink); }
 :root[data-theme="dark"] .ds-card[data-prov="agent"] .ds-card-head .ds-eyebrow { color:#cdb9ff; }
+
+
+/* Flat selected controls: avoid the old inset shadow that curved along the
+   pill's lower edge and appeared as a disconnected underline. */
+.ds-tab[aria-selected="true"] {
+  background: var(--bg-selected);
+  color: var(--selected-fg);
+  border-radius: 9px;
+  box-shadow: none;
+}
+.ds-tab[aria-selected="true"]::after {
+  content: ""; position: absolute; inset-inline: 12px; bottom: 0;
+  height: 2px; background: var(--accent); border-radius: 0;
+  pointer-events: none;
+}
+.ds-segment button[aria-pressed="true"],
+.ds-btn-group > button[aria-pressed="true"] {
+  border-color: var(--accent-border);
+  background: var(--bg-selected);
+  color: var(--selected-fg);
+  box-shadow: none;
+}
+.ds-btn:not(:disabled):active { transform: translateY(1px); }
+.ds-btn:focus-visible, .ds-tab:focus-visible, .ds-segment button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media(prefers-reduced-motion:reduce) {
+  .ds-btn:not(:disabled):active { transform: none; }
+}
