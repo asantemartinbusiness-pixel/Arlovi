@@ -46,3 +46,10 @@
 .connect-live-account>span{font-size:var(--text-xs);color:var(--fg-muted);white-space:nowrap}
 @media(max-width:600px){.connect-guide{padding:var(--space-3)}.connect-guide-mark{width:36px;height:36px}.connect-guide-goals{grid-template-columns:repeat(2,minmax(0,1fr))}.connect-guide-goals button{min-height:92px}.connect-setup-summary>div{flex-direction:column;gap:3px}.connect-setup-summary span{text-align:left}}
 @media(prefers-reduced-motion:reduce){.connect-guide-goals button,.connect-guide-card{transition:none}}
+
+/* Cloud activation is a distinct layer from successful provider sign-in. */
+.connect-activation{display:flex;flex-direction:column;gap:var(--space-3);padding:var(--space-3);border:1px solid var(--border-default);background:var(--bg-inset);border-radius:var(--radius-md)}
+.connect-activation h4{font-size:var(--text-sm);font-weight:600;margin:0 0 var(--space-1)}
+.connect-activation p{font-size:var(--text-xs);line-height:1.5;margin:0}
+.connect-activation>.ds-btn{align-self:flex-start}
+.connect-activation .connect-live-account{background:var(--bg-surface);flex-wrap:wrap}
