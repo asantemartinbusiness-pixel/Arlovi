@@ -84,8 +84,25 @@ export function ScreenHost() {
       setTab,
       selectedId,
       select: setSelectedId,
-      openOverlay: (id, payload) => setOverlay({ id, payload }),
-      closeOverlay: () => setOverlay(null),
+      openOverlay: (id, payload) => {
+        setOverlay({ id, payload });
+        // New invoice is a resumable, payload-free workflow. Encode its overlay
+        // in the URL so a cross-app return can reopen the editor exactly.
+        if (screen.applicationCode === "FIN" && id === "New invoice" && payload === undefined && linkedOverlay !== id) {
+          const query = new URLSearchParams(location.search);
+          query.set("overlay", id);
+          navigate(`${location.pathname}?${query.toString()}${location.hash}`, { replace: true });
+        }
+      },
+      closeOverlay: () => {
+        setOverlay(null);
+        if (linkedOverlay) {
+          const query = new URLSearchParams(location.search);
+          query.delete("overlay");
+          const suffix = query.toString();
+          navigate(`${location.pathname}${suffix ? `?${suffix}` : ""}${location.hash}`, { replace: true });
+        }
+      },
       overlayPayload: overlay?.payload,
       navigate,
       path: (route, id) => route.replace(":org", workspace.org.slug).replace(":id", id ?? selectedId ?? "").replace(":slug", "showroom-consult"),
@@ -261,7 +278,7 @@ export function ScreenHost() {
           {actions.length > 0 && actionBar}
         </div>
         {body}
-        <ScreenOverlays context={context} def={def} overlayId={overlay?.id} onClose={() => setOverlay(null)} />
+        <ScreenOverlays context={context} def={def} overlayId={overlay?.id} onClose={context.closeOverlay} />
       </div>
     );
   }
@@ -312,7 +329,7 @@ export function ScreenHost() {
 
       <div className="pg-body" data-pad={def?.surface ? "none" : undefined}>{body}</div>
 
-      <ScreenOverlays context={context} def={def} overlayId={overlay?.id} onClose={() => setOverlay(null)} />
+      <ScreenOverlays context={context} def={def} overlayId={overlay?.id} onClose={context.closeOverlay} />
     </div>
   );
 

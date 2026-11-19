@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { Link } from "react-router-dom";
 import { FileText, Plus, Printer, Send, Trash2 } from "lucide-react";
 import {
@@ -1014,16 +1015,19 @@ export function issueLines(data: FinData, totals: DocumentTotals, invoice: Rec):
 export function NewInvoice({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useFinData();
   const { org, now } = useWorkspace();
+  // Finance's draft fields survive a same-tab detour to Projects, CRM, etc.
+  // This cache is in memory only, isolated to the current company and actor.
+  const draftScope = `finance:new-invoice:${org.id}:${context.actor}`;
   /* Until a person types or chooses, the number and customer follow the
      loaded records, so neither is fixed from an empty first read. */
-  const [chosenContact, setContactId] = useState<string>();
+  const [chosenContact, setContactId] = useWorkingField<string | undefined>(draftScope, "contact", undefined);
   const contactId = chosenContact ?? data.contacts[0]?.id ?? "";
-  const [typedNumber, setNumber] = useState<string>();
-  const [dueDays, setDueDays] = useState(21);
-  const [description, setDescription] = useState("");
-  const [unit, setUnit] = useState(0);
-  const [quantity, setQuantity] = useState(1);
-  const [category, setCategory] = useState<TaxCategory>("standard");
+  const [typedNumber, setNumber] = useWorkingField<string | undefined>(draftScope, "number", undefined);
+  const [dueDays, setDueDays] = useWorkingField(draftScope, "dueDays", 21);
+  const [description, setDescription] = useWorkingField(draftScope, "description", "");
+  const [unit, setUnit] = useWorkingField(draftScope, "unitMinor", 0);
+  const [quantity, setQuantity] = useWorkingField(draftScope, "quantity", 1);
+  const [category, setCategory] = useWorkingField<TaxCategory>(draftScope, "taxCategory", "standard");
   const [busy, setBusy] = useState(false);
 
   const suggested = useMemo(() => {
@@ -1078,6 +1082,7 @@ export function NewInvoice({ context, close }: { context: ScreenContext; close: 
           },
           body: writeLines([{ id: "l1", description: description || "Line", quantity, unitPriceMinor: unit, taxCategory: category, discountBp: 0 }]),
         }, `Invoice ${number.trim()} drafted`);
+        clearWorkingDraft(draftScope);
         context.toast("Draft invoice created", `${created.title} is a draft. It is in no statement until it is approved and posted.`);
         setBusy(false);
         close();
@@ -1116,7 +1121,7 @@ export function NewInvoice({ context, close }: { context: ScreenContext; close: 
 
       <Row gap={2}>
         <Button type="submit" variant="primary" busy={busy} disabled={!numbersKnown || duplicate || !number.trim()}>Create draft</Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
+        <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
     </form>
   );
