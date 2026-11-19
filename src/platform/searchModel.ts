@@ -2,8 +2,10 @@
  * Shared, deterministic ranking for the browser-local Arlovi search surface.
  * Retrieval and authorisation remain responsibilities of each search provider.
  */
-export type SearchScope = "all" | "this-app" | "my-work" | "files" | "people" | "mail" | "actions" | "apps";
-export type SearchKind = "record" | "app" | "screen" | "workspace" | "resume" | "saved" | "action" | "return";
+export type SearchScope = "all" | "this-app" | "my-work" | "files" | "people" | "mail" | "integrations" | "actions" | "apps";
+export type SearchKind = "record" | "app" | "screen" | "workspace" | "resume" | "saved" | "action" | "return" | "connector";
+
+import type { CapabilityState } from "@/domain/types";
 
 export interface SearchHit {
   key: string;
@@ -16,6 +18,10 @@ export interface SearchHit {
   collection?: string;
   recordId?: string;
   summary?: string;
+  /** Provenance must be explicit: catalogue entries are not external records. */
+  sourceName?: string;
+  sourceType?: "local" | "catalogue" | "remote";
+  sourceState?: CapabilityState;
   /** Local, in-memory text only; never sent to an external search service. */
   contentText?: string;
   previewFields?: ReadonlyArray<{ label: string; value: string }>;
@@ -39,6 +45,7 @@ export const SEARCH_SCOPES: ReadonlyArray<{ id: SearchScope; label: string }> = 
   { id: "files", label: "Files" },
   { id: "people", label: "People" },
   { id: "mail", label: "Mail" },
+  { id: "integrations", label: "Integrations" },
   { id: "apps", label: "Apps" },
   { id: "actions", label: "Actions" },
 ];
@@ -60,6 +67,7 @@ export function matchesScope(hit: SearchHit, scope: SearchScope, activeApp?: str
     case "people": return Boolean(hit.collection && PEOPLE_COLLECTIONS.has(hit.collection))
       || (hit.kind === "app" && hit.appCode === "HR");
     case "mail": return hit.collection === "emailThreads" || (hit.kind === "app" && hit.appCode === "COMMS");
+    case "integrations": return hit.kind === "connector";
     case "apps": return hit.kind === "app" || hit.kind === "screen" || hit.kind === "workspace";
     case "actions": return hit.kind === "action";
   }
@@ -90,6 +98,7 @@ export function scoreSearchHit(hit: SearchHit, rawQuery: string): number {
   if (content.includes(query)) score += 12;
   if (hit.kind === "record") score += 14;
   if (hit.kind === "app") score += 8;
+  if (hit.kind === "connector") score += 3;
   if (hit.kind === "saved") score += 4;
   return score;
 }
@@ -108,7 +117,7 @@ export function searchHits(hits: SearchHit[], options: SearchOptions, limit = 40
     // individually discoverable rather than disappear under URL deduplication.
     const identity = item.hit.kind === "record" && item.hit.recordId
       ? `record:${item.hit.recordId}`
-      : item.hit.to;
+      : item.hit.kind === "connector" ? item.hit.key : item.hit.to;
     if (seen.has(identity)) continue;
     seen.add(identity);
     visible.push(item.hit);

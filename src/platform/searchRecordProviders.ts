@@ -208,6 +208,7 @@ export function buildLocalSearchHits(rows: readonly Rec[], context: LocalProvide
 
     hits.push({
       key: `record-${row.id}`, kind: "record", group: groupFor(row.collection),
+      sourceType: "local", sourceName: row.collection === "emailThreads" ? "Local mail" : "Arlovi workspace",
       title: row.title, detail: categoryLabel(row.collection, row.status), to,
       appCode: destination.applicationCode, collection: row.collection, recordId: row.id,
       // Confidential document matches remain title/tags-only; folder and
