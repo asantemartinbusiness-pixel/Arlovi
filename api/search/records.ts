@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SearchMapping } from "../../server/search/authority";
 import { configuredSearchAuthority } from "../../server/search/authority";
+import { connectedSearchConfigured } from "../../server/search/config";
 import { createNangoDocumentAdapter } from "../../server/search/nangoDocuments";
 import { runAuthorizedFederatedSearch } from "../../server/search/federation";
 
@@ -16,14 +17,6 @@ function json(res: ServerResponse, statusCode: number, payload: unknown): void {
   res.end(JSON.stringify(payload));
 }
 
-function configured(): boolean {
-  return process.env.ARLOVI_SEARCH_REMOTE_ENABLED === "true"
-    && Boolean(process.env.ARLOVI_APP_ORIGIN)
-    && Boolean(process.env.NANGO_SECRET_KEY)
-    && Boolean(process.env.ARLOVI_SEARCH_NANGO_DOCUMENT_INTEGRATION)
-    && Boolean(process.env.ARLOVI_SEARCH_NANGO_DOCUMENT_MODEL)
-    && configuredSearchAuthority() !== null;
-}
 
 async function bodyObject(req: Request): Promise<Record<string, unknown> | null> {
   if (req.body !== undefined) {
@@ -55,7 +48,7 @@ async function bodyObject(req: Request): Promise<Record<string, unknown> | null>
  */
 export default async function handler(req: Request, res: ServerResponse): Promise<void> {
   if (req.method !== "POST") return json(res, 405, { error: "METHOD_NOT_ALLOWED" });
-  if (!configured()) return json(res, 503, { error: "CONNECTED_SEARCH_NOT_CONFIGURED" });
+  if (!connectedSearchConfigured()) return json(res, 503, { error: "CONNECTED_SEARCH_NOT_CONFIGURED" });
   if (typeof req.headers.origin !== "string" || req.headers.origin !== process.env.ARLOVI_APP_ORIGIN) {
     return json(res, 403, { error: "ORIGIN_MISMATCH" });
   }
