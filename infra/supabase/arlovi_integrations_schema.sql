@@ -184,7 +184,7 @@ for select to authenticated using (
     ownership <> 'personal' or owner_user_id = (select auth.uid())
     or exists (
       select 1 from public.arlovi_memberships m
-      where m.organization_id = organization_id and m.user_id = (select auth.uid())
+      where m.organization_id = arlovi_integration_connections.organization_id and m.user_id = (select auth.uid())
         and m.status = 'active' and m.role in ('owner','admin')
     )
   )
