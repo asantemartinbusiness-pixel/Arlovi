@@ -177,7 +177,7 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
   const stale = Boolean(member && String(member.fields.role) !== String(request.fields.fromRole));
   const eligibleMember = Boolean(member && member.organizationId === context.org.id && member.status === "active" && member.fields.kind !== "ai");
   const validRole = ROLES.includes(from) && ROLES.includes(to) && from !== to;
-  const expired = Boolean(request.fields.expiresAt && Date.parse(String(request.fields.expiresAt)) <= Date.now());
+  const expired = Boolean(request.fields.expiresAt && Date.parse(String(request.fields.expiresAt)) <= Date.parse(clockIso()));
   const laterApproved = ofKind(data.policies, "accessRequest").some((row) =>
     row.id !== request.id && row.fields.memberId === request.fields.memberId &&
     row.status === "approved" && String(row.fields.decidedAt ?? "") > String(request.fields.decidedAt ?? ""));
