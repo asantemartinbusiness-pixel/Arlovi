@@ -16,6 +16,7 @@ import { contactById, openQuoteValueMinor, quotesOfDeal, useCrmData } from "./da
 import type { CrmData } from "./data";
 import { CapabilityNotice, CapabilityPill, Money, QuoteStatusPill, isExpired } from "./parts";
 import { clockIso } from "@/platform/clock";
+import { clearWorkingDraft, readWorkingField, useWorkingState } from "@/platform/workingDrafts";
 import { duplicateQuoteBody, fieldsForQuoteDuplicate, freshQuoteVersionFields } from "./quoteEvidence";
 
 /* ---------------------------- CRM-008 ---------------------------- *
@@ -156,17 +157,20 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
   const payload = context.overlayPayload as { id?: string; dealId?: string } | undefined;
   const existing = useRecord(payload?.id ?? context.selectedId);
   const quote = existing?.collection === "quotes" ? existing : undefined;
-
-  const [dealId, setDealId] = useState(String(quote?.fields.dealId ?? payload?.dealId ?? ""));
-  const [contactId, setContactId] = useState(String(quote?.fields.contactId ?? ""));
-  const [number, setNumber] = useState(String(quote?.fields.number ?? ""));
-  const [status, setStatus] = useState<CustomerTaxStatus>("domestic");
-  const [lines, setLines] = useState<InvoiceLine[]>([]);
-  const [expires, setExpires] = useState((quote?.dueAt ?? new Date(now.getTime() + 30 * 86_400_000).toISOString()).slice(0, 10));
+  // Editing a different deal or quote must never reopen another quote's draft.
+  const draftScope = `crm:quote:${org.id}:${context.actor}:${payload?.id || quote?.id || `new:${payload?.dealId || "unlinked"}`}`;
+  const [dealId, setDealId] = useWorkingState(draftScope, "dealId", String(quote?.fields.dealId ?? payload?.dealId ?? ""));
+  const [contactId, setContactId] = useWorkingState(draftScope, "contactId", String(quote?.fields.contactId ?? ""));
+  const [number, setNumber] = useWorkingState(draftScope, "number", String(quote?.fields.number ?? ""));
+  const [status, setStatus] = useWorkingState<CustomerTaxStatus>(draftScope, "status", "domestic");
+  const [lines, setLines] = useWorkingState<InvoiceLine[]>(draftScope, "lines", []);
+  const [expires, setExpires] = useWorkingState(draftScope, "expires", (quote?.dueAt ?? new Date(now.getTime() + 30 * 86_400_000).toISOString()).slice(0, 10));
   const [busy, setBusy] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [dirty, setDirty] = useWorkingState(draftScope, "dirty", false);
 
   useEffect(() => {
+    // A local in-progress revision takes precedence over record refreshes.
+    if (readWorkingField(draftScope, "dirty", false)) return;
     if (quote) {
       setLines(readLines(quote));
       setStatus(statusFor(quote, contactById(data, String(quote.fields.contactId ?? ""))));
@@ -179,7 +183,7 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
       setNumber((current) => current || `Q-${Math.max(100, ...numbers) + 1}`);
       setLines((current) => (current.length ? current : [blankLine(0)]));
     }
-  }, [quote, data]);
+  }, [quote, data, draftScope, setLines, setStatus, setNumber, setContactId, setDealId, setDirty]);
 
   const deal = data.deals.find((item) => item.id === dealId);
   const customer = contactById(data, contactId);
@@ -385,6 +389,7 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
                 : `${created.title} is a draft.`);
               context.select(created.id);
             }
+            clearWorkingDraft(draftScope);
             setDirty(false);
             setBusy(false);
             close();
@@ -404,8 +409,10 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
           </Button>
         )}
         <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close</Button>
+        <Button variant="ghost" onClick={close}>{dirty ? "Close & keep draft" : "Close"}</Button>
+        {dirty && <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard changes</Button>}
       </Row>
+      {dirty && <p className="ds-subtle">Unfinished quote lines and pricing stay in this browser tab. No quote is sent without a separate action.</p>}
     </Stack>
   );
 }

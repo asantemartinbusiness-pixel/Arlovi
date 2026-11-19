@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
 
 /**
  * Explicitly opt-in, in-memory working drafts. Sensitive draft fields never
@@ -35,5 +35,17 @@ export function useWorkingField<T>(scope: string, field: string, fallback: T): [
     rememberWorkingField(scope, field, next);
     setEntry({ key, value: next });
   }, [scope, field, key]);
+  return [value, update];
+}
+
+/** Opt-in working state that supports React functional updates, useful for
+ * multi-line quote editors. Keep authoritative values in memory, not URLs. */
+export function useWorkingState<T>(scope: string, field: string, fallback: T): [T, Dispatch<SetStateAction<T>>] {
+  const [value, write] = useWorkingField(scope, field, fallback);
+  const update = useCallback<Dispatch<SetStateAction<T>>>((next) => {
+    const latest = readWorkingField(scope, field, value);
+    const resolved = typeof next === "function" ? (next as (current: T) => T)(latest) : next;
+    write(resolved);
+  }, [scope, field, value, write]);
   return [value, update];
 }

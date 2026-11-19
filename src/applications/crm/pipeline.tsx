@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { ArrowLeft, ArrowRight, GripVertical, Kanban } from "lucide-react";
 import {
   BarChart, Button, Card, DataGrid, Empty, Field, Grid, Kbd, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
@@ -365,13 +366,23 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
   const { org, now } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const existing = data.deals.find((deal) => deal.id === (payload?.id ?? context.selectedId));
-  const [title, setTitle] = useState(existing?.title ?? "");
-  const [amount, setAmount] = useState(Number(existing?.amountMinor ?? 0));
-  const [contactId, setContactId] = useState(String(existing?.fields.contactId ?? ""));
-  const [companyId, setCompanyId] = useState(String(existing?.fields.companyId ?? ""));
-  const [stageId, setStageId] = useState(existing ? stageOf(existing).id : "discovery");
-  const [closeDate, setCloseDate] = useState(String(existing?.fields.closeDate ?? ""));
-  const [summary, setSummary] = useState(existing?.summary ?? "");
+  const draftScope = `crm:deal:${org.id}:${context.actor}:${payload?.id || existing?.id || "new"}`;
+  // Resolve record-backed fields dynamically; an asynchronous record load must
+  // not be overwritten by the editor's initial empty state.
+  const [draftTitle, setTitle] = useWorkingField<string | undefined>(draftScope, "title", undefined);
+  const [draftAmount, setAmount] = useWorkingField<number | undefined>(draftScope, "amount", undefined);
+  const [draftContact, setContactId] = useWorkingField<string | undefined>(draftScope, "contactId", undefined);
+  const [draftCompany, setCompanyId] = useWorkingField<string | undefined>(draftScope, "companyId", undefined);
+  const [draftStage, setStageId] = useWorkingField<string | undefined>(draftScope, "stageId", undefined);
+  const [draftCloseDate, setCloseDate] = useWorkingField<string | undefined>(draftScope, "closeDate", undefined);
+  const [draftSummary, setSummary] = useWorkingField<string | undefined>(draftScope, "summary", undefined);
+  const title = draftTitle ?? existing?.title ?? "";
+  const amount = draftAmount ?? Number(existing?.amountMinor ?? 0);
+  const contactId = draftContact ?? String(existing?.fields.contactId ?? "");
+  const companyId = draftCompany ?? String(existing?.fields.companyId ?? "");
+  const stageId = draftStage ?? (existing ? stageOf(existing).id : "discovery");
+  const closeDate = draftCloseDate ?? String(existing?.fields.closeDate ?? "");
+  const summary = draftSummary ?? existing?.summary ?? "";
   const [busy, setBusy] = useState(false);
 
   const stage = STAGES.find((item) => item.id === stageId)!;
@@ -433,11 +444,12 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
             if (companyId) fields.companyId = companyId;
             if (closeDate) fields.closeDate = closeDate;
             if (existing) {
-              await context.mutate.patch(existing.id, {
+              const saved = await context.mutate.patch(existing.id, {
                 title: title.trim(), summary, amountMinor: amount, status: stageId,
                 dueAt: closeDate ? `${closeDate}T00:00:00.000Z` : existing.dueAt,
                 fields: { ...existing.fields, ...fields },
               }, { expectRevision: existing.revision, event: `Deal ${title.trim()} updated` });
+              if (!saved) { setBusy(false); return; }
               context.toast("Deal saved", `${title.trim()} is in ${stage.label} at ${stage.probability}%.`);
             } else {
               const created = await context.mutate.create({
@@ -451,6 +463,7 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
               context.select(created.id);
               context.toast("Deal created", `${created.title} is in ${stage.label}. Its weighted value is ${context.money(Math.round((amount * stage.probability) / 100))}.`);
             }
+            clearWorkingDraft(draftScope);
             setBusy(false);
             close();
           }}
@@ -461,8 +474,10 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
           <Button variant="secondary" onClick={() => { close(); context.navigate(`/o/${org.slug}/crm/deals/${existing.id}`); }}>Open the full record</Button>
         )}
         <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
+        <Button variant="ghost" onClick={close}>Close & keep draft</Button>
+        <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard changes</Button>
       </Row>
+      <p className="ds-subtle">Unfinished deal changes remain in this browser tab until saved or discarded.</p>
     </Stack>
   );
 }
