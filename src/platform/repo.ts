@@ -410,6 +410,93 @@ export async function confirmBankReconciliation(
   });
 }
 
+/**
+ * Privacy erasure commits the selected records, the request status and audit
+ * events as a single IndexedDB transaction. The caller must supply the entire
+ * reviewed organisation snapshot, not just records it wishes to delete.
+ * This catches new, changed or removed records (including retention policies)
+ * before any deletion, avoiding partial effects and stale legal-hold decisions.
+ * This remains browser-local and is not a substitute for provider-side erasure.
+ */
+export async function executeReviewedErasure(
+  organizationId: string,
+  requestId: string,
+  snapshotRevisions: Record<string, number>,
+  candidateIds: string[],
+  expectedRequestRevision: number,
+  context: WriteContext,
+): Promise<{ deleted: number; retained: number }> {
+  if (!candidateIds.length) throw new Error("There are no eligible records to erase.");
+  if (new Set(candidateIds).size !== candidateIds.length) throw new Error("Erasure candidates contain duplicates.");
+  if (candidateIds.includes(requestId)) throw new Error("The subject request cannot erase itself.");
+  if (snapshotRevisions[requestId] !== expectedRequestRevision) throw new Error("The reviewed request revision is stale.");
+  const result = await db.transaction("rw", [db.records, db.events], async () => {
+    const latest = await db.records.where("organizationId").equals(organizationId).toArray();
+    const current = new Map(latest.map((record) => [record.id, record]));
+    const reviewedIds = Object.keys(snapshotRevisions);
+    if (latest.length !== reviewedIds.length) throw new Error("Records were added or removed since review. Reopen the erasure preview.");
+    for (const id of reviewedIds) {
+      const record = current.get(id);
+      if (!record || record.revision !== snapshotRevisions[id]) {
+        throw new ConflictError(id, snapshotRevisions[id], record?.revision ?? -1);
+      }
+    }
+    const request = current.get(requestId);
+    if (!request || request.collection !== "dataRequests" || request.organizationId !== organizationId) {
+      throw new Error("The selected subject request is no longer available.");
+    }
+    if (request.fields.legalHold === true) throw new Error("The subject request is under a legal hold.");
+    const scope = String(request.fields.collections ?? "").split(",").map((entry) => entry.trim()).filter(Boolean);
+    const held = latest.filter((record) => record.collection === "policies" &&
+      record.fields.kind === "retention" && record.fields.legalHold === true);
+    for (const id of candidateIds) {
+      const record = current.get(id);
+      if (!record || record.organizationId !== organizationId || !scope.includes(record.collection)) {
+        throw new Error(`Candidate ${id} is outside this subject request scope.`);
+      }
+      if (record.collection === "journals" && record.status === "posted") {
+        throw new Error("Posted journals must be reversed, not deleted.");
+      }
+      if (held.some((policy) =>
+        String(policy.fields.collections ?? "").split(",").map((entry) => entry.trim()).includes(record.collection))) {
+        throw new Error(`A legal hold now prevents deletion from ${record.collection}.`);
+      }
+    }
+    const candidateSet = new Set(candidateIds);
+    const retained = latest.filter((record) => record.id !== requestId && scope.includes(record.collection) &&
+      !candidateSet.has(record.id)).length;
+    // No awaits outside this transaction before committing the entire batch.
+    await db.records.bulkDelete(candidateIds);
+    const updated = revisedRecord(request, {
+      status: retained ? "partially_completed" : "completed",
+      fields: {
+        ...request.fields,
+        deletedCount: candidateIds.length,
+        blockedCount: retained,
+        completedBy: context.actor,
+        completedAt: context.now,
+        erasureExecutedLocally: true,
+      },
+    }, context);
+    await db.records.put(updated);
+    await db.events.bulkAdd([
+      ...candidateIds.map((id) => ({
+        id: crypto.randomUUID(), organizationId, at: context.now, actor: context.actor,
+        type: "delete", entityId: id, screenId: context.screenId,
+        message: `Local erasure ${requestId} removed record ${id}`,
+      })),
+      {
+        id: crypto.randomUUID(), organizationId, at: context.now, actor: context.actor,
+        type: "update", entityId: requestId, screenId: context.screenId,
+        message: `Local erasure: ${candidateIds.length} records removed; ${retained} retained`,
+      },
+    ]);
+    return { deleted: candidateIds.length, retained };
+  });
+  for (const id of candidateIds) known.delete(id);
+  return result;
+}
+
 export async function deleteRecord(id: string, context: WriteContext, event?: Omit<Audit, "id" | "at" | "actor" | "organizationId">, expectedOrgId?: string): Promise<void> {
   await db.transaction("rw", [db.records, db.events], async () => {
     const current = await db.records.get(id);
