@@ -95,7 +95,8 @@ export class HttpSearchAuthority implements SearchAuthority {
       organizationSlug: requestedOrgSlug, permission: "search.read",
     }, headers);
     if (!isPlainObject(payload) || payload.authenticated !== true
-      || payload.permissionGranted !== true || payload.organizationSlug !== requestedOrgSlug
+      || payload.permissionGranted !== true || payload.rateLimitOk !== true
+      || payload.organizationSlug !== requestedOrgSlug
       || !isPlainObject(payload.actor)) return null;
 
     const actor = payload.actor;
