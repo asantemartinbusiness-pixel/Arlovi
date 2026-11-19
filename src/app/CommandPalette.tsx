@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  ArrowRight, ArrowUpRight, Bookmark, BookmarkCheck, Clock3, CornerUpLeft,
+  ArrowRight, ArrowUpRight, Bookmark, BookmarkCheck, CornerUpLeft,
   FileText, FolderKanban, LayoutGrid, Search, UserRound, X, Zap,
 } from "lucide-react";
 import { appEntry, findScreen, screens } from "@/app/catalog";
