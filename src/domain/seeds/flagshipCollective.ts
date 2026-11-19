@@ -1,4 +1,5 @@
 import { registerSeed } from "@/domain/seedRegistry";
+import { NORTHLINE_COLORS, NORTHLINE_COLLECTIVE_IDENTITY } from "@/domain/flagship/identity";
 import type { Rec } from "@/domain/types";
 import { LAYOUTS, THEMES, slideFromLayout, type Deck, type Slide } from "@/applications/present/model";
 
@@ -14,12 +15,17 @@ import { LAYOUTS, THEMES, slideFromLayout, type Deck, type Slide } from "@/appli
  */
 const BASE = 900;
 const BRANDS = [
-  { name: "Northline Collective", descriptor: "Independent design, objects and experiences", accent: "#B65E39" },
-  { name: "Northline Atelier", descriptor: "Spatial design and material thinking", accent: "#8B9B86" },
-  { name: "Harbor Supply Studio", descriptor: "Objects with purpose and permanence", accent: "#D0B67E" },
-  { name: "Northline Experiences", descriptor: "The art of gathering", accent: "#AC8990" },
+  { name: "Northline Collective", descriptor: "Material. Space. Experience.", accent: NORTHLINE_COLORS.acid },
+  { name: "Northline Atelier", descriptor: "Spatial ideas and material thinking", accent: NORTHLINE_COLORS.violet },
+  { name: "Harbor Supply Studio", descriptor: "Considered objects and useful forms", accent: NORTHLINE_COLORS.apricot },
+  { name: "Northline Experiences", descriptor: "Gathering through making", accent: NORTHLINE_COLORS.bluePaper },
 ];
-const PALETTE = { ink: "#1B2523", canvas: "#F4F0E8", bronze: "#B65E39", sage: "#839484", cream: "#E7DCCB", quiet: "#6F756F" };
+const PALETTE = {
+  ink: NORTHLINE_COLORS.ink, canvas: NORTHLINE_COLORS.canvas,
+  acid: NORTHLINE_COLORS.acid, violet: NORTHLINE_COLORS.violet,
+  apricot: NORTHLINE_COLORS.apricot, bluePaper: NORTHLINE_COLORS.bluePaper,
+  paper: NORTHLINE_COLORS.canvas, quiet: NORTHLINE_COLORS.muted,
+};
 const sitePage = (id: string, name: string, path: string, heading: string, description: string, blocks: unknown[]) => ({
   id, name, path, status: "draft",
   seo: { title: heading + " — Northline Collective", description, noindex: true },
@@ -33,7 +39,7 @@ const column = (id: string, title: string, items: string[]) => ({ id, type: "col
 const gallery = (id: string, title: string, items: string[]) => ({ id, type: "gallery", props: { title, items, columns: 3, alt: title + ", editorial project index" } });
 const paragraph = (id: string, title: string, body: string) => ({ id, type: "text", props: { title, body } });
 const WEB_BODY = {
-  theme: { font: "Inter", accent: PALETTE.bronze, ink: PALETTE.ink, paper: PALETTE.canvas, radius: 6, scale: 100 },
+  theme: { font: "Manrope", accent: PALETTE.acid, ink: PALETTE.ink, paper: PALETTE.canvas, radius: 0, scale: 100 },
   seo: { siteTitle: "Northline Collective — Material. Space. Experience.", description: "An independent collective working at the intersection of thoughtful objects, spaces and human experience.", robots: "noindex", sitemap: false },
   analytics: { consent: "not_asked" },
   pages: [
@@ -109,11 +115,11 @@ const WEB_BODY = {
 };
 const form = (fields: unknown[], confirmation: string) => ({
   fields, logic: [],
-  theme: { accent: PALETTE.bronze, ink: PALETTE.ink, paper: PALETTE.canvas, radius: 9, width: "narrow", font: "Inter" },
+  theme: { accent: PALETTE.acid, ink: PALETTE.ink, paper: PALETTE.canvas, radius: 0, width: "narrow", font: "Manrope" },
   settings: { notifyEnabled: false, notifyTo: "", confirmation, retentionDays: 180, access: "link", closed: false, closeMessage: "", version: 1 },
 });
 const move = (id: string, label: string, kind: string, fill: string, box: {x:number;y:number;w:number;h:number}, text?: string) => ({
-  id, name: label, kind, visible: true, locked: false, box, fill, ...(text ? { text, textStyle: { family: "Inter", size: kind === "text" ? 62 : 18, weight: 500, align: "start" } } : {}),
+  id, name: label, kind, visible: true, locked: false, box, fill, ...(text ? { text, textStyle: { family: "Manrope", size: kind === "text" ? 62 : 18, weight: 500, align: "start" } } : {}),
   tracks: { opacity: [{ id:id+"-a", t:0, value:0, easing: {kind:"bezier",points:[0.2,0,0,1]} }, {id:id+"-b",t:1.4,value:1,easing:{kind:"bezier",points:[0.2,0,0,1]}}] },
 });
 const deckLayout = (id:string) => LAYOUTS.find(l=>l.id===id) ?? LAYOUTS[0];
@@ -145,7 +151,7 @@ registerSeed("flagship-collective", (ctx) => {
       fields:{...details.fields,flagship:"Northline Collective",fictional:true},
       tags:["flagship",...(details.tags??[])]}));
   };
-  push("brands",0,"Northline Collective — identity system",{summary:"Fictional flagship master identity: editorial restraint, exacting craft, warm modernism.",fields:{palette:JSON.stringify(PALETTE),positioning:"Material. Space. Experience.",website:id("sites",0)},body:{brands:BRANDS,palette:PALETTE,typography:{display:"Inter",body:"Inter",tracking:"editorial"},artDirection:"Bold negative space, photography-first art direction, architectural grids, warm mineral materials, tactile shadows, no generic AI gradients."}});
+  push("brands",0,"Northline Collective — identity system",{summary:"Fictional flagship master identity: editorial restraint, exacting craft, warm modernism.",fields:{palette:JSON.stringify(PALETTE),positioning:"Material. Space. Experience.",website:id("sites",0)},body:{brands:BRANDS,palette:PALETTE,identity:NORTHLINE_COLLECTIVE_IDENTITY,typography:{display:"Manrope",accent:"Newsreader Italic",labels:"DM Mono",reading:"Georgia"},artDirection:"Tactile editorial material collage, paper slips, acid directional drawing, violet/blue/apricot paper, typographic contrasts, crisp thin rules and square panels. Original Northline artwork; no reference-brand assets."}});
   push("legalEntities",0,"Northline Collective — group concept",{status:"draft",summary:"Demonstration group profile only; not a registered legal entity.",fields:{entityType:"fictional_group",currency:"GBP",legalStatus:"simulation"}});
   ["Group Strategy","Design & Studio","Commerce & Distribution","Experiences & Hospitality","Finance & Governance","Technology & Digital","Marketing & Growth","People & Operations"].forEach((name,i)=>push("departments",i,name,{summary:"Flagship organisational unit; representative staffing and responsibilities.",fields:{lead:["Maya Chen","Iris Bell","Jonah Adeyemi","Amara Diallo","Elena Voss","Leo Moreno","Priya Shah","Theo Marsh"][i],members:[8,18,16,9,9,8,8,6][i]}}));
   ["Manchester Creative Headquarters","London Design Showroom","Midlands Distribution Centre","Northline Experiences Studio"].forEach((name,i)=>push("locations",i,name,{summary:"Illustrative operational facility, not a real address.",fields:{kind:["office","showroom","warehouse","studio"][i],timezone:"Europe/London"}}));
@@ -188,8 +194,8 @@ registerSeed("flagship-collective", (ctx) => {
   push("motions",0,"Collective identity — cinematic wordmark",{status:"draft",summary:"Five-second typography and tonal composition with accessible motion settings.",fields:{kind:"composition",fps:30,width:1440,height:810,duration:5},body:{
     version:2,width:1440,height:810,fps:30,duration:5,background:PALETTE.ink,loop:false,
     layers:[move("m1","Northline", "text",PALETTE.canvas,{x:120,y:275,w:1100,h:118},"NORTHLINE"),
-      move("m2","Bronze rule","rect",PALETTE.bronze,{x:120,y:452,w:360,h:8}),
-      move("m3","Collective","text",PALETTE.cream,{x:120,y:490,w:900,h:100},"COLLECTIVE")],
+      move("m2","Bronze rule","rect",PALETTE.acid,{x:120,y:452,w:360,h:8}),
+      move("m3","Collective","text",PALETTE.paper,{x:120,y:490,w:900,h:100},"COLLECTIVE")],
     markers:[],presets:[],renders:[],reducedMotion:true,
   }});
   push("videos",0,"A Collection of Ways of Living — brand film",{status:"draft",summary:"60-second storyboard and editorial edit plan; footage is not rendered or uploaded.",fields:{kind:"sequence",fps:25,width:1920,height:1080,duration:60,provider:"not_connected"},body:{
