@@ -63,6 +63,7 @@ describe("Search 2.2 native providers", () => {
     expect(hit.previewFields).toEqual([{ label: "Folder", value: "Contracts" }]);
     expect(searchHits([hit], { query: "SECRET_BODY", scope: "all" })).toHaveLength(0);
     expect(searchHits([hit], { query: "SECRET_SUMMARY", scope: "all" })).toHaveLength(0);
+    expect(searchHits([hit], { query: "Contracts", scope: "all" })).toHaveLength(0);
     expect(searchHits([hit], { query: "Confidential", scope: "files" })).toHaveLength(1);
   });
 
