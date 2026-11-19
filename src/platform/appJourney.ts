@@ -64,7 +64,17 @@ function sessionKey(scope: string): string {
 }
 export function readAppJourney(scope: string, slug: string): AppJourney {
   const storageKey = sessionKey(scope);
-  const fallback = () => inMemoryJourneys.get(storageKey) ?? EMPTY();
+  const fallback = (): AppJourney => {
+    const cached = inMemoryJourneys.get(storageKey);
+    if (!cached) return EMPTY();
+    // The organisation slug may have changed for the same ID; never return
+    // out-of-scope destinations even from the same-tab memory fallback.
+    const trail = cached.trail.filter(item =>
+      validApp(item.app) && scopedJourneyUrl(item.url, slug));
+    const byApp = Object.fromEntries(Object.entries(cached.byApp).filter(([app, url]) =>
+      validApp(app) && scopedJourneyUrl(url, slug)));
+    return { trail, byApp };
+  };
   try {
     if (typeof sessionStorage === "undefined") return fallback();
     const raw = sessionStorage.getItem(storageKey);
