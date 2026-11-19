@@ -82,7 +82,7 @@ export function AgentWorkBoard({ scope = null }: { scope?: Scope }) {
         </div>
       </div>;
     })}</div>}
-    {recent.length>0 && <div className="ws-agent-list"><button type="button" className="ws-agent-previous-toggle" aria-expanded={showPrevious} onClick={()=>setShowPrevious(v=>!v)}>Previous assignments ({recent.length}) <span>{showPrevious?"Hide":"Show"}</span></button>{showPrevious&&recent.map(assignment=><div key={assignment.id} className="ws-agent-row"><div className="ws-agent-details"><strong>{assignment.title}</strong><small>{assignment.status} · {new Date(assignment.updatedAt).toLocaleDateString()}</small></div></div>)}</div>}
+    {recent.length>0 && <div className="ws-agent-list"><h3 className="ws-agent-previous-head"><button type="button" className="ws-agent-previous-toggle" aria-expanded={showPrevious} onClick={()=>setShowPrevious(v=>!v)}>Previous assignments ({recent.length}) <span>{showPrevious?"Hide":"Show"}</span></button></h3>{showPrevious&&recent.map(assignment=><div key={assignment.id} className="ws-agent-row"><div className="ws-agent-details"><strong>{assignment.title}</strong><small>{assignment.status} · {new Date(assignment.updatedAt).toLocaleDateString()}</small></div></div>)}</div>}
     <p className="ws-agent-note"><ShieldAlert size={16}/> This is a browser-local assignment and evidence workflow. It does not perform AI inference, schedule background work, incur model charges, or enforce server-side workforce permissions.</p>
   </section>;
 }
