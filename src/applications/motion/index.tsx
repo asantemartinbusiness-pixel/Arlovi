@@ -1,5 +1,5 @@
 import { Clapperboard, Cpu, Download, FolderOpen, MousePointerClick, Spline } from "lucide-react";
-import { Button } from "@/design-system";
+import { Button, OVERLAY_WIDTH, OverlayActions, OverlayCancel, OverlaySummary } from "@/design-system";
 import { registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
 import { stagger } from "./anim";
 import { motionUi, parseMotion } from "./model";
@@ -8,7 +8,7 @@ import {
   AssetLibrary, CompositionSetup, ImportComposition, ProjectsTab, PublishTemplate, type ProjectLens,
 } from "./projects";
 import {
-  EditorScreen, KeyboardHelp, KeyframeEditor, LayerInspector, MotionPicker, selectedKeyframe, selectedLayer, setKeyframeHere,
+  EditorScreen, KeyboardHelp, KeyframeEditor, KeyframeSummary, LayerInspector, LayerSummary, MotionPicker, selectedKeyframe, selectedLayer, setKeyframeHere,
 } from "./editor";
 import { CurveEditor, EasingScreen, LoopValidation, TimingPreview, runMotionTest } from "./easing";
 import { loopSeams } from "./anim";
@@ -267,7 +267,7 @@ const EXPORT_ACTIONS: ActionDef[] = [
 
 /* ---------------------------- registration ---------------------------- */
 
-const closeFooter = ({ close }: ScreenContext & { close: () => void }) => <><span className="ds-grow" /><Button variant="ghost" onClick={close}>Close</Button></>;
+const closeFooter = (_context: ScreenContext & { close: () => void }) => <OverlayActions end={<OverlayCancel>Close</OverlayCancel>} />;
 
 registerApp({
   code: "MOTION",
@@ -297,10 +297,10 @@ registerApp({
       })),
       actions: PROJECT_ACTIONS,
       overlays: [
-        { id: "Composition setup", kind: "modal", title: "New composition", width: 560, render: ({ close, ...context }) => <CompositionSetup context={context} close={close} /> },
-        { id: "asset library", kind: "drawer", title: "Linked assets", width: 460, render: ({ close: _close, ...context }) => <AssetLibrary context={context} /> },
-        { id: "publish", kind: "modal", title: "Publish as a brand template", width: 520, render: ({ close, ...context }) => <PublishTemplate context={context} close={close} /> },
-        { id: "import composition", kind: "modal", title: "Import a composition", width: 560, render: ({ close, ...context }) => <ImportComposition context={context} close={close} /> },
+        { id: "Composition setup", kind: "modal", title: "New composition", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <CompositionSetup context={context} close={close} /> },
+        { id: "asset library", kind: "drawer", title: "Linked assets", width: OVERLAY_WIDTH.form, render: ({ close: _close, ...context }) => <AssetLibrary context={context} /> },
+        { id: "publish", kind: "modal", title: "Publish as a brand template", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <PublishTemplate context={context} close={close} /> },
+        { id: "import composition", kind: "modal", title: "Import a composition", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ImportComposition context={context} close={close} /> },
       ],
     },
 
@@ -314,10 +314,10 @@ registerApp({
       })),
       actions: EDITOR_ACTIONS,
       overlays: [
-        { id: "Keyframe editor", kind: "modal", title: "Keyframe", width: 560, render: ({ close }) => <KeyframeEditor close={close} /> },
-        { id: "layer inspector", kind: "drawer", title: "Layer", width: 440, render: ({ close }) => <LayerInspector close={close} /> },
-        { id: "motion picker", kind: "modal", title: "Apply a motion preset", width: 640, render: ({ close }) => <MotionPicker close={close} /> },
-        { id: "keyboard", kind: "modal", title: "Keyboard", width: 560, render: () => <KeyboardHelp />, footer: closeFooter },
+        { id: "Keyframe editor", kind: "modal", title: "Keyframe", width: OVERLAY_WIDTH.modal, summary: () => <KeyframeSummary />, render: ({ close }) => <KeyframeEditor close={close} /> },
+        { id: "layer inspector", kind: "drawer", title: "Layer", width: OVERLAY_WIDTH.form, summary: () => <LayerSummary />, render: ({ close }) => <LayerInspector close={close} /> },
+        { id: "motion picker", kind: "modal", title: "Apply a motion preset", width: OVERLAY_WIDTH.wide, render: ({ close }) => <MotionPicker close={close} /> },
+        { id: "keyboard", kind: "modal", title: "Keyboard", width: OVERLAY_WIDTH.form, render: () => <KeyboardHelp />, footer: closeFooter },
       ],
     },
 
@@ -331,9 +331,9 @@ registerApp({
       })),
       actions: EASING_ACTIONS,
       overlays: [
-        { id: "Curve editor", kind: "modal", title: "Curve editor", width: 560, render: ({ close }) => <CurveEditor close={close} /> },
-        { id: "loop validation", kind: "modal", title: "Loop validation", width: 620, render: ({ close }) => <LoopValidation close={close} /> },
-        { id: "timing preview", kind: "modal", title: "Timing preview", width: 560, render: () => <TimingPreview />, footer: closeFooter },
+        { id: "Curve editor", kind: "modal", title: "Curve editor", width: OVERLAY_WIDTH.modal, render: ({ close }) => <CurveEditor close={close} /> },
+        { id: "loop validation", kind: "modal", title: "Loop validation", width: OVERLAY_WIDTH.modal, render: ({ close }) => <LoopValidation close={close} /> },
+        { id: "timing preview", kind: "modal", title: "Timing preview", width: OVERLAY_WIDTH.modal, render: () => <TimingPreview />, footer: closeFooter },
       ],
     },
 
@@ -347,11 +347,11 @@ registerApp({
       })),
       actions: INTERACTIVE_ACTIONS,
       overlays: [
-        { id: "State inspector", kind: "drawer", title: "State", width: 480, render: ({ close }) => <StateInspector close={close} /> },
-        { id: "interaction guard", kind: "modal", title: "Interaction guard", width: 600, render: ({ close }) => <InteractionGuard close={close} /> },
-        { id: "device preview", kind: "modal", title: "Device preview", width: 720, render: () => <DevicePreview />, footer: closeFooter },
-        { id: "bind trigger", kind: "modal", title: "Bind a trigger", width: 600, render: ({ close }) => <BindTrigger close={close} /> },
-        { id: "remove trigger", kind: "modal", title: "Remove the trigger", width: 480, tone: "danger", render: ({ close }) => <RemoveTrigger close={close} /> },
+        { id: "State inspector", kind: "drawer", title: "State", width: OVERLAY_WIDTH.form, render: ({ close }) => <StateInspector close={close} /> },
+        { id: "interaction guard", kind: "modal", title: "Interaction guard", width: OVERLAY_WIDTH.modal, render: ({ close }) => <InteractionGuard close={close} /> },
+        { id: "device preview", kind: "modal", title: "Device preview", width: OVERLAY_WIDTH.wide, render: () => <DevicePreview />, footer: closeFooter },
+        { id: "bind trigger", kind: "modal", title: "Bind a trigger", width: OVERLAY_WIDTH.form, render: ({ close }) => <BindTrigger close={close} /> },
+        { id: "remove trigger", kind: "modal", title: "Remove the trigger", width: OVERLAY_WIDTH.compact, tone: "danger", render: ({ close }) => <RemoveTrigger close={close} /> },
       ],
     },
 
@@ -365,10 +365,10 @@ registerApp({
       })),
       actions: EXPORT_ACTIONS,
       overlays: [
-        { id: "Export options", kind: "modal", title: (context) => ((context.overlayPayload as { mode?: string } | undefined)?.mode === "render" ? "Render" : "Export"), width: 620, render: ({ close, ...context }) => <ExportOptionsOverlay context={context} close={close} /> },
-        { id: "reduced-motion review", kind: "modal", title: "Reduced-motion review", width: 640, render: ({ close, ...context }) => <ReducedMotionReview context={context} close={close} /> },
-        { id: "compatibility", kind: "modal", title: "Compatibility", width: 760, render: () => <CompatibilityOverlay />, footer: closeFooter },
-        { id: "publish export", kind: "modal", title: "Publish", width: 520, render: ({ close, ...context }) => <PublishExport context={context} close={close} /> },
+        { id: "Export options", kind: "modal", title: (context) => ((context.overlayPayload as { mode?: string } | undefined)?.mode === "render" ? "Render" : "Export"), width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ExportOptionsOverlay context={context} close={close} /> },
+        { id: "reduced-motion review", kind: "modal", title: "Reduced-motion review", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <ReducedMotionReview context={context} close={close} /> },
+        { id: "compatibility", kind: "modal", title: "Compatibility", width: OVERLAY_WIDTH.wide, render: () => <CompatibilityOverlay />, footer: closeFooter },
+        { id: "publish export", kind: "modal", title: "Publish", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <PublishExport context={context} close={close} /> },
       ],
     },
   },

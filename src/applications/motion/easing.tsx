@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Notice, Pill, Row, Select, Stack, TextArea } from "@/design-system";
+import { Button, Notice, Pill, Row, Select, Stack, TextArea, ModalActions, OverlayActions, OverlayCancel, OverlaySection, FactGrid, KeyValueList } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import { EditorFrame, NumberBox, PanelGroup, SaveState, useStore, type DocHandle } from "@/applications/visual/kit";
 import { clamp, springValue } from "@/applications/visual/geometry";
@@ -363,11 +363,7 @@ export function CurveEditor({ close }: { close: () => void }) {
         {EASING_PRESETS.filter((preset) => preset.easing.kind === "bezier").map((preset) => <Button key={preset.id} size="sm" variant="ghost" onClick={() => setDraft(preset.easing)}>{preset.name}</Button>)}
       </Row>
       <code className="ds-num vx-mini">cubic-bezier({points.join(", ")})</code>
-      <Row gap={2}>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={() => { handle.edit((current) => setEasing(current, found.layer.id, found.property, found.keyframe.id, easing), "Edit the easing curve"); close(); }}>Save the curve</Button>
-      </Row>
+      <ModalActions><OverlayActions primary={<Button variant="primary" onClick={() => { handle.edit((current) => setEasing(current, found.layer.id, found.property, found.keyframe.id, easing), "Edit the easing curve"); close(); }}>Save the curve</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }

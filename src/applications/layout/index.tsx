@@ -440,7 +440,6 @@ function FramePanel({ handle, context, compositions }: { handle: DocHandle<Publi
   if (!frame) {
     return (
       <Stack gap={3}>
-        <Notice tone="info" title="Nothing selected">Click a frame on the page, or pick a tool and click to place a new one.</Notice>
         <PanelGroup title="Page">
           <Field label="Master">
             <Select
@@ -458,6 +457,7 @@ function FramePanel({ handle, context, compositions }: { handle: DocHandle<Publi
             { label: "Frames on this page", value: page?.frames.length ?? 0 },
           ]} />
         </PanelGroup>
+        <p className="vx-mini">Click a frame to edit it, or pick a tool and click the page to place one.</p>
       </Stack>
     );
   }

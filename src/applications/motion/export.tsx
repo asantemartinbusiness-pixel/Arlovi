@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, CircleSlash, Download, TriangleAlert } from "lucide-react";
-import { Button, Card, DataGrid, Empty, Grid, Meter, Notice, Pill, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Button, Card, DataGrid, Empty, Grid, Meter, Notice, Pill, Row, Select, Stack, TextArea, TextInput, ModalActions, OverlayActions, OverlayCancel, OverlaySection, FactGrid, KeyValueList } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import { CAPABILITY_LABELS, capabilityById } from "@/platform/capability";
 import {
@@ -382,10 +382,7 @@ export function ExportOptionsOverlay({ context, close }: { context: ScreenContex
 
       {progress.frames > 0 && <Meter value={progress.frame} max={progress.frames} label={`Rendering frame ${progress.frame} of ${progress.frames}`} />}
       {blocked && <Notice tone="danger" title="Not available">{blocked}</Notice>}
-      <Row gap={2}>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>{progress.frames > 0 ? "Hide (keeps rendering)" : "Cancel"}</Button>
-        <Button
+      <ModalActions><OverlayActions primary={<Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || (declared.length > 0 && !acknowledged) || progress.frames > 0}
@@ -402,8 +399,7 @@ export function ExportOptionsOverlay({ context, close }: { context: ScreenContex
           }}
         >
           {format.kind === "raster" ? `Render ${format.name}` : `Export ${format.name}`}
-        </Button>
-      </Row>
+        </Button>} end={<OverlayCancel>{progress.frames > 0 ? "Hide (keeps rendering)" : "Cancel"}</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -437,11 +433,7 @@ export function ReducedMotionReview({ context, close }: { context: ScreenContext
       <FormField label="Review note" hint="What you checked, for example that the alternative still says everything the full motion says.">
         <TextArea rows={2} value={note} onChange={(event) => setNote(event.target.value)} />
       </FormField>
-      <Row gap={2}>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close</Button>
-        <Button variant="primary" disabled={note.trim().length < 6 || doc.reducedMotion.strategy === "none"} onClick={() => { handle.edit((current) => ({ ...current, fallbackReview: { by: context.actor, at: clockIso(), note: note.trim() } }), "Reduced-motion alternative reviewed"); close(); }}>Record the review</Button>
-      </Row>
+      <ModalActions><OverlayActions primary={<Button variant="primary" disabled={note.trim().length < 6 || doc.reducedMotion.strategy === "none"} onClick={() => { handle.edit((current) => ({ ...current, fallbackReview: { by: context.actor, at: clockIso(), note: note.trim() } }), "Reduced-motion alternative reviewed"); close(); }}>Record the review</Button>} end={<OverlayCancel>Close</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }
@@ -488,15 +480,13 @@ export function PublishExport({ context, close }: { context: ScreenContext; clos
       <Notice tone="warning" title={`${hosting?.provider ?? "Hosting"}: ${CAPABILITY_LABELS[hosting?.state ?? "not_connected"]}`}>
         {hosting?.note} The publication is recorded here as queued locally, with who asked and when. Nothing leaves this browser, and no public URL exists.
       </Notice>
-      <Row gap={2}><span className="ds-grow" /><Button variant="ghost" onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={async () => {
+      <ModalActions><OverlayActions primary={<Button variant="primary" onClick={async () => {
           const at = clockIso();
           handle.edit((current) => ({ ...current, renders: current.renders.map((render) => (render.id === latest.id ? { ...render, publish: { state: "queued_local", at, by: context.actor } } : render)) }), `Publish ${latest.artifact} queued locally`);
           await context.mutate.log(`Publish of ${latest.artifact} queued locally; hosting is not connected, nothing left the browser.`, { entityId: current()?.recordId, type: "publish", capability: "queued_local" });
           context.setTab("History");
           close();
-        }}>Queue the publication locally</Button>
-      </Row>
+        }}>Queue the publication locally</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }

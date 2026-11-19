@@ -840,9 +840,9 @@ export function PeriodCompare({ context }: { context: ScreenContext }) {
 export function CustomerSegments({ context }: { context: ScreenContext }) {
   const data = useCommerceData();
   const live = data.orders.filter((order) => order.status !== "cancelled");
-  const segments = [...new Set(data.contacts.map((contact) => String(contact.fields.segment ?? "unknown")))];
+  const segments = [...new Set(data.contacts.map((contact) => String(contact.fields.segment || "No segment recorded")))];
   const rows = segments.map((segment) => {
-    const members = data.contacts.filter((contact) => String(contact.fields.segment ?? "unknown") === segment);
+    const members = data.contacts.filter((contact) => String(contact.fields.segment || "No segment recorded") === segment);
     const orders = live.filter((order) => members.some((contact) => contact.id === String(order.fields.contactId)));
     const value = orders.reduce((sum, order) => sum + (order.amountMinor ?? 0), 0);
     const buyers = new Set(orders.map((order) => String(order.fields.contactId))).size;
@@ -851,6 +851,12 @@ export function CustomerSegments({ context }: { context: ScreenContext }) {
   const guest = live.filter((order) => !data.contacts.some((contact) => contact.id === String(order.fields.contactId)));
   return (
     <Stack gap={4}>
+      <FactGrid columns={4} dense items={[
+        { label: "Segments", value: String(rows.length), mono: true },
+        { label: "Contacts", value: String(rows.reduce((sum, row) => sum + row.members, 0)), mono: true },
+        { label: "Orders counted", value: String(rows.reduce((sum, row) => sum + row.orders, 0)), mono: true },
+        { label: "Order value", value: context.money(rows.reduce((sum, row) => sum + row.value, 0)), mono: true },
+      ]} />
       <DataGrid rows={rows} rowId={(row) => row.segment} label="Customer segments" filterable={false}
         columns={[
           { key: "segment", header: "Segment", primary: true, cell: (row) => <Pill>{row.segment}</Pill> },

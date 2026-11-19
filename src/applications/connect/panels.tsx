@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import {
   Activity, Plug, RefreshCcw, Search, ShieldAlert, ShieldCheck, Webhook, X,
 } from "lucide-react";
-import { Button, Card, Checkbox, DataGrid, Empty, Field, Grid, KeyValueList, Notice, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput } from "@/design-system";
+import { Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Grid, KeyValueList, Notice, OverlaySection, Pill, Row, Select, Stack, Stat, StatRow, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollection, useCollectionState, useEvents, useWorkspace } from "@/platform/workspace";
 import { CAPABILITY_LABELS, CAPABILITY_TONE } from "@/platform/capability";
@@ -36,7 +36,8 @@ export function openConnector(context: ScreenContext, records: Rec[], entry: Con
 
 export function useConnector(context: ScreenContext): { records: Rec[]; record?: Rec; entry?: ConnectorEntry } {
   const records = useCollection("connectors");
-  const routeId = context.params.id;
+  const payloadId = (context.overlayPayload as { id?: unknown } | undefined)?.id;
+  const routeId = context.params.id ?? (typeof payloadId === "string" ? payloadId : undefined) ?? context.selectedId;
   // An explicit connection URL never substitutes another connector's record.
   const record = routeId ? records.find(item => item.id === routeId) : records[0];
   const entry = useMemo(() => {
@@ -81,9 +82,7 @@ export function Marketplace({ context, lens }: { context: ScreenContext; lens: "
   const marketplaceOverview = <section className="connect-marketplace-overview" aria-label="Integration catalogue overview">
     <div className="connect-marketplace-head">
       <div>
-        <span className="connect-eyebrow">PLATFORM / INTEGRATIONS</span>
-        <h2>Connect the tools your work depends on.</h2>
-        <p>Discover software that fits your business, then review secure connection requirements. Existing local capabilities remain available while providers are set up.</p>
+        <p>Review what each provider would need before anything is connected. Local capabilities keep working meanwhile.</p>
       </div>
       <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>View connections</Button>
     </div>
@@ -207,29 +206,26 @@ export function ConnectorPreview({ context }: { context: ScreenContext }) {
   const entry = entryById(chosen) ?? CONNECTOR_ENTRIES[0];
   const authorisationPath = connectorPath(context.org.slug, records, entry, "connect");
   return (
-    <Stack gap={3}>
+    <Stack gap={4}>
       <Field label="Connector" htmlFor="preview-connector">
         <Select id="preview-connector" value={entry.capability.id} onChange={(event) => setChosen(event.target.value)}>
           {CONNECTOR_ENTRIES.map((item) => <option key={item.capability.id} value={item.capability.id}>{item.capability.label}</option>)}
         </Select>
       </Field>
-      <KeyValueList items={[
-        { label: "Capability", value: entry.capability.label },
+      <FactGrid columns={3} items={[
         { label: "Provider", value: entry.capability.provider },
         { label: "State", value: <StateCell entry={entry} /> },
-        { label: "Contract", value: <span className="ds-num">{entry.version}</span> },
+        { label: "Contract", value: entry.version, mono: true },
       ]} />
-      <h4>Scopes it would request</h4>
-      <Stack gap={2}>
-        {entry.scopes.map((scope) => (
-          <Row key={scope.name} gap={2}>
-            <code className="ds-grow">{scope.name}</code>
-            <Pill tone={scope.kind === "write" ? "warning" : "neutral"}>{scope.kind}</Pill>
-          </Row>
-        ))}
-        {entry.scopes.length === 0 && <span className="ds-subtle">No scope model is published for this capability.</span>}
-      </Stack>
-      <Notice tone="warning" title="What happens instead">{entry.capability.localEquivalent}</Notice>
+      <OverlaySection title="Scopes it would request" hint="Read scopes look; write scopes change things at the provider.">
+        {entry.scopes.length === 0 ? <span className="ds-subtle">No scope model is published for this capability.</span> : (
+          <KeyValueList items={entry.scopes.map((scope) => ({
+            label: <code>{scope.name}</code>,
+            value: <Pill tone={scope.kind === "write" ? "warning" : "neutral"}>{scope.kind}</Pill>,
+          }))} />
+        )}
+      </OverlaySection>
+      <OverlaySection title="What happens instead" tone="warning">{entry.capability.localEquivalent}</OverlaySection>
       {authorisationPath ? (
         <Button variant="secondary" onClick={() => { context.closeOverlay(); context.navigate(authorisationPath); }}>
           Open the authorisation flow
@@ -246,22 +242,22 @@ export function ConnectorPreview({ context }: { context: ScreenContext }) {
 export function RiskSummary({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const entry = entryById(payload?.id ?? "") ?? CONNECTOR_ENTRIES[0];
+  const writes = entry.scopes.filter((scope) => scope.kind === "write").length;
   return (
-    <Stack gap={3}>
-      <KeyValueList items={[
+    <Stack gap={4}>
+      <FactGrid columns={3} items={[
+        { label: "Connector", value: entry.capability.label },
         { label: "Risk", value: <Pill tone={entry.risk.level === "high" ? "danger" : entry.risk.level === "medium" ? "warning" : "neutral"}>{entry.risk.level}</Pill> },
-        { label: "Write scopes", value: <span className="ds-num">{String(entry.scopes.filter((scope) => scope.kind === "write").length)}</span> },
+        { label: "Write scopes", value: String(writes), mono: true },
       ]} />
       <p className="ds-prose">{entry.risk.note}</p>
-      <h4>Claims this directory does not repeat</h4>
-      {entry.unverified.length === 0 ? <span className="ds-subtle">None recorded.</span> : (
-        <Stack gap={1}>
-          {entry.unverified.map((claim) => <Row key={claim} gap={2}><span className="ds-grow">{claim}</span><Pill tone="warning">unverified</Pill></Row>)}
-        </Stack>
-      )}
-      <Notice tone="info" title="A provider's own claim is not a supported feature">
-        Only the operations listed in the capability contract are described as supported. Marketing claims are shown as claims.
-      </Notice>
+      <OverlaySection title="Claims this directory does not repeat" hint="A provider's own claim is not a supported feature; only the contract's operations are described as supported.">
+        {entry.unverified.length === 0 ? <span className="ds-subtle">None recorded.</span> : (
+          <Stack gap={1}>
+            {entry.unverified.map((claim) => <Row key={claim} gap={2}><span className="ds-grow">{claim}</span><Pill tone="warning">unverified</Pill></Row>)}
+          </Stack>
+        )}
+      </OverlaySection>
     </Stack>
   );
 }
@@ -575,16 +571,18 @@ export function ExternalOAuth({ context }: { context: ScreenContext }) {
   const { entry } = useConnector(context);
   if (!entry) return null;
   return (
-    <Stack gap={3}>
-      <Notice tone="danger" title="This workspace will not open a sign-in page">
-        An authorisation sends you to a page the provider controls and expects a callback to an address this workspace does not have. Opening a window that cannot come back would be theatre.
+    <Stack gap={4}>
+      <Notice tone="danger" title="No sign-in page will open">
+        Authorisation hands you to a page the provider controls and expects a callback this workspace cannot receive. A window that cannot come back would be theatre, so none is opened and nothing is marked connected.
       </Notice>
-      <KeyValueList items={[
-        { label: "Provider", value: entry.capability.provider },
+      <FactGrid columns={3} items={[
         { label: "Redirect address", value: <Pill tone="danger">none exists</Pill> },
         { label: "Callback receiver", value: <Pill tone="danger">none exists</Pill> },
-        { label: "Result", value: "The flow stops here, deliberately" },
+        { label: "Grant", value: <Pill tone="danger">none</Pill> },
       ]} />
+      <OverlaySection title="When this can work" hint="Only with a verified backend.">
+        A connection counts as made when the provider returns a grant through a server that holds the credential, and one real read succeeds. Until then this stays {entry.capability.provider}, not connected.
+      </OverlaySection>
       <Button variant="secondary" onClick={() => { context.closeOverlay(); context.setTab("Test"); }}>See exactly where it stops</Button>
     </Stack>
   );
@@ -593,24 +591,27 @@ export function ExternalOAuth({ context }: { context: ScreenContext }) {
 export function ScopeReview({ context }: { context: ScreenContext }) {
   const { entry } = useConnector(context);
   if (!entry) return null;
+  const reads = entry.scopes.filter((scope) => scope.kind === "read");
+  const writes = entry.scopes.filter((scope) => scope.kind === "write");
+  const row = (scope: (typeof entry.scopes)[number]) => (
+    <Row key={scope.name} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
+      <div className="ds-grow">
+        <code>{scope.name}</code>
+        <p className="ds-subtle">{scope.purpose}</p>
+      </div>
+      <Checkbox label={scope.kind === "read" ? "Request" : "Request (write)"} defaultChecked={scope.kind === "read"} />
+    </Row>
+  );
   return (
-    <Stack gap={3}>
-      <p className="ds-prose">Least privilege means asking for the read scopes and adding a write scope only when a mission genuinely performs an action.</p>
-      <Stack gap={2}>
-        {entry.scopes.map((scope) => (
-          <Row key={scope.name} gap={2} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-            <div className="ds-grow">
-              <code>{scope.name}</code>
-              <p className="ds-subtle">{scope.purpose}</p>
-            </div>
-            <Pill tone={scope.kind === "write" ? "warning" : "neutral"}>{scope.kind}</Pill>
-            <Checkbox label={scope.kind === "read" ? "Request" : "Request (write)"} defaultChecked={scope.kind === "read"} />
-          </Row>
-        ))}
-        {entry.scopes.length === 0 && <span className="ds-subtle">No scope model is published.</span>}
-      </Stack>
+    <Stack gap={4}>
+      <OverlaySection title={`Read scopes · ${reads.length}`} hint="Enough for most of what a mission needs.">
+        <Stack gap={2}>{reads.map(row)}{reads.length === 0 && <span className="ds-subtle">No read scope is published.</span>}</Stack>
+      </OverlaySection>
+      <OverlaySection title={`Write scopes · ${writes.length}`} tone={writes.length ? "warning" : "neutral"} hint="Add one only when a mission performs an action at the provider.">
+        <Stack gap={2}>{writes.map(row)}{writes.length === 0 && <span className="ds-subtle">This capability proposes no write scope.</span>}</Stack>
+      </OverlaySection>
       <Notice tone="info" title="The choice is recorded, not sent">
-        Nothing is requested, because nothing is reached. The selection is here so the decision can be made before a provider ever exists.
+        Nothing is requested, because no provider is reached. The selection lets the decision be made before one exists.
       </Notice>
     </Stack>
   );
@@ -622,25 +623,24 @@ export function ConsentStatus({ context }: { context: ScreenContext }) {
   if (!entry) return null;
   const attempts = events.filter((event) => event.message.includes(entry.capability.label));
   return (
-    <Stack gap={3}>
-      <KeyValueList items={[
+    <Stack gap={4}>
+      <FactGrid columns={3} items={[
         { label: "Consent", value: <Pill tone="danger">never given</Pill> },
-        { label: "Attempts recorded", value: <span className="ds-num">{String(attempts.length)}</span> },
-        { label: "Last attempt", value: attempts[0] ? <span className="ds-num">{context.dateTime(attempts[0].at)}</span> : "None" },
+        { label: "Attempts recorded", value: String(attempts.length), mono: true },
+        { label: "Last attempt", value: attempts[0] ? context.dateTime(attempts[0].at) : "None", mono: Boolean(attempts[0]) },
       ]} />
       {attempts.length > 0 && (
-        <Stack gap={2}>
-          {attempts.slice(0, 5).map((event) => (
-            <div key={event.id} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-              <strong style={{ fontSize: "var(--text-sm)" }}>{event.message}</strong>
-              <div className="ds-subtle ds-num">{context.dateTime(event.at)} · {event.actor}</div>
-            </div>
-          ))}
-        </Stack>
+        <OverlaySection title="Attempts" hint="Failures are kept so no later reader assumes a connection existed.">
+          <Stack gap={2}>
+            {attempts.slice(0, 5).map((event) => (
+              <div key={event.id} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
+                <strong style={{ fontSize: "var(--text-sm)" }}>{event.message}</strong>
+                <div className="ds-subtle ds-num">{context.dateTime(event.at)} · {event.actor}</div>
+              </div>
+            ))}
+          </Stack>
+        </OverlaySection>
       )}
-      <Notice tone="info" title="An attempt is kept even though it failed">
-        Keeping the failures is what stops a later reader assuming a connection existed.
-      </Notice>
     </Stack>
   );
 }
@@ -950,19 +950,20 @@ export function CapabilityInspector({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const entry = entryById(payload?.id ?? "") ?? CONNECTOR_ENTRIES[0];
   return (
-    <Stack gap={3}>
-      <KeyValueList items={[
+    <Stack gap={4}>
+      <FactGrid columns={3} items={[
         { label: "Capability", value: entry.capability.label },
-        { label: "Contract", value: <span className="ds-num">{entry.version}</span> },
+        { label: "Contract", value: entry.version, mono: true },
         { label: "State", value: <StateCell entry={entry} /> },
       ]} />
-      <h4>Schema</h4>
+      <OverlaySection title="Schema" flush>
       <pre className="t6-code">{JSON.stringify({
         capability: entry.capability.id,
         version: entry.version,
         operations: entry.operations.map((operation) => ({ name: operation.name, kind: operation.direction })),
         scopes: entry.scopes.map((scope) => ({ name: scope.name, kind: scope.kind })),
       }, null, 2)}</pre>
+      </OverlaySection>
       <Notice tone="info" title="A mission chooses by semantics">
         An agent asks for <code>{entry.operations[0]?.name ?? "an operation"}</code> rather than for a provider, so swapping the provider behind it does not rewrite the mission.
       </Notice>
@@ -988,9 +989,7 @@ export function SyncCentre({ context, lens }: { context: ScreenContext; lens: "J
   const overview = <section className="connect-sync-overview" aria-label="Synchronisation overview">
     <div className="connect-sync-head">
       <div>
-        <span className="connect-eyebrow">INTEGRATIONS / SYNCHRONISATION</span>
-        <h2>Understand every movement of data.</h2>
-        <p>Review potential sources, conflicts, schedules and field mappings. No provider ingestion or background jobs are running.</p>
+        <p>No provider ingestion or background job is running; mappings and rules are written before a first sync.</p>
       </div>
       <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>Connection records</Button>
     </div>
@@ -1183,9 +1182,7 @@ export function ConnectorHealth({ context, lens }: { context: ScreenContext; len
   const overview = <section className="connect-health-overview" aria-label="Connector health overview">
     <div className="connect-health-head">
       <div>
-        <span className="connect-eyebrow">INTEGRATIONS / RELIABILITY</span>
-        <h2>Separate local readiness from provider health.</h2>
-        <p>Review checks, incidents, proposed limits and contract versions. External availability cannot be measured without an authorised connection.</p>
+        <p>Two checks run here. Provider availability cannot be measured without an authorised connection.</p>
       </div>
       <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/connect/connections`)}>Review connections</Button>
     </div>
@@ -1460,8 +1457,6 @@ export function ActionReceipts({ context, lens }: { context: ScreenContext; lens
       <section className="connect-receipts-overview" aria-label="Action receipt overview">
         <div className="connect-receipts-head">
           <div>
-            <span className="connect-eyebrow">INTEGRATIONS / AUDIT RECEIPTS</span>
-            <h2>Trace every request at the provider boundary.</h2>
             <p>Review which actions were attempted, blocked or confirmed. A local log entry is not proof that an external provider completed an operation.</p>
           </div>
           <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${org.slug}/connect/sync`)}>Synchronisation</Button>
@@ -1532,15 +1527,14 @@ export function ReceiptDetail({ context }: { context: ScreenContext }) {
     : undefined;
   if (!event) return <Empty title="No receipt selected" icon={<Activity size={20} />} />;
   return (
-    <Stack gap={3}>
-      <KeyValueList items={[
-        { label: "When", value: <span className="ds-num">{context.dateTime(event.at)}</span> },
+    <Stack gap={4}>
+      <FactGrid columns={2} items={[
+        { label: "When", value: context.dateTime(event.at), mono: true },
         { label: "Actor", value: event.actor },
-        { label: "Screen", value: event.screenId ?? "—" },
         { label: "Outcome", value: <Pill tone={CAPABILITY_TONE[event.capability ?? "not_connected"]} dot>{CAPABILITY_LABELS[event.capability ?? "not_connected"]}</Pill> },
         { label: "Provider evidence", value: <Pill tone="danger">none</Pill> },
       ]} />
-      <p className="ds-prose">{event.message}</p>
+      <OverlaySection title="What was recorded" hint={event.screenId ? `From ${event.screenId}` : undefined}>{event.message}</OverlaySection>
       <Notice tone="info" title="What evidence would look like">
         A provider's own identifier for the request, the response status, and a later read that shows the effect. Until all three exist, a receipt stays at the state it reached.
       </Notice>
@@ -1629,18 +1623,18 @@ export function ConflictResolver({ context }: { context: ScreenContext }) {
 export function RevokeGrant({ context }: { context: ScreenContext }) {
   const { entry } = useConnector(context);
   return (
-    <Stack gap={3}>
+    <Stack gap={4}>
       <Notice tone="warning" title="There is no grant to revoke">
         Nothing has been authorised for {entry?.capability.label ?? "this capability"}, so there is no token to invalidate and no cached permission to clear.
       </Notice>
-      <KeyValueList items={[
-        { label: "Tokens held", value: <span className="ds-num">0</span> },
-        { label: "Cached grants", value: <span className="ds-num">0</span> },
-        { label: "Queued calls", value: <span className="ds-num">0</span> },
+      <FactGrid columns={3} items={[
+        { label: "Tokens held", value: "0", mono: true },
+        { label: "Cached grants", value: "0", mono: true },
+        { label: "Queued calls", value: "0", mono: true },
       ]} />
-      <Notice tone="info" title="What revocation would do">
+      <OverlaySection title="What revocation would do">
         Stop new calls immediately, discard the cached grant, and fail any queued mission step rather than retrying it with a dead token.
-      </Notice>
+      </OverlaySection>
       <Button variant="secondary" onClick={() => void context.mutate.log(`Revocation requested for ${entry?.capability.label ?? "a capability"}: nothing to revoke.`, { type: "capability", capability: "not_connected" }).then(() => context.toast("Recorded", "The request is in the receipts, with nothing to revoke."))}>
         Record the request anyway
       </Button>

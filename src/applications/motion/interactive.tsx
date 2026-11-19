@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Keyboard, MonitorSmartphone, MousePointer2, Plus, Trash2 } from "lucide-react";
-import { Button, DataGrid, Empty, Notice, Pill, Row, Segmented, Select, Stack, TextInput } from "@/design-system";
+import { Button, DataGrid, Empty, Notice, Pill, Row, Segmented, Select, Stack, TextInput, ModalActions, OverlayActions, OverlayCancel, DrawerActions, OverlaySection, FactGrid, KeyValueList } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import { ColorBox, EditorFrame, NumberBox, PanelGroup, SaveState, downloadText, slug, useStore, type DocHandle } from "@/applications/visual/kit";
 import { clamp, uid } from "@/applications/visual/geometry";
@@ -382,7 +382,7 @@ export function BindTrigger({ close }: { close: () => void }) {
   const states = doc.states.filter((item) => item.id !== REST);
   const keyboardOptions = on === "hover" ? ["Focus"] : on === "scroll" ? ["Arrow keys"] : on === "load" ? [] : KEY_CHOICES;
   return (
-    <form className="ds-stack ds-gap-3" onSubmit={(event) => {
+    <form id="motion-bind-trigger" className="ds-stack ds-gap-3" onSubmit={(event) => {
       event.preventDefault();
       if (!layerId) { setError("Choose a layer."); return; }
       if (!state) { setError("Add a state on the States tab first; a trigger moves a layer to a state."); return; }
@@ -424,7 +424,7 @@ export function BindTrigger({ close }: { close: () => void }) {
         </Row>
       )}
       {error && <Notice tone="danger" title="Not bound">{error}</Notice>}
-      <Row gap={2}><span className="ds-grow" /><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit">Bind the trigger</Button></Row>
+      <ModalActions><OverlayActions primary={<Button variant="primary" type="submit" form="motion-bind-trigger">Bind the trigger</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </form>
   );
 }
@@ -475,8 +475,18 @@ export function StateInspector({ close }: { close: () => void }) {
           </PanelGroup>
         );
       })}
-      <Row gap={2}>
-        <Button variant="outline-danger" icon={<Trash2 size={14} />} onClick={() => {
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={() => {
+          handle.edit((current) => ({
+            ...current,
+            states: current.states.map((item) => (item.id === state.id ? draft.state : item)),
+            layers: current.layers.map((layer) => ({ ...layer, states: { ...(layer.states ?? {}), [state.id]: draft.layers[layer.id] ?? {} } })),
+          }), `Edit the state ${draft.state.name}`);
+          close();
+        }}>Save the state</Button>}
+          secondary={<OverlayCancel>Cancel</OverlayCancel>}
+          end={<Button variant="outline-danger" icon={<Trash2 size={14} />} onClick={() => {
           handle.edit((current) => ({
             ...current,
             states: current.states.filter((item) => item.id !== state.id),
@@ -485,18 +495,9 @@ export function StateInspector({ close }: { close: () => void }) {
           }), `Delete the state ${state.name}`);
           motionUi.set((current) => ({ ...current, selectedStateId: undefined }));
           close();
-        }}>Delete the state and its triggers</Button>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={() => {
-          handle.edit((current) => ({
-            ...current,
-            states: current.states.map((item) => (item.id === state.id ? draft.state : item)),
-            layers: current.layers.map((layer) => ({ ...layer, states: { ...(layer.states ?? {}), [state.id]: draft.layers[layer.id] ?? {} } })),
-          }), `Edit the state ${draft.state.name}`);
-          close();
-        }}>Save the state</Button>
-      </Row>
+        }}>Delete the state and its triggers</Button>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -565,13 +566,11 @@ export function RemoveTrigger({ close }: { close: () => void }) {
   return (
     <Stack gap={3}>
       <p>Remove <strong>{EVENT_LABEL[trigger.on].toLowerCase()} on {layer?.name}</strong>, which moves it to <strong>{stateName(doc, trigger.state)}</strong>? The state itself is kept. Undo brings the trigger back.</p>
-      <Row gap={2}><span className="ds-grow" /><Button variant="ghost" onClick={close}>Cancel</Button>
-        <Button variant="danger" onClick={() => {
+      <ModalActions><OverlayActions variant="confirm" primary={<Button variant="danger" onClick={() => {
           handle.edit((current) => ({ ...current, triggers: current.triggers.filter((item) => item.id !== trigger.id) }), `Remove the ${trigger.on} trigger on ${layer?.name}`);
           motionUi.set((current) => ({ ...current, selectedTriggerId: undefined }));
           close();
-        }}>Remove the trigger</Button>
-      </Row>
+        }}>Remove the trigger</Button>} end={<OverlayCancel>Cancel</OverlayCancel>} /></ModalActions>
     </Stack>
   );
 }

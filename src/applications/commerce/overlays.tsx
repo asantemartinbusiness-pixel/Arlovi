@@ -9,7 +9,7 @@ import { resolveTaxCode, type TaxCategory } from "@/platform/money";
 import { newRecord, revisedRecord } from "@/platform/repo";
 import { RefundHistory } from "./operations";
 import { orderRefundSummary, refundableMinor, refundedMinor, shipmentsOf } from "./fulfilment";
-import { ProcChain, Totals, type ChainStage } from "@/applications/proc/kit";
+import { CountList, ProcChain, Totals, type ChainStage } from "@/applications/proc/kit";
 import { ProviderBoundary, TAX_CATEGORIES } from "@/applications/market/kit";
 import type { Rec } from "@/domain/types";
 import { setStoreLayout, useStorefront } from "./actions";
@@ -486,15 +486,12 @@ export function CountReconciliation({ context, close }: { context: ScreenContext
         close();
       }}
     >
-      <DataGrid rows={rows} rowId={(row) => row.product.id} label="Count sheet" filterable={false}
-        columns={[
-          { key: "title", header: "Product", primary: true, cell: (row) => row.product.title },
-          { key: "expected", header: "Expected", align: "end", cell: (row) => String(row.expected) },
-          { key: "counted", header: "Counted", align: "end", cell: (row) => (
-            <TextInput aria-label={`Counted ${row.product.title}`} inputMode="numeric" align="end" style={{ maxWidth: 90 }} value={counts[row.product.id] ?? ""} onChange={(event) => setCounts((current) => ({ ...current, [row.product.id]: event.target.value }))} />
-          ) },
-          { key: "variance", header: "Variance", align: "end", cell: (row) => (row.variance === undefined ? <span className="ds-subtle">Not counted</span> : <strong className={row.variance === 0 ? "ds-num" : "ds-field-error"}>{row.variance > 0 ? "+" : ""}{row.variance}</strong>) },
-        ]} />
+      <CountList label="Count sheet" rows={rows.map((row) => ({
+        id: row.product.id, title: row.product.title,
+        facts: [{ label: "Expected", value: String(row.expected) }, { label: "Variance", value: row.variance === undefined ? "Not counted" : `${row.variance > 0 ? "+" : ""}${row.variance}`, tone: row.variance ? "danger" : undefined }],
+        inputHeader: "Counted", inputLabel: `Counted ${row.product.title}`,
+        value: counts[row.product.id] ?? "", onChange: (next) => setCounts((current) => ({ ...current, [row.product.id]: next })),
+      }))} />
       <Notice tone="warning" title="A variance is recorded, not hidden">
         Each difference becomes its own movement with the counted and expected figures in its summary, so the stock ledger explains how it got to today's number.
       </Notice>
@@ -581,6 +578,7 @@ export function RefundApproval({ context, close }: { context: ScreenContext; clo
   const [amount, setAmount] = useState<number | undefined>(undefined);
   const [reason, setReason] = useState("");
   if (!order) return <Empty title="No order" />;
+  if (data.contacts.length === 0 && order.fields.contactId) return <Empty title="Loading the order" />;
   const value = amount ?? remainingMinor;
   const tooMuch = value > remainingMinor;
   const invalid = tooMuch || value <= 0 || !reason.trim();
@@ -619,7 +617,7 @@ export function RefundApproval({ context, close }: { context: ScreenContext; clo
           <Field label="Reason" required><TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required /></Field>
         </Stack>
       </OverlaySection>
-      <ProviderBoundary id="payment.capture" title="A refund cannot be executed here" />
+      <ProviderBoundary id="payment.capture" title="A refund cannot be executed here" kept="The proposal, its amount and its reason, on this order." />
     </form>
   );
 }
@@ -744,6 +742,7 @@ export function RefundConfirmation({ context }: { context: ScreenContext }) {
   const selected = useRecord(id);
   const order = selected?.organizationId === context.org.id && selected.collection === "orders" ? selected : undefined;
   if (!order) return <Empty title="No order selected">Choose the order whose refund proposal you want to review. Another order will not be substituted.</Empty>;
+  if (data.contacts.length === 0 && order.fields.contactId) return <Empty title="Loading the order" />;
   const contact = data.contacts.find((item) => item.id === String(order.fields.contactId ?? ""));
   const summary = orderRefundSummary(order, data.returns);
   const orderTotalMinor = orderTotals(order, contact, org.jurisdiction).grossMinor + Number(order.fields.shippingMinor ?? 0);
@@ -779,9 +778,7 @@ export function RefundConfirmation({ context }: { context: ScreenContext }) {
             ]} />
         )}
       </OverlaySection>
-      <ProviderBoundary id="payment.capture" title="The refund stops at the same boundary as the payment">
-        Money cannot leave this browser. The proposal, its amount and its reason are on the order so the studio can send the refund and record it against the ledger. Arlovi shows no processor receipt because none exists.
-      </ProviderBoundary>
+      <ProviderBoundary id="payment.capture" title="Arlovi cannot send or confirm a refund" kept="The proposal and every refund you record with its reference. No processor receipt exists, so none is shown." />
     </Stack>
   );
 }

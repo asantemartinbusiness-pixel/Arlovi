@@ -35,6 +35,8 @@ import { clockIso, wallMs } from "@/platform/clock";
  * VIDEO — Video Production & Editing
  * ====================================================================== */
 
+const SOURCE_LICENCES = ["Unknown", "Company-owned", "Licensed — single use", "Licensed — unlimited", "Model released", "No model release"];
+
 function useVideoDoc(context: ScreenContext, id?: string) {
   const record = useRecord(id ?? context.params.id);
   const handle = useSharedDoc<VideoDoc>(record, parseVideo, context.screen.id);
@@ -2732,9 +2734,9 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "Media import", kind: "modal", title: "Import media", width: 520, render: ({ close, ...context }) => <MediaImport context={context} close={close} /> },
-        { id: "new sequence", kind: "modal", title: "New sequence", width: 520, render: ({ close, ...context }) => <NewSequence context={context} close={close} />, footer: ({ close }) => (<><Button variant="ghost" onClick={close}>Cancel</Button><span className="ds-grow" /><Button variant="primary" type="submit" form="video-new-sequence">Create</Button></>) },
-        { id: "project settings", kind: "drawer", title: "Project", width: 420, render: ({ ...context }) => <ProjectSettings context={context} /> },
+        { id: "Media import", kind: "modal", title: "Import media", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <MediaImport context={context} close={close} /> },
+        { id: "new sequence", kind: "modal", title: "New sequence", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <NewSequence context={context} close={close} />, footer: formFooter("video-new-sequence", "Create the sequence") },
+        { id: "project settings", kind: "drawer", title: "Project", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <ProjectSettings context={context} /> },
       ],
     },
 
@@ -2748,9 +2750,9 @@ registerApp({
       })),
       actions: TIMELINE_ACTIONS,
       overlays: [
-        { id: "Clip property", kind: "drawer", title: "Clip", width: 420, render: ({ ...context }) => <ClipProperty context={context} /> },
-        { id: "transition editor", kind: "modal", title: "Transition", width: 520, render: ({ close, ...context }) => <TransitionEditor context={context} close={close} /> },
-        { id: "proxy status", kind: "modal", title: "Proxies", width: 480, render: ({ ...context }) => <ProxyStatus context={context} /> },
+        { id: "Clip property", kind: "drawer", title: "Clip", width: OVERLAY_WIDTH.compact, summary: (context) => <ClipSummary context={context} />, render: ({ ...context }) => <ClipProperty context={context} /> },
+        { id: "transition editor", kind: "modal", title: "Transition", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <TransitionEditor context={context} close={close} /> },
+        { id: "proxy status", kind: "modal", title: "Proxies", width: OVERLAY_WIDTH.compact, render: ({ ...context }) => <ProxyStatus context={context} /> },
       ],
     },
 
@@ -2810,11 +2812,11 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "Media inspector", kind: "drawer", title: "Source", width: 460, render: ({ ...context }) => <MediaInspector context={context} /> },
-        { id: "relink file", kind: "modal", title: "Relink", width: 520, render: ({ close, ...context }) => <RelinkFile context={context} close={close} /> },
-        { id: "license", kind: "drawer", title: "Rights", width: 440, render: ({ ...context }) => <LicenceDrawer context={context} /> },
+        { id: "Media inspector", kind: "drawer", title: "Source", width: OVERLAY_WIDTH.form, summary: (context) => <SourceSummary context={context} />, render: ({ ...context }) => <MediaInspector context={context} /> },
+        { id: "relink file", kind: "modal", title: "Relink", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <RelinkFile context={context} close={close} /> },
+        { id: "license", kind: "drawer", title: "Rights", width: OVERLAY_WIDTH.form, summary: (context) => <SourceSummary context={context} />, render: ({ ...context }) => <LicenceDrawer context={context} /> },
         { id: "Media import", kind: "modal", title: "Import a source", width: 520, render: ({ close, ...context }) => <MediaImport context={context} close={close} /> },
-        { id: "tag source", kind: "modal", title: "Tag a source", width: 460, render: ({ close, ...context }) => <TagSource context={context} close={close} />, footer: formFooter("video-tag-source", "Save the tags") },
+        { id: "tag source", kind: "modal", title: "Tag a source", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <TagSource context={context} close={close} />, footer: formFooter("video-tag-source", "Save the tags") },
       ],
     },
 
@@ -2852,11 +2854,11 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "Mixer property", kind: "drawer", title: "Track", width: 420, render: ({ ...context }) => <MixerProperty context={context} /> },
-        { id: "loudness review", kind: "modal", title: "Loudness", width: 560, render: ({ ...context }) => <LoudnessReview context={context} /> },
-        { id: "voice cleanup", kind: "modal", title: "Voice cleanup", width: 520, render: () => <VoiceCleanup /> },
-        { id: "automation point", kind: "modal", title: "Gain automation", width: 520, render: ({ close, ...context }) => <AutomationPoint context={context} close={close} />, footer: formFooter("video-automation", "Write the point") },
-        { id: "export mix check", kind: "modal", title: "Before the mix is exported", width: 520, render: ({ close, ...context }) => <ExportMixWarning context={context} close={close} /> },
+        { id: "Mixer property", kind: "drawer", title: "Track", width: OVERLAY_WIDTH.compact, summary: (context) => <TrackSummary context={context} />, render: ({ ...context }) => <MixerProperty context={context} /> },
+        { id: "loudness review", kind: "modal", title: "Loudness", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <LoudnessReview context={context} /> },
+        { id: "voice cleanup", kind: "modal", title: "Voice cleanup", width: OVERLAY_WIDTH.compact, render: () => <VoiceCleanup /> },
+        { id: "automation point", kind: "modal", title: "Gain automation", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <AutomationPoint context={context} close={close} />, footer: formFooter("video-automation", "Write the point") },
+        { id: "export mix check", kind: "modal", title: "Before the mix is exported", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ExportMixWarning context={context} close={close} /> },
       ],
     },
 
@@ -2941,10 +2943,10 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "Caption editor", kind: "drawer", title: "Cue", width: 460, render: ({ ...context }) => <CaptionEditorOverlay context={context} /> },
-        { id: "speaker verification", kind: "modal", title: "Speakers", width: 520, render: ({ ...context }) => <SpeakerVerification context={context} /> },
-        { id: "language review", kind: "modal", title: "Languages", width: 520, render: ({ ...context }) => <LanguageReview context={context} /> },
-        { id: "caption style", kind: "modal", title: "Caption style", width: 560, render: ({ close, ...context }) => <CaptionStyleEditor context={context} close={close} />, footer: formFooter("video-caption-style", "Apply the style") },
+        { id: "Caption editor", kind: "drawer", title: "Cue", width: OVERLAY_WIDTH.form, summary: (context) => <CueSummary context={context} />, render: ({ ...context }) => <CaptionEditorOverlay context={context} /> },
+        { id: "speaker verification", kind: "modal", title: "Speakers", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <SpeakerVerification context={context} /> },
+        { id: "language review", kind: "modal", title: "Languages", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <LanguageReview context={context} /> },
+        { id: "caption style", kind: "modal", title: "Caption style", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <CaptionStyleEditor context={context} close={close} />, footer: formFooter("video-caption-style", "Apply the style") },
       ],
     },
 
@@ -2988,11 +2990,11 @@ registerApp({
         { id: "save preset", label: "Save the grade as a preset…", placement: "overflow", guard: needsClip, run: (context) => context.openOverlay("preset save") },
       ],
       overlays: [
-        { id: "Effect inspector", kind: "drawer", title: "Effects", width: 440, render: ({ ...context }) => <EffectInspectorOverlay context={context} /> },
-        { id: "scope display", kind: "modal", title: "Scopes", width: 560, render: ({ ...context }) => <ScopeOverlay context={context} /> },
-        { id: "preset save", kind: "modal", title: "Save a preset", width: 480, render: ({ close, ...context }) => <SavePreset context={context} close={close} />, footer: formFooter("video-save-preset", "Save the preset") },
-        { id: "apply preset", kind: "modal", title: "Apply a preset", width: 520, render: ({ close, ...context }) => <ApplyPreset context={context} close={close} /> },
-        { id: "grade preview", kind: "modal", title: "Preview the grade", width: 620, render: ({ ...context }) => <GradePreview context={context} /> },
+        { id: "Effect inspector", kind: "drawer", title: "Effects", width: OVERLAY_WIDTH.compact, summary: (context) => <ClipSummary context={context} />, render: ({ ...context }) => <EffectInspectorOverlay context={context} /> },
+        { id: "scope display", kind: "modal", title: "Scopes", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <ScopeOverlay context={context} /> },
+        { id: "preset save", kind: "modal", title: "Save a preset", width: OVERLAY_WIDTH.compact, render: ({ close, ...context }) => <SavePreset context={context} close={close} />, footer: formFooter("video-save-preset", "Save the preset") },
+        { id: "apply preset", kind: "modal", title: "Apply a preset", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ApplyPreset context={context} close={close} /> },
+        { id: "grade preview", kind: "modal", title: "Preview the grade", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <GradePreview context={context} /> },
       ],
     },
 
@@ -3047,11 +3049,11 @@ registerApp({
         { id: "compatibility", label: "What this browser can encode", placement: "overflow", run: (context) => context.openOverlay("compatibility") },
       ],
       overlays: [
-        { id: "Render settings", kind: "modal", title: "Render", width: 760, render: ({ ...context }) => <RenderSettings context={context} /> },
-        { id: "compatibility", kind: "modal", title: "What this browser can encode", width: 560, render: () => <Compatibility /> },
-        { id: "delivery confirmation", kind: "drawer", title: "Delivery", width: 460, render: ({ ...context }) => <DeliveryConfirmation context={context} /> },
-        { id: "render preview", kind: "modal", title: "Render preview", width: 760, render: ({ ...context }) => <RenderPreview context={context} /> },
-        { id: "publish render", kind: "modal", title: "Publish a render", width: 520, render: ({ close, ...context }) => <PublishRender context={context} close={close} />, footer: formFooter("video-publish", "Queue for publishing") },
+        { id: "Render settings", kind: "modal", title: "Render", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <RenderSettings context={context} /> },
+        { id: "compatibility", kind: "modal", title: "What this browser can encode", width: OVERLAY_WIDTH.modal, render: () => <Compatibility /> },
+        { id: "delivery confirmation", kind: "drawer", title: "Delivery", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <DeliveryConfirmation context={context} /> },
+        { id: "render preview", kind: "modal", title: "Render preview", width: OVERLAY_WIDTH.modal, render: ({ ...context }) => <RenderPreview context={context} /> },
+        { id: "publish render", kind: "modal", title: "Publish a render", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <PublishRender context={context} close={close} />, footer: formFooter("video-publish", "Queue for publishing") },
       ],
     },
 
@@ -3092,9 +3094,9 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "Review marker", kind: "modal", title: "Timecoded note", width: 720, render: ({ ...context }) => <ReviewMarker context={context} /> },
-        { id: "version comparison", kind: "modal", title: "Compare versions", width: 820, render: ({ ...context }) => <VersionComparison context={context} /> },
-        { id: "final signoff", kind: "modal", title: "Record a decision", width: 560, render: ({ close, ...context }) => <FinalSignoff context={context} close={close} />, footer: ({ close }) => (<><Button variant="ghost" onClick={close}>Cancel</Button><span className="ds-grow" /><Button variant="primary" type="submit" form="video-signoff">Record</Button></>) },
+        { id: "Review marker", kind: "modal", title: "Timecoded note", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <ReviewMarker context={context} /> },
+        { id: "version comparison", kind: "modal", title: "Compare versions", width: OVERLAY_WIDTH.wide, render: ({ ...context }) => <VersionComparison context={context} /> },
+        { id: "final signoff", kind: "modal", title: "Record a decision", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <FinalSignoff context={context} close={close} />, footer: formFooter("video-signoff", "Record the decision") },
       ],
     },
   },

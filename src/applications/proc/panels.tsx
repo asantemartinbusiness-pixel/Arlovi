@@ -92,7 +92,7 @@ export function ProcurementOverview({ context, lens }: { context: ScreenContext;
               <KeyValueList items={[
                 { label: "Open exposure", value: <span className="ds-num">{context.money(exposure)}</span> },
                 { label: "On time", value: <span className="ds-num">{String(supplier.fields.onTimeRatePct ?? "—")}%</span> },
-                { label: "Lead time", value: <span className="ds-num">{String(supplier.fields.leadTimeDays ?? "—")} days</span> },
+                { label: "Lead time", value: supplier.fields.leadTimeDays ? <span className="ds-num">{String(supplier.fields.leadTimeDays)} days</span> : "—" },
                 { label: "Terms", value: String(supplier.fields.terms ?? "—") },
               ]} />
             </Card>
@@ -317,24 +317,23 @@ export function SupplierDetail({ context, lens }: { context: ScreenContext; lens
 
   return (
     <Grid>
-      <Card span={5} eyebrow="SUPPLIER" prov="human" title={supplier.title} subtitle={supplier.summary}
-        actions={<Pill tone={statusTone(supplier.status)} dot>{supplier.status}</Pill>}>
+      <Card span={5} eyebrow="ON RECORD" prov="human" title="Contact and terms" subtitle={supplier.summary || undefined}>
         <KeyValueList items={[
           { label: "Category", value: String(supplier.fields.category ?? "—") },
           { label: "Contact", value: String(supplier.fields.contactName ?? "—") },
           { label: "Email", value: String(supplier.fields.email ?? "—") },
           { label: "Terms", value: String(supplier.fields.terms ?? "—") },
-          { label: "Lead time", value: <span className="ds-num">{String(supplier.fields.leadTimeDays ?? "—")} days</span> },
+          { label: "Lead time", value: supplier.fields.leadTimeDays ? <span className="ds-num">{String(supplier.fields.leadTimeDays)} days</span> : "—" },
           { label: "Tax status", value: String(supplier.fields.taxStatus ?? "unknown").replace("_", " ") },
           { label: "Approved by", value: String(supplier.fields.approvedBy || "Not approved") },
         ]} />
       </Card>
-      <Card span={7} eyebrow="BANK DETAIL" prov={String(supplier.fields.bankLast4) ? "posted" : "unknown"} title="Payment details" subtitle="Changed only through a separate verification">
+      <Card span={7} eyebrow="BANK DETAIL" prov={supplier.fields.bankLast4 ? "posted" : "unknown"} title="Payment details" subtitle="Changed only through a separate verification">
         <Stack gap={3}>
           <KeyValueList items={[
-            { label: "Account on file", value: String(supplier.fields.bankLast4) ? <span className="ds-num">ends ···{String(supplier.fields.bankLast4)}</span> : "None recorded" },
-            { label: "Verified", value: String(supplier.fields.bankVerifiedAt) ? <span className="ds-num">{context.date(String(supplier.fields.bankVerifiedAt))}</span> : <Pill tone="warning">Never</Pill> },
-            { label: "Age", value: String(supplier.fields.bankVerifiedAt) ? `${freshness(String(supplier.fields.bankVerifiedAt), now, 365).days} days` : "Unknown" },
+            { label: "Account on file", value: supplier.fields.bankLast4 ? <span className="ds-num">ends ···{String(supplier.fields.bankLast4)}</span> : "None recorded" },
+            { label: "Verified", value: supplier.fields.bankVerifiedAt ? <span className="ds-num">{context.date(String(supplier.fields.bankVerifiedAt))}</span> : <Pill tone="warning">Never</Pill> },
+            { label: "Age", value: supplier.fields.bankVerifiedAt ? `${freshness(String(supplier.fields.bankVerifiedAt), now, 365).days} days` : "Unknown" },
           ]} />
           <Notice tone="danger" title="A bank change is the most common fraud in procurement">
             Changing these details is not an ordinary edit. It requires a separate verification against a known contact, recorded with who confirmed it, which is why the field is read-only here.

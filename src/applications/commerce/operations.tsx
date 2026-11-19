@@ -1,3 +1,4 @@
+import { CountList } from "@/applications/proc/kit";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -141,17 +142,13 @@ function FulfilLinesForm({ context, close, order }: { context: ScreenContext; cl
         { label: "Shipment", value: <span className="ds-num">{nextShipmentNumber(order)}</span> },
         { label: "Ship from", value: data.warehouses.find((item) => item.id === warehouseId)?.title ?? "Not set" },
       ]} />
-      <DataGrid rows={progress} rowId={(row) => row.line.id} label="Units to put on this shipment" filterable={false}
-        columns={[
-          { key: "line", header: "Line", primary: true, cell: (row) => row.line.description },
-          { key: "remaining", header: "Remaining", align: "end", cell: (row) => <span className="ds-num">{row.remaining}</span> },
-          { key: "qty", header: "This shipment", align: "end", cell: (row) => (
-            <TextInput aria-label={`Units of ${row.line.description} on this shipment`} inputMode="numeric" align="end" style={{ maxWidth: 90 }}
-              value={counts[row.line.id] ?? "0"} disabled={row.remaining === 0}
-              invalid={(request[row.line.id] ?? 0) > row.remaining}
-              onChange={(event) => { setCounts((current) => ({ ...current, [row.line.id]: event.target.value })); setError(""); }} />
-          ) },
-        ]} />
+      <CountList label="Units to put on this shipment" rows={progress.map((row) => ({
+        id: row.line.id, title: row.line.description,
+        facts: [{ label: "Remaining", value: String(row.remaining) }],
+        inputHeader: "This shipment", inputLabel: `Units of ${row.line.description} on this shipment`,
+        value: counts[row.line.id] ?? "0", disabled: row.remaining === 0, invalid: (request[row.line.id] ?? 0) > row.remaining,
+        onChange: (next) => { setCounts((current) => ({ ...current, [row.line.id]: next })); setError(""); },
+      }))} />
       {short.length > 0 && (
         <Notice tone="warning" title="Less on hand than you are picking">
           {short.map((row) => row.line.description).join(", ")} {short.length === 1 ? "has" : "have"} fewer units at this location than requested. Pick what is there and leave the balance for a later shipment.

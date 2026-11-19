@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import { Button, FactGrid, MoneyInput, Notice, OverlayActions, Pill, Select, TextInput } from "@/design-system";
 import type { InvoiceTotals, TaxCategory } from "@/platform/money";
 import type { Rec } from "@/domain/types";
 import { bodyOf, isPurchaseOrder, type PoBody, type PoLine } from "./data";
 import { purchaseTrail, type StepState } from "./lifecycle";
-import { useWorkspace } from "@/platform/workspace";
+import { useRecord, useWorkspace } from "@/platform/workspace";
 import type { ScreenContext } from "@/platform/registry";
 import { statusTone, findSupplier, useProcData } from "./data";
 import "./proc-lifecycle.css";
@@ -136,16 +137,46 @@ export function Totals({ totals, money, label }: { totals: InvoiceTotals; money:
 export function SupplierHeading({ context, part }: { context: ScreenContext; part: "title" | "status" | "subtitle" | "meta" }) {
   const data = useProcData();
   const { org } = useWorkspace();
-  const supplier = findSupplier(data, context.params.id);
+  const routed = useRecord(context.params.id);
+  const supplier = findSupplier(data, context.params.id) ?? (routed?.collection === "suppliers" ? routed : undefined);
   if (!supplier) return part === "title" ? <>Supplier</> : null;
   if (part === "title") return <>{supplier.title}</>;
   if (part === "status") return <Pill tone={statusTone(supplier.status)} dot>{supplier.status}</Pill>;
   const open = data.purchaseOrders.filter((order) => String(order.fields.supplierId) === supplier.id && ["approved", "sent"].includes(order.status));
   const exposure = open.reduce((sum, order) => sum + (order.amountMinor ?? 0), 0);
-  if (part === "subtitle") return <>{String(supplier.fields.category ?? "")}{supplier.fields.email ? ` · ${String(supplier.fields.email)}` : ""}</>;
+  const text = (value: unknown) => (value === undefined || value === null || value === "" ? "" : String(value));
+  if (part === "subtitle") return <>{[text(supplier.fields.category), text(supplier.fields.email)].filter(Boolean).join(" · ")}</>;
+  const parts = [
+    text(supplier.fields.terms),
+    text(supplier.fields.leadTimeDays) ? `${text(supplier.fields.leadTimeDays)} day lead` : "",
+    supplier.fields.onTimeRatePct !== undefined && supplier.fields.onTimeRatePct !== "" ? `${text(supplier.fields.onTimeRatePct)}% on time` : "no delivery record",
+    `${open.length} open order${open.length === 1 ? "" : "s"}${open.length ? `, ${new Intl.NumberFormat(undefined, { style: "currency", currency: org.currency }).format(exposure / 100)} exposed` : ""}`,
+  ].filter(Boolean);
+  return <span className="ds-num">{parts.join(" · ")}</span>;
+}
+
+/* ---------------- Count list: labelled, stacked rows that keep their inputs on a phone ---------------- */
+
+export interface CountRow { id: string; title: ReactNode; facts: { label: string; value: ReactNode; tone?: "danger" }[]; inputLabel: string; inputHeader: string; value: string; onChange: (next: string) => void; invalid?: boolean; disabled?: boolean }
+
+/** Editable count rows. Unlike a data grid in card mode, every input stays on screen at any width. */
+export function CountList({ rows, label }: { rows: CountRow[]; label: string }) {
   return (
-    <span className="ds-num">
-      {String(supplier.fields.terms ?? "No terms")} · {String(supplier.fields.leadTimeDays ?? "—")} day lead · {supplier.fields.onTimeRatePct !== undefined ? `${String(supplier.fields.onTimeRatePct)}% on time` : "no delivery record"} · {open.length} open order{open.length === 1 ? "" : "s"}, {new Intl.NumberFormat(undefined, { style: "currency", currency: org.currency }).format(exposure / 100)} exposed
-    </span>
+    <ul className="pr-count" aria-label={label}>
+      {rows.map((row) => (
+        <li key={row.id} className="pr-count-row">
+          <div className="pr-count-title">{row.title}</div>
+          <dl className="pr-count-facts">
+            {row.facts.map((fact) => (
+              <div key={fact.label} data-tone={fact.tone}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>
+            ))}
+          </dl>
+          <label className="pr-count-input">
+            <span>{row.inputHeader}</span>
+            <TextInput aria-label={row.inputLabel} inputMode="numeric" align="end" invalid={row.invalid} disabled={row.disabled} value={row.value} onChange={(event) => row.onChange(event.target.value)} />
+          </label>
+        </li>
+      ))}
+    </ul>
   );
 }

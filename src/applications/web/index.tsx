@@ -637,7 +637,7 @@ function ConsentInspector({ context }: { context: ScreenContext }) {
     <Stack gap={4}>
       {form ? (
         <OverlaySection title={form.name} hint="The wording shown to the person is copied onto each submission, so a later reader sees what was agreed.">
-          <FactGrid columns={1} items={[
+          <FactGrid columns={2} items={[
             { label: "Consent line", value: form.consent },
             { label: "Stored with the submission", value: "Yes, the accepted wording is copied onto the record" },
             { label: "Spam control", value: form.honeypot ? "A hidden field is checked" : "None" },

@@ -3631,11 +3631,9 @@ function PublishComponent({ context, close }: { context: ScreenContext; close: (
   return (
     <Stack gap={3}>
       <FactGrid
-        columns={3}
         items={[
-          { label: "Library version", value: component.published ? `version ${component.version}` : "not published", mono: true },
-          { label: "Publishes as", value: `version ${next}`, mono: true },
-          { label: "Instances reached", value: uses.length, mono: true, tone: breaking.length > 0 && uses.length > 0 ? "warning" : undefined },
+          { label: "Version", value: component.published ? `${component.version} → ${next}` : `unpublished → ${next}`, mono: true },
+          { label: "Instances reached", value: uses.length, mono: true, tone: breaking.length > 0 && uses.length > 0 ? "warning" : undefined, hint: uses.length ? `on ${[...new Set(uses.map((use) => use.pageName))].join(", ")}` : undefined },
         ]}
       />
       <OverlaySection
@@ -3691,12 +3689,9 @@ function BreakingChange({ context }: { context: ScreenContext }) {
   return (
     <Stack gap={3}>
       <FactGrid
-        columns={3}
-        dense
         items={[
-          { label: "Instances", value: uses.length, mono: true },
+          { label: "Instances", value: uses.length, mono: true, hint: `${withOverrides} with overrides, which survive` },
           { label: "Pages", value: new Set(uses.map((use) => use.pageId)).size, mono: true },
-          { label: "With overrides", value: withOverrides, mono: true, hint: "Overrides survive" },
         ]}
       />
       {!first && changes.length > 0 && (

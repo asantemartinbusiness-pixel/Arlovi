@@ -10,7 +10,7 @@ import type { Rec } from "@/domain/types";
 import type { TaxCategory } from "@/platform/money";
 import { applyScenario, approvalLimitFor } from "./actions";
 import { ReceiptStockLinks } from "./supplierInsights";
-import { blankLine, chainForOrder, chainForRequisition, LineEditor, ProcChain, Totals } from "./kit";
+import { blankLine, chainForOrder, chainForRequisition, CountList, LineEditor, ProcChain, Totals } from "./kit";
 import {
   approverFor, APPROVAL_LIMITS, billTotals, bodyOf, findSupplier, isPurchaseOrder, MATCH_LABEL, matchTone, resolveSupplierId,
   outstandingFor, poTotals, statusTone, threeWayMatch, useProcData,
@@ -470,8 +470,8 @@ export function SupplierVerification({ context, close }: { context: ScreenContex
     >
       <OverlaySummary eyebrow="Bank detail" title={supplier.title} status={<Pill tone={statusTone(supplier.status)} dot>{supplier.status}</Pill>} />
       <FactGrid columns={2} items={[
-        { label: "Current account", value: String(supplier.fields.bankLast4) ? `···${String(supplier.fields.bankLast4)}` : "None recorded", mono: true },
-        { label: "Last verified", value: String(supplier.fields.bankVerifiedAt) ? context.date(String(supplier.fields.bankVerifiedAt)) : "Never", mono: true, tone: String(supplier.fields.bankVerifiedAt) ? undefined : "warning" },
+        { label: "Current account", value: supplier.fields.bankLast4 ? `···${String(supplier.fields.bankLast4)}` : "None recorded", mono: true },
+        { label: "Last verified", value: supplier.fields.bankVerifiedAt ? context.date(String(supplier.fields.bankVerifiedAt)) : "Never", mono: true, tone: supplier.fields.bankVerifiedAt ? undefined : "warning" },
       ]} />
       <OverlaySection title="Call-back verification" flush>
       <Stack gap={3}>
@@ -820,6 +820,7 @@ export function SendPreview({ context, close }: { context: ScreenContext; close:
         meta={[`To ${supplier?.title ?? "—"} · ${String(supplier?.fields.email ?? "no email on file")}`]}
       />
       <ProcChain stages={chainForOrder(order, data.purchaseOrders, data.receipts, data.bills)} />
+      {(bodyOf<PoBody>(order, {}).lines ?? []).length === 0 && <Notice tone="warning" title="This order has no lines">There is nothing to issue. Add lines in the order editor first.</Notice>}
       <OverlaySection title="What the supplier would receive" hint={`From ${org.name}`} flush>
         <DataGrid rows={bodyOf<PoBody>(order, {}).lines ?? []} rowId={(row) => row.id} label="Order lines" filterable={false}
           columns={[
@@ -838,7 +839,7 @@ export function SendPreview({ context, close }: { context: ScreenContext; close:
           primary={
             <Button
               variant="primary"
-              disabled={!approved}
+              disabled={!approved || (bodyOf<PoBody>(order, {}).lines ?? []).length === 0}
               onClick={async () => {
                 const ok7 = await context.mutate.patch(order.id, {
                   status: "sent",
@@ -943,16 +944,12 @@ export function StockCount({ context, close }: { context: ScreenContext; close: 
       <OverlaySummary eyebrow="Stock count" title={warehouse.title}
         meta={[`${rows.filter((row) => row.counted !== undefined).length} of ${rows.length} lines counted`, `${variances.length} variance${variances.length === 1 ? "" : "s"} to record`]} />
       <OverlaySection title="Count sheet" hint="Leave a line blank if it was not counted." flush>
-      <DataGrid rows={rows} rowId={(row) => row.product.id} label="Count sheet" filterable={false}
-        columns={[
-          { key: "product", header: "Product", primary: true, cell: (row) => row.product.title },
-          { key: "expected", header: "Expected", align: "end", cell: (row) => <span className="ds-num">{String(row.expected)}</span> },
-          { key: "counted", header: "Counted", align: "end", cell: (row) => (
-            <TextInput aria-label={`Counted ${row.product.title}`} inputMode="numeric" align="end" style={{ maxWidth: 90 }}
-              value={counts[row.product.id] ?? ""} onChange={(event) => setCounts((current) => ({ ...current, [row.product.id]: event.target.value }))} />
-          ) },
-          { key: "variance", header: "Variance", align: "end", cell: (row) => (row.variance === undefined ? <span className="ds-subtle">Not counted</span> : <strong className={row.variance === 0 ? "ds-num" : "ds-field-error"}>{row.variance > 0 ? "+" : ""}{row.variance}</strong>) },
-        ]} />
+      <CountList label="Count sheet" rows={rows.map((row) => ({
+        id: row.product.id, title: row.product.title,
+        facts: [{ label: "Expected", value: String(row.expected) }, { label: "Variance", value: row.variance === undefined ? "Not counted" : `${row.variance > 0 ? "+" : ""}${row.variance}`, tone: row.variance ? "danger" : undefined }],
+        inputHeader: "Counted", inputLabel: `Counted ${row.product.title}`,
+        value: counts[row.product.id] ?? "", onChange: (next) => setCounts((current) => ({ ...current, [row.product.id]: next })),
+      }))} />
       </OverlaySection>
       <Notice tone="warning" title="A variance becomes its own movement">
         The level is never overwritten. Each difference is written as a movement carrying the counted and expected figures.
@@ -1009,7 +1006,9 @@ export function TransferForm({ context, close }: { context: ScreenContext; close
 
 export function ScanOverlay({ context, close }: { context: ScreenContext; close: () => void }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
-  const target = useRecord(payload?.id);
+  const chosen = useRecord(payload?.id ?? context.selectedId);
+  // A selected receipt or order presets the form; any other selection (a stock row, say) is ignored.
+  const target = chosen && ["receipts", "purchaseOrders"].includes(chosen.collection) ? chosen : undefined;
   const data = useProcData();
   if (payload?.id && !target) return <Empty title="Loading the record" />;
   if (target?.collection === "receipts" && target.status !== "expected") {
@@ -1152,18 +1151,13 @@ function ScanOverlayForm({ context, close, receipt, presetOrder, loaded }: { con
         <>
           <OverlaySection title="Count what arrived" hint="Enter what is physically here. The receipt is its own record, separate from the order and the invoice." flush>
           {outstanding.length === 0 ? <Notice tone="success" title="Everything on this order has been received">There is nothing outstanding to receipt.</Notice> : (
-            <DataGrid rows={outstanding} rowId={(row) => row.line.id} label="Outstanding lines" filterable={false}
-              columns={[
-                { key: "description", header: "Item", primary: true, cell: (row) => row.line.description },
-                { key: "ordered", header: "Ordered", align: "end", cell: (row) => <span className="ds-num">{String(row.line.quantity)}</span> },
-                { key: "already", header: "Already received", align: "end", cell: (row) => <span className="ds-num">{String(row.line.receivedQuantity)}</span> },
-                { key: "outstanding", header: "Outstanding", align: "end", cell: (row) => <span className="ds-num">{String(row.outstanding)}</span> },
-                { key: "count", header: "Received now", align: "end", cell: (row) => (
-                  <TextInput aria-label={`Received now for ${row.line.description}`} inputMode="numeric" align="end" style={{ maxWidth: 90 }}
-                    invalid={countFor(row.line.id) > row.outstanding}
-                    value={received[row.line.id] ?? ""} onChange={(event) => setReceived((current) => ({ ...current, [row.line.id]: event.target.value }))} />
-                ) },
-              ]} />
+            <CountList label="Outstanding lines" rows={outstanding.map((row) => ({
+              id: row.line.id, title: row.line.description,
+              facts: [{ label: "Ordered", value: String(row.line.quantity) }, { label: "Already received", value: String(row.line.receivedQuantity) }, { label: "Outstanding", value: String(row.outstanding) }],
+              inputHeader: "Received now", inputLabel: `Received now for ${row.line.description}`,
+              invalid: countFor(row.line.id) > row.outstanding,
+              value: received[row.line.id] ?? "", onChange: (next) => setReceived((current) => ({ ...current, [row.line.id]: next })),
+            }))} />
           )}
           </OverlaySection>
           {outstanding.length > 0 && (
