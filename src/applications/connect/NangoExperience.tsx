@@ -165,6 +165,7 @@ export function NangoGuidedSetup({ context }: { context: ScreenContext }) {
   const [launched, setLaunched] = useState(false);
   const [verified, setVerified] = useState(false);
   const [previousIds, setPreviousIds] = useState<string[] | null>(null);
+  const [popupBlockedLink, setPopupBlockedLink] = useState<string | null>(null);
   const available = Boolean(provider && status?.available && status.integrations.includes(provider.id));
   if (!provider) return <Notice tone="warning" title="Unknown integration">Select a supported integration in the directory.</Notice>;
 
@@ -173,7 +174,7 @@ export function NangoGuidedSetup({ context }: { context: ScreenContext }) {
     // Open synchronously on user action, before the asynchronous session call.
     const popup = window.open("about:blank", "_blank", "width=580,height=730");
     if (popup) { popup.document.title = "Authorising account"; popup.opener = null; }
-    setBusy(true); setError("");
+    setBusy(true); setError(""); setPopupBlockedLink(null);
     try {
       // A preflight snapshot prevents an older account from being mistaken for
       // a successful NEW connection. The backend checks current user ownership.
@@ -185,9 +186,15 @@ export function NangoGuidedSetup({ context }: { context: ScreenContext }) {
       });
       const destination = new URL(result.connectLink);
       if (destination.protocol !== "https:") throw new Error("The connection service returned an invalid sign-in address.");
-      if (popup && !popup.closed) popup.location.replace(destination.toString());
-      else window.open(destination.toString(), "_blank", "noopener,noreferrer");
-      setLaunched(true); setStep(2);
+      if (popup && !popup.closed) {
+        popup.location.replace(destination.toString());
+        setLaunched(true);
+      } else {
+        // Browsers can block windows after asynchronous session creation.
+        // Offer a user-clicked link rather than silently dropping the flow.
+        setPopupBlockedLink(destination.toString());
+      }
+      setStep(2);
     } catch (cause) {
       if (popup && !popup.closed) popup.close();
       setError(cause instanceof Error ? cause.message : "We could not start the secure sign-in.");
@@ -249,10 +256,14 @@ export function NangoGuidedSetup({ context }: { context: ScreenContext }) {
       <p className="ds-prose">{verified
         ? "The account now appears in Nango's connection register. Data imports and actions must still be enabled and verified separately."
         : "Once you approve access in the sign-in window, return here to verify that the account was linked."}</p>
+      {popupBlockedLink && !verified && <Notice tone="info" title="Your browser blocked the sign-in window">
+        <a href={popupBlockedLink} target="_blank" rel="noopener noreferrer"
+          onClick={() => setLaunched(true)}>Open the secure sign-in page</a>, then return here to check your connection.
+      </Notice>}
       {verified && <Notice tone="success" title="Account verified">Authorisation is confirmed. No data sync or external write was automatically activated.</Notice>}
       {error && !verified && <Notice tone="warning" title="Not verified yet">{error}</Notice>}
       {verified ? <Button variant="primary" onClick={() => { context.closeOverlay(); context.navigate("/o/" + context.org.slug + "/connect/connections"); }}>View connections <ArrowRight size={15}/></Button> :
-        <Button variant="primary" busy={busy} onClick={verify}><CheckCircle2 size={16}/> Check connection</Button>}
+        <Button variant="primary" disabled={!launched} busy={busy} onClick={verify}><CheckCircle2 size={16}/> Check connection</Button>}
       <Button variant="secondary" onClick={() => context.closeOverlay()}>Done for now</Button>
     </Stack>}
   </Stack>;
@@ -320,7 +331,7 @@ export function NangoLiveConnections({ context }: { context: ScreenContext }) {
         connections.map(item => <div key={item.integrationId + ":" + item.id} className="connect-live-account">
           <div><strong>{item.provider || item.integrationId}</strong><small>Account {item.id}</small>
             <small>{item.needsAttention ? "Needs attention" : "Authorised · data sync not automatically enabled"}</small></div>
-          <Button size="sm" variant="secondary" busy={busy} onClick={() => void reconnect(item)}>Reconnect</Button>
+          <Button size="sm" variant="secondary" busy={busy} onClick={() => void reconnect(item)}>{item.needsAttention ? "Fix connection" : "Re-authorise"}</Button>
         </div>)}
       {nextPage && <Button size="sm" variant="secondary" busy={busy} onClick={() => void load(nextPage)}>Show more accounts</Button>}
     </div>}
