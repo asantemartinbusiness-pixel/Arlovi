@@ -363,6 +363,27 @@ export function PipelineTeam({ context }: { context: ScreenContext }) {
 
 /* --------------------------- Overlays --------------------------- */
 
+/** Head of the Deal drawer: the saved deal (or a new one) and a link to the full record. */
+export function DealDrawerSummary({ context, close }: { context: ScreenContext; close: () => void }) {
+  const data = useCrmData();
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const existing = data.deals.find((deal) => deal.id === (payload?.id ?? context.selectedId));
+  const company = companyOfDeal(data, existing);
+  return (
+    <OverlaySummary
+      eyebrow={existing ? "Deal" : "New deal"}
+      title={existing ? existing.title : "New deal"}
+      status={existing ? <StagePill deal={existing} /> : undefined}
+      meta={[
+        company?.title ?? "No account yet",
+        `Owner ${existing ? String(existing.fields.owner ?? existing.ownerName) : context.actor}`,
+        existing ? `${quotesOfDeal(data, existing.id).length} quote(s)` : undefined,
+      ]}
+      actions={existing ? <Button size="sm" variant="ghost" onClick={() => { close(); context.navigate(`/o/${context.org.slug}/crm/deals/${existing.id}`); }}>Open the full record</Button> : undefined}
+    />
+  );
+}
+
 export function DealDrawer({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useCrmData();
   const { org, now } = useWorkspace();
@@ -441,18 +462,6 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
 
   return (
     <Stack gap={4}>
-      <OverlaySummary
-        eyebrow={existing ? "Deal" : "New deal"}
-        title={existing ? existing.title : title.trim() || "Untitled deal"}
-        status={<StagePill stageId={stageId} />}
-        meta={[
-          company?.title ?? "No account yet",
-          existing ? `Owner ${String(existing.fields.owner ?? existing.ownerName)}` : `Owner ${context.actor}`,
-          existing ? `${quotesOfDeal(data, existing.id).length} quote(s)` : undefined,
-        ]}
-        actions={existing ? <Button size="sm" variant="ghost" onClick={() => { close(); context.navigate(`/o/${org.slug}/crm/deals/${existing.id}`); }}>Open the full record</Button> : undefined}
-      />
-
       <Stack gap={3}>
         <Field label="Deal" required><TextInput aria-label="Deal" value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
         <div className="crm-deal-pair">

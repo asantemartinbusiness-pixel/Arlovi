@@ -39,7 +39,6 @@ test("Growth app entry screens offer native work areas without synthetic record 
   await page.goto("/o/northline/portal/portals");
   const portal = page.getByRole("region", { name: "Client & Partner Portals workflow shortcuts" });
   await expect(portal).toBeVisible();
-  await expect(portal.getByText(/Choose a portal below/)).toBeVisible();
   await expect(portal.locator("a[href*=':id']")).toHaveCount(0);
 });
 

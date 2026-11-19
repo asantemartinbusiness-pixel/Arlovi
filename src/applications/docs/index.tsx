@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import {
   BarChart, Button, ButtonGroup, Card, Checkbox, DataGrid, DrawerActions, DrawerInFlight, DrawerUnsavedChanges, Empty, Field, Grid, InspectorSection,
-  Menu, Meter, Notice, OverlayCancel, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Switch, Tabs,
+  Menu, Meter, Notice, OverlayActions, OverlayCancel, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, Switch, Tabs,
   TextArea, TextInput, Tool, Toolbar, ToolbarSeparator, type RecordHeaderProps,
 } from "@/design-system";
 import { getScreenDef, registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
@@ -64,6 +64,21 @@ function DocActions({ context }: { context: ScreenContext }) {
     <Menu label="Document actions" items={items} trigger={<Button size="sm" variant="ghost" icon={<MoreHorizontal size={15} />}>Actions</Button>} />
   );
 }
+
+/** Identity head for overlays that act on the open document. */
+function DocOverlaySummary({ context }: { context: ScreenContext }) {
+  const record = useDocument(context);
+  if (!record) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Document"
+      title={record.title}
+      status={<Pill tone={record.status === "published" ? "success" : record.status === "in_review" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>}
+      meta={[String(record.fields.folder ?? "Unfiled"), record.ownerName, `Revision ${record.revision}`]}
+    />
+  );
+}
+const docSummary = (context: ScreenContext) => <DocOverlaySummary context={context} />;
 
 /** Outline view state shared by the outline tree and the screen's collapse action. */
 const outlineUi = createStore<{ collapseAll: number }>({ collapseAll: 0 });
@@ -1383,23 +1398,42 @@ function TemplatesScreen({ context, tab }: { context: ScreenContext; tab: "All" 
  * ARL-DOCS-006 — Publishing & Export
  * ====================================================================== */
 
-/** Identity block for the document pages that sit beside the editor: one title, the real state of the page. */
-function documentRecord(context: ScreenContext): RecordHeaderProps | null {
+/** Pieces of the document identity block. `record` runs outside hook rules, so each piece reads the document itself. */
+function useDocumentFacts(context: ScreenContext) {
   const record = useDocument(context);
   if (!record) return null;
   const model = readDoc(record.body, context.actor, context.now.toISOString());
-  const stats = documentStats(model);
-  const mandatory = model.comments.filter((comment) => comment.mandatory && !comment.resolved).length;
-  const changes = openSuggestions(model).length;
   return {
-    title: record.title,
-    status: <Pill tone={record.status === "published" ? "success" : record.status === "in_review" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>,
-    meta: [
-      String(record.fields.folder ?? "Unfiled"),
-      record.ownerName,
-      `${stats.words} words`,
-      mandatory + changes > 0 ? `${mandatory} mandatory · ${changes} change${changes === 1 ? "" : "s"} open` : "No open review items",
-    ],
+    record,
+    words: documentStats(model).words,
+    mandatory: model.comments.filter((comment) => comment.mandatory && !comment.resolved).length,
+    changes: openSuggestions(model).length,
+  };
+}
+function DocumentTitle({ context }: { context: ScreenContext }) {
+  return <>{useDocument(context)?.title ?? "Document"}</>;
+}
+function DocumentStatus({ context }: { context: ScreenContext }) {
+  const record = useDocument(context);
+  if (!record) return null;
+  return <Pill tone={record.status === "published" ? "success" : record.status === "in_review" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>;
+}
+function DocumentFacts({ context }: { context: ScreenContext }) {
+  const facts = useDocumentFacts(context);
+  if (!facts) return null;
+  const { record, words, mandatory, changes } = facts;
+  return (
+    <>
+      {String(record.fields.folder ?? "Unfiled")} · {record.ownerName} · {words} words ·{" "}
+      {mandatory + changes > 0 ? `${mandatory} mandatory review${mandatory === 1 ? "" : "s"} and ${changes} change${changes === 1 ? "" : "s"} open` : "no open review items"}
+    </>
+  );
+}
+function documentRecord(context: ScreenContext): RecordHeaderProps {
+  return {
+    title: <DocumentTitle context={context} />,
+    status: <DocumentStatus context={context} />,
+    meta: [<DocumentFacts key="facts" context={context} />],
   };
 }
 
@@ -3003,12 +3037,12 @@ const docEditorFor = (context: ScreenContext) => activeDocEditor(context.params.
 /** A heading the editor should put the caret on when it next opens. */
 let pendingJump: string | undefined;
 
-function docFooter(form: string, label: string, danger = false) {
+function docFooter(form: string, label: string, danger = false, dismiss = "Cancel") {
   return ({ close }: { close: () => void }) => (
-    <>
-      <Button variant="ghost" onClick={close}>Cancel</Button>
-      <Button variant={danger ? "outline-danger" : "primary"} type="submit" form={form}>{label}</Button>
-    </>
+    <OverlayActions
+      primary={<Button variant={danger ? "outline-danger" : "primary"} type="submit" form={form}>{label}</Button>}
+      end={<Button variant="ghost" onClick={close}>{dismiss}</Button>}
+    />
   );
 }
 
@@ -3459,11 +3493,11 @@ registerApp({
         { id: "share", label: "Share", placement: "overflow", guard: (context) => (context.selectedId ? undefined : "Select a document first"), run: (context) => context.openOverlay("sharing") },
       ],
       overlays: [
-        { id: "search documents", kind: "modal", title: "Search documents", width: 600, render: (context) => <SearchDocuments context={context} close={context.close} /> },
-        { id: "New doc", kind: "modal", title: "New document", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="new-doc">Create</Button></>, render: (context) => <NewDocumentOverlay context={context} close={context.close} /> },
-        { id: "folder selector", kind: "modal", title: "Move to folder", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="folder-selector">Move</Button></>, render: (context) => <FolderSelector context={context} close={context.close} /> },
-        { id: "sharing", kind: "drawer", title: "Sharing", width: 500, presentation: { selectedRecord: true, collection: "documents", guidance: "Review this document’s classification, existing sharing entries and local permission record. No public URL is created." }, render: (context) => <SharingOverlay context={context} close={context.close} /> },
-        { id: "trash confirm", kind: "modal", title: "Delete documents", tone: "danger", blocking: true, width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Keep them</Button><Button variant="outline-danger" type="submit" form="trash-confirm">Delete</Button></>, render: (context) => <TrashConfirm context={context} close={context.close} /> },
+        { id: "search documents", kind: "modal", title: "Search documents", width: OVERLAY_WIDTH.modal, render: (context) => <SearchDocuments context={context} close={context.close} /> },
+        { id: "New doc", kind: "modal", title: "New document", width: OVERLAY_WIDTH.form, footer: docFooter("new-doc", "Create", false), render: (context) => <NewDocumentOverlay context={context} close={context.close} /> },
+        { id: "folder selector", kind: "modal", title: "Move to folder", width: OVERLAY_WIDTH.compact, footer: docFooter("folder-selector", "Move", false), render: (context) => <FolderSelector context={context} close={context.close} /> },
+        { id: "sharing", kind: "drawer", summary: docSummary, title: "Sharing", width: OVERLAY_WIDTH.form, presentation: { selectedRecord: true, collection: "documents", guidance: "Review this document’s classification, existing sharing entries and local permission record. No public URL is created." }, render: (context) => <SharingOverlay context={context} close={context.close} /> },
+        { id: "trash confirm", kind: "modal", title: "Delete documents", tone: "danger", blocking: true, width: OVERLAY_WIDTH.form, footer: docFooter("trash-confirm", "Delete", true, "Keep them"), render: (context) => <TrashConfirm context={context} close={context.close} /> },
       ],
     },
 
@@ -3481,13 +3515,13 @@ registerApp({
         { id: "export", label: "Export", placement: "toolbar", run: (context) => context.openOverlay("export") },
       ],
       overlays: [
-        { id: "format", kind: "modal", title: "Format", width: 480, render: (context) => <FormatOverlay context={context} close={context.close} /> },
-        { id: "accept changes", kind: "modal", title: "Accept or reject changes", width: 600, render: (context) => <AcceptChanges context={context} close={context.close} /> },
-        { id: "Styles", kind: "drawer", title: "Styles", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="styles">Save styles</Button></>, render: (context) => <StylesOverlay context={context} close={context.close} /> },
-        { id: "insert table", kind: "modal", title: "Insert", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="insert">Insert</Button></>, render: (context) => <InsertOverlay context={context} close={context.close} /> },
-        { id: "citations", kind: "modal", title: "Comment or reference", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="citations">Save</Button></>, render: (context) => <CitationsOverlay context={context} close={context.close} /> },
-        { id: "link", kind: "modal", title: "Link", width: 460, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="link">Apply</Button></>, render: (context) => <LinkOverlay context={context} close={context.close} /> },
-        { id: "export", kind: "modal", title: "Export", width: 620, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="export">Download</Button></>, render: (context) => <ExportOverlay context={context} close={context.close} /> },
+        { id: "format", kind: "modal", title: "Format", width: OVERLAY_WIDTH.compact, render: (context) => <FormatOverlay context={context} close={context.close} /> },
+        { id: "accept changes", kind: "modal", summary: docSummary, title: "Accept or reject changes", width: OVERLAY_WIDTH.modal, render: (context) => <AcceptChanges context={context} close={context.close} /> },
+        { id: "Styles", kind: "drawer", summary: docSummary, title: "Styles", width: OVERLAY_WIDTH.form, footer: docFooter("styles", "Save styles", false), render: (context) => <StylesOverlay context={context} close={context.close} /> },
+        { id: "insert table", kind: "modal", title: "Insert", width: OVERLAY_WIDTH.form, footer: docFooter("insert", "Insert", false), render: (context) => <InsertOverlay context={context} close={context.close} /> },
+        { id: "citations", kind: "modal", title: "Comment or reference", width: OVERLAY_WIDTH.form, footer: docFooter("citations", "Save", false), render: (context) => <CitationsOverlay context={context} close={context.close} /> },
+        { id: "link", kind: "modal", title: "Link", width: OVERLAY_WIDTH.compact, footer: docFooter("link", "Apply", false), render: (context) => <LinkOverlay context={context} close={context.close} /> },
+        { id: "export", kind: "modal", title: "Export", width: OVERLAY_WIDTH.record, footer: docFooter("export", "Download", false, "Close"), render: (context) => <ExportOverlay context={context} close={context.close} /> },
       ],
     },
 
@@ -3504,11 +3538,11 @@ registerApp({
         { id: "collapse", label: "Collapse or expand every heading", placement: "overflow", run: () => outlineUi.set((current) => ({ collapseAll: current.collapseAll + 1 })) },
       ],
       overlays: [
-        { id: "add section", kind: "modal", title: "Add a section", width: 520, footer: docFooter("docs-add-section", "Add"), render: (context) => <AddSection context={context} close={context.close} /> },
-        { id: "jump to", kind: "modal", title: "Jump to a heading", width: 480, render: (context) => <JumpTo context={context} close={context.close} /> },
-        { id: "reorder heading", kind: "modal", title: "Reorder a heading", width: 480, render: (context) => <ReorderHeading context={context} close={context.close} /> },
-        { id: "Heading properties", kind: "modal", title: "Heading properties", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="heading-properties">Save</Button></>, render: (context) => <HeadingProperties context={context} close={context.close} /> },
-        { id: "document structure warning", kind: "drawer", title: "Document structure", width: 520, render: (context) => <StructureWarningOverlay context={context} /> },
+        { id: "add section", kind: "modal", title: "Add a section", width: OVERLAY_WIDTH.form, footer: docFooter("docs-add-section", "Add"), render: (context) => <AddSection context={context} close={context.close} /> },
+        { id: "jump to", kind: "modal", title: "Jump to a heading", width: OVERLAY_WIDTH.compact, render: (context) => <JumpTo context={context} close={context.close} /> },
+        { id: "reorder heading", kind: "modal", title: "Reorder a heading", width: OVERLAY_WIDTH.compact, render: (context) => <ReorderHeading context={context} close={context.close} /> },
+        { id: "Heading properties", kind: "modal", title: "Heading properties", width: OVERLAY_WIDTH.compact, footer: docFooter("heading-properties", "Save", false), render: (context) => <HeadingProperties context={context} close={context.close} /> },
+        { id: "document structure warning", kind: "drawer", summary: docSummary, title: "Document structure", width: OVERLAY_WIDTH.form, render: (context) => <StructureWarningOverlay context={context} /> },
       ],
     },
 
@@ -3524,13 +3558,13 @@ registerApp({
         { id: "mention", label: "Mention someone…", placement: "overflow", run: (context) => context.openOverlay("mention") },
       ],
       overlays: [
-        { id: "approve document", kind: "modal", title: "Approve the document", width: 540, footer: docFooter("docs-approve", "Approve"), render: (context) => <ApproveDocument context={context} close={context.close} /> },
-        { id: "suggest edit", kind: "modal", title: "Suggest an edit", width: 560, footer: docFooter("docs-suggest", "Suggest"), render: (context) => <SuggestEdit context={context} close={context.close} /> },
-        { id: "accept changes", kind: "modal", title: "Accept or reject changes", width: 600, render: (context) => <AcceptChanges context={context} close={context.close} /> },
-        { id: "mention", kind: "modal", title: "Mention someone", width: 520, footer: docFooter("docs-mention", "Mention"), render: (context) => <MentionSomeone context={context} close={context.close} /> },
-        { id: "Comment thread", kind: "drawer", title: "Comment thread", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="comment-thread">Reply</Button></>, render: (context) => <CommentThread context={context} close={context.close} /> },
-        { id: "diff", kind: "drawer", title: "Compare", width: 560, render: (context) => <DiffOverlay context={context} /> },
-        { id: "reviewer assignment", kind: "modal", title: "Assign reviewers", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="reviewer-assignment">Assign</Button></>, render: (context) => <ReviewerAssignment context={context} close={context.close} /> },
+        { id: "approve document", kind: "modal", summary: docSummary, title: "Approve the document", width: OVERLAY_WIDTH.form, footer: docFooter("docs-approve", "Approve"), render: (context) => <ApproveDocument context={context} close={context.close} /> },
+        { id: "suggest edit", kind: "modal", title: "Suggest an edit", width: OVERLAY_WIDTH.modal, footer: docFooter("docs-suggest", "Suggest"), render: (context) => <SuggestEdit context={context} close={context.close} /> },
+        { id: "accept changes", kind: "modal", summary: docSummary, title: "Accept or reject changes", width: OVERLAY_WIDTH.modal, render: (context) => <AcceptChanges context={context} close={context.close} /> },
+        { id: "mention", kind: "modal", title: "Mention someone", width: OVERLAY_WIDTH.form, footer: docFooter("docs-mention", "Mention"), render: (context) => <MentionSomeone context={context} close={context.close} /> },
+        { id: "Comment thread", kind: "drawer", summary: docSummary, title: "Comment thread", width: OVERLAY_WIDTH.form, footer: docFooter("comment-thread", "Reply", false, "Close"), render: (context) => <CommentThread context={context} close={context.close} /> },
+        { id: "diff", kind: "drawer", summary: docSummary, title: "Compare", width: OVERLAY_WIDTH.form, render: (context) => <DiffOverlay context={context} /> },
+        { id: "reviewer assignment", kind: "modal", summary: docSummary, title: "Assign reviewers", width: OVERLAY_WIDTH.form, footer: docFooter("reviewer-assignment", "Assign", false), render: (context) => <ReviewerAssignment context={context} close={context.close} /> },
       ],
     },
 
@@ -3553,9 +3587,9 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "Template editor", kind: "drawer", title: "Template", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="template-editor">Save</Button></>, render: (context) => <TemplateEditor context={context} close={context.close} /> },
-        { id: "token mapping", kind: "modal", title: "Token mapping", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="token-mapping">Save mapping</Button></>, render: (context) => <TokenMapping context={context} close={context.close} /> },
-        { id: "change impact", kind: "drawer", title: "Change impact", width: 560, render: (context) => <ChangeImpact context={context} /> },
+        { id: "Template editor", kind: "drawer", summary: docSummary, title: "Template", width: OVERLAY_WIDTH.form, footer: docFooter("template-editor", "Save", false), render: (context) => <TemplateEditor context={context} close={context.close} /> },
+        { id: "token mapping", kind: "modal", title: "Token mapping", width: OVERLAY_WIDTH.modal, footer: docFooter("token-mapping", "Save mapping", false), render: (context) => <TokenMapping context={context} close={context.close} /> },
+        { id: "change impact", kind: "drawer", summary: docSummary, title: "Change impact", width: OVERLAY_WIDTH.form, render: (context) => <ChangeImpact context={context} /> },
       ],
     },
 
@@ -3571,12 +3605,12 @@ registerApp({
         { id: "revoke link", label: "Revoke a link…", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("revoke links") },
       ],
       overlays: [
-        { id: "approve document", kind: "modal", title: "Approve the document", width: 540, footer: docFooter("docs-approve", "Approve"), render: (context) => <ApproveDocument context={context} close={context.close} /> },
-        { id: "preview", kind: "modal", title: "Export preview", width: 760, render: (context) => <PreviewDocument context={context} /> },
-        { id: "revoke links", kind: "modal", title: "Revoke a link", width: 560, tone: "danger", render: (context) => <RevokeLinks context={context} close={context.close} /> },
-        { id: "PDF settings", kind: "modal", title: "PDF settings", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="pdf-settings">Write print HTML</Button></>, render: (context) => <PdfSettings context={context} close={context.close} /> },
-        { id: "link permissions", kind: "modal", title: "Link permissions", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="link-permissions">Create link</Button></>, render: (context) => <LinkPermissions context={context} close={context.close} /> },
-        { id: "signature request", kind: "modal", title: "Signature request", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="signature-request">Record request</Button></>, render: (context) => <SignatureRequest context={context} close={context.close} /> },
+        { id: "approve document", kind: "modal", summary: docSummary, title: "Approve the document", width: OVERLAY_WIDTH.form, footer: docFooter("docs-approve", "Approve"), render: (context) => <ApproveDocument context={context} close={context.close} /> },
+        { id: "preview", kind: "modal", title: "Export preview", width: OVERLAY_WIDTH.wide, render: (context) => <PreviewDocument context={context} /> },
+        { id: "revoke links", kind: "modal", summary: docSummary, title: "Revoke a link", width: OVERLAY_WIDTH.modal, tone: "danger", render: (context) => <RevokeLinks context={context} close={context.close} /> },
+        { id: "PDF settings", kind: "modal", summary: docSummary, title: "PDF settings", width: OVERLAY_WIDTH.form, footer: docFooter("pdf-settings", "Write print HTML", false), render: (context) => <PdfSettings context={context} close={context.close} /> },
+        { id: "link permissions", kind: "modal", summary: docSummary, title: "Link permissions", width: OVERLAY_WIDTH.form, footer: docFooter("link-permissions", "Create link", false), render: (context) => <LinkPermissions context={context} close={context.close} /> },
+        { id: "signature request", kind: "modal", summary: docSummary, title: "Signature request", width: OVERLAY_WIDTH.form, footer: docFooter("signature-request", "Record request", false), render: (context) => <SignatureRequest context={context} close={context.close} /> },
       ],
     },
 
@@ -3591,10 +3625,10 @@ registerApp({
         { id: "inspect citations", label: "Inspect citations", placement: "overflow", run: (context) => context.setTab("Sources") },
       ],
       overlays: [
-        { id: "apply suggestions", kind: "modal", title: "Apply writing suggestions", width: 620, footer: docFooter("docs-apply", "Apply the ticked ones"), render: (context) => <ApplySuggestions context={context} close={context.close} /> },
-        { id: "Suggestion diff", kind: "modal", title: "Suggestion", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="suggestion-diff">Apply</Button></>, render: (context) => <SuggestionDiff context={context} close={context.close} /> },
-        { id: "source inspection", kind: "drawer", title: "Source", width: 520, render: (context) => <SourceInspection context={context} /> },
-        { id: "style settings", kind: "modal", title: "Style settings", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="style-settings">Save</Button></>, render: (context) => <StyleSettings context={context} close={context.close} /> },
+        { id: "apply suggestions", kind: "modal", title: "Apply writing suggestions", width: OVERLAY_WIDTH.record, footer: docFooter("docs-apply", "Apply the ticked ones"), render: (context) => <ApplySuggestions context={context} close={context.close} /> },
+        { id: "Suggestion diff", kind: "modal", title: "Suggestion", width: OVERLAY_WIDTH.modal, footer: docFooter("suggestion-diff", "Apply", false, "Close"), render: (context) => <SuggestionDiff context={context} close={context.close} /> },
+        { id: "source inspection", kind: "drawer", summary: docSummary, title: "Source", width: OVERLAY_WIDTH.form, render: (context) => <SourceInspection context={context} /> },
+        { id: "style settings", kind: "modal", title: "Style settings", width: OVERLAY_WIDTH.form, footer: docFooter("style-settings", "Save", false), render: (context) => <StyleSettings context={context} close={context.close} /> },
       ],
     },
   },

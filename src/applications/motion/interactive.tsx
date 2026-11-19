@@ -197,6 +197,7 @@ export function InteractiveScreen({ context, actions }: { context: ScreenContext
   return (
     <EditorFrame
       context={context}
+      lean
       actions={actions}
       tabs={[{ id: "States" }, { id: "Triggers" }, { id: "Preview" }, { id: "Export" }]}
       title={`${record.title} — interactions`}

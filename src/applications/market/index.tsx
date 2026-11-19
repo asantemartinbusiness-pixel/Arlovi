@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { CalendarDays, Images, LayoutTemplate, Mail, Megaphone, MousePointerClick, Search, Target, TrendingUp, Users } from "lucide-react";
-import { Empty, Notice, Pill, Properties, Stack } from "@/design-system";
+import { Empty, Notice, OVERLAY_WIDTH, Pill, Properties, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { GrowthOverviewNav } from "@/app/GrowthOverviewNav";
 import { MarketingWorkAreaHeader } from "./MarketingWorkAreaHeader";
@@ -21,7 +21,7 @@ import {
   AccountAuthorization, AdPreview, AttributionModelExplainer, AudiencePreview, AuditIssue,
   BudgetInspector, CampaignDiagnostics, CampaignTemplatePicker, CampaignWizard, ConsentInspector,
   CreativePreview, DeliveryReceipt, DuplicateRules, EmailBuilder, ExportPermission, GlobalUpdateImpact,
-  LaunchApproval, MetricNotes, MetricSource, PageMetadataEditor, PageTemplatePicker, PauseConsequence,
+  LaunchApproval, LaunchApprovalFooter, LaunchApprovalSummary, DeliveryReceiptFooter, SuppressionCheckSummary, MetricNotes, MetricSource, PageMetadataEditor, PageTemplatePicker, PauseConsequence,
   PlanApproval, PostComposer, PostEditor, PublishConfirm, PublishPreview, SegmentBuilder, SendReview,
   SourceInspector, SpendApproval, SuppressionCheck, TechnicalRecommendation, TemplateApproval,
   TemplateEditor, VersionCompare, AssetPicker,
@@ -144,7 +144,7 @@ export const marketApp = registerApp({
       ],
       overlays: [
         { id: "Creative preview", kind: "drawer", title: "Creative preview", width: 520, render: ({ ...context }) => <CreativePreview context={context} /> },
-        { id: "launch approval", kind: "modal", title: "Launch approval", width: 560, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <LaunchApproval context={context} close={close} />, footer: submitFooter("launch-approval", "Record launch") },
+        { id: "launch approval", kind: "modal", title: "Launch approval", width: 560, summary: (context) => <LaunchApprovalSummary context={context} />, render: ({ close, ...context }) => <LaunchApproval context={context} close={close} />, footer: ({ close, ...context }) => <LaunchApprovalFooter context={context} close={close} /> },
         { id: "pause consequence", kind: "modal", title: "What pausing does", tone: "danger", width: 560, render: ({ close, ...context }) => <PauseConsequence context={context} close={close} /> },
         { id: "email builder", kind: "modal", title: "Campaign brief and email", width: 620, render: ({ close, ...context }) => <EmailBuilder context={context} close={close} />, footer: submitFooter("email-builder", "Save draft") },
         { id: "Metric source", kind: "drawer", title: "Where this figure comes from", width: 560, render: ({ ...context }) => <MetricSource context={context} /> },
@@ -197,7 +197,7 @@ export const marketApp = registerApp({
       overlays: [
         { id: "Account authorization", kind: "modal", title: "Connect an account", width: 560, render: ({ close, ...context }) => <AccountAuthorization context={context} close={close} />, footer: submitFooter("account-auth", "Record the request") },
         { id: "post composer", kind: "drawer", title: "Composer", width: 640, render: ({ close, ...context }) => <PostComposer context={context} close={close} />, footer: submitFooter("post-composer", "Save draft") },
-        { id: "delivery receipt", kind: "modal", title: "Delivery receipt", width: 560, render: ({ ...context }) => <DeliveryReceipt context={context} /> },
+        { id: "delivery receipt", kind: "modal", title: "Delivery receipt", width: 560, render: ({ ...context }) => <DeliveryReceipt context={context} />, footer: ({ close, ...context }) => <DeliveryReceiptFooter context={context} close={close} /> },
         confirmOverlay,
       ],
     },
@@ -222,7 +222,7 @@ export const marketApp = registerApp({
       overlays: [
         { id: "Audience preview", kind: "drawer", title: "Audience preview", width: 620, render: ({ ...context }) => <AudiencePreview context={context} /> },
         { id: "send review", kind: "modal", title: "Send review", width: 620, render: ({ close, ...context }) => <SendReview context={context} close={close} />, footer: submitFooter("send-review", "Record recipients") },
-        { id: "suppression check", kind: "drawer", title: "Suppression check", width: 620, presentation: { noRecordContext: true }, render: ({ ...context }) => <SuppressionCheck context={context} /> },
+        { id: "suppression check", kind: "drawer", title: "Suppression check", width: 620, summary: () => <SuppressionCheckSummary />, render: ({ ...context }) => <SuppressionCheck context={context} /> },
         { id: "email builder", kind: "drawer", title: "Email builder", width: 640, render: ({ close, ...context }) => <EmailBuilder context={context} close={close} />, footer: submitFooter("email-builder", "Save draft") },
         confirmOverlay,
       ],
@@ -318,7 +318,7 @@ export const marketApp = registerApp({
       overlays: [
         { id: "Page template", kind: "modal", title: "New landing page", width: 600, render: ({ close, ...context }) => <PageTemplatePicker context={context} close={close} />, footer: submitFooter("page-template", "Create page") },
         { id: "publish confirm", kind: "modal", title: "Export this page", width: 560, render: ({ close, ...context }) => <PublishConfirm context={context} close={close} /> },
-        { id: "version compare", kind: "drawer", title: "Versions", width: 720, render: ({ ...context }) => <VersionCompare context={context} /> },
+        { id: "version compare", kind: "drawer", title: "Versions", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <VersionCompare context={context} /> },
         { id: "visual editor", kind: "drawer", title: "Visual editor", width: 720, render: ({ close, ...context }) => <VisualEditor context={context} close={close} />, footer: submitFooter("visual-editor", "Save page") },
         confirmOverlay,
       ],

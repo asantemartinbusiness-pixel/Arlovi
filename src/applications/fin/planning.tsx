@@ -10,7 +10,7 @@ import { accountCode, accountMovements, budgetVariance, cashBalance, periodLabel
 import type { VarianceRow } from "@/domain/fin-ledger";
 import { useFinData } from "./data";
 import type { FinData } from "./data";
-import { Amount, BooksLoading, SourceNote, StatementRow } from "./parts";
+import { Amount, BooksLoading, FormFooter, SourceNote, StatementRow } from "./parts";
 import { clockIso, wallMs } from "@/platform/clock";
 import "./variance.css";
 
@@ -416,27 +416,30 @@ export function ModelAssumptions({ context, close }: { context: ScreenContext; c
           </Row>
         ))}
       </Stack>
-      <Row gap={2}>
-        <Button variant="secondary" onClick={() => setRows([...rows, { id: `a${rows.length + 1}${wallMs().toString(36)}`, label: "", valueMinor: 0, note: "" }])}>Add an assumption</Button>
-        <span className="ds-grow" />
+      <FormFooter drawer end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button
           variant="primary"
           busy={busy}
           disabled={rows.some((row) => !row.label.trim())}
           onClick={async () => {
             setBusy(true);
-            await context.mutate.patch(record.id, {
-              body: { ...(record.body as object ?? {}), assumptions: rows },
-            }, { expectRevision: record.revision, event: `Assumptions edited on ${record.title}` });
-            context.toast("Assumptions saved", `${record.title} now projects from ${rows.length} named assumptions.`);
-            setBusy(false);
-            close();
+            try {
+              await context.mutate.patch(record.id, {
+                body: { ...(record.body as object ?? {}), assumptions: rows },
+              }, { expectRevision: record.revision, event: `Assumptions edited on ${record.title}` });
+              context.toast("Assumptions saved", `${record.title} now projects from ${rows.length} named assumptions.`);
+              close();
+            } catch (error) {
+              context.toast("Assumptions not saved", error instanceof Error ? error.message : "The model changed. Reopen it and retry.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Save
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        <Button variant="secondary" onClick={() => setRows([...rows, { id: `a${rows.length + 1}${wallMs().toString(36)}`, label: "", valueMinor: 0, note: "" }])}>Add an assumption</Button>
+      </FormFooter>
     </Stack>
   );
 }
@@ -649,13 +652,14 @@ export function BudgetApprovalOverlay({ context, close }: { context: ScreenConte
       </Row>
       <Field label="Basis"><TextArea aria-label="Basis" value={note} rows={2} onChange={(event) => setNote(event.target.value)} placeholder="Why this figure" /></Field>
       {existing && <Notice tone="warning" title={`${accountCodeValue} already has a ${period} budget`}>{existing.title} is {existing.status} at {context.money(existing.amountMinor)}. Submitting another would double the ceiling in the comparison.</Notice>}
-      <Row gap={2}>
+      <FormFooter end={<Button variant="ghost" onClick={close}>Cancel</Button>}>
         <Button
           variant="primary"
           busy={busy}
           disabled={amount <= 0 || Boolean(existing)}
           onClick={async () => {
             setBusy(true);
+            try {
             const account = data.accounts.find((item) => accountCode(item) === accountCodeValue);
             await context.mutate.create({
               collection: "budgets",
@@ -666,14 +670,17 @@ export function BudgetApprovalOverlay({ context, close }: { context: ScreenConte
               fields: { kind: "budget", accountCode: accountCodeValue, period, submittedBy: context.actor },
             }, `Budget submitted for ${accountCodeValue} ${period}`);
             context.toast("Budget submitted", "It is a draft until someone approves it, so no variance has changed.");
-            setBusy(false);
             close();
+            } catch (error) {
+              context.toast("Budget not submitted", error instanceof Error ? error.message : "Try again.", "failed");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Submit for approval
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      </FormFooter>
     </Stack>
   );
 }

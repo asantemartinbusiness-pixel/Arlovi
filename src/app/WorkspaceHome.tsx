@@ -49,11 +49,12 @@ export function WorkspaceHome({ orgName, slug, actor, tasks, projects, missions,
   const focused = [...pending].sort((a,b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5);
   const { decisions, unreadUpdates } = useWaitingOnYou();
   const inbox = appEntry("INBOX", slug);
+  const waiting = decisions + pending.length;
   return <div className="wh-home">
     <header className="wh-head">
       <div className="wh-head-copy">
         <span className="ws-eyebrow">{orgName.toUpperCase()} / MY WORKSPACE</span>
-        <h1>Make room for <em>what matters.</em></h1>
+        <h1>{waiting === 0 ? <>Nothing is <em>waiting on you.</em></> : <><em>{waiting} {waiting === 1 ? "thing needs" : "things need"} you</em> today.</>}</h1>
       </div>
       <div className="wh-hero-actions"><ContextualCreate label="Create new"/><Link className="wh-secondary-action" to={inbox}>Open inbox <ArrowUpRight size={16}/></Link></div>
     </header>

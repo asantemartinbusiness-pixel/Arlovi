@@ -8,7 +8,7 @@ test("headquarters opens without requesting unrelated native application chunks"
       nativeRequests.push(url);
   });
   await page.goto("/o/northline/workspace/home");
-  await expect(page.getByRole("heading",{name:"Your day, in one place."})).toBeVisible();
+  await expect(page.getByRole("heading",{name:/need you today|waiting on you/i})).toBeVisible();
   // No hover or app navigation is issued before this assertion.
   expect(nativeRequests).toEqual([]);
 });
@@ -22,7 +22,7 @@ test("a direct native app destination loads its own module and eventually render
 
 test("workspace still opens and its organisation remains selected after reload",async({page})=>{
   await page.goto("/o/northline/workspace/home");
-  await expect(page.getByRole("heading",{name:"Your day, in one place."})).toBeVisible();
+  await expect(page.getByRole("heading",{name:/need you today|waiting on you/i})).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("heading",{name:"Your day, in one place."})).toBeVisible();
+  await expect(page.getByRole("heading",{name:/need you today|waiting on you/i})).toBeVisible();
 });

@@ -1,7 +1,7 @@
 import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useState } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
-import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput, OverlayActions } from "@/design-system";
 import type { ActionDef, ScreenContext } from "@/platform/registry";
 import { useCollection, useRecord } from "@/platform/workspace";
 import { CAPABILITY_LABELS } from "@/platform/capability";
@@ -33,12 +33,12 @@ function editorFor(context: ScreenContext): DeckEditor | undefined {
   return activeDeckEditor(context.params.id);
 }
 
-export function formFooter(form: string, label: string) {
+export function formFooter(form: string, label: string, danger = false, dismiss = "Cancel") {
   return ({ close }: { close: () => void }) => (
-    <>
-      <Button variant="ghost" onClick={close}>Cancel</Button>
-      <Button variant="primary" type="submit" form={form}>{label}</Button>
-    </>
+    <OverlayActions
+      primary={<Button variant={danger ? "outline-danger" : "primary"} type="submit" form={form}>{label}</Button>}
+      end={<Button variant="ghost" onClick={close}>{dismiss}</Button>}
+    />
   );
 }
 

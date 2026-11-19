@@ -5,7 +5,7 @@ import {
   MousePointer2, Hand, Grid3x3, Magnet, Link2, Play, FileCode2, Download, Plus, Component,
 } from "lucide-react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, FactGrid, Grid, ModalActions, ModalInFlight, Notice, OVERLAY_WIDTH, OverlayActions, OverlayCancel,
+  Button, Card, Checkbox, DataGrid, DrawerActions, Empty, Field, FactGrid, Grid, ModalActions, ModalInFlight, Notice, OVERLAY_WIDTH, OverlayActions, OverlayCancel,
   OverlaySection, OverlaySummary, Pill, Popover, Properties, Row,
   Select, Stack, Stat, StatRow, TextArea, TextInput, Tool, Toolbar, ToolbarSeparator,
 } from "@/design-system";
@@ -20,7 +20,7 @@ import { CAPABILITY_LABELS } from "@/platform/capability";
 import { fitRect, rectCenter } from "@/applications/visual/geometry";
 import {
   absoluteRect, activePage, addNode, applyAutoLayout, isEditable, makeNode, childrenOf, contrastRatio, createComponent,
-  detachInstance, findDuplicates, flatten, fontAvailable, FONT_STACK, groupNodes, instancesOf,
+  componentChanges, detachInstance, findDuplicates, flatten, fontAvailable, FONT_STACK, groupNodes, instancesOf,
   instantiate, layoutConflicts, pageBounds, parentOf, patchNode, patchNodes, removeNodes, reorder,
   resizeFrame, selectionBounds, updatePage, wcagGrade,
   type DesignDoc, type SceneNode, type ScenePage,
@@ -1238,7 +1238,10 @@ function ComponentsScreen({ context, lens }: { context: ScreenContext; lens: "Li
               span={4}
               title={component.name}
               subtitle={`${uses.length} instance${uses.length === 1 ? "" : "s"} · v${component.version}`}
-              actions={<Pill tone={component.published ? "success" : "warning"}>{component.published ? "published" : "local"}</Pill>}
+              actions={(() => {
+                const pending = componentChanges(doc, component).changes;
+                return <Row gap={1}>{pending.some((change) => change.breaking) && <Pill tone="danger">breaking</Pill>}<Pill tone={component.published ? "success" : "warning"}>{component.published ? "published" : "local"}</Pill></Row>;
+              })()}
             >
               <Stack gap={2}>
                 <p className="ds-subtle">{component.description}</p>
@@ -1254,8 +1257,8 @@ function ComponentsScreen({ context, lens }: { context: ScreenContext; lens: "Li
                   >
                     Place
                   </Button>
-                  {!component.published && (
-                    <Button size="sm" variant="ghost" onClick={() => context.openOverlay("library publish", { componentId: component.id })}>Publish</Button>
+                  {(!component.published || componentChanges(doc, component).changes.length > 0) && (
+                    <Button size="sm" variant="ghost" onClick={() => context.openOverlay("library publish", { componentId: component.id })}>{component.published ? "Publish changes" : "Publish"}</Button>
                   )}
                   <Button size="sm" variant="ghost" onClick={() => context.openOverlay("breaking-change diff", { componentId: component.id })}>Impact</Button>
                 </Row>
@@ -2899,9 +2902,9 @@ registerApp({
         { id: "usage tab", label: "Usage across the file", placement: "overflow", run: (context) => context.setTab("Usage") },
       ],
       overlays: [
-        { id: "Variant editor", kind: "modal", title: "Component property", width: 480, render: ({ close, ...context }) => <VariantEditor context={context} close={close} />, footer: submitFooter("variant-editor", "Add the property") },
-        { id: "library publish", kind: "modal", title: "Publish to the library", width: 520, render: ({ close, ...context }) => <PublishComponent context={context} close={close} /> },
-        { id: "breaking-change diff", kind: "drawer", title: "Instances affected", width: 460, render: ({ ...context }) => <BreakingChange context={context} /> },
+        { id: "Variant editor", kind: "modal", title: "Component property", width: OVERLAY_WIDTH.compact, summary: componentSummary, render: ({ close, ...context }) => <VariantEditor context={context} close={close} />, footer: submitFooter("variant-editor", "Add the property") },
+        { id: "library publish", kind: "modal", title: "Publish to the library", width: OVERLAY_WIDTH.form, summary: componentSummary, render: ({ close, ...context }) => <PublishComponent context={context} close={close} /> },
+        { id: "breaking-change diff", kind: "drawer", title: "Instances affected", width: OVERLAY_WIDTH.form, summary: componentSummary, render: ({ ...context }) => <BreakingChange context={context} /> },
         { id: "swap instance", kind: "modal", title: "Swap an instance", width: 480, render: ({ close, ...context }) => <SwapInstance context={context} close={close} /> },
       ],
     },
@@ -3439,95 +3442,203 @@ function BreakpointPreview({ context }: { context: ScreenContext }) {
   );
 }
 
+/** The component an overlay is about: the card that opened it, else the selection, else the first candidate. */
+function targetComponent(context: ScreenContext, doc: DesignDoc, prefer?: (item: DesignDoc["components"][number]) => boolean) {
+  const payload = (context.overlayPayload as { componentId?: string } | undefined)?.componentId;
+  const selected = designUi.get().selected[0];
+  const page = activePage(doc);
+  return doc.components.find((item) => item.id === payload)
+    ?? doc.components.find((item) => item.id === (page.nodes[selected]?.componentId ?? selected))
+    ?? (prefer ? doc.components.find(prefer) : undefined)
+    ?? doc.components[0];
+}
+
+function componentSummary(context: ScreenContext) {
+  return <ComponentSummary context={context} />;
+}
+
+function ComponentSummary({ context }: { context: ScreenContext }) {
+  const { handle } = useDesignDoc(context);
+  const doc = handle.doc;
+  const component = doc ? targetComponent(context, doc, (item) => !item.published) : undefined;
+  if (!doc || !component) return null;
+  const uses = instancesOf(doc, component.id);
+  return (
+    <OverlaySummary
+      eyebrow="Component"
+      title={component.name}
+      status={<Pill tone={component.published ? "success" : "warning"}>{component.published ? `published v${component.version}` : "local"}</Pill>}
+      meta={[<span key="i"><span className="ds-num">{uses.length}</span> instance{uses.length === 1 ? "" : "s"}</span>, <span key="p"><span className="ds-num">{component.properties.length}</span> propert{component.properties.length === 1 ? "y" : "ies"}</span>]}
+    />
+  );
+}
+
 function VariantEditor({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, handle } = useDesignDoc(context);
-  const ui = useStore(designUi);
   const [name, setName] = useState("state");
   const [values, setValues] = useState("default, hover, disabled");
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const doc = handle.doc;
-  const component = doc.components.find((item) => item.id === (activePage(doc).nodes[ui.selected[0]]?.componentId ?? ui.selected[0])) ?? doc.components[0];
+  const component = targetComponent(context, doc);
   if (!component) return <Empty title="No components yet">Create one from a frame first.</Empty>;
+  const parsed = values.split(",").map((value) => value.trim()).filter(Boolean);
+  const duplicate = component.properties.some((item) => item.name.toLowerCase() === name.trim().toLowerCase());
   return (
     <form
       id="variant-editor"
-      className="ds-stack ds-gap-4"
+      className="ds-stack ds-gap-3"
       onSubmit={(event) => {
         event.preventDefault();
+        if (duplicate || parsed.length === 0) return;
         handle.edit((current) => ({
           ...current,
           components: current.components.map((item) => (item.id === component.id
-            ? { ...item, properties: [...item.properties, { name, values: values.split(",").map((value) => value.trim()).filter(Boolean) }] }
+            ? { ...item, properties: [...item.properties, { name: name.trim(), values: parsed }] }
             : item)),
         }), "Add component property");
-        context.toast("Property added", `${component.name} now offers ${name} to each instance.`);
+        context.toast("Property added", `${component.name} now offers ${name.trim()} to each instance.`);
         close();
       }}
     >
-      <Properties rows={[{ label: "Component", value: component.name }, { label: "Instances", value: instancesOf(doc, component.id).length }]} />
-      <Field label="Property name" required><TextInput value={name} onChange={(event) => setName(event.target.value)} required /></Field>
-      <Field label="Values" hint="Comma separated"><TextInput value={values} onChange={(event) => setValues(event.target.value)} required /></Field>
+      <Field label="Property name" required error={duplicate ? `${component.name} already has a property called ${name.trim()}.` : undefined}><TextInput value={name} onChange={(event) => setName(event.target.value)} required /></Field>
+      <Field label="Values" hint="Comma separated. The first is the default.">
+        <TextInput value={values} onChange={(event) => setValues(event.target.value)} required />
+      </Field>
+      {parsed.length > 0 && <div className="vx-chiprow" aria-label="Values">{parsed.map((value, index) => <Pill key={value} tone={index === 0 ? "accent" : undefined}>{value}</Pill>)}</div>}
+      <p className="vx-mini">Adding a property is not a breaking change: {instancesOf(doc, component.id).length} instance{instancesOf(doc, component.id).length === 1 ? "" : "s"} keep their look until a value is chosen.</p>
     </form>
+  );
+}
+
+function ChangeList({ changes }: { changes: ReturnType<typeof componentChanges>["changes"] }) {
+  return (
+    <ul className="vx-changes">
+      {changes.map((change) => (
+        <li key={change.id} className="vx-change" data-breaking={change.breaking || undefined}>
+          <Pill tone={change.breaking ? "danger" : "success"}>{change.breaking ? "breaking" : "safe"}</Pill>
+          <div><strong>{change.what}</strong><div className="vx-mini">{change.detail}</div></div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 function PublishComponent({ context, close }: { context: ScreenContext; close: () => void }) {
   const { record, handle } = useDesignDoc(context);
-  const ui = useStore(designUi);
+  const [reviewed, setReviewed] = useState(false);
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const doc = handle.doc;
-  const component = doc.components.find((item) => item.id === (activePage(doc).nodes[ui.selected[0]]?.componentId ?? ui.selected[0])) ?? doc.components.find((item) => !item.published) ?? doc.components[0];
+  const component = targetComponent(context, doc, (item) => !item.published);
   if (!component) return <Empty title="Nothing to publish" />;
   const uses = instancesOf(doc, component.id);
+  const { first, changes } = componentChanges(doc, component);
+  const breaking = changes.filter((change) => change.breaking);
+  const nothingNew = !first && changes.length === 0;
+  const next = component.version + 1;
   return (
     <Stack gap={3}>
-      <Properties rows={[
-        { label: "Component", value: component.name },
-        { label: "Current version", value: component.version },
-        { label: "Instances in this file", value: uses.length },
-        { label: "Pages affected", value: [...new Set(uses.map((use) => use.pageName))].join(", ") || "none" },
-      ]} />
-      <Notice tone="warning" title="Publishing raises the version">Every instance listed above resolves against the new version. Instances with overrides keep them.</Notice>
-      <Button
-        variant="primary"
-        onClick={() => {
-          handle.edit((current) => ({
-            ...current,
-            components: current.components.map((item) => (item.id === component.id ? { ...item, published: true, version: item.version + 1 } : item)),
-          }), "Publish component");
-          context.toast("Published", `${component.name} is at version ${component.version + 1} in this file's library. A shared team library needs a backend, which is not connected.`);
-          close();
-        }}
+      <FactGrid
+        columns={3}
+        items={[
+          { label: "Library version", value: component.published ? `version ${component.version}` : "not published", mono: true },
+          { label: "Publishes as", value: `version ${next}`, mono: true },
+          { label: "Instances reached", value: uses.length, mono: true, tone: breaking.length > 0 && uses.length > 0 ? "warning" : undefined },
+        ]}
+      />
+      <OverlaySection
+        title={first ? "First publication" : `Changes since v${component.version}`}
+        tone={breaking.length > 0 ? "danger" : "neutral"}
+        hint={first ? "There is no earlier version to compare against." : nothingNew ? "Nothing differs from the published version." : `${breaking.length} breaking, ${changes.length - breaking.length} safe`}
+        actions={uses.length > 0 ? <Button size="sm" variant="ghost" onClick={() => context.openOverlay("breaking-change diff", { componentId: component.id })}>Affected instances</Button> : undefined}
       >
-        Publish version {component.version + 1}
-      </Button>
+        {changes.length > 0 ? <ChangeList changes={changes} /> : first ? (
+          <p className="vx-mini">{uses.length} instance{uses.length === 1 ? "" : "s"} in {[...new Set(uses.map((use) => use.pageName))].join(", ") || "no page"} will resolve against v{next}. Overrides are kept.</p>
+        ) : null}
+      </OverlaySection>
+      {breaking.length > 0 && (
+        <Checkbox label={`I have reviewed the ${breaking.length} breaking change${breaking.length === 1 ? "" : "s"} and the ${uses.length} instance${uses.length === 1 ? "" : "s"} they reach`} checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} />
+      )}
+      <p className="vx-mini">The version is kept in this file. A shared team library needs a backend, which is not connected.</p>
+      <ModalActions>
+        <OverlayActions
+          primary={
+            <Button
+              variant="primary"
+              disabled={nothingNew || (breaking.length > 0 && !reviewed)}
+              onClick={() => {
+                handle.edit((current) => ({
+                  ...current,
+                  components: current.components.map((item) => (item.id === component.id
+                    ? { ...item, published: true, version: next, publishedSnapshot: { properties: structuredClone(item.properties), nodes: structuredClone(item.nodes), children: structuredClone(item.children) } }
+                    : item)),
+                }), "Publish component");
+                context.toast("Published", `${component.name} is at version ${next} in this file's library${breaking.length ? `; ${breaking.length} breaking change${breaking.length === 1 ? "" : "s"} reached ${uses.length} instance${uses.length === 1 ? "" : "s"}` : ""}.`);
+                close();
+              }}
+            >
+              {nothingNew ? "Nothing to publish" : `Publish version ${next}`}
+            </Button>
+          }
+          end={<OverlayCancel />}
+        />
+      </ModalActions>
     </Stack>
   );
 }
 
 function BreakingChange({ context }: { context: ScreenContext }) {
   const { record, handle } = useDesignDoc(context);
-  const ui = useStore(designUi);
   if (!record || !handle.doc) return <Empty title="Open a file first" />;
   const doc = handle.doc;
-  const component = doc.components.find((item) => item.id === (activePage(doc).nodes[ui.selected[0]]?.componentId ?? ui.selected[0]));
+  const component = targetComponent(context, doc);
   if (!component) return <Empty title="No component selected">Select an instance to see every place its component is used.</Empty>;
   const uses = instancesOf(doc, component.id);
+  const { first, changes } = componentChanges(doc, component);
+  const withOverrides = uses.filter((use) => Object.keys(use.node.overrides ?? {}).length > 0).length;
   return (
     <Stack gap={3}>
-      <Notice tone={uses.length > 0 ? "warning" : "info"} title={`${uses.length} instance${uses.length === 1 ? "" : "s"} would change`}>
-        Each one is listed with the overrides it holds; an override survives the change.
-      </Notice>
-      {uses.length === 0 ? <Empty title="No instances yet" /> : (
-        <Stack gap={2}>
-          {uses.map((use) => (
-            <Row key={use.node.id} gap={2} className="ds-panel" style={{ padding: "var(--space-2) var(--space-3)" }}>
-              <span className="ds-grow">{use.pageName} · {use.node.name}</span>
-              <Pill>{Object.keys(use.node.overrides ?? {}).length} overrides</Pill>
-            </Row>
-          ))}
-        </Stack>
+      <FactGrid
+        columns={3}
+        dense
+        items={[
+          { label: "Instances", value: uses.length, mono: true },
+          { label: "Pages", value: new Set(uses.map((use) => use.pageId)).size, mono: true },
+          { label: "With overrides", value: withOverrides, mono: true, hint: "Overrides survive" },
+        ]}
+      />
+      {!first && changes.length > 0 && (
+        <OverlaySection title={`Pending since v${component.version}`} tone={changes.some((change) => change.breaking) ? "danger" : "neutral"}>
+          <ChangeList changes={changes} />
+        </OverlaySection>
       )}
+      <OverlaySection title="Where it is used" hint="Select a row to open the layer on the canvas" flush>
+        {uses.length === 0 ? <Empty title="No instances yet">Place one from the Library tab.</Empty> : (
+          <ul className="vx-uselist">
+            {uses.map((use) => (
+              <li key={use.node.id}>
+                <button
+                  type="button"
+                  className="vx-use"
+                  onClick={() => {
+                    handle.edit((current) => ({ ...current, activePageId: use.pageId }), "Switch page");
+                    setSelection([use.node.id]);
+                    context.navigate(context.path("/o/:org/design/files/:id", context.params.id));
+                  }}
+                >
+                  <span className="ds-grow">{use.pageName} · {use.node.name}</span>
+                  <span className="vx-mini">{Object.keys(use.node.overrides ?? {}).length} override{Object.keys(use.node.overrides ?? {}).length === 1 ? "" : "s"}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </OverlaySection>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="primary" onClick={() => context.openOverlay("library publish", { componentId: component.id })}>{component.published ? "Review and publish" : "Publish…"}</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }

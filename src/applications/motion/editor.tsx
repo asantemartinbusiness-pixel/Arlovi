@@ -172,6 +172,7 @@ export function EditorScreen({ context, actions }: { context: ScreenContext; act
   return (
     <EditorFrame
       context={context}
+      lean
       actions={actions}
       tabs={[{ id: "Animate" }, { id: "Design" }, { id: "Effects" }, { id: "Preview" }]}
       title={record.title}

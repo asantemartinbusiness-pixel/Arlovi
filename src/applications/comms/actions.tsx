@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Avatar, Button, Checkbox, Empty, FactGrid, Field, OverlayActions, ModalInFlight, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
+import { Avatar, Button, Checkbox, Empty, FactGrid, Field, OverlayActions, ModalActions, ModalInFlight, OverlayCancel, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useCollections, useRecord, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
@@ -500,7 +500,7 @@ export function SendConfirmation({ context, close }: { context: ScreenContext; c
       <Stack gap={4}>
         <Notice tone="warning" title="Nothing is sent from here">{LOCAL_DRAFT_STATEMENT}</Notice>
         <p className="ds-subtle">Start a forward or a reply from an email thread; the recipients are confirmed here first.</p>
-        <OverlayActions variant="confirm" end={<OverlayCancel>Close</OverlayCancel>} />
+        <ModalActions><OverlayActions variant="confirm" end={<OverlayCancel>Close</OverlayCancel>} /></ModalActions>
       </Stack>
     );
   }
@@ -520,6 +520,7 @@ export function SendConfirmation({ context, close }: { context: ScreenContext; c
         { label: "Sensitive", value: sensitive ? "Labelled sensitive" : "No", tone: sensitive ? "warning" : undefined },
       ]} />
       {needsCheck && <Checkbox label={`I have checked these ${request.to.length} recipients and they should receive this`} checked={checked} onChange={(event) => setChecked(event.target.checked)} />}
+      <ModalActions>
       <OverlayActions
         busy={busy}
         primary={(
@@ -552,6 +553,7 @@ export function SendConfirmation({ context, close }: { context: ScreenContext; c
         )}
         end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
       />
+      </ModalActions>
     </Stack>
   );
 }

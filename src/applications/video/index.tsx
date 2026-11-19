@@ -206,6 +206,7 @@ function TimelineScreen({ context, actions }: { context: ScreenContext; actions:
   return (
     <EditorFrame
       context={context}
+      lean
       actions={actions}
       tabs={[{ id: "Edit" }, { id: "Colour" }, { id: "Audio" }, { id: "Captions" }, { id: "Export" }]}
       title={record.title}

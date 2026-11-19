@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AtSign, CalendarDays, Hash, Mail, Megaphone, MessageSquare, Phone, Settings2, Video } from "lucide-react";
 import {
-  Button, Checkbox, Empty, FactGrid, Field, Notice, OverlayActions, OverlaySummary, OVERLAY_WIDTH, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  Button, Checkbox, Empty, FactGrid, Field, ModalActions, Notice, OverlayActions, OverlaySummary, OVERLAY_WIDTH, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
@@ -11,7 +11,7 @@ import {
   MemberManagement, Preferences, PhishingReport, QuickSwitcher, useCommsData,
 } from "./panels";
 import { DraftComposer } from "./mail";
-import { EmailExperience, type EmailArea } from "./EmailExperience";
+import { EmailExperience, mailTabCount, type EmailArea } from "./EmailExperience";
 import { EventForm, MeetingWorkspace } from "./meetings";
 import "./comms.css";
 import { kitOverlays, needsSelection } from "@/applications/hr/opsKit";
@@ -334,6 +334,21 @@ function PostPreview({ context }: { context: ScreenContext }) {
   );
 }
 
+function PublishReviewSummary({ context }: { context: ScreenContext }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const post = useRecord(payload?.id ?? context.selectedId);
+  if (!post) return null;
+  const published = post.status === "published";
+  return (
+    <OverlaySummary
+      eyebrow="Announcement"
+      title={post.title}
+      status={<Pill tone={published ? "success" : post.status === "scheduled" ? "info" : "neutral"} dot>{post.status}</Pill>}
+      meta={[String(post.fields.audience ?? "Everyone"), post.at ? context.date(post.at) : undefined]}
+    />
+  );
+}
+
 function PublishReview({ context, close }: { context: ScreenContext; close: () => void }) {
   const [reviewed, setReviewed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -348,12 +363,6 @@ function PublishReview({ context, close }: { context: ScreenContext; close: () =
   const published = post.status === "published";
   return (
     <Stack gap={4}>
-      <OverlaySummary
-        eyebrow="Announcement"
-        title={post.title}
-        status={<Pill tone={published ? "success" : post.status === "scheduled" ? "info" : "neutral"} dot>{post.status}</Pill>}
-        meta={[audience, post.at ? context.date(post.at) : undefined]}
-      />
       <FactGrid columns={3} items={[
         { label: "Reaches", value: wide ? `${staff} people` : audience },
         { label: "Acknowledgement", value: post.fields.requiresAck === true ? "Required" : "Not required" },
@@ -362,20 +371,28 @@ function PublishReview({ context, close }: { context: ScreenContext; close: () =
       <Notice tone="info" title="Not emailed">No mail or push service is connected, so only people who open Arlovi see this.</Notice>
       {wide && <Notice tone="warning" title="This goes to everyone">Readers cannot reply to it in private. Check the wording before publishing.</Notice>}
       {needsReview && <Checkbox label={`I have reviewed the wording and the audience${post.fields.sensitive === true ? " of this sensitive post" : ""}`} checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} />}
-      <OverlayActions
-        busy={busy}
-        primary={(
-          <Button variant="primary" disabled={published || (needsReview && !reviewed)} onClick={async () => {
-            setBusy(true);
-            try {
-              await context.mutate.patch(post.id, { status: "published", at: clockIso(), fields: { ...post.fields, publishedBy: context.actor, reviewedBy: needsReview ? context.actor : "" } }, { expectRevision: post.revision, event: `${post.title} published by ${context.actor}${needsReview ? " after review" : ""}` });
-              context.toast("Published to the board", "People see it in Arlovi. Nothing was emailed.");
-              close();
-            } finally { setBusy(false); }
-          }}>{published ? "Already published" : "Publish to the board"}</Button>
-        )}
-        end={<Button variant="ghost" onClick={close}>Cancel</Button>}
-      />
+      <ModalActions>
+        <OverlayActions
+          busy={busy}
+          primary={(
+            <Button variant="primary" disabled={published || (needsReview && !reviewed)} onClick={async () => {
+              setBusy(true);
+              try {
+                const saved = await context.mutate.patch(post.id, { status: "published", at: clockIso(), fields: { ...post.fields, publishedBy: context.actor, reviewedBy: needsReview ? context.actor : "" } }, { expectRevision: post.revision, event: `${post.title} published by ${context.actor}${needsReview ? " after review" : ""}` });
+                if (!saved) {
+                  context.toast("Not published", "The announcement changed after this was opened. Close, check the latest version and try again.", "failed");
+                  return;
+                }
+                context.toast("Published to the board", "People see it in Arlovi. Nothing was emailed.");
+                close();
+              } catch (error) {
+                context.toast("Not published", error instanceof Error ? error.message : "The announcement changed after this was opened. Close, check the latest version and try again.", "failed");
+              } finally { setBusy(false); }
+            }}>{published ? "Already published" : "Publish to the board"}</Button>
+          )}
+          end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
@@ -561,7 +578,7 @@ export const commsApp = registerApp({
       id: "ARL-COMMS-005",
       subtitle: () => "Mail is kept in this browser. No mail service is connected, so nothing is delivered.",
       tabs: (["Inbox", "Sent", "Drafts", "Archive", "Spam", "Shared inboxes", "Accounts & domains", "Sender identities"] as EmailArea[]).map((lens) => ({
-        id: lens, render: (context: ScreenContext) => <EmailExperience context={context} lens={lens} />,
+        id: lens, render: (context: ScreenContext) => <EmailExperience context={context} lens={lens} />, count: () => mailTabCount(lens),
       })),
       actions: [
         { id: "Compose", label: "Compose", placement: "primary", run: (context) => context.openOverlay("Compose window") },
@@ -712,7 +729,7 @@ export const commsApp = registerApp({
         { id: "draft announcement", kind: "modal", title: "Draft an announcement", width: 600, render: ({ close, ...context }) => <DraftAnnouncement context={context} close={close} />, footer: submitFooter("cm-draft", "Save the draft") },
         { id: "Audience selector", kind: "modal", title: "Audience", width: 520, render: ({ close, ...context }) => <AudienceSelector context={context} close={close} />, footer: submitFooter("cm-audience", "Save audience") },
         { id: "post preview", kind: "modal", title: "Preview", width: 620, render: ({ ...context }) => <PostPreview context={context} /> },
-        { id: "publish review", kind: "modal", title: "Publish this announcement", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <PublishReview context={context} close={close} /> },
+        { id: "publish review", kind: "modal", title: "Publish this announcement", width: OVERLAY_WIDTH.form, summary: (context) => <PublishReviewSummary context={context} />, render: ({ close, ...context }) => <PublishReview context={context} close={close} /> },
       ],
     },
 

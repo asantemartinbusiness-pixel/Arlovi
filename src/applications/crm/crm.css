@@ -24,3 +24,9 @@
 .crm-facts > * + *::before { content: "\00b7"; margin-inline: var(--space-2); color: var(--fg-subtle); }
 .crm-facts a { color: inherit; text-decoration: underline; text-decoration-color: var(--border-default); text-underline-offset: 2px; }
 .crm-facts a:hover { text-decoration-color: currentColor; }
+
+/* A real sequence: numbered steps of a rule. */
+.crm-steps { margin: 0; padding: 0; list-style: none; counter-reset: crm-step; display: grid; gap: var(--space-2); }
+.crm-steps li { counter-increment: crm-step; display: grid; grid-template-columns: 1.5em minmax(0, 1fr); gap: var(--space-2); }
+.crm-steps li::before { content: counter(crm-step); font-family: var(--font-mono, monospace); color: var(--fg-subtle); }
+.crm-steps strong { text-transform: capitalize; margin-inline-end: var(--space-1); }

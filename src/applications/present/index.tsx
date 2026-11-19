@@ -54,6 +54,21 @@ function useDeck(context: ScreenContext): Rec | undefined {
   return all.find((record) => record.fields.isTemplate !== true) ?? all[0];
 }
 
+/** Identity head for overlays that act on the open deck. */
+function DeckOverlaySummary({ context }: { context: ScreenContext }) {
+  const record = useDeck(context);
+  if (!record) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Deck"
+      title={record.title}
+      status={<Pill tone={record.status === "published" ? "success" : "neutral"}>{record.status.replace("_", " ")}</Pill>}
+      meta={[record.ownerName, `Revision ${record.revision}`]}
+    />
+  );
+}
+const deckSummary = (context: ScreenContext) => <DeckOverlaySummary context={context} />;
+
 /** The screen's contract actions, on the editor's own bar (the full-chrome surface has no page header). */
 function EditorActions({ context }: { context: ScreenContext }) {
   const def = getScreenDef(context.screen.applicationCode, context.screen.id);
@@ -487,7 +502,7 @@ function ObjectInspector({ editor, context }: { editor: DeckEditor; context: Scr
           ]} />
           <Button size="sm" variant="secondary" style={{ marginBlockStart: "var(--space-2)" }} onClick={() => context.openOverlay("Layout picker", { mode: "reapply" })}>Change layout</Button>
         </InspectorSection>
-        <InspectorSection title="Speaker notes">
+        <InspectorSection title="Speaker notes · private to the presenter">
           <TextArea
             rows={7}
             aria-label="Speaker notes"
@@ -728,12 +743,24 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
   return (
     <div className="px-shell">
       <div className="px-bar">
-        <div className="px-bar-title">
-          <strong>{record.title}</strong>
-          <span>Slide {editor.deck.index + 1} of {editor.deck.slides.length} · {editor.deck.theme.name} · {layoutById(editor.deck, editor.slide.layoutId).name}</span>
-        </div>
+        <section className="px-bar-main" aria-label="Active slide context">
+          <div className="px-bar-title">
+            <strong>{record.title}</strong>
+            <span className="px-bar-sub">
+              <Pill tone={record.status === "published" ? "success" : "neutral"}>{record.status.replace("_", " ")}</Pill>
+              <span>Slide {editor.deck.index + 1} of {editor.deck.slides.length} · {layoutById(editor.deck, editor.slide.layoutId).name}</span>
+              <span>{editor.slide.objects.length} objects · {buildOrder(editor.slide).length} animated</span>
+              {editor.slide.hidden && <Pill tone="warning">Hidden from the audience</Pill>}
+              {editor.deck.comments.filter((item) => !item.resolved).length > 0 && <Pill tone="info">{editor.deck.comments.filter((item) => !item.resolved).length} open comments</Pill>}
+            </span>
+          </div>
+          <ButtonGroup label="Deck areas">
+            <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks`)}>Library</Button>
+            <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}/theme`)}>Theme</Button>
+            <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}/animation`)}>Animation</Button>
+          </ButtonGroup>
+        </section>
         <span className="ds-grow" />
-        <EditorActions context={context} />
         <SaveBadge editor={editor} context={context} />
         <Button size="sm" variant="secondary" disabled={editor.saveState === "clean" || editor.saveState === "saved"} onClick={() => void editor.saveNow()}>Save now</Button>
         <Button size="sm" variant="primary" icon={<Play size={15} />} onClick={() => context.navigate(context.path("/o/:org/present/decks/:id/present", record.id))}>Present</Button>
@@ -742,23 +769,6 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
           <Button size="sm" variant={mobilePanel === "aside" ? "secondary" : "ghost"} aria-pressed={mobilePanel === "aside"} onClick={() => setMobilePanel(mobilePanel === "aside" ? "canvas" : "aside")}>Inspector</Button>
         </ButtonGroup>
       </div>
-
-      <section className="pr-editor-context" aria-label="Active slide context">
-        <div className="pr-editor-context-main">
-          <span className="pr-library-eyebrow">PRESENT / SLIDE WORKSPACE</span>
-          <Row gap={2} wrap>
-            <strong>{editor.slide.title || `Slide ${editor.deck.index + 1}`}</strong>
-            <Pill tone={editor.slide.hidden ? "warning" : "neutral"}>{editor.slide.hidden ? "Hidden from presenting" : "Included in presentation"}</Pill>
-            <span className="ds-subtle">{editor.slide.objects.length} objects · {buildOrder(editor.slide).length} animated · {editor.deck.comments.filter((item) => !item.resolved).length} open comments</span>
-          </Row>
-          <span className="ds-subtle">Theme: {editor.deck.theme.name} · Layout: {layoutById(editor.deck, editor.slide.layoutId).name}</span>
-        </div>
-        <Row gap={2} wrap>
-          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks`)}>Library</Button>
-          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}/theme`)}>Theme</Button>
-          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/present/decks/${record.id}/animation`)}>Animation</Button>
-        </Row>
-      </section>
       <div className="px-bar" style={{ minHeight: 40 }}>
         <Tabs
           label="Editor modes"
@@ -771,6 +781,7 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
             { id: "Review", label: "Review", count: editor.deck.comments.filter((comment) => !comment.resolved).length },
             { id: "View", label: "View" },
           ]}
+          trailing={<EditorActions context={context} />}
         />
       </div>
 
@@ -815,9 +826,10 @@ function SlideEditorScreen({ context }: { context: ScreenContext }) {
                 onDelete={(ids) => { editor.commitSlide(removeObjects(editor.slide, ids), "Delete objects"); editor.setSelectedIds([]); }}
               scale={scale}
             />
-            <Notice tone="neutral">
-              Drag to move, the eight handles to resize, the round handle above to rotate. From the keyboard: Tab cycles objects, arrows move, Alt and arrows resize, square brackets rotate, Enter edits text, Delete removes.
-            </Notice>
+            <details className="px-keys">
+              <summary>Move, resize and keyboard</summary>
+              <p>Drag to move, the eight handles to resize, the round handle above to rotate. From the keyboard: Tab cycles objects, arrows move, Alt and arrows resize, square brackets rotate, Enter edits text, Delete removes.</p>
+            </details>
           </div>
           <div className="px-status">
             <span>Selection <strong className="ds-num">{editor.selectedIds.length}</strong></span>
@@ -3089,9 +3101,9 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "new deck", kind: "modal", title: "New deck", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="new-deck">Create</Button></>, render: (context) => <NewDeck context={context} close={context.close} /> },
-        { id: "Import", kind: "drawer", title: "Import a deck", width: 600, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="import-deck">Import</Button></>, render: (context) => <ImportDeck context={context} close={context.close} /> },
-        { id: "template preview", kind: "drawer", title: "Preview", width: 680, render: (context) => <TemplatePreview context={context} /> },
+        { id: "new deck", kind: "modal", title: "New deck", width: OVERLAY_WIDTH.form, footer: formFooter("new-deck", "Create", false), render: (context) => <NewDeck context={context} close={context.close} /> },
+        { id: "Import", kind: "drawer", summary: deckSummary, title: "Import a deck", width: OVERLAY_WIDTH.record, footer: formFooter("import-deck", "Import", false), render: (context) => <ImportDeck context={context} close={context.close} /> },
+        { id: "template preview", kind: "drawer", summary: deckSummary, title: "Preview", width: OVERLAY_WIDTH.wide, render: (context) => <TemplatePreview context={context} /> },
       ],
     },
 
@@ -3102,13 +3114,13 @@ registerApp({
       tabs: ["Design", "Insert", "Animate", "Review", "View"].map((id) => ({ id, render: () => null })),
       actions: SLIDE_ACTIONS,
       overlays: [
-        { id: "Layout picker", kind: "drawer", title: "Layouts", width: 640, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="layout-picker">Apply</Button></>, render: (context) => <LayoutPicker context={context} close={context.close} /> },
-        { id: "image insert", kind: "modal", title: "Image", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="image-insert">Save</Button></>, render: (context) => <ImageInsert context={context} close={context.close} /> },
-        { id: "properties", kind: "modal", title: "Object", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="properties">Save</Button></>, render: (context) => <PropertiesOverlay context={context} close={context.close} /> },
-        { id: "move object", kind: "modal", title: "Move object", width: 440, footer: formFooter("present-move", "Move"), render: (context) => <MoveObject context={context} close={context.close} /> },
-        { id: "resize object", kind: "modal", title: "Resize object", width: 440, footer: formFooter("present-resize", "Resize"), render: (context) => <ResizeObject context={context} close={context.close} /> },
-        { id: "align objects", kind: "modal", title: "Align", width: 520, render: (context) => <AlignObjects context={context} close={context.close} /> },
-        { id: "AI suggestion", kind: "drawer", title: "Suggestions", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="ai-suggestion">Apply selected</Button></>, render: (context) => <AiSuggestion context={context} close={context.close} /> },
+        { id: "Layout picker", kind: "drawer", summary: deckSummary, title: "Layouts", width: OVERLAY_WIDTH.record, footer: formFooter("layout-picker", "Apply", false), render: (context) => <LayoutPicker context={context} close={context.close} /> },
+        { id: "image insert", kind: "modal", title: "Image", width: OVERLAY_WIDTH.form, footer: formFooter("image-insert", "Save", false), render: (context) => <ImageInsert context={context} close={context.close} /> },
+        { id: "properties", kind: "modal", summary: deckSummary, title: "Object", width: OVERLAY_WIDTH.form, footer: formFooter("properties", "Save", false, "Close"), render: (context) => <PropertiesOverlay context={context} close={context.close} /> },
+        { id: "move object", kind: "modal", title: "Move object", width: OVERLAY_WIDTH.compact, footer: formFooter("present-move", "Move"), render: (context) => <MoveObject context={context} close={context.close} /> },
+        { id: "resize object", kind: "modal", title: "Resize object", width: OVERLAY_WIDTH.compact, footer: formFooter("present-resize", "Resize"), render: (context) => <ResizeObject context={context} close={context.close} /> },
+        { id: "align objects", kind: "modal", title: "Align", width: OVERLAY_WIDTH.form, render: (context) => <AlignObjects context={context} close={context.close} /> },
+        { id: "AI suggestion", kind: "drawer", summary: deckSummary, title: "Suggestions", width: OVERLAY_WIDTH.form, footer: formFooter("ai-suggestion", "Apply selected", false, "Close"), render: (context) => <AiSuggestion context={context} close={context.close} /> },
       ],
     },
 
@@ -3122,10 +3134,10 @@ registerApp({
         { id: "preview impact", label: "Preview the impact", placement: "overflow", run: (context) => context.openOverlay("global apply review") },
       ],
       overlays: [
-        { id: "Theme editor", kind: "modal", title: "Apply a theme", width: 600, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="theme-editor">Apply</Button></>, render: (context) => <ThemeEditor context={context} close={context.close} /> },
-        { id: "global apply review", kind: "drawer", title: "Apply the master", width: 640, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="global-apply">Apply</Button></>, render: (context) => <GlobalApplyReview context={context} close={context.close} /> },
-        { id: "font resolver", kind: "modal", title: "Fonts", width: 560, render: (context) => <FontResolver context={context} /> },
-        { id: "create layout", kind: "modal", title: "Create a layout", width: 480, footer: formFooter("present-create-layout", "Create"), render: (context) => <CreateLayout context={context} close={context.close} /> },
+        { id: "Theme editor", kind: "modal", summary: deckSummary, title: "Apply a theme", width: OVERLAY_WIDTH.modal, footer: formFooter("theme-editor", "Apply", false), render: (context) => <ThemeEditor context={context} close={context.close} /> },
+        { id: "global apply review", kind: "drawer", summary: deckSummary, title: "Apply the master", width: OVERLAY_WIDTH.record, footer: formFooter("global-apply", "Apply", false), render: (context) => <GlobalApplyReview context={context} close={context.close} /> },
+        { id: "font resolver", kind: "modal", title: "Fonts", width: OVERLAY_WIDTH.modal, render: (context) => <FontResolver context={context} /> },
+        { id: "create layout", kind: "modal", title: "Create a layout", width: OVERLAY_WIDTH.compact, footer: formFooter("present-create-layout", "Create"), render: (context) => <CreateLayout context={context} close={context.close} /> },
       ],
     },
 
@@ -3141,9 +3153,9 @@ registerApp({
         { id: "freshness", label: "Check freshness", placement: "overflow", run: (context) => context.setTab("Refresh") },
       ],
       overlays: [
-        { id: "Dataset picker", kind: "drawer", title: "Dataset", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="dataset-picker">Insert</Button></>, render: (context) => <DatasetPicker context={context} close={context.close} /> },
-        { id: "chart inspector", kind: "drawer", title: "Chart", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="chart-inspector">Save</Button></>, render: (context) => <ChartInspector context={context} close={context.close} /> },
-        { id: "unlink warning", kind: "modal", title: "Unlink this chart", tone: "danger", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Keep the link</Button><Button variant="outline-danger" type="submit" form="unlink-warning">Unlink</Button></>, render: (context) => <UnlinkWarning context={context} close={context.close} /> },
+        { id: "Dataset picker", kind: "drawer", summary: deckSummary, title: "Dataset", width: OVERLAY_WIDTH.form, footer: formFooter("dataset-picker", "Insert", false), render: (context) => <DatasetPicker context={context} close={context.close} /> },
+        { id: "chart inspector", kind: "drawer", summary: deckSummary, title: "Chart", width: OVERLAY_WIDTH.form, footer: formFooter("chart-inspector", "Save", false, "Close"), render: (context) => <ChartInspector context={context} close={context.close} /> },
+        { id: "unlink warning", kind: "modal", summary: deckSummary, title: "Unlink this chart", tone: "danger", width: OVERLAY_WIDTH.form, footer: formFooter("unlink-warning", "Unlink", true, "Keep the link"), render: (context) => <UnlinkWarning context={context} close={context.close} /> },
       ],
     },
 
@@ -3159,9 +3171,9 @@ registerApp({
         { id: "accessibility", label: "Accessibility review", placement: "overflow", run: (context) => context.openOverlay("accessibility review") },
       ],
       overlays: [
-        { id: "Motion inspector", kind: "modal", title: "Motion", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Close</Button><Button variant="primary" type="submit" form="motion-inspector">Done</Button></>, render: (context) => <MotionInspector context={context} close={context.close} /> },
-        { id: "playback", kind: "drawer", title: "Playback", width: 640, render: (context) => <PlaybackOverlay context={context} /> },
-        { id: "accessibility review", kind: "drawer", title: "Accessibility", width: 600, render: (context) => <AccessibilityReview context={context} /> },
+        { id: "Motion inspector", kind: "modal", title: "Motion", width: OVERLAY_WIDTH.form, footer: formFooter("motion-inspector", "Done", false, "Close"), render: (context) => <MotionInspector context={context} close={context.close} /> },
+        { id: "playback", kind: "drawer", summary: deckSummary, title: "Playback", width: OVERLAY_WIDTH.record, render: (context) => <PlaybackOverlay context={context} /> },
+        { id: "accessibility review", kind: "drawer", summary: deckSummary, title: "Accessibility", width: OVERLAY_WIDTH.record, render: (context) => <AccessibilityReview context={context} /> },
       ],
     },
 
@@ -3188,10 +3200,10 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "Display selector", kind: "modal", title: "Audience display", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="display-selector">Continue</Button></>, render: (context) => <DisplaySelector context={context} close={context.close} /> },
-        { id: "rehearsal report", kind: "drawer", title: "Rehearsal", width: 600, render: (context) => <RehearsalReport context={context} /> },
-        { id: "annotate", kind: "modal", title: "Annotate the live slide", width: 480, footer: formFooter("present-annotate", "Add"), render: (context) => <Annotate context={context} close={context.close} /> },
-        { id: "access confirmation", kind: "modal", title: "Before you present", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="display-selector">Continue</Button></>, render: (context) => <DisplaySelector context={context} close={context.close} /> },
+        { id: "Display selector", kind: "modal", title: "Audience display", width: OVERLAY_WIDTH.form, footer: formFooter("display-selector", "Continue", false), render: (context) => <DisplaySelector context={context} close={context.close} /> },
+        { id: "rehearsal report", kind: "drawer", summary: deckSummary, title: "Rehearsal", width: OVERLAY_WIDTH.record, render: (context) => <RehearsalReport context={context} /> },
+        { id: "annotate", kind: "modal", title: "Annotate the live slide", width: OVERLAY_WIDTH.compact, footer: formFooter("present-annotate", "Add"), render: (context) => <Annotate context={context} close={context.close} /> },
+        { id: "access confirmation", kind: "modal", summary: deckSummary, title: "Before you present", width: OVERLAY_WIDTH.form, footer: formFooter("display-selector", "Continue", false), render: (context) => <DisplaySelector context={context} close={context.close} /> },
       ],
     },
 
@@ -3206,11 +3218,11 @@ registerApp({
         { id: "share", label: "Share…", placement: "overflow", run: (context) => context.openOverlay("share deck") },
       ],
       overlays: [
-        { id: "Version comparison", kind: "drawer", title: "Compare versions", width: 720, render: (context) => <VersionComparison context={context} /> },
-        { id: "export settings", kind: "modal", title: "Export settings", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="export-settings">Export</Button></>, render: (context) => <ExportSettings context={context} close={context.close} /> },
-        { id: "resolve comments", kind: "modal", title: "Resolve comments", width: 560, render: (context) => <ResolveComments context={context} close={context.close} /> },
-        { id: "share deck", kind: "modal", title: "Share the deck", width: 520, footer: formFooter("present-share", "Share"), render: (context) => <ShareDeck context={context} close={context.close} /> },
-        { id: "approval", kind: "modal", title: "Approval", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="approval">Record</Button></>, render: (context) => <ApprovalOverlay context={context} close={context.close} /> },
+        { id: "Version comparison", kind: "drawer", summary: deckSummary, title: "Compare versions", width: OVERLAY_WIDTH.wide, render: (context) => <VersionComparison context={context} /> },
+        { id: "export settings", kind: "modal", summary: deckSummary, title: "Export settings", width: OVERLAY_WIDTH.modal, footer: formFooter("export-settings", "Export", false), render: (context) => <ExportSettings context={context} close={context.close} /> },
+        { id: "resolve comments", kind: "modal", title: "Resolve comments", width: OVERLAY_WIDTH.modal, render: (context) => <ResolveComments context={context} close={context.close} /> },
+        { id: "share deck", kind: "modal", title: "Share the deck", width: OVERLAY_WIDTH.form, footer: formFooter("present-share", "Share"), render: (context) => <ShareDeck context={context} close={context.close} /> },
+        { id: "approval", kind: "modal", summary: deckSummary, title: "Approval", width: OVERLAY_WIDTH.form, footer: formFooter("approval", "Record", false), render: (context) => <ApprovalOverlay context={context} close={context.close} /> },
       ],
     },
   },

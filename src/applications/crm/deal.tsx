@@ -572,6 +572,19 @@ export function CollaboratorPicker({ context, close }: { context: ScreenContext;
  * Closing a deal as won creates the real linked records: a quote if none
  * exists, and a draft invoice in Finance priced through the tax engine.
  */
+export function ClosureSummary({ context }: { context: ScreenContext }) {
+  const { deal, data } = useDeal(context);
+  if (!deal) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Deal"
+      title={deal.title}
+      status={<StagePill deal={deal} />}
+      meta={[contactOfDeal(data, deal)?.title, accountOfDeal(data, deal)?.title, <span className="ds-num" key="amt">{context.money(Number(deal.amountMinor ?? 0))}</span>]}
+    />
+  );
+}
+
 export function ClosureConfirmation({ context, close }: { context: ScreenContext; close: () => void }) {
   const { deal, data } = useDeal(context);
   const { org, now } = useWorkspace();
@@ -582,7 +595,6 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
   const quotes = quotesOfDeal(data, deal.id);
   const latest = quotes.find((quote) => quote.status === "accepted") ?? quotes[0];
   const contact = contactOfDeal(data, deal);
-  const account = accountOfDeal(data, deal);
   const existingInvoices = invoicesOfDeal(data, deal);
   const guard = dealWonBlocker({ deal, quote: latest, contact, invoices: existingInvoices, createInvoice: createInvoice === "yes", now });
 
@@ -594,19 +606,9 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
     date: now.toISOString().slice(0, 10),
   });
 
-  const summary = (
-    <OverlaySummary
-      eyebrow="Deal"
-      title={deal.title}
-      status={<StagePill deal={deal} />}
-      meta={[contact?.title, account?.title, <span className="ds-num" key="amt">{context.money(Number(deal.amountMinor ?? 0))}</span>]}
-    />
-  );
-
   if (stageOf(deal).kind === "won") {
     return (
       <Stack gap={4}>
-        {summary}
         <Notice tone="success" title="This deal is already closed won">
           {existingInvoices.length ? `${existingInvoices[0].title} is linked to it.` : "No invoice is linked yet."}
         </Notice>
@@ -642,7 +644,6 @@ export function ClosureConfirmation({ context, close }: { context: ScreenContext
     <Stack gap={4}>
       <ModalUnsavedChanges when={createInvoice !== "yes"} />
       <ModalInFlight when={busy} />
-      {summary}
       {guard && <Notice tone="danger" title="This deal cannot be closed won yet">{guard}</Notice>}
       <OverlaySection title="Evidence" hint="What the close rests on. The same stage validation runs here as on the board.">
         <ul className="crm-evidence" data-flush>

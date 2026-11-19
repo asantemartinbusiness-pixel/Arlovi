@@ -100,14 +100,34 @@ export function BookingsOverview({ context, lens }: { context: ScreenContext; le
   }
 
   const rows = lens === "Week" ? weeks : todays;
+  const upcoming = data.bookings
+    .filter((booking) => isLive(booking) && booking.startAt && new Date(booking.startAt) >= now)
+    .sort((a, b) => a.startAt!.localeCompare(b.startAt!))
+    .slice(0, 3);
   return (
     <Stack gap={5}>
+      <PageSection title="Next up" hint={upcoming.length ? "The next appointments, with what each one still needs" : undefined}>
+        {upcoming.length === 0 ? <span className="ds-subtle">Nothing is booked from now on.</span> : (
+          <ul className="book-ledger" data-flush>
+            {upcoming.map((booking) => {
+              const state = String(booking.fields.depositState ?? "none");
+              const needs = booking.status === "hold" ? "Held, not confirmed" : state === "awaiting_payment" ? "Deposit awaiting payment" : state === "not_requested" ? "Deposit not requested" : "Ready";
+              return (
+                <li key={booking.id}>
+                  <Pill tone={needs === "Ready" ? "success" : "warning"} dot>{needs === "Ready" ? "Ready" : "Needs action"}</Pill>
+                  <span className="book-ledger-label"><Link to={`/o/${org.slug}/book/bookings/${booking.id}`}>{booking.title}</Link> <span className="ds-subtle">{resourceOf(data, booking)?.title}</span></span>
+                  <span className="book-ledger-detail ds-num">{context.relative(booking.startAt)}{needs !== "Ready" ? `, ${needs.toLowerCase()}` : ""}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </PageSection>
       <StatRow>
         <Stat label="Appointments today" value={String(todays.filter(isLive).length)} prov="human" meta={`${weeks.filter(isLive).length} this week`} onClick={() => context.openOverlay("capacity alert")} />
         <Stat label="Held, not confirmed" value={String(data.bookings.filter((booking) => booking.status === "hold").length)} prov="human" meta="Blocking a resource" />
         <Stat label="Deposits awaiting payment" value={context.money(data.bookings.filter((booking) => String(booking.fields.depositState) === "awaiting_payment").reduce((sum, booking) => sum + Number(booking.fields.depositMinor ?? 0), 0))} prov="human" meta="No processor is connected" />
         <Stat label="Cancellations" value={String(cancellations.length)} prov="human" meta={`${noShows.length} no-shows recorded`} />
-        <Stat label="Online bookings today" value="Unavailable" unavailable meta="The public page is not hosted" />
       </StatRow>
 
       <Grid>

@@ -123,7 +123,7 @@ export function ProfileMenu({
                 ? <PinOff size={17} aria-hidden="true"/>
                 : <Pin size={17} aria-hidden="true"/>}
               <span className="profile-menu__item-title">
-                {activeApplication.pinned ? "Unpin" : "Pin"} {activeApplication.name} {activeApplication.pinned ? "from" : "to"} favourites
+                {activeApplication.pinned ? "Remove" : "Pin"} {activeApplication.name} {activeApplication.pinned ? "from" : "to"} favourites
               </span>
             </DropdownMenu.Item>
           )}

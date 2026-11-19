@@ -193,3 +193,11 @@
 .px-audience-window-bar { opacity: 0; transition: opacity 160ms ease; }
 .px-audience-window-bar:hover, .px-audience-window-bar:focus-within { opacity: 1; }
 @media (hover: none) { .px-audience-window-bar { opacity: 1; } }
+
+/* One bar: deck identity, slide state and deck areas share a row. */
+.px-bar-main { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; min-width: 0; flex: 1 1 520px; }
+.px-bar-sub { display: flex !important; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.px-bar { padding-block: var(--space-1); }
+.px-keys { font-size: var(--text-xs); color: var(--fg-muted); }
+.px-keys summary { cursor: pointer; font-weight: 600; }
+.px-keys p { margin: var(--space-1) 0 0; }

@@ -198,6 +198,7 @@ function RasterEditor({ context, actions }: { context: ScreenContext; actions: A
   return (
     <EditorFrame
       context={context}
+      lean
       actions={actions}
       tabs={[{ id: "Edit" }, { id: "Layers" }, { id: "Adjust" }, { id: "Review" }]}
       title={record.title}
@@ -389,6 +390,7 @@ function MasksScreen({ context, actions }: { context: ScreenContext; actions: Ac
   return (
     <EditorFrame
       context={context}
+      lean
       actions={actions}
       tabs={[{ id: "Select" }, { id: "Refine" }, { id: "Mask" }, { id: "Compare" }]}
       title={`${record.title} — selections and masks`}

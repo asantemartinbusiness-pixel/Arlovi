@@ -16,10 +16,10 @@ import {
   RelationshipInspector, RoutingRulesOverlay,
 } from "./companies";
 import {
-  DealDrawer, LostReason, PipelineBoard, PipelineForecast, PipelineList, PipelineStrip, PipelineTeam, StageChangeValidation,
+  DealDrawer, DealDrawerSummary, LostReason, PipelineBoard, PipelineForecast, PipelineList, PipelineStrip, PipelineTeam, StageChangeValidation,
 } from "./pipeline";
 import {
-  ClosureConfirmation, CollaboratorPicker, DealActivity, DealDocuments, dealRecord, DealInspector, DealOverview,
+  ClosureConfirmation, ClosureSummary, CollaboratorPicker, DealActivity, DealDocuments, dealRecord, DealInspector, DealOverview,
   DealProducts, DealTeam, RequestApproval,
 } from "./deal";
 import { PricingPolicy, QuoteEditor, QuotesList, QuotesStrip, SendPreview } from "./quotes";
@@ -233,7 +233,7 @@ export const crmApp = registerApp({
         { id: "close lost", label: "Close lost", placement: "overflow", tone: "danger", guard: (context) => (context.selectedId ? undefined : "Select a deal first"), run: (context) => context.openOverlay("lost reason", { id: context.selectedId }) },
       ],
       overlays: [
-        { id: "Deal drawer", kind: "drawer", title: "Deal", width: OVERLAY_WIDTH.form, presentation: { noRecordContext: true }, render: ({ close, ...context }) => <DealDrawer context={context} close={close} /> },
+        { id: "Deal drawer", kind: "drawer", title: "Deal", width: OVERLAY_WIDTH.form, summary: ({ close, ...context }) => <DealDrawerSummary context={context} close={close} />, render: ({ close, ...context }) => <DealDrawer context={context} close={close} /> },
         { id: "stage change validation", kind: "modal", title: "Stage change", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <StageChangeValidation context={context} close={close} /> },
         { id: "lost reason", kind: "modal", title: "Close the deal as lost", width: OVERLAY_WIDTH.modal, tone: "danger", render: ({ close, ...context }) => <LostReason context={context} close={close} /> },
         { id: "assign owner", kind: "modal", title: "Assign an owner", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AssignOwner context={context} close={close} /> },
@@ -264,7 +264,7 @@ export const crmApp = registerApp({
       overlays: [
         { id: "Quote builder", kind: "drawer", title: "Quote builder", width: 1040, render: ({ close, ...context }) => <QuoteEditor context={context} close={close} /> },
         { id: "collaborator picker", kind: "drawer", title: "People and approvals", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <Stack gap={4}><CollaboratorPicker context={context} close={close} /><RequestApproval context={context} close={close} /></Stack> },
-        { id: "closure confirmation", kind: "modal", title: "Close the deal", width: OVERLAY_WIDTH.record, capability: "edit_pipeline", presentation: { selectedRecord: true, noRecordContext: true, collection: "deals", guidance: "Review customer, quote and tax evidence before closing won or handing over to Finance." }, render: ({ close, ...context }) => <ClosureConfirmation context={context} close={close} /> },
+        { id: "closure confirmation", kind: "modal", title: "Close the deal", width: OVERLAY_WIDTH.record, capability: "edit_pipeline", summary: (context) => <ClosureSummary context={context} />, presentation: { selectedRecord: true, collection: "deals", guidance: "Review customer, quote and tax evidence before closing won or handing over to Finance." }, render: ({ close, ...context }) => <ClosureConfirmation context={context} close={close} /> },
         { id: "stage change validation", kind: "modal", title: "Stage change", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <StageChangeValidation context={context} close={close} /> },
       ],
     },

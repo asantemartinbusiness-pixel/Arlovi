@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("global spaces, work and apps navigate without losing organisational scope", async ({ page }) => {
   await page.goto("/o/northline/workspace/home");
-  await expect(page.getByRole("heading", { name: /Make room for what matters/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /need you today|waiting on you/i })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Primary navigation" }).getByRole("link", { name: "Spaces" })).toBeVisible();
   await page.getByRole("navigation", { name: "Primary navigation" }).getByRole("link", { name: "Spaces" }).click();
   await expect(page).toHaveURL(/\/o\/northline\/workspace\/spaces/);

@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import {
   BarChart, Button, ButtonGroup, Card, Checkbox, DataGrid, DonutChart, Empty, Field, Grid,
-  InspectorSection, LineChart, Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat,
+  InspectorSection, KeyValueList, LineChart, Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat,
   StatRow, Switch, Tabs, TextArea, TextInput, Tool, Toolbar, ToolbarSeparator,
 } from "@/design-system";
 import { getScreenDef, registerApp, type ActionDef, type ScreenContext } from "@/platform/registry";
@@ -32,6 +32,7 @@ import {
 } from "./model";
 import { SheetGrid, singleSelection } from "./grid";
 import { boxAddresses, protectedSet, SAVE_LABEL, SAVE_TONE, useWorkbookEditor, type WorkbookEditor } from "./state";
+import { ChangePreview, proposeChange } from "./preview";
 import "./sheets.css";
 
 /* ====================================================================== *
@@ -49,6 +50,21 @@ function useWorkbook(context: ScreenContext): Rec | undefined {
   useGuardRefresh(context);
   return fromRoute ?? all.find((record) => record.status === "active") ?? all[0];
 }
+
+/** Identity head for overlays that act on the open workbook. */
+function WorkbookOverlaySummary({ context }: { context: ScreenContext }) {
+  const record = useWorkbook(context);
+  if (!record) return null;
+  return (
+    <OverlaySummary
+      eyebrow="Workbook"
+      title={record.title}
+      status={<Pill tone={record.status === "archived" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>}
+      meta={[String(record.fields.folder ?? "Unfiled"), record.ownerName, `Revision ${record.revision}`]}
+    />
+  );
+}
+const workbookSummary = (context: ScreenContext) => <WorkbookOverlaySummary context={context} />;
 
 /** The grid's contract actions, on its own bar (the full-chrome surface has no page header). */
 function GridActions({ context }: { context: ScreenContext }) {
@@ -541,12 +557,25 @@ function GridEditorScreen({ context }: { context: ScreenContext }) {
   return (
     <div className="sx-shell">
       <div className="sx-bar">
-        <div className="sx-bar-title">
-          <strong>{record.title}</strong>
-          <span>{editor.sheet.name} · {editor.workbook.sheets.length} sheet{editor.workbook.sheets.length === 1 ? "" : "s"} · {String(record.fields.folder ?? "Unfiled")}</span>
-        </div>
+        <section className="sx-bar-main" aria-label="Workbook working status">
+          <div className="sx-bar-title">
+            <strong>{record.title}</strong>
+            <span className="sx-bar-sub">
+              <Pill tone={record.status === "archived" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>
+              <span>{editor.sheet.name} · {editor.workbook.sheets.length} sheet{editor.workbook.sheets.length === 1 ? "" : "s"}</span>
+              <span>{populatedCells} cells · {formulaCount} formulas</span>
+              {sheetErrors.length > 0
+                ? <Pill tone="danger">{sheetErrors.length} calculation error{sheetErrors.length === 1 ? "" : "s"}</Pill>
+                : formulaCount > 0 && <span className="sx-bar-ok">All formulas calculate</span>}
+            </span>
+          </div>
+          <ButtonGroup label="Workbook areas">
+            <Button size="sm" variant="ghost" onClick={() => context.navigate(`/o/${context.org.slug}/sheets/workbooks`)}>Library</Button>
+            <Button size="sm" variant="ghost" onClick={() => context.navigate(context.path("/o/:org/sheets/workbooks/:id/formulas", record.id))}>Formula audit</Button>
+            <Button size="sm" variant="ghost" onClick={() => context.navigate(context.path("/o/:org/sheets/workbooks/:id/charts", record.id))}>Charts</Button>
+          </ButtonGroup>
+        </section>
         <span className="ds-grow" />
-        <GridActions context={context} />
         <SaveBadge editor={editor} context={context} />
         <Button size="sm" variant="secondary" disabled={editor.saveState === "clean" || editor.saveState === "saved"} onClick={() => void editor.saveNow()}>Save now</Button>
         <Button size="sm" variant="ghost" icon={<RefreshCw size={15} />} onClick={() => { editor.recalculate(); context.toast("Recalculated", "Formulas were re-evaluated in topological order."); }}>Recalculate</Button>
@@ -554,24 +583,6 @@ function GridEditorScreen({ context }: { context: ScreenContext }) {
           <Button size="sm" variant={mobilePanel === "aside" ? "secondary" : "ghost"} aria-pressed={mobilePanel === "aside"} onClick={() => setMobilePanel(mobilePanel === "aside" ? "grid" : "aside")}>Inspector</Button>
         </ButtonGroup>
       </div>
-
-      <section className="sx-workflow-strip" aria-label="Workbook working status">
-        <div className="sx-workflow-context">
-          <span className="sx-library-eyebrow">ACTIVE SHEET</span>
-          <Row gap={2} wrap>
-            <Pill tone={record.status === "archived" ? "warning" : "neutral"}>{record.status.replace("_", " ")}</Pill>
-            <strong>{editor.sheet.name}</strong>
-            <span className="ds-subtle">{populatedCells} populated cells · {formulaCount} formulas</span>
-            {sheetErrors.length > 0 && <Pill tone="danger">{sheetErrors.length} calculation error{sheetErrors.length === 1 ? "" : "s"}</Pill>}
-          </Row>
-          <span className="ds-subtle">Values are calculated locally. Editing and sharing do not imply a cloud spreadsheet session.</span>
-        </div>
-        <div className="sx-workflow-actions">
-          <Button size="sm" variant="secondary" onClick={() => context.navigate(`/o/${context.org.slug}/sheets/workbooks`)}>Library</Button>
-          <Button size="sm" variant="secondary" onClick={() => context.navigate(context.path("/o/:org/sheets/workbooks/:id/formulas", record.id))}>Formula audit</Button>
-          <Button size="sm" variant="secondary" onClick={() => context.navigate(context.path("/o/:org/sheets/workbooks/:id/charts", record.id))}>Charts</Button>
-        </div>
-      </section>
       <div className="sx-bar" style={{ minHeight: 40, paddingBlock: 0 }}>
         <Tabs
           label="Grid modes"
@@ -584,6 +595,7 @@ function GridEditorScreen({ context }: { context: ScreenContext }) {
             { id: "Review", label: "Review", count: editor.workbook.comments.filter((comment) => !comment.resolved).length },
             { id: "View", label: "View" },
           ]}
+          trailing={<GridActions context={context} />}
         />
       </div>
 
@@ -596,6 +608,7 @@ function GridEditorScreen({ context }: { context: ScreenContext }) {
       </div>
 
       <FormulaBar editor={editor} onEdit={commitCell} />
+      <ChangePreview editor={editor} editorKey={record.id} />
 
       {editor.conflict && <div style={{ padding: "var(--space-3) var(--space-4)" }}><ConflictNotice editor={editor} /></div>}
 
@@ -608,10 +621,11 @@ function GridEditorScreen({ context }: { context: ScreenContext }) {
             selection={editor.selection}
             onSelectionChange={editor.setSelection}
             onCommit={commitCell}
-            onClear={(box) => editor.commitSheet(clearRange(editor.sheet, box), "Clear cells")}
+            onClear={(box) => { void proposeChange(editor, clearRange(editor.sheet, box), `Clear ${boxLabel(box)}`, record.id); }}
             onPaste={(text, col, row) => {
-              editor.commitSheet(pasteAt(editor.sheet, text, col, row), "Paste");
-              context.toast("Pasted", "Values were written as typed. A pasted formula keeps its references exactly as pasted.");
+              if (proposeChange(editor, pasteAt(editor.sheet, text, col, row), `Paste at ${cellAddress(col, row)}`, record.id)) {
+                context.toast("Pasted", "Values were written as typed. A pasted formula keeps its references exactly as pasted.");
+              }
             }}
             onCopy={(box) => copyRange(editor.sheet, box)}
             hiddenRows={hidden}
@@ -623,12 +637,12 @@ function GridEditorScreen({ context }: { context: ScreenContext }) {
               if (action === "redo") { if (editor.canRedo) editor.redo(); return; }
               if (action === "fillDown") {
                 if (box.fromRow === box.toRow) { context.toast("Nothing to fill", "Select the source row and the rows below it, then fill down.", "info"); return; }
-                editor.commitSheet(fillRange(editor.sheet, box, "down"), "Fill down");
+                void proposeChange(editor, fillRange(editor.sheet, box, "down"), `Fill down ${boxLabel(box)}`, record.id);
                 return;
               }
               if (action === "fillRight") {
                 if (box.fromCol === box.toCol) { context.toast("Nothing to fill", "Select the source column and the columns to its right, then fill right.", "info"); return; }
-                editor.commitSheet(fillRange(editor.sheet, box, "right"), "Fill right");
+                void proposeChange(editor, fillRange(editor.sheet, box, "right"), `Fill right ${boxLabel(box)}`, record.id);
                 return;
               }
               const first = editor.sheet.styles[cellAddress(box.fromCol, box.fromRow)];
@@ -641,18 +655,7 @@ function GridEditorScreen({ context }: { context: ScreenContext }) {
         </div>
 
         <div className="sx-aside">
-          <InspectorSection title="Cell">
-            <Properties rows={[
-              { label: "Address", value: cellAddress(editor.selection.active.col, editor.selection.active.row) },
-              { label: "Raw", value: <code style={{ fontSize: "var(--text-xs)" }}>{editor.sheet.cells[cellAddress(editor.selection.active.col, editor.selection.active.row)] || "(empty)"}</code> },
-              { label: "Value", value: displayValue(editor.values[cellAddress(editor.selection.active.col, editor.selection.active.row)], editor.sheet.styles[cellAddress(editor.selection.active.col, editor.selection.active.row)], editor.format) || "(empty)" },
-              { label: "Format", value: FORMAT_LABELS[editor.sheet.styles[cellAddress(editor.selection.active.col, editor.selection.active.row)]?.format ?? "general"] },
-              { label: "Selection", value: boxLabel(editor.selection.box) },
-            ]} />
-          </InspectorSection>
-          <InspectorSection title="Precedents">
-            <PrecedentList editor={editor} />
-          </InspectorSection>
+          <SelectionInspector editor={editor} />
           <InspectorSection title="Errors on this sheet">
             {editor.evaluation.errors.filter((error) => error.sheetName === editor.sheet.name).length === 0
               ? <span className="ds-subtle">No formula on this sheet is in error.</span>
@@ -681,20 +684,67 @@ function GridEditorScreen({ context }: { context: ScreenContext }) {
             )}
             <Button size="sm" variant="secondary" style={{ marginBlockStart: "var(--space-2)" }} onClick={() => context.openOverlay("named range")}>Define a range</Button>
           </InspectorSection>
-          <InspectorSection title="Keyboard">
-            <Properties rows={[
+          <details className="sx-keys">
+            <summary>Keyboard</summary>
+            <KeyValueList items={[
               { label: "Move", value: "Arrow keys" },
-              { label: "Extend selection", value: "Shift + arrows, Shift + click" },
-              { label: "Jump", value: "Cmd/Ctrl + arrows, Page up/down, Home" },
-              { label: "Edit", value: "Enter or F2, or just start typing" },
-              { label: "Commit", value: "Enter (down), Tab (right)" },
-              { label: "Clear", value: "Delete or Backspace" },
+              { label: "Extend", value: "Shift + arrows or click" },
+              { label: "Jump", value: "Cmd/Ctrl + arrows" },
+              { label: "Edit", value: "Enter, F2 or type" },
+              { label: "Commit", value: "Enter down, Tab right" },
+              { label: "Clear", value: "Delete (previewed)" },
               { label: "Copy / paste", value: "Cmd/Ctrl + C / V" },
             ]} />
-          </InspectorSection>
+          </details>
         </div>
       </div>
     </div>
+  );
+}
+
+function SelectionInspector({ editor }: { editor: WorkbookEditor }) {
+  const { col, row } = editor.selection.active;
+  const address = cellAddress(col, row);
+  const box = editor.selection.box;
+  const addresses = boxAddresses(box);
+  const multi = addresses.length > 1;
+  const style = editor.sheet.styles[address];
+  const numbers = addresses
+    .map((key) => editor.values[key])
+    .filter((cell): cell is CellResult => Boolean(cell) && !cell.error)
+    .map((cell) => (typeof cell.value === "number" ? cell.value : Number(toText(cell.value))))
+    .filter((value) => !Number.isNaN(value));
+  const sum = numbers.reduce((total, value) => total + value, 0);
+  const filled = addresses.filter((key) => (editor.sheet.cells[key] ?? "") !== "").length;
+  const formulas = addresses.filter((key) => (editor.sheet.cells[key] ?? "").startsWith("=")).length;
+  const raw = editor.sheet.cells[address] ?? "";
+  return (
+    <>
+      <InspectorSection title={multi ? `Range ${boxLabel(box)}` : `Cell ${address}`}>
+        <KeyValueList items={multi ? [
+          { label: "Cells", value: `${addresses.length} (${filled} filled)`, mono: true },
+          { label: "Formulas", value: String(formulas), mono: true },
+          { label: "Numeric", value: String(numbers.length), mono: true },
+          { label: "Sum", value: numbers.length ? String(Math.round(sum * 1e6) / 1e6) : "—", mono: true },
+          { label: "Average", value: numbers.length ? String(Math.round((sum / numbers.length) * 1e4) / 1e4) : "—", mono: true },
+        ] : [
+          { label: "Entered", value: raw || "(empty)", mono: true },
+          { label: "Shows", value: displayValue(editor.values[address], style, editor.format) || "(empty)", mono: true },
+          { label: "Format", value: FORMAT_LABELS[style?.format ?? "general"] },
+        ]} />
+      </InspectorSection>
+      {multi && (
+        <InspectorSection title={`Active cell ${address}`}>
+          <KeyValueList items={[
+            { label: "Entered", value: raw || "(empty)", mono: true },
+            { label: "Shows", value: displayValue(editor.values[address], style, editor.format) || "(empty)", mono: true },
+          ]} />
+        </InspectorSection>
+      )}
+      <InspectorSection title="Formula links">
+        <PrecedentList editor={editor} />
+      </InspectorSection>
+    </>
   );
 }
 
@@ -2694,10 +2744,10 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "new workbook", kind: "modal", title: "New workbook", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="new-workbook">Create</Button></>, render: (context) => <NewWorkbook context={context} close={context.close} /> },
-        { id: "Import mapper", kind: "drawer", title: "Import CSV", width: 620, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="import-wizard">Import</Button></>, render: (context) => <ImportMapper context={context} close={context.close} /> },
-        { id: "search workbooks", kind: "modal", title: "Search workbooks", width: 560, render: (context) => <SearchWorkbooks context={context} close={context.close} /> },
-        { id: "share", kind: "modal", title: "Share workbook", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="share-workbook">Save</Button></>, render: (context) => <ShareWorkbook context={context} close={context.close} /> },
+        { id: "new workbook", kind: "modal", title: "New workbook", width: OVERLAY_WIDTH.form, footer: formFooter("new-workbook", "Create", false), render: (context) => <NewWorkbook context={context} close={context.close} /> },
+        { id: "Import mapper", kind: "drawer", summary: workbookSummary, title: "Import CSV", width: OVERLAY_WIDTH.record, footer: formFooter("import-wizard", "Import", false), render: (context) => <ImportMapper context={context} close={context.close} /> },
+        { id: "search workbooks", kind: "modal", title: "Search workbooks", width: OVERLAY_WIDTH.modal, render: (context) => <SearchWorkbooks context={context} close={context.close} /> },
+        { id: "share", kind: "modal", title: "Share workbook", width: OVERLAY_WIDTH.compact, footer: formFooter("share-workbook", "Save", false), render: (context) => <ShareWorkbook context={context} close={context.close} /> },
       ],
     },
 
@@ -2708,13 +2758,13 @@ registerApp({
       tabs: ["Sheet tabs", "Data", "Formulas", "Review", "View"].map((id) => ({ id, render: () => null })),
       actions: GRID_ACTIONS,
       overlays: [
-        { id: "Format cells", kind: "modal", title: "Format cells", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="format-cells">Apply</Button></>, render: (context) => <FormatCells context={context} close={context.close} /> },
-        { id: "data validation", kind: "modal", title: "Data validation", width: 560, presentation: { guidance: "Check the selected range, accepted values and validation outcome before saving." }, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="validation">Save</Button></>, render: (context) => <ValidationOverlay context={context} close={context.close} /> },
-        { id: "named range", kind: "modal", title: "Named range", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="named-range">Save</Button></>, render: (context) => <NamedRangeOverlay context={context} close={context.close} /> },
-        { id: "edit cell", kind: "modal", title: "Edit cell", width: 480, footer: formFooter("sheets-edit-cell", "Save"), render: (context) => <EditCell context={context} close={context.close} /> },
-        { id: "paste cells", kind: "modal", title: "Paste", width: 560, footer: formFooter("sheets-paste", "Paste"), render: (context) => <PasteCells context={context} close={context.close} /> },
-        { id: "sort range", kind: "modal", title: "Sort", width: 480, footer: formFooter("sheets-sort", "Sort"), render: (context) => <SortForm context={context} close={context.close} /> },
-        { id: "chart picker", kind: "drawer", title: "Chart", width: 560, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="chart-picker">Save chart</Button></>, render: (context) => <ChartPicker context={context} close={context.close} /> },
+        { id: "Format cells", kind: "modal", summary: workbookSummary, title: "Format cells", width: OVERLAY_WIDTH.modal, footer: formFooter("format-cells", "Apply", false), render: (context) => <FormatCells context={context} close={context.close} /> },
+        { id: "data validation", kind: "modal", summary: workbookSummary, title: "Data validation", width: OVERLAY_WIDTH.modal, presentation: { guidance: "Check the selected range, accepted values and validation outcome before saving." }, footer: formFooter("validation", "Save", false), render: (context) => <ValidationOverlay context={context} close={context.close} /> },
+        { id: "named range", kind: "modal", summary: workbookSummary, title: "Named range", width: OVERLAY_WIDTH.form, footer: formFooter("named-range", "Save", false), render: (context) => <NamedRangeOverlay context={context} close={context.close} /> },
+        { id: "edit cell", kind: "modal", title: "Edit cell", width: OVERLAY_WIDTH.compact, footer: formFooter("sheets-edit-cell", "Save"), render: (context) => <EditCell context={context} close={context.close} /> },
+        { id: "paste cells", kind: "modal", title: "Paste", width: OVERLAY_WIDTH.modal, footer: formFooter("sheets-paste", "Paste"), render: (context) => <PasteCells context={context} close={context.close} /> },
+        { id: "sort range", kind: "modal", title: "Sort", width: OVERLAY_WIDTH.compact, footer: formFooter("sheets-sort", "Sort"), render: (context) => <SortForm context={context} close={context.close} /> },
+        { id: "chart picker", kind: "drawer", summary: workbookSummary, title: "Chart", width: OVERLAY_WIDTH.form, footer: formFooter("chart-picker", "Save chart", false), render: (context) => <ChartPicker context={context} close={context.close} /> },
       ],
     },
 
@@ -2748,11 +2798,11 @@ registerApp({
         { id: "compare", label: "Compare dependencies…", placement: "overflow", run: (context) => context.openOverlay("compare dependencies") },
       ],
       overlays: [
-        { id: "Formula inspector", kind: "drawer", title: "Formula", width: 560, render: (context) => <FormulaInspector context={context} /> },
-        { id: "function help", kind: "modal", title: "Function help", width: 620, render: (context) => <FunctionHelp context={context} /> },
-        { id: "circular reference", kind: "drawer", title: "Circular reference", width: 600, tone: "danger", render: (context) => <CircularReference context={context} /> },
-        { id: "fix errors", kind: "modal", title: "Fix formula errors", width: 620, footer: formFooter("sheets-fix", "Wrap the ticked formulas"), render: (context) => <FixErrors context={context} close={context.close} /> },
-        { id: "compare dependencies", kind: "modal", title: "Compare dependencies", width: 720, render: (context) => <CompareDependencies context={context} /> },
+        { id: "Formula inspector", kind: "drawer", summary: workbookSummary, title: "Formula", width: OVERLAY_WIDTH.form, render: (context) => <FormulaInspector context={context} /> },
+        { id: "function help", kind: "modal", title: "Function help", width: OVERLAY_WIDTH.record, render: (context) => <FunctionHelp context={context} /> },
+        { id: "circular reference", kind: "drawer", summary: workbookSummary, title: "Circular reference", width: OVERLAY_WIDTH.record, tone: "danger", render: (context) => <CircularReference context={context} /> },
+        { id: "fix errors", kind: "modal", title: "Fix formula errors", width: OVERLAY_WIDTH.record, footer: formFooter("sheets-fix", "Wrap the ticked formulas"), render: (context) => <FixErrors context={context} close={context.close} /> },
+        { id: "compare dependencies", kind: "modal", title: "Compare dependencies", width: OVERLAY_WIDTH.wide, render: (context) => <CompareDependencies context={context} /> },
       ],
     },
 
@@ -2767,10 +2817,10 @@ registerApp({
         { id: "connect", label: "Connect a source…", placement: "overflow", run: (context) => context.openOverlay("connect source") },
       ],
       overlays: [
-        { id: "Column editor", kind: "drawer", title: "Table schema", width: 620, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="column-editor">Save</Button></>, render: (context) => <ColumnEditor context={context} close={context.close} /> },
-        { id: "import schema", kind: "drawer", title: "Import", width: 620, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="import-wizard">Import</Button></>, render: (context) => <ImportMapper context={context} close={context.close} /> },
-        { id: "relation preview", kind: "drawer", title: "References", width: 560, render: (context) => <RelationPreview context={context} /> },
-        { id: "connect source", kind: "modal", title: "Connect a source", width: 520, footer: formFooter("sheets-connect", "Record the request"), render: (context) => <ConnectSource context={context} close={context.close} /> },
+        { id: "Column editor", kind: "drawer", summary: workbookSummary, title: "Table schema", width: OVERLAY_WIDTH.record, footer: formFooter("column-editor", "Save", false), render: (context) => <ColumnEditor context={context} close={context.close} /> },
+        { id: "import schema", kind: "drawer", summary: workbookSummary, title: "Import", width: OVERLAY_WIDTH.record, footer: formFooter("import-wizard", "Import", false), render: (context) => <ImportMapper context={context} close={context.close} /> },
+        { id: "relation preview", kind: "drawer", summary: workbookSummary, title: "References", width: OVERLAY_WIDTH.form, render: (context) => <RelationPreview context={context} /> },
+        { id: "connect source", kind: "modal", title: "Connect a source", width: OVERLAY_WIDTH.form, footer: formFooter("sheets-connect", "Record the request"), render: (context) => <ConnectSource context={context} close={context.close} /> },
       ],
     },
 
@@ -2785,12 +2835,12 @@ registerApp({
         { id: "publish", label: "Publish to a deck…", placement: "overflow", run: (context) => context.openOverlay("publish chart") },
       ],
       overlays: [
-        { id: "Series editor", kind: "drawer", title: "Chart series", width: 600, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="chart-picker">Save chart</Button></>, render: (context) => <SeriesEditor context={context} close={context.close} /> },
-        { id: "formatting inspector", kind: "modal", title: "Chart formatting", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="formatting-inspector">Save</Button></>, render: (context) => <FormattingInspector context={context} close={context.close} /> },
-        { id: "calculation note", kind: "modal", title: "How these numbers are produced", width: 560, render: (context) => <CalculationNote context={context} /> },
-        { id: "chart type", kind: "modal", title: "Change the chart type", width: 480, footer: formFooter("sheets-chart-type", "Change"), render: (context) => <ChangeChartType context={context} close={context.close} /> },
-        { id: "drill down", kind: "drawer", title: "Drill down", width: 640, render: (context) => <DrillDown context={context} /> },
-        { id: "publish chart", kind: "modal", title: "Publish a chart to a deck", width: 520, footer: formFooter("sheets-publish-chart", "Publish"), render: (context) => <SendChartToDeck context={context} close={context.close} /> },
+        { id: "Series editor", kind: "drawer", summary: workbookSummary, title: "Chart series", width: OVERLAY_WIDTH.record, footer: formFooter("chart-picker", "Save chart", false), render: (context) => <SeriesEditor context={context} close={context.close} /> },
+        { id: "formatting inspector", kind: "modal", title: "Chart formatting", width: OVERLAY_WIDTH.form, footer: formFooter("formatting-inspector", "Save", false), render: (context) => <FormattingInspector context={context} close={context.close} /> },
+        { id: "calculation note", kind: "modal", title: "How these numbers are produced", width: OVERLAY_WIDTH.modal, render: (context) => <CalculationNote context={context} /> },
+        { id: "chart type", kind: "modal", title: "Change the chart type", width: OVERLAY_WIDTH.compact, footer: formFooter("sheets-chart-type", "Change"), render: (context) => <ChangeChartType context={context} close={context.close} /> },
+        { id: "drill down", kind: "drawer", summary: workbookSummary, title: "Drill down", width: OVERLAY_WIDTH.record, render: (context) => <DrillDown context={context} /> },
+        { id: "publish chart", kind: "modal", title: "Publish a chart to a deck", width: OVERLAY_WIDTH.form, footer: formFooter("sheets-publish-chart", "Publish"), render: (context) => <SendChartToDeck context={context} close={context.close} /> },
       ],
     },
 
@@ -2807,14 +2857,14 @@ registerApp({
         { id: "rollback", label: "Roll back an import", placement: "overflow", tone: "danger", run: (context) => context.openOverlay("rollback") },
       ],
       overlays: [
-        { id: "Import wizard", kind: "drawer", title: "Import CSV", width: 640, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="import-wizard">Import</Button></>, render: (context) => <ImportMapper context={context} close={context.close} /> },
+        { id: "Import wizard", kind: "drawer", summary: workbookSummary, title: "Import CSV", width: OVERLAY_WIDTH.record, footer: formFooter("import-wizard", "Import", false), render: (context) => <ImportMapper context={context} close={context.close} /> },
         {
-          id: "compatibility report", kind: "modal", title: "Compatibility", width: 600,
+          id: "compatibility report", kind: "modal", title: "Compatibility", width: OVERLAY_WIDTH.modal,
           render: (context) => <CompatibilityCheck context={context} />,
         },
-        { id: "export csv", kind: "modal", title: "Export CSV", width: 520, footer: formFooter("sheets-export", "Export"), render: (context) => <ExportCsv context={context} close={context.close} /> },
-        { id: "publish workbook", kind: "modal", title: "Publish the workbook", width: 520, footer: formFooter("sheets-publish", "Publish"), render: (context) => <PublishWorkbook context={context} close={context.close} /> },
-        { id: "rollback", kind: "modal", title: "Roll back", tone: "danger", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="outline-danger" type="submit" form="rollback">Roll back</Button></>, render: (context) => <RollbackOverlay context={context} close={context.close} /> },
+        { id: "export csv", kind: "modal", title: "Export CSV", width: OVERLAY_WIDTH.form, footer: formFooter("sheets-export", "Export"), render: (context) => <ExportCsv context={context} close={context.close} /> },
+        { id: "publish workbook", kind: "modal", title: "Publish the workbook", width: OVERLAY_WIDTH.form, footer: formFooter("sheets-publish", "Publish"), render: (context) => <PublishWorkbook context={context} close={context.close} /> },
+        { id: "rollback", kind: "modal", summary: workbookSummary, title: "Roll back", tone: "danger", width: OVERLAY_WIDTH.form, footer: formFooter("rollback", "Roll back", true), render: (context) => <RollbackOverlay context={context} close={context.close} /> },
       ],
     },
 
@@ -2834,12 +2884,12 @@ registerApp({
         },
       ],
       overlays: [
-        { id: "share", kind: "modal", title: "Workbook sharing", width: 480, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="share-workbook">Save</Button></>, render: (context) => <ShareWorkbook context={context} close={context.close} /> },
-        { id: "Conflict resolver", kind: "drawer", title: "Conflict", width: 540, render: (context) => <ConflictResolver context={context} close={context.close} /> },
-        { id: "protected range", kind: "modal", title: "Protect a range", width: 520, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="primary" type="submit" form="protected-range">Protect</Button></>, render: (context) => <ProtectedRangeOverlay context={context} close={context.close} /> },
-        { id: "comment cell", kind: "modal", title: "Comment on a cell", width: 480, footer: formFooter("sheets-comment", "Comment"), render: (context) => <CommentCell context={context} close={context.close} /> },
-        { id: "restore version", kind: "modal", title: "Restore a version", width: 560, render: (context) => <RestoreVersion context={context} /> },
-        { id: "restore confirmation", kind: "modal", title: "Restore this version", tone: "danger", width: 540, footer: ({ close }) => <><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="outline-danger" type="submit" form="restore-confirmation">Restore</Button></>, render: (context) => <RestoreConfirmation context={context} close={context.close} /> },
+        { id: "share", kind: "modal", title: "Workbook sharing", width: OVERLAY_WIDTH.compact, footer: formFooter("share-workbook", "Save", false), render: (context) => <ShareWorkbook context={context} close={context.close} /> },
+        { id: "Conflict resolver", kind: "drawer", summary: workbookSummary, title: "Conflict", width: OVERLAY_WIDTH.form, render: (context) => <ConflictResolver context={context} close={context.close} /> },
+        { id: "protected range", kind: "modal", summary: workbookSummary, title: "Protect a range", width: OVERLAY_WIDTH.form, footer: formFooter("protected-range", "Protect", false), render: (context) => <ProtectedRangeOverlay context={context} close={context.close} /> },
+        { id: "comment cell", kind: "modal", title: "Comment on a cell", width: OVERLAY_WIDTH.compact, footer: formFooter("sheets-comment", "Comment"), render: (context) => <CommentCell context={context} close={context.close} /> },
+        { id: "restore version", kind: "modal", title: "Restore a version", width: OVERLAY_WIDTH.modal, render: (context) => <RestoreVersion context={context} /> },
+        { id: "restore confirmation", kind: "modal", summary: workbookSummary, title: "Restore this version", tone: "danger", width: OVERLAY_WIDTH.form, footer: formFooter("restore-confirmation", "Restore", true), render: (context) => <RestoreConfirmation context={context} close={context.close} /> },
       ],
     },
   },

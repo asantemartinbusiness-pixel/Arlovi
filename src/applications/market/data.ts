@@ -1,4 +1,6 @@
-import { useCollections } from "@/platform/workspace";
+import { useLiveQuery } from "dexie-react-hooks";
+import { useCollections, useWorkspace } from "@/platform/workspace";
+import { listByCollection } from "@/platform/repo";
 import type { Rec } from "@/domain/types";
 
 /* ---------------- Record body shapes used by MARKET ---------------- */
@@ -47,6 +49,16 @@ export function bodyOf<T>(record: Rec | undefined, fallback: T): T {
 
 export function useMarketData() {
   return useCollections(["campaigns", "socialPosts", "audiences", "templates", "sites", "contacts", "leads", "deals", "orders"]);
+}
+
+/** True once the contacts and audiences collections have been read from the database (not merely empty). */
+export function useAudienceDataLoaded(): boolean {
+  const { org } = useWorkspace();
+  const loaded = useLiveQuery(async () => {
+    await Promise.all([listByCollection(org.id, "contacts"), listByCollection(org.id, "audiences")]);
+    return true;
+  }, [org.id]);
+  return loaded === true;
 }
 
 export const NETWORKS: { id: string; label: string; limit: number; media: string }[] = [

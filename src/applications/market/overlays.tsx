@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   Button, Card, Checkbox, DataGrid, Empty, FactGrid, Field, Meter, Notice, OverlayActions, OverlayCancel,
-  OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
+  ModalActions, OverlaySection, OverlaySummary, Pill, Properties, Row, Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import { LaunchChecklist, launchBlocked, launchRows } from "./readiness";
 import type { ScreenContext } from "@/platform/registry";
@@ -10,11 +10,11 @@ import { ProviderBoundary } from "@/applications/market/kit";
 import { capabilityById } from "@/platform/capability";
 import type { Rec } from "@/domain/types";
 import {
-  bodyOf, evaluateSegment, networkOf, NETWORKS, rollUp, useMarketData,
+  bodyOf, evaluateSegment, networkOf, NETWORKS, rollUp, useAudienceDataLoaded, useMarketData,
   type AudienceBody, type CampaignBody, type PostBody, type SegmentRule, type SiteBody,
 } from "./data";
 import { NetworkPreview } from "./panels";
-import { pageChecks, retryState, VersionRestoreGrid } from "./actions";
+import { pageChecks, retryPost, retryState, VersionRestoreGrid } from "./actions";
 
 /* ====================================================================== *
  * MARKET overlays. One component per overlay in the approved contract.
@@ -435,34 +435,68 @@ export function CreativePreview({ context }: { context: ScreenContext }) {
   );
 }
 
-export function LaunchApproval({ context, close }: { context: ScreenContext; close: () => void }) {
+function useLaunchState(context: ScreenContext) {
   const data = useMarketData();
-  const { actor, now } = useWorkspace();
+  const { now } = useWorkspace();
   const campaign = useRecord(context.params.id) ?? data.campaigns[0];
-  if (!campaign) return <Empty title="No campaign" />;
+  if (!campaign) return undefined;
   const audience = data.audiences.find((item) => item.id === String(campaign.fields.audienceId ?? ""));
   const rows = launchRows(context, campaign, audience, data.contacts, now);
-  const blocked = launchBlocked(campaign);
-  const attention = rows.filter((row) => row.state === "blocked");
+  const attention = rows.filter((row) => row.state === "blocked").length;
+  return { campaign, rows, blocked: launchBlocked(campaign), attention };
+}
+
+const LAUNCH_REASON_ID = "launch-blocked-reason";
+
+export function LaunchApprovalSummary({ context }: { context: ScreenContext }) {
+  const state = useLaunchState(context);
+  if (!state) return null;
+  const { campaign } = state;
+  return (
+    <OverlaySummary
+      eyebrow="Campaign"
+      title={campaign.title}
+      status={<Pill tone={campaign.status === "active" ? "success" : "neutral"} dot>{campaign.status.replaceAll("_", " ")}</Pill>}
+      meta={[`Owner ${campaign.ownerName}`]}
+    />
+  );
+}
+
+export function LaunchApprovalFooter({ context, close }: { context: ScreenContext; close: () => void }) {
+  const state = useLaunchState(context);
+  const blocked = state?.blocked ?? true;
+  const count = Math.max(state?.attention ?? 1, 1);
+  const reason = `Launch blocked: ${count} ${count === 1 ? "check needs" : "checks need"} attention.`;
+  return (
+    <OverlayActions
+      primary={<Button variant="primary" type="submit" form="launch-approval" disabled={blocked} aria-describedby={blocked ? LAUNCH_REASON_ID : undefined}>Record launch</Button>}
+      secondary={blocked ? <span id={LAUNCH_REASON_ID} className="ds-subtle">{reason}</span> : undefined}
+      end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+    />
+  );
+}
+
+export function LaunchApproval({ context, close }: { context: ScreenContext; close: () => void }) {
+  const { actor, now } = useWorkspace();
+  const state = useLaunchState(context);
+  if (!state) return <Empty title="No campaign" />;
+  const { campaign, rows, blocked, attention } = state;
   return (
     <form
       id="launch-approval"
       className="ds-stack ds-gap-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        if (blocked) return;
+        if (blocked) {
+          context.toast(`Launch blocked: ${attention} ${attention === 1 ? "check needs" : "checks need"} attention`, "Record a plan approval and approve every creative first.", "blocked");
+          return;
+        }
         await context.mutate.patch(campaign.id, { status: "active", fields: { ...campaign.fields, launchedBy: actor, launchedAt: now.toISOString() } }, { expectRevision: campaign.revision, event: `${campaign.title} launched locally by ${actor}` });
         context.toast("Launch recorded", `${campaign.title} is active in this workspace. Nothing was published.`);
         close();
       }}
     >
-      <OverlaySummary
-        eyebrow="Campaign"
-        title={campaign.title}
-        status={<Pill tone={campaign.status === "active" ? "success" : "neutral"} dot>{campaign.status.replaceAll("_", " ")}</Pill>}
-        meta={[`Owner ${campaign.ownerName}`]}
-      />
-      <OverlaySection title="Launch checklist" hint={blocked ? `${attention.length} to fix before this can be recorded` : "Everything this launch depends on"}>
+      <OverlaySection title="Launch checklist" hint={blocked ? `${attention} to fix before this can be recorded` : "Everything this launch depends on"}>
         <LaunchChecklist rows={rows} />
       </OverlaySection>
       <Notice tone={blocked ? "danger" : "warning"} title={blocked ? "Launch is blocked" : "Recording a launch publishes nothing"}>
@@ -746,6 +780,18 @@ export function PostComposer({ context, close }: { context: ScreenContext; close
   );
 }
 
+export function DeliveryReceiptFooter({ context, close }: { context: ScreenContext; close: () => void }) {
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const post = useRecord(payload?.id ?? context.selectedId);
+  const safe = Boolean(post && post.status === "failed" && retryState(post).safe);
+  return (
+    <OverlayActions
+      primary={safe && post ? <Button variant="primary" onClick={() => { void retryPost({ ...context, selectedId: post.id }); }}>Retry safely</Button> : undefined}
+      end={<Button variant="ghost" onClick={close}>Close</Button>}
+    />
+  );
+}
+
 export function DeliveryReceipt({ context }: { context: ScreenContext }) {
   const data = useMarketData();
   const payload = context.overlayPayload as { id?: string } | undefined;
@@ -766,7 +812,7 @@ export function DeliveryReceipt({ context }: { context: ScreenContext }) {
       {unknown ? (
         <Notice tone="danger" title="The publication state is unknown, so a retry is blocked">{retry.reason}</Notice>
       ) : post.status === "failed" ? (
-        <Notice tone="warning" title="Known not to have been published">{retry.reason} Use "Retry safely" to re-queue it.</Notice>
+        <Notice tone="warning" title="Known not to have been published">{retry.reason} The footer action, Retry safely, re-queues it after a confirmation.</Notice>
       ) : (
         <Notice tone="info" title="Recorded locally">
           The reference above is a local identifier, not a provider URL. It records that someone marked this item published in this workspace.
@@ -945,9 +991,10 @@ export function SendReview({ context, close }: { context: ScreenContext; close: 
   );
 }
 
-export function SuppressionCheck({ context }: { context: ScreenContext }) {
+function useSuppressionState() {
   const data = useMarketData();
   const { now } = useWorkspace();
+  const loaded = useAudienceDataLoaded();
   const suppressed = data.contacts.filter((contact) => contact.fields.suppressed === true);
   const rows = data.audiences.map((audience) => {
     const result = evaluateSegment(audience, data.contacts, now);
@@ -955,20 +1002,34 @@ export function SuppressionCheck({ context }: { context: ScreenContext }) {
     const ruled = (bodyOf<AudienceBody>(audience, {}).exclusions ?? []).includes("suppressed");
     return { audience, held: result.excluded.length, caught, ruled };
   });
-  const missing = rows.filter((row) => !row.ruled);
+  return { loaded, suppressed, rows, missing: rows.filter((row) => !row.ruled) };
+}
+
+export function SuppressionCheckSummary() {
+  const { loaded, suppressed, missing } = useSuppressionState();
+  if (!loaded) {
+    return <OverlaySummary eyebrow="Email send safety" title="Reading contacts" status={<Pill tone="neutral">Loading</Pill>} meta={["Counts appear once the contact records are read"]} />;
+  }
+  return (
+    <OverlaySummary
+      eyebrow="Email send safety"
+      title={`${suppressed.length} suppressed ${suppressed.length === 1 ? "contact" : "contacts"}`}
+      status={missing.length === 0 ? <Pill tone="success" dot>Every segment excludes them</Pill> : <Pill tone="danger" dot>{missing.length} {missing.length === 1 ? "segment does" : "segments do"} not</Pill>}
+      meta={["Read from the suppressed field on each contact", "Applied before every count, preview and send review"]}
+    />
+  );
+}
+
+export function SuppressionCheck({ context }: { context: ScreenContext }) {
+  const { loaded, rows, missing } = useSuppressionState();
   async function addRule(audience: Rec) {
     const body = bodyOf<AudienceBody>(audience, {});
     await context.mutate.patch(audience.id, { body: { ...body, exclusions: [...new Set([...(body.exclusions ?? []), "suppressed"])] } }, { expectRevision: audience.revision, event: `Suppression rule added to ${audience.title} by ${context.actor}` });
     context.toast("Suppression rule added", `${audience.title} now holds back suppressed contacts.`);
   }
+  if (!loaded) return <div role="status" aria-live="polite"><Empty title="Reading contacts" /></div>;
   return (
     <Stack gap={4}>
-      <OverlaySummary
-        eyebrow="Email send safety"
-        title={`${suppressed.length} suppressed ${suppressed.length === 1 ? "contact" : "contacts"}`}
-        status={missing.length === 0 ? <Pill tone="success" dot>Every segment excludes them</Pill> : <Pill tone="danger" dot>{missing.length} {missing.length === 1 ? "segment does" : "segments do"} not</Pill>}
-        meta={["Read from the suppressed field on each contact", "Applied before every count, preview and send review"]}
-      />
       <DataGrid rows={rows} rowId={(row) => row.audience.id} label="Suppression by segment" filterable={false}
         columns={[
           { key: "segment", header: "Segment", primary: true, cell: (row) => row.audience.title },
@@ -1118,15 +1179,21 @@ export function ExportPermission({ context, close }: { context: ScreenContext; c
         { label: "Your role view", value: allowed ? <Pill tone="success">May export</Pill> : <Pill tone="danger">May not export</Pill> },
       ]} />
       {!allowed ? (
-        <Notice tone="danger" title="This role view does not export contact data">
-          Exporting personal data is limited to the roles that hold the export capability. Role views shape what the interface offers here; they are not an account security boundary.
-        </Notice>
+        <>
+          <Notice tone="danger" title="This role view does not export contact data">
+            Exporting personal data is limited to the roles that hold the export capability. Role views shape what the interface offers here; they are not an account security boundary.
+          </Notice>
+          <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Close</Button>} /></ModalActions>
+        </>
       ) : (
         <>
           <Field label="Why is this export needed?" required hint="Recorded in the activity log with the row count."><TextInput value={reason} onChange={(event) => setReason(event.target.value)} /></Field>
           <Notice tone="warning" title="The file is written by this browser">
             A CSV of {result.members.length} contacts downloads from here. Suppressed and non-consenting contacts are never written to it.
           </Notice>
+          <ModalActions>
+          <OverlayActions
+            primary={(
           <Button
             variant="primary"
             disabled={!reason.trim()}
@@ -1148,6 +1215,10 @@ export function ExportPermission({ context, close }: { context: ScreenContext; c
           >
             Download {result.members.length} rows
           </Button>
+            )}
+            end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+          />
+          </ModalActions>
         </>
       )}
     </Stack>
@@ -1483,10 +1554,10 @@ export function VersionCompare({ context }: { context: ScreenContext }) {
   if (!page) return <Empty title="No page selected" />;
   return (
     <Stack gap={4}>
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "Page", value: page.title },
-        { label: "Current revision", value: String(page.revision) },
-        { label: "Stored versions", value: String(page.history.length) },
+        { label: "Current revision", value: String(page.revision), mono: true },
+        { label: "Stored versions", value: String(page.history.length), mono: true },
         { label: "Last change", value: `${context.dateTime(page.updatedAt)} by ${page.updatedBy}` },
       ]} />
       {page.history.length === 0 ? (

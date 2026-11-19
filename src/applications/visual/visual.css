@@ -191,3 +191,12 @@
 .lx-overset-chip { cursor: pointer; font: inherit; font-weight: 600; }
 .lx-overset-chip:focus-visible { box-shadow: var(--focus-ring); outline: none; }
 .vx-keys { width: min(340px, 80vw); }
+
+/* component change lists and use lists (additive) */
+.vx-changes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.vx-change { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-3); align-items: start; padding: var(--space-2) 0; border-bottom: 1px solid var(--border-subtle); }
+.vx-change:last-child { border-bottom: 0; }
+.vx-uselist { list-style: none; margin: 0; padding: 0; }
+.vx-use { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: var(--space-2) var(--space-3); text-align: start; border-bottom: 1px solid var(--border-subtle); font-size: var(--text-sm); }
+.vx-use:hover { background: var(--bg-hover); }
+.vx-use:focus-visible { box-shadow: var(--focus-ring); outline: none; }

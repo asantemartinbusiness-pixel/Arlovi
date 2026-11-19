@@ -18,7 +18,7 @@ import {
   RemindersAndNoShows, ServicesAndPricing, StaffAndResources,
 } from "./panels";
 import {
-  AvailabilityTest, BookingForm, BookingInspector, CapacityAlert, ConflictReview, CustomerMessage,
+  AvailabilityTest, BookingForm, BookingInspector, BookingInspectorSummary, CapacityAlert, ConflictReview, CustomerMessage,
   FormFieldInspector, MetricCalculation, PricingReview, PrivacyPolicy, PublishBookingPage, Recurrence,
   RefundRule, ReminderSuppression, ReminderTemplateEditor, ReportDesign, RescheduleBooking,
   ResourceConflictDialog, ResourceEditor, SendPreview, ServiceEditor, SourceProof, TakeDeposit,
@@ -78,7 +78,7 @@ export const bookApp = registerApp({
       ],
       overlays: [
         { id: "Quick booking", kind: "drawer", title: "New booking", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <BookingForm context={context} close={close} />, footer: submitFooter("booking-form", "Save booking") },
-        { id: "booking inspector", kind: "drawer", title: "Booking", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <BookingInspector context={context} /> },
+        { id: "booking inspector", kind: "drawer", title: "Booking", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <BookingInspector context={context} /> , summary: (context) => <BookingInspectorSummary context={context} /> },
         { id: "capacity alert", kind: "modal", title: "Capacity today", width: OVERLAY_WIDTH.modal, render: () => <CapacityAlert /> },
         { id: "Reschedule", kind: "modal", title: "Reschedule", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RescheduleBooking context={context} close={close} />, footer: submitFooter("reschedule", "Move booking") },
       ],
@@ -108,7 +108,7 @@ export const bookApp = registerApp({
       ],
       overlays: [
         { id: "Booking form", kind: "drawer", title: "Booking", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <BookingForm context={context} close={close} />, footer: submitFooter("booking-form", "Save booking") },
-        { id: "conflict review", kind: "drawer", title: "Conflicts", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ConflictReview context={context} /> },
+        { id: "conflict review", kind: "drawer", title: "Conflicts", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ConflictReview context={context} /> },
         { id: "reschedule notice", kind: "modal", title: "Reschedule notice", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RescheduleNotice context={context} close={close} />, footer: submitFooter("reschedule-notice", "Keep as a draft") },
         { id: "Reschedule", kind: "modal", title: "Move booking", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <RescheduleBooking context={context} close={close} />, footer: submitFooter("reschedule", "Move booking") },
         { id: "cancel booking", kind: "modal", title: "Cancel booking", tone: "danger", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <CancelBooking context={context} close={close} />, footer: submitFooter("cancel-booking", "Cancel booking") },
@@ -187,7 +187,7 @@ export const bookApp = registerApp({
       ],
       overlays: [
         { id: "Resource editor", kind: "drawer", title: "Resource", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ResourceEditor context={context} close={close} />, footer: submitFooter("resource-editor", "Save resource") },
-        { id: "conflict dialog", kind: "drawer", title: "Conflicts", width: OVERLAY_WIDTH.form, render: ({ ...context }) => <ResourceConflictDialog context={context} /> },
+        { id: "conflict dialog", kind: "drawer", title: "Conflicts", width: OVERLAY_WIDTH.record, render: ({ ...context }) => <ResourceConflictDialog context={context} /> },
         { id: "recurrence", kind: "modal", title: "Block a period", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <Recurrence context={context} close={close} />, footer: submitFooter("recurrence", "Block period") },
         { id: "assign resource", kind: "modal", title: "Assign to a service", width: OVERLAY_WIDTH.modal, render: ({ close, ...context }) => <AssignResource context={context} close={close} />, footer: submitFooter("assign-resource", "Assign") },
       ],

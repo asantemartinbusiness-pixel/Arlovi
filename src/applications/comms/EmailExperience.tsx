@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Archive, ArrowLeft, ArrowRight, AtSign, CheckCheck, ChevronRight, CircleAlert,
-  FilePenLine, Inbox, Mail, MailOpen, Search, Send, Settings2, ShieldCheck,
-  ShieldAlert, Users, X,
+  Archive, ArrowLeft, ArrowRight, CheckCheck, CircleAlert,
+  Mail, MailOpen, Search, ShieldCheck,
+  Users, X,
 } from "lucide-react";
 import { Avatar, Button, Notice, Pill, Row, TextInput } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
@@ -15,18 +15,17 @@ import type { Rec } from "@/domain/types";
 
 export type EmailArea = MailFolder | "Accounts & domains" | "Sender identities" | "Shared inboxes";
 
-const NAV = [
-  { label: "Inbox", Icon: Inbox },
-  { label: "Sent", Icon: Send },
-  { label: "Drafts", Icon: FilePenLine },
-  { label: "Archive", Icon: Archive },
-  { label: "Spam", Icon: ShieldAlert },
-] as const;
-const CONFIG = [
-  { label: "Shared inboxes", Icon: Users },
-  { label: "Accounts & domains", Icon: Settings2 },
-  { label: "Sender identities", Icon: AtSign },
-] as const;
+/**
+ * Counts shown on the registry tabs. The tab strip is the only folder
+ * navigation on this page, so the unread inbox and the draft total live
+ * there. EmailExperience publishes them; the tab strip reads them when the
+ * page header renders.
+ */
+let tabCounts: Record<string, number> = {};
+export function mailTabCount(area: EmailArea): number | undefined {
+  const value = tabCounts[area];
+  return value && value > 0 ? value : undefined;
+}
 
 function addressOf(row: Rec): string {
   const folder = folderOf(row);
@@ -119,6 +118,10 @@ export function EmailExperience({ context, lens }: { context: ScreenContext; len
   const config = !MAIL_FOLDERS.some(f => f === lens);
   const rows = config ? [] : filterMailView(searchThreads(data.emailThreads, query, folder), view);
   const counts = folderCounts(data.emailThreads);
+  const unreadInbox = data.emailThreads.filter((row) => folderOf(row) === "inbox" && row.fields.unread === true).length;
+  useEffect(() => {
+    tabCounts = { Inbox: unreadInbox, Drafts: counts.drafts ?? 0 };
+  }, [unreadInbox, counts.drafts]);
   const selected = rows.find(row => row.id === selectedId) ?? null;
   const related = selected ? relatedMailContext(selected, data.contacts, tasks) : null;
   const messages = (selected?.body as { messages?: { from?: string; body?: string; at?: string; external?: boolean }[] } | undefined)?.messages ?? [];
@@ -134,24 +137,6 @@ export function EmailExperience({ context, lens }: { context: ScreenContext; len
 
   return (
     <section className="cmx-shell" aria-label="Communications email workspace">
-      <aside className="cmx-rail" aria-label="Email navigation">
-        <div className="cmx-rail-heading"><span>Mailboxes</span></div>
-        <nav aria-label="Mail folders">
-          {NAV.map(({label, Icon}) => (
-            <button className="cmx-rail-link" data-active={label === lens} aria-current={label === lens ? "page" : undefined} type="button" key={label} onClick={() => changeFolder(label)}>
-              <Icon size={16}/><span>{label}</span><small>{counts[label.toLowerCase()] ?? 0}</small>
-            </button>
-          ))}
-        </nav>
-        <div className="cmx-rail-heading cmx-rail-separator"><span>Setup</span></div>
-        <nav aria-label="Email management">
-          {CONFIG.map(({label, Icon}) => (
-            <button className="cmx-rail-link" data-active={label === lens} aria-current={label === lens ? "page" : undefined} type="button" key={label} onClick={() => changeFolder(label)}>
-              <Icon size={16}/><span>{label}</span><ChevronRight size={13}/>
-            </button>
-          ))}
-        </nav>
-      </aside>
       <main className="cmx-main">
         {config ? (
           <div className="cmx-settings">
@@ -172,7 +157,7 @@ export function EmailExperience({ context, lens }: { context: ScreenContext; len
             </div>
             <div className="cmx-workspace">
               <section className="cmx-list" aria-label={`${lens} conversations`}>
-                <div className="cmx-list-heading"><span>{lens}</span><span>{rows.length} total</span></div>
+                <div className="cmx-list-heading"><span>Conversations</span><span>{rows.length} total</span></div>
                 {rows.length ? rows.map(row => (
                   <button type="button" key={row.id} data-active={selectedId === row.id} data-unread={row.fields.unread === true} className="cmx-message" onClick={() => { setSelectedId(row.id); setShowReader(true); context.select(row.id); }}>
                     <Avatar size="sm" name={addressOf(row) || "Unknown"}/>

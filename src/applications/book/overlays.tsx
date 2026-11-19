@@ -1,15 +1,15 @@
 import { useMemo, useState } from "react";
 import {
-  Button, Card, Checkbox, DataGrid, Empty, Field, ModalActions, ModalInFlight, ModalUnsavedChanges, MoneyInput, Notice, Pill, Properties, Row,
+  Button, Checkbox, DataGrid, Empty, FactGrid, Field, KeyValueList, ModalActions, ModalInFlight, ModalUnsavedChanges, MoneyInput, Notice, OverlayActions, OverlaySection, OverlaySummary, Pill, Properties, Row,
   Select, Stack, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useRecord, useWorkspace } from "@/platform/workspace";
-import { addDays, clockIso } from "@/platform/clock";
+import { addDays, clockIso, startOfWeek } from "@/platform/clock";
 import { computeInvoice } from "@/platform/money";
 import { CHANGED_ELSEWHERE, ProviderBoundary, TotalsBlock } from "@/applications/market/kit";
 import {
-  blackoutFor, bodyOf, conflictsWithLinks, DEPOSIT_LABEL, isBookable, isLive, rememberResource, statusTone, useBookData,
+  blackoutFor, bodyOf, bookedMinutes, conflictsWithLinks, DEPOSIT_LABEL, isBookable, isLive, rememberResource, statusTone, useBookData,
   workingHours, type BookingBody, type PublicPageBody, type ResourceBody, type ServiceBody,
 } from "./data";
 import { ConflictNotice, SlotPicker } from "./calendar";
@@ -183,6 +183,14 @@ export function BookingForm({ context, close }: { context: ScreenContext; close:
       </Field>
       <Checkbox label="Hold the slot without confirming it" checked={hold} onChange={(event) => setHold(event.target.checked)} />
 
+      <OverlaySection title="Slot check" hint="Re-run on every change, and again when you save.">
+        <FactGrid columns={2} dense items={[
+          { label: "Slot", value: clashes.length ? "Taken" : blackout ? "Blocked" : outsideHours ? "Free, outside hours" : "Free", tone: clashes.length || blackout ? "danger" : outsideHours ? "warning" : "success" },
+          { label: "Ends", value: Number.isNaN(end.getTime()) ? "-" : end.toLocaleTimeString(org.locale, { hour: "2-digit", minute: "2-digit" }), mono: true },
+          { label: capacity > 1 ? "Places left" : "Seats", value: capacity > 1 ? String(Math.max(0, capacity - usedSeats)) : "1 of 1", mono: true },
+          { label: "Deposit", value: Number(service?.fields.depositMinor ?? 0) ? context.money(Number(service?.fields.depositMinor)) : "None", mono: true },
+        ]} />
+      </OverlaySection>
       <ConflictNotice clashes={clashes} resources={data.resources} />
       {blackout && <Notice tone="danger" title="The resource is unavailable then">{resource?.title} has a blackout for {blackout.reason} covering that window.</Notice>}
       {!blackout && clashes.length === 0 && outsideHours && (
@@ -218,17 +226,32 @@ export function BookingInspector({ context }: { context: ScreenContext }) {
     : [];
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Booking", value: booking.title },
-        { label: "Service", value: service?.title ?? "—" },
-        { label: "Resource", value: resource?.title ?? "—" },
-        { label: "When", value: <span className="ds-num">{context.dateTime(booking.startAt)}</span> },
-        { label: "State", value: <Pill tone={statusTone(booking.status)} dot>{booking.status.replace("_", " ")}</Pill> },
-        { label: "Deposit", value: DEPOSIT_LABEL[String(booking.fields.depositState ?? "none")] ?? String(booking.fields.depositState) },
+      <FactGrid columns={2} items={[
+        { label: "Starts", value: context.dateTime(booking.startAt), mono: true, hint: booking.startAt ? context.relative(booking.startAt) : undefined },
+        { label: "Resource", value: resource?.title ?? "None" },
+        { label: "Service", value: service?.title ?? "None" },
+        { label: "Seats", value: String(booking.fields.seats ?? 1), mono: true },
       ]} />
       <ConflictNotice clashes={clashes} resources={data.resources} />
-      <Button variant="secondary" onClick={() => { context.navigate(`/o/${org.slug}/book/bookings/${booking.id}`); context.closeOverlay(); }}>Open the booking</Button>
+      <OverlayActions primary={<Button variant="secondary" onClick={() => { context.navigate(`/o/${org.slug}/book/bookings/${booking.id}`); context.closeOverlay(); }}>Open the booking</Button>} />
     </Stack>
+  );
+}
+
+/** Head of the booking inspector: who, status and the deposit state. */
+export function BookingInspectorSummary({ context }: { context: ScreenContext }) {
+  const data = useBookData();
+  const payload = context.overlayPayload as { id?: string } | undefined;
+  const booking = useRecord(payload?.id ?? context.selectedId) ?? data.bookings[0];
+  if (!booking) return null;
+  const state = String(booking.fields.depositState ?? "none");
+  return (
+    <OverlaySummary
+      eyebrow="Booking"
+      title={booking.title}
+      status={<Pill tone={statusTone(booking.status)} dot>{booking.status.replace("_", " ")}</Pill>}
+      meta={[state !== "none" ? DEPOSIT_LABEL[state] : undefined]}
+    />
   );
 }
 
@@ -246,8 +269,14 @@ export function CapacityAlert() {
     }
     return { resource, free: slots.filter((slot) => slot.free).length, total: slots.length };
   });
+  rows.sort((a, b) => a.free - b.free);
   return (
     <Stack gap={4}>
+      <FactGrid columns={3} items={[
+        { label: "Full", value: String(rows.filter((row) => row.free === 0).length), mono: true, tone: rows.some((row) => row.free === 0) ? "danger" : undefined },
+        { label: "Nearly full", value: String(rows.filter((row) => row.free > 0 && row.free < 2).length), mono: true, tone: "warning" },
+        { label: "Free hours left", value: String(rows.reduce((sum, row) => sum + row.free, 0)), mono: true },
+      ]} />
       <DataGrid rows={rows} rowId={(row) => row.resource.id} label="Capacity today" filterable={false}
         columns={[
           { key: "title", header: "Resource", primary: true, cell: (row) => row.resource.title },
@@ -255,7 +284,7 @@ export function CapacityAlert() {
           { key: "total", header: "Working hours", align: "end", cell: (row) => <span className="ds-num">{String(row.total)}</span> },
           { key: "state", header: "State", cell: (row) => <Pill tone={row.free === 0 ? "danger" : row.free < 2 ? "warning" : "success"}>{row.free === 0 ? "Full" : row.free < 2 ? "Nearly full" : "Space"}</Pill> },
         ]} />
-      <Notice tone="info">A slot counts as free only when nothing holds it, including a linked resource. A held slot counts as taken, because offering it would risk a double booking.</Notice>
+      <p className="ds-subtle">A slot counts as free only when nothing holds it, including a linked resource. A held slot counts as taken.</p>
     </Stack>
   );
 }
@@ -268,6 +297,10 @@ export function ConflictReview({ context }: { context: ScreenContext }) {
     && conflictsWithLinks(data.bookings, data.resources, org.id, String(booking.fields.resourceId), booking.startAt, booking.endAt, booking.id).length > 0);
   return (
     <Stack gap={4}>
+      <FactGrid columns={2} items={[
+        { label: "Live bookings checked", value: String(data.bookings.filter(isLive).length), mono: true },
+        { label: "In conflict", value: String(clashing.length), mono: true, tone: clashing.length ? "danger" : "success" },
+      ]} />
       {clashing.length === 0 ? (
         <Notice tone="success" title="Nothing overlaps">
           Every live booking has its resource to itself for its whole window, including resources linked to it.
@@ -282,9 +315,7 @@ export function ConflictReview({ context }: { context: ScreenContext }) {
             { key: "with", header: "Clashes with", cell: (row) => conflictsWithLinks(data.bookings, data.resources, org.id, String(row.fields.resourceId), row.startAt!, row.endAt!, row.id).map((clash) => clash.booking.title).join(", ") },
           ]} />
       )}
-      <Notice tone="info" title="How a conflict is found">
-        Two bookings conflict when they hold the same resource and their windows overlap at all. The rule lives in the shared domain layer, so the calendar, the forms and the public page all refuse the same slots.
-      </Notice>
+      <p className="ds-subtle">Two bookings conflict when they hold the same resource and their windows overlap at all. The calendar, the forms and the public page all refuse the same slots.</p>
     </Stack>
   );
 }
@@ -720,6 +751,12 @@ export function PricingReview({ context }: { context: ScreenContext }) {
   });
   return (
     <Stack gap={4}>
+      <FactGrid columns={4} items={[
+        { label: "Services priced", value: String(rows.length), mono: true },
+        { label: "Lowest", value: rows.length ? context.money(Math.min(...rows.map((row) => row.totals.grossMinor))) : "None", mono: true },
+        { label: "Highest", value: rows.length ? context.money(Math.max(...rows.map((row) => row.totals.grossMinor))) : "None", mono: true },
+        { label: "Unresolved tax", value: String(rows.filter((row) => row.totals.hasUnknownRate).length), mono: true, tone: rows.some((row) => row.totals.hasUnknownRate) ? "danger" : "success" },
+      ]} />
       <DataGrid rows={rows} rowId={(row) => row.service.id} label="Pricing review" filterable={false}
         columns={[
           { key: "title", header: "Service", primary: true, cell: (row) => row.service.title },
@@ -729,9 +766,7 @@ export function PricingReview({ context }: { context: ScreenContext }) {
           { key: "gross", header: "Customer pays", align: "end", cell: (row) => <strong className="ds-num">{context.money(row.totals.grossMinor)}</strong> },
           { key: "deposit", header: "Deposit", align: "end", cell: (row) => <span className="ds-num">{Number(row.service.fields.depositMinor ?? 0) ? context.money(Number(row.service.fields.depositMinor)) : "—"}</span> },
         ]} />
-      <Notice tone="info" title={`Rates resolved for ${org.jurisdiction}`}>
-        Every figure above comes from the tax engine for this jurisdiction and today's date. Nothing is derived from the currency, so changing the reporting currency would not change a rate.
-      </Notice>
+      <p className="ds-subtle">Rates resolved for {org.jurisdiction} by the tax engine, as of today. Nothing is derived from the currency.</p>
     </Stack>
   );
 }
@@ -744,23 +779,22 @@ export function AvailabilityTest({ context }: { context: ScreenContext }) {
   const resources = bodyOf<ServiceBody>(service, {}).resources ?? [];
   if (!service) return <Empty title="No service" />;
   const minutes = Number(service.fields.minutes ?? 45) + Number(service.fields.bufferMinutes ?? 0);
+  const perResource = resources.map((resourceId) => ({ resourceId, slots: freeSlots(data.bookings, data.resources, org.id, resourceId, minutes, now) }));
+  const earliest = perResource.flatMap((entry) => entry.slots.map((slot) => slot.startAt)).sort()[0];
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Service", value: service.title },
-        { label: "Occupies", value: <span className="ds-num">{minutes} minutes</span> },
-        { label: "Resources", value: resources.length ? resources.map((id) => data.resources.find((item) => item.id === id)?.title ?? id).join(", ") : "None — this service cannot be booked" },
+      <FactGrid columns={3} items={[
+        { label: "Occupies", value: `${minutes} minutes`, mono: true, hint: `incl. ${Number(service.fields.bufferMinutes ?? 0)} buffer` },
+        { label: "Resources", value: String(resources.length), mono: true, tone: resources.length ? undefined : "danger" },
+        { label: "Next free", value: earliest ? context.relative(earliest) : "None in five days", tone: earliest ? "success" : "warning" },
       ]} />
       {resources.length === 0 ? (
         <Notice tone="danger" title="No resource can deliver this service">A service with no resource has no availability at all, so the public page would show nothing.</Notice>
-      ) : resources.map((resourceId) => {
-        const slots = freeSlots(data.bookings, data.resources, org.id, resourceId, minutes, now);
-        return (
-          <Card key={resourceId} eyebrow="NEXT FREE" prov="human" title={data.resources.find((item) => item.id === resourceId)?.title ?? resourceId} subtitle={`${slots.length} free slots in the next five working days`}>
-            <SlotPicker suggestions={slots} onPick={() => undefined} />
-          </Card>
-        );
-      })}
+      ) : perResource.map(({ resourceId, slots }) => (
+        <OverlaySection key={resourceId} title={data.resources.find((item) => item.id === resourceId)?.title ?? resourceId} hint={`${slots.length} free slots in the next five working days`}>
+          <SlotPicker suggestions={slots} onPick={() => undefined} />
+        </OverlaySection>
+      ))}
     </Stack>
   );
 }
@@ -769,7 +803,7 @@ export function AvailabilityTest({ context }: { context: ScreenContext }) {
 
 export function ResourceEditor({ context, close }: { context: ScreenContext; close: () => void }) {
   const data = useBookData();
-  const { org } = useWorkspace();
+  const { org, now } = useWorkspace();
   const payload = context.overlayPayload as { id?: string } | undefined;
   const existing = useRecord(payload?.id);
   const [title, setTitle] = useState(existing?.title ?? "");
@@ -781,6 +815,9 @@ export function ResourceEditor({ context, close }: { context: ScreenContext; clo
   const capacity = Math.floor(Number(capacityText));
   const capacityError = !Number.isFinite(capacity) || capacity < 1 || capacity > 200 ? "Enter a whole number from 1 to 200" : undefined;
   const invalid = !title.trim() || !/\d{2}:\d{2}\D+\d{2}:\d{2}/.test(hours) || Boolean(capacityError);
+  const parsed = workingHours({ fields: { workingHours: hours } } as Rec);
+  const offeredHours = (parsed.endHour - parsed.startHour) * parsed.days.length * (capacityError ? 1 : capacity);
+  const upcoming = existing ? data.bookings.filter((booking) => String(booking.fields.resourceId) === existing.id && isLive(booking) && booking.startAt && new Date(booking.startAt) >= now).length : 0;
   return (
     <form
       id="resource-editor"
@@ -813,7 +850,13 @@ export function ResourceEditor({ context, close }: { context: ScreenContext; clo
         </Select>
       </Field>
       <Checkbox label="Can be booked" checked={bookable} onChange={(event) => setBookable(event.target.checked)} />
-      {linked && <Notice tone="info">Linking means a confirmed slot on one is refused on the other, which is what stops the survey kit being promised twice.</Notice>}
+      <OverlaySection title="What this offers" hint={linked ? "Linked: a confirmed slot on one is refused on the other." : undefined}>
+        <FactGrid columns={3} dense items={[
+          { label: "Hours a week", value: invalid ? "-" : String(offeredHours), mono: true, hint: capacityError ? undefined : `${capacity} at a time` },
+          { label: "Booked ahead", value: existing ? String(upcoming) : "0", mono: true },
+          { label: "Bookable", value: bookable ? "Yes" : "No", tone: bookable ? "success" : "warning" },
+        ]} />
+      </OverlaySection>
     </form>
   );
 }
@@ -850,7 +893,11 @@ export function Recurrence({ context, close }: { context: ScreenContext; close: 
         close();
       }}
     >
-      <Properties rows={[{ label: "Resource", value: resource.title }, { label: "Existing blackouts", value: String((bodyOf<ResourceBody>(resource, {}).blackouts ?? []).length) }]} />
+      <FactGrid columns={3} dense items={[
+        { label: "Resource", value: resource.title },
+        { label: "Days blocked", value: String(Math.max(0, Math.round((new Date(`${to}T00:00:00`).getTime() - new Date(`${from}T00:00:00`).getTime()) / 86_400_000) + 1)), mono: true },
+        { label: "In the way", value: String(affected.length), mono: true, tone: affected.length ? "danger" : "success", hint: `${(bodyOf<ResourceBody>(resource, {}).blackouts ?? []).length} existing blackout(s)` },
+      ]} />
       <Row gap={3} wrap>
         <Field label="From" required><TextInput type="date" value={from} onChange={(event) => setFrom(event.target.value)} required /></Field>
         <Field label="To" required><TextInput type="date" value={to} onChange={(event) => setTo(event.target.value)} required /></Field>
@@ -890,7 +937,11 @@ export function FormFieldInspector({ context, close }: { context: ScreenContext;
       }}
     >
       <Field label="Label" required><TextInput value={label} onChange={(event) => setLabel(event.target.value)} required /></Field>
-      <Properties rows={[{ label: "Type", value: field.type }, { label: "Field id", value: <code>{field.id}</code> }]} />
+      <FactGrid columns={3} dense items={[
+        { label: "Type", value: field.type },
+        { label: "Position", value: `${(body.fields ?? []).findIndex((item) => item.id === field.id) + 1} of ${(body.fields ?? []).length}`, mono: true },
+        { label: "Field id", value: field.id, mono: true },
+      ]} />
       <Checkbox label="Required" checked={required} onChange={(event) => setRequired(event.target.checked)} disabled={field.type === "consent"} />
       {field.type === "consent" && <Notice tone="warning" title="A consent field stays required and unticked">Consent that is pre-ticked or optional is not consent.</Notice>}
     </form>
@@ -908,12 +959,13 @@ export function PublishBookingPage({ context, close }: { context: ScreenContext;
   ];
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Page", value: page.title },
-        { label: "Path", value: <code>/book/{String(page.fields.slug)}</code> },
-        { label: "Services offered", value: String((body.services ?? []).length) },
-        { label: "Fields", value: String((body.fields ?? []).length) },
-      ]} />
+      <OverlaySection title={page.title} hint={`/book/${String(page.fields.slug)}`}>
+        <ul className="book-ledger" data-flush>
+          <li><Pill tone={(body.services ?? []).length ? "success" : "warning"} dot>{(body.services ?? []).length ? "Holds" : "Open"}</Pill><span className="book-ledger-label">A service is offered</span><span className="book-ledger-detail ds-num">{(body.services ?? []).length}</span></li>
+          <li><Pill tone={(body.fields ?? []).some((field) => field.type === "consent") ? "success" : "warning"} dot>{(body.fields ?? []).some((field) => field.type === "consent") ? "Holds" : "Open"}</Pill><span className="book-ledger-label">A consent field is present</span><span className="book-ledger-detail ds-num">{(body.fields ?? []).length} fields</span></li>
+          <li><Pill tone="warning" dot>Open</Pill><span className="book-ledger-label">Hosting is connected</span><span className="book-ledger-detail">Not connected</span></li>
+        </ul>
+      </OverlaySection>
       {problems.length > 0 && <Notice tone="warning" title="Before publishing">{problems.join(" ")}</Notice>}
       <ProviderBoundary id="site.publish" title="There is nowhere to publish to">
         The page model, its services and its fields are saved here and export as HTML. Until hosting is connected, no visitor can reach it, so the booking page cannot take a booking on its own.
@@ -935,16 +987,16 @@ export function PublishBookingPage({ context, close }: { context: ScreenContext;
 export function PrivacyPolicy() {
   return (
     <Stack gap={4}>
-      <Properties rows={[
+      <KeyValueList items={[
         { label: "Collected", value: "Name, email, company and what the visitor is working on" },
         { label: "Why", value: "To hold the appointment and contact the person about it" },
         { label: "Stored", value: "In this browser, as a booking and a contact record" },
         { label: "Shared", value: "With nobody — no provider is connected" },
         { label: "Consent", value: <Pill tone="success">Required, never pre-ticked</Pill> },
       ]} />
-      <Notice tone="info" title="What a visitor is told">
-        The page says what is collected, why, and that it stays in the studio's workspace. Marketing consent is a separate box from the booking itself, so agreeing to an appointment is not agreeing to a newsletter.
-      </Notice>
+      <OverlaySection title="What a visitor is told" hint="Marketing consent is a separate box, so agreeing to an appointment is not agreeing to a newsletter.">
+        <p>The page says what is collected, why, and that it stays in the studio's workspace.</p>
+      </OverlaySection>
     </Stack>
   );
 }
@@ -1011,11 +1063,12 @@ export function SendPreview({ context }: { context: ScreenContext }) {
     .replace(/\{\{notice_hours\}\}/g, String(service?.fields.cancellationNoticeHours ?? 24));
   return (
     <Stack gap={4}>
-      <Properties rows={[
+      <FactGrid columns={2} items={[
         { label: "Rendered against", value: booking?.title ?? "No upcoming booking" },
-        { label: "Channel", value: String(template.fields.channel) },
-        { label: "Would send", value: <span className="ds-num">{String(template.fields.offsetHours)} hours before</span> },
-        { label: "Recipient", value: String(contact?.fields.email ?? "No contact on the booking") },
+        { label: "Would send", value: `${String(template.fields.offsetHours)} hours before`, mono: true, hint: String(template.fields.channel) },
+        { label: "Recipient", value: String(contact?.fields.email ?? "No contact on the booking"), mono: Boolean(contact?.fields.email) },
+        { label: "Would it go out", value: !contact ? "No: nobody attached" : contact.fields.suppressed === true ? "No: suppressed" : contact.fields.consentEmail !== true && String(template.fields.channel) === "email" ? "No: no email consent" : "Yes, once a provider is connected",
+          tone: !contact || contact.fields.suppressed === true || (contact.fields.consentEmail !== true && String(template.fields.channel) === "email") ? "warning" : "success" },
       ]} />
       <div className="t4-device">
         <div className="t4-device-head">{String(template.fields.channel) === "email" ? (body.subject ?? "").replace(/\{\{service\}\}/g, service?.title ?? "your appointment").replace(/\{\{time\}\}/g, booking?.startAt ? new Date(booking.startAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "the booked time") || "No subject" : "SMS"}</div>
@@ -1037,10 +1090,10 @@ export function ReminderSuppression({ context }: { context: ScreenContext }) {
   });
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Bookings with no contact", value: <span className="ds-num">{String(noContact.length)}</span> },
-        { label: "Contacts without email consent", value: <span className="ds-num">{String(noConsent.length)}</span> },
-        { label: "Suppressed contacts", value: <span className="ds-num">{String(data.contacts.filter((contact) => contact.fields.suppressed === true).length)}</span> },
+      <FactGrid columns={3} items={[
+        { label: "No contact", value: String(noContact.length), mono: true, tone: noContact.length ? "warning" : undefined },
+        { label: "No email consent", value: String(noConsent.length), mono: true, tone: noConsent.length ? "warning" : undefined },
+        { label: "Suppressed", value: String(data.contacts.filter((contact) => contact.fields.suppressed === true).length), mono: true },
       ]} />
       <DataGrid rows={[...noContact, ...noConsent]} rowId={(row) => row.id} label="Would not be reminded" filterable={false}
         onOpen={(id) => { context.navigate(`/o/${context.org.slug}/book/bookings/${id}`); context.closeOverlay(); }}
@@ -1050,9 +1103,7 @@ export function ReminderSuppression({ context }: { context: ScreenContext }) {
           { key: "why", header: "Why", cell: (row) => (String(row.fields.contactId) ? <Pill tone="warning">No email consent</Pill> : <Pill tone="warning">No contact record</Pill>) },
         ]}
         empty={<Empty title="Everyone with an appointment could be reminded" />} />
-      <Notice tone="danger" title="These are left out of the queue, not queued and dropped">
-        A reminder nobody consented to is not sent, and a booking with nobody attached has nowhere to send one. Both are shown here rather than counted as delivered.
-      </Notice>
+      <p className="ds-subtle">Left out of the queue, not queued and dropped. A reminder nobody consented to is not sent, and a booking with nobody attached has nowhere to send one.</p>
     </Stack>
   );
 }
@@ -1064,6 +1115,15 @@ export function MetricCalculation({ context }: { context: ScreenContext }) {
   const { now } = useWorkspace();
   const payload = context.overlayPayload as { metric?: string } | undefined;
   const metric = payload?.metric ?? "utilisation";
+  const weekStart = startOfWeek(now, 1);
+  const worked = data.resources.filter((resource) => isBookable(resource)).map((resource) => {
+    const hours = workingHours(resource);
+    return {
+      resource,
+      booked: bookedMinutes(data.bookings, resource.id, weekStart, addDays(weekStart, 7)),
+      offered: (hours.endHour - hours.startHour) * 60 * hours.days.length * resourceCapacity(resource),
+    };
+  });
   if (metric === "seats") {
     const groups = data.bookings.filter((booking) => Number(booking.fields.seats ?? 1) > 1);
     return (
@@ -1082,16 +1142,23 @@ export function MetricCalculation({ context }: { context: ScreenContext }) {
     );
   }
   return (
-    <Stack gap={3}>
-      <Properties rows={[
-        { label: "Utilisation", value: "Booked minutes divided by the working hours recorded on the resource" },
-        { label: "Window", value: "The current week, resolved from the workspace clock" },
-        { label: "Counted as booked", value: "Confirmed, held, completed and no-show appointments" },
-        { label: "Not counted", value: "Cancelled appointments, and any resource with no recorded hours" },
-        { label: "As at", value: <span className="ds-num">{context.dateTime(now)}</span> },
+    <Stack gap={4}>
+      <OverlaySection title="Utilisation, worked through" hint="Booked minutes this week divided by the working hours on each resource record.">
+        <DataGrid rows={worked} rowId={(row) => row.resource.id} label="Utilisation by resource" filterable={false}
+          columns={[
+            { key: "r", header: "Resource", primary: true, cell: (row) => row.resource.title },
+            { key: "b", header: "Booked", align: "end", cell: (row) => <span className="ds-num">{Math.round(row.booked / 60)}h</span> },
+            { key: "o", header: "Offered", align: "end", cell: (row) => <span className="ds-num">{Math.round(row.offered / 60)}h</span> },
+            { key: "p", header: "Utilisation", align: "end", cell: (row) => <strong className="ds-num">{row.offered ? `${Math.round((row.booked / row.offered) * 100)}%` : "No hours"}</strong> },
+          ]} />
+      </OverlaySection>
+      <KeyValueList items={[
+        { label: "Counted as booked", value: "Confirmed, held, completed and no-show" },
+        { label: "Not counted", value: "Cancelled, and any resource with no recorded hours" },
+        { label: "As at", value: context.dateTime(now), mono: true },
       ]} />
       <Notice tone="warning" title="A held slot counts as busy">
-        A slot held without a customer still blocks the resource, so it is counted. That is deliberate: it is the reason a resource can look full while earning nothing.
+        It still blocks the resource, so it is counted. That is why a resource can look full while earning nothing.
       </Notice>
     </Stack>
   );
@@ -1128,12 +1195,11 @@ export function SourceProof({ context }: { context: ScreenContext }) {
   const data = useBookData();
   return (
     <Stack gap={3}>
-      <Properties rows={[
-        { label: "Bookings", value: <span className="ds-num">{String(data.bookings.length)}</span> },
-        { label: "Live", value: <span className="ds-num">{String(data.bookings.filter(isLive).length)}</span> },
-        { label: "Services", value: <span className="ds-num">{String(data.services.length)}</span> },
-        { label: "Bookable resources", value: <span className="ds-num">{String(data.resources.filter((resource) => isBookable(resource)).length)}</span> },
-        { label: "External calendar", value: <Pill tone="warning">Not connected</Pill> },
+      <FactGrid columns={4} items={[
+        { label: "Bookings", value: String(data.bookings.length), mono: true },
+        { label: "Counted", value: String(data.bookings.filter(isLive).length), mono: true },
+        { label: "Services", value: String(data.services.length), mono: true },
+        { label: "Resources", value: String(data.resources.filter((resource) => isBookable(resource)).length), mono: true, hint: "External calendar: not connected" },
       ]} />
       <DataGrid rows={data.bookings} rowId={(row) => row.id} label="Every booking behind the reports"
         columns={[

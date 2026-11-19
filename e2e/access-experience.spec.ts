@@ -21,7 +21,7 @@ test("sensitive screens and policy simulation can be inspected without granting 
   await expect(workbench.getByText("Reason:",{exact:false})).toBeVisible();
   await workbench.getByRole("checkbox",{name:"Add explicit example grant"}).check();
   await workbench.getByRole("checkbox",{name:"Explicit deny"}).check();
-  await expect(workbench.getByText("explicit deny",{exact:false})).toBeVisible();
+  await expect(workbench.locator(".aw-decision").getByText("explicit deny",{exact:false})).toBeVisible();
 });
 
 test("access workbench reflows at mobile size",async({page})=>{

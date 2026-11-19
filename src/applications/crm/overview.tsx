@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Megaphone, Target, TrendingUp } from "lucide-react";
 import {
-  BarChart, Button, Card, DataGrid, DonutChart, Empty, Field, Grid, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  BarChart, Button, Card, DataGrid, DonutChart, Empty, Field, FactGrid, Grid, MoneyInput, Notice, OverlaySection, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useWorkspace } from "@/platform/workspace";
@@ -14,7 +14,7 @@ import { activitiesFor, probabilityOf, stageOf } from "@/domain/crm-pipeline";
 import { periodLabel, recentPeriods } from "@/domain/fin-ledger";
 import { companyOfDeal, contactById, contactOfDeal, useCrmData } from "./data";
 import type { CrmData } from "./data";
-import { ActivityPill, ForecastNote, Money, StagePill } from "./parts";
+import { ActivityPill, ConsentPill, ForecastNote, Money, StagePill } from "./parts";
 
 /* ---------------------------- CRM-001 ---------------------------- */
 
@@ -340,16 +340,13 @@ export function CrmMetricDrilldown({ context }: { context: ScreenContext }) {
     const pct = (part: number, whole: number) => (whole ? `${Math.round((part / whole) * 100)}%` : "No data");
     return (
       <Stack gap={4}>
-        <Notice tone="info" title="Conversion is a ratio of recorded outcomes">
-          Lead to deal counts leads with a linked deal. Win rate counts closed deals only; an open deal is neither a win nor a loss yet.
-        </Notice>
-        <Properties rows={[
-          { label: "Leads recorded", value: String(leads.length) },
-          { label: "Qualified", value: `${qualified.length} · ${pct(qualified.length, leads.length)}` },
-          { label: "Converted to a deal", value: `${converted.length} · ${pct(converted.length, leads.length)}` },
-          { label: "Deals closed", value: String(closed.length) },
-          { label: "Won", value: `${won.length} · ${pct(won.length, closed.length)} win rate` },
+        <FactGrid columns={4} items={[
+          { label: "Leads", value: String(leads.length), mono: true },
+          { label: "Qualified", value: pct(qualified.length, leads.length), mono: true, hint: `${qualified.length} of ${leads.length}` },
+          { label: "Became a deal", value: pct(converted.length, leads.length), mono: true, hint: `${converted.length} of ${leads.length}` },
+          { label: "Win rate", value: pct(won.length, closed.length), mono: true, hint: `${won.length} of ${closed.length} closed` },
         ]} />
+        <OverlaySection title="Closed deals behind the win rate" hint="An open deal is neither a win nor a loss yet, so it is not counted.">
         <DataGrid
           rows={closed}
           rowId={(row) => row.id}
@@ -363,22 +360,29 @@ export function CrmMetricDrilldown({ context }: { context: ScreenContext }) {
           ]}
           onOpen={(id) => { context.closeOverlay(); context.navigate(`/o/${org.slug}/crm/deals/${id}`); }}
         />
+        </OverlaySection>
       </Stack>
     );
   }
   const rows = metric === "won"
     ? data.deals.filter((deal) => stageOf(deal).kind === "won")
     : data.deals.filter((deal) => stageOf(deal).kind === "open");
+  const total = rows.reduce((sum, deal) => sum + (metric === "weighted" ? Math.round((Number(deal.amountMinor ?? 0) * probabilityOf(deal)) / 100) : Number(deal.amountMinor ?? 0)), 0);
+  const largest = [...rows].sort((a, b) => Number(b.amountMinor ?? 0) - Number(a.amountMinor ?? 0))[0];
 
   return (
     <Stack gap={4}>
-      <Notice tone="info" title="Every figure is a sum over the rows below">
-        {metric === "weighted"
-          ? "Each row contributes its amount multiplied by its probability."
-          : metric === "won"
-            ? "Closed-won deals. The money itself is recognised in Finance from posted journals, not here."
-            : "Open deals only. A closed deal is not pipeline."}
-      </Notice>
+      <FactGrid columns={4} items={[
+        { label: "Deals", value: String(rows.length), mono: true },
+        { label: metric === "weighted" ? "Weighted total" : "Total", value: context.money(total), mono: true },
+        { label: "Average", value: rows.length ? context.money(Math.round(total / rows.length)) : "None", mono: true },
+        { label: "Largest", value: largest ? context.money(Number(largest.amountMinor ?? 0)) : "None", mono: true, hint: largest?.title },
+      ]} />
+      <OverlaySection title="Rows behind the figure" hint={metric === "weighted"
+        ? "Each row contributes its amount multiplied by its probability."
+        : metric === "won"
+          ? "Closed-won deals. The money itself is recognised in Finance from posted journals, not here."
+          : "Open deals only. A closed deal is not pipeline."}>
       <DataGrid
         rows={rows}
         rowId={(row) => row.id}
@@ -404,6 +408,7 @@ export function CrmMetricDrilldown({ context }: { context: ScreenContext }) {
           bold
         />}
       />
+      </OverlaySection>
     </Stack>
   );
 }
@@ -462,7 +467,12 @@ export function NewLead({ context, close }: { context: ScreenContext; close: () 
       </Row>
       <Row gap={3} wrap>
         <Field label="Contact">
-          <Select aria-label="Contact" value={contactId} onChange={(event) => setContactId(event.target.value)}>
+          <Select aria-label="Contact" value={contactId} onChange={(event) => {
+            setContactId(event.target.value);
+            // Naming a person also names their account unless one was already chosen.
+            const linked = contactById(data, event.target.value)?.fields.companyId;
+            if (linked && !companyId) setCompanyId(String(linked));
+          }}>
             <option value="">None yet</option>
             {data.contacts.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
           </Select>
@@ -479,9 +489,18 @@ export function NewLead({ context, close }: { context: ScreenContext; close: () 
           The lead can be recorded, but no outreach will be drafted and no automation will touch it.
         </Notice>
       )}
-      <Field label="Notes"><TextArea aria-label="Notes" value={note} rows={3} onChange={(event) => setNote(event.target.value)} /></Field>
+      <Field label="Notes"><TextArea aria-label="Notes" value={note} rows={2} onChange={(event) => setNote(event.target.value)} /></Field>
+      <OverlaySection title="What happens next" hint="Decided from the records you picked, before anything is saved.">
+        <FactGrid columns={2} dense items={[
+          { label: "Can become a deal", value: contact ? "Yes" : "Not until a contact is named", tone: contact ? "success" : "warning" },
+          { label: "Email consent", value: contact ? <ConsentPill contact={contact} /> : "Unknown" },
+          { label: "Owner", value: context.actor },
+          { label: "Lands in", value: "Inbox, unqualified" },
+        ]} />
+      </OverlaySection>
       <Row gap={2}>
         <Button type="submit" variant="primary" busy={busy} disabled={!title.trim()}>Create the lead</Button>
+        <span className="ds-grow" />
         <Button variant="ghost" onClick={close}>Close & keep draft</Button>
         <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
@@ -531,20 +550,16 @@ export function InsightCard({ context }: { context: ScreenContext }) {
 
   return (
     <Stack gap={4}>
-      <Notice tone="info" title="These notes are arithmetic over records, not a model">
-        No language model is connected. Each one names the records it was computed from.
-      </Notice>
+      <p className="ds-subtle">Arithmetic over records, not a model. Each note names where it was counted from.</p>
       {notes.length === 0 ? (
         <Empty title="Nothing notable">Notes appear when a deal goes quiet, a stage requirement is missing or a figure has no source.</Empty>
       ) : (
-        <Stack gap={3}>
-          {notes.map((note) => (
-            <Card key={note.id} eyebrow="NOTE" prov="human" title={note.title} subtitle={note.body}
-              footer={<Button size="sm" variant="secondary" onClick={() => { context.closeOverlay(); context.navigate(note.to); }}>Open the source</Button>}>
-              <Properties rows={[{ label: "Computed from", value: note.evidence }]} />
-            </Card>
-          ))}
-        </Stack>
+        notes.map((note) => (
+          <OverlaySection key={note.id} title={note.title} tone="warning" hint={note.evidence}
+            actions={<Button size="sm" variant="secondary" onClick={() => { context.closeOverlay(); context.navigate(note.to); }}>Open the source</Button>}>
+            <p>{note.body}</p>
+          </OverlaySection>
+        ))
       )}
     </Stack>
   );
