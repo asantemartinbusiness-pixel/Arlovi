@@ -1030,6 +1030,7 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
           erasureCandidateIds: deletable.map((record) => record.id).join(","),
           erasureRetainedIds: blocked.map((record) => record.id).join(","),
           erasureSourceRevision: request!.revision,
+          erasureSnapshot: JSON.stringify(Object.fromEntries(settledRecords!.map((record) => [record.id, record.revision]))),
           erasureExecutionStatus: "not_executed",
         },
       }, {
