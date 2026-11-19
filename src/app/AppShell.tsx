@@ -116,6 +116,15 @@ export function AppShell() {
       : APP_ENTRIES[returnTo.app]?.short ?? "Previous app"
     : "";
   const returnScreen = returnTo ? findScreen(returnTo.url.split(/[?#]/)[0])?.screen : null;
+  /* Name the remembered tab, so the strip says what will actually be restored. */
+  const returnTabLabel = (() => {
+    if (!returnTo || !returnScreen) return null;
+    const query = returnTo.url.split("?")[1];
+    const tab = query ? new URLSearchParams(query.split("#")[0]).get("tab") : null;
+    if (!tab) return null;
+    const def = getApp(returnScreen.applicationCode)?.screens[returnScreen.id];
+    return def?.tabs?.find((item) => item.id === tab)?.label ?? tab;
+  })();
 
   const activeGroup = NAV_GROUPS.find(group => group.apps.some(app => app.code === activeCode));
   // Return to the active native application category without carrying record IDs.
@@ -552,7 +561,7 @@ export function AppShell() {
               <span>Back to <strong>{returnName}</strong></span>
             </button>
             {returnScreen && <span className="hq-journey-page ds-truncate">{returnScreen.title}</span>}
-            <span className="hq-journey-context">Screen &amp; tab remembered</span>
+            <span className="hq-journey-context">{returnTabLabel ? `Tab: ${returnTabLabel}` : "Position remembered"}</span>
           </nav>}
           {/* The page scrolls here, above the tray, so the tray never covers content. */}
           <div className="hq-scroll">
