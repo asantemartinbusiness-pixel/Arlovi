@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { cloudConfigured, verifyCloudIdentity } from "./supabaseIdentity";
 
 export type Request = IncomingMessage & { body?: unknown };
 export type Response = ServerResponse;
@@ -17,7 +18,8 @@ export function configuredIntegrations(): string[] {
 }
 
 export function ready(): boolean {
-  return Boolean(process.env.NANGO_SECRET_KEY && process.env.ARLOVI_SESSION_VERIFY_URL && process.env.ARLOVI_APP_ORIGIN && configuredIntegrations().length);
+  const hasAuth = cloudConfigured() || Boolean(process.env.ARLOVI_SESSION_VERIFY_URL);
+  return Boolean(process.env.NANGO_SECRET_KEY && hasAuth && process.env.ARLOVI_APP_ORIGIN && configuredIntegrations().length);
 }
 
 export function sameOrigin(req: Request): boolean {
@@ -30,6 +32,15 @@ export function sameOrigin(req: Request): boolean {
 // browser/IndexedDB demo workspace. Its response is authoritative ONLY if that
 // backend verifies the session, company membership and integration permission.
 export async function identify(req: Request, orgId: string): Promise<Identity | null> {
+  if (cloudConfigured()) {
+    const cloud = await verifyCloudIdentity(req.headers.authorization, orgId, {
+      url: process.env.ARLOVI_CLOUD_SUPABASE_URL!,
+      key: process.env.ARLOVI_CLOUD_SUPABASE_PUBLISHABLE_KEY!,
+    });
+    // Viewer and editor can browse their own permitted integrations in the
+    // future; creating, reconnecting, changing permissions requires admin.
+    return cloud && cloud.canManageIntegrations ? cloud : null;
+  }
   const verifier = process.env.ARLOVI_SESSION_VERIFY_URL;
   if (!verifier || !/^https:\/\//.test(verifier)) return null;
   const response = await fetch(verifier, {
