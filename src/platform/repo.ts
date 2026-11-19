@@ -486,9 +486,7 @@ export async function executeReviewedErasure(
         throw new Error(`A legal hold now prevents deletion from ${record.collection}.`);
       }
     }
-    const candidateSet = new Set(candidateIds);
-    const retained = latest.filter((record) => record.id !== requestId && scope.includes(record.collection) &&
-      !candidateSet.has(record.id)).length;
+    const retained = String(request.fields.erasureRetainedIds ?? "").split(",").filter(Boolean).length;
     // No awaits outside this transaction before committing the entire batch.
     await db.records.bulkDelete(candidateIds);
     const updated = revisedRecord(request, {
