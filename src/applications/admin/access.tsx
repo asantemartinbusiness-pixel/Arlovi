@@ -163,6 +163,7 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
   const payload = context.overlayPayload as { id?: string } | undefined;
   const request = ofKind(data.policies, "accessRequest").find((row) => row.id === (payload?.id ?? context.selectedId) && row.organizationId === context.org.id);
   const [note, setNote] = useState("");
+  const [restoreNote, setRestoreNote] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   if (!request) return <Empty title="Select a request" icon={<KeyRound size={20} />}>Choose an access request to review.</Empty>;
@@ -177,6 +178,12 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
   const eligibleMember = Boolean(member && member.organizationId === context.org.id && member.status === "active" && member.fields.kind !== "ai");
   const validRole = ROLES.includes(from) && ROLES.includes(to) && from !== to;
   const expired = Boolean(request.fields.expiresAt && Date.parse(String(request.fields.expiresAt)) <= Date.now());
+  const laterApproved = ofKind(data.policies, "accessRequest").some((row) =>
+    row.id !== request.id && row.fields.memberId === request.fields.memberId &&
+    row.status === "approved" && String(row.fields.decidedAt ?? "") > String(request.fields.decidedAt ?? ""));
+  const canRestore = request.status === "approved" && canDecide && eligibleMember &&
+    ROLES.includes(to) && ROLES.includes(String(request.fields.fromRole) as Role) &&
+    String(member?.fields.role) === to && !laterApproved && restoreNote.trim().length >= 10 && !busy;
   const canApprove = !busy && !decided && canDecide && eligibleMember && validRole && !stale && !expired && note.trim().length >= 10;
 
   async function decide(outcome: "approved" | "declined") {
@@ -219,15 +226,40 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Decision failed."); } finally { setBusy(false); }
   }
 
+  async function restorePreviousRole() {
+    if (!canRestore || !member || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const now = clockIso();
+      const previousRole = String(request.fields.fromRole) as Role;
+      await context.mutate.putMany([
+        revisedRecord(member, { fields: { ...member.fields, role: previousRole } }, { actor: context.actor, now }),
+        revisedRecord(request, {
+          status: "restored",
+          fields: { ...request.fields, restoredBy: context.actor, restoredAt: now, restorationReason: restoreNote.trim() },
+        }, { actor: context.actor, now }),
+      ], [
+        `Role view restored from ${to} to ${previousRole} for ${member.title}`,
+        `Access approval ${request.id} manually restored by ${context.actor}: ${restoreNote.trim()}`,
+      ], { [member.id]: member.revision, [request.id]: request.revision }, ["update", "update"]);
+      context.toast("Previous local role restored", `${member.title} now has the ${ROLE_LABELS[previousRole]} role view in this browser. No external access was revoked.`);
+      close();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The restoration failed. Reload and review the latest role.");
+    } finally { setBusy(false); }
+  }
+
   return (
     <Stack gap={4}>
       <DrawerInFlight when={busy} />
-      <DrawerUnsavedChanges when={note.trim().length > 0 && !decided} />
+      <DrawerUnsavedChanges when={(note.trim().length > 0 && !decided) || restoreNote.trim().length > 0} />
       <Properties rows={[
         { label: "Requested by", value: String(request.fields.memberName ?? request.ownerName) },
         { label: "Change", value: `${ROLE_LABELS[from]} → ${ROLE_LABELS[to] ?? to}` },
         { label: "Reason given", value: request.summary || "None given" },
         { label: "Asked", value: context.dateTime(request.at ?? request.createdAt) },
+        { label: "Grant expiry", value: "None — this local role persists until manually changed" },
         ...(decided ? [
           { label: "Decision", value: <Pill tone={request.status === "approved" ? "success" : "danger"}>{request.status}</Pill> },
           { label: "Decided by", value: `${String(request.fields.decidedBy ?? "")} · ${context.relative(String(request.fields.decidedAt ?? ""))}` },
@@ -268,9 +300,23 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
           <TextArea rows={2} value={note} onChange={(event) => { setNote(event.target.value); setError(""); }} />
         </Field>
       )}
+      {request.status === "approved" && <Stack gap={2}>
+        <Notice tone="warning" title="Manual restoration only">
+          Restoring the earlier role will change this browser's member record, not terminate identity-provider sessions.
+          No automatic expiry or delegation is configured.
+        </Notice>
+        {laterApproved && <Notice tone="danger" title="A later approval exists">Review the person's latest access change before restoring an earlier role.</Notice>}
+        {String(member?.fields.role) !== to && <Notice tone="warning" title="Role changed since approval">The previous role cannot be restored from this decision without overwriting a newer change.</Notice>}
+        <Field label="Reason to restore previous role" required hint="At least 10 characters; retained with the original approval's audit history.">
+          <TextArea rows={2} value={restoreNote} onChange={(event) => { setRestoreNote(event.target.value); setError(""); }} />
+        </Field>
+      </Stack>}
+      {error && decided && <Notice tone="danger" title="Change not saved">{error}</Notice>}
       <DrawerActions>
         <Button variant="ghost" disabled={busy} onClick={close}>{decided ? "Close" : "Cancel"}</Button>
         <span className="ds-grow" />
+        {request.status === "approved" && <Button variant="danger" busy={busy} disabled={!canRestore}
+          onClick={() => void restorePreviousRole()}>Restore previous local role</Button>}
         {!decided && (
           <>
             <Button variant="danger" busy={busy} disabled={!canDecide || busy || note.trim().length < 10} onClick={() => void decide("declined")}>Decline</Button>
