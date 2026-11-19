@@ -831,7 +831,7 @@ export function subjectRecords(request: Rec, records: Rec[]): Rec[] {
   return [...matched.values()];
 }
 
-export function DataRequestOverlay({ context, close }: { context: ScreenContext; close: () => void }) {
+export function DataRequestOverlay({ context, close: _close }: { context: ScreenContext; close: () => void }) {
   const data = useAdmin();
   const settledRecords = useSettledOrgRecords();
   const seeds = useSeedStatus();
