@@ -157,3 +157,19 @@ test("Administration never exports an arbitrary subject request", async ({ page 
   await expect(drawer).toContainText("Choose a subject request");
   await expect(drawer.getByRole("button", { name: "Export scoped CSV" })).toHaveCount(0);
 });
+
+test("privacy erasure refuses to choose a subject request by default", async ({ page }) => {
+  await page.goto("/o/northline/admin/privacy?overlay=deletion%20impact");
+  const dialog = page.getByRole("dialog", { name: "What deletion would remove" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("Select a subject request before reviewing erasure");
+  await expect(dialog.getByRole("button", { name: /Delete .* local records/ })).toHaveCount(0);
+});
+
+test("privacy erasure never offers deletion without a saved impact review", async ({ page }) => {
+  await page.goto("/o/northline/admin/privacy/nl-dataRequests-001?overlay=deletion%20impact");
+  const dialog = page.getByRole("dialog", { name: "What deletion would remove" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /Delete .* local records/ })).toHaveCount(0);
+  await expect(dialog).toContainText("Permanent deletion of local browser records");
+});
