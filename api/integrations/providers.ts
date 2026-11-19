@@ -1,5 +1,5 @@
-import type { Request, Response } from "./_shared";
-import { json, nango } from "./_shared";
+import type { Request, Response } from "../../server/integrations/shared";
+import { json, nango } from "../../server/integrations/shared";
 
 /**
  * Read-only provider discovery. A supported provider is NOT necessarily a
