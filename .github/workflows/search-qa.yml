@@ -1,0 +1,36 @@
+name: Search 2.1 focused QA
+
+on:
+  pull_request:
+    paths:
+      - "src/app/CommandPalette.tsx"
+      - "src/app/command-search.css"
+      - "src/platform/searchModel.ts"
+      - "tests/unit/search-model.test.ts"
+      - "e2e/search-v2.spec.ts"
+      - "e2e/command-resume.spec.ts"
+      - "e2e/header-context-safety.spec.ts"
+      - ".github/workflows/search-qa.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: search-qa-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx vitest run tests/unit/search-model.test.ts tests/unit/navigation-continuity.test.ts tests/unit/app-journey.test.ts
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test e2e/search-v2.spec.ts e2e/command-resume.spec.ts e2e/header-context-safety.spec.ts e2e/universal-header.spec.ts --workers=2
