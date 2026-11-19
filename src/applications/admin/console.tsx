@@ -999,15 +999,13 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
       const saved = await context.mutate.patch(request!.id, {
         fields: {
           ...request!.fields,
-          erasureReview: {
-            reviewedBy: context.actor,
-            reviewedAt: context.now.toISOString(),
-            reason: reason.trim(),
-            candidateIds: deletable.map((record) => record.id),
-            retainedIds: blocked.map((record) => record.id),
-            sourceRevision: request!.revision,
-            executionStatus: "not_executed",
-          },
+          erasureReviewedBy: context.actor,
+          erasureReviewedAt: context.now.toISOString(),
+          erasureReason: reason.trim(),
+          erasureCandidateIds: deletable.map((record) => record.id).join(","),
+          erasureRetainedIds: blocked.map((record) => record.id).join(","),
+          erasureSourceRevision: request!.revision,
+          erasureExecutionStatus: "not_executed",
         },
       }, {
         event: `Erasure impact reviewed for ${subject}; no records removed`,
