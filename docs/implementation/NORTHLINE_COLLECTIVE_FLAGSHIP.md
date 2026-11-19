@@ -52,3 +52,14 @@ Run `npm run qa`, `npm run test:e2e`, and manual browser reviews for:
 ## Release safety
 
 Do not merge this into production without CI and browser verification. Do not overwrite the existing `nl-sites-020` Atelier site or reassign the independently scoped `harbor` demo organization.
+
+
+## Native Studio expansion and discovery hub (continuation)
+
+A second contributor `flagship-studio` is loaded alongside `flagship-collective` with isolated `nl-<collection>-910+` identifiers. This adds two native Design Studio files (five editable editorial artboards), an eight-page native publication with text stories, two layered Photo studies and a four-chapter 60-second Film Editor timeline with generated storyboard proxies. Native vector objects can be selected and modified, and layout frames are proper publication elements. These are not screenshots posing as editable work.
+
+The **native showcase hub** is accessible at `/o/northline/workspace/showcase` through an optional panel on Northline's My Workspace. It links to the true native record detail routes and to the standalone showcase at `/northline-collective/`. The route refuses to show the flagship within the Harbor demo organisation. Metrics derive from records currently available in the browser rather than being presented as real company achievements.
+
+`tests/unit/flagship-studio.test.ts` checks structural integrity, editable scene graphs, publication stories, video source references, and rights status. `e2e/flagship-showcase.spec.ts` exercises native navigation, cross-tenant denial, responsive reflow and the local download-only form.
+
+**Independent sign-off remains required.** Confirm that the Video Studio generated source preview behaves correctly and that the layout's print preflight reports rather than conceals overset. Visual review in browser and quality gates are not replaced by the existence of fixtures. The production site is unchanged until reviewed and merged.
