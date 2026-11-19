@@ -219,5 +219,75 @@ registerSeed("flagship-collective", (ctx) => {
     if(collection==="datasets")return;
     push(collection,0,"Collective / "+collection.replace(/([A-Z])/g," $1").toLowerCase()+" showcase",{status:"draft",summary:"Illustrative flagship record; additional specialist-specific records belong in the native editor.",fields:{sourceProjectId:id("projects",0),demoOnly:true}});
   });
+  // Realistic roster size for the reference company, without exposing personal data.
+  // Each member is fictional and starts with a scoped demonstration profile.
+  const first=["Avery","Morgan","Samira","Theo","Priya","Elliot","Amara","Jonah","Harper","Nia","Iris","Owen","Elena","Felix","Maya","Sofia","Rowan","Leah","Rafael","Sable"];
+  const last=["Bell","Chen","Shah","Moss","Moreno","Vale","Brooks","Reed","Lind","Patel","Hale","Bennett","Grant","Singh","Santos","Walker","Doyle","Nash","Ward","Foster"];
+  const titles=["Interior Designer","Lighting Specialist","Product Designer","Creative Producer","Warehouse Associate","Account Manager","Customer Care Specialist","Marketing Executive","Studio Coordinator","Operations Analyst","Software Engineer","Finance Associate"];
+  for(let i=1;i<=82;i++){
+    const title=titles[(i-1)%titles.length];
+    const name=first[(i-1)%first.length]+" "+last[(i*7)%last.length]+" "+String(i).padStart(2,"0");
+    const departmentId=id("departments",(i-1)%8);
+    push("employees",i,name,{status:i%19===0?"probation":"active",summary:"Fictional "+title+" in the flagship workforce.",fields:{
+      title,departmentId,office:["Manchester Creative Headquarters","London Design Showroom","Midlands Distribution Centre","Experiences Studio"][i%4],
+      employment:"full-time",payrollState:"demo_only",manager:"Maya Chen",hireDate:"2025-"+String((i%12)+1).padStart(2,"0")+"-01",
+      salaryMinor:0,confidentiality:"fictional_no_personal_data"
+    }});
+    push("members",i,name,{summary:"Scoped fictional human member of the flagship.",fields:{kind:"human",role:"member",departmentId,title,employeeId:id("employees",i)}});
+  }
+  const specialistRoles=[
+    "Chief of Staff","Sales Director","Financial Analyst","Marketing Strategist","Creative Producer","Customer Care Specialist",
+    "Procurement Coordinator","People Operations Assistant","Project Coordinator","Data Analyst","Knowledge Steward","IT Reliability",
+    "Digital Engineer","Content Editor","Photo Editor","Motion Designer","Legal Operations Assistant","Operations Coordinator"
+  ];
+  specialistRoles.forEach((role,i)=>{
+    const n=i+1,dep=id("departments",i%8);
+    push("agents",n,"Northline / "+role,{status:"draft",summary:"Fictional AI specialist. Contract configured for local demonstration; no provider connection or autonomous execution.",
+      fields:{role,model:"not_connected",autonomy:i===0?"suggest":"draft",departmentId:dep,manager:"Maya Chen",
+        spendCapMinor:0,recordedCostMinor:0,authority:"Read scoped records; draft proposals; request human approval",pausedReason:"No AI provider is connected"},
+      body:{skills:["Scoped research","Drafting","Source citation","Approval handoff"],tools:[
+        {id:"workspace.read",label:"Read authorised records",granted:true},
+        {id:"workspace.draft",label:"Prepare local draft",granted:true},
+        {id:"external.execute",label:"Perform external action",granted:false}],
+        sources:[],authority:["No financial posting","No external sending","No live publication","No permissions escalation"],evaluated:false}
+    });
+    push("evaluations",n,""+role+" — activation evaluation",{status:"pending",summary:"Activation blocked until scoped scenarios and an independent reviewer sign off.",fields:{agentId:id("agents",n),passed:false}});
+  });
+  // Twelve non-posted KPI planning snapshots provide charts and year-over-year
+  // narrative without generating counterfeit bank or accounting evidence.
+  const baseline=[480000,510000,545000,575000,602000,615000,660000,690000,718000,725000,768000,812000];
+  baseline.forEach((revenue,i)=>push("datasets",i+1,"2026 monthly planning / "+String(i+1).padStart(2,"0"),{
+    status:"draft",summary:"Synthetic scenario, not actual ledger revenue; do not mix with posted financial KPIs.",
+    fields:{period:"2026-"+String(i+1).padStart(2,"0"),scenarioRevenueGBP:revenue,scenarioGrossMarginPct:39+(i%6),scenarioOnly:true,source:"flagship_simulation"}
+  }));
+  // Connected portfolios: each project links to a fictional customer and a
+  // handful of specific deliverables without inventing invoice settlements.
+  const projectKinds=["Interior refresh","Lighting specification","Showroom concept","Editorial campaign","Website experience","Object collection","Hospitality wayfinding","Digital product"];
+  for(let i=1;i<=48;i++){
+    const customerId=id("companies",10+(i%6)), projectId=id("projects",i),name=projectKinds[i%projectKinds.length];
+    push("projects",i,name+" / "+String(i).padStart(3,"0"),{status:i%8===0?"completed":i%5===0?"at_risk":"active",
+      summary:"Fictional multidisciplinary case for operational workflows.",fields:{companyId:customerId,portfolio:"Flagship / Client delivery",
+        progress:(i*17)%100,projectLead:first[i%first.length]+" "+last[i%last.length],approvalState:"local_only"}});
+    for(let j=0;j<3;j++)push("tasks",i*3+j+5,name+" — "+["Discovery","Creative development","Review & handover"][j],{
+      status:j===0?"done":j===1?"in_progress":"todo",parentId:projectId,fields:{projectId,phase:j+1}});
+  }
+  for(let i=1;i<=45;i++){
+    push("suppliers",i,"Sample supplier "+String(i).padStart(2,"0"),{status:i%7===0?"review":"prospect",
+      summary:"Fictional sourcing partner, no supplier account or payment connection.",fields:{category:["Materials","Fabrication","Packaging","Transport"][i%4],approved:false}});
+  }
+  for(let i=1;i<=65;i++){
+    const productId=id("products",i%8);
+    push("orders",i,"NLC demo order "+String(i).padStart(4,"0"),{status:i%9===0?"returned":i%4===0?"processing":"draft",
+      summary:"Fictional sales-order lifecycle record. Not a confirmed external checkout or settlement.",
+      amountMinor:42000+(i%7)*12500,fields:{productId,customerId:id("contacts",10+(i%6)),paymentState:"not_connected",
+        fulfilmentState:i%4===0?"processing":"local_draft",externalOrder:false}});
+    if(i<=30)push("tickets",i,"Order help / "+String(i).padStart(4,"0"),{status:i%3===0?"resolved":"open",
+      summary:"Sample support case for an illustrative order.",fields:{orderId:id("orders",i),customerId:id("contacts",10+(i%6)),priority:i%7===0?"high":"normal"}});
+  }
+  for(let i=1;i<=24;i++)push("campaigns",i,"Editorial campaign / "+String(i).padStart(3,"0"),{
+    status:i%6===0?"in_review":"draft",summary:"Fictional campaign brief; not published or sent.",
+    fields:{objective:["Engagement","Lead quality","Collection discovery"][i%3],budgetMinor:50000+i*2500,spentMinor:0,
+      approval:"draft",delivery:"not_connected"}
+  });
   return {records,events:[{id:"evt-collective-flagship-900",organizationId:ctx.northline,at:ctx.now,actor:"flagship fixture",type:"showcase.created",message:"Northline Collective fictional flagship records loaded locally. No external publication, payment or communication occurred.",capability:"ready_local"}]};
 });
