@@ -15,12 +15,17 @@ export function subscribeWorkingDrafts(listener: () => void): () => void {
 }
 export function workingDraftRevision(): number { return draftRevision; }
 export function hasWorkingDraft(scope: string): boolean {
-  return (workingDrafts.get(scope)?.size ?? 0) > 0;
+  const fields = workingDrafts.get(scope);
+  if (!fields?.size) return false;
+  // Loading a saved quote hydrates its lines. Count it only after the person
+  // actually changes a value; hydration alone is not an unsaved edit.
+  if (scope.startsWith("crm:quote:")) return fields.get("dirty") === true;
+  return true;
 }
 export function countWorkingDrafts(orgId: string, actor: string): number {
   const marker = `:${orgId}:${actor}`;
-  return [...workingDrafts.entries()].filter(([scope, fields]) =>
-    fields.size > 0 && (scope.endsWith(marker) || scope.includes(marker + ":"))).length;
+  return [...workingDrafts.keys()].filter(scope =>
+    hasWorkingDraft(scope) && (scope.endsWith(marker) || scope.includes(marker + ":"))).length;
 }
 export function useWorkingDraftPresence(scope: string): boolean {
   useSyncExternalStore(subscribeWorkingDrafts, workingDraftRevision, () => 0);

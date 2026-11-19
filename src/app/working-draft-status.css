@@ -9,3 +9,6 @@
 .arl-draft-counter__qualifier{font-weight:400;color:var(--fg-muted)}
 @media(max-width:1023px){.arl-draft-counter__qualifier{display:none}}
 @media(max-width:630px){.arl-draft-counter{padding:6px;border-color:transparent}.arl-draft-counter span{display:none}}
+
+/* Keep status readable beside a footer action at phone widths. */
+.arl-draft-status{min-width:0;max-width:100%;flex:1 1 220px;overflow-wrap:anywhere}

@@ -18,6 +18,18 @@ describe("working draft save status", () => {
       expect(events).toEqual([1, 0]);
     } finally { unsubscribe(); clearWorkingDraft(scope); }
   });
+  it("does not report an unchanged, hydrated quote as an unsaved draft", () => {
+    const scope = "crm:quote:org-status:Alex:quote-7";
+    rememberWorkingField(scope, "lines", [{ description: "Saved line" }]);
+    rememberWorkingField(scope, "dirty", false);
+    expect(hasWorkingDraft(scope)).toBe(false);
+    expect(countWorkingDrafts("org-status", "Alex")).toBe(0);
+    rememberWorkingField(scope, "dirty", true);
+    expect(hasWorkingDraft(scope)).toBe(true);
+    expect(countWorkingDrafts("org-status", "Alex")).toBe(1);
+    clearWorkingDraft(scope);
+    expect(hasWorkingDraft(scope)).toBe(false);
+  });
   it("counts company and actor scopes separately without revealing draft details", () => {
     const a = "crm:new-lead:org-one:Alex";
     const b = "project:create:org-two:Alex";
