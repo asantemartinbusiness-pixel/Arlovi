@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#192421">
+<meta name="theme-color" content="#f3f0e8">
 <meta name="description" content="Northline Collective — an editorial showcase of spaces, objects and experiences. Fictional flagship business simulation built for Arlovi.">
 <meta name="robots" content="noindex,nofollow">
 <title>Northline Collective — Material. Space. Experience.</title>
@@ -36,6 +36,7 @@ footer{background:var(--ink);color:var(--paper);padding:55px 0 35px}.footer-top{
 @media(max-width:620px){.container{width:88%}.flag{font-size:9px}.hero-content{padding-top:9vh}.hero h1{font-size:clamp(62px,18vw,110px);margin-top:85px}.hero-bottom{align-items:start}.hero-counter{display:none}.orb{right:-45%;top:35%}.statement{padding:130px 0}.statement .copy{font-size:40px}.projects{gap:90px}.work{padding-bottom:110px}.tile-grid{grid-template-columns:1fr}.tile{min-height:410px}.banded{padding:100px 0}.studio{padding:95px 0}.numbers{grid-template-columns:1fr 1fr;row-gap:35px}.numbers>div:nth-child(3){padding-left:0}.contact{padding-top:90px}.contact-form{grid-template-columns:1fr}.footer-top{flex-direction:column}.footer-links{justify-content:start}.footer-bottom{flex-direction:column}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}.reveal{opacity:1;transform:none}}
 </style>
+<link rel="stylesheet" href="./identity.css">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -48,13 +49,43 @@ footer{background:var(--ink);color:var(--paper);padding:55px 0 35px}.footer-top{
   </nav>
 </header>
 <main id="main">
-<section class="hero container" id="top" aria-labelledby="hero-heading">
-  <div class="orb" aria-hidden="true"></div>
+<section class="hero" id="top" aria-labelledby="hero-heading">
   <div class="hero-content">
-    <span class="label eyebrow">An independent house of ideas · Est. in imagination</span>
+    <span class="label eyebrow">NORTHLINE COLLECTIVE / A HOUSE OF IDEAS</span>
     <h1 id="hero-heading">Material.<br>Space.<br><em>Experience.</em></h1>
+    <p class="hero-lead">Spaces that stay with you, objects that earn their place, and experiences that bring people together. Made deliberately, from the first sketch to the final detail.</p>
+    <div class="hero-actions"><a class="hero-cta" href="#work">Explore the work <span aria-hidden="true">↗</span></a><a class="hero-alt" href="#approach">How we work <span aria-hidden="true">↗</span></a></div>
+    <p class="hero-footnote">THREE DISCIPLINES. ONE POINT OF VIEW.<br>AN ORIGINAL FICTIONAL BUSINESS SIMULATION IN ARLOVI.</p>
   </div>
-  <div class="hero-bottom"><p>We make considered places, useful objects and moments that stay with you.</p><span class="micro">01 — 07<br>Scroll to explore</span><span class="hero-counter" aria-hidden="true">N° 01</span></div>
+  <div class="hero-cover-art" role="img" aria-label="Art-directed tactile collage of layered cream paper, violet geometry, graphite drawing and an acid-yellow directional line, with two Northline project notes">
+    <div class="paper-grain"></div>
+    <svg class="collage-composition" viewBox="0 0 760 920" preserveAspectRatio="xMidYMid slice" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="paper-shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="12" dy="18" stdDeviation="11" flood-color="#211d1b" flood-opacity=".24"/></filter>
+        <filter id="paper-noise"><feTurbulence type="fractalNoise" baseFrequency=".6" numOctaves="3" seed="4" result="n"/><feColorMatrix in="n" type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope=".075"/></feComponentTransfer></filter>
+      </defs>
+      <rect width="760" height="920" fill="#c9c4b9"/>
+      <rect x="-35" y="-15" width="465" height="930" transform="rotate(10 110 400)" fill="#e8e2d6" filter="url(#paper-shadow)"/>
+      <path d="M152 -24L682 30L617 760L140 850L88 275Z" fill="#e9e5dd" filter="url(#paper-shadow)"/>
+      <path d="M-60 145L320 45L522 334L145 495Z" fill="#7e57ff" opacity=".92" filter="url(#paper-shadow)"/>
+      <path d="M294 20L765 210L602 552L371 431Z" fill="#2f2b33" opacity=".9"/>
+      <path d="M310 0L515 95L380 383L235 279Z" fill="#bea8ff" opacity=".8"/>
+      <rect x="45" y="446" width="380" height="305" fill="#f3f0e8" transform="rotate(-9 235 595)" filter="url(#paper-shadow)"/>
+      <path d="M414 436L738 340L802 720L515 811Z" fill="#b8d8fe" filter="url(#paper-shadow)"/>
+      <path d="M-45 805L535 700L609 987L70 996Z" fill="#e6a868" opacity=".83"/>
+      <path d="M55 174Q225 132 323 222T434 515T658 636" stroke="#454139" stroke-width="2" fill="none" stroke-linecap="round" opacity=".85"/>
+      <path d="M81 188Q140 332 70 455T199 731" stroke="#454139" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".65"/>
+      <path d="M420 169Q564 100 623 279T588 507" stroke="#211f1d" stroke-width="2" fill="none" stroke-linecap="round" opacity=".7"/>
+      <path d="M147 500C325 380 544 372 603 505C649 598 566 702 449 690C337 682 290 570 404 525C506 484 596 572 557 628" fill="none" stroke="#dfff3f" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M538 604L557 628L577 604" fill="none" stroke="#dfff3f" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="208" cy="636" r="44" fill="#f3f0e8" stroke="#262323" stroke-width="1.5"/>
+      <path d="M207 602V669M175 635H239" stroke="#262323" stroke-width="1.5"/>
+      <rect width="760" height="920" filter="url(#paper-noise)" opacity=".65"/>
+    </svg>
+    <div class="paper-slip paper-slip--one"><small>OBJECT STUDY / 001</small>Objects that grow more interesting with use.</div>
+    <div class="paper-slip paper-slip--two"><small>ATELIER / FIELD NOTE</small>Good ideas are made, unmade, and made again.</div>
+    <span class="collage-index">MATERIAL ARCHIVE / N° 001</span>
+  </div>
 </section>
 <div class="ticker" aria-hidden="true"><span>OBSERVE</span><span>MAKE</span><span>LIVE</span><span>FEEL</span><span>REMEMBER</span></div>
 <section class="statement container reveal" aria-labelledby="manifesto"><span class="label eyebrow">A point of view</span><p class="copy" id="manifesto">We believe the things we surround ourselves with should do more than look beautiful. They should make room for <em>life.</em></p></section>
@@ -89,6 +120,17 @@ footer{background:var(--ink);color:var(--paper);padding:55px 0 35px}.footer-top{
     <article class="tile"><span class="tile-index">N° 03 / GATHERINGS</span><div class="tile-visual" aria-hidden="true"><svg viewBox="0 0 300 260"><circle cx="110" cy="109" r="62" fill="#d4c1a9"/><circle cx="182" cy="130" r="60" fill="#aa978c" opacity=".9"/><circle cx="146" cy="190" r="60" fill="#809185" opacity=".88"/><circle cx="150" cy="134" r="18" fill="#eeeae1"/></svg></div><div><h3>Experiences</h3><p>Time made meaningful. Workshops, consultations and conversations.</p></div></article>
   </div>
 </section>
+<section class="mosaic container" aria-labelledby="mosaic-heading">
+  <div class="mosaic-head"><div><span class="label eyebrow">03 / The working studio</span><h2 id="mosaic-heading" style="margin-top:36px">One thought.<br><em>Many forms.</em></h2></div><p>Every Northline discipline begins with a real brief. Concepts, original media, production notes and decisions remain connected inside the demonstration business.</p></div>
+  <div class="mosaic-grid">
+    <div class="mosaic-feature"><span class="label">COLLECTIVE / CREATIVE PRACTICE</span><div><h3>From the first scrap to the final specification.</h3><p>Make, test, document, refine. A design-led process for spaces and objects, not just beautiful presentation pages.</p></div><div class="mosaic-disk" aria-hidden="true">✳</div></div>
+    <div class="mosaic-stack">
+      <article class="mosaic-tile"><span class="label">01 / MATERIAL</span><h4>A living collection of paper, ink and real decisions.</h4><a href="#work">View the portfolio ↗</a></article>
+      <article class="mosaic-tile"><span class="label">02 / MAKING</span><h4>The objects: considered, tested, documented.</h4><a href="#disciplines">Meet the disciplines ↗</a></article>
+      <article class="mosaic-tile"><span class="label">03 / PEOPLE</span><h4>Conversations that become useful work.</h4><a href="#contact">Begin a project brief ↗</a></article>
+    </div>
+  </div>
+</section>
 <section class="banded" id="approach">
   <div class="container">
     <span class="label eyebrow">03 / How we think</span><h2 style="margin-top:70px">The beauty<br>is in the <i>doing.</i></h2>
@@ -113,6 +155,7 @@ footer{background:var(--ink);color:var(--paper);padding:55px 0 35px}.footer-top{
   </div>
 </section>
 </main>
+<section class="statement-ending"><h2>Keep the curiosity.<br><em>Make it matter.</em></h2><a href="#contact">Create a project brief ↗</a></section>
 <footer><div class="container"><div class="footer-top"><div class="footer-logo">Northline<br><i>Collective.</i></div><div class="footer-links"><a href="#work">Work</a><a href="#disciplines">Disciplines</a><a href="#contact">Contact</a></div></div><div class="footer-bottom"><span>© 2026 Northline Collective. Fictional flagship demonstration.</span><span>Art-directed and built as a standalone design showcase for Arlovi.</span><a href="#top">Back to top ↑</a></div></div></footer>
 <script>
 const menu=document.getElementById('menu'),nav=document.getElementById('nav');menu.addEventListener('click',()=>{const open=nav.classList.toggle('open');menu.setAttribute('aria-expanded',String(open));menu.textContent=open?'Close −':'Menu +'});nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{nav.classList.remove('open');menu.setAttribute('aria-expanded','false');menu.textContent='Menu +'}));
