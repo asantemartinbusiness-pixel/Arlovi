@@ -385,10 +385,8 @@ export function MergePreview({ context, close }: { context: ScreenContext; close
         >
           Merge into {keep.title}
         </Button>
-        <Button variant="ghost" onClick={close}>Close & keep draft</Button>
-        <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
+        <Button variant="ghost" onClick={close}>Cancel</Button>
       </Row>
-      <p className="ds-subtle">Message text is held in this tab only until you save or discard it. Nothing is sent externally.</p>
     </Stack>
   );
 }
@@ -808,8 +806,10 @@ export function ComposeMessage({ context, close }: { context: ScreenContext; clo
         >
           Save the draft
         </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
+        <Button variant="ghost" onClick={close}>Close & keep draft</Button>
+        <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
+      <p className="ds-subtle">Message text stays in this browser tab until saved or discarded. Nothing is sent externally.</p>
     </Stack>
   );
 }
