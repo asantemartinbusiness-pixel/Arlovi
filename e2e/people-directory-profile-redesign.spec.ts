@@ -84,8 +84,9 @@ test("Every employee-profile tab shares one identity head, company scope and rec
   // A4 review: the Overview carries an "At a glance" card (open work, or "Nothing open") and folds empty contact rows into one line.
   await expect(main.getByText("What is open for this person")).toBeVisible();
   await expect(main.getByText("No contact details recorded.")).toBeVisible();
-  await page.goto("/o/northline/hr/employees/nl-employees-007?tab=Overview");
+  await page.goto("/o/northline/hr/employees/nl-employees-023?tab=Overview");
   await expect(main.getByText("What is open for this person")).toBeVisible();
+  await expect(main.getByText("Next leave").or(main.getByText("Latest leave")).first()).toBeVisible();
   await page.getByRole("navigation", { name: "People navigation" }).getByText("Employee Directory").click();
   await expect(main.locator(".hr-bar")).toBeVisible();
 });
