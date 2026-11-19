@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowRight, ArrowUpRight, Bookmark, BookmarkCheck, CornerUpLeft,
-  FileText, FolderKanban, LayoutGrid, Search, UserRound, X, Zap,
+  FileText, FolderKanban, LayoutGrid, Plug, Search, UserRound, X, Zap,
 } from "lucide-react";
 import { appEntry, findScreen, screens } from "@/app/catalog";
 import { APP_ENTRIES, NAV_GROUPS } from "@/app/nav";
 import { buildLocalSearchHits } from "@/platform/searchRecordProviders";
+import { integrationSearchHits, LOCAL_SEARCH_SOURCE } from "@/platform/searchSources";
 import { canOpenLegacyScreen } from "@/platform/accessInventory";
 import { canOpen } from "@/platform/policy";
 import { useCollections, useOrgRecords, useWorkspace } from "@/platform/workspace";
@@ -29,6 +30,7 @@ function iconFor(kind: SearchKind) {
   if (kind === "saved") return Bookmark;
   if (kind === "action") return Zap;
   if (kind === "app") return LayoutGrid;
+  if (kind === "connector") return Plug;
   return ArrowUpRight;
 }
 
@@ -180,6 +182,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     const rows = buildLocalSearchHits(records, {
       organizationId: org.id, organizationSlug: org.slug, actor, role,
     });
+    const integrations = canOpen(role, "CONNECT") ? integrationSearchHits(org.slug) : [];
 
     const workspaces: SearchHit[] = [
       ...departments.map(record => ({
@@ -199,7 +202,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     return [
       ...back, ...continued,
       ...locations, ...actions,
-      ...apps, ...workspaces, ...pages, ...rows,
+      ...apps, ...workspaces, ...pages, ...rows, ...integrations,
     ].filter(hit => safeLocation(hit.to, org.slug));
   }, [
     location.pathname, location.search, location.hash, journey, resumable,
@@ -239,7 +242,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const preview = showPreview && Boolean(query.trim()) && selected;
   const previewSnippet = preview ? matchingContentSnippet(preview, query) : undefined;
   const canSave = selected && !selected.to.includes("?") && !selected.to.includes("#")
-    && selected.kind !== "return";
+    && selected.kind !== "return" && selected.kind !== "connector";
   const isSaved = Boolean(selected && navigation.pinned.includes(selected.to));
 
   function go(hit?: SearchHit) {
@@ -299,7 +302,8 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
             <button type="button" className="search-v2-close" onClick={onClose} aria-label="Close search"><X size={18}/></button>
           </div>
           <div className="search-v2-scopes" role="group" aria-label="Search within">
-            {SEARCH_SCOPES.filter(item => item.id !== "mail" || canOpen(role, "COMMS")).map(item =>
+            {SEARCH_SCOPES.filter(item => (item.id !== "mail" || canOpen(role, "COMMS"))
+              && (item.id !== "integrations" || canOpen(role, "CONNECT"))).map(item =>
               <button type="button" key={item.id} aria-pressed={scope === item.id}
                 onClick={() => { setScope(item.id); inputRef.current?.focus(); }}
                 title={item.id === "this-app" ? "Search the current application" : undefined}>
@@ -307,6 +311,13 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
               </button>)}
           </div>
         </div>
+        {scope === "integrations" && <div className="search-v2-source-disclosure" role="note">
+          <Plug size={16} aria-hidden="true"/>
+          <span><strong>Integration catalogue, not connected data.</strong> These are setup options; external accounts are not searchable yet.</span>
+          <button type="button" onClick={() => go({ key: "browse-integrations", kind: "connector", group: "", title: "", detail: "", to: `/o/${org.slug}/connect/marketplace` })}>
+            Browse <ArrowRight size={13}/>
+          </button>
+        </div>}
         <div className="search-v2-body">
           <div className="hq-palette-list search-v2-results" id="palette-list" role="listbox"
             aria-label="Search results" ref={listRef}>
@@ -341,7 +352,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
                       <Highlight text={matchingContentSnippet(hit, query) ?? ""} query={query}/>
                     </span>}
                   </span>
-                  {query && <span className="search-v2-kind">{hit.kind === "record" ? recordCategory(hit.collection ?? "") : hit.kind === "screen" ? "Screen" : hit.kind === "app" ? "App" : hit.kind === "action" ? "Action" : hit.group}</span>}
+                  {query && <span className="search-v2-kind">{hit.kind === "connector" ? "Not connected" : hit.kind === "record" ? recordCategory(hit.collection ?? "") : hit.kind === "screen" ? "Screen" : hit.kind === "app" ? "App" : hit.kind === "action" ? "Action" : hit.group}</span>}
                   <ArrowUpRight className="search-v2-hit-arrow" size={15} aria-hidden="true"/>
                 </button>
               </div>;
@@ -357,6 +368,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
             </div>
             <h2>{preview.title}</h2>
             <p className="search-v2-preview-meta">{preview.detail}</p>
+            <div className="search-v2-provenance">{preview.sourceType === "catalogue" ? "Integration catalogue · No external data" : (preview.sourceName ?? LOCAL_SEARCH_SOURCE)}</div>
             {previewSnippet
               ? <p className="search-v2-preview-summary search-v2-content-excerpt"><Highlight text={previewSnippet} query={query}/></p>
               : preview.summary && <p className="search-v2-preview-summary">{preview.summary.slice(0, 270)}</p>}
@@ -367,7 +379,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
             {preview.ownerName && <div className="search-v2-preview-field"><span>Owner</span><strong>{preview.ownerName}</strong></div>}
             {preview.updatedAt && <div className="search-v2-preview-field"><span>Updated</span><strong>{new Date(preview.updatedAt).toLocaleDateString()}</strong></div>}
             <div className="search-v2-preview-actions">
-              <button type="button" className="search-v2-primary" onClick={() => go(preview)}>Open result <ArrowUpRight size={15}/></button>
+              <button type="button" className="search-v2-primary" onClick={() => go(preview)}>{preview.kind === "connector" ? "Explore integration" : "Open result"} <ArrowUpRight size={15}/></button>
               {canSave && <button type="button" className="search-v2-secondary"
                 onClick={() => toggleSavedNavigation(org.id, org.slug, selected.to)}>
                 {isSaved ? <BookmarkCheck size={15}/> : <Bookmark size={15}/>}
