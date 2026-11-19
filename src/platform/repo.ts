@@ -449,6 +449,22 @@ export async function executeReviewedErasure(
     if (request.fields.erasureExecutionStatus !== "not_executed" || !request.fields.erasureReviewedBy) {
       throw new Error("This request has no approved local erasure impact review.");
     }
+    let reviewedSnapshot: Record<string, number>;
+    try {
+      reviewedSnapshot = JSON.parse(String(request.fields.erasureSnapshot ?? "")) as Record<string, number>;
+    } catch {
+      throw new Error("The recorded review lacks a valid revision snapshot. Record a fresh review.");
+    }
+    if (!reviewedSnapshot || typeof reviewedSnapshot !== "object" ||
+      Object.keys(reviewedSnapshot).length !== Object.keys(snapshotRevisions).length) {
+      throw new Error("The organisation changed since erasure review. Record a fresh review.");
+    }
+    for (const [id, revision] of Object.entries(snapshotRevisions)) {
+      const expected = id === requestId ? reviewedSnapshot[id] + 1 : reviewedSnapshot[id];
+      if (!Number.isInteger(reviewedSnapshot[id]) || revision !== expected) {
+        throw new Error("The erasure impact review is stale. Record a fresh review before deleting.");
+      }
+    }
     const reviewedCandidates = String(request.fields.erasureCandidateIds ?? "").split(",").filter(Boolean);
     if (reviewedCandidates.length !== candidateIds.length ||
       reviewedCandidates.some((id) => !candidateIds.includes(id))) {
