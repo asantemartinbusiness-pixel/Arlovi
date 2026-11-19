@@ -63,6 +63,9 @@ describe("Northline Collective flagship — isolated, connected fictional compan
       }
     }
     expect(records.find(r => r.id === "nc-projects-0001")?.title).toContain("Lighthouse");
+    expect(records.find(r => r.id === "nc-projects-0001")?.fields.clientId).toBe("nc-contacts-0001");
+    expect(records.find(r => r.id === "nc-portals-0001")?.fields.contactId).toBe("nc-contacts-0001");
+    expect(records.find(r => r.id === "nc-portals-0001")?.fields.projectId).toBe("nc-projects-0001");
     expect(index.get("nc-sites-0001")).toBeDefined();
   });
 
