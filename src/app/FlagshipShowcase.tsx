@@ -6,7 +6,7 @@ import { useCollections, useWorkspace } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import "./flagship-showcase.css";
 
-const GROUPS = ["designs","publications","photos","videos","decks","sites","forms","projects","employees","agents","orders","campaigns"];
+const GROUPS = ["designs","publications","photos","videos","decks","sites","forms","projects","deals","employees","agents","orders","campaigns"];
 const STUDIO: { title:string; kind:string; code:string; id:string; description:string; style:string; icon:typeof Palette }[] = [
   {title:"The Collective identity",kind:"DESIGN SYSTEM / VECTOR",code:"DESIGN",id:"nl-designs-910",description:"Three original editable vector artboards. Explore the mark, campaign and architectural visual language.",style:"identity",icon:Palette},
   {title:"Material. Space. Experience.",kind:"EDITORIAL / PUBLICATION",code:"LAYOUT",id:"nl-publications-910",description:"An eight-page editorial book with live text stories, intentional typography, page geometry and folios.",style:"publication",icon:FileText},
@@ -22,10 +22,20 @@ function findFlagship(records: Record<string,Rec[]>, id:string):Rec|undefined {
   return (records[collection] ?? []).find(rec=>rec.id===id && rec.fields.flagship==="Northline Collective");
 }
 function openRecord(record:Rec|undefined,code:string,slug:string):string {
-  return record ? routeForRecord(record,slug) ?? appEntry(code,slug) : appEntry(code,slug);
+  if (!record) return appEntry(code,slug);
+  const details:Record<string,string> = {
+    sites:"web/sites", publications:"layout/publications", videos:"video/projects",
+    photos:"photo/photos", forms:"forms/forms",
+  };
+  const target=details[record.collection];
+  if(target){
+    const tail=record.collection==="sites"?"/builder":"";
+    return `/o/${slug}/${target}/${encodeURIComponent(record.id)}${tail}`;
+  }
+  return routeForRecord(record,slug) ?? appEntry(code,slug);
 }
 const paths=[
-  {step:"01",name:"Acquire",note:"Customer brief → qualified opportunity",app:"CRM",id:"nl-projects-900"},
+  {step:"01",name:"Acquire",note:"Customer brief → qualified opportunity",app:"CRM",id:"nl-deals-910"},
   {step:"02",name:"Create",note:"Creative concept → collaborative review",app:"DESIGN",id:"nl-designs-911"},
   {step:"03",name:"Operate",note:"Supply and project delivery",app:"PROJECT",id:"nl-projects-900"},
   {step:"04",name:"Grow",note:"Campaign drafts and customer experiences",app:"MARKET",id:"nl-campaigns-900"},
