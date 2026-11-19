@@ -591,7 +591,7 @@ export function TaxStrip({ context }: { context: ScreenContext }) {
   const { org } = useWorkspace();
   const boxes = buildReturn({ period: data.currentPeriod, invoices: data.invoices, bills: data.bills, contacts: data.contacts, jurisdiction: org.jurisdiction, now: context.now });
   return (
-    <Row gap={4} wrap>
+    <div className="fin-strip">
       <Pill tone="neutral" dot>{org.jurisdiction}</Pill>
       <span>{periodLabel(data.currentPeriod, org.locale)} output <Amount minor={boxes.outputTaxMinor} context={context} bold /></span>
       <span>Input <Amount minor={boxes.inputTaxMinor} context={context} bold /></span>
@@ -599,6 +599,6 @@ export function TaxStrip({ context }: { context: ScreenContext }) {
       {boxes.unknownDocumentIds.length > 0 && <Pill tone="danger" dot>{boxes.unknownDocumentIds.length} unresolved</Pill>}
       <span className="ds-grow" />
       <CapabilityPill id="tax.file" />
-    </Row>
+    </div>
   );
 }

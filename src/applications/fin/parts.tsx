@@ -145,7 +145,7 @@ export function SourceNote({ children }: { children: ReactNode }) {
   return <p className="ds-subtle" style={{ fontSize: "var(--text-xs)" }}>{children}</p>;
 }
 
-export function StatementRow({ rows, context }: { rows: { label: string; minor?: number; bold?: boolean; note?: string; indent?: boolean }[]; context: ScreenContext }) {
+export function StatementRow({ rows, context }: { rows: { label: string; minor?: number; text?: string; bold?: boolean; note?: string; indent?: boolean }[]; context: ScreenContext }) {
   return (
     <table className="ds-table">
       <tbody>
@@ -155,7 +155,7 @@ export function StatementRow({ rows, context }: { rows: { label: string; minor?:
               {row.label}
               {row.note && <span className="ds-subtle" style={{ display: "block", fontSize: "var(--text-xs)" }}>{row.note}</span>}
             </th>
-            <td data-align="end"><Amount minor={row.minor} context={context} bold={row.bold} /></td>
+            <td data-align="end">{row.text !== undefined ? <span className="ds-num">{row.text}</span> : <Amount minor={row.minor} context={context} bold={row.bold} />}</td>
           </tr>
         ))}
       </tbody>

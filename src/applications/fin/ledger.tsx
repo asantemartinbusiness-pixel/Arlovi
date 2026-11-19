@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Lock, Plus, RotateCcw, Trash2, Unlock } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, OverlayCancel, MoneyInput, Notice, Pill, Properties, Row, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, DataGrid, DrawerActions, DrawerUnsavedChanges, Empty, FactGrid, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, OverlayActions, OverlayCancel, OverlaySummary, MoneyInput, Notice, Pill, Properties, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 import { useEvents, useRecord, useWorkspace } from "@/platform/workspace";
@@ -48,6 +48,7 @@ export function JournalForm({ context, close }: { context: ScreenContext; close:
   const [lines, setLines] = useState<DraftLine[]>(toDraft(payload?.from?.lines ?? [{ accountId: "", debitMinor: 0, creditMinor: 0 }, { accountId: "", debitMinor: 0, creditMinor: 0 }]));
   const [busy, setBusy] = useState<"save" | "post" | undefined>();
   const [error, setError] = useState<string>();
+  const dirty = !readOnly && (memo.trim() !== "" || reference.trim() !== "" || lines.some((line) => line.accountId || line.debitMinor || line.creditMinor));
 
   useEffect(() => {
     if (!existing) return;
@@ -125,17 +126,26 @@ export function JournalForm({ context, close }: { context: ScreenContext; close:
 
   return (
     <Stack gap={4}>
-      <Row gap={3} wrap>
+      <DrawerUnsavedChanges when={dirty && !existing} />
+      <OverlaySummary
+        eyebrow={existing ? "Draft journal" : "New journal"}
+        title={memo.trim() || "Untitled journal"}
+        status={<Pill tone="warning">Draft, not in the trial balance</Pill>}
+        meta={[<span className="ds-num" key="d">{context.date(date)}</span>, periodLabel(period, org.locale), reference.trim() || undefined]}
+      />
+      <div className="fin-form-grid">
         <Field label="Ledger date" required hint={`Posts into ${periodLabel(period, org.locale)}`}>
           <TextInput aria-label="Ledger date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
         </Field>
         <Field label="Reference" hint="Optional. Your own numbering or a document id.">
           <TextInput aria-label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} placeholder="JNL-0094" />
         </Field>
-        <Field label="Narrative" required hint={existing ? `What this entry records. The journal keeps its title, ${existing.title}.` : "What this entry records. It becomes the journal title."}>
-          <TextInput aria-label="Narrative" value={memo} onChange={(event) => setMemo(event.target.value)} required />
-        </Field>
-      </Row>
+        <div data-span="full">
+          <Field label="Narrative" required hint={existing ? `What this entry records. The journal keeps its title, ${existing.title}.` : "What this entry records. It becomes the journal title."}>
+            <TextInput aria-label="Narrative" value={memo} onChange={(event) => setMemo(event.target.value)} required />
+          </Field>
+        </div>
+      </div>
 
       {data.locked.includes(period) && (
         <Notice tone="danger" title={`${periodLabel(period, org.locale)} is closed`}>
@@ -149,10 +159,10 @@ export function JournalForm({ context, close }: { context: ScreenContext; close:
             <caption className="ds-sr-only">Journal lines</caption>
             <thead>
               <tr>
-                <th style={{ minWidth: 220 }}>Account</th>
-                <th style={{ minWidth: 160 }}>Line memo</th>
-                <th data-align="end" style={{ width: 160 }}>Debit</th>
-                <th data-align="end" style={{ width: 160 }}>Credit</th>
+                <th style={{ minWidth: 190 }}>Account</th>
+                <th style={{ minWidth: 120 }}>Line memo</th>
+                <th data-align="end" style={{ width: 140 }}>Debit</th>
+                <th data-align="end" style={{ width: 140 }}>Credit</th>
                 <th style={{ width: 48 }}><span className="ds-sr-only">Remove</span></th>
               </tr>
             </thead>
@@ -227,20 +237,21 @@ export function JournalForm({ context, close }: { context: ScreenContext; close:
       {!check.reason && <Notice tone="success" title="Balanced">Debits and credits both come to {context.money(check.debitMinor)}. Posting is irreversible: a posted entry is corrected by a reversal, not an edit.</Notice>}
       {error && <Notice tone="danger" title="Saving failed">{error}</Notice>}
 
-      <Row gap={2} wrap>
-        <Button
-          variant="primary"
-          busy={busy === "post"}
-          disabled={Boolean(check.reason) || !memo.trim() || !context.can("post_journal")}
-          title={!context.can("post_journal") ? "Posting needs the Finance or Owner role view" : check.reason}
-          onClick={() => save(true)}
-        >
-          Post to the ledger
-        </Button>
-        <Button variant="secondary" busy={busy === "save"} disabled={!memo.trim()} onClick={() => save(false)}>Save as draft</Button>
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button
+            variant="primary"
+            busy={busy === "post"}
+            disabled={Boolean(check.reason) || !memo.trim() || !context.can("post_journal")}
+            title={!context.can("post_journal") ? "Posting needs the Finance or Owner role view" : check.reason}
+            onClick={() => save(true)}
+          >
+            Post to the ledger
+          </Button>}
+          secondary={<Button variant="secondary" busy={busy === "save"} disabled={!memo.trim()} onClick={() => save(false)}>Save as draft</Button>}
+          end={<OverlayCancel>Cancel</OverlayCancel>}
+        />
+      </DrawerActions>
       {!context.can("post_journal") && (
         <SourceNote>Your role view cannot post. It shapes what this interface offers and is not an account security boundary.</SourceNote>
       )}
@@ -272,17 +283,19 @@ function PostedJournal({ context, journal, close }: { context: ScreenContext; jo
 
   return (
     <Stack gap={4}>
+      <OverlaySummary
+        eyebrow="Journal"
+        title={journal.title}
+        status={<Pill tone={journal.status === "reversed" ? "warning" : "success"} dot>{journal.status === "reversed" ? "Posted, reversed" : "Posted"}</Pill>}
+        meta={[<span className="ds-num" key="d">{context.date(journalDate(journal))}</span>, periodOf(journalDate(journal)), `Posted by ${String(journal.fields.postedBy ?? journal.createdBy ?? journal.updatedBy)}`]}
+      />
       <Notice tone="info" title="A posted journal is immutable">
         It is in the trial balance, so its lines cannot be edited. A mistake is corrected by posting an offsetting reversal, which leaves both entries on the record.
       </Notice>
-      <Properties rows={[
-        { label: "Journal", value: journal.title },
-        { label: "Ledger date", value: <span className="ds-num">{context.date(journalDate(journal))}</span> },
-        { label: "Period", value: periodOf(journalDate(journal)) },
-        { label: "Status", value: <Pill tone={journal.status === "reversed" ? "warning" : "success"} dot>{journal.status}</Pill> },
-        { label: "Posted by", value: String(journal.fields.postedBy ?? journal.createdBy ?? journal.updatedBy) },
+      <FactGrid columns={2} items={[
         { label: "Narrative", value: journalMemo(journal) },
-        ...(reverses ? [{ label: "Reverses", value: reverses }] : []),
+        { label: "Amount", value: context.money(debit), mono: true },
+        ...(reverses ? [{ label: "Reverses", value: reverses, mono: true }] : []),
         ...(reversal ? [{ label: "Reversed by", value: reversal.title }] : []),
       ]} />
       <div className="ds-grid-wrap">
@@ -309,16 +322,14 @@ function PostedJournal({ context, journal, close }: { context: ScreenContext; jo
           </table>
         </div>
       </div>
-      <Row gap={2}>
-        {journal.status === "posted" && !reversal && (
-          <Button variant="outline-danger" icon={<RotateCcw size={15} />} onClick={() => context.openOverlay("reverse confirmation", { id: journal.id })}>
-            Reverse this journal
-          </Button>
-        )}
-        {reversal && <Pill tone="warning">Already reversed by {reversal.title}</Pill>}
-        <span className="ds-grow" />
-        <Button variant="ghost" onClick={close}>Close</Button>
-      </Row>
+      <DrawerActions>
+        <OverlayActions
+          primary={journal.status === "posted" && !reversal
+            ? <Button variant="outline-danger" icon={<RotateCcw size={15} />} onClick={() => context.openOverlay("reverse confirmation", { id: journal.id })}>Reverse this journal</Button>
+            : reversal ? <Pill tone="warning">Already reversed by {reversal.title}</Pill> : undefined}
+          end={<Button variant="ghost" onClick={close}>Close</Button>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -626,12 +637,14 @@ export function BalancingValidator({ context }: { context: ScreenContext }) {
               actions={check.reason ? <Pill tone="danger" dot>Blocked</Pill> : <Pill tone="success" dot>Ready</Pill>}
               footer={<Button size="sm" variant="secondary" onClick={() => context.openOverlay("Journal form", { id: journal.id })}>Open the editor</Button>}
             >
-              <Properties rows={[
-                { label: "Debits", value: <Amount minor={check.debitMinor} context={context} /> },
-                { label: "Credits", value: <Amount minor={check.creditMinor} context={context} /> },
-                { label: "Difference", value: check.differenceMinor === null ? "Not computable" : <Amount minor={check.differenceMinor} context={context} bold /> },
-                { label: "Verdict", value: check.reason ?? "Debits equal credits and the period is open." },
-              ]} />
+              <Stack gap={2}>
+                <FactGrid columns={3} dense items={[
+                  { label: "Debits", value: <Amount minor={check.debitMinor} context={context} zero="0" />, mono: true },
+                  { label: "Credits", value: <Amount minor={check.creditMinor} context={context} zero="0" />, mono: true },
+                  { label: "Difference", value: check.differenceMinor === null ? "Not computable" : <Amount minor={check.differenceMinor} context={context} zero="0" />, mono: true, tone: check.differenceMinor ? "danger" : "success" },
+                ]} />
+                <span className={check.reason ? "" : "ds-subtle"}>{check.reason ?? "Debits equal credits and the period is open."}</span>
+              </Stack>
             </Card>
           ))}
         </Stack>
@@ -667,23 +680,23 @@ export function ReverseConfirmation({ context, close }: { context: ScreenContext
     <Stack gap={4}>
       <ModalUnsavedChanges when={reason.trim().length > 0 || date !== now.toISOString().slice(0, 10)} />
       <ModalInFlight when={busy} />
-      <Properties rows={[
-        { label: "Original journal", value: journal.title },
-        { label: "Original posting date", value: context.date(journalDate(journal)) },
-        { label: "Journal amount", value: context.money(lines.reduce((sum, line) => sum + line.debitMinor, 0)) },
-        { label: "Reversal period", value: period },
-      ]} />
+      <OverlaySummary
+        eyebrow="Reverse a posted journal"
+        title={journal.title}
+        status={<Pill tone="success" dot>Posted</Pill>}
+        meta={[<span className="ds-num" key="d">{context.date(journalDate(journal))}</span>, <span className="ds-num" key="a">{context.money(lines.reduce((sum, line) => sum + line.debitMinor, 0))}</span>, `Reversal period ${period}`]}
+      />
       <Notice tone="warning" title="A reversal adds an entry, it does not remove one">
         {journal.title} stays in the ledger and is marked reversed. The offsetting journal below is posted with the chosen reversal date so the audit trail shows when the correction was made.
       </Notice>
-      <Row gap={3} wrap>
+      <div className="fin-form-grid">
         <Field label="Reversal date" required hint={`Posts into ${period}`}>
           <TextInput aria-label="Reversal date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
         </Field>
         <Field label="Why" required hint="Recorded on the reversal and in the audit trail.">
           <TextInput aria-label="Why" value={reason} onChange={(event) => setReason(event.target.value)} required placeholder="Posted to the wrong account" />
         </Field>
-      </Row>
+      </div>
       <div className="ds-grid-wrap">
         <div className="ds-grid-scroll">
           <table className="ds-table">
@@ -704,7 +717,8 @@ export function ReverseConfirmation({ context, close }: { context: ScreenContext
       {check.reason && <Notice tone="danger" title="The reversal cannot be posted">{check.reason}</Notice>}
       {error && <Notice tone="danger" title="Reversal could not be saved">{error}</Notice>}
       <ModalActions>
-        <Button
+        <OverlayActions
+          primary={<Button
           variant="danger"
           busy={busy}
           disabled={busy || Boolean(check.reason) || reason.trim().length < 10 || !context.can("post_journal")}
@@ -748,8 +762,9 @@ export function ReverseConfirmation({ context, close }: { context: ScreenContext
           }}
         >
           Post the reversal
-        </Button>
-        <OverlayCancel disabled={busy}>Cancel</OverlayCancel>
+        </Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
       </ModalActions>
     </Stack>
   );
@@ -811,7 +826,7 @@ export function LedgerStrip({ context }: { context: ScreenContext }) {
   }));
   if (!data.ready) return <BooksLoading />;
   return (
-    <Row gap={4} wrap>
+    <div className="fin-strip">
       <Pill tone={data.statements.booksBalance ? "success" : "danger"} dot>
         {data.statements.booksBalance ? "Debits equal credits" : `Out by ${context.money(Math.abs(data.statements.debit - data.statements.credit))}`}
       </Pill>
@@ -823,7 +838,7 @@ export function LedgerStrip({ context }: { context: ScreenContext }) {
       ))}
       <span className="ds-grow" />
       <span className="ds-subtle">{periodLabel(data.currentPeriod, org.locale)} · {data.accounts.filter((account) => accountType(account) === "asset").length} asset accounts</span>
-    </Row>
+    </div>
   );
 }
 

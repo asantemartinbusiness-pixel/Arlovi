@@ -78,6 +78,14 @@ export function BudgetsTab({ context }: { context: ScreenContext }) {
         rows={rows}
         rowId={(row) => row.id}
         label="Budget against actual"
+        card={(row) => <>
+          <span className="ds-sr-only">Explain </span>
+          <strong>{row.label}</strong>
+          <span className="ds-subtle ds-num">{row.accountCode} · Budget {context.money(row.budgetMinor)} · Actual {row.hasActual ? context.money(row.actualMinor) : "nothing posted"}</span>
+          {row.varianceMinor === 0
+            ? <Pill tone="neutral">On budget</Pill>
+            : <Pill tone={row.favourable ? "success" : "danger"} dot>{row.favourable ? "Favourable" : "Adverse"} {context.money(Math.abs(row.varianceMinor))}</Pill>}
+        </>}
         columns={[
           { key: "code", header: "Code", width: "80px", cell: (row) => <code className="ds-num">{row.accountCode}</code>, sortValue: (row) => row.accountCode },
           { key: "label", header: "Line", primary: true, cell: (row) => row.label, filterValue: (row) => `${row.label} ${row.accountCode}` },
@@ -120,6 +128,12 @@ export function BudgetsTab({ context }: { context: ScreenContext }) {
             rowId={(row) => row.accountId}
             label="Actuals with no budget line"
             filterable={false}
+            onOpen={(id) => { const row = unbudgeted.find((item) => item.accountId === id); if (row) context.openOverlay("variance drilldown", { code: row.code, period }); }}
+            card={(row) => <>
+              <span className="ds-sr-only">Explain </span>
+              <strong>{row.name}</strong>
+              <span className="ds-subtle ds-num">{row.code} · Actual {context.money(row.balanceMinor)} · no budget line</span>
+            </>}
             columns={[
               { key: "code", header: "Code", width: "80px", cell: (row) => <code className="ds-num">{row.code}</code> },
               { key: "name", header: "Account", primary: true, cell: (row) => row.name },
@@ -672,14 +686,14 @@ export function PlanningStrip({ context }: { context: ScreenContext }) {
   const rows: VarianceRow[] = budgetVariance(approved, scoped.rows, data.accounts);
   const adverse = rows.filter((row) => !row.favourable && row.varianceMinor !== 0);
   return (
-    <Row gap={4} wrap>
+    <div className="fin-strip">
       <Pill tone="neutral">{periodLabel(data.currentPeriod, org.locale)}</Pill>
       <span>Budget <Amount minor={rows.reduce((sum, row) => sum + row.budgetMinor, 0)} context={context} bold /></span>
       <span>Actual <Amount minor={rows.reduce((sum, row) => sum + row.actualMinor, 0)} context={context} bold /></span>
       <Pill tone={adverse.length ? "warning" : "success"} dot>{adverse.length} adverse</Pill>
       <span className="ds-grow" />
       <span className="ds-subtle">Forecast figures are never blended into these actuals.</span>
-    </Row>
+    </div>
   );
 }
 

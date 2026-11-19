@@ -468,13 +468,13 @@ export function EntitiesStrip({ context }: { context: ScreenContext }) {
   const data = useFinData();
   const consolidation = consolidate(data.entities, data.journals);
   return (
-    <Row gap={4} wrap>
+    <div className="fin-strip">
       <Pill tone="neutral">{data.entities.length} entities</Pill>
       <span>Group debits <Amount minor={consolidation.groupDebitMinor} context={context} bold /></span>
       <span>Eliminated <Amount minor={consolidation.eliminationMinor} context={context} bold /></span>
       {consolidation.unassignedJournalIds.length > 0 && <Pill tone="warning" dot>{consolidation.unassignedJournalIds.length} untagged journals</Pill>}
       <span className="ds-grow" />
       <span className="ds-subtle">Organisations are never consolidated with each other.</span>
-    </Row>
+    </div>
   );
 }

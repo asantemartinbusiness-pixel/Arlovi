@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Banknote, FileSpreadsheet, PlugZap } from "lucide-react";
 import {
-  Button, Card, DataGrid, Empty, Field, Grid, MoneyInput, Notice, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput,
+  Button, Card, DataGrid, DrawerActions, DrawerUnsavedChanges, Empty, FactGrid, Field, Grid, ModalActions, ModalInFlight, ModalUnsavedChanges, MoneyInput, Notice, OverlayActions, OverlayCancel, OverlaySection, OverlaySummary, Pill, Properties, Row, Segmented, Select, Stack, Stat, StatRow, TextArea, TextInput,
 } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
 
@@ -498,7 +498,7 @@ export function useReconciliation(code: string): Reconciliation {
 export function ReconciliationStrip({ context }: { context: ScreenContext }) {
   const recon = useReconciliation("1000");
   return (
-    <Row gap={4} wrap>
+    <div className="fin-strip">
       <span>Statement <Amount minor={recon.statementClosingMinor} context={context} bold /></span>
       <span>Ledger at statement end <Amount minor={recon.ledgerMinor} context={context} bold /></span>
       <span>Difference <Amount minor={recon.differenceMinor} context={context} bold /></span>
@@ -509,8 +509,8 @@ export function ReconciliationStrip({ context }: { context: ScreenContext }) {
       <span className="ds-grow" />
       {recon.complete
         ? <Pill tone="success" dot>Ready to confirm</Pill>
-        : <Pill tone="warning" dot>{recon.blockedReason}</Pill>}
-    </Row>
+        : <Pill tone="warning" dot>Not ready to confirm</Pill>}
+    </div>
   );
 }
 
@@ -531,81 +531,96 @@ export function ToReconcile({ context }: { context: ScreenContext }) {
 
   const open = [...recon.suggested.map((item) => ({ line: item.line, candidates: item.candidates })), ...recon.needsPosting.map((line) => ({ line, candidates: [] as MatchCandidate[] }))];
 
+  const matchedCount = recon.matched.length;
+  const unexplained = recon.unexplainedMinor ?? 0;
+  const eq: { label: string; minor: number; op?: string; note?: string; tone?: "danger" | "success" }[] = [
+    { label: "Statement closing", minor: recon.statementClosingMinor ?? 0, note: recon.statement.filename },
+    { label: "Ledger at statement end", minor: recon.ledgerMinor, op: "\u2212", note: recon.statement.to ? `Posted on 1000 to ${context.date(recon.statement.to)}` : "Posted on 1000" },
+    { label: "Difference", minor: recon.differenceMinor ?? 0, op: "=" },
+    { label: `Not on the ledger (${recon.needsPosting.length})`, minor: recon.needsPostingMinor, op: "\u2212", note: "Statement lines with no journal" },
+    { label: "Unexplained", minor: unexplained, op: "=", tone: unexplained === 0 ? "success" : "danger", note: unexplained === 0 ? "Every penny accounted for" : "Investigate before confirming" },
+  ];
+
   return (
     <Stack gap={4}>
-      <StatRow>
-        <Stat prov="posted" label="Statement closing" value={context.money(recon.statementClosingMinor ?? 0)} meta={`${recon.statement.filename}`} />
-        <Stat prov="posted" label="Ledger balance" value={context.money(recon.bookBalanceMinor)} meta="Every posted journal on 1000, to date" />
-        <Stat prov="posted" label="Ledger at statement end" value={context.money(recon.ledgerMinor)} meta={recon.statement.to ? `Posted on 1000 up to ${context.date(recon.statement.to)}` : "Posted journals on 1000"} />
-        <Stat prov="posted"
-          label="Unexplained"
-          value={context.money(recon.unexplainedMinor ?? 0)}
-          meta={`Difference ${context.money(recon.differenceMinor ?? 0)} · ${open.length} open line${open.length === 1 ? "" : "s"} · ${recon.unexplainedMinor === 0 ? "every penny accounted for" : "investigate before confirming"}`}
-        />
-      </StatRow>
+      <Card prov="posted" title="Reconciliation" subtitle={`${matchedCount} matched \u00b7 ${open.length} open \u00b7 confirming needs zero unexplained`}>
+        <ol className="fin-eq" aria-label="How the statement ties to the ledger">
+          {eq.map((item) => (
+            <li key={item.label} data-op={item.op} data-tone={item.tone}>
+              <span className="fin-eq-label">{item.label}</span>
+              <span className="fin-eq-figure">{item.op && <span className="fin-eq-op" aria-hidden="true">{item.op}</span>}<Amount minor={item.minor} context={context} zero="0" /></span>
+              {item.note && <span className="fin-eq-note">{item.note}</span>}
+            </li>
+          ))}
+        </ol>
+        <SourceNote>Ledger balance to date {context.money(recon.bookBalanceMinor)}: every posted journal on 1000, to date. Only postings up to the statement end enter the difference.</SourceNote>
+        {!recon.complete && recon.blockedReason && <SourceNote>{recon.blockedReason}</SourceNote>}
+        {data.draftJournals.length > 0 && <SourceNote>{data.draftJournals.length} draft journals are not counted in the ledger figure.</SourceNote>}
+      </Card>
 
       {open.length === 0 ? (
         <Notice tone="success" title="Every statement line is matched">
           The difference is {context.money(recon.differenceMinor ?? 0)}. Confirm the statement to record the reconciliation.
         </Notice>
       ) : (
-        <Stack gap={3}>
-          {open.map(({ line, candidates }) => (
-            <Card prov="posted"
-              key={line.id}
-              title={line.title}
-              subtitle={`${context.date(line.at)} · ${String(line.fields.reference ?? "")}`}
-              actions={<Amount minor={line.amountMinor} context={context} bold />}
-            >
-              {candidates.length > 0 ? (
-                <Stack gap={2}>
-                  <span className="ds-subtle">{candidates.length} posted journal{candidates.length === 1 ? "" : "s"} could be this line. Matching only links them; nothing is posted.</span>
-                  {candidates.slice(0, 3).map((candidate) => (
-                    <Row key={candidate.journal.id} gap={3} className="ds-panel" style={{ padding: "var(--space-3)" }}>
-                      <div className="ds-grow">
-                        <strong>{candidate.journal.title}</strong>
-                        <p className="ds-subtle">{candidate.reason}</p>
+        <Card prov="posted" title={`Open statement lines (${open.length})`} subtitle="Matching only links a line to a posted journal; nothing is posted." pad="none">
+          <ul className="fin-recon">
+            {open.map(({ line, candidates }) => (
+              <li key={line.id} className="fin-recon-line">
+                <div className="fin-recon-head">
+                  <span className="fin-recon-date">{context.date(line.at)}</span>
+                  <div className="fin-recon-title">
+                    <strong>{line.title}</strong>
+                    <span className="ds-subtle">{String(line.fields.reference ?? "")}</span>
+                  </div>
+                  <Amount minor={line.amountMinor} context={context} bold />
+                </div>
+                {candidates.length > 0 ? (
+                  <div className="fin-recon-body">
+                    {candidates.slice(0, 3).map((candidate) => (
+                      <div key={candidate.journal.id} className="fin-recon-candidate">
+                        <div className="ds-grow">
+                          <strong>{candidate.journal.title}</strong>
+                          <p className="ds-subtle">{candidate.reason}</p>
+                        </div>
+                        <Pill tone={candidate.confidence >= 85 ? "success" : candidate.confidence >= 70 ? "info" : "warning"}>{candidate.confidence}% confident</Pill>
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          busy={busy === line.id}
+                          onClick={async () => {
+                            setBusy(line.id);
+                            try {
+                              await commitStatementMatch(context, line, candidate.journal, recon.bankAccountId);
+                              context.toast("Matched", `${line.title} is linked to ${candidate.journal.title}. The posted ledger balance has not changed.`);
+                            } catch (error) {
+                              context.toast("The match was not saved", error instanceof Error ? error.message : "Reload and retry.", "failed");
+                            } finally {
+                              setBusy(undefined);
+                            }
+                          }}
+                        >
+                          Match
+                        </Button>
                       </div>
-                      <Pill tone={candidate.confidence >= 85 ? "success" : candidate.confidence >= 70 ? "info" : "warning"}>{candidate.confidence}% confident</Pill>
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        busy={busy === line.id}
-                        onClick={async () => {
-                          setBusy(line.id);
-                          try {
-                            await commitStatementMatch(context, line, candidate.journal, recon.bankAccountId);
-                            context.toast("Matched", `${line.title} is linked to ${candidate.journal.title}. The posted ledger balance has not changed.`);
-                          } catch (error) {
-                            context.toast("The match was not saved", error instanceof Error ? error.message : "Reload and retry.", "failed");
-                          } finally {
-                            setBusy(undefined);
-                          }
-                        }}
-                      >
-                        Match
-                      </Button>
-                    </Row>
-                  ))}
-                  <Row gap={2}>
-                    <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Match candidates", { id: line.id })}>See every candidate</Button>
-                    <Button size="sm" variant="ghost" onClick={() => context.openOverlay("adjustment review", { id: line.id })}>Post an adjustment instead</Button>
-                  </Row>
-                </Stack>
-              ) : (
-                <Stack gap={3}>
-                  <Notice tone="warning" title="No posted journal matches this line">
-                    The money moved in the bank but nothing is on the ledger. Post an adjustment to record it, or split it across several accounts.
-                  </Notice>
-                  <Row gap={2}>
+                    ))}
+                    <div className="fin-recon-more">
+                      <Button size="sm" variant="ghost" onClick={() => context.openOverlay("Match candidates", { id: line.id })}>See every candidate ({candidates.length})</Button>
+                      <Button size="sm" variant="ghost" onClick={() => context.openOverlay("adjustment review", { id: line.id })}>Post an adjustment instead</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="fin-recon-body fin-recon-none">
+                    <Pill tone="warning" dot>Not on the ledger</Pill>
+                    <span className="ds-subtle ds-grow">The money moved in the bank and nothing is posted for it.</span>
                     <Button size="sm" variant="primary" onClick={() => context.openOverlay("adjustment review", { id: line.id })}>Create an adjustment</Button>
                     <Button size="sm" variant="secondary" onClick={() => context.openOverlay("adjustment review", { id: line.id, split: true })}>Split across accounts</Button>
-                  </Row>
-                </Stack>
-              )}
-            </Card>
-          ))}
-        </Stack>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
 
       {recon.postedAfterStatement.length > 0 && (
@@ -625,12 +640,6 @@ export function ToReconcile({ context }: { context: ScreenContext }) {
         </Card>
       )}
 
-      <Notice tone={recon.unexplainedMinor === 0 ? "info" : "danger"} title="How the difference is explained">
-        Statement {context.money(recon.statementClosingMinor ?? 0)} less ledger at the statement end {context.money(recon.ledgerMinor)} is {context.money(recon.differenceMinor ?? 0)}.
-        The {recon.needsPosting.length} line{recon.needsPosting.length === 1 ? "" : "s"} with no ledger entry come to {context.money(recon.needsPostingMinor)}.
-        That leaves {context.money(recon.unexplainedMinor ?? 0)} unexplained.
-        {data.draftJournals.length > 0 && ` ${data.draftJournals.length} draft journals are excluded from the ledger figure.`}
-      </Notice>
     </Stack>
   );
 }
@@ -772,12 +781,12 @@ export function MatchCandidatesOverlay({ context, close }: { context: ScreenCont
 
   return (
     <Stack gap={4}>
-      <Properties rows={[
-        { label: "Line", value: line.title },
-        { label: "Date", value: <span className="ds-num">{context.date(line.at)}</span> },
-        { label: "Reference", value: String(line.fields.reference ?? "None") },
-        { label: "Amount", value: <Amount minor={line.amountMinor} context={context} bold /> },
-      ]} />
+      <OverlaySummary
+        eyebrow="Statement line"
+        title={line.title}
+        status={<Pill tone="warning" dot>Open</Pill>}
+        meta={[<span className="ds-num" key="d">{context.date(line.at)}</span>, String(line.fields.reference ?? "") || "No reference", <Amount key="a" minor={line.amountMinor} context={context} bold />]}
+      />
       {candidates.length === 0 ? (
         <Notice tone="warning" title="No posted journal moves this account by exactly this amount">
           A match is never approximate here. Post an adjustment so the ledger records what the bank did.
@@ -815,6 +824,12 @@ export function MatchCandidatesOverlay({ context, close }: { context: ScreenCont
         </Stack>
       )}
       <SourceNote>Confidence starts at 60 for an exact amount, rises with date proximity and shared words, and never implies the match is correct.</SourceNote>
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button variant="secondary" onClick={() => { close(); context.openOverlay("adjustment review", { id: line.id }); }}>Post an adjustment instead</Button>}
+          end={<OverlayCancel>Close</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -848,15 +863,16 @@ export function AdjustmentReview({ context, close }: { context: ScreenContext; c
 
   return (
     <Stack gap={4}>
+      <DrawerUnsavedChanges when={splits.length > 0} />
+      <OverlaySummary
+        eyebrow="Adjustment for statement line"
+        title={line.title}
+        status={<Pill tone="warning" dot>Not on the ledger</Pill>}
+        meta={[<span className="ds-num" key="d">{context.date(line.at)}</span>, amount >= 0 ? "Money in: bank debited" : "Money out: bank credited", <Amount key="a" minor={amount} context={context} bold />]}
+      />
       <Notice tone="info" title="An adjustment is a real journal">
         It debits or credits the bank account by exactly the statement amount and puts the other side where you say. The statement line is then matched to it.
       </Notice>
-      <Properties rows={[
-        { label: "Statement line", value: line.title },
-        { label: "Date", value: <span className="ds-num">{context.date(line.at)}</span> },
-        { label: "Amount", value: <Amount minor={amount} context={context} bold /> },
-        { label: "Direction", value: amount >= 0 ? "Money in: the bank account is debited" : "Money out: the bank account is credited" },
-      ]} />
 
       <div className="ds-grid-wrap">
         <div className="ds-grid-scroll">
@@ -911,8 +927,31 @@ export function AdjustmentReview({ context, close }: { context: ScreenContext; c
 
       {blocked && <Notice tone="danger" title="This adjustment cannot be posted">{blocked}</Notice>}
 
-      <Row gap={2}>
-        <Button
+      <OverlaySection title="Journal that will be posted" hint="Debits equal credits before anything is saved.">
+        <table className="ds-table">
+          <caption className="ds-sr-only">Journal preview</caption>
+          <thead><tr><th>Account</th><th data-align="end">Debit</th><th data-align="end">Credit</th></tr></thead>
+          <tbody>
+            {[
+              { key: "bank", label: `${recon.bankAccountCode} Bank`, debit: amount >= 0 ? amount : 0, credit: amount < 0 ? Math.abs(amount) : 0 },
+              ...rows.map((row, index) => {
+                const account = data.accounts.find((item) => item.id === row.accountId);
+                return { key: `r${index}`, label: account ? `${accountCode(account)} ${account.title}` : "Account not chosen", debit: amount < 0 ? row.amountMinor : 0, credit: amount >= 0 ? row.amountMinor : 0 };
+              }),
+            ].map((line) => (
+              <tr key={line.key}>
+                <td>{line.label}</td>
+                <td data-align="end" className="ds-num">{line.debit ? context.money(line.debit) : "\u2014"}</td>
+                <td data-align="end" className="ds-num">{line.credit ? context.money(line.credit) : "\u2014"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </OverlaySection>
+
+      <DrawerActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || !context.can("post_journal")}
@@ -970,9 +1009,10 @@ export function AdjustmentReview({ context, close }: { context: ScreenContext; c
           }}
         >
           Post the adjustment
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
+      </DrawerActions>
     </Stack>
   );
 }
@@ -988,23 +1028,8 @@ export function ReconciliationApproval({ context, close }: { context: ScreenCont
 
   return (
     <Stack gap={4}>
-      <StatementRow
-        context={context}
-        rows={[
-          { label: "Statement closing", minor: recon.statementClosingMinor },
-          { label: "Ledger at statement end", minor: recon.ledgerMinor },
-          { label: "Difference", minor: recon.differenceMinor, bold: true },
-          { label: "Open lines without journals", minor: recon.needsPostingMinor },
-          { label: "Unexplained", minor: recon.unexplainedMinor, bold: true },
-        ]}
-      />
-      {recon.statement && (
-        <Properties rows={[
-          { label: "Statement", value: recon.statement.filename },
-          { label: "Period ends", value: context.date(recon.statement.to) },
-          { label: "Evidence", value: "Manually imported, locally checked; no bank provider verification" },
-        ]} />
-      )}
+      <ModalUnsavedChanges when={note.trim() !== ""} />
+      <ModalInFlight when={busy} />
       {blocked ? (
         <Notice tone="danger" title="This reconciliation cannot be confirmed">{blocked}</Notice>
       ) : (
@@ -1014,11 +1039,21 @@ export function ReconciliationApproval({ context, close }: { context: ScreenCont
           when you confirm, and keeps the evidence snapshot for later review.
         </Notice>
       )}
+      <OverlaySection title="The figures being signed off" hint={recon.statement ? `${recon.statement.filename} \u00b7 period ends ${context.date(recon.statement.to)}. Imported by hand and checked locally; no bank provider verified it.` : undefined}>
+        <FactGrid columns={3} items={[
+          { label: "Statement closing", value: <Amount minor={recon.statementClosingMinor} context={context} />, mono: true },
+          { label: "Ledger at statement end", value: <Amount minor={recon.ledgerMinor} context={context} />, mono: true },
+          { label: "Difference", value: <Amount minor={recon.differenceMinor} context={context} zero="0" />, mono: true },
+          { label: "Lines without journals", value: <Amount minor={recon.needsPostingMinor} context={context} zero="0" />, mono: true },
+          { label: "Unexplained", value: <Amount minor={recon.unexplainedMinor} context={context} zero="0" />, mono: true, tone: recon.unexplainedMinor ? "danger" : "success" },
+        ]} />
+      </OverlaySection>
       <Field label="Note" hint="Retained in the locally confirmed reconciliation record.">
         <TextArea aria-label="Note" value={note} rows={3} onChange={(event) => setNote(event.target.value)} />
       </Field>
-      <Row gap={2}>
-        <Button
+      <ModalActions>
+        <OverlayActions
+          primary={<Button
           variant="primary"
           busy={busy}
           disabled={Boolean(blocked) || !context.can("post_journal")}
@@ -1038,9 +1073,10 @@ export function ReconciliationApproval({ context, close }: { context: ScreenCont
           }}
         >
           Confirm the statement
-        </Button>
-        <Button variant="ghost" onClick={close}>Cancel</Button>
-      </Row>
+        </Button>}
+          end={<OverlayCancel disabled={busy}>Cancel</OverlayCancel>}
+        />
+      </ModalActions>
     </Stack>
   );
 }
