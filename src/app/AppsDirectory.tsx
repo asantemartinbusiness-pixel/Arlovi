@@ -266,7 +266,7 @@ export function AppsDirectory() {
         {recentApps.length > 0 && <section className="ws-section" aria-label="Recently used applications">
           <div className="apps-directory-section-header"><h2><Clock3 size={17} aria-hidden="true"/> Pick up where you left off</h2><span>Recent applications</span></div>
           <div className="apps-directory-shortcuts">
-            {recentApps.map(app => <AppShortcut key={app.code} app={app} slug={org.slug}/>)}
+            {recentApps.map(app => <AppShortcut key={app.code} app={app} slug={org.slug} resumeApp={resumeApp}/>)}
           </div>
         </section>}
       </div>
