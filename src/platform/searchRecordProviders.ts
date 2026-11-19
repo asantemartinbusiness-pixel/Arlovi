@@ -210,7 +210,9 @@ export function buildLocalSearchHits(rows: readonly Rec[], context: LocalProvide
       key: `record-${row.id}`, kind: "record", group: groupFor(row.collection),
       title: row.title, detail: categoryLabel(row.collection, row.status), to,
       appCode: destination.applicationCode, collection: row.collection, recordId: row.id,
-      keywords: [row.id, row.collection, ...row.tags, metadataText].join(" "),
+      // Confidential document matches remain title/tags-only; folder and
+      // type may appear in authorised previews but are not query tokens.
+      keywords: [row.id, row.collection, ...row.tags, confidential ? "" : metadataText].join(" "),
       summary: confidential ? undefined : row.summary,
       contentText: contentText || undefined,
       previewFields: fields,
