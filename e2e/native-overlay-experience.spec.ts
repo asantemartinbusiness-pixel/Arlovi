@@ -183,3 +183,10 @@ test("access approval cannot choose an arbitrary request", async ({ page }) => {
   await expect(drawer).toContainText("Select a request");
   await expect(drawer.getByRole("button", { name: "Approve and change role" })).toHaveCount(0);
 });
+
+test("access review cannot restore an unselected approval", async ({ page }) => {
+  await page.goto("/o/northline/admin/roles?overlay=access%20review");
+  const drawer = page.getByRole("dialog", { name: "Review access request" });
+  await expect(drawer).toContainText("Select a request");
+  await expect(drawer.getByRole("button", { name: "Restore previous local role" })).toHaveCount(0);
+});
