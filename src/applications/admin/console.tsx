@@ -974,6 +974,7 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
   const [busy, setBusy] = useState(false);
   const [reviewed, setReviewed] = useState(false);
   const [reason, setReason] = useState("");
+  const [executionPhrase, setExecutionPhrase] = useState("");
   const [error, setError] = useState("");
   if (!request) return <Empty title="Select a subject request before reviewing erasure" />;
   if (seeds.status === "failed") return <SeedsFailedNotice retry={seeds.retry} />;
@@ -989,7 +990,31 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
   const covered = subject ? subjectRecords(request, settledRecords) : [];
   const deletable = covered.filter((record) => !held.some((policy) => csvList(policy.fields.collections).includes(record.collection)));
   const blocked = covered.filter((record) => held.some((policy) => csvList(policy.fields.collections).includes(record.collection)));
+  const candidateIds = deletable.map((record) => record.id);
+  const reviewStored = request.fields.erasureExecutionStatus === "not_executed" &&
+    request.fields.erasureReviewedBy &&
+    csvList(request.fields.erasureCandidateIds).length === candidateIds.length &&
+    csvList(request.fields.erasureCandidateIds).every((id) => candidateIds.includes(id));
+  const executeReady = Boolean(reviewStored) && candidateIds.length > 0 &&
+    context.can("delete_records") && executionPhrase === "DELETE" && reviewed && !busy &&
+    request.fields.legalHold !== true;
   const eligible = context.can("delete_records") && subject.length > 0 && reviewed && reason.trim().length >= 10 && !busy;
+
+  async function executeErasure() {
+    if (!executeReady || !settledRecords) return;
+    setBusy(true);
+    setError("");
+    try {
+      const revisions = Object.fromEntries(settledRecords.map((record) => [record.id, record.revision]));
+      const result = await context.mutate.executeReviewedErasure(request!.id, revisions, candidateIds, request!.revision);
+      context.toast("Local erasure completed", `${result.deleted} record(s) removed in one transaction. External systems were not affected.`);
+      close();
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Erasure failed. No records were removed.";
+      setError(message);
+      context.toast("Erasure blocked", message, "failed");
+    } finally { setBusy(false); }
+  }
 
   async function recordReview() {
     if (!eligible) return;
@@ -1041,17 +1066,22 @@ export function DeletionImpact({ context, close }: { context: ScreenContext; clo
         { label: "Potentially erasable", value: deletable.length ? deletable.map((record) => `${record.collection}/${record.id}`).join(", ") : "None" },
         { label: "Excluded by legal hold", value: blocked.length ? blocked.map((record) => `${record.collection}/${record.id}`).join(", ") : "None" },
         { label: "Hold policies", value: held.map((policy) => policy.title).join("; ") || "None recorded" },
-        { label: "Execution status", value: "Not executed — no records removed" },
+        { label: "Execution status", value: String(request.fields.erasureExecutionStatus ?? "Not reviewed") },
       ]} />
       <Field label="Review rationale" required hint="At least 10 characters; explain the lawful basis, scope and any held records.">
         <TextArea value={reason} onChange={(event) => setReason(event.target.value)} />
       </Field>
-      <Checkbox checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} label="I checked the subject, scope and retention holds. This saves an impact review only." />
+      <Checkbox checked={reviewed} onChange={(event) => setReviewed(event.target.checked)}
+        label={reviewStored
+          ? "I independently rechecked the subject, scope, legal holds and permanent local deletion."
+          : "I checked the subject, scope and retention holds. This saves an impact review only."} />
       {!context.can("delete_records") && <Notice tone="warning" title="Permission required">Only a role with record-deletion capability may record this erasure review.</Notice>}
       {error && <Notice tone="danger" title="Review not saved">{error}</Notice>}
       <ModalActions>
         <Button variant="ghost" disabled={busy} onClick={close}>Keep request unchanged</Button>
-        <Button variant="primary" busy={busy} disabled={!eligible} onClick={() => void recordReview()}>Record erasure review</Button>
+        {reviewStored
+          ? <Button variant="danger" busy={busy} disabled={!executeReady} onClick={() => void executeErasure()}>Delete {candidateIds.length} local records</Button>
+          : <Button variant="primary" busy={busy} disabled={!eligible} onClick={() => void recordReview()}>Record erasure review</Button>}
       </ModalActions>
     </Stack>
   );
