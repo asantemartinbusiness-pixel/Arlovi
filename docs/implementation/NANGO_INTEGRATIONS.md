@@ -134,3 +134,21 @@ advisors, user/tenant RLS tests and migration dry runs before applying the
 cloud and integration schemas. No cloud storage is created automatically by
 this PR. Keep Supabase secret keys off the browser and avoid bypassing RLS
 in an untrusted server endpoint.
+
+## Connection activation & AI permission policy
+
+- GET /api/integrations/registry is a read-only Arlovi Cloud registry endpoint. It requires the configured dedicated cloud project, a real bearer session, verified owner/admin membership and an RLS-filtered read. It independently checks every returned company ID. It never exposes raw tokens or provider metadata.
+- The native Connections page shows this activation registry separately from Nango account authorisation, only when a real cloud registry is configured. Its labels distinguish Not activated, Read-only, and Approved writes; these states are not inferred from a successful sign-in.
+- server/integrations/policy.ts is a deterministic, deny-by-default policy decision module for a future protected Nango tool/action gateway. It checks organisation, account authorisation, verified read, ownership, explicit user/app/agent grants and per-operation human approvals. Financial operations require a bounded integer amount with approval. All AI employee writes require explicit, unexpired human approval.
+- These controls DO NOT execute remote operations. A future execution endpoint must supply authenticated principals and trusted database grants, call the policy immediately before dispatch, and persist an audit receipt of the external outcome.
+- The Connect UI now provides a human-clicked secure sign-in link when the popup is blocked; it does not silently abandon setup.
+
+Tests added: tests/unit/nango-cloud-identity.test.ts, nango-registry.test.ts,
+nango-policy.test.ts, nango-gateway.test.ts and nango-webhook.test.ts.
+A viewport-specific regression also covers notification click-through.
+
+This is an implementable foundation, NOT proof of a deployed Arlovi Cloud
+database, working customer logins, activated syncs, AI agent executions or
+successful external provider calls. Keep these features disabled until
+cloud authentication, provider accounts and server-side execution/worker
+infrastructure are configured and independently tested.
