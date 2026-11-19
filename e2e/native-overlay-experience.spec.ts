@@ -149,3 +149,11 @@ test("Customer Care bulk routing requires a named owner and review", async ({ pa
   await expect(dialog.getByRole("button", { name: /Assign \d+ cases/ })).toBeDisabled();
   await expect(dialog).toContainText("Their conversation history, queue, priority and existing SLA remain unchanged");
 });
+
+test("Administration never exports an arbitrary subject request", async ({ page }) => {
+  await page.goto("/o/northline/admin/privacy?overlay=Data%20request");
+  const drawer = page.getByRole("dialog", { name: "Subject request" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toContainText("Choose a subject request");
+  await expect(drawer.getByRole("button", { name: "Export scoped CSV" })).toHaveCount(0);
+});
