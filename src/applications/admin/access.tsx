@@ -272,7 +272,7 @@ export function AccessReview({ context, close }: { context: ScreenContext; close
         ] : []),
       ]} />
       {stale && !decided && <Notice tone="danger" title="The person's role changed since they asked">They asked from {ROLE_LABELS[String(request.fields.fromRole) as Role]}; they now hold {ROLE_LABELS[from]}. Approval is blocked until a new request reflects their current role.</Notice>}
-      {expired && !decided && <Notice tone="warning" title="Request expired">Approval is blocked. A fresh request is required.</Notice>
+      {expired && !decided && <Notice tone="warning" title="Request expired">Approval is blocked. A fresh request is required.</Notice>}
       {selfReview && !decided && <Notice tone="danger" title="Independent review required">The requester or affected member cannot decide this request in the local approval workflow. A different reviewer must take the decision.</Notice>}
       {!eligibleMember && !decided && <Notice tone="danger" title="Member unavailable">An active human member is required before approval.</Notice>}
       {!validRole && !decided && <Notice tone="danger" title="Invalid role change">Select two different recognised role views.</Notice>}
