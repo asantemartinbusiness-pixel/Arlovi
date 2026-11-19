@@ -1,3 +1,4 @@
+import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useState } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
@@ -143,7 +144,7 @@ export function ProfileEditor({ context, close }: { context: ScreenContext; clos
       <Field label="Office"><TextInput name="office" value={office} onChange={(event) => setOffice(event.target.value)} /></Field>
       <Field label="Work phone" hint="Personal contact detail is not offered to AI retrieval."><TextInput name="phone" value={phone} onChange={(event) => setPhone(event.target.value)} /></Field>
       <Row gap={2}>
-        <span className="ds-subtle">Unfinished profile changes are kept in memory in this tab.</span>
+        <WorkingDraftStatus scope={draftScope} />
         <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard changes</Button>
       </Row>
     </form>

@@ -1,3 +1,4 @@
+import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Building2, Mail, UserRound, Users } from "lucide-react";
@@ -270,7 +271,7 @@ export function ContactForm({ context, close }: { context: ScreenContext; close:
         <Button variant="ghost" onClick={close}>Close & keep draft</Button>
         <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
-      <p className="ds-subtle">Unfinished edits stay in this browser tab until saved or discarded. No customer message is sent.</p>
+      <WorkingDraftStatus scope={draftScope} />
     </form>
   );
 }
@@ -809,7 +810,7 @@ export function ComposeMessage({ context, close }: { context: ScreenContext; clo
         <Button variant="ghost" onClick={close}>Close & keep draft</Button>
         <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
-      <p className="ds-subtle">Message text stays in this browser tab until saved or discarded. Nothing is sent externally.</p>
+      <WorkingDraftStatus scope={draftScope} />
     </Stack>
   );
 }

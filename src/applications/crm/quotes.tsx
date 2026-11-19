@@ -1,3 +1,4 @@
+import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { FileSignature, Plus, Trash2 } from "lucide-react";
@@ -412,7 +413,7 @@ export function QuoteEditor({ context, close }: { context: ScreenContext; close:
         <Button variant="ghost" onClick={close}>{dirty ? "Close & keep draft" : "Close"}</Button>
         {dirty && <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard changes</Button>}
       </Row>
-      {dirty && <p className="ds-subtle">Unfinished quote lines and pricing stay in this browser tab. No quote is sent without a separate action.</p>}
+      {dirty && <WorkingDraftStatus scope={draftScope} />}
     </Stack>
   );
 }

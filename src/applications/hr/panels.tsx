@@ -1,3 +1,4 @@
+import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useMemo, useState, type ReactNode } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import {
@@ -3208,7 +3209,7 @@ export function PositionEditor({ context, close }: { context: ScreenContext; clo
       <Field label="What the role is for"><TextArea value={summary} onChange={(event) => setSummary(event.target.value)} rows={3} /></Field>
       <Notice tone="info">Publishing a salary range in the advert is a choice this workspace supports; the range is stored on the position record.</Notice>
       <Row gap={2}>
-        <span className="ds-subtle">Unfinished edits remain in this browser tab.</span>
+        <WorkingDraftStatus scope={draftScope} />
         <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
     </form>

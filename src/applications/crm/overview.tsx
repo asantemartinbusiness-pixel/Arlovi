@@ -1,3 +1,4 @@
+import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Megaphone, Target, TrendingUp } from "lucide-react";
@@ -484,7 +485,7 @@ export function NewLead({ context, close }: { context: ScreenContext; close: () 
         <Button variant="ghost" onClick={close}>Close & keep draft</Button>
         <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
-      <p className="ds-subtle">Your lead details remain in this browser tab until you create or discard them.</p>
+      <WorkingDraftStatus scope={draftScope} />
     </form>
   );
 }

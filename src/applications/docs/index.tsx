@@ -1,3 +1,4 @@
+import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlignLeft, Bold, Braces, CheckCheck, ChevronDown, ChevronUp, CornerDownRight, FileDown, FileText,
@@ -1830,7 +1831,7 @@ function NewDocumentOverlay({ context, close }: { context: ScreenContext; close:
       {error && <Notice tone="danger" title="Document not created">{error}</Notice>}
       {saving && <p className="ds-subtle">Creating the document…</p>}
       <Row gap={2}>
-        <span className="ds-subtle">Unfinished document setup stays in this browser tab.</span>
+        <WorkingDraftStatus scope={draftScope} />
         <Button type="button" variant="ghost" disabled={saving} onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
     </form>

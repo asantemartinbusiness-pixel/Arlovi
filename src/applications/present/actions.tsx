@@ -1,3 +1,4 @@
+import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useState } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
@@ -189,7 +190,7 @@ export function CreateLayout({ context, close }: { context: ScreenContext; close
       <Properties rows={[{ label: "Placeholders copied", value: String(base.placeholders.length) }, { label: "Background", value: base.backgroundToken }]} />
       <p className="vx-mini">The new layout belongs to this deck's master. No slide uses it until it is applied.</p>
       <Row gap={2}>
-        <span className="ds-subtle">Layout setup stays in memory while you work in another app.</span>
+        <WorkingDraftStatus scope={draftScope} />
         <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
     </form>
@@ -286,7 +287,7 @@ export function Annotate({ context, close }: { context: ScreenContext; close: ()
     >
       <p className="ds-prose">An annotation is drawn over slide {editor.deck.index + 1} on the audience display while you present. It is not saved into the deck.</p>
       <Field label="Annotation" required><TextArea rows={2} value={text} onChange={(event) => setText(event.target.value)} required autoFocus placeholder="Lead time is now six weeks" /></Field>
-      <Row gap={2}><span className="ds-subtle">Unposted annotation text is retained in this tab, not saved in the deck.</span>
+      <Row gap={2}><WorkingDraftStatus scope={draftScope} />
         <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
       {notes.length > 0 && (

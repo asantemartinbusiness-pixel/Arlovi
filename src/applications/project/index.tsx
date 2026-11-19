@@ -1,3 +1,4 @@
+import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useState } from "react";
 import { CalendarRange, FolderKanban, Gauge, LayoutDashboard, ListChecks, Target, Timer, Users } from "lucide-react";
 import {
@@ -100,7 +101,7 @@ function ProjectFromTemplate({ context, close }: { context: ScreenContext; close
         Confidential attachments, comments and approvals from the source project are not copied. Only the phase and task structure is.
       </Notice>
       <Row gap={2}>
-        <span className="ds-subtle">Draft retained in this browser tab if you close and return.</span>
+        <WorkingDraftStatus scope={draftScope} />
         <Button type="button" variant="ghost" onClick={() => {
           clearWorkingDraft(draftScope);
           setTemplateId(""); setTitle(""); close();

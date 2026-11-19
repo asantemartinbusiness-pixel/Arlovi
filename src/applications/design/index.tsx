@@ -1,3 +1,4 @@
+import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useMemo, useState } from "react";
 import {
   PenTool, Square, Circle, Type as TypeIcon, Frame as FrameIcon, Minus, Hexagon,
@@ -235,7 +236,7 @@ function FileSetupForm({ context, close }: { context: ScreenContext; close: () =
       </Field>
       <Notice tone="info" title="Stays in this browser">The file is a record in this workspace. Nothing is uploaded.</Notice>
       <Row gap={2}>
-        <span className="ds-subtle">New-file details remain in this browser tab until saved or discarded.</span>
+        <WorkingDraftStatus scope={draftScope} />
         <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
     </form>

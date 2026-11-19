@@ -1,3 +1,4 @@
+import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useState } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { Button, Checkbox, Empty, Field, Notice, Pill, Properties, Row, Select, Stack, TextArea, TextInput } from "@/design-system";
@@ -136,7 +137,7 @@ export function EditCell({ context, close }: { context: ScreenContext; close: ()
       </Field>
       {blocked && <Notice tone="danger" title="Protected">{blocked}. The reason is listed in Collaboration.</Notice>}
       <Properties rows={[{ label: "Shows now", value: String(editor.values[address]?.value ?? "") || "empty" }]} />
-      <Row gap={2}><span className="ds-subtle">Uncommitted cell text stays in this browser tab if you switch apps.</span>
+      <Row gap={2}><WorkingDraftStatus scope={draftScope} />
         <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
     </form>
@@ -169,7 +170,7 @@ export function PasteCells({ context, close }: { context: ScreenContext; close: 
     >
       <Notice tone="info" title="The browser did not share the clipboard">Paste the cells here (tab between columns, a new line per row). They go in from {cellAddress(editor.selection.active.col, editor.selection.active.row)}.</Notice>
       <TextArea rows={6} value={text} onChange={(event) => setText(event.target.value)} autoFocus aria-label="Cells to paste" style={{ fontFamily: "var(--font-mono)" }} />
-      <Row gap={2}><span className="ds-subtle">Clipboard text is held in this tab only until pasted or discarded.</span>
+      <Row gap={2}><WorkingDraftStatus scope={draftScope} />
         <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
     </form>
@@ -573,7 +574,7 @@ export function CommentCell({ context, close }: { context: ScreenContext; close:
     >
       <Field label={`Cell on ${editor.sheet.name}`} error={valid ? undefined : "Use an address like B4."}><TextInput value={address} onChange={(event) => setAddress(event.target.value)} style={{ fontFamily: "var(--font-mono)" }} /></Field>
       <Field label="Comment" required><TextArea rows={3} value={body} onChange={(event) => setBody(event.target.value)} required autoFocus /></Field>
-      <Row gap={2}><span className="ds-subtle">This comment is not saved until you submit.</span>
+      <Row gap={2}><WorkingDraftStatus scope={draftScope} />
         <Button type="button" variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard draft</Button>
       </Row>
     </form>

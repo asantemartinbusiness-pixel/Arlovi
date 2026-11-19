@@ -1,3 +1,4 @@
+import { WorkingDraftStatus } from "@/app/WorkingDraftStatus";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clearWorkingDraft, useWorkingField } from "@/platform/workingDrafts";
 import { ArrowLeft, ArrowRight, GripVertical, Kanban } from "lucide-react";
@@ -477,7 +478,7 @@ export function DealDrawer({ context, close }: { context: ScreenContext; close: 
         <Button variant="ghost" onClick={close}>Close & keep draft</Button>
         <Button variant="ghost" onClick={() => { clearWorkingDraft(draftScope); close(); }}>Discard changes</Button>
       </Row>
-      <p className="ds-subtle">Unfinished deal changes remain in this browser tab until saved or discarded.</p>
+      <WorkingDraftStatus scope={draftScope} />
     </Stack>
   );
 }
