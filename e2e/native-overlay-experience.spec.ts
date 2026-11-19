@@ -36,7 +36,7 @@ test("cancelling an edited receipt asks whether to discard changes", async ({ pa
   await dialog.getByRole("button", { name: "Cancel" }).click();
   const confirm = page.getByRole("dialog", { name: "Discard unsaved changes?" });
   await expect(confirm).toBeVisible();
-  await confirm.getByRole("button", { name: "Keep editing" }).click();
+  await confirm.getByRole("button", { name: "Keep editing" }).last().click();
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("textbox", { name: "Amount received" })).toHaveValue("1.00");
 });
