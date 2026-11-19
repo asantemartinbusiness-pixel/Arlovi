@@ -24,7 +24,6 @@ const DEPARTMENTS = ["Leadership", "Finance", "Sales", "People", "Projects", "Cu
 const CATEGORIES = ["Lighting", "Furniture", "Objects", "Textiles", "Accessories"];
 const COLLECTIONS = ["Cove", "Forma", "Still", "Tide", "Arc", "Lumen", "Volume", "Atelier"];
 const FINISHES = ["Brushed brass", "Oxidised bronze", "Warm white", "Smoked oak", "Bone linen", "Charcoal"];
-const STATUSES = ["active", "draft", "in_review", "approved", "completed", "blocked", "archived"];
 const daysFrom = (now: string, offset: number) => new Date(Date.parse(now) + offset * 86_400_000).toISOString();
 
 export function createFlagshipRecords(now: string = SEED_NOW): { records: Rec[]; events: Audit[] } {
@@ -116,10 +115,10 @@ export function createFlagshipRecords(now: string = SEED_NOW): { records: Rec[];
   ]);
   for(let i=1;i<=180;i++)add("invoices",i,`NLC-INV-${String(2700+i).padStart(5,"0")}`,{
     status:i===2?"paid":i%13===0?"overdue":i%7===0?"draft":"awaiting_payment",
-    amountMinor: (420+i%35*73)*100,
+    amountMinor: (420+i%35*72)*100,
     parentId:flagshipId("contacts",(i%600)+1),
     fields:{number:`NLC-INV-${2700+i}`,contactId:flagshipId("contacts",(i%600)+1),
-      netMinor:(350+i%35*60)*100,taxMinor:(70+i%35*13)*100,
+      netMinor:(350+i%35*60)*100,taxMinor:(70+i%35*12)*100,
       issuedAt:daysFrom(now,-(i%100)),paymentProvider:"not_connected"}});
   for(let i=1;i<=140;i++)add("bills",i,`Supplier bill NLC-B${String(i).padStart(4,"0")}`,{
     amountMinor:(250+i%40*140)*100,
