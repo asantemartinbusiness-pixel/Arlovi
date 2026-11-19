@@ -93,6 +93,11 @@ export interface OverlayDef {
   capability?: Capability;
   render: (context: ScreenContext & { close: () => void }) => ReactNode;
   footer?: (context: ScreenContext & { close: () => void }) => ReactNode;
+  /**
+   * Identity block for the overlay head (normally an `OverlaySummary`). When
+   * present it is the only identity block: the generic record chip is not shown.
+   */
+  summary?: (context: ScreenContext & { close: () => void }) => ReactNode;
 }
 
 export interface ScreenDef {
