@@ -3263,48 +3263,93 @@ export function CandidateProfileOverlay({ context }: { context: ScreenContext })
 export function PayrollReview({ context }: { context: ScreenContext }) {
   const payload = context.overlayPayload as { id?: string } | undefined;
   const data = useCollections(["payrollRuns", "employees"]);
-  const wantedId = payload?.id ?? context.selectedId;
-  const run = wantedId
-    ? data.payrollRuns.find((row) => row.id === wantedId && row.organizationId === context.org.id)
-    : data.payrollRuns[0];
+  const [selectedRunId, setSelectedRunId] = useState(payload?.id ?? context.selectedId ?? "");
+  // Payroll is sensitive. Resolve only an explicitly selected run within this
+  // organisation; never display the first run from a broad list as a fallback.
+  const runs = data.payrollRuns.filter(row => row.organizationId === context.org.id);
+  const run = runs.find(row => row.id === selectedRunId);
   if (!context.can("view_payroll")) return <RoleViewNote what="Payroll detail" />;
-  if (!run) return <Empty title={wantedId ? "Selected payroll run unavailable" : "No payroll run"}>
-    Open a payroll run from this company. A missing selection never falls back to an unrelated record.
-  </Empty>;
-  const eligible = data.employees.filter((employee) => !["alumni", "terminated"].includes(employee.status)
-    && employee.fields.employment !== "contractor");
+  if (!run) return (
+    <Stack gap={3}>
+      <Notice tone={selectedRunId ? "warning" : "info"}
+        title={selectedRunId ? "Selected payroll run unavailable" : "Choose a payroll run to review"}>
+        {selectedRunId
+          ? "This run may have changed or does not belong to this company. No other run has been substituted."
+          : "Select a run before opening sensitive salary evidence. Current salary estimates are not historical payslips."}
+      </Notice>
+      {runs.length ? <Field label="Company payroll run">
+        <Select aria-label="Company payroll run" value={selectedRunId}
+          onChange={event => setSelectedRunId(event.target.value)}>
+          <option value="">Select a payroll run</option>
+          {runs.map(row => <option key={row.id} value={row.id}>
+            {row.title} · {String(row.fields.period ?? "Period not recorded")} · {row.status}
+          </option>)}
+        </Select>
+      </Field> : <Empty title="No payroll runs in this company" />}
+    </Stack>
+  );
+  const eligible = data.employees.filter(employee =>
+    employee.organizationId === context.org.id &&
+    !["alumni", "terminated"].includes(employee.status) &&
+    employee.fields.employment !== "contractor");
   const salaryKnown = (employee: Rec) => employee.fields.salaryMinor !== undefined
     && employee.fields.salaryMinor !== null && String(employee.fields.salaryMinor).trim() !== ""
     && Number.isFinite(Number(employee.fields.salaryMinor)) && Number(employee.fields.salaryMinor) >= 0;
-  const missing = eligible.filter((employee) => !salaryKnown(employee));
+  const missing = eligible.filter(employee => !salaryKnown(employee));
   const lines = computePayroll(eligible.filter(salaryKnown));
+  const estimatedGross = lines.reduce((sum, line) => sum + line.grossMinor, 0);
+  const estimatedNet = lines.reduce((sum, line) => sum + line.netMinor, 0);
+  const recordedGross = run.fields.grossMinor;
+  const hasRecordedGross = recordedGross !== undefined &&
+    Number.isFinite(Number(recordedGross)) && Number(recordedGross) >= 0;
+  const recordedPeople = run.fields.people;
+  const currentDifferent = hasRecordedGross && Number(recordedGross) !== estimatedGross;
+
   return (
     <Stack gap={4}>
+      <Notice tone="info" title="Saved run and current payroll estimate are different records">
+        The approved or draft run details below are saved against {run.title}. The employee table is
+        calculated from today's personnel records and must not be treated as that historical run's
+        payslips, deduction schedule or payment instruction.
+      </Notice>
       <Properties rows={[
-        { label: "Run", value: run.title },
-        { label: "Period", value: String(run.fields.period ?? "") },
-        { label: "Status", value: <Pill tone={run.status === "approved" ? "success" : "warning"}>{run.status}</Pill> },
-        { label: "People", value: String(lines.length) },
-        { label: "Current salary estimate gross", value: context.money(lines.reduce((sum, line) => sum + line.grossMinor, 0)) },
-        { label: "Current salary estimate net", value: context.money(lines.reduce((sum, line) => sum + line.netMinor, 0)) },
-        { label: "Recorded run amount", value: run.amountMinor === undefined ? "Not recorded" : context.money(run.amountMinor) },
-        { label: "Missing salary inputs", value: String(missing.length) },
+        { label: "Payroll run", value: run.title },
+        { label: "Recorded period", value: String(run.fields.period ?? "Not recorded") },
+        { label: "Recorded status", value: <Pill tone={run.status === "approved" ? "success" : "warning"}>{run.status}</Pill> },
+        { label: "Saved gross amount", value: hasRecordedGross ? context.money(Number(recordedGross)) : "Not recorded" },
+        { label: "Saved run value", value: run.amountMinor === undefined ? "Not recorded" : context.money(run.amountMinor) },
+        { label: "Recorded people", value: recordedPeople === undefined ? "Not recorded" : String(recordedPeople) },
+        { label: "Saved approval", value: run.fields.approvedAt
+          ? `${String(run.fields.approvedBy ?? "Unknown reviewer")} · ${context.dateTime(String(run.fields.approvedAt))}`
+          : "No approval recorded" },
+      ]} />
+      {currentDifferent && <Notice tone="warning" title="Current estimates differ from the saved run">
+        The current gross estimate ({context.money(estimatedGross)}) is different from the
+        saved gross amount ({context.money(Number(recordedGross))}). Check the saved run's
+        preparation evidence before making a payroll decision.
+      </Notice>}
+      <Properties rows={[
+        { label: "Current payroll estimate — people", value: String(lines.length) },
+        { label: "Current payroll estimate — gross", value: context.money(estimatedGross) },
+        { label: "Current payroll estimate — net", value: context.money(estimatedNet) },
+        { label: "Employees missing salary inputs", value: String(missing.length) },
       ]} />
       <DataGrid
         rows={lines}
-        rowId={(row) => row.employeeId}
-        label="Run detail"
+        rowId={row => row.employeeId}
+        label="Illustrative current employee salary breakdown"
         filterable={false}
         columns={[
-          { key: "name", header: "Person", primary: true, cell: (row) => row.name },
-          { key: "gross", header: "Gross", align: "end", cell: (row) => <span className="ds-num">{context.money(row.grossMinor)}</span> },
-          { key: "net", header: "Net", align: "end", cell: (row) => <span className="ds-num">{context.money(row.netMinor)}</span> },
+          { key: "name", header: "Person", primary: true, cell: row => row.name },
+          { key: "gross", header: "Current gross estimate", align: "end", cell: row => <span className="ds-num">{context.money(row.grossMinor)}</span> },
+          { key: "net", header: "Current net estimate", align: "end", cell: row => <span className="ds-num">{context.money(row.netMinor)}</span> },
         ]}
       />
-      <Notice tone="warning" title="Current estimates, not a run-specific payslip or filing">
-        The figures above use current salaries on employee records, excluding {missing.length} people with absent or invalid salary
-        inputs. They do not reconstruct this run's historical approved amounts. Deductions are illustrative, do not apply the
-        current rules for {context.org.jurisdiction}, and make no external payment or authority submission.
+      <Notice tone="warning" title="Estimates are not payroll certification">
+        Calculations use current salaries and exclude {missing.length} employee(s) with invalid
+        or missing salary inputs. The illustrative deductions do not implement the current
+        payroll rules for {context.org.jurisdiction}. Nothing here files taxes, issues payslips
+        or transfers wages. Verify the saved run and external payroll system separately.
       </Notice>
     </Stack>
   );
