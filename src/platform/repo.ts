@@ -305,6 +305,10 @@ export async function putMany(records: Rec[], context: WriteContext, events: Omi
         if (!previous || previous.status !== "open" || previous.fields.kind !== "accessRequest") {
           throw new Error("Only an open access request can be approved.");
         }
+        if (String(previous.fields.requestedBy ?? "") === context.actor ||
+            String(previous.fields.memberName ?? "") === context.actor) {
+          throw new Error("This local access decision requires a different reviewer.");
+        }
         const memberId = String(previous.fields.memberId ?? "");
         const memberIndex = records.findIndex((row) => row.id === memberId);
         const member = memberIndex >= 0 ? existing[memberIndex] : undefined;
