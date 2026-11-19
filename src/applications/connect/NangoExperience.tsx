@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, CheckCircle2, ExternalLink, PlugZap, Search, ShieldCheck, Sparkles } from "lucide-react";
 import { Button, Notice, Stack } from "@/design-system";
 import type { ScreenContext } from "@/platform/registry";
-import { BUSINESS_GOALS, SUGGESTED_INTEGRATIONS, type IntegrationGoal } from "./nangoCatalog";
+import { BUSINESS_GOALS, SUGGESTED_INTEGRATIONS, type IntegrationGoal, type SuggestedIntegration } from "./nangoCatalog";
 import "./nango-experience.css";
 
 type Status = { available: boolean; integrations: string[]; note?: string };
@@ -34,14 +34,44 @@ export function GuidedMarketplace({ context }: { context: ScreenContext }) {
   const [goal, setGoal] = useState<IntegrationGoal>("sell");
   const [query, setQuery] = useState("");
   const [all, setAll] = useState(false);
+  const [nangoProviders, setNangoProviders] = useState<SuggestedIntegration[]>([]);
+  const [nangoTotal, setNangoTotal] = useState(0);
   const status = useNangoReadiness();
+  useEffect(() => {
+    if (!all || !status?.available) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      readJson<{ providers: { id: string; name: string; categories: string[] }[]; total: number }>(
+        "/api/integrations/providers?q=" + encodeURIComponent(query), { signal: controller.signal })
+        .then(result => {
+          setNangoTotal(result.total);
+          setNangoProviders(result.providers.map(item => {
+            const cats = item.categories.map(value => value.toLowerCase());
+            const category = cats.some(value => /financ|account|payment/.test(value)) ? "Finance" :
+              cats.some(value => /commerce|retail/.test(value)) ? "Commerce" :
+              cats.some(value => /crm|sales/.test(value)) ? "CRM" :
+              cats.some(value => /mail|messag|communication/.test(value)) ? "Communication" : "Work";
+            return {
+              id: item.id, name: item.name, category, goal: "organise",
+              summary: "Explore account access. Available actions and syncs must be verified separately.",
+              applications: ["Integrations"],
+            };
+          }));
+        })
+        .catch(() => { if (!controller.signal.aborted) setNangoProviders([]); });
+    }, 250);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [all, query, status?.available]);
   const cards = useMemo(() => {
     const q = query.toLocaleLowerCase().trim();
-    const results = SUGGESTED_INTEGRATIONS.filter(item =>
+    const merged = all
+      ? [...SUGGESTED_INTEGRATIONS, ...nangoProviders.filter(item => !SUGGESTED_INTEGRATIONS.some(existing => existing.id === item.id))]
+      : SUGGESTED_INTEGRATIONS;
+    return merged.filter(item =>
       (all || item.goal === goal) &&
-      (!q || [item.name, item.category, item.summary, item.keywords || "", ...item.applications].join(" ").toLocaleLowerCase().includes(q)));
-    return results.slice(0, all ? 48 : 6);
-  }, [goal, all, query]);
+      (!q || [item.name, item.category, item.summary, item.keywords || "", ...item.applications].join(" ").toLocaleLowerCase().includes(q)))
+      .slice(0, all ? 48 : 6);
+  }, [goal, all, query, nangoProviders]);
 
   return <section className="connect-guide" aria-label="Guided integration setup">
     <div className="connect-guide-heading">
@@ -76,6 +106,7 @@ export function GuidedMarketplace({ context }: { context: ScreenContext }) {
         ? "Connections are enabled for configured services. We'll always ask before linking an account."
         : "Browse suggested tools now. Secure account connections will be available when company setup is complete."}</span>
     </div>
+    {all && status?.available && <p className="connect-guide-disclaimer">Browse Nango provider metadata · {nangoTotal} matching providers · individual actions and account permissions require verification.</p>}
     <div className="connect-guide-cards" aria-label="Suggested business integrations">
       {cards.map(item => {
         const enabled = Boolean(status?.available && status.integrations.includes(item.id));
