@@ -449,7 +449,7 @@ export function AppShell() {
               <p>{appModule.purpose}</p>
               <details className="hq-app-switch">
                 <summary>Switch application <ChevronDown size={14} aria-hidden="true" /></summary>
-                <nav className="hq-app-switch-list" aria-label="Recently visited applications">
+                <div className="hq-app-switch-list" role="group" aria-label="Recently visited applications">
                   {recentAppCodes.filter(code => code !== activeCode).map(code => {
                     const item = APP_ENTRIES[code];
                     const Icon = item.icon;
@@ -462,7 +462,7 @@ export function AppShell() {
                     const details = event.currentTarget.closest("details");
                     if (details) details.open = false;
                   }}><MenuIcon size={15} aria-hidden="true"/>All applications</Link>
-                </nav>
+                </div>
               </details>
             </div>
             <div className="hq-appnav-body">
@@ -523,7 +523,7 @@ export function AppShell() {
               <span>Back to <strong>{returnName}</strong></span>
             </button>
             {returnScreen && <span className="hq-journey-page ds-truncate">{returnScreen.title}</span>}
-            <span className="hq-journey-context">Your place is saved</span>
+            <span className="hq-journey-context">Screen &amp; tab remembered</span>
           </nav>}
           {/* The page scrolls here, above the tray, so the tray never covers content. */}
           <div className="hq-scroll">
