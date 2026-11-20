@@ -196,7 +196,7 @@ function RasterEditor({ context, actions }: { context: ScreenContext; actions: A
   const data = useHistogram(handle.doc, bank);
   /* Opening an image whose active layer is an adjustment would greet the brush with "holds no pixels":
      start on the top pixel layer instead (a view choice, so it makes no undo entry). */
-  const settledFor = useRef<string>();
+  const settledFor = useRef<string | undefined>(undefined);
   useEffect(() => {
     const open = handle.doc;
     if (!open || !record || settledFor.current === record.id) return;
