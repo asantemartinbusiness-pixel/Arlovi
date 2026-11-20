@@ -47,7 +47,7 @@ export function WorkspaceHome({ orgName, slug, actor, tasks, projects, missions,
         <Link to={`/o/${slug}/workspace/work`}>{pending.length ? "Review assigned work" : "Explore work"} <ArrowRight size={16}/></Link>
       </div>
     </header>
-    {slug === "northline" && <section className="wh-flagship-spotlight" aria-label="Explore Northline Collective flagship">
+    {slug === "collective" && <section className="wh-flagship-spotlight" aria-label="Explore Northline Collective flagship">
       <div><span className="wh-flagship-eyebrow">ARLOVI FLAGSHIP / FICTIONAL BUSINESS EXPERIENCE</span>
         <h2>Explore <em>Northline Collective.</em></h2>
         <p>One extraordinary business, thirty-five native applications. Discover the editorial website, editable Studio work, client projects and connected operations.</p></div>
