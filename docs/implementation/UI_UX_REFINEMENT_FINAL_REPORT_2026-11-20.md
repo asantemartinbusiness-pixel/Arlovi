@@ -72,7 +72,7 @@ plus repository-wide integrity passes.
 
 | Gate | Result |
 | --- | --- |
-| Typecheck, lint, unit tests, inventory, build | see §2a (filled from the gate run) |
+| Typecheck, lint, unit tests, inventory, build | all pass on the integrated branch (§2a) |
 | Cross-application journeys | 24/24 pass (`workflow-results.json`); overlay suites: native-overlay 21/21, modal 4/4, drawer 3/3, crm-finance-handoff 3/3 |
 | Screen ledger | 316 screens verified (`SCREEN_LEDGER.md`, regenerated) |
 | Playwright gate (all groups) | see `ui-ux-dispositions/GATES.md`, compared with `QA_BASELINE.md` (627 tests on the untouched build: 427 pass, 38 persistent pre-existing failures, 92 environmental) |
@@ -82,7 +82,13 @@ plus repository-wide integrity passes.
 
 ### 2a. Static gates (final run on the integrated branch)
 
-Filled in by the orchestrator from `scratchpad/gates/*.log` at the end of the run.
+| Command | Result |
+| --- | --- |
+| `npm run typecheck` | pass, 0 errors |
+| `npm run lint` | pass, 0 errors, 0 warnings (the baseline's one warning and two added directives removed) |
+| `npm test` (vitest) | 104 files, 829 tests pass (baseline 824; new: overlay kit, write integrity, mission tags, finance/mission/B3 specs' unit companions) |
+| `npm run verify:inventory` | pass |
+| `npm run build` | pass (`verify-native-chunks`, `tsc`, `vite build`, bundle report) |
 
 ## 3. What this is not
 

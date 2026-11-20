@@ -208,7 +208,7 @@ orchestrator. 8. No new dependencies. 9. No fabricated completion; provider boun
 3. Reviewed: the journey bar shows the previous application whenever the user arrived from another app; that is the cross-application continuity requirement (§B5), not a defect. `canReturnTo` scopes by organisation, role and app.
 4. DONE: repository-wide write-integrity sweep (see ledger row); Finance, Procurement, Commerce, Auto, Analytics, Care, Portal, Asset, Team and Mission were fixed by their own workers.
 5. DONE (d886c88): `.hq-state-line` size folded into `shell.css`.
-6. Full gate run on a quiet machine: typecheck, lint, unit, build, then Playwright groups on the dev server with `--workers=1..2`; compare with `QA_BASELINE.md`.
+6. Static gates DONE on the integrated branch: typecheck 0 errors; lint 0 errors/0 warnings; vitest 104 files / 829 tests; inventory; build. Playwright groups: see `ui-ux-dispositions/GATES.md` (final run in progress at the time of writing).
 7. Opus HR acceptance sample (≥15% of overlays per package via `?overlay=`), final report, PR body.
 
 ## 8. Definition of done per component
