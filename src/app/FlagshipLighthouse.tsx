@@ -54,7 +54,16 @@ const statusLabel=(s:string)=>s.replace(/_/g," ");
 function route(rec:Rec|undefined,app:string,slug:string){
   if(!rec)return appEntry(app,slug);
   if(rec.collection==="portals")return `/o/${slug}/portal/portals/nl-portals-900/builder`;
-  return routeForRecord(rec,slug)??appEntry(app,slug);
+  // Record-specific native editors exist for most of the workstream. The
+  // remaining operations have real collection or scoped-workspace screens:
+  // never fall back to a generic home that loses the user's context.
+  const collectionRoutes:Record<string,string>={
+    approvals:`/o/${slug}/workspace/work/project/${PROJECT}?tab=approvals`,
+    requisitions:`/o/${slug}/proc/requisitions`,
+    purchaseOrders:`/o/${slug}/proc/orders`,
+    risks:`/o/${slug}/legal/risks`,
+  };
+  return collectionRoutes[rec.collection]??routeForRecord(rec,slug)??appEntry(app,slug);
 }
 function find(all:Record<string,Rec[]>,id:string):Rec|undefined {
   const parts=id.split("-");
