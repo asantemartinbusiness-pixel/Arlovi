@@ -367,3 +367,10 @@
 .auto-plan > li { display: grid; gap: 2px; }
 .auto-plan > li > span { color: var(--fg-muted); font-size: var(--text-xs); }
 .auto-run-head { display: grid; gap: var(--space-3); padding: var(--space-3) var(--page-pad) 0; }
+
+/* Narrow screens: the palette is one scrolling row, so the canvas is not pushed below the fold. */
+@media (max-width: 900px) {
+  .auto-palette { flex-direction: row; overflow-x: auto; padding-block-end: var(--space-1); }
+  .auto-palette-item { width: auto; flex: 0 0 auto; }
+  .auto-palette-note { display: none; }
+}

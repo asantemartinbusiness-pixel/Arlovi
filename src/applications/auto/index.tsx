@@ -62,7 +62,7 @@ function builderRecordHeader(context: ScreenContext): RecordHeaderProps | null {
     eyebrow: "Workflow builder",
     title: record.title,
     status: <Pill tone={tone} dot>{record.status}</Pill>,
-    meta: [`${graph.nodes.length} nodes, ${graph.edges.length} connections`, record.ownerName ? `Owner ${record.ownerName}` : undefined],
+    meta: [`${graph.nodes.length} nodes, ${graph.edges.length} connections as saved`, record.ownerName ? `Owner ${record.ownerName}` : undefined],
   };
 }
 
@@ -138,7 +138,7 @@ export const autoApp = registerApp({
       ],
       overlays: [
         { id: "Workflow quick view", kind: "drawer", title: "Automation", width: OVERLAY_WIDTH.form, summary: ({ ...context }) => <WorkflowQuickSummary context={context} />, render: ({ ...context }) => <WorkflowQuickView context={context} /> },
-        { id: "activation review", kind: "modal", title: "Activation review", width: OVERLAY_WIDTH.modal, summary: ({ ...context }) => <ActivationSummary context={context} />, capability: "run_automation", presentation: { selectedRecord: true, collection: "workflows", guidance: "Review the workflow graph, blocking errors, warnings and disconnected providers before activating it." }, render: ({ close, ...context }) => <ActivationReview context={context} close={close} /> },
+        { id: "activation review", kind: "modal", title: "Activation review", width: OVERLAY_WIDTH.modal, summary: ({ ...context }) => <ActivationSummary context={context} />, capability: "run_automation", presentation: { selectedRecord: true, collection: "workflows" }, render: ({ close, ...context }) => <ActivationReview context={context} close={close} /> },
         { id: "archive", kind: "modal", title: "Archive this automation", tone: "danger", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <ArchiveWorkflow context={context} close={close} /> },
         { id: "Create workflow", kind: "modal", title: "New automation", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <CreateWorkflow context={context} close={close} />, footer: submitFooter("auto-create", "Create automation") },
         { id: "duplicate copy", kind: "modal", title: "Duplicate without grants", width: OVERLAY_WIDTH.form, render: ({ close, ...context }) => <DuplicateWorkflow context={context} close={close} /> },

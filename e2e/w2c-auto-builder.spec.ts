@@ -85,3 +85,34 @@ test.describe("mobile", () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 });
+
+test("a paused automation cannot be run live, and neither can any automation while the organisation is paused", async ({ page }) => {
+  await page.goto(`/o/northline/auto/workflows?${CLOCK}`);
+  await page.getByText("Chase overdue invoices").first().click();
+  await page.getByRole("button", { name: "Activation review" }).click();
+  const dialog = page.getByRole("dialog", { name: "Activation review" });
+  await dialog.getByRole("button", { name: "Pause the automation" }).click();
+  await expect(dialog).toBeHidden();
+
+  await page.goto(`/o/northline/auto/workflows/nl-workflows-020?${CLOCK}&tab=Test`);
+  const runLive = page.getByRole("button", { name: "Run live" });
+  await expect(runLive).toBeDisabled();
+  await expect(page.getByText(/This automation is paused/).first()).toBeVisible();
+
+  // Resume it, then pause the organisation: the same button is off for the organisation's reason.
+  await page.goto(`/o/northline/auto/workflows?${CLOCK}`);
+  await page.getByText("Chase overdue invoices").first().click();
+  await page.getByRole("button", { name: "Activation review" }).click();
+  await page.getByRole("dialog", { name: "Activation review" }).getByRole("checkbox").check();
+  await page.getByRole("dialog", { name: "Activation review" }).getByRole("button", { name: "Activate" }).click();
+  // Pause the organisation from the Admin autonomy centre, as an owner would.
+  await page.goto(`/o/northline/admin/autonomy?${CLOCK}`);
+  await page.getByRole("main").getByRole("button", { name: "Pause all automation" }).click();
+  const pause = page.getByRole("dialog").getByRole("button", { name: "Pause all automation" });
+  await page.getByRole("dialog").getByLabel("Type PAUSE to confirm").fill("PAUSE");
+  await pause.click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.goto(`/o/northline/auto/workflows/nl-workflows-020?${CLOCK}&tab=Test`);
+  await expect(page.getByRole("button", { name: "Run live" })).toBeDisabled();
+  await expect(page.getByText(/Execution is paused for this organisation/).first()).toBeVisible();
+});

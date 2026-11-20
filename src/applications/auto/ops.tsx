@@ -11,7 +11,7 @@ import type { Rec } from "@/domain/types";
 import { readGraph } from "./engine";
 import { describeSchedule, nextOccurrences, readSchedule, type ScheduleSpec } from "./schedule";
 import { readRun } from "./panels";
-import { executeRun, useGraphRecords, LiveRunRefused, useLiveRunBlocker } from "./runner";
+import { executeRun, useGraphRecords, LiveRunRefused, useLiveRunBlocker, patchChecked } from "./runner";
 
 /* ====================================================================== *
  * ARL-AUTO-008 — Schedules & queues
@@ -141,7 +141,7 @@ export function SchedulesAndQueues({ context }: { context: ScreenContext }) {
                   <TextInput aria-label="Parallel runs allowed" type="number" min={1} max={8} value={String(spec.concurrency)}
                     onChange={(event) => {
                       const next = Math.min(8, Math.max(1, Number(event.target.value) || 1));
-                      void context.mutate.patch(workflow.id, { fields: { ...workflow.fields, concurrency: next } }, { expectRevision: workflow.revision, event: "Concurrency changed" });
+                      void patchChecked(context, workflow.id, { fields: { ...workflow.fields, concurrency: next } }, { expectRevision: workflow.revision, event: "Concurrency changed" });
                     }}
                   />
                 </Field>

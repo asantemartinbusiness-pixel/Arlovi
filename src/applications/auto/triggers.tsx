@@ -8,7 +8,7 @@ import { useCollection, useRecord } from "@/platform/workspace";
 import type { Rec } from "@/domain/types";
 import { CONDITION_OPS, matchTrigger, type ConditionOp, type WfNode, type WfNodeConfig } from "./engine";
 import { setDraftGraph, useBuilderDraft } from "./store";
-import { useGraphRecords } from "./runner";
+import { useGraphRecords, patchChecked } from "./runner";
 import { classifyDeliveries, describeSchedule, nextOccurrences, readSchedule, type Delivery } from "./schedule";
 
 function useTriggerContext(context: ScreenContext) {
@@ -79,22 +79,22 @@ export function TriggerConfiguration({ context }: { context: ScreenContext }) {
           <Stack gap={4}>
             <Field label="Frequency">
               <Select aria-label="Frequency" value={schedule.frequency}
-                onChange={(event) => { void context.mutate.patch(record.id, { fields: { ...record.fields, scheduleFrequency: event.target.value } }, { expectRevision: record.revision, event: "Schedule frequency changed" }); }}
+                onChange={(event) => { void patchChecked(context, record.id, { fields: { ...record.fields, scheduleFrequency: event.target.value } }, { expectRevision: record.revision, event: "Schedule frequency changed" }); }}
               >
                 {["hourly", "daily", "weekly", "monthly"].map((value) => <option key={value} value={value}>{value}</option>)}
               </Select>
             </Field>
             <Row gap={2}>
               <Field label="Hour">
-                <TextInput aria-label="Hour" type="number" min={0} max={23} value={String(schedule.hour)} onChange={(event) => { void context.mutate.patch(record.id, { fields: { ...record.fields, scheduleHour: Math.min(23, Math.max(0, Number(event.target.value) || 0)) } }, { expectRevision: record.revision, event: "Schedule hour changed" }); }} />
+                <TextInput aria-label="Hour" type="number" min={0} max={23} value={String(schedule.hour)} onChange={(event) => { void patchChecked(context, record.id, { fields: { ...record.fields, scheduleHour: Math.min(23, Math.max(0, Number(event.target.value) || 0)) } }, { expectRevision: record.revision, event: "Schedule hour changed" }); }} />
               </Field>
               <Field label="Minute">
-                <TextInput aria-label="Minute" type="number" min={0} max={59} value={String(schedule.minute)} onChange={(event) => { void context.mutate.patch(record.id, { fields: { ...record.fields, scheduleMinute: Math.min(59, Math.max(0, Number(event.target.value) || 0)) } }, { expectRevision: record.revision, event: "Schedule minute changed" }); }} />
+                <TextInput aria-label="Minute" type="number" min={0} max={59} value={String(schedule.minute)} onChange={(event) => { void patchChecked(context, record.id, { fields: { ...record.fields, scheduleMinute: Math.min(59, Math.max(0, Number(event.target.value) || 0)) } }, { expectRevision: record.revision, event: "Schedule minute changed" }); }} />
               </Field>
             </Row>
             <Field label="Time zone" hint="Firings are resolved in this zone, so a clock change moves the UTC instant, not the local time.">
               <Select aria-label="Time zone" value={schedule.timezone}
-                onChange={(event) => { void context.mutate.patch(record.id, { fields: { ...record.fields, scheduleTimezone: event.target.value } }, { event: "Schedule time zone changed" }); patchTrigger({ timezone: event.target.value }, "Trigger time zone changed"); }}
+                onChange={(event) => { void patchChecked(context, record.id, { fields: { ...record.fields, scheduleTimezone: event.target.value } }, { event: "Schedule time zone changed" }); patchTrigger({ timezone: event.target.value }, "Trigger time zone changed"); }}
               >
                 {["Europe/London", "America/New_York", "Europe/Paris", "Australia/Sydney", "UTC"].map((zone) => <option key={zone} value={zone}>{zone}</option>)}
               </Select>

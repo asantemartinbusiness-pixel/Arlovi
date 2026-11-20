@@ -152,6 +152,8 @@ test("WF-05 Sales-to-cash: lead, quote approval, won deal, posted invoice, recei
   await expect(dialog(page).getByText("53 / 100", { exact: true })).toBeVisible();
   await expect(dialog(page).getByText("warm", { exact: true })).toBeVisible();
   await dialog(page).getByRole("button", { name: "Convert to a deal" }).click();
+  // The form prefills the lead's recorded value, so clear it to exercise the "needs an amount" rule deterministically.
+  await dialog(page).getByLabel("Deal amount").fill("0");
   await expect(dialog(page).getByText("This lead cannot be converted")).toBeVisible();
   await dialog(page).getByLabel("Deal amount").fill("3360");
   await dialog(page).getByLabel("Also create a draft quote").selectOption({ index: 0 });
@@ -1267,7 +1269,7 @@ test("WF-17 Multi-entity organization: switching organization rescopes records, 
 
   // AI context reset: the assistant reads only the active organisation.
   await open(page, "/o/harbor/ai/chat");
-  await expect(main(page).getByText(/READING HARBOR SUPPLY ONLY/i)).toBeVisible();
+  await expect(main(page).getByText(/Answers are composed from Harbor Supply records/)).toBeVisible(); // AI chat scope line reworded; still names the active organisation only
 
   // Transactions stay within the organisation: a Northline record is not reachable from Harbor.
   await page.goto(withClock("/o/harbor/fin/invoices/nl-invoices-003"));
@@ -1319,20 +1321,23 @@ test("WF-19 Sensitive data deletion/export: legal hold refuses erasure, export s
   expect(registerSam).toBe(34);
   await pick(page, /Rowan Pike — erasure of personal data/, "Rowan Pike — erasure of personal data");
   await action(page, "Review request");
-  await expect(dialog(page).getByText("A legal hold applies")).toBeVisible();
-  await expect(dialog(page).getByText(/Erasure is refused while the hold stands/)).toBeVisible();
-  await expect(dialog(page).getByRole("button", { name: "Delete where lawful…" })).toBeDisabled();
+  // A2: the Subject request drawer states the hold as "Legal hold recorded … Erasure is blocked while the hold remains" and gates "Review deletion impact…".
+  await expect(dialog(page).getByText("Legal hold recorded")).toBeVisible();
+  await expect(dialog(page).getByText(/Erasure is blocked while the hold remains/)).toBeVisible();
+  await expect(dialog(page).getByRole("button", { name: "Review deletion impact…" })).toBeDisabled();
   // The records matched must be the records the register says the request covers.
-  await expect.soft(dialog(page).getByText(new RegExp(`^${registerCount} across`)), `DEFECT: /admin/privacy Requests — the register says Rowan Pike's request covers ${registerCount} records; the review matches a different number`).toBeVisible();
+  await expect.soft(dialog(page).getByText(new RegExp(`^${registerCount} matches in`)), `DEFECT: /admin/privacy Requests — the register says Rowan Pike's request covers ${registerCount} records; the review matches a different number`).toBeVisible();
   await dialog(page).getByRole("button", { name: "Close" }).last().click();
 
   // Scoped export for an access request: the job is recorded and stays in this browser.
   await pick(page, /Sam Okafor — copy of their data/, "Sam Okafor — copy of their data");
   await action(page, "Export subject data");
-  await expect.soft(dialog(page).getByText(new RegExp(`^${registerSam} across`)), `DEFECT: /admin/privacy Requests — the register says Sam Okafor's access request covers ${registerSam} records; 'Export subject data' matches 0, so the export would be empty`).toBeVisible();
-  await dialog(page).getByRole("button", { name: "Export their data" }).click();
+  await expect.soft(dialog(page).getByText(new RegExp(`^${registerSam} matches in`)), `DEFECT: /admin/privacy Requests — the register says Sam Okafor's access request covers ${registerSam} records; 'Export subject data' matches 0, so the export would be empty`).toBeVisible();
+  // A2: the drawer asks for an identity-verified attestation, then offers "Export scoped CSV" (toast "CSV prepared").
+  await dialog(page).getByRole("checkbox", { name: /independently verified the requester's identity/ }).check();
+  await dialog(page).getByRole("button", { name: "Export scoped CSV" }).click();
   // Wait for the actual local audit write, not just the download-button click.
-  await expect(page.getByText("Copy prepared", { exact: true })).toBeVisible();
+  await expect(page.getByText("CSV prepared", { exact: true })).toBeVisible();
   // Downstream connectors are not reached; the evidence is the audit entry.
   await open(page, "/admin/audit", "Audit Trail");
   await main(page).getByRole("searchbox").first().fill("Sam Okafor");

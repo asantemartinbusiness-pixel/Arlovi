@@ -286,8 +286,9 @@ export function ActivationReview({ context, close }: { context: ScreenContext; c
   return (
     <Stack gap={4}>
       <ModalInFlight when={busy} />
-      <FactGrid columns={3} dense items={[
+      <FactGrid columns={2} dense items={[
         { label: "Status now", value: row.record.status },
+        { label: "Nodes", value: String(row.graph.nodes.length), mono: true },
         { label: "Blocking errors", value: String(errors.length), mono: true, tone: errors.length ? "danger" : "success" },
         { label: "Warnings", value: String(warnings.length), mono: true, tone: warnings.length ? "warning" : "success" },
       ]} />

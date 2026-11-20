@@ -101,6 +101,13 @@ export async function storedLiveRunBlocker(context: ScreenContext, workflowId: s
   return liveRunBlocker(workflow, org);
 }
 
+/** A field edit whose result is read: when the write is refused the input shows the stored value again. */
+export async function patchChecked(context: ScreenContext, id: string, patch: Partial<Rec>, options?: Parameters<ScreenContext["mutate"]["patch"]>[2]): Promise<Rec | null> {
+  const saved = await context.mutate.patch(id, patch, options);
+  if (!saved) context.toast("Change not saved", "The field shows the stored value again.", "blocked");
+  return saved;
+}
+
 export class LiveRunRefused extends Error {}
 
 export interface ExecuteOptions {
