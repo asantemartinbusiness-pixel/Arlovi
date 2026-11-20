@@ -107,3 +107,16 @@
 .wh-flagship-spotlight>a:focus-visible{outline:3px solid #d5ac82;outline-offset:4px}
 @media(max-width:760px){.wh-flagship-spotlight{align-items:flex-start;flex-direction:column}.wh-flagship-spotlight>a{width:100%;justify-content:space-between}}
 @media(prefers-reduced-motion:reduce){.wh-flagship-spotlight *{transition:none!important}}
+
+
+/* Northline-only flagship invitation: match its paper/acid identity without
+   changing Arlovi's global workspace design or unrelated tenants. */
+.wh-flagship-spotlight{background:#f3f0e8;color:#151515;border:1px solid #151515;border-radius:0}
+.wh-flagship-spotlight:after{border-radius:0;background:#7e57ff;transform:rotate(-19deg);opacity:1;width:170px;height:360px;right:16%;top:-120px}
+.wh-flagship-spotlight:before{content:"";position:absolute;width:145px;height:145px;border-radius:50%;background:#dfff3f;right:8%;bottom:-70px;z-index:0}
+.wh-flagship-eyebrow{font-family:"DM Mono","Courier New",monospace;font-weight:400;letter-spacing:.12em;color:#4f4d48}
+.wh-flagship-spotlight h2{font-family:Manrope,Arial,sans-serif;font-weight:700;letter-spacing:-.06em}
+.wh-flagship-spotlight h2 em{font-family:Newsreader,Georgia,serif;font-style:italic;font-weight:500;color:#151515}
+.wh-flagship-spotlight p{color:#4f4d48}
+.wh-flagship-spotlight>a{background:#dfff3f;color:#151515;border:1px solid #151515;border-radius:0;box-shadow:none}
+.wh-flagship-spotlight>a:hover{background:#151515;color:white}
