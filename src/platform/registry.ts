@@ -124,6 +124,9 @@ export interface ScreenDef {
    * becomes the page h1 (and the route-change focus target), the screen title
    * becomes the eyebrow, the lede is dropped and the screen actions render in
    * the header. Breadcrumbs and the ScreenDef tab strip stay as they are.
+   * This is a plain function called during ScreenHost's render, after its
+   * early returns, so it must not call hooks: put live data in small
+   * components passed as the title, status or meta slots instead.
    */
   record?: (context: ScreenContext) => RecordHeaderProps | null;
 }
