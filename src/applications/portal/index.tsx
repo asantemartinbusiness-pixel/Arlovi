@@ -1,6 +1,7 @@
 import { BarChart3, FileText, LifeBuoy, MessageSquare, Receipt, ShieldCheck, Wand2 } from "lucide-react";
 import { Empty, Notice, OVERLAY_WIDTH, Pill, Properties, Row, Stack } from "@/design-system";
 import { registerApp, type ScreenContext } from "@/platform/registry";
+import { gateScreens } from "@/applications/analytics/ready";
 import { GrowthOverviewNav } from "@/app/GrowthOverviewNav";
 import { useWorkspace } from "@/platform/workspace";
 import { confirmOverlay, submitFooter } from "@/applications/market/kit";
@@ -49,7 +50,8 @@ export const portalApp = registerApp({
       { label: "Access & analytics", screenId: "ARL-PORTAL-007", icon: ShieldCheck },
     ] },
   ],
-  screens: {
+  // A portal names records from many applications; count none from a partial read.
+  screens: gateScreens({
     /* ------------------------------ 001 ------------------------------ */
     "ARL-PORTAL-001": {
       id: "ARL-PORTAL-001",
@@ -234,7 +236,7 @@ export const portalApp = registerApp({
       inspector: (context) => <PortalFacts context={context} />,
       inspectorTitle: "Portal facts",
     },
-  },
+  }),
 });
 
 function PortalHeading({ context, part }: { context: ScreenContext; part: "title" | "status" | "meta" }) {

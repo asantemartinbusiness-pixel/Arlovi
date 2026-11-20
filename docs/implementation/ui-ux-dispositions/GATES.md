@@ -288,3 +288,7 @@ Checks: five-spec run 27/27 pass; deep DOCS/DESIGN/LAYOUT/MISSION pass; eslint c
   "Open navigation"; it now opens the menu as a person on those devices would.
 - The phone notifications drawer hid "Reading is not approval." to save width; the footer now wraps and keeps it.
 - Local re-run of the whole Browser QA config: 306/306 on desktop, tablet and mobile.
+- CI then showed a fourth device failure: the Harrow House portal directory read 6 shared records while the
+  client dashboard read 7, then 8, as other applications' records landed in the background. Portal screens and
+  overlays now use the same fixtures-ready gate as Analytics (the gate now also wraps overlays). Re-runs: portal,
+  analytics, growth and journey specs 65/65, deep PORTAL/ANALYTICS pass, native overlays 21/21, Browser QA 306/306.
