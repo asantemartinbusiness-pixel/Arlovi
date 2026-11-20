@@ -194,9 +194,9 @@ orchestrator. 8. No new dependencies. 9. No fabricated completion; provider boun
 | B7 Care + Portal + Asset | ACCEPTED (R and HR corrections done) | 105 rows; SLA clock band, scope preview per person, 49 handlers honour conflicts; `shots/B7/` |
 | B6 Automation + Analytics | ACCEPTED after corrections (paused automation/organisation blocks live runs with e2e) | 86 rows; designer, replay plan, activation guard, dashboard scope and tile inspector, real CSV exports; `shots/B6/` |
 | B9 Team + Missions | ACCEPTED (R and HR corrections done) | 83 rows; contract page head, honest builder steps, pause-respecting execution, deliverables table, commitTogether; `shots/B9/` |
-| B8 AI + Brain | reviewed: no S1/S2; 7 S3 corrections in progress | 70 rows; `shots/B8/`, `shots/R-B8/` |
+| B8 AI + Brain | ACCEPTED after R and HR corrections (resolution records an assertion when the winner has none) | 70 rows; `shots/B8/`, `shots/R-B8/`, `shots/HR3/` |
 | Journey QA (Phase 3) | done | 24/24 cross-application journeys pass; native-overlay 21/21, modal 4/4, drawer 3/3, crm-finance-handoff 3/3; `workflow-results.json`, `defects.json`, screen ledger 316 verified |
-| HR acceptance sample 2 (B3, B7, B9) | done | 29 overlays; B3 returned (blend picker) and fixed; B7/B9 S3s fixed; systemic: app-owned selection guards with live footers → sweep in progress |
+| HR acceptance sample 2 (B3, B7, B9) and 3 (B6, B8) | done | 48 overlays; B3 and B8 returned once each and fixed; B6/B7/B9 S3s fixed; selection-guard sweep done (24 overlays) |
 | Integrity sweep (Phase 3 item 4) | done | ~255 ignored patch results handled across 24 folders, 49 busy flags reset in finally, 11 multi-record transactions converted to `commitTogether` (`src/applications/shared/commit.ts`); `tests/unit/write-integrity.test.ts` |
 | HR acceptance sample (Opus) | done for A1–A7, B1, B2, B4, B5: 107 overlays opened, 9 accepted, A1 and A6 returned and fixed | `shots/HR/`, `scratchpad/hr/res_*.json` |
 | Central fixes by orchestrator | done | `OverlayDef.summary` head slot; `ScreenDef.chromeTitle`; `EditorFrame titleLevel`; record guards carry no footer action; 15 Cancel slots corrected; tabs never shrink; `document.publish` capability; data-grid card selection; status strip wraps at 390; journey bar names the remembered tab; heading focus waits for lazy surfaces; generic hidden dialog descriptions removed; WF-05 and w2a spec labels aligned |
@@ -208,8 +208,8 @@ orchestrator. 8. No new dependencies. 9. No fabricated completion; provider boun
 3. Reviewed: the journey bar shows the previous application whenever the user arrived from another app; that is the cross-application continuity requirement (§B5), not a defect. `canReturnTo` scopes by organisation, role and app.
 4. DONE: repository-wide write-integrity sweep (see ledger row); Finance, Procurement, Commerce, Auto, Analytics, Care, Portal, Asset, Team and Mission were fixed by their own workers.
 5. DONE (d886c88): `.hq-state-line` size folded into `shell.css`.
-6. Static gates DONE on the integrated branch: typecheck 0 errors; lint 0 errors/0 warnings; vitest 104 files / 829 tests; inventory; build. Playwright groups: see `ui-ux-dispositions/GATES.md` (final run in progress at the time of writing).
-7. Opus HR acceptance sample (≥15% of overlays per package via `?overlay=`), final report, PR body.
+6. Static gates DONE on the integrated branch: typecheck 0 errors; lint 0 errors/0 warnings; vitest 104 files / 829 tests; inventory; build. Playwright gate DONE: 630 tests, 616 pass, 11 deterministic failures all closed afterwards (2 regressions + 1 a11y gap fixed in product, 8 stale expectations aligned); 36/38 baseline persistent failures now pass; see `ui-ux-dispositions/GATES.md`.
+7. DONE: three HR samples (165 overlays), all 16 packages accepted; final report `UI_UX_REFINEMENT_FINAL_REPORT_2026-11-20.md`; PR #88 description updated.
 
 ## 8. Definition of done per component
 

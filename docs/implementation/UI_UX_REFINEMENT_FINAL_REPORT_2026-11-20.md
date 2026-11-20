@@ -75,7 +75,7 @@ plus repository-wide integrity passes.
 | Typecheck, lint, unit tests, inventory, build | all pass on the integrated branch (§2a) |
 | Cross-application journeys | 24/24 pass (`workflow-results.json`); overlay suites: native-overlay 21/21, modal 4/4, drawer 3/3, crm-finance-handoff 3/3 |
 | Screen ledger | 316 screens verified (`SCREEN_LEDGER.md`, regenerated) |
-| Playwright gate (all groups) | see `ui-ux-dispositions/GATES.md`, compared with `QA_BASELINE.md` (627 tests on the untouched build: 427 pass, 38 persistent pre-existing failures, 92 environmental) |
+| Playwright gate (all groups, dev server, `--workers=2`) | 630 tests: 616 pass, 11 deterministic failures, 3 skipped (`ui-ux-dispositions/GATES.md`). Against `QA_BASELINE.md` (427/627 on the untouched build): 36 of the 38 persistent pre-existing failures now pass, all 92 environmental ones pass, the a11y sweep is clean, the deep sweep's CRM React error and renderer crashes did not recur. The 11 were then closed: 2 regressions fixed in product (role-picker keyboard selection, nested button in grid cards), 1 accessibility gap fixed in product (docs editor h1 text), 8 stale expectations aligned; re-runs 27/27 on the five affected specs, deep DOCS/DESIGN/LAYOUT/MISSION pass, and a smoke of the grid-card consumers 37/37 |
 | Independent review | 16 of 16 packages reviewed by R with one-line findings; every S1/S2 fixed; S3s fixed or logged within the ≤5 limit per package |
 | HR acceptance samples | 3 samples, 165 overlays opened at random; 16 of 16 packages accepted (A1, A6, B3, B8 after one returned defect each) |
 | Browser evidence | before/after screenshots per package in the session scratchpad (`shots/<pkg>/`, `shots/R-*/`, `shots/HR*/`); not committed |
