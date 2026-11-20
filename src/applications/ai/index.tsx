@@ -801,7 +801,7 @@ function MissionRoom({ context, view }: { context: ScreenContext; view: "Discuss
 
   return (
     <Grid>
-      <Card span={8} eyebrow="MISSION ROOM" prov="agent" title={`${mission.title} room`} subtitle="Agent-to-agent requests and the coordinator's decisions">
+      <Card span={8} prov="agent" title="Coordination" subtitle="Requests between agents and the coordinator's decisions">
         <Stack gap={4}>
           {loops.length > 0 && (
             <Notice tone="warning" title="A delegation loop was stopped">
@@ -817,7 +817,7 @@ function MissionRoom({ context, view }: { context: ScreenContext; view: "Discuss
                   {message.fields.requestTo ? <Pill tone="info">request to {String(message.fields.requestTo)}</Pill> : null}
                   <span className="ds-subtle">{context.dateTime(message.at ?? message.createdAt)}</span>
                   <span className="ds-grow" />
-                  <Button size="sm" variant="ghost" onClick={() => context.openOverlay("evidence inspector", { id: message.id })}>Evidence</Button>
+                  <Button size="sm" variant="ghost" aria-label={`Evidence for ${message.title}`} onClick={() => context.openOverlay("evidence inspector", { id: message.id })}>Evidence</Button>
                 </Row>
                 <p className="ds-prose" style={{ marginBlockStart: "var(--space-2)" }}>{message.title} — {message.summary}</p>
               </div>
@@ -855,7 +855,7 @@ function MissionRoom({ context, view }: { context: ScreenContext; view: "Discuss
           />
         </Stack>
       </Card>
-      <Card span={4} eyebrow="DEPENDENCIES" prov="human" title="Dependencies" subtitle={`${tasks.length} tasks`}>
+      <Card span={4} prov="human" title="Dependencies" subtitle={`${tasks.length} tasks`}>
         <Stack gap={2}>
           {tasks.map((task) => {
             const body = task.body as { dependsOn?: string[] } | undefined;
@@ -2006,7 +2006,7 @@ function DeleteConversation({ context, close }: { context: ScreenContext; close:
           {readTurns(conversation).length} turns and any attachment references go with it. Citations elsewhere that point at this thread will no longer resolve.
         </Notice>
       )}
-      <Button
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={<Button
         variant="danger"
         disabled={held || !context.can("delete_records")}
         title={held ? "A legal hold prevents deletion" : context.can("delete_records") ? undefined : "This role view does not delete records"}
@@ -2018,7 +2018,7 @@ function DeleteConversation({ context, close }: { context: ScreenContext; close:
         }}
       >
         Delete this thread
-      </Button>
+      </Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2033,7 +2033,7 @@ function SharingDialog({ context, close }: { context: ScreenContext; close: () =
       <Notice tone="info" title="Sharing is inside this browser">
         Sharing changes what the role views in this workspace offer. It does not send a link anywhere and is not an account security boundary.
       </Notice>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           if (!(await context.mutate.patch(conversation.id, { fields: { ...conversation.fields, shared } }, { expectRevision: conversation.revision, event: `${conversation.title} sharing changed` }))) return;
@@ -2042,7 +2042,7 @@ function SharingDialog({ context, close }: { context: ScreenContext; close: () =
         }}
       >
         Save sharing
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2130,6 +2130,7 @@ function MissionEscalation({ context, close }: { context: ScreenContext; close: 
       <Notice tone="info" title="An escalation is a record, not progress">
         The request moves to {coordinator} as a task. Nothing is reported as finished, and the specialist's own answer stays in the thread for audit.
       </Notice>
+      <ModalUnsavedChanges when={Boolean(reason.trim())} />
       <Field label="Why this is outside the contract" required>
         <TextArea value={reason} rows={3} onChange={(event) => setReason(event.target.value)} required />
       </Field>
@@ -2159,7 +2160,7 @@ function ParticipantSelector({ context, close }: { context: ScreenContext; close
       <Notice tone="info" title="Adding an AI employee adds its contract, not new powers">
         A contract in a room reads what its grants allow. It cannot gain a tool by being mentioned here.
       </Notice>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           if (!(await context.mutate.patch(room.id, { fields: { ...room.fields, participants: selected.join(",") } }, { expectRevision: room.revision, event: `Participants changed in ${room.title}` }))) return;
@@ -2168,7 +2169,7 @@ function ParticipantSelector({ context, close }: { context: ScreenContext; close
         }}
       >
         Save participants
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2208,6 +2209,7 @@ function DecisionRecorder({ context, close }: { context: ScreenContext; close: (
         close();
       }}
     >
+      <ModalUnsavedChanges when={Boolean(title.trim() || rationale.trim())} />
       <Field label="Decision" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
       <Field label="Why" required hint="The rationale is kept so the decision can be audited later."><TextArea value={rationale} rows={3} onChange={(event) => setRationale(event.target.value)} required /></Field>
       <Field label="Approver">
@@ -2278,7 +2280,7 @@ function TaskHandoffDrawer({ context, close }: { context: ScreenContext; close: 
           Handing it over does not pass the gate. It still waits for a person with approval authority.
         </Notice>
       )}
-      <Button
+      <DrawerActions><OverlayActions primary={<Button
         variant="primary"
         disabled={!task || !target}
         onClick={async () => {
@@ -2298,7 +2300,7 @@ function TaskHandoffDrawer({ context, close }: { context: ScreenContext; close: 
         }}
       >
         Record the handoff
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></DrawerActions>
     </Stack>
   );
 }
@@ -2355,9 +2357,10 @@ function ReviewDialog({ context, close }: { context: ScreenContext; close: () =>
           <option value="blocked">Blocked — it cannot proceed here</option>
         </Select>
       </Field>
+      <ModalUnsavedChanges when={Boolean(note.trim())} />
       <Field label="What you checked" required><TextArea value={note} rows={3} onChange={(event) => setNote(event.target.value)} required /></Field>
       {!allowed && <Notice tone="warning" title="This role view does not approve missions">The verdict will be recorded as a note, not as an approval.</Notice>}
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         disabled={!note.trim()}
         onClick={async () => {
@@ -2371,7 +2374,7 @@ function ReviewDialog({ context, close }: { context: ScreenContext; close: () =>
         }}
       >
         {allowed ? "Record the review" : "Record a note"}
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2420,7 +2423,7 @@ function SensitiveActionConfirmation({ context, close }: { context: ScreenContex
       <Field label={`Type “${phrase}” to confirm`} required>
         <TextInput value={typed} onChange={(event) => setTyped(event.target.value)} invalid={Boolean(typed) && typed !== phrase} />
       </Field>
-      <Button
+      <ModalActions><OverlayActions variant="confirm" end={<Button variant="ghost" onClick={close}>Cancel</Button>} primary={<Button
         variant="primary"
         disabled={typed !== phrase}
         onClick={async () => {
@@ -2430,7 +2433,7 @@ function SensitiveActionConfirmation({ context, close }: { context: ScreenContex
         }}
       >
         Confirm
-      </Button>
+      </Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2467,7 +2470,7 @@ function RecordingConsent({ context, close }: { context: ScreenContext; close: (
           </Row>
         ))}
       </Stack>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           const body = (meeting.body ?? {}) as Record<string, unknown>;
@@ -2481,7 +2484,7 @@ function RecordingConsent({ context, close }: { context: ScreenContext; close: (
         }}
       >
         Save consent
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2506,6 +2509,7 @@ function MeetingNotes({ context, close }: { context: ScreenContext; close: () =>
       <Notice tone="info" title="Notes are written by a person">
         {transcript.length} transcript line{transcript.length === 1 ? "" : "s"} are available to read while you write. Nothing is summarised for you: no model is connected.
       </Notice>
+      <ModalUnsavedChanges when={Boolean(notes.trim())} />
       <Field label="Notes" required><TextArea value={notes} rows={6} onChange={(event) => setNotes(event.target.value)} required /></Field>
     </form>
   );
@@ -2538,6 +2542,7 @@ function FollowUpApproval({ context, close }: { context: ScreenContext; close: (
       <Notice tone="info" title="An action needs a person to approve it">
         A sentence in a transcript is not an instruction. This creates the action with your name against it.
       </Notice>
+      <ModalUnsavedChanges when={Boolean(title.trim())} />
       <Field label="Action" required><TextInput value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
       <Field label="Owner">
         <Select value={owner} onChange={(event) => setOwner(event.target.value)}>
@@ -2626,7 +2631,7 @@ function SaveReport({ context, close }: { context: ScreenContext; close: () => v
         { label: "With a source", value: String(findings.filter((finding) => finding.sourceId).length) },
         { label: "Gaps", value: String(gaps.length) },
       ]} />
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={async () => {
           const text = [
@@ -2650,7 +2655,7 @@ function SaveReport({ context, close }: { context: ScreenContext; close: () => v
         }}
       >
         Publish in this workspace
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2728,6 +2733,7 @@ function SensitiveDataWarning({ context, close }: { context: ScreenContext; clos
       <Notice tone="warning" title="A redaction here is not an erasure">
         Marking text sensitive keeps it out of what this interface offers to an answer. The record and its history still hold the original, so treat this as a handling instruction, not deletion.
       </Notice>
+      <ModalUnsavedChanges when={Boolean(selection.trim())} />
       <Field label="Text to keep out of retrieval" required><TextArea value={selection} rows={4} onChange={(event) => setSelection(event.target.value)} required /></Field>
     </form>
   );
@@ -2782,7 +2788,7 @@ function ExportDialog({ context, close }: { context: ScreenContext; close: () =>
   return (
     <Stack gap={4}>
       <p className="ds-prose">The export is written by this browser from the artifact record. It contains the current text, the version list and the provenance line.</p>
-      <Button
+      <ModalActions><OverlayActions primary={<Button
         variant="primary"
         onClick={() => {
           const content = [
@@ -2806,7 +2812,7 @@ function ExportDialog({ context, close }: { context: ScreenContext; close: () =>
         }}
       >
         Download as text
-      </Button>
+      </Button>} end={<Button variant="ghost" onClick={close}>Cancel</Button>} /></ModalActions>
     </Stack>
   );
 }
@@ -2972,6 +2978,11 @@ export const aiApp = registerApp({
     "ARL-AI-005": {
       id: "ARL-AI-005",
       title: () => "Mission room",
+      record: (context) => ({
+        title: <MissionHeading context={context} part="title" />,
+        status: <MissionHeading context={context} part="status" />,
+        meta: [<MissionHeading key="meta" context={context} part="meta" />],
+      }),
       tabs: (["Discussion", "Agents", "Tasks", "Reviews"] as const).map((view) => ({
         id: view,
         render: (context: ScreenContext) => <MissionRoom context={context} view={view} />,
@@ -3099,6 +3110,21 @@ export const aiApp = registerApp({
     },
   },
 });
+
+function MissionHeading({ context, part }: { context: ScreenContext; part: "title" | "status" | "meta" }) {
+  const mission = useRecord(context.params.id);
+  const agents = useCollection("agents");
+  if (!mission || mission.collection !== "missions") return part === "title" ? <>Mission room</> : null;
+  if (part === "title") return <>{mission.title}</>;
+  if (part === "status") return <Pill tone={mission.status === "running" ? "info" : mission.status === "proposed" ? "warning" : "neutral"} dot>{mission.status}</Pill>;
+  const agent = agents.find((item) => item.id === mission.fields.agentId);
+  return (
+    <>
+      {agent ? `${agent.title} · ` : ""}
+      <span className="ds-num">ceiling {context.money(Number(mission.fields.budgetMinor ?? 0))}, committed {context.money(Number(mission.fields.committedMinor ?? 0))}, spent {context.money(Number(mission.fields.spentMinor ?? 0))}</span>
+    </>
+  );
+}
 
 function SpecialistHeaderWrapper({ context }: { context: ScreenContext }) {
   const agent = useRecord(context.params.id);

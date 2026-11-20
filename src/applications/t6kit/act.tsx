@@ -154,7 +154,7 @@ function ActBody({ spec, context, close }: { spec: ActSpec; context: ScreenConte
         }
       }}
     >
-      {spec.collection && (
+      {spec.collection && !(spec.summary && candidates.length === 1) && (
         candidates.length === 0
           ? <Empty title={`No ${noun} to act on`}>Nothing in this workspace matches. The action stays unavailable rather than acting on something else.</Empty>
           : (
