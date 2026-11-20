@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#151515">
+<title>Northline Collective — Ways of Living / Original Motion Study</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400&family=Manrope:wght@400;600;700;800&family=Newsreader:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#151515;--paper:#f3f0e8;--acid:#dfff3f;--violet:#7e57ff;--apricot:#e6a868;--blue:#b8d8fe}
+*{box-sizing:border-box}html{background:var(--ink);color:var(--paper);font-family:Manrope,Arial,sans-serif}body{margin:0;min-height:100vh}a{color:inherit}button,input{font:inherit}
+header{display:flex;justify-content:space-between;align-items:center;padding:22px 3vw;border-bottom:1px solid #414141;gap:20px}
+.brand{font-weight:800;font-size:17px;letter-spacing:-.08em;text-decoration:none}.brand mark{background:var(--acid);color:var(--ink);padding:6px 8px}
+.meta{font:400 10px/1.4 'DM Mono',monospace;letter-spacing:.12em;color:#bdbdbd;text-align:right}
+main{margin:0 auto;padding:20px 3vw 70px;max-width:1780px}.intro{display:flex;justify-content:space-between;align-items:end;gap:35px;margin:30px 0}
+.intro h1{font-size:clamp(37px,5.5vw,78px);font-weight:700;line-height:.9;letter-spacing:-.065em;margin:12px 0}
+.intro h1 em{font:italic 500 1em/.9 Newsreader,Georgia,serif;letter-spacing:-.07em;color:var(--acid)}
+.intro p{font-size:13px;max-width:370px;line-height:1.7;color:#b4b4b4}
+.eyebrow{font:400 10px 'DM Mono',monospace;letter-spacing:.12em;color:var(--acid)}
+.stage{aspect-ratio:16/9;width:100%;overflow:hidden;position:relative;isolation:isolate;outline:1px solid #363636;background:var(--paper)}
+.scene{position:absolute;inset:0;opacity:0;visibility:hidden;transition:opacity 1100ms cubic-bezier(.22,1,.36,1),visibility 1100ms;overflow:hidden}
+.scene.active{opacity:1;visibility:visible}
+.scene svg{display:block;width:100%;height:100%;position:absolute;inset:0}
+.scene-title{position:absolute;z-index:5;left:7%;bottom:10%;font-weight:700;letter-spacing:-.08em;line-height:.92;font-size:clamp(35px,7vw,125px);color:var(--ink);margin:0;max-width:80%}
+.scene-title em{font-family:Newsreader,Georgia,serif;font-weight:500;font-style:italic}
+.scene-label{position:absolute;top:6%;left:7%;z-index:5;font:400 clamp(8px,.8vw,13px)/1.3 'DM Mono',monospace;letter-spacing:.12em}
+.scene-counter{position:absolute;bottom:7%;right:6%;z-index:5;font:400 clamp(10px,1vw,17px)/1.2 'DM Mono',monospace}
+.scene-material{background:var(--paper)}
+.scene-material .scene-title{color:var(--ink)}.scene-space{background:var(--violet)}
+.scene-space .scene-title{color:var(--paper);text-shadow:0 2px 4px #15151544}.scene-space .scene-label,.scene-space .scene-counter{color:white}
+.scene-human{background:var(--blue)}.scene-final{background:var(--ink);color:var(--paper)}
+.scene-final .scene-title{color:var(--paper);font-size:clamp(50px,8vw,145px)}.scene-final .scene-title em{color:var(--acid)}
+.scene-final .scene-label,.scene-final .scene-counter{color:var(--acid)}
+.scene .drift{transform-origin:center;animation:drift 9s ease-in-out infinite alternate}
+.scene .sketch{stroke-dasharray:1000;stroke-dashoffset:1000;animation:draw 13s ease-out forwards}
+.scene .fold{animation:rise 13s ease-in-out infinite alternate}
+@keyframes drift{to{transform:translate(18px,-13px) rotate(3deg)}}
+@keyframes rise{to{transform:translateY(-22px)}}
+@keyframes draw{to{stroke-dashoffset:0}}
+.controls{display:grid;grid-template-columns:auto auto minmax(100px,1fr) auto;align-items:center;gap:20px;padding:24px 0}
+button{cursor:pointer;background:var(--acid);border:1px solid var(--acid);color:var(--ink);padding:13px 20px;min-height:44px;border-radius:0;font-weight:700;font-size:13px}
+button.secondary{background:transparent;color:var(--paper);border:1px solid #777}
+button:hover{transform:translateY(-2px)}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--acid);outline-offset:3px}
+input[type=range]{width:100%;accent-color:var(--acid);cursor:pointer;height:28px}
+.time{white-space:nowrap;font:400 13px 'DM Mono',monospace;font-variant-numeric:tabular-nums}
+.chapters{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #535353}
+.chapter{padding:20px;min-height:132px;border-right:1px solid #535353;background:none;color:#b8b8b8;text-align:left;display:flex;flex-direction:column;justify-content:space-between;gap:14px;transition:background .2s}
+.chapter:last-child{border:0}.chapter.active{background:var(--acid);color:var(--ink)}
+.chapter span{font:400 10px 'DM Mono',monospace;letter-spacing:.12em}.chapter strong{font-size:clamp(16px,1.9vw,27px);line-height:1.1;letter-spacing:-.04em}
+.note{margin:40px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:35px;color:#bdbdbd;border-top:1px solid #535353;padding-top:20px}
+.note p{font-size:12px;line-height:1.7}.note a{border-bottom:1px solid #bdbdbd;text-decoration:none}
+footer{display:flex;justify-content:space-between;gap:20px;font:400 10px/1.7 'DM Mono',monospace;letter-spacing:.08em;color:#aaa;margin-top:40px}
+@media(max-width:800px){.intro{display:block}.intro p{margin-top:22px}.controls{grid-template-columns:auto auto auto;gap:12px}.controls input{grid-column:1/-1;grid-row:1}.chapters{grid-template-columns:repeat(2,1fr)}.chapter:nth-child(2){border-right:0}.chapter:nth-child(-n+2){border-bottom:1px solid #535353}.note{grid-template-columns:1fr}.scene-title{bottom:13%}}
+@media(max-width:460px){header{padding:20px}.meta{max-width:130px}.controls{grid-template-columns:1fr 1fr 1fr}.controls button{padding:10px}.scene-title{font-size:clamp(24px,8vw,48px)}.scene-label{font-size:8px}.chapter{min-height:105px;padding:14px}}
+@media(prefers-reduced-motion:reduce){.scene,.scene.active,.drift,.fold,.sketch{animation:none!important;transition:none!important;stroke-dashoffset:0!important}button:hover{transform:none}}
+</style></head><body>
+<header><a class="brand" href="./"><mark>N/C</mark> NORTHLINE COLLECTIVE</a><span class="meta">FILM 01 / WAYS OF LIVING<br>ORIGINAL BROWSER MOTION STUDY</span></header>
+<main>
+<div class="intro"><div><span class="eyebrow">COLLECTIVE STUDIO / 60-SECOND EDITORIAL EXPERIMENT</span><h1>Ways of <em>living.</em></h1></div>
+<p>An original, authored sequence built from vector illustration, geometric motion and editorial titles. It is a playable browser-based motion study, not licensed footage, a rendered MP4 or proof of external video export.</p></div>
+<div class="stage" role="region" aria-label="Northline Collective interactive motion study, four scenes">
+<section class="scene scene-material active" data-scene="0" aria-label="Chapter one: Material">
+  <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="1600" height="900" fill="#f3f0e8"/>
+    <g class="drift"><path d="M760 -80L1540 30L1380 950L750 750Z" fill="#7e57ff"/><path d="M1040 60L1550 220L1290 660L900 550Z" fill="#292929" opacity=".9"/></g>
+    <g class="fold"><path d="M140 30L840 70L780 690L70 550Z" fill="#e6a868"/><path d="M265 110L880 60L990 650L300 790Z" fill="#fff" opacity=".89"/></g>
+    <path class="sketch" d="M200 310Q390 90 610 300T1010 410T1430 230" fill="none" stroke="#151515" stroke-width="5" stroke-linecap="round"/>
+    <path class="sketch" d="M730 590C990 450 1220 460 1260 600C1320 790 950 810 925 650C912 570 1010 540 1100 600" fill="none" stroke="#dfff3f" stroke-width="16" stroke-linecap="round"/>
+    <rect x="1020" y="650" width="270" height="100" fill="#f3f0e8" transform="rotate(7 1020 650)"/><text x="1052" y="700" font-size="30" font-family="Georgia" fill="#151515">Material studies</text>
+  </svg>
+  <span class="scene-label">01 / OBSERVE THE MATERIAL</span><h2 class="scene-title">What we <em>touch.</em></h2><span class="scene-counter">00:00 — 00:15</span>
+</section>
+<section class="scene scene-space" data-scene="1" aria-label="Chapter two: Space">
+  <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="1600" height="900" fill="#7e57ff"/>
+    <rect x="680" y="-75" width="720" height="1080" fill="#171717" transform="rotate(9 680 0)"/>
+    <g class="drift"><path d="M920 900V315Q920 90 1170 90H1200Q1420 90 1420 315V900" fill="#f3f0e8"/><path d="M1000 900V350Q1000 180 1180 180H1200Q1340 180 1340 350V900" fill="#b8d8fe"/></g>
+    <circle cx="1155" cy="410" r="135" fill="#dfff3f"/><circle cx="1155" cy="410" r="79" fill="#f3f0e8"/>
+    <path d="M220 780L700 200M200 180L640 670" stroke="#151515" opacity=".45" stroke-width="4"/>
+    <path class="sketch" d="M190 730Q500 570 660 690Q760 750 860 650" stroke="#dfff3f" stroke-width="13" fill="none" stroke-linecap="round"/>
+  </svg>
+  <span class="scene-label">02 / MAKE ROOM FOR LIFE</span><h2 class="scene-title">Where we <em>belong.</em></h2><span class="scene-counter">00:15 — 00:30</span>
+</section>
+<section class="scene scene-human" data-scene="2" aria-label="Chapter three: Experience">
+  <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="1600" height="900" fill="#b8d8fe"/>
+    <rect x="705" y="40" width="860" height="680" fill="#ffffff" transform="rotate(-8 705 40)"/>
+    <g class="drift"><ellipse cx="1120" cy="370" rx="360" ry="210" fill="#e6a868"/><circle cx="1040" cy="315" r="145" fill="#f3f0e8"/><circle cx="1280" cy="420" r="135" fill="#7e57ff"/><circle cx="1135" cy="500" r="120" fill="#dfff3f"/></g>
+    <path class="sketch" d="M720 140C825 380 1070 100 1210 270S1500 510 1380 675" fill="none" stroke="#151515" stroke-width="6"/>
+    <rect x="205" y="150" width="450" height="220" fill="#f3f0e8" transform="rotate(5 205 150)"/><text x="280" y="275" font-family="Georgia" font-style="italic" font-size="55" fill="#151515">Made together.</text>
+  </svg>
+  <span class="scene-label">03 / GATHER AND MAKE</span><h2 class="scene-title">What we <em>share.</em></h2><span class="scene-counter">00:30 — 00:45</span>
+</section>
+<section class="scene scene-final" data-scene="3" aria-label="Chapter four: Collective">
+  <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="1600" height="900" fill="#151515"/>
+    <circle class="drift" cx="1330" cy="100" r="470" fill="#7e57ff"/><circle class="fold" cx="1250" cy="320" r="290" fill="#dfff3f"/>
+    <path class="sketch" d="M140 790C420 520 640 690 830 470Q1010 270 1350 440" fill="none" stroke="#f3f0e8" stroke-width="4"/>
+    <path d="M1120 320H1410M1265 175V465" stroke="#151515" stroke-width="10"/>
+    <rect x="100" y="130" width="550" height="4" fill="#dfff3f"/>
+  </svg>
+  <span class="scene-label">04 / A SHARED POINT OF VIEW</span><h2 class="scene-title">Northline<br><em>Collective.</em></h2><span class="scene-counter">00:45 — 01:00</span>
+</section>
+</div>
+<div class="controls"><button id="play" type="button" aria-label="Play motion study">Play motion study ▶</button>
+<button class="secondary" id="reset" type="button">Restart ↺</button>
+<input type="range" min="0" max="60" step=".1" value="0" id="seek" aria-label="Motion timeline position in seconds">
+<output id="clock" class="time" for="seek">00:00 / 01:00</output></div>
+<nav class="chapters" aria-label="Motion chapters">
+<button class="chapter active" data-start="0" aria-current="step"><span>01 / 00:00</span><strong>Material</strong></button>
+<button class="chapter" data-start="15"><span>02 / 00:15</span><strong>Space</strong></button>
+<button class="chapter" data-start="30"><span>03 / 00:30</span><strong>Experience</strong></button>
+<button class="chapter" data-start="45"><span>04 / 00:45</span><strong>Collective</strong></button>
+</nav>
+<div class="note"><p><strong>Production note.</strong> This is an original motion-design exploration authored for the fictional flagship. Its timeline and visual motifs correspond to a separate editable native Video Studio draft, but the two files do not automatically synchronise. It includes no recorded voice, music, actors or footage requiring model releases.</p>
+<p><strong>Accessibility.</strong> Choose a chapter or scrub the timeline directly. Motion respects the operating system's reduced-motion setting; the same compositions remain readable without animation. <a href="./">Return to the Collective website ↗</a></p></div>
+<footer><span>© 2026 NORTHLINE COLLECTIVE / FICTIONAL FLAGSHIP</span><span>ORIGINAL VECTOR + TYPOGRAPHY MOTION STUDY / ARLOVI</span></footer>
+</main>
+<script>
+(() => {
+  const scenes=[...document.querySelectorAll('.scene')],chapters=[...document.querySelectorAll('.chapter')],play=document.getElementById('play'),reset=document.getElementById('reset'),seek=document.getElementById('seek'),clock=document.getElementById('clock');
+  let playing=false,elapsed=0,startTime=0,raf=0;
+  const fmt=s=>{const total=Math.floor(s);return String(Math.floor(total/60)).padStart(2,'0')+':'+String(total%60).padStart(2,'0')};
+  const set=t=>{
+    elapsed=Math.max(0,Math.min(60,t));seek.value=String(elapsed);clock.textContent=fmt(elapsed)+' / 01:00';
+    const index=Math.min(3,Math.floor(Math.min(elapsed,59.999)/15));
+    scenes.forEach((scene,i)=>{scene.classList.toggle('active',i===index);scene.setAttribute('aria-hidden',String(i!==index))});
+    chapters.forEach((chapter,i)=>{chapter.classList.toggle('active',i===index);if(i===index)chapter.setAttribute('aria-current','step');else chapter.removeAttribute('aria-current')});
+  };
+  const stop=()=>{playing=false;cancelAnimationFrame(raf);play.textContent='Play motion study ▶';play.setAttribute('aria-label','Play motion study')};
+  const tick=now=>{if(!playing)return;set((now-startTime)/1000);if(elapsed>=60){stop();return}raf=requestAnimationFrame(tick)};
+  const start=()=>{if(elapsed>=60)set(0);startTime=performance.now()-elapsed*1000;playing=true;play.textContent='Pause motion study ❚❚';play.setAttribute('aria-label','Pause motion study');raf=requestAnimationFrame(tick)};
+  play.addEventListener('click',()=>playing?stop():start());reset.addEventListener('click',()=>{stop();set(0)});seek.addEventListener('input',()=>{const was=playing;stop();set(Number(seek.value));if(was)start()});
+  chapters.forEach(chapter=>chapter.addEventListener('click',()=>{const was=playing;stop();set(Number(chapter.dataset.start));if(was)start()}));
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop()});set(0);
+})();
+</script></body></html>
