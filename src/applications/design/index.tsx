@@ -346,6 +346,7 @@ function CanvasScreen({ context, actions }: { context: ScreenContext; actions: A
       actions={actions}
       tabs={[{ id: "Design" }, { id: "Prototype" }, { id: "Inspect" }, { id: "Comments" }]}
       lean
+      titleLevel={1}
       title={record.title}
       subtitle={<Row gap={2} wrap><SaveState handle={handle} /><span>{page ? `${page.name} · ${Object.keys(page.nodes).length} layers` : ""}</span></Row>}
       backTo={{ label: "Design", to: `/o/${context.org.slug}/design/files` }}
@@ -712,6 +713,7 @@ function PathScreen({ context, actions }: { context: ScreenContext; actions: Act
       actions={actions}
       tabs={[{ id: "Pen" }, { id: "Curves" }, { id: "Boolean" }, { id: "Offset" }]}
       lean
+      titleLevel={1}
       title={`${record.title} — paths`}
       subtitle={<Row gap={2}><SaveState handle={handle} /><span>{paths.length} path layer{paths.length === 1 ? "" : "s"}</span></Row>}
       backTo={{ label: record.title, to: context.path("/o/:org/design/files/:id", context.params.id) }}

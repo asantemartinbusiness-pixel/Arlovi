@@ -247,6 +247,7 @@ function PublicationEditor({ context, actions }: { context: ScreenContext; actio
       actions={actions}
       tabs={[{ id: "Pages" }, { id: "Layout" }, { id: "Type" }, { id: "Review" }]}
       lean
+      titleLevel={1}
       title={record.title}
       subtitle={(
         <Row gap={2} wrap>
