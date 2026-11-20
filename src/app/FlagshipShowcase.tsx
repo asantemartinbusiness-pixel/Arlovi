@@ -43,7 +43,7 @@ const paths=[
 ];
 
 export default function FlagshipShowcase() {
-  const {org}=useWorkspace();
+  const {org,role}=useWorkspace();
   const records=useCollections(GROUPS);
   const flagshipCount=Object.values(records).flat().filter(record=>record.fields.flagship==="Northline Collective").length;
   const staff=(records.employees??[]).filter(record=>record.fields.flagship==="Northline Collective"&&record.id!=="nl-employees-900").length;
@@ -60,6 +60,7 @@ export default function FlagshipShowcase() {
   const sterling=(minor:number)=>new Intl.NumberFormat("en-GB",{style:"currency",currency:"GBP",maximumFractionDigits:0}).format(minor/100);
 
   if(org.slug!=="northline")return <div className="fs-access"><h1>This showcase is not in this organisation</h1><p>Northline Collective is only available in the existing Northline local demonstration workspace.</p><Link to={`/o/${org.slug}/workspace/home`}>Return to your workspace</Link></div>;
+  if(role==="client")return <div className="fs-access"><h1>Internal showcase unavailable</h1><p>This fictional casefile and its internal records cannot be inspected in the Client role preview.</p><Link to={`/o/${org.slug}/workspace/home`}>Return to your workspace</Link></div>;
   return <div className="fs">
     <div className="fs-utility"><Link to={`/o/${org.slug}/workspace/home`}><ArrowLeft size={15}/> Back to workspace</Link><span>FICTIONAL COMPANY · BROWSER-LOCAL DEMONSTRATION</span></div>
     <header className="fs-hero">
@@ -133,6 +134,10 @@ export default function FlagshipShowcase() {
     </section>
     <section className="fs-business">
       <div className="fs-section-head"><div><span className="fs-overline">02 / THE OPERATING STORY</span><h2>From enquiry to <em>outcome.</em></h2></div><p>Follow Lighthouse Hotels through connected business work. Live actions still require appropriate permissions and connected providers.</p></div>
+      <div className="fs-lighthouse-feature"><div><span>CASEFILE / LIGHTHOUSE HOTELS / 45 ROOMS</span><h3>Follow the work.<br/><em>Not just the outcome.</em></h3>
+        <p>Open a guided, record-backed project story: client brief, editable concept boards, documents, explicit approval gates, sourcing plans and commercial drafts. Nothing has been externally sent or approved.</p></div>
+        <Link to={`/o/${org.slug}/workspace/showcase/lighthouse`}>Explore Lighthouse casefile <ArrowUpRight size={18}/></Link>
+      </div>
       <div className="fs-journey">{paths.map((item,i)=>{
         const record=findFlagship(records,item.id);
         return <Link key={item.step} to={openRecord(record,item.app,org.slug)} className="fs-journey-step">
