@@ -1274,6 +1274,7 @@ export function CannedReply({ context }: { context: ScreenContext }) {
           >
             <strong>{macro.title}</strong>
             <span className="ds-subtle">{macro.summary}</span>
+            <span className="ds-subtle ds-num">{[(((macro.body as { steps?: string[] } | undefined)?.steps ?? []).map((step) => step.match(/^Set the queue to (\w+)/)?.[1]).find(Boolean) ?? "Any queue"), `${String(macro.fields.steps ?? 0)} steps`, `used ${String(macro.fields.uses ?? 0)} times`].join(" · ")}</span>
             {article && <span className="ds-subtle">Cites {article.title} v{String(article.fields.version ?? "")}</span>}
           </button>
         );

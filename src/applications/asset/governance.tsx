@@ -228,7 +228,8 @@ export function TokenEditor({ context, close }: { context: ScreenContext; close:
   const brand = data.brands.find((row) => row.id === (payload?.id ?? context.selectedId));
   const [values, setValues] = useState<Record<string, string>>(() => {
     const seed: Record<string, string> = {};
-    for (const token of TOKENS) seed[token] = String(brand?.fields[token] ?? "#234FE8");
+    const defaults: Record<string, string> = { ink: "#14213D", cobalt: "#234FE8", papaya: "#B54708", aqua: "#0B7A75", paper: "#FAFAF7" };
+    for (const token of TOKENS) seed[token] = String(brand?.fields[token] ?? defaults[token]);
     seed.headingFont = String(brand?.fields.headingFont ?? "Inter");
     seed.bodyFont = String(brand?.fields.bodyFont ?? "Inter");
     seed.title = brand?.title ?? "";

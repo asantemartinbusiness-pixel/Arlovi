@@ -2281,11 +2281,10 @@ function PolicyWarning({ context }: { context: ScreenContext }) {
  * ====================================================================== */
 
 const submitFooter = (formId: string, label: string) => ({ close }: { close: () => void }) => (
-  <>
-    <Button variant="ghost" onClick={close}>Cancel</Button>
-    <span className="ds-grow" />
-    <Button variant="primary" type="submit" form={formId}>{label}</Button>
-  </>
+  <OverlayActions
+    primary={<Button variant="primary" type="submit" form={formId}>{label}</Button>}
+    end={<Button variant="ghost" onClick={close}>Cancel</Button>}
+  />
 );
 
 async function teamRecords(context: ScreenContext, collection: string): Promise<Rec[]> {

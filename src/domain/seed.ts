@@ -383,7 +383,7 @@ export function buildSeed(): { records: Rec[]; events: Audit[] } {
     rec(NORTH, "tickets", 1, "CARE-19 Shade alignment", { status: "open", summary: "Harrow House reports a shade sitting slightly off centre.", fields: { contactId: "nl-contacts-001", priority: "normal", slaDue: "2026-11-16" } }),
     rec(NORTH, "tickets", 2, "CARE-22 Finish sample", { status: "waiting", summary: "Leo asked for a brushed brass sample.", fields: { contactId: "nl-contacts-002", priority: "low" } }),
     rec(NORTH, "articles", 1, "How to seat the Arc shade", { summary: "Approved care article. Safe for local replies.", status: "approved", body: { html: "<p>Seat the shade until the pin clicks. Do not force the brass collar.</p>" } }),
-    rec(NORTH, "macros", 1, "Shade seating reply", { summary: "Inserts the approved shade article into a local reply.", status: "active" }),
+    rec(NORTH, "macros", 1, "Shade article insert", { summary: "Inserts the approved shade article into a local reply, nothing else.", status: "active" }),
     rec(NORTH, "slas", 1, "Showroom care", { summary: "First response within one business day.", fields: { hours: 24 } }),
   );
 
