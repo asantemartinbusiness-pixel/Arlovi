@@ -44,7 +44,7 @@ test("original 60-second motion study supports chapter selection, scrub, restart
   await page.getByRole("button",{name:/Space/}).click();
   await expect(page.locator(".scene-space")).toHaveClass(/active/);
   await expect(page.locator("#clock")).toContainText("00:15");
-  await page.locator("#seek").fill("47");
+  await page.locator("#seek").evaluate(element=>{\n    const input=element as HTMLInputElement; input.value="47";\n    input.dispatchEvent(new Event("input",{bubbles:true}));\n  });
   await expect(page.locator(".scene-final")).toHaveClass(/active/);
   await page.getByRole("button",{name:/Restart/}).click();
   await expect(page.locator("#clock")).toContainText("00:00");
