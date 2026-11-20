@@ -6,6 +6,7 @@ import type { Rec } from "@/domain/types";
 import { askFirst, Boundary, logBoundary, pickRecord, recordOf, selectedOf } from "@/applications/hr/opsKit";
 import { clausesOf, lifecycleLabel, type Clause } from "./panels";
 import { clockIso } from "@/platform/clock";
+import { commitTogether } from "@/applications/shared/commit";
 export { RecordReview } from "./review";
 
 /* ------------------------------------------------------------------ *
@@ -208,11 +209,12 @@ export async function publishPolicy(context: ScreenContext, policy: Rec): Promis
     run: async () => {
       const due = new Date(context.now);
       due.setUTCFullYear(due.getUTCFullYear() + 1);
-      if (!(await context.mutate.patch(policy.id, { status: "published", at: clockIso(), dueAt: due.toISOString(), fields: { ...policy.fields, publishedBy: context.actor, acknowledged: 0 } }, { expectRevision: policy.revision, event: `${policy.title} v${String(policy.fields.version ?? "")} published by ${context.actor}` }))) return;
       const old = await recordOf(context, supersededId, "policies");
-      if (old && old.status !== "superseded") {
-        if (!(await context.mutate.patch(old.id, { status: "superseded", fields: { ...old.fields, supersededBy: policy.id } }, { expectRevision: old.revision, event: `${old.title} v${String(old.fields.version ?? "")} superseded by v${String(policy.fields.version ?? "")}; kept for history` }))) return;
-      }
+      // The new version and the one it replaces change together or not at all.
+      if (!(await commitTogether(context, [
+        { record: policy, patch: { status: "published", at: clockIso(), dueAt: due.toISOString(), fields: { ...policy.fields, publishedBy: context.actor, acknowledged: 0 } }, event: `${policy.title} v${String(policy.fields.version ?? "")} published by ${context.actor}` },
+        ...(old && old.status !== "superseded" ? [{ record: old, patch: { status: "superseded", fields: { ...old.fields, supersededBy: policy.id } }, event: `${old.title} v${String(old.fields.version ?? "")} superseded by v${String(policy.fields.version ?? "")}; kept for history` }] : []),
+      ]))) return;
       context.toast("Policy published", old ? `v${String(old.fields.version ?? "")} is kept as superseded.` : "It is live for its audience.");
     },
   });

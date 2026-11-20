@@ -15,6 +15,7 @@ import { knownRecord, newRecord } from "@/platform/repo";
 import { planShiftSwap, planTimesheetApprovals } from "./workforce";
 import { PeopleDialogLead, PeopleDialogSection } from "./dialogs";
 export { MyLearning, recordAcknowledgement, setDirectoryTeam, useDirectoryTeam } from "./shared";
+import { commitTogether } from "@/applications/shared/commit";
 import { Boundary, askFirst, boundaryText, logBoundary, pickRecord, recordOf } from "./opsKit";
 
 /* ------------------------------------------------------------------ *
@@ -401,13 +402,14 @@ export function MentorAssign({ context, close }: { context: ScreenContext; close
         event.preventDefault();
         const mentor = String(new FormData(event.currentTarget).get("mentor") ?? "");
         if (!starter || !mentor) return;
-        if (!(await context.mutate.patch(starter.id, { fields: { ...starter.fields, mentor } }, { expectRevision: starter.revision, event: `${mentor} assigned as mentor to ${starter.title} by ${context.actor}` }))) return;
         const intro = data.tasks.find((task) => task.fields.employeeId === starter.id && task.title.startsWith("Mentor introduction"));
-        if (intro) {
-          if (!(await context.mutate.patch(intro.id, { title: `Mentor introduction with ${mentor}`, fields: { ...intro.fields, assignee: mentor } }, { event: `Mentor introduction reassigned to ${mentor}` }))) return;
-        } else {
-          await context.mutate.create({ collection: "tasks", title: `Mentor introduction with ${mentor}`, status: "ready", summary: `Manager step for ${starter.title}.`, parentId: starter.id, fields: { kind: "onboarding", employeeId: starter.id, stage: "ready", assignee: mentor, group: "Manager" } }, `Mentor introduction added for ${starter.title}`);
-        }
+        // The mentor and the introduction step change together or not at all.
+        if (!(await commitTogether(context, [
+          { record: starter, patch: { fields: { ...starter.fields, mentor } }, event: `${mentor} assigned as mentor to ${starter.title} by ${context.actor}` },
+          intro
+            ? { record: intro, patch: { title: `Mentor introduction with ${mentor}`, fields: { ...intro.fields, assignee: mentor } }, event: `Mentor introduction reassigned to ${mentor}` }
+            : { create: { collection: "tasks", title: `Mentor introduction with ${mentor}`, status: "ready", summary: `Manager step for ${starter.title}.`, parentId: starter.id, fields: { kind: "onboarding", employeeId: starter.id, stage: "ready", assignee: mentor, group: "Manager" } }, event: `Mentor introduction added for ${starter.title}` },
+        ]))) return;
         context.toast("Mentor assigned", `${mentor} is ${starter.title}'s mentor and owns the introduction step.`);
         close();
       }}
@@ -1087,9 +1089,12 @@ export function completeModule(context: ScreenContext): void {
       confirm: "Mark complete",
       run: async () => {
         const { getRecord } = await import("@/platform/repo");
-        if (!(await context.mutate.patch(record.id, { status: "complete", fields: { ...record.fields, completedAt: clockIso() } }, { expectRevision: record.revision, event: `${record.title} completed` }))) return;
         const course = await getRecord(String(record.fields.courseId ?? ""));
-        if (course) { if (!(await context.mutate.patch(course.id, { fields: { ...course.fields, completions: Number(course.fields.completions ?? 0) + 1 } }, { expectRevision: course.revision, event: `${course.title} completion recorded for ${context.actor}` }))) return; }
+        // The completion and the course count change together or not at all.
+        if (!(await commitTogether(context, [
+          { record, patch: { status: "complete", fields: { ...record.fields, completedAt: clockIso() } }, event: `${record.title} completed` },
+          ...(course ? [{ record: course, patch: { fields: { ...course.fields, completions: Number(course.fields.completions ?? 0) + 1 } }, event: `${course.title} completion recorded for ${context.actor}` }] : []),
+        ]))) return;
         context.toast("Module complete", "The completion and the course count both changed.");
       },
     }),

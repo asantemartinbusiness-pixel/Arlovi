@@ -10,6 +10,7 @@ import { useUi } from "@/runtime/ui";
 import type { Rec } from "@/domain/types";
 import { documentTotals, statusFor, writeLines } from "@/domain/fin-invoice";
 import type { TaxCategory } from "@/platform/money";
+import { commitTogether } from "@/applications/shared/commit";
 import { CHANGED_ELSEWHERE, createStore, downloadCsv, ProviderBoundary, type ConfirmSpec } from "@/applications/market/kit";
 import {
   bodyOf, conflictsWithLinks, DEPOSIT_LABEL, isLive, useBookData,
@@ -297,12 +298,12 @@ export async function publishService(context: ScreenContext) {
     boundaryNote: "The page itself is not hosted, so publishing makes the service bookable in this workspace and in the exported page only.",
     confirmLabel: "Publish service",
     run: async () => {
-      const saved = await context.mutate.patch(service.id, { status: "active", fields: { ...service.fields, published: true, publishedBy: context.actor, publishedAt: iso(context) } }, { expectRevision: service.revision, event: `Service ${service.title} published by ${context.actor}` });
+      // The service and the booking page that lists it change together or not at all.
+      const saved = await commitTogether(context, [
+        { record: service, patch: { status: "active", fields: { ...service.fields, published: true, publishedBy: context.actor, publishedAt: iso(context) } }, event: `Service ${service.title} published by ${context.actor}` },
+        ...(page && !onPage ? [{ record: page, patch: { body: { ...pageBody, services: [...(pageBody.services ?? []), service.id] } }, event: `${service.title} offered on ${page.title}` }] : []),
+      ]);
       if (!saved) return CHANGED_ELSEWHERE;
-      if (page && !onPage) {
-        const added = await context.mutate.patch(page.id, { body: { ...pageBody, services: [...(pageBody.services ?? []), service.id] } }, { expectRevision: page.revision, event: `${service.title} offered on ${page.title}` });
-        if (!added) return CHANGED_ELSEWHERE;
-      }
       context.toast("Published", `${service.title} is offered on the booking page model.`);
     },
   });
@@ -332,11 +333,12 @@ export async function archiveService(context: ScreenContext) {
       : problems ? `${problems} booking${problems === 1 ? " is" : "s are"} not reconciled: ${[...upcoming, ...unreconciled, ...owed].slice(0, 3).map((booking) => booking.title).join(", ")}${problems > 3 ? "…" : ""}. Move, close or settle them first.` : undefined,
     confirmLabel: "Archive service",
     run: async () => {
-      const saved = await context.mutate.patch(service.id, { status: "archived", fields: { ...service.fields, published: false, archivedBy: context.actor, archivedAt: iso(context) } }, { expectRevision: service.revision, event: `Service ${service.title} archived by ${context.actor}` });
+      // The service and the booking page that lists it change together or not at all.
+      const saved = await commitTogether(context, [
+        { record: service, patch: { status: "archived", fields: { ...service.fields, published: false, archivedBy: context.actor, archivedAt: iso(context) } }, event: `Service ${service.title} archived by ${context.actor}` },
+        ...(page && (pageBody.services ?? []).includes(service.id) ? [{ record: page, patch: { body: { ...pageBody, services: (pageBody.services ?? []).filter((id) => id !== service.id) } }, event: `${service.title} removed from ${page.title}` }] : []),
+      ]);
       if (!saved) return CHANGED_ELSEWHERE;
-      if (page && (pageBody.services ?? []).includes(service.id)) {
-        if (!(await context.mutate.patch(page.id, { body: { ...pageBody, services: (pageBody.services ?? []).filter((id) => id !== service.id) } }, { expectRevision: page.revision, event: `${service.title} removed from ${page.title}` }))) return CHANGED_ELSEWHERE;
-      }
       context.toast("Archived", `${service.title} is no longer offered.`);
     },
   });
